@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Complete Pending Payment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #635BFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #4F46E5;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        .success {
+            background: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #10B981;
+        }
+        .error {
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #EF4444;
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Complete Pending Payment</h1>
+        <p>Click the button below to manually complete your pending EUR 50.00 payment.</p>
+        <p><strong>Payment Intent:</strong> pi_3SXkZgEvAmqye8aT068Nz9Ak</p>
+        
+        <button onclick="completePayment()">Complete Payment</button>
+        
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        async function completePayment() {
+            const resultDiv = document.getElementById('result');
+            const button = document.querySelector('button');
+            
+            button.disabled = true;
+            button.textContent = 'Processing...';
+            resultDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/admin/complete-pending-payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include', // Important for cookies/auth
+                    body: JSON.stringify({})
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <strong>✅ Success!</strong><br>
+                        Payment completed successfully!<br>
+                        <strong>Credits Added:</strong> ${data.transaction.credits}<br>
+                        <strong>New Balance:</strong> ${data.wallet.balance} credits<br>
+                        <br>
+                        <em>Refresh your wallet page to see the updated balance!</em>
+                    `;
+                } else {
+                    throw new Error(data.error || 'Failed to complete payment');
+                }
+                
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <strong>❌ Error:</strong><br>
+                    ${error.message}<br>
+                    <br>
+                    <em>Make sure you're logged in as admin first at http://localhost:3000/admin/login</em>
+                `;
+                resultDiv.style.display = 'block';
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Complete Payment';
+            }
+        }
+    </script>
+</body>
+</html>
+

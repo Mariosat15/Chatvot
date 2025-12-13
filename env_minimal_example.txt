@@ -1,0 +1,44 @@
+# ============================================
+# ESSENTIAL ENVIRONMENT VARIABLES
+# ============================================
+# These are the ONLY variables that MUST be in .env
+# All other settings (API keys, payment providers, etc.) are managed via the Admin Panel
+
+# NODE ENVIRONMENT
+NODE_ENV='development'
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+
+# MONGODB (Required for app to start)
+MONGODB_URI=your-mongodb-connection-string
+
+# BETTER AUTH (Required for authentication)
+BETTER_AUTH_SECRET=your-super-secret-key-min-32-chars
+BETTER_AUTH_URL=http://localhost:3000
+
+# ADMIN PANEL (Required for admin access)
+ADMIN_EMAIL=admin@email.com
+ADMIN_PASSWORD=admin123
+ADMIN_JWT_SECRET=your-super-secret-admin-key-change-in-production
+
+# ============================================
+# ALL OTHER SETTINGS
+# ============================================
+# The following settings are now managed via the Admin Panel:
+# - Nodemailer (Email) credentials
+# - Gemini API Key (AI)
+# - Massive API Keys (Forex data)
+# - Payment Provider credentials (Stripe, Clerk, Polar, Paddle, etc.)
+# 
+# To configure these:
+# 1. Start the app
+# 2. Login to admin panel
+# 3. Go to Settings > Environment Variables OR Settings > Payment Providers
+# 4. Configure your credentials there
+#
+# Benefits:
+# - No need to edit this file
+# - Settings persist in database
+# - Protected from database resets
+# - Can be updated via UI
+# - More secure and manageable
+
