@@ -683,6 +683,7 @@ class NotificationService {
   } = {}) {
     await connectToDatabase();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = { userId };
     
     if (options.category) {
@@ -753,6 +754,7 @@ class NotificationService {
   async getTemplates(category?: NotificationCategory) {
     await connectToDatabase();
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
     if (category) {
       query.category = category;

@@ -468,8 +468,8 @@ export async function seedMarketplaceItems(adminId: string = 'system'): Promise<
         createdBy: adminId,
       });
       result.created++;
-    } catch (error: any) {
-      result.errors.push(`Failed to create ${itemData.slug}: ${error.message}`);
+    } catch (error) {
+      result.errors.push(`Failed to create ${itemData.slug}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
   

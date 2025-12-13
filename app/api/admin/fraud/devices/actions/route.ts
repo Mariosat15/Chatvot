@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { connectToDatabase } from '@/database/mongoose';
-import User from '@/database/models/user.model';
 import DeviceFingerprint from '@/database/models/fraud/device-fingerprint.model';
 import FraudAlert from '@/database/models/fraud/fraud-alert.model';
 
@@ -16,10 +15,9 @@ import FraudAlert from '@/database/models/fraud/fraud-alert.model';
 export async function POST(request: NextRequest) {
   try {
     // Verify admin authentication
-    const authHeader = request.headers.get('authorization');
-    const isAdmin = authHeader && (await verifyAdminAuth(authHeader.replace('Bearer ', '')));
+    const admin = await verifyAdminAuth();
     
-    if (!isAdmin) {
+    if (!admin.isAuthenticated) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
 

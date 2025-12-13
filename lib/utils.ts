@@ -1,6 +1,28 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+// Type definitions for news and alerts
+export interface RawNewsArticle {
+  id?: number;
+  headline?: string;
+  summary?: string;
+  source?: string;
+  url?: string;
+  datetime?: number;
+  image?: string;
+  category?: string;
+  related?: string;
+}
+
+export interface Alert {
+  id: string;
+  symbol: string;
+  alertType: 'upper' | 'lower';
+  threshold: number;
+  createdAt: Date;
+  isTriggered: boolean;
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -85,7 +107,7 @@ export const formatArticle = (
     symbol?: string,
     index: number = 0
 ) => ({
-  id: isCompanyNews ? Date.now() + Math.random() : article.id + index,
+  id: isCompanyNews ? Date.now() + Math.random() : (article.id || 0) + index,
   headline: article.headline!.trim(),
   summary:
       article.summary!.trim().substring(0, isCompanyNews ? 200 : 150) + '...',

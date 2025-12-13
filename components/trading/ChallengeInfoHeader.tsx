@@ -66,7 +66,9 @@ export function ChallengeInfoHeader({
         const participants = data.participants;
         
         // Find opponent and me
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const oppData = participants.find((p: any) => p.userId === opponentId);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const myData = participants.find((p: any) => p.userId !== opponentId);
         
         if (myData) {

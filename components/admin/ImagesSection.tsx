@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Save, Upload, RefreshCw, Image as ImageIconLucide, Info, Palette } from 'lucide-react';
 import Image from 'next/image';

@@ -67,9 +67,9 @@ function createLazyAuthProxy(): ReturnType<typeof betterAuth> {
                     return new Proxy(function() {}, {
                         apply: async (_target, _thisArg, args) => {
                             const instance = await getAuth();
-                            const parent = (instance as Record<string, Record<string, unknown>>)[prop as string];
+                            const parent = (instance as unknown as Record<string, Record<string, unknown>>)[prop as string];
                             if (parent && typeof parent[nestedProp as string] === 'function') {
-                                return (parent[nestedProp as string] as Function).apply(parent, args);
+                                return (parent[nestedProp as string] as (...args: unknown[]) => unknown).apply(parent, args);
                             }
                             throw new Error(`${String(prop)}.${String(nestedProp)} is not a function`);
                         }

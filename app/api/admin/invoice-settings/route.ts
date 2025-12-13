@@ -28,10 +28,10 @@ export async function GET() {
       companyInEU,
       shouldApplyVat: companyInEU && invoiceSettings.vatEnabled,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching invoice settings:', error);
     
-    if (error.message === 'Unauthorized') {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
@@ -124,10 +124,10 @@ export async function PUT(request: Request) {
       success: true,
       settings,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error updating invoice settings:', error);
     
-    if (error.message === 'Unauthorized') {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     

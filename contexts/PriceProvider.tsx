@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
+import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 
 // Price quote structure
 interface PriceQuote {

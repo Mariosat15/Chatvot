@@ -62,7 +62,8 @@ interface PendingWithdrawal {
   userEmail: string;
   amount: number;
   createdAt: string;
-  metadata?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  metadata?: Record<string, any>;
 }
 
 interface LiabilityMetrics {
@@ -80,6 +81,7 @@ interface LiabilityMetrics {
 interface PlatformFinancials {
   totalUnclaimedPools: number;
   totalPlatformFees: number;
+  totalChallengeFees: number; // Challenge platform fees
   
   // Marketplace revenue
   totalMarketplaceSales: number;
@@ -122,6 +124,7 @@ interface PlatformFinancials {
     totalAmount: number;
     totalAmountEUR: number;
     byReason: Record<string, { count: number; amount: number }>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recentPools: any[];
   };
 }
@@ -162,6 +165,7 @@ interface VATPayment {
 interface Transaction {
   _id: string;
   userId: string;
+  userName?: string;
   transactionType: string;
   amount: number;
   amountEUR?: number;
@@ -170,7 +174,8 @@ interface Transaction {
   description?: string;
   competitionId?: string;
   paymentMethod?: string;
-  metadata?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  metadata?: Record<string, any>;
   source?: 'wallet' | 'platform' | 'vat';
   userInfo?: {
     id: string;
@@ -426,8 +431,8 @@ export default function FinancialDashboard() {
       document.body.removeChild(a);
       
       toast.success(`Invoices exported successfully as ${format.toUpperCase()}`);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to export invoices');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to export invoices');
     } finally {
       setExportingInvoices(false);
     }
@@ -1435,7 +1440,7 @@ export default function FinancialDashboard() {
                   <>
                     <h4 className="text-sm font-medium text-gray-400 mb-3">Recent Unclaimed Pools</h4>
                     <div className="space-y-2">
-                      {platformFinancials.unclaimedPools.recentPools.slice(0, 5).map((pool: any) => (
+                      {platformFinancials.unclaimedPools.recentPools.slice(0, 5).map((pool) => (
                         <div key={pool._id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
                           <div>
                             <div className="font-medium text-white">{pool.sourceName}</div>

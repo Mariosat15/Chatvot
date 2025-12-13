@@ -9,9 +9,9 @@ export async function getStripeClient(): Promise<Stripe> {
   try {
     const stripeConfig = await getPaymentProviderCredentials('stripe');
     
-    if (stripeConfig && stripeConfig.secret_key) {
-      return new Stripe(stripeConfig.secret_key, {
-        apiVersion: '2024-11-20.acacia',
+    if (stripeConfig && (stripeConfig as any).secret_key) {
+      return new Stripe((stripeConfig as any).secret_key, {
+        apiVersion: '2024-11-20.acacia' as any,
         typescript: true,
       });
     }
@@ -26,7 +26,7 @@ export async function getStripeClient(): Promise<Stripe> {
   }
   
   return new Stripe(envKey, {
-    apiVersion: '2024-11-20.acacia',
+    apiVersion: '2024-11-20.acacia' as any,
     typescript: true,
   });
 }
@@ -34,7 +34,7 @@ export async function getStripeClient(): Promise<Stripe> {
 // Legacy export for backward compatibility (deprecated - use getStripeClient() instead)
 // This will fail if STRIPE_SECRET_KEY is not in .env, which is expected
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
-  apiVersion: '2024-11-20.acacia',
+  apiVersion: '2024-11-20.acacia' as any,
   typescript: true,
 });
 

@@ -101,8 +101,8 @@ export async function PUT(
       success: true,
       alert: JSON.parse(JSON.stringify(alert))
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error updating fraud alert:', error);
@@ -141,8 +141,8 @@ export async function DELETE(
       success: true,
       message: 'Alert deleted'
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error deleting fraud alert:', error);

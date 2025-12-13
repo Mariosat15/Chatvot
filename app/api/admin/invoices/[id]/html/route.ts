@@ -36,9 +36,9 @@ export async function GET(
         'Content-Type': 'text/html; charset=utf-8',
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching invoice HTML:', error);
-    if (error.message === 'Unauthorized') {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return NextResponse.json({ error: 'Failed to fetch invoice' }, { status: 500 });

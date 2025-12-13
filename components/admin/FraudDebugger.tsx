@@ -200,6 +200,7 @@ export default function FraudDebugger() {
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {debugData.recentFingerprints.map((fp: any) => (
                     <div key={fp.id} className="bg-gray-900 p-3 rounded-lg border border-gray-700">
                       <div className="flex items-start justify-between">
@@ -253,6 +254,7 @@ export default function FraudDebugger() {
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {debugData.recentAlerts.map((alert: any) => (
                     <div key={alert.id} className="bg-gray-900 p-3 rounded-lg border border-gray-700">
                       <div className="flex items-start justify-between">

@@ -113,6 +113,7 @@ export default function FraudSettingsSection() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateSetting = (key: keyof FraudSettings, value: any) => {
     if (!settings) return;
     setSettings({ ...settings, [key]: value });

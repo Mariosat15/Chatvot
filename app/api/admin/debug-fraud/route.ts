@@ -76,13 +76,13 @@ export async function GET() {
         }))
       }
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error debugging fraud system:', error);
     return NextResponse.json(
-      { error: 'Failed to debug fraud system', details: error.message },
+      { error: 'Failed to debug fraud system', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

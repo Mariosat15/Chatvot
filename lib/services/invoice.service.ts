@@ -170,7 +170,9 @@ export const InvoiceService = {
    */
   generateInvoiceHTML: async (
     invoice: IInvoice,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     invoiceSettings?: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     companySettings?: any
   ): Promise<string> => {
     await connectToDatabase();

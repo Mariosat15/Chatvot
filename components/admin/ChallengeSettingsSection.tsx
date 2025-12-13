@@ -85,9 +85,9 @@ export default function ChallengeSettingsSection() {
       }
 
       toast.success('Challenge settings saved successfully');
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to save settings', {
-        description: error.message || 'Network or server error',
+        description: error instanceof Error ? error.message : 'Network or server error',
       });
       console.error('Save error:', error);
     } finally {
@@ -95,6 +95,7 @@ export default function ChallengeSettingsSection() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateSetting = (key: keyof ChallengeSettings, value: any) => {
     if (settings) {
       setSettings({ ...settings, [key]: value });

@@ -40,7 +40,7 @@ export default function AdminLogin() {
       } else {
         toast.error(data.error || 'Login failed');
       }
-    } catch (error) {
+    } catch {
       toast.error('An error occurred');
     } finally {
       setIsLoading(false);

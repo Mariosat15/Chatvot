@@ -40,7 +40,7 @@ export async function GET(
       success: true,
       invoice,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching invoice by transaction:', error);
     return NextResponse.json({ error: 'Failed to fetch invoice' }, { status: 500 });
   }

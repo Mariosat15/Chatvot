@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     // Verify admin authentication
     const session = await auth.api.getSession({ headers: await headers() });
     
-    if (!session?.user || !session.user.isAdmin) {
+    if (!session?.user || (session.user as any).role !== 'admin') {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
         { status: 401 }
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
       
       return NextResponse.json({
         success: true,
-        sharedPayments: sharedPayments.map(payment => ({
+        sharedPayments: sharedPayments.map((payment: any) => ({
           _id: payment._id.toString(),
           userId: payment.userId.toString(),
           paymentProvider: payment.paymentProvider,
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
           cardCountry: payment.cardCountry,
           cardFunding: payment.cardFunding,
           paypalEmail: payment.paypalEmail,
-          linkedUserIds: payment.linkedUserIds.map(id => id.toString()),
+          linkedUserIds: payment.linkedUserIds.map((id: any) => id.toString()),
           isShared: payment.isShared,
           riskScore: payment.riskScore,
           firstUsed: payment.firstUsed,
@@ -76,14 +76,14 @@ export async function GET(request: Request) {
         success: true,
         userId,
         hasSharedPayments: hasShared,
-        payments: userPayments.map(payment => ({
+        payments: userPayments.map((payment: any) => ({
           _id: payment._id.toString(),
           paymentProvider: payment.paymentProvider,
           paymentFingerprint: payment.paymentFingerprint,
           cardLast4: payment.cardLast4,
           cardBrand: payment.cardBrand,
           cardCountry: payment.cardCountry,
-          linkedUserIds: payment.linkedUserIds.map(id => id.toString()),
+          linkedUserIds: payment.linkedUserIds.map((id: any) => id.toString()),
           isShared: payment.isShared,
           riskScore: payment.riskScore,
           firstUsed: payment.firstUsed,

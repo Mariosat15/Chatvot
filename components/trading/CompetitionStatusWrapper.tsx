@@ -166,7 +166,7 @@ export default function CompetitionStatusWrapper({
           <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg text-center">
             <p className="text-amber-400 text-sm font-medium flex items-center justify-center gap-2">
               <Clock className="h-4 w-4 animate-pulse" />
-              Competition hasn't started yet. Trading button will appear when it begins!
+              Competition hasn&apos;t started yet. Trading button will appear when it begins!
             </p>
           </div>
         )}

@@ -21,7 +21,7 @@ export async function getWhiteLabelImages() {
   try {
     await connectToDatabase();
     
-    let settings = await WhiteLabel.findOne().lean();
+    const settings = await WhiteLabel.findOne().lean();
     
     if (!settings) {
       // Return defaults if no settings exist

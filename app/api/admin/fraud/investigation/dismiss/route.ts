@@ -10,8 +10,8 @@ import { auditLogService } from '@/lib/services/audit-log.service';
 export async function POST(request: NextRequest) {
   try {
     // Verify admin authentication
-    const adminUser = await verifyAdminAuth(request);
-    if (!adminUser) {
+    const adminUser = await verifyAdminAuth();
+    if (!adminUser.isAuthenticated) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       {
         status: 'dismissed',
         resolvedAt: new Date(),
-        resolvedBy: adminUser._id,
+        resolvedBy: adminUser.adminId || 'admin',
         actionTaken: 'none',
         resolution: `Investigation dismissed - Marked as false positive. After investigation, this alert was determined to be a false positive or acceptable use case (e.g., family members, shared device).`
       },

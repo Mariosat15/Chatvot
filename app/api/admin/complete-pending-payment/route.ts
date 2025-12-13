@@ -223,7 +223,7 @@ export async function POST(request: Request) {
           await inngest.send({
             name: 'app/invoice.created',
             data: {
-              invoiceId: invoice._id.toString(),
+              invoiceId: (invoice._id as any).toString(),
               customerEmail,
               customerName,
               invoiceNumber: invoice.invoiceNumber,
@@ -258,8 +258,8 @@ export async function POST(request: Request) {
         totalDeposited: wallet.totalDeposited,
       },
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('❌ Error completing payment:', error);

@@ -7,7 +7,7 @@ import { getUsersByIds } from '@/lib/utils/user-lookup';
  * GET /api/admin/fraud/restrictions
  * Fetch all user restrictions with user info
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     await connectToDatabase();
 

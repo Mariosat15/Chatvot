@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/better-auth/auth';
 import { getGlobalLeaderboard, getMyLeaderboardPosition } from '@/lib/actions/leaderboard/global-leaderboard.actions';
-import { Trophy, TrendingUp, Target, Award, Medal, Star, Crown, Zap, Swords } from 'lucide-react';
+import { Trophy, Medal, Star, Crown, Zap, Swords } from 'lucide-react';
 import Link from 'next/link';
 import LeaderboardChallengeButton from '@/components/leaderboard/LeaderboardChallengeButton';
 import LeaderboardPresenceTracker from '@/components/leaderboard/LeaderboardPresenceTracker';
@@ -120,7 +120,7 @@ const GlobalLeaderboardPage = async () => {
 
             {/* Table Body */}
             <div className="divide-y divide-gray-700/50">
-              {leaderboard.map((entry, index) => {
+              {leaderboard.map((entry, _index) => {
                 const isCurrentUser = entry.userId === session.user.id;
                 
                 return (

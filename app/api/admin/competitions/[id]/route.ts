@@ -15,7 +15,7 @@ async function verifyAdminToken(request: NextRequest) {
 
     const payload = jwt.verify(token, JWT_SECRET) as { email: string };
     return payload;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

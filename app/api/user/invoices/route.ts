@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       invoices,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching user invoices:', error);
     
     return NextResponse.json(

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Minus,
@@ -9,7 +8,8 @@ import {
   Type,
   ArrowRight,
   Target,
-  Trash2
+  Trash2,
+  LucideIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DrawingTool, DrawingObject } from '@/lib/services/drawing-tools.service';
@@ -21,7 +21,7 @@ interface DrawingToolsPanelProps {
   onClearDrawings: () => void;
 }
 
-const DRAWING_TOOLS: { tool: DrawingTool; icon: any; label: string }[] = [
+const DRAWING_TOOLS: { tool: DrawingTool; icon: LucideIcon; label: string }[] = [
   { tool: 'trend-line', icon: TrendingUp, label: 'Trend Line' },
   { tool: 'horizontal-line', icon: Minus, label: 'Horizontal Line' },
   { tool: 'vertical-line', icon: Minus, label: 'Vertical Line' },

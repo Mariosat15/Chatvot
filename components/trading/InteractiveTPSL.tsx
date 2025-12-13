@@ -5,16 +5,19 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import EditPositionModal from './EditPositionModal';
 
+import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
+
 interface Position {
   _id: string;
-  symbol: string;
+  symbol: ForexSymbol;
   side: 'long' | 'short';
   quantity: number;
   entryPrice: number;
   currentPrice: number;
-  unrealizedPnl: number;
+  unrealizedPnl?: number;
   takeProfit?: number;
   stopLoss?: number;
+  marginUsed: number;
 }
 
 interface InteractiveTPSLProps {
@@ -28,7 +31,7 @@ interface InteractiveTPSLProps {
  * 2. Auto-refreshing positions after trades
  * 3. Managing edit modal state
  */
-const InteractiveTPSL = ({ positions, competitionId }: InteractiveTPSLProps) => {
+const InteractiveTPSL = ({ positions }: InteractiveTPSLProps) => {
   const router = useRouter();
   const [editingPosition, setEditingPosition] = useState<string | null>(null);
   const [lastPositionCount, setLastPositionCount] = useState(positions.length);
@@ -100,7 +103,6 @@ const InteractiveTPSL = ({ positions, competitionId }: InteractiveTPSLProps) => 
             window.dispatchEvent(new CustomEvent('tpslUpdated'));
           }}
           position={positionToEdit}
-          competitionId={competitionId}
         />
       )}
       

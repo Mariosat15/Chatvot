@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
 
     // Build query
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
     
     if (userId) {
@@ -144,8 +145,8 @@ export async function GET(request: NextRequest) {
         }, {} as Record<string, number>),
       },
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error fetching audit logs:', error);
@@ -172,7 +173,8 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const beforeDate = searchParams.get('beforeDate');
 
-    let query: any = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const query: any = {};
     let description = 'Cleared all audit logs';
     
     if (beforeDate) {
@@ -200,8 +202,8 @@ export async function DELETE(request: NextRequest) {
       success: true,
       deletedCount: result.deletedCount,
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error clearing audit logs:', error);

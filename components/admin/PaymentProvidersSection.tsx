@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import {
   CreditCard,
   Plus,
@@ -17,7 +16,6 @@ import {
   Check,
   X,
   AlertCircle,
-  ExternalLink,
   DollarSign,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -470,7 +468,7 @@ export default function PaymentProvidersSection() {
           <div className="col-span-full text-center py-12 text-gray-500">
             <CreditCard className="h-16 w-16 mx-auto mb-4 opacity-50" />
             <p>No payment providers configured</p>
-            <p className="text-sm mt-2">Click "Add Custom Provider" to get started</p>
+            <p className="text-sm mt-2">Click &quot;Add Custom Provider&quot; to get started</p>
           </div>
         )}
       </div>
@@ -804,7 +802,7 @@ export default function PaymentProvidersSection() {
 
                 {newProvider.credentials.length === 0 && (
                   <p className="text-sm text-gray-500 text-center py-4">
-                    No credentials added yet. Click "Add Credential" to get started.
+                    No credentials added yet. Click &quot;Add Credential&quot; to get started.
                   </p>
                 )}
               </div>

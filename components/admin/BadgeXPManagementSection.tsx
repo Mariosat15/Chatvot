@@ -145,6 +145,7 @@ export default function BadgeXPManagementSection() {
   const [triggering, setTriggering] = useState(false);
   const [selectedUser, setSelectedUser] = useState<{
     user: { id: string; name: string; email: string; image: string | null };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     level: any;
     badges: UserBadgeData[];
   } | null>(null);

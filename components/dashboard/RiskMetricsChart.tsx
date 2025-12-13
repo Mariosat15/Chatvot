@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Shield, TrendingDown } from 'lucide-react';
+import { AlertTriangle, Shield } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency } from '@/lib/utils';
 

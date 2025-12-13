@@ -46,9 +46,9 @@ interface AuditLog {
   targetType?: string;
   targetId?: string;
   targetName?: string;
-  metadata?: Record<string, any>;
-  previousValue?: any;
-  newValue?: any;
+  metadata?: Record<string, unknown>;
+  previousValue?: unknown;
+  newValue?: unknown;
   ipAddress?: string;
   userAgent?: string;
   requestPath?: string;
@@ -284,6 +284,8 @@ export default function AuditLogSection() {
         {CATEGORIES.slice(1).map((cat) => {
           const count = stats[cat.value] || 0;
           const Icon = cat.icon;
+          const colorClass = cat.color || 'bg-gray-500';
+          if (!Icon) return null;
           return (
             <Card
               key={cat.value}
@@ -294,8 +296,8 @@ export default function AuditLogSection() {
             >
               <CardContent className="p-3">
                 <div className="flex items-center gap-2">
-                  <div className={`p-1.5 rounded ${cat.color}/20`}>
-                    <Icon className={`h-3.5 w-3.5 ${cat.color.replace('bg-', 'text-').replace('-500', '-400')}`} />
+                  <div className={`p-1.5 rounded ${colorClass}/20`}>
+                    <Icon className={`h-3.5 w-3.5 ${colorClass.replace('bg-', 'text-').replace('-500', '-400')}`} />
                   </div>
                   <div>
                     <div className="text-lg font-bold text-white">{count}</div>
@@ -436,8 +438,8 @@ export default function AuditLogSection() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge className={`${catInfo.color} text-white text-xs`}>
-                              <CatIcon className="h-3 w-3 mr-1" />
+                            <Badge className={`${catInfo.color || 'bg-gray-500'} text-white text-xs`}>
+                              {CatIcon && <CatIcon className="h-3 w-3 mr-1" />}
                               {catInfo.label}
                             </Badge>
                           </TableCell>

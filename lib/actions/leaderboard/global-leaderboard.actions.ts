@@ -3,7 +3,6 @@
 import { connectToDatabase } from '@/database/mongoose';
 import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
 import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import TradeHistory from '@/database/models/trading/trade-history.model';
 import UserBadge from '@/database/models/user-badge.model';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
@@ -216,6 +215,8 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
         email: stats.email, // Primary identifier for traders
         username: stats.username, // Display name (for reference only)
         rank: 0, // Will be assigned after sorting
+        isTied: false,
+        tiedWith: [],
         totalPnl: stats.totalPnl,
         totalPnlPercentage,
         totalTrades: stats.totalTrades,
@@ -266,12 +267,11 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
           // Also link to all previously tied users at this rank
           for (let j = i - 2; j >= 0; j--) {
             if (leaderboardEntries[j].rank === current.rank && leaderboardEntries[j].isTied) {
-              if (!leaderboardEntries[j].tiedWith) leaderboardEntries[j].tiedWith = [];
-              if (!current.tiedWith.includes(leaderboardEntries[j].userId)) {
-                current.tiedWith.push(leaderboardEntries[j].userId);
+              if (!current.tiedWith!.includes(leaderboardEntries[j].userId)) {
+                current.tiedWith!.push(leaderboardEntries[j].userId);
               }
-              if (!leaderboardEntries[j].tiedWith.includes(current.userId)) {
-                leaderboardEntries[j].tiedWith.push(current.userId);
+              if (!leaderboardEntries[j].tiedWith!.includes(current.userId)) {
+                leaderboardEntries[j].tiedWith!.push(current.userId);
               }
             } else {
               break;

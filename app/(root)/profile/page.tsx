@@ -54,7 +54,7 @@ export default async function ProfilePage() {
       <div className="max-w-7xl mx-auto space-y-6">
         <ProfilePageContent
           overviewContent={overviewContent}
-          badges={badges}
+          badges={badges as any}
           badgeStats={badgeStats}
         />
       </div>

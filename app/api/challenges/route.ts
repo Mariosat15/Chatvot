@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const type = searchParams.get('type'); // 'sent', 'received', 'all'
 
-    let query: any = {};
+    const query: any = {};
 
     // Filter by user
     if (type === 'sent') {

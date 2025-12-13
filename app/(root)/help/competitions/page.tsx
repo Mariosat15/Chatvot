@@ -152,7 +152,7 @@ export default function CompetitionsHelpPage() {
         <section className="bg-dark-700/50 rounded-2xl p-6 shadow-xl border border-dark-600">
           <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-3">
             <Users className="h-6 w-6 text-amber-500" />
-            What Happens if There's a Tie?
+            What Happens if There&apos;s a Tie?
           </h2>
           <p className="text-dark-200 mb-6">
             When two or more traders have identical performance, the competition uses tiebreaker rules:
@@ -201,7 +201,7 @@ export default function CompetitionsHelpPage() {
                 Must complete X trades to qualify for prizes. Prevents single-trade luck.
               </p>
               <p className="text-xs text-blue-300/60 mt-2">
-                Example: If minimum is 10 trades and you only made 8, you're disqualified.
+                Example: If minimum is 10 trades and you only made 8, you&apos;re disqualified.
               </p>
             </div>
 
@@ -214,7 +214,7 @@ export default function CompetitionsHelpPage() {
                 Must maintain X% win rate to qualify. Rare, but rewards consistency.
               </p>
               <p className="text-xs text-amber-300/60 mt-2">
-                Example: If minimum is 40% and you have 35%, you're disqualified.
+                Example: If minimum is 40% and you have 35%, you&apos;re disqualified.
               </p>
             </div>
 
@@ -224,7 +224,7 @@ export default function CompetitionsHelpPage() {
                 <h3 className="font-semibold text-white">Liquidation</h3>
               </div>
               <p className="text-sm text-dark-300">
-                If you get liquidated (margin call), you're usually disqualified from prizes.
+                If you get liquidated (margin call), you&apos;re usually disqualified from prizes.
               </p>
               <p className="text-xs text-red-300/60 mt-2">
                 Manage your risk! Keep your margin level above the stopout threshold.
@@ -266,7 +266,7 @@ export default function CompetitionsHelpPage() {
                 <li>• Over-leverage and risk liquidation</li>
                 <li>• Ignore minimum trade requirements</li>
                 <li>• Trade without a strategy</li>
-                <li>• Panic trade if you're behind</li>
+                <li>• Panic trade if you&apos;re behind</li>
                 <li>• Forget to close positions before end</li>
               </ul>
             </div>

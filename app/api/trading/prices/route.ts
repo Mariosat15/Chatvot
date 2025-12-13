@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       const marketStatusData = await getMarketStatusFromAPI();
       marketOpen = marketStatusData.isOpen;
       status = marketStatusData.isOpen ? '🟢 Market Open' : '🔴 Market Closed';
-    } catch (error) {
+    } catch (_error) {
       console.warn('Using fallback market status detection');
       marketOpen = isMarketOpenSync();
       status = marketOpen ? '🟢 Market Open' : '🔴 Market Closed';
@@ -57,7 +57,7 @@ export async function GET() {
     const marketStatusData = await getMarketStatusFromAPI();
     marketOpen = marketStatusData.isOpen;
     status = marketStatusData.isOpen ? '🟢 Market Open' : '🔴 Market Closed';
-  } catch (error) {
+  } catch (_error) {
     marketOpen = isMarketOpenSync();
     status = marketOpen ? '🟢 Market Open' : '🔴 Market Closed';
   }

@@ -1,4 +1,9 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document, Model } from 'mongoose';
+
+// Interface for the static methods
+interface IChallengeSettingsModel extends Model<IChallengeSettings> {
+  getSingleton(): Promise<IChallengeSettings>;
+}
 
 // Admin settings for 1v1 Challenges - Only challenge-specific settings
 // Trading settings (leverage, position size, margin) come from TradingRiskSettings (universal)
@@ -161,7 +166,7 @@ ChallengeSettingsSchema.statics.getSingleton = async function () {
 };
 
 const ChallengeSettings =
-  models?.ChallengeSettings ||
-  model<IChallengeSettings>('ChallengeSettings', ChallengeSettingsSchema);
+  (models?.ChallengeSettings as IChallengeSettingsModel) ||
+  model<IChallengeSettings, IChallengeSettingsModel>('ChallengeSettings', ChallengeSettingsSchema);
 
 export default ChallengeSettings;

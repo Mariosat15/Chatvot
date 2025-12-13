@@ -3,7 +3,6 @@ import { connectToDatabase } from '@/database/mongoose';
 import UserLevel from '@/database/models/user-level.model';
 import UserBadge from '@/database/models/user-badge.model';
 import { BADGES } from '@/lib/constants/badges';
-import { TITLE_LEVELS } from '@/lib/constants/levels';
 
 export async function GET(request: NextRequest) {
   try {

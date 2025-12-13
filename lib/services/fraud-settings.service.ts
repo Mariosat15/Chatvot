@@ -27,15 +27,16 @@ export async function getFraudSettings(): Promise<IFraudSettings> {
   try {
     await connectToDatabase();
     
-    let settings = await FraudSettings.findOne().lean();
+    let settings = await FraudSettings.findOne().lean() as IFraudSettings | null;
     
     // Create default settings if none exist
     if (!settings) {
-      settings = await FraudSettings.create(DEFAULT_FRAUD_SETTINGS);
+      const created = await FraudSettings.create(DEFAULT_FRAUD_SETTINGS);
+      settings = created.toObject() as IFraudSettings;
     }
 
     // Update cache
-    cachedSettings = settings as IFraudSettings;
+    cachedSettings = settings;
     cacheTime = now;
 
     return cachedSettings;

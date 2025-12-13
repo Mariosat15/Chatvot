@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
-import { MarketplaceItem, IMarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
+import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
 import { UserPurchase } from '@/database/models/marketplace/user-purchase.model';
 import { requireAdminAuth, getAdminSession } from '@/lib/admin/auth';
 import { auditLogService } from '@/lib/services/audit-log.service';
@@ -56,13 +56,13 @@ export async function GET(request: NextRequest) {
       items: itemsWithStats,
       stats,
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error fetching marketplace items:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -113,24 +113,27 @@ export async function POST(request: NextRequest) {
     const item = await MarketplaceItem.create(data);
     
     // Log audit
-    await auditLogService.logSettingsUpdated(request, 'marketplace_item_created', {
-      itemId: item._id.toString(),
-      name: item.name,
-      category: item.category,
-      price: item.price,
-    });
+    const adminSession = await getAdminSession();
+    if (adminSession) {
+      await auditLogService.logSettingsUpdated(
+        { id: adminSession.id, email: adminSession.email, name: adminSession.name },
+        'marketplace_item_created',
+        null,
+        { itemId: (item._id as any).toString(), name: item.name, category: item.category, price: item.price }
+      );
+    }
     
     return NextResponse.json({
       success: true,
       item,
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error creating marketplace item:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -178,23 +181,27 @@ export async function PUT(request: NextRequest) {
     }
     
     // Log audit
-    await auditLogService.logSettingsUpdated(request, 'marketplace_item_updated', {
-      itemId: item._id.toString(),
-      name: item.name,
-      updates: Object.keys(updates),
-    });
+    const adminSession2 = await getAdminSession();
+    if (adminSession2) {
+      await auditLogService.logSettingsUpdated(
+        { id: adminSession2.id, email: adminSession2.email, name: adminSession2.name },
+        'marketplace_item_updated',
+        null,
+        { itemId: (item._id as any).toString(), name: item.name, updates: Object.keys(updates) }
+      );
+    }
     
     return NextResponse.json({
       success: true,
       item,
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error updating marketplace item:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -238,22 +245,27 @@ export async function DELETE(request: NextRequest) {
     }
     
     // Log audit
-    await auditLogService.logSettingsUpdated(request, 'marketplace_item_deleted', {
-      itemId: item._id.toString(),
-      name: item.name,
-    });
+    const adminSession3 = await getAdminSession();
+    if (adminSession3) {
+      await auditLogService.logSettingsUpdated(
+        { id: adminSession3.id, email: adminSession3.email, name: adminSession3.name },
+        'marketplace_item_deleted',
+        null,
+        { itemId: (item._id as any).toString(), name: item.name }
+      );
+    }
     
     return NextResponse.json({
       success: true,
       message: 'Item deleted',
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error deleting marketplace item:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

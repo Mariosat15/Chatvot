@@ -227,7 +227,7 @@ export class PaymentFraudService {
     const affectedUserIds = new Set<string>();
     sharedPayments.forEach(payment => {
       affectedUserIds.add(payment.userId.toString());
-      payment.linkedUserIds.forEach(id => affectedUserIds.add(id.toString()));
+      payment.linkedUserIds.forEach((id: { toString: () => string }) => affectedUserIds.add(id.toString()));
     });
     
     return {

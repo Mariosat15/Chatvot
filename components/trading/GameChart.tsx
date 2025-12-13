@@ -817,7 +817,7 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
             </>
           ) : (
             <>
-              <span className="font-bold">💡 How to Read:</span> Each colorful bar is a "candle"! 
+              <span className="font-bold">💡 How to Read:</span> Each colorful bar is a &quot;candle&quot;! 
               <span className="text-green-400 font-bold"> Green bars 📈</span> mean price went UP! 
               <span className="text-red-400 font-bold"> Red bars 📉</span> mean price went DOWN!
             </>

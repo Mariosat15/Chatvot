@@ -33,12 +33,14 @@ export const getUserDashboardDataForApi = async (userId: string) => {
       endTime: { $gte: new Date() },
     }).distinct('_id');
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const liveParticipations = activeParticipations.filter((participation: any) =>
       liveCompetitionIds.some((id) => id.toString() === participation.competitionId.toString())
     );
 
     // Same logic as getUserDashboardData but with userId parameter
     const competitionsWithStats = await Promise.all(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       liveParticipations.map(async (participation: any) => {
         try {
           const competition = await Competition.findById(participation.competitionId).lean();
@@ -52,15 +54,18 @@ export const getUserDashboardDataForApi = async (userId: string) => {
           // Calculate unrealized PnL for open positions
           let totalUnrealizedPnL = 0;
           const positionsWithPnL = await Promise.all(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             openPositions.map(async (pos: any) => {
               try {
-                const currentPrice = await getRealPrice(pos.symbol as ForexSymbol);
-                if (currentPrice) {
+                const priceQuote = await getRealPrice(pos.symbol as ForexSymbol);
+                if (priceQuote) {
+                  const currentPrice = pos.type === 'long' ? priceQuote.bid : priceQuote.ask;
                   const unrealizedPnL = calculateUnrealizedPnL(
                     pos.type,
-                    pos.size,
                     pos.entryPrice,
-                    currentPrice
+                    currentPrice,
+                    pos.size,
+                    pos.symbol as ForexSymbol
                   );
                   totalUnrealizedPnL += unrealizedPnL;
                   return { ...pos, currentPrice, unrealizedPnL };
@@ -72,7 +77,8 @@ export const getUserDashboardDataForApi = async (userId: string) => {
             })
           );
 
-          const currentCapital = (participation.currentCapital || competition.startingCapital) + totalUnrealizedPnL;
+          const comp = competition as { startingCapital?: number };
+          const currentCapital = (participation.currentCapital || comp.startingCapital || 0) + totalUnrealizedPnL;
 
           return {
             competition: JSON.parse(JSON.stringify(competition)),
@@ -168,6 +174,7 @@ export const getUserDashboardData = async () => {
     }).distinct('_id');
 
     // Filter participations to only include live competitions
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const liveParticipations = activeParticipations.filter((participation: any) =>
       liveCompetitionIds.some((id) => id.toString() === participation.competitionId.toString())
     );
@@ -177,6 +184,7 @@ export const getUserDashboardData = async () => {
 
     // Get competition details for each participation (only live ones)
     const competitionsWithStats = await Promise.all(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       liveParticipations.map(async (participation: any) => {
         try {
           console.log(`📊 Processing competition for user ${session.user.id}, participationId: ${participation._id}`);
@@ -188,7 +196,8 @@ export const getUserDashboardData = async () => {
             return null;
           }
           
-          console.log(`✅ Competition found: ${competition.name}`);
+          const comp = competition as { name?: string };
+          console.log(`✅ Competition found: ${comp.name || 'Unknown'}`);
 
         // Get participant statistics for this competition
         const participantStats = await CompetitionParticipant.aggregate([
@@ -211,7 +220,8 @@ export const getUserDashboardData = async () => {
           total: 0
         };
 
-        participantStats.forEach((stat: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        participantStats.forEach((stat: { _id: string; count: number }) => {
           stats[stat._id as keyof typeof stats] = stat.count;
           stats.total += stat.count;
         });
@@ -432,11 +442,13 @@ export const getUserDashboardData = async () => {
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dayTrades = allTrades.filter((t: any) => {
         const tradeDate = new Date(t.closedAt);
         return tradeDate >= startOfDay && tradeDate <= endOfDay;
       });
       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dayPnL = dayTrades.reduce((sum: number, t: any) => sum + (t.realizedPnl || 0), 0);
       
       aggregatedDailyPnL.set(dateStr, {

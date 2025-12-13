@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Trophy, TrendingUp, TrendingDown, Users, Clock, Target, AlertCircle, Skull, UserCheck, UserX } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { Trophy, TrendingUp, TrendingDown, Users, Clock, Target, AlertCircle } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 
 interface ActiveCompetitionCardProps {
@@ -83,7 +83,7 @@ export default function ActiveCompetitionCard({
             {participantStats && (
               <div className="flex items-center gap-2 text-xs text-gray-500 sm:ml-auto">
                 <Users className="h-3 w-3" />
-                <span>{participantStats.counts.active}/{participantStats.counts.total} Active</span>
+                <span>{participantStats.active}/{participantStats.total} Active</span>
               </div>
             )}
           </div>

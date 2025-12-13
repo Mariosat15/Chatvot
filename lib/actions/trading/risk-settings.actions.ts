@@ -1,6 +1,6 @@
 'use server';
 
-import { unstable_cache, unstable_noStore as noStore } from 'next/cache';
+import { unstable_noStore as noStore } from 'next/cache';
 import { connectToDatabase } from '@/database/mongoose';
 import TradingRiskSettings from '@/database/models/trading-risk-settings.model';
 import { DEFAULT_MARGIN_THRESHOLDS, type MarginThresholds } from '@/lib/services/margin-safety.service';

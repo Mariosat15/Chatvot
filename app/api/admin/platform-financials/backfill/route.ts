@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const errors: string[] = [];
     
     for (const deposit of completedDeposits) {
-      const depositId = deposit._id.toString();
+      const depositId = (deposit._id as any).toString();
       
       // Skip if already has platform transaction
       if (existingPlatformTxIds.has(depositId)) {
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     let withdrawalBackfilledCount = 0;
     
     for (const withdrawal of completedWithdrawals) {
-      const withdrawalId = withdrawal._id.toString();
+      const withdrawalId = (withdrawal._id as any).toString();
       
       if (existingWithdrawalTxIds.has(withdrawalId)) {
         continue;

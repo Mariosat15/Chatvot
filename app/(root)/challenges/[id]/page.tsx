@@ -1,4 +1,4 @@
-import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, ArrowLeft, Target, Shield, AlertTriangle, Zap, Info, Skull, Swords, Crown } from 'lucide-react';
+import { Trophy, DollarSign, Calendar, TrendingUp, ArrowLeft, Target, Shield, AlertTriangle, Info, Skull, Swords } from 'lucide-react';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { connectToDatabase } from '@/database/mongoose';
@@ -80,8 +80,8 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
     }
 
     // Get participants
-    const participants = await ChallengeParticipant.find({ challengeId: id }).lean();
-    const riskSettings = await getTradingRiskSettings();
+    const _participants = await ChallengeParticipant.find({ challengeId: id }).lean();
+    const _riskSettings = await getTradingRiskSettings();
 
     const isChallenger = challenge.challengerId === session.user.id;
     const isChallenged = challenge.challengedId === session.user.id;

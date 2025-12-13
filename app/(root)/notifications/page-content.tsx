@@ -8,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -123,7 +123,7 @@ export default function NotificationsPageContent() {
         );
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to mark as read');
     }
   };
@@ -141,7 +141,7 @@ export default function NotificationsPageContent() {
         setUnreadCount(0);
         toast.success('All notifications marked as read');
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to mark all as read');
     }
   };
@@ -160,7 +160,7 @@ export default function NotificationsPageContent() {
         }
         toast.success('Notification deleted');
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to delete notification');
     }
   };
@@ -180,7 +180,7 @@ export default function NotificationsPageContent() {
         setUnreadCount(0);
         toast.success('All notifications cleared');
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to clear notifications');
     }
   };

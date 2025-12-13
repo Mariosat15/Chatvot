@@ -1,5 +1,10 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
+// Interface for the static methods
+interface ICreditConversionSettingsModel extends Model<ICreditConversionSettings> {
+  getSingleton(): Promise<ICreditConversionSettings>;
+}
+
 export interface ICreditConversionSettings extends Document {
   _id: string;
   eurToCreditsRate: number; // How many credits for 1 EUR (e.g., 100 credits = 1 EUR)
@@ -143,9 +148,9 @@ CreditConversionSettingsSchema.statics.getSingleton = async function () {
   return settings;
 };
 
-const CreditConversionSettings: Model<ICreditConversionSettings> =
-  mongoose.models?.CreditConversionSettings ||
-  mongoose.model<ICreditConversionSettings>('CreditConversionSettings', CreditConversionSettingsSchema);
+const CreditConversionSettings =
+  (mongoose.models?.CreditConversionSettings as unknown as ICreditConversionSettingsModel) ||
+  mongoose.model<ICreditConversionSettings, ICreditConversionSettingsModel>('CreditConversionSettings', CreditConversionSettingsSchema);
 
 export default CreditConversionSettings;
 

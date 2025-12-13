@@ -173,6 +173,7 @@ export function calculateRankings(
       ...p,
       rank: 0, // Will be assigned later
       isTied: false,
+      tiedWith: [] as string[], // Track tied participants
       qualificationStatus: qualification.qualified ? 'qualified' as const : 'disqualified' as const,
       disqualificationReason: qualification.reason,
     };
@@ -243,15 +244,12 @@ export function calculateRankings(
         console.log(`    🔗 TRUE TIE detected! Both at rank ${previous.rank}`);
 
         // Track who they're tied with (collect all tied participants)
-        if (!current.tiedWith) current.tiedWith = [];
-        if (!previous.tiedWith) previous.tiedWith = [];
-        
         // Add all previous tied participants to current's list
         current.tiedWith.push(previous.userId);
         if (previous.tiedWith.length > 0) {
-          previous.tiedWith.forEach(id => {
-            if (!current.tiedWith!.includes(id)) {
-              current.tiedWith!.push(id);
+          previous.tiedWith.forEach((id: string) => {
+            if (!current.tiedWith.includes(id)) {
+              current.tiedWith.push(id);
             }
           });
         }
@@ -262,7 +260,6 @@ export function calculateRankings(
         // Update all previously tied participants to include current
         for (let j = i - 2; j >= 0; j--) {
           if (qualified[j].rank === current.rank && qualified[j].isTied) {
-            if (!qualified[j].tiedWith) qualified[j].tiedWith = [];
             if (!qualified[j].tiedWith.includes(current.userId)) {
               qualified[j].tiedWith.push(current.userId);
             }

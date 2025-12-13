@@ -381,7 +381,7 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
             await inngest.send({
               name: 'app/invoice.created',
               data: {
-                invoiceId: invoice._id.toString(),
+                invoiceId: (invoice._id as unknown as string).toString(),
                 customerEmail,
                 customerName,
                 invoiceNumber: invoice.invoiceNumber,
@@ -646,7 +646,7 @@ export const initiateWithdrawal = async (creditsAmount: number) => {
           feeCredits: feeAmountCredits,
           totalDeducted: totalCreditsDeducted,
           eurGross: eurGross.toFixed(2),
-          eurFee: feeAmountEUR.toFixed(2),
+          eurFee: platformFeeAmountEUR.toFixed(2),
           eurNet: eurNet.toFixed(2),
         },
       };

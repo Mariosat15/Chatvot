@@ -7,9 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { 
-  Activity, Users, TrendingUp, RefreshCw, Search, 
-  AlertTriangle, BarChart3, Target, Clock, Percent,
-  GitCompare, Eye, Play, Loader2
+  Activity, Users, RefreshCw, Search, 
+  AlertTriangle, BarChart3, Target,
+  GitCompare, Play, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -629,6 +629,7 @@ export default function BehavioralAnalysisSection() {
                     Mirror Trading Suspects
                   </p>
                   <div className="space-y-2">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {selectedProfile.mirrorTradingSuspects.map((suspect: any, index: number) => (
                       <div key={index} className="flex items-center justify-between text-sm">
                         <code className="text-gray-300">

@@ -16,10 +16,10 @@ export async function GET() {
     const settings = await CompanySettings.getSingleton();
     
     return NextResponse.json(settings);
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching company settings:', error);
     
-    if (error.message === 'Unauthorized') {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
@@ -70,6 +70,7 @@ export async function PUT(request: Request) {
     
     for (const field of updateFields) {
       if (body[field] !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (settings as any)[field] = body[field];
       }
     }
@@ -101,10 +102,10 @@ export async function PUT(request: Request) {
       success: true,
       settings,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error updating company settings:', error);
     
-    if (error.message === 'Unauthorized') {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     

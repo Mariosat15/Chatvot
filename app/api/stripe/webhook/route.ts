@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
     // Get Stripe client and webhook secret from database
     const stripe = await getStripeClient();
-    const stripeConfig = await getPaymentProviderCredentials('stripe');
+    const stripeConfig = await getPaymentProviderCredentials('stripe') as any;
     const webhookSecret = stripeConfig?.webhook_secret || stripeConfig?.webhookUrl || process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
@@ -58,8 +58,8 @@ export async function POST(req: NextRequest) {
         await handlePaymentIntentCanceled(event.data.object as Stripe.PaymentIntent);
         break;
 
-      case 'payment_intent.expired':
-        await handlePaymentIntentCanceled(event.data.object as Stripe.PaymentIntent);
+      case 'payment_intent.expired' as string:
+        await handlePaymentIntentCanceled((event as any).data.object as Stripe.PaymentIntent);
         break;
 
       case 'charge.refunded':

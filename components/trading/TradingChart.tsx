@@ -96,6 +96,7 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
         if (response.ok) {
           const data = await response.json();
           if (candlestickSeriesRef.current && data.candles) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const formattedCandles = data.candles.map((candle: any) => ({
               time: (candle.timestamp / 1000) as Time,
               open: candle.open,

@@ -9,7 +9,7 @@ export async function GET() {
     await connectToDatabase();
     
     const now = new Date();
-    let results = {
+    const results = {
       started: 0,
       completed: 0,
     };

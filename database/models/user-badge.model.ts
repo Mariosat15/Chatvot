@@ -9,7 +9,7 @@ export interface IUserBadge extends Document {
     competitionId?: string;
     tradeId?: string;
     value?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

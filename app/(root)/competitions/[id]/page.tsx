@@ -1,4 +1,4 @@
-import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, ArrowLeft, Target, Shield, AlertTriangle, Zap, Info, Percent, BarChart3, Skull, Bell, Eye } from 'lucide-react';
+import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, ArrowLeft, Target, Shield, AlertTriangle, Zap, Info, Percent, BarChart3, Skull, Bell } from 'lucide-react';
 import { getCompetitionById, getCompetitionLeaderboard, isUserInCompetition, getUserParticipant } from '@/lib/actions/trading/competition.actions';
 import { getWalletBalance } from '@/lib/actions/trading/wallet.actions';
 import { getTradingRiskSettings } from '@/lib/actions/trading/risk-settings.actions';
@@ -48,7 +48,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
       return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
     };
 
-    const getTimeRemaining = () => {
+    const _getTimeRemaining = () => {
       const now = new Date();
       const end = new Date(competition.endTime);
       const diff = end.getTime() - now.getTime();
@@ -590,7 +590,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                   <p className="text-xs text-yellow-400 flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                     <span>
-                      <strong>Important:</strong> If you hit any risk limit, you won't be able to open new positions until your account recovers or the next trading day (for daily limits).
+                      <strong>Important:</strong> If you hit any risk limit, you won&apos;t be able to open new positions until your account recovers or the next trading day (for daily limits).
                     </span>
                   </p>
                 </div>
@@ -770,7 +770,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                 
                 let unclaimedPercentage = 0;
                 if (currentParticipants < prizePositions) {
-                  competition.prizeDistribution.forEach((prize: any, index: number) => {
+                  competition.prizeDistribution.forEach((prize: { percentage: number }, index: number) => {
                     if (index >= currentParticipants) {
                       unclaimedPercentage += prize.percentage;
                     }
@@ -822,7 +822,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
 
                     {/* Prize Distribution List */}
                     <div className="space-y-2">
-                      {competition.prizeDistribution.map((prize: any, index: number) => {
+                      {competition.prizeDistribution.map((prize: { percentage: number; rank?: number }, index: number) => {
                         const isFilled = index < currentParticipants;
                         const basePercentage = prize.percentage;
                         

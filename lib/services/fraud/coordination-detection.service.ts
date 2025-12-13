@@ -12,13 +12,6 @@ import { connectToDatabase } from '@/database/mongoose';
  * - Similar first trade patterns
  */
 
-interface CoordinatedEntry {
-  userId: string;
-  competitionId: string;
-  entryTime: Date;
-  timeDelta: number; // seconds from reference entry
-}
-
 interface CoordinationResult {
   detected: boolean;
   involvedUsers: string[];

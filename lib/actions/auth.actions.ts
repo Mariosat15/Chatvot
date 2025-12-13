@@ -29,6 +29,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, addr
                 console.log(`📝 Sign-up: Updating user ${userId} with profile data...`);
                 
                 // Build query to find user by multiple ID formats
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const queries: any[] = [{ id: userId }];
                 if (ObjectId.isValid(userId)) {
                     queries.push({ _id: new ObjectId(userId) });

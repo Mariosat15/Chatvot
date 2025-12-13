@@ -1,10 +1,9 @@
 'use client';
 
-import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Coins, Zap, FileText, Download, ExternalLink, Swords } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Zap, FileText, Swords } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
 
 interface Transaction {
   _id: string;

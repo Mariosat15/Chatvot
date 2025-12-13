@@ -103,6 +103,7 @@ export default function ChallengeStatusMonitor({
             // Check if user won
             const winnerId = data.challenge?.winnerId;
             const isWinner = winnerId && data.participants?.some(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (p: any) => p.userId === winnerId && p.isWinner
             );
 

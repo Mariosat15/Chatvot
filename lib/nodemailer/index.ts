@@ -1,6 +1,5 @@
 import nodemailer from 'nodemailer';
-import {WELCOME_EMAIL_TEMPLATE, INVOICE_EMAIL_TEMPLATE} from "@/lib/nodemailer/templates";
-import { getEmailLogo, getDashboardPreview } from '@/lib/admin/images';
+import { INVOICE_EMAIL_TEMPLATE} from "@/lib/nodemailer/templates";
 import { connectToDatabase } from '@/database/mongoose';
 import { WhiteLabel } from '@/database/models/whitelabel.model';
 import { getSettings } from '@/lib/services/settings.service';
@@ -197,7 +196,7 @@ function buildWelcomeEmailHtml(
     ];
     
     const featureListHtml = featureItems
-        .map(item => `<li style="margin-bottom: 12px;">${item}</li>`)
+        .map((item: string) => `<li style="margin-bottom: 12px;">${item}</li>`)
         .join('\n                                ');
     
     // Get the CTA URL

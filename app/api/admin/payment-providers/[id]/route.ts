@@ -49,8 +49,8 @@ export async function PUT(
       message: 'Payment provider updated successfully',
       provider,
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Update payment provider error:', error);
@@ -100,8 +100,8 @@ export async function DELETE(
       success: true,
       message: 'Payment provider deleted successfully',
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Delete payment provider error:', error);
@@ -125,7 +125,7 @@ async function updateEnvFile() {
     try {
       existingContent = await fs.readFile(envPath, 'utf-8');
       console.log('📖 Read existing .env file, length:', existingContent.length);
-    } catch (error) {
+    } catch {
       console.log('⚠️ .env file does not exist, will create new one');
     }
 

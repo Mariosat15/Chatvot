@@ -81,6 +81,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
   }
 
   // Type assertion for proper TypeScript inference
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const participant = participantDoc as any;
 
   // Get user's positions
@@ -94,7 +95,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
   const pendingOrders = await getUserOrders(competitionId, 'pending');
 
   // Get wallet balance
-  const walletBalance = await getWalletBalance();
+  const _walletBalance = await getWalletBalance();
 
   // Load admin risk settings (fail gracefully to defaults)
   let marginThresholds;
@@ -118,9 +119,10 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
   // Calculate daily realized P&L (from today's closed trades)
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dailyRealizedPnl = tradeHistory
     .filter((trade: any) => trade.closedAt && new Date(trade.closedAt) >= today)
-    .reduce((sum: number, trade: any) => sum + (trade.pnl || 0), 0);
+    .reduce((sum: number, trade: any) => sum + (trade.pnl || trade.realizedPnl || 0), 0);
 
   return (
     <PriceProvider>

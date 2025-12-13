@@ -13,7 +13,7 @@ import mongoose from 'mongoose';
  * even if competition status is already "completed"
  * POST /api/admin/finalize-old-competitions
  */
-export async function POST(request: Request) {
+export async function POST(_request: Request) {
   try {
     await connectToDatabase();
 
@@ -180,7 +180,7 @@ export async function POST(request: Request) {
               const newCapital = participant.currentCapital + positionPnL;
               const newTotalTrades = participant.totalTrades + 1;
               const newWinningTrades = participant.winningTrades + (isWinner ? 1 : 0);
-              const newLosingTrades = participant.losingTrades + (isWinner ? 0 : 1);
+              const _newLosingTrades = participant.losingTrades + (isWinner ? 0 : 1);
               const winRate = newTotalTrades > 0 ? (newWinningTrades / newTotalTrades) * 100 : 0;
 
               await CompetitionParticipant.findByIdAndUpdate(

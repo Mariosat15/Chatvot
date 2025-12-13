@@ -63,8 +63,8 @@ export async function GET(request: Request) {
       stats,
       deviceTypes
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error fetching devices:', error);

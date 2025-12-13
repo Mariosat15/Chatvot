@@ -62,6 +62,7 @@ export async function requireAdminAuth() {
 export async function getAdminSession(): Promise<{
   id: string;
   email: string;
+  name?: string;
 } | null> {
   try {
     const auth = await verifyAdminAuth();
@@ -73,6 +74,7 @@ export async function getAdminSession(): Promise<{
     return {
       id: auth.adminId,
       email: auth.email,
+      name: auth.name,
     };
   } catch {
     return null;

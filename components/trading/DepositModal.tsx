@@ -29,7 +29,7 @@ export default function DepositModal({ children }: DepositModalProps) {
   const [vatEnabled, setVatEnabled] = useState(false);
   const [vatPercentage, setVatPercentage] = useState(0);
 
-  const minDeposit = settings?.transactions?.minimumDeposit || 10;
+  const minDeposit = (settings as { transactions?: { minimumDeposit?: number } })?.transactions?.minimumDeposit || 10;
 
   // Calculate VAT on the EUR amount
   const calculateVAT = (amountEur: number) => {

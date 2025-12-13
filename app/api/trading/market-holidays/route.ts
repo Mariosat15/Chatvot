@@ -9,12 +9,12 @@ export async function GET() {
   try {
     const holidays = await getUpcomingHolidays();
     return NextResponse.json({ holidays });
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Error fetching holidays:', error);
     
     return NextResponse.json({
       holidays: [],
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }

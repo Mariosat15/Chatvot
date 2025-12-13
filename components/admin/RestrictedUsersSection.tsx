@@ -288,6 +288,7 @@ export default function RestrictedUsersSection() {
               />
             </div>
             
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
               <SelectTrigger className="w-full sm:w-48 bg-gray-900 border-gray-700 text-white">
                 <SelectValue placeholder="Filter by type" />

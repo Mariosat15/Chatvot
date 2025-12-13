@@ -366,7 +366,7 @@ export function calculateRiskRewardRatio(
   entryPrice: number,
   stopLoss: number,
   takeProfit: number,
-  side: 'long' | 'short'
+  _side: 'long' | 'short'
 ): number {
   const risk = Math.abs(entryPrice - stopLoss);
   const reward = Math.abs(takeProfit - entryPrice);

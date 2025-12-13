@@ -295,7 +295,7 @@ export class MirrorTradingService {
     
     // Check if suspect already exists
     const existingIndex = profile.mirrorTradingSuspects.findIndex(
-      s => s.pairedUserId.toString() === pairedUserId
+      (s: IMirrorTradingSuspect) => s.pairedUserId.toString() === pairedUserId
     );
     
     const suspect: IMirrorTradingSuspect = {
@@ -383,7 +383,7 @@ export class MirrorTradingService {
     let checksRun = 0;
     for (const otherProfile of recentProfiles) {
       // Filter to recent trades
-      const recentTrades = otherProfile.recentTradeSequence.filter(t => 
+      const recentTrades = otherProfile.recentTradeSequence.filter((t: { pair: string; openTime: Date }) => 
         t.pair === trade.pair &&
         new Date(t.openTime).getTime() >= timeWindow.getTime()
       );
@@ -392,7 +392,7 @@ export class MirrorTradingService {
         console.log(`   👀 User ${otherProfile.userId.toString().substring(0, 8)}... has ${recentTrades.length} recent ${trade.pair} trades`);
         
         // Check if any trade matches our trade timing
-        const matchingTrade = recentTrades.find(t => 
+        const matchingTrade = recentTrades.find((t: { openTime: Date }) => 
           Math.abs(new Date(t.openTime).getTime() - new Date(trade.openTime).getTime()) <= this.SYNC_WINDOW_SECONDS * 1000
         );
         
@@ -433,8 +433,8 @@ export class MirrorTradingService {
       userId2: s.userId2.toString(),
       score: s.mirrorTradingScore,
       matchingTrades: s.mirrorTradingEvidence.length,
-      directionPattern: s.mirrorTradingEvidence.filter(e => e.isOpposite).length > 
-                        s.mirrorTradingEvidence.filter(e => !e.isOpposite).length
+      directionPattern: s.mirrorTradingEvidence.filter((e: { isOpposite: boolean }) => e.isOpposite).length > 
+                        s.mirrorTradingEvidence.filter((e: { isOpposite: boolean }) => !e.isOpposite).length
                         ? 'Opposite' : 'Same',
       detectedAt: s.lastCalculated
     }));

@@ -16,6 +16,7 @@ import {
 interface WikiTopic {
   id: string;
   title: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon: any;
   category: string;
   content: React.ReactNode;

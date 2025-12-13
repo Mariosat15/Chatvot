@@ -129,7 +129,8 @@ export async function GET() {
 
     // Fetch user details from Better Auth for each verified payment
     const paymentsWithUserDetails = await Promise.all(
-      verifiedPendingPayments.map(async (payment) => {
+      verifiedPendingPayments.map(async (paymentDoc) => {
+        const payment = paymentDoc as any; // Type assertion for lean() result
         try {
           // Get user from Better Auth 'user' collection
           // Try matching both 'id' field and '_id' field
@@ -199,8 +200,8 @@ export async function GET() {
       count: paymentsWithUserDetails.length,
       payments: paymentsWithUserDetails,
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('❌ Error fetching pending payments:', error);

@@ -18,7 +18,6 @@ import {
   Settings,
   Loader2,
   Info,
-  AlertCircle,
   Scale,
   RotateCcw
 } from 'lucide-react';

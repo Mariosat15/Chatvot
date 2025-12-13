@@ -50,6 +50,7 @@ interface FraudAlert {
   evidence: Array<{
     type: string;
     description: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data: any;
   }>;
   resolution?: string;
@@ -384,7 +385,7 @@ export default function FraudMonitoringSection() {
     try {
       const token = localStorage.getItem('adminToken');
       let endpoint = '';
-      let body: any = {
+      const body: Record<string, unknown> = {
         alertId: selectedInvestigationAlert._id,
         action: investigationActionType,
         userIds: selectedUserIds,
@@ -987,9 +988,9 @@ export default function FraudMonitoringSection() {
                           <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 capitalize">
                             {alert.alertType.replace(/_/g, ' ')}
                           </Badge>
-                          {alert.competitionId && (
+                          {(alert as any).competitionId && (
                             <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
-                              Competition: {alert.competitionId.substring(0, 8)}...
+                              Competition: {((alert as any).competitionId as string).substring(0, 8)}...
                             </Badge>
                           )}
                         </div>
@@ -1003,7 +1004,7 @@ export default function FraudMonitoringSection() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            Resolved: {new Date(alert.resolvedAt || alert.updatedAt).toLocaleDateString()}
+                            Resolved: {new Date((alert as any).resolvedAt || (alert as any).updatedAt).toLocaleDateString()}
                           </span>
                           {alert.actionTaken && (
                             <span className="flex items-center gap-1">
@@ -1101,8 +1102,9 @@ export default function FraudMonitoringSection() {
                   
                   <div className="flex flex-wrap gap-2">
                     {/* Group evidence by type and show count */}
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {Object.entries(
-                      selectedAlert.evidence.reduce((acc: Record<string, number>, e: any) => {
+                      selectedAlert.evidence.reduce((acc: Record<string, number>, e: { type: string }) => {
                         acc[e.type] = (acc[e.type] || 0) + 1;
                         return acc;
                       }, {})
@@ -1121,6 +1123,7 @@ export default function FraudMonitoringSection() {
                   <div className="mt-3 pt-3 border-t border-red-500/20">
                     <p className="text-xs text-gray-400 mb-2">Detection Timeline:</p>
                     <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                      {/* eslint-disable @typescript-eslint/no-explicit-any */}
                       {selectedAlert.evidence
                         .filter((e: any) => e.data?.detectedAt)
                         .sort((a: any, b: any) => new Date(a.data.detectedAt).getTime() - new Date(b.data.detectedAt).getTime())
@@ -1134,6 +1137,7 @@ export default function FraudMonitoringSection() {
                             )}
                           </div>
                         ))}
+                      {/* eslint-enable @typescript-eslint/no-explicit-any */}
                     </div>
                   </div>
                 </div>

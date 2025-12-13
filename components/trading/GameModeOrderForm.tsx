@@ -3,13 +3,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { HelpTooltip } from '@/components/ui/help-tooltip';
-import { TrendingUp, TrendingDown, Zap, Target, Shield, Flame, Trophy, Star } from 'lucide-react';
+import { TrendingUp, TrendingDown, Zap, Target, Shield, Flame, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
+import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
 import { useRiskSettings } from '@/hooks/useRiskSettings';
@@ -313,8 +312,8 @@ export default function GameModeOrderForm({
       // Reset amount after successful trade to $1
       setAmount(1);
 
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to place trade');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to place trade');
     } finally {
       setIsSubmitting(false);
     }

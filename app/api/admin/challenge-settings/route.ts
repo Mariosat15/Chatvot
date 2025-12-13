@@ -17,7 +17,7 @@ async function verifyAdminToken(request: NextRequest) {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
     return payload;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -116,10 +116,9 @@ export async function PUT(request: NextRequest) {
     try {
       const { auditLogService } = await import('@/lib/services/audit-log.service');
       await auditLogService.logSettingsUpdated(
-        request,
-        admin.sub as string,
-        admin.email as string,
+        { id: admin.sub as string, email: admin.email as string },
         'challenge_settings',
+        null,
         body
       );
     } catch (auditError) {
@@ -131,13 +130,15 @@ export async function PUT(request: NextRequest) {
       message: 'Challenge settings updated',
       settings,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error updating challenge settings:', error);
     
     // Handle Mongoose validation errors
-    if (error.name === 'ValidationError' && error.errors) {
-      const validationMessages = Object.keys(error.errors).map((field) => {
-        const err = error.errors[field];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anyError = error as any;
+    if (anyError.name === 'ValidationError' && anyError.errors) {
+      const validationMessages = Object.keys(anyError.errors).map((field) => {
+        const err = anyError.errors[field];
         return `${field}: ${err.message}`;
       });
       return NextResponse.json(
@@ -147,7 +148,7 @@ export async function PUT(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: error.message || 'Failed to update challenge settings' },
+      { error: error instanceof Error ? error.message : 'Failed to update challenge settings' },
       { status: 500 }
     );
   }

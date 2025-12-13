@@ -98,10 +98,14 @@ export default function SuspicionScoreCard({ score }: Props) {
   ];
 
   const activeDetections = detectionMethods
-    .map(method => ({
-      ...method,
-      ...score.scoreBreakdown[method.key as keyof typeof score.scoreBreakdown]
-    }))
+    .map(method => {
+      const breakdown = score.scoreBreakdown[method.key as keyof typeof score.scoreBreakdown];
+      return {
+        ...method,
+        ...breakdown,
+        percentage: breakdown?.points || 0, // Use points as percentage
+      };
+    })
     .filter(method => method.percentage > 0)
     .sort((a, b) => b.percentage - a.percentage);
 

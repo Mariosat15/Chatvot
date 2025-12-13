@@ -6,11 +6,11 @@ export const dynamic = 'force-dynamic';
 
 const WalletPage = async () => {
   // Get wallet data
-  const wallet = await getOrCreateWallet();
+  const _wallet = await getOrCreateWallet();
   const stats = await getWalletStats();
   const transactions = await getWalletTransactions(20);
 
-  return <WalletContent stats={stats} transactions={transactions} />
+  return <WalletContent stats={stats as any} transactions={transactions} />
 };
 
 export default WalletPage;

@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // Check if user is admin
-    if (session.user.role !== 'admin') {
+    // Check if user is admin (cast to any for role check)
+    if ((session.user as any).role !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
     
@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    if (session.user.role !== 'admin') {
+    if ((session.user as any).role !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
     

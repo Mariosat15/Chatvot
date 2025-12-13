@@ -23,7 +23,7 @@ async function verifyAdminToken(request: NextRequest) {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
     return payload;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       .limit(50)
       .lean();
 
-    const competitionIds = competitions.map((c) => c._id);
+    const competitionIds = competitions.map((c) => (c as any)._id);
     
     // Get all wallet transactions for these competitions
     const [
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
 
     // Get platform fees from PlatformTransaction (not WalletTransaction)
     // Platform fees for competitions are stored in PlatformTransaction with sourceType: 'competition'
-    const competitionIdStrings = competitionIds.map(id => id.toString());
+    const competitionIdStrings = competitionIds.map(id => (id as any).toString());
     
     const [platformFeeTransactions, unclaimedPools] = await Promise.all([
       PlatformTransaction.find({
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
 
     // Build detailed competition analytics
     const competitionAnalytics = await Promise.all(competitions.map(async (comp) => {
-      const compId = comp._id.toString();
+      const compId = (comp._id as any).toString();
       
       // Get transactions for this competition
       const compWins = winTransactions.filter(
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
 
       // Calculate totals
       const totalWinnersPaid = compWins.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
-      const totalEntryFees = compEntries.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
+      const _totalEntryFees = compEntries.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
       const totalRefunds = compRefunds.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
       const platformFeeFromTransactions = (compPlatformFee as any)?.amount || 0;
       const unclaimedPoolAmount = (compUnclaimedPool as any)?.amount || 0;
@@ -204,7 +204,7 @@ export async function GET(request: NextRequest) {
         try {
           const user = await getUserById(t.userId);
           displayName = user?.name || user?.email?.split('@')[0] || t.userId.substring(0, 8);
-        } catch (e) {
+        } catch {
           displayName = t.userId.substring(0, 8);
         }
         
@@ -224,7 +224,7 @@ export async function GET(request: NextRequest) {
         try {
           const user = await getUserById(t.userId);
           displayName = user?.name || user?.email?.split('@')[0] || t.userId.substring(0, 8);
-        } catch (e) {
+        } catch {
           displayName = t.userId.substring(0, 8);
         }
         
@@ -288,7 +288,7 @@ export async function GET(request: NextRequest) {
       .limit(50)
       .lean();
 
-    const challengeIds = challenges.map((c) => c._id.toString());
+    const challengeIds = challenges.map((c) => (c._id as any).toString());
 
     // Get challenge-related wallet transactions
     const [
@@ -322,9 +322,9 @@ export async function GET(request: NextRequest) {
 
     // Build challenge analytics
     const challengeAnalytics = challenges.map((challenge) => {
-      const chalId = challenge._id.toString();
-      const wins = challengeWinTransactions.filter((t) => t.challengeId === chalId);
-      const entries = challengeEntryTransactions.filter((t) => t.challengeId === chalId);
+      const chalId = (challenge._id as any).toString();
+      const _wins = challengeWinTransactions.filter((t) => t.challengeId === chalId);
+      const _entries = challengeEntryTransactions.filter((t) => t.challengeId === chalId);
       const platformFee = challengePlatformFees.find((t: any) => t.sourceId === chalId);
       const unclaimedPool = challengeUnclaimedPools.find((t: any) => t.sourceId === chalId);
 
@@ -334,8 +334,8 @@ export async function GET(request: NextRequest) {
       const bothDisqualified = challengerDisqualified && challengedDisqualified;
 
       return {
-        _id: challenge._id,
-        status: challenge.status,
+        _id: (challenge as any)._id,
+        status: (challenge as any).status,
         challengerName: challenge.challengerName,
         challengedName: challenge.challengedName,
         entryFee: challenge.entryFee,

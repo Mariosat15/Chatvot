@@ -82,7 +82,7 @@ export async function POST(request: Request) {
             // Convert positions to trade-like objects
             trades = positionsWithPnL.map((pos: any) => ({
               realizedPnl: pos.profitLoss || 0,
-            }));
+            })) as unknown as typeof trades;
           } else {
             console.log(`  ⚠️  ${participant.username}: ${allPositions.length} positions found but NONE have profitLoss data (likely never closed)`);
             skipped++;

@@ -8,14 +8,10 @@ import { connectToDatabase } from '@/database/mongoose';
 import TradingOrder from '@/database/models/trading/trading-order.model';
 import TradingPosition from '@/database/models/trading/trading-position.model';
 import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import Competition from '@/database/models/trading/competition.model';
-import { getContestAndParticipant, getParticipantModel, ContestType } from './contest-utils';
+import { getContestAndParticipant, getParticipantModel } from './contest-utils';
 import mongoose from 'mongoose';
 import {
   calculateMarginRequired,
-  calculateUnrealizedPnL,
-  calculatePnLPercentage,
   validateQuantity,
   validateSLTP,
   ForexSymbol,
@@ -41,8 +37,11 @@ async function ensureMarketOpen(): Promise<void> {
  * Check competition risk limits (max drawdown and daily loss)
  * Returns { allowed: boolean, reason?: string }
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function checkCompetitionRiskLimits(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   participant: any
 ): Promise<{ allowed: boolean; reason?: string }> {
   // Check if risk limits are enabled for this competition
@@ -495,6 +494,7 @@ export const getUserOrders = async (
 
     await connectToDatabase();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {
       competitionId,
       userId: session.user.id,

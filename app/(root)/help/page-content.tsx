@@ -1,23 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { 
   Trophy, 
-  Star, 
   TrendingUp, 
   Shield, 
-  Zap, 
-  DollarSign, 
-  BarChart3, 
   Award,
   Target,
-  Users,
   HelpCircle,
   ChevronRight,
   Book,
   Coins,
-  CreditCard,
-  Activity,
   Info,
   Menu,
   X
@@ -176,7 +170,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               <div>
                 <h3 className="text-lg font-semibold text-white mb-2">Welcome to the Trading Platform!</h3>
                 <p className="leading-relaxed">
-                  This platform offers simulated trading competitions where you can test your trading skills, compete with others, and win real prizes. Here's how to get started:
+                  This platform offers simulated trading competitions where you can test your trading skills, compete with others, and win real prizes. Here&apos;s how to get started:
                 </p>
               </div>
 
@@ -642,7 +636,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   </li>
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                    <span>Track your net profit to see how much you've won vs. spent.</span>
+                    <span>Track your net profit to see how much you&apos;ve won vs. spent.</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
@@ -691,7 +685,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <h5 className="font-semibold text-orange-400">🚨 Margin Call</h5>
                       <span className="text-sm text-orange-400">120-150%</span>
                     </div>
-                    <p className="text-sm text-gray-400">Danger! You're approaching liquidation. Close some trades or risk automatic liquidation.</p>
+                    <p className="text-sm text-gray-400">Danger! You&apos;re approaching liquidation. Close some trades or risk automatic liquidation.</p>
                   </div>
 
                   <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
@@ -795,22 +789,22 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
             <Info className="h-12 w-12 text-primary-400 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-white mb-2">Need More Help?</h3>
             <p className="text-gray-300 mb-4">
-              If you have questions that aren't covered here, feel free to reach out to our support team.
+              If you have questions that aren&apos;t covered here, feel free to reach out to our support team.
             </p>
             {isLoggedIn && (
               <div className="flex flex-wrap gap-3 justify-center">
-                <a
+                <Link
                   href="/profile"
                   className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium"
                 >
                   View Your Profile
-                </a>
-                <a
+                </Link>
+                <Link
                   href="/competitions"
                   className="px-6 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg transition-colors font-medium border border-dark-600"
                 >
                   Browse Competitions
-                </a>
+                </Link>
               </div>
             )}
           </div>

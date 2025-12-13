@@ -21,8 +21,8 @@ export async function GET() {
       success: true,
       providers,
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Get payment providers error:', error);
@@ -117,8 +117,8 @@ export async function POST(request: Request) {
       message: 'Payment provider created successfully',
       provider,
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Create payment provider error:', error);

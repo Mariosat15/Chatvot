@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
     const { currentPage, acceptingChallenges } = body;
 
     const now = new Date();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {
       lastHeartbeat: now,
       lastSeen: now,

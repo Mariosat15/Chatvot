@@ -73,7 +73,7 @@ export default function ChallengeEntryActions({
           ⚔️ Challenge Received!
         </h3>
         <p className="text-sm text-gray-400 mb-4">
-          You've been challenged to a 1v1 trading battle. Accept to start trading immediately!
+          You&apos;ve been challenged to a 1v1 trading battle. Accept to start trading immediately!
         </p>
         <div className="flex gap-2">
           <Button

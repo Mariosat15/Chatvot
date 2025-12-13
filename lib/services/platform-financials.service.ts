@@ -168,6 +168,7 @@ export const PlatformFinancialsService = {
   /**
    * Record admin withdrawal (converting platform credits to real money)
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   recordAdminWithdrawal: async (params: AdminWithdrawalParams): Promise<{ success: boolean; transaction?: any; error?: string }> => {
     await connectToDatabase();
     
@@ -309,8 +310,8 @@ export const PlatformFinancialsService = {
     let totalUnclaimedPools = 0;
     let totalPlatformFees = 0;       // Competition fees
     let totalChallengeFees = 0;      // Challenge fees
-    let totalMarketplaceSales = marketplaceSales.totalSales;
-    let marketplacePurchases = marketplaceSales.purchaseCount;
+    const totalMarketplaceSales = marketplaceSales.totalSales;
+    const marketplacePurchases = marketplaceSales.purchaseCount;
     let totalDepositFeesGross = 0;
     let totalWithdrawalFeesGross = 0;
     let totalBankDepositFees = 0;
@@ -464,9 +465,11 @@ export const PlatformFinancialsService = {
     skip?: number;
     startDate?: Date;
     endDate?: Date;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } = {}): Promise<{ transactions: any[]; total: number }> => {
     await connectToDatabase();
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
     
     if (params.type && params.type !== 'all') {
@@ -498,6 +501,7 @@ export const PlatformFinancialsService = {
     totalAmount: number;
     totalAmountEUR: number;
     byReason: Record<string, { count: number; amount: number }>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recentPools: any[];
   }> => {
     await connectToDatabase();

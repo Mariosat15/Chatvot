@@ -111,6 +111,7 @@ export async function getAllRestrictions(filters?: {
 }) {
   await connectToDatabase();
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const query: any = {};
   if (filters?.userId) query.userId = filters.userId;
   if (filters?.restrictionType) query.restrictionType = filters.restrictionType;

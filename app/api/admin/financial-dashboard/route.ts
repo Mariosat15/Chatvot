@@ -3,7 +3,6 @@ import { jwtVerify } from 'jose';
 import { connectToDatabase } from '@/database/mongoose';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import Competition from '@/database/models/trading/competition.model';
 import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
 import { PlatformFinancialsService } from '@/lib/services/platform-financials.service';
 import { getUsersByIds } from '@/lib/utils/user-lookup';
@@ -22,7 +21,7 @@ async function verifyAdminToken(request: NextRequest) {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
     return payload;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

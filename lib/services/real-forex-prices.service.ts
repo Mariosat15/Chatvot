@@ -188,6 +188,7 @@ export async function fetchRealForexPrices(symbols: ForexSymbol[]): Promise<Map<
  * Response format: { last: { ask, bid, exchange, timestamp }, status: "success", symbol: "AUD/USD" }
  * Documentation: https://massive.com/docs/rest/forex/quotes/last-quote
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseLastQuoteResponse(data: any, symbol: ForexSymbol): PriceQuote | null {
   try {
     if (!data.last) {
@@ -339,7 +340,7 @@ export async function getMarketStatusFromAPI(): Promise<MarketStatus> {
     console.log(`🕒 Server time: ${data.serverTime}`);
     
     return status;
-  } catch (error: any) {
+  } catch (error) {
     console.warn('⚠️ Market status API unavailable, using time-based fallback');
     // Don't log as error - this is expected for some plans
     throw error;
@@ -382,8 +383,8 @@ export async function getUpcomingHolidays(): Promise<MarketHoliday[]> {
 
     console.log(`✅ Got ${holidays.length} upcoming holidays`);
     return holidays;
-  } catch (error: any) {
-    console.error('❌ Error fetching holidays:', error.message);
+  } catch (error) {
+    console.error('❌ Error fetching holidays:', error instanceof Error ? error.message : 'Unknown error');
     return [];
   }
 }

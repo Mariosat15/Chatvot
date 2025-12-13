@@ -4,7 +4,7 @@ import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { evaluateUserBadges, getUserBadges } from '@/lib/services/badge-evaluation.service';
-import { BADGES, getBadgesByCategory, BadgeCategory } from '@/lib/constants/badges';
+import { BadgeCategory } from '@/lib/constants/badges';
 
 /**
  * Get all badges for the current user with earned status
@@ -54,7 +54,10 @@ export async function getMyBadgeStats() {
   };
 
   for (const badge of earnedBadges) {
-    categoryCount[badge.category]++;
+    const cat = badge.category as BadgeCategory;
+    if (cat in categoryCount) {
+      categoryCount[cat]++;
+    }
   }
 
   return {

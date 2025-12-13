@@ -12,10 +12,7 @@ import {
   RefreshCw,
   Package,
   Users,
-  DollarSign,
   Save,
-  X,
-  Settings,
   Code,
   Star,
 } from 'lucide-react';
@@ -46,6 +43,7 @@ import StrategyBuilder from './StrategyBuilder';
 import { Lightbulb, Target } from 'lucide-react';
 
 interface StrategyConfig {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rules: any[];
   defaultIndicators: string[];
   signalDisplay: {
@@ -572,7 +570,7 @@ export default function MarketplaceSection() {
                   <Label>Category *</Label>
                   <Select
                     value={editingItem.category || 'trading_bot'}
-                    onValueChange={(v) => setEditingItem({ ...editingItem, category: v })}
+                    onValueChange={(v) => setEditingItem({ ...editingItem, category: v as 'indicator' | 'strategy' })}
                   >
                     <SelectTrigger className="bg-gray-800 border-gray-700">
                       <SelectValue />

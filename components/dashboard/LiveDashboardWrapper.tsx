@@ -6,7 +6,6 @@ import GlobalRiskMetrics from './GlobalRiskMetrics';
 import CompetitionsTable from './CompetitionsTable';
 import RecentClosedTrades from './RecentClosedTrades';
 import OpenPositions from './OpenPositions';
-import WinPotentialCard from './WinPotentialCard';
 import DailyPnLChart from './DailyPnLChart';
 import Link from 'next/link';
 import { Trophy, TrendingUp, RefreshCw } from 'lucide-react';

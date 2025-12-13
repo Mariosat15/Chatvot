@@ -31,10 +31,10 @@ export async function GET(
       invoice,
       html,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching invoice:', error);
     
-    if (error.message === 'Unauthorized') {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
@@ -71,7 +71,7 @@ export async function POST(
     await inngest.send({
       name: 'app/invoice.created',
       data: {
-        invoiceId: invoice._id.toString(),
+        invoiceId: (invoice._id as any).toString(),
         customerEmail: invoice.customerEmail,
         customerName: invoice.customerName,
         invoiceNumber: invoice.invoiceNumber,
@@ -84,10 +84,10 @@ export async function POST(
       success: true,
       message: `Invoice email queued for ${invoice.customerEmail}`,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error resending invoice:', error);
     
-    if (error.message === 'Unauthorized') {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     

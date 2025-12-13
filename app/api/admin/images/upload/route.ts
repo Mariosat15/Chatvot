@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const uploadDir = path.join(process.cwd(), 'public', 'assets', 'images');
     try {
       await mkdir(uploadDir, { recursive: true });
-    } catch (error) {
+    } catch {
       // Directory might already exist
     }
 
@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
       path: publicPath,
       filename,
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Upload error:', error);

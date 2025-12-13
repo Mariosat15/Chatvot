@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, MouseEvent } from 'react';
+import { useRef, useEffect } from 'react';
 
 /**
  * Hook for drag-to-scroll functionality
@@ -52,7 +52,7 @@ export function useDragScroll<T extends HTMLElement>() {
     // Set initial cursor
     element.style.cursor = 'grab';
     element.style.scrollbarWidth = 'none'; // Firefox
-    element.style.msOverflowStyle = 'none'; // IE/Edge
+    (element.style as CSSStyleDeclaration & { msOverflowStyle: string }).msOverflowStyle = 'none'; // IE/Edge
 
     // Add event listeners
     element.addEventListener('mousedown', handleMouseDown);

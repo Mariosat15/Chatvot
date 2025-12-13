@@ -4,7 +4,6 @@ import TradingBehaviorProfile, {
   IRecentTrade 
 } from '@/database/models/fraud/trading-behavior-profile.model';
 import { connectToDatabase } from '@/database/mongoose';
-import mongoose from 'mongoose';
 
 /**
  * Behavioral Analysis Service

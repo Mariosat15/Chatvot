@@ -1,4 +1,4 @@
-import { Trophy, Users, DollarSign, Calendar, TrendingUp, ArrowLeft, Edit, Clock, Target, Award } from 'lucide-react';
+import { Trophy, Users, DollarSign, Calendar, ArrowLeft, Edit, Clock, Target, Award } from 'lucide-react';
 import { getCompetitionById, getCompetitionLeaderboard } from '@/lib/actions/trading/competition.actions';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -20,11 +20,11 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
 
   // Get dynamic currency settings
   await connectToDatabase();
-  const appSettings = await AppSettings.findById('app-settings').lean();
+  const appSettings = await AppSettings.findById('app-settings').lean() as any;
   const creditName = appSettings?.credits?.name || 'Credits';
-  const creditSymbol = appSettings?.credits?.symbol || '⚡';
+  const _creditSymbol = appSettings?.credits?.symbol || '⚡';
   const currencySymbol = appSettings?.currency?.symbol || '€';
-  const currencyCode = appSettings?.currency?.code || 'EUR';
+  const _currencyCode = appSettings?.currency?.code || 'EUR';
 
   try {
     // Get competition data
@@ -32,7 +32,7 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
     const leaderboard = await getCompetitionLeaderboard(id, 100);
 
     const isActive = competition.status === 'active';
-    const isUpcoming = competition.status === 'upcoming';
+    const _isUpcoming = competition.status === 'upcoming';
     const isCompleted = competition.status === 'completed';
     const isCancelled = competition.status === 'cancelled';
 

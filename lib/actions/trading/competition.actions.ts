@@ -19,6 +19,7 @@ export const getCompetitions = async (filters?: {
   try {
     await connectToDatabase();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
     if (filters?.status) {
       query.status = filters.status;
@@ -190,7 +191,7 @@ export const createCompetition = async (competitionData: {
     }
 
     // Generate slug from name with auto-increment for duplicates
-    let baseSlug = competitionData.name
+    const baseSlug = competitionData.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
@@ -568,6 +569,7 @@ export const getCompetitionLeaderboard = async (competitionId: string, limit: nu
     const { getTitleByXP } = await import('@/lib/constants/levels');
 
     // Prepare participant data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const participantData = participants.map((p: any) => ({
       userId: p.userId,
       username: p.username || 'Anonymous',
@@ -647,6 +649,7 @@ export const getUserCompetitions = async (status?: 'active' | 'completed') => {
 
     await connectToDatabase();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = { userId: session.user.id };
     if (status) {
       query.status = status;
@@ -665,6 +668,7 @@ export const getUserCompetitions = async (status?: 'active' | 'completed') => {
     // Merge data
     const userCompetitions = participants.map((participant) => {
       const competition = competitions.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (c: any) => c._id.toString() === participant.competitionId
       );
       return {

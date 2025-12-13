@@ -1,14 +1,13 @@
 import { ArrowLeft, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { notFound } from 'next/navigation';
 import CompetitionEditorForm from '@/components/admin/CompetitionEditorForm';
 
 interface EditCompetitionPageProps {
   params: Promise<{ id: string }>;
 }
 
-async function getCompetition(id: string) {
+async function _getCompetition(id: string) {
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/competitions/${id}`, {
       cache: 'no-store',

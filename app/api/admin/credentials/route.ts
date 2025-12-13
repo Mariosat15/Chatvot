@@ -131,8 +131,8 @@ export async function PUT(request: NextRequest) {
       email: admin.email,
       name: admin.name || 'Admin',
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }

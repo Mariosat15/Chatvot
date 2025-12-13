@@ -27,9 +27,9 @@ export interface IAuditLog extends Document {
   targetName?: string;
   
   // Additional context
-  metadata?: Record<string, any>;
-  previousValue?: any;
-  newValue?: any;
+  metadata?: Record<string, unknown>;
+  previousValue?: unknown;
+  newValue?: unknown;
   
   // Request info
   ipAddress?: string;
@@ -57,9 +57,9 @@ export interface IAuditLogModel extends Model<IAuditLog> {
     targetType?: IAuditLog['targetType'];
     targetId?: string;
     targetName?: string;
-    metadata?: Record<string, any>;
-    previousValue?: any;
-    newValue?: any;
+    metadata?: Record<string, unknown>;
+    previousValue?: unknown;
+    newValue?: unknown;
     ipAddress?: string;
     userAgent?: string;
     requestPath?: string;

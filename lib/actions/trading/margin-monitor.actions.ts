@@ -83,7 +83,8 @@ export const checkUserMargin = async (competitionId: string) => {
       
       if (marginStatus.status === 'warning') {
         await notificationService.notifyMarginWarning(session.user.id, marginStatus.marginLevel);
-      } else if (marginStatus.status === 'margin_call') {
+      } else if (marginStatus.status === 'danger') {
+        // 'danger' status indicates margin call
         await notificationService.notifyMarginCall(session.user.id, marginStatus.marginLevel);
       }
     } catch (notifError) {

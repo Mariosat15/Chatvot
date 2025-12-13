@@ -7,7 +7,6 @@ import TradingPosition from '@/database/models/trading/trading-position.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import { getRealPrice } from '@/lib/services/real-forex-prices.service';
-import { closePositionAutomatic } from './position.actions';
 import mongoose from 'mongoose';
 
 /**
@@ -536,7 +535,7 @@ export async function finalizeCompetition(competitionId: string) {
     console.log(`   Winners: ${winnerTransactions.length}`);
     console.log(`   Total Distributed: ${totalDistributed} credits`);
     console.log(`   Platform Fee: ${actualPlatformFee.toFixed(2)} credits`);
-    console.log(`   Platform Earned: ${finalPlatformFee.toFixed(2)} credits`);
+    console.log(`   Platform Earned: ${(prizePool - totalDistributed).toFixed(2)} credits`);
 
     // Evaluate badges for ALL participants after competition ends (fire and forget)
     try {

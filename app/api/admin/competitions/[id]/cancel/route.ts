@@ -51,10 +51,10 @@ export async function POST(
       message: 'Competition cancelled and all participants refunded',
       refundedCount: participantCount,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error cancelling competition:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to cancel competition' },
+      { error: error instanceof Error ? error.message : 'Failed to cancel competition' },
       { status: 500 }
     );
   }

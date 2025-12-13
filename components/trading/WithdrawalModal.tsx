@@ -139,10 +139,10 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             <div>
               <h3 className="text-xl font-semibold text-gray-100">Withdrawal Requested!</h3>
               <p className="text-sm text-gray-400 mt-2">
-                Your withdrawal request has been submitted. We'll process it within 1-3 business days.
+                Your withdrawal request has been submitted. We&apos;ll process it within 1-3 business days.
               </p>
               <p className="text-xs text-gray-500 mt-4">
-                You'll receive an email confirmation shortly.
+                You&apos;ll receive an email confirmation shortly.
               </p>
             </div>
           </div>
@@ -291,7 +291,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             </div>
 
             <p className="text-xs text-center text-gray-500">
-              Withdrawals are processed manually. You'll be notified once approved.
+              Withdrawals are processed manually. You&apos;ll be notified once approved.
             </p>
           </form>
         )}

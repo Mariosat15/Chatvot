@@ -25,6 +25,7 @@ interface IPDetectionResult {
   riskScore: number; // 0-100
   
   // Additional data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rawData?: any;
 }
 

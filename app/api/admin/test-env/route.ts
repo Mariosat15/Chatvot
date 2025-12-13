@@ -18,7 +18,7 @@ export async function GET() {
       await fs.access(envPath);
       fileExists = true;
       console.log('✅ .env file exists');
-    } catch (error) {
+    } catch {
       console.log('❌ .env file does not exist');
     }
 
@@ -55,8 +55,8 @@ export async function GET() {
       linesCount: content.split('\n').length,
       preview: content.substring(0, 200) + '...',
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return NextResponse.json({

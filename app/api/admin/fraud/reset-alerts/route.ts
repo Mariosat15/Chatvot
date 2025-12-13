@@ -28,10 +28,9 @@ import bcrypt from 'bcryptjs';
 export async function POST(request: NextRequest) {
   try {
     // Verify admin authentication
-    const authHeader = request.headers.get('authorization');
-    const isAdmin = authHeader && (await verifyAdminAuth(authHeader.replace('Bearer ', '')));
+    const adminAuth = await verifyAdminAuth();
     
-    if (!isAdmin) {
+    if (!adminAuth.isAuthenticated) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
 

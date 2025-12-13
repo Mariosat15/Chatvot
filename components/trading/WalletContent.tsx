@@ -19,7 +19,7 @@ interface WalletContentProps {
     kycVerified: boolean;
     withdrawalEnabled: boolean;
   };
-  transactions: any[];
+  transactions: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 export default function WalletContent({ stats, transactions }: WalletContentProps) {

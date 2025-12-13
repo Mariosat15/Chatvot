@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, Check, CheckCheck, Trash2, ChevronRight, X, RefreshCw } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, ChevronRight, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {

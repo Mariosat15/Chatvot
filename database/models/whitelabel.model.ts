@@ -27,6 +27,11 @@ export interface WhiteLabelDocument extends Document {
   betterAuthSecret: string;
   betterAuthUrl: string;
   
+  // Admin Credentials
+  adminEmail: string;
+  adminPassword: string;
+  adminName: string;
+  
   updatedAt: Date;
   createdAt: Date;
 }
@@ -99,6 +104,20 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     betterAuthUrl: { 
       type: String, 
       default: 'http://localhost:3000' 
+    },
+    
+    // Admin Credentials
+    adminEmail: {
+      type: String,
+      default: ''
+    },
+    adminPassword: {
+      type: String,
+      default: ''
+    },
+    adminName: {
+      type: String,
+      default: 'Admin'
     },
   },
   { 

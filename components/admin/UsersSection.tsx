@@ -7,13 +7,8 @@ import {
   Users, 
   Search, 
   Coins, 
-  TrendingUp, 
-  TrendingDown, 
-  Trophy, 
-  Wallet, 
   Calendar,
   Mail,
-  User,
   RefreshCw,
   Plus,
   Minus,
@@ -23,9 +18,7 @@ import {
   AlertTriangle,
   FileText,
   Send,
-  Eye,
-  Download,
-  ExternalLink
+  Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {

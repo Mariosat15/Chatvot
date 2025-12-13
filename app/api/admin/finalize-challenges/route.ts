@@ -3,7 +3,7 @@ import { requireAdminAuth } from '@/lib/admin/auth';
 import { finalizeEndedChallenges, expirePendingChallenges } from '@/lib/actions/trading/challenge-finalize.actions';
 
 // POST - Manually trigger challenge finalization (for testing/debugging)
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     await requireAdminAuth();
 

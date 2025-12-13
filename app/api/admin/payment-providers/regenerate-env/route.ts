@@ -97,8 +97,8 @@ export async function POST() {
       message: '.env file regenerated successfully. Duplicates removed.',
       providersCount: providers.length,
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Regenerate .env error:', error);

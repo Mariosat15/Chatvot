@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, CheckCircle2, AlertCircle, Clock, DollarSign, User } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertCircle, Clock, User } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PendingPayment {

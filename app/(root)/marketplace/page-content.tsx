@@ -1,21 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   TrendingUp, 
-  Zap, 
   Star, 
   ShoppingCart, 
   Check, 
   Search,
   Sparkles,
   Shield,
-  Clock,
   Users,
   BadgeCheck,
   Gift,
-  ChevronRight,
   Target,
   LineChart,
   Activity,
@@ -43,7 +40,7 @@ interface MarketplaceItem {
   thumbnailUrl?: string;
   version: string;
   indicatorType?: string;
-  strategyConfig?: any;
+  strategyConfig?: Record<string, unknown>;
   totalPurchases: number;
   averageRating: number;
   totalRatings: number;
@@ -55,13 +52,13 @@ interface MarketplaceItem {
 
 type Category = 'all' | 'indicator' | 'strategy';
 
-const CATEGORIES: { value: Category; label: string; icon: any; color: string; bgGradient: string }[] = [
+const CATEGORIES: { value: Category; label: string; icon: React.ComponentType<{ className?: string }>; color: string; bgGradient: string }[] = [
   { value: 'all', label: 'All Items', icon: Sparkles, color: 'text-white', bgGradient: 'from-gray-600/20 to-gray-800/20' },
   { value: 'indicator', label: 'Indicators', icon: LineChart, color: 'text-emerald-400', bgGradient: 'from-emerald-500/20 to-teal-500/20' },
   { value: 'strategy', label: 'Strategies', icon: Target, color: 'text-orange-400', bgGradient: 'from-orange-500/20 to-amber-500/20' },
 ];
 
-const INDICATOR_TYPE_INFO: Record<string, { icon: any; color: string; label: string }> = {
+const INDICATOR_TYPE_INFO: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string; label: string }> = {
   sma: { icon: TrendingUp, color: 'text-blue-400', label: 'Moving Average' },
   ema: { icon: Activity, color: 'text-cyan-400', label: 'EMA' },
   bb: { icon: Layers, color: 'text-purple-400', label: 'Volatility' },
@@ -87,11 +84,7 @@ export default function MarketplaceContent() {
   const [showFreeOnly, setShowFreeOnly] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
   
-  useEffect(() => {
-    fetchItems();
-  }, [category, showFreeOnly]);
-  
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -115,7 +108,11 @@ export default function MarketplaceContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [category, showFreeOnly, search]);
+  
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
   
   const handlePurchase = async (item: MarketplaceItem) => {
     if (item.owned) {
@@ -397,7 +394,7 @@ function ItemCard({
   purchasing: boolean;
   featured?: boolean;
 }) {
-  const isIndicator = item.category === 'indicator';
+  const _isIndicator = item.category === 'indicator';
   const isStrategy = item.category === 'strategy';
   const indicatorInfo = item.indicatorType ? INDICATOR_TYPE_INFO[item.indicatorType] : null;
   const riskStyle = RISK_STYLES[item.riskLevel as keyof typeof RISK_STYLES] || RISK_STYLES.medium;
@@ -574,7 +571,7 @@ function ItemDetailModal({
   onPurchase: () => void;
   purchasing: boolean;
 }) {
-  const isIndicator = item.category === 'indicator';
+  const _isIndicator = item.category === 'indicator';
   const isStrategy = item.category === 'strategy';
   const indicatorInfo = item.indicatorType ? INDICATOR_TYPE_INFO[item.indicatorType] : null;
   const riskStyle = RISK_STYLES[item.riskLevel as keyof typeof RISK_STYLES] || RISK_STYLES.medium;

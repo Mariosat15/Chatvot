@@ -10,8 +10,8 @@ import { auditLogService } from '@/lib/services/audit-log.service';
 export async function POST(request: NextRequest) {
   try {
     // Verify admin authentication
-    const adminUser = await verifyAdminAuth(request);
-    if (!adminUser) {
+    const adminUser = await verifyAdminAuth();
+    if (!adminUser.isAuthenticated) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    const restrictionResults = await Promise.all(restrictionPromises);
+    const _restrictionResults = await Promise.all(restrictionPromises);
 
     // Update fraud alert
     const updatedAlert = await FraudAlert.findByIdAndUpdate(

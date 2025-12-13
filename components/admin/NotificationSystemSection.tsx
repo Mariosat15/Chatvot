@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  Bell, Send, Settings, History, Plus, Trash2, Edit, Save, 
-  RefreshCw, CheckCircle, XCircle, Users, User, Megaphone,
-  AlertTriangle, Info, Zap, ChevronDown, ChevronRight, Search,
-  ToggleLeft, ToggleRight, Copy
+  Bell, Send, Settings, Trash2, Edit, Save, 
+  RefreshCw, CheckCircle, Users, User,
+  Search, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -86,7 +85,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 export default function NotificationSystemSection() {
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
-  const [groupedTemplates, setGroupedTemplates] = useState<Record<string, NotificationTemplate[]>>({});
+  const [_groupedTemplates, setGroupedTemplates] = useState<Record<string, NotificationTemplate[]>>({});
   const [stats, setStats] = useState<NotificationStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('templates');
@@ -163,7 +162,7 @@ export default function NotificationSystemSection() {
       } else {
         toast.error('Failed to seed templates');
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to seed templates');
     }
   };
@@ -182,7 +181,7 @@ export default function NotificationSystemSection() {
         ));
         toast.success(`Template ${isEnabled ? 'enabled' : 'disabled'}`);
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to toggle template');
     }
   };
@@ -199,7 +198,7 @@ export default function NotificationSystemSection() {
         setTemplates(prev => prev.map(t => ({ ...t, isEnabled })));
         toast.success(`All templates ${isEnabled ? 'enabled' : 'disabled'}`);
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to toggle templates');
     }
   };
@@ -212,6 +211,7 @@ export default function NotificationSystemSection() {
 
     setSending(true);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const body: any = {
         action: 'send_instant',
         title: instantTitle,
@@ -251,7 +251,7 @@ export default function NotificationSystemSection() {
         const data = await response.json();
         toast.error(data.error || 'Failed to send notification');
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to send notification');
     } finally {
       setSending(false);
@@ -294,7 +294,7 @@ export default function NotificationSystemSection() {
       } else {
         toast.error('Failed to update template');
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to update template');
     } finally {
       setSaving(false);
@@ -316,7 +316,7 @@ export default function NotificationSystemSection() {
         const data = await response.json();
         toast.error(data.error || 'Failed to delete template');
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to delete template');
     }
   };

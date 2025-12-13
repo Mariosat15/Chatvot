@@ -85,7 +85,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get old values for audit log
-    const oldTemplate = await EmailTemplate.findOne({ templateType }).lean();
+    const _oldTemplate = await EmailTemplate.findOne({ templateType }).lean();
 
     const template = await EmailTemplate.findOneAndUpdate(
       { templateType },
@@ -97,11 +97,10 @@ export async function PUT(request: NextRequest) {
     const admin = await getAdminSession();
     if (admin) {
       await auditLogService.logSettingsUpdated(
-        admin.id,
-        admin.email,
+        { id: admin.id, email: admin.email || 'admin', name: admin.name },
         `email_template_${templateType}`,
-        Object.keys(updates),
-        request
+        null,
+        Object.keys(updates)
       );
     }
 
@@ -148,11 +147,10 @@ export async function POST(request: NextRequest) {
       const admin = await getAdminSession();
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          admin.id,
-          admin.email,
+          { id: admin.id, email: admin.email || 'admin', name: admin.name },
           'test_email_sent',
-          [`type: ${templateType}`, `to: ${testEmail}`],
-          request
+          null,
+          { templateType, testEmail }
         );
       }
       

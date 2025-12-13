@@ -17,6 +17,7 @@ import mongoose from 'mongoose';
 export interface AlertEvidence {
   type: string;
   description: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any;
 }
 
@@ -131,6 +132,7 @@ export class AlertManagerService {
       const allAlertsForUsers = await FraudAlert.find(userQuery).select('_id status alertType title').lean();
       if (allAlertsForUsers.length > 0) {
         console.log(`   📊 All alerts for these users:`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         allAlertsForUsers.forEach((a: any, i: number) => {
           console.log(`      ${i + 1}. ID: ${a._id}, Status: ${a.status}, Type: ${a.alertType}`);
         });
@@ -162,7 +164,9 @@ export class AlertManagerService {
    * ALWAYS adds new evidence with timestamps - allows tracking multiple detections
    * ALL detections for same users are MERGED into ONE alert
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private static async updateExistingAlert(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     existingAlert: any,
     alertType: string,
     evidence: AlertEvidence[],
@@ -191,6 +195,7 @@ export class AlertManagerService {
     
     // Check if this EXACT evidence already exists (same type + same key data)
     const isDuplicateEvidence = (newEvidence: AlertEvidence): boolean => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return existingAlert.evidence.some((existing: any) => {
         if (existing.type !== newEvidence.type) return false;
         
@@ -235,6 +240,7 @@ export class AlertManagerService {
     detectionMethods.add(alertType);
     
     // Also add any detection methods from evidence types
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     existingAlert.evidence.forEach((e: any) => {
       if (e.type.includes('device') || e.type.includes('fingerprint')) detectionMethods.add('same_device');
       if (e.type.includes('payment')) detectionMethods.add('same_payment');

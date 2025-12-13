@@ -199,8 +199,8 @@ export async function GET(request: NextRequest) {
       ...enrichedPlatformTransactions,
       ...enrichedVatPayments,
     ].sort((a, b) => {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
+      const dateA = new Date((a as any).createdAt).getTime();
+      const dateB = new Date((b as any).createdAt).getTime();
       return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
     });
 
@@ -262,8 +262,8 @@ export async function GET(request: NextRequest) {
         },
       },
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error fetching transactions:', error);
@@ -301,10 +301,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user info
-    let userInfo = { id: transaction.userId, name: 'Unknown', email: 'Unknown' };
-    if (transaction.userId !== 'platform') {
-      const usersMap = await getUsersByIds([transaction.userId]);
-      userInfo = usersMap.get(transaction.userId) || userInfo;
+    const txUserId = (transaction as any).userId;
+    let userInfo = { id: txUserId, name: 'Unknown', email: 'Unknown' };
+    if (txUserId !== 'platform') {
+      const usersMap = await getUsersByIds([txUserId]);
+      userInfo = usersMap.get(txUserId) || userInfo;
     } else {
       userInfo = { id: 'platform', name: 'Platform', email: 'system' };
     }
@@ -318,8 +319,8 @@ export async function POST(request: NextRequest) {
         },
       },
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error fetching transaction:', error);

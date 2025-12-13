@@ -114,11 +114,10 @@ export async function POST(request: NextRequest) {
       // Log action
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          admin.id,
-          admin.email,
+          { id: admin.id, email: admin.email || 'admin', name: admin.name },
           'notification_sent',
-          [`type: instant`, `to: ${userId || 'all'}`, `title: ${title}`],
-          request
+          null,
+          { type: 'instant', to: userId || 'all', title }
         );
       }
 
@@ -151,11 +150,10 @@ export async function POST(request: NextRequest) {
       // Log action
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          admin.id,
-          admin.email,
+          { id: admin.id, email: admin.email || 'admin', name: admin.name },
           'notification_sent',
-          [`type: template`, `template: ${templateId}`, `count: ${count}`],
-          request
+          null,
+          { type: 'template', templateId, count }
         );
       }
 
@@ -203,11 +201,10 @@ export async function POST(request: NextRequest) {
       // Log action
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          admin.id,
-          admin.email,
+          { id: admin.id, email: admin.email || 'admin', name: admin.name },
           'notification_template_created',
-          [`id: ${templateId}`, `name: ${name}`],
-          request
+          null,
+          { templateId, name }
         );
       }
 
@@ -225,11 +222,10 @@ export async function POST(request: NextRequest) {
       // Log action
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          admin.id,
-          admin.email,
+          { id: admin.id, email: admin.email || 'admin', name: admin.name },
           'notification_templates_seeded',
-          ['Seeded default notification templates'],
-          request
+          null,
+          { action: 'Seeded default notification templates' }
         );
       }
 
@@ -279,11 +275,10 @@ export async function PUT(request: NextRequest) {
 
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          admin.id,
-          admin.email,
+          { id: admin.id, email: admin.email || 'admin', name: admin.name },
           'notification_template_toggled',
-          [`id: ${templateId}`, `enabled: ${updates.isEnabled}`],
-          request
+          null,
+          { templateId, enabled: updates.isEnabled }
         );
       }
 
@@ -300,11 +295,10 @@ export async function PUT(request: NextRequest) {
 
       if (admin) {
         await auditLogService.logSettingsUpdated(
-          admin.id,
-          admin.email,
+          { id: admin.id, email: admin.email || 'admin', name: admin.name },
           'notification_templates_toggled_all',
-          [`enabled: ${updates.isEnabled}`],
-          request
+          null,
+          { enabled: updates.isEnabled }
         );
       }
 
@@ -326,11 +320,10 @@ export async function PUT(request: NextRequest) {
 
     if (admin) {
       await auditLogService.logSettingsUpdated(
-        admin.id,
-        admin.email,
+        { id: admin.id, email: admin.email || 'admin', name: admin.name },
         'notification_template_updated',
-        [`id: ${templateId}`, ...Object.keys(updates)],
-        request
+        null,
+        { templateId, updates: Object.keys(updates) }
       );
     }
 
@@ -379,11 +372,10 @@ export async function DELETE(request: NextRequest) {
     const admin = await getAdminSession();
     if (admin) {
       await auditLogService.logSettingsUpdated(
-        admin.id,
-        admin.email,
+        { id: admin.id, email: admin.email || 'admin', name: admin.name },
         'notification_template_deleted',
-        [`id: ${templateId}`],
-        request
+        null,
+        { templateId }
       );
     }
 

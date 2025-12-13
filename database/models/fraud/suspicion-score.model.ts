@@ -267,6 +267,7 @@ SuspicionScoreSchema.methods.addPercentage = function(
     
     // Recalculate total score
     this.totalScore = Math.min(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       Object.values(this.scoreBreakdown).reduce((sum: number, item: any) => {
         return sum + (item?.percentage || 0);
       }, 0),

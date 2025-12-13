@@ -298,6 +298,7 @@ const Challenge = models?.Challenge || model<IChallenge>('Challenge', ChallengeS
   try {
     if (Challenge.collection) {
       const indexes = await Challenge.collection.indexes();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hasStaleIndex = indexes.some((idx: any) => idx.name === 'challengeCode_1');
       if (hasStaleIndex) {
         await Challenge.collection.dropIndex('challengeCode_1');

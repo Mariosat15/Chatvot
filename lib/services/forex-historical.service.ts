@@ -92,6 +92,7 @@ export async function fetchHistoricalCandles(
     }
 
     // Transform to lightweight-charts format
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const candles: OHLCCandle[] = data.results.map((bar: any) => ({
       time: Math.floor(bar.t / 1000), // Convert milliseconds to seconds
       open: Number(bar.o.toFixed(5)),
@@ -103,8 +104,8 @@ export async function fetchHistoricalCandles(
 
     console.log(`✅ Fetched ${candles.length} candles for ${symbol}`);
     return candles;
-  } catch (error: any) {
-    console.error('❌ Error fetching historical candles:', error.message);
+  } catch (error) {
+    console.error('❌ Error fetching historical candles:', error instanceof Error ? error.message : 'Unknown error');
     // Return empty array on error instead of crashing - more graceful for UI
     console.warn(`⚠️ Returning empty data due to error - market may be closed`);
     return [];

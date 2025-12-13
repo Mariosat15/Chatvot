@@ -144,11 +144,11 @@ export async function POST(request: NextRequest) {
       purchase: purchase[0],
       newBalance: wallet.creditBalance,
     });
-  } catch (error: any) {
+  } catch (error) {
     await mongoSession.abortTransaction();
     console.error('Error purchasing item:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   } finally {

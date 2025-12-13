@@ -19,6 +19,7 @@ export interface UserProfile {
 /**
  * Helper to find user by various ID formats
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function findUserById(db: any, userId: string) {
   // Try by 'id' field first (better-auth uses this)
   let user = await db.collection('user').findOne({ id: userId });
@@ -44,6 +45,7 @@ async function findUserById(db: any, userId: string) {
  * Helper to build query filter for user
  */
 function buildUserQuery(userId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const queries: any[] = [{ id: userId }];
   
   if (ObjectId.isValid(userId)) {

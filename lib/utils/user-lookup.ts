@@ -40,7 +40,7 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
 
     // If still not found, try as string _id
     if (!user) {
-      user = await db.collection('user').findOne({ _id: userId });
+      user = await db.collection('user').findOne({ _id: userId as any });
     }
 
     if (!user) {
@@ -87,7 +87,8 @@ export async function getAllUsers(): Promise<UserInfo[]> {
     const users = await db.collection('user').find({
       $and: [
         // Must have email
-        { email: { $exists: true, $ne: null, $ne: '' } },
+        { email: { $exists: true, $ne: null } },
+        { email: { $nin: [''] } },
         // Role filter - only traders
         {
           $or: [
@@ -177,7 +178,7 @@ export async function getUsersByIds(userIds: string[]): Promise<Map<string, User
 
       // If still not found, try as string _id
       if (!user) {
-        user = await db.collection('user').findOne({ _id: originalId });
+        user = await db.collection('user').findOne({ _id: originalId as any });
       }
 
       if (user) {

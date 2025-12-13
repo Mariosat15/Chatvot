@@ -54,8 +54,8 @@ export async function GET() {
       betterAuthSecret: settings.betterAuthSecret || getEnvValue('BETTER_AUTH_SECRET', ''),
       betterAuthUrl: settings.betterAuthUrl || getEnvValue('BETTER_AUTH_URL', ''),
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Get environment error:', error);
@@ -143,7 +143,7 @@ export async function PUT(request: NextRequest) {
     let existingEnvContent = '';
     try {
       existingEnvContent = await fs.readFile(envPath, 'utf-8');
-    } catch (error) {
+    } catch {
       console.log('.env file does not exist yet');
     }
     
@@ -241,8 +241,8 @@ export async function PUT(request: NextRequest) {
       success: true,
       message: 'All environment variables updated. Please restart your application.',
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Update environment error:', error);

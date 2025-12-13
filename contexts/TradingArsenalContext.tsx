@@ -193,7 +193,9 @@ const INDICATOR_TYPE_MAP: Record<string, { type: IndicatorType; displayType: 'ov
 // Helper to convert marketplace item to chart indicator
 export function marketplaceItemToIndicator(
   purchaseId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   item: { _id: string; name: string; category: string; indicatorType?: string; defaultSettings?: any },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   customSettings: any
 ): ArsenalIndicator | null {
   if (item.category !== 'indicator') return null;

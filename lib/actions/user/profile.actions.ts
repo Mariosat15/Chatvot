@@ -186,8 +186,8 @@ export async function getUserCompetitionStats(userId?: string): Promise<UserComp
       bestRoi,
       bestWinRate,
       mostTrades,
-      totalPrizesWon: wallet?.totalWonFromCompetitions || 0,
-      totalCreditsWon: wallet?.totalWonFromCompetitions || 0,
+      totalPrizesWon: (wallet as Record<string, number> | null)?.totalWonFromCompetitions || 0,
+      totalCreditsWon: (wallet as Record<string, number> | null)?.totalWonFromCompetitions || 0,
       competitionsWon,
       podiumFinishes,
       recentCompetitions,
@@ -311,7 +311,7 @@ export async function getUserChallengeStats(userId?: string): Promise<UserChalle
 
     // If we didn't get wins from participations, use wallet data
     if (totalPrizeAmount === 0) {
-      totalPrizeAmount = wallet?.totalWonFromChallenges || 0;
+      totalPrizeAmount = (wallet as Record<string, number> | null)?.totalWonFromChallenges || 0;
     }
 
     const overallWinRate = totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
@@ -353,8 +353,8 @@ export async function getUserChallengeStats(userId?: string): Promise<UserChalle
       bestPnl,
       bestRoi,
       mostTrades,
-      totalCreditsWon: wallet?.totalWonFromChallenges || totalPrizeAmount,
-      totalCreditsSpent: wallet?.totalSpentOnChallenges || 0,
+      totalCreditsWon: (wallet as Record<string, number> | null)?.totalWonFromChallenges || totalPrizeAmount,
+      totalCreditsSpent: (wallet as Record<string, number> | null)?.totalSpentOnChallenges || 0,
       recentChallenges,
     };
   } catch (error) {

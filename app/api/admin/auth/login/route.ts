@@ -54,8 +54,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate JWT
+    const adminId = (admin._id as any).toString();
     const token = await new SignJWT({ 
-      adminId: admin._id.toString(), 
+      adminId, 
       email: admin.email 
     })
       .setProtectedHeader({ alg: 'HS256' })
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
       success: true,
       isFirstLogin: admin.isFirstLogin,
       admin: {
-        id: admin._id,
+        id: adminId,
         email: admin.email,
       },
     });
@@ -83,9 +84,9 @@ export async function POST(request: NextRequest) {
     // Log admin login
     try {
       await auditLogService.logAdminLogin({
-        id: admin._id.toString(),
+        id: adminId,
         email: admin.email,
-        name: admin.email.split('@')[0],
+        name: admin.name || admin.email.split('@')[0],
         role: 'admin',
       });
     } catch (auditError) {

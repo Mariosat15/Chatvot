@@ -99,7 +99,7 @@ export async function GET() {
     return NextResponse.json({
       configured: true,
       provider: 'stripe',
-      publishableKey: stripeConfig.publishable_key || stripeConfig.public_key || '',
+      publishableKey: (stripeConfig as any).publishable_key || (stripeConfig as any).public_key || '',
       testMode: stripeConfig.testMode || false,
       processingFee: platformDepositFee, // From centralized Fee Settings
       // VAT info

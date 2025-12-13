@@ -1,5 +1,11 @@
 import { Schema, model, models, type Document, type Model } from 'mongoose';
 
+// Interface for static methods
+export interface ICompanySettingsModel extends Model<ICompanySettings> {
+  getSingleton(): Promise<ICompanySettings>;
+  isEUCompany(): Promise<boolean>;
+}
+
 // EU countries for VAT purposes (ISO 3166-1 alpha-2 codes)
 export const EU_COUNTRIES = [
   'AT', // Austria
@@ -68,11 +74,6 @@ export interface ICompanySettings extends Document {
   
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface ICompanySettingsModel extends Model<ICompanySettings> {
-  getSingleton(): Promise<ICompanySettings>;
-  isEUCompany(): Promise<boolean>;
 }
 
 const CompanySettingsSchema = new Schema<ICompanySettings>(
@@ -185,7 +186,7 @@ CompanySettingsSchema.statics.getSingleton = async function (): Promise<ICompany
 
 // Static method to check if company is in EU
 CompanySettingsSchema.statics.isEUCompany = async function (): Promise<boolean> {
-  const settings = await this.getSingleton();
+  const settings = await (this as ICompanySettingsModel).getSingleton();
   return EU_COUNTRIES.includes(settings.country as EUCountryCode);
 };
 

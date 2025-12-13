@@ -183,7 +183,6 @@ export async function generateInvoicePDF(invoice: InvoiceData): Promise<{ buffer
       width: statusWidth,
       height: 16,
       color: statusColor,
-      borderRadius: 3,
     });
     
     page.drawText(statusText, {
@@ -626,23 +625,28 @@ export async function generateInvoicePDF(invoice: InvoiceData): Promise<{ buffer
       filename: `Invoice-${invoice.invoiceNumber}.pdf`,
     };
     
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ [PDF] Error generating PDF:', error);
-    throw new Error(`Failed to generate PDF: ${error?.message}`);
+    throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
  * Draw legal disclaimer section
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function drawDisclaimer(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   page: any,
   margin: number,
   y: number,
   contentWidth: number,
   invoice: InvoiceData,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   helvetica: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   helveticaBold: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   lightGray: any
 ) {
   // Divider line
@@ -769,8 +773,8 @@ export async function generatePDFFromHTML(html: string): Promise<Buffer> {
     console.log(`🖨️ [PDF] PDF generated: ${pdfBytes.length} bytes`);
     
     return Buffer.from(pdfBytes);
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ [PDF] Error generating PDF:', error);
-    throw new Error(`Failed to generate PDF: ${error?.message}`);
+    throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

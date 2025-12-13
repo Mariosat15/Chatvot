@@ -6,7 +6,6 @@ import TradingPosition from '@/database/models/trading/trading-position.model';
 import TradeHistory from '@/database/models/trading/trade-history.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import UserBadge from '@/database/models/user-badge.model';
-import BadgeConfig from '@/database/models/badge-config.model';
 import { Badge } from '@/lib/constants/badges';
 import { awardXPForBadge } from '@/lib/services/xp-level.service';
 import { getBadgesFromDB } from '@/lib/services/badge-config-seed.service';
@@ -125,7 +124,7 @@ export async function evaluateUserBadges(userId: string): Promise<{
       if (existingBadgeIds.has(badge.id)) continue;
 
       // Check if badge condition is met
-      const earned = await checkBadgeCondition(badge, stats);
+      const earned = await checkBadgeCondition(badge as Badge, stats);
 
       if (earned) {
         console.log(`✅ [BADGE EVAL] User earned badge: ${badge.name} (${badge.id})`);
@@ -253,15 +252,15 @@ async function gatherUserStats(userId: string): Promise<UserStats> {
   const alwaysUsesTP = allPositions.length > 0 && tradesWithTP === allPositions.length;
 
   // Wallet stats
-  const wallet = await CreditWallet.findOne({ userId }).lean();
-  const totalDeposited = wallet?.totalDeposited || 0;
-  const totalWithdrawn = wallet?.totalWithdrawn || 0;
+  const wallet = await CreditWallet.findOne({ userId }).lean() as Record<string, unknown> | null;
+  const totalDeposited = (wallet?.totalDeposited as number) || 0;
+  const totalWithdrawn = (wallet?.totalWithdrawn as number) || 0;
 
   // Account age (assuming user created with first participation or wallet)
   const firstParticipation = participations.sort((a, b) => 
     new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   )[0];
-  const accountCreatedAt = firstParticipation?.createdAt || wallet?.createdAt || new Date();
+  const accountCreatedAt = firstParticipation?.createdAt || (wallet?.createdAt as Date) || new Date();
   const accountAge = Math.floor((Date.now() - new Date(accountCreatedAt).getTime()) / (1000 * 60 * 60 * 24));
 
   // Calculate trading streaks

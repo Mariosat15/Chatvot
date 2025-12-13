@@ -4,7 +4,6 @@ import { useState, useCallback } from 'react';
 import { 
   Plus,
   Trash2,
-  Save,
   Play,
   AlertTriangle,
   TrendingUp,
@@ -29,7 +28,6 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 
 // Available indicators for strategy conditions
 const AVAILABLE_INDICATORS = [

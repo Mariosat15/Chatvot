@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
       transactionCount: txCount,
       status: 'paid',
       paidAt: new Date(),
-      paidBy: admin.id,
+      paidBy: admin.adminId || 'admin',
       paidByEmail: admin.email,
       reference,
       notes,

@@ -1,20 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bell, BellOff, Mail, Smartphone, Clock, RefreshCw, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { Bell, BellOff, Mail, Clock, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { toast } from 'sonner';
 
 interface NotificationTemplate {
@@ -138,7 +131,7 @@ export default function NotificationSettings() {
       } else {
         toast.error('Failed to save preferences');
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to save preferences');
     } finally {
       setSaving(false);
@@ -163,7 +156,7 @@ export default function NotificationSettings() {
         } : null);
         toast.success(`${CATEGORY_INFO[category]?.label || category} notifications ${enabled ? 'enabled' : 'disabled'}`);
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to update preference');
     }
   };
@@ -185,7 +178,7 @@ export default function NotificationSettings() {
           return { ...prev, disabledNotifications: newDisabled };
         });
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to update preference');
     }
   };
@@ -202,7 +195,7 @@ export default function NotificationSettings() {
         toast.success('Preferences reset to defaults');
         fetchPreferences();
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to reset preferences');
     }
   };

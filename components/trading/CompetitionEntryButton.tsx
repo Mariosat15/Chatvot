@@ -8,7 +8,9 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionEntryButtonProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
   userBalance: number;
   isUserIn: boolean;
@@ -69,7 +71,7 @@ export default function CompetitionEntryButton({
           <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
             <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-green-400">You're in this competition!</p>
+              <p className="text-sm font-medium text-green-400">You&apos;re in this competition!</p>
               <p className="text-xs text-gray-400 mt-1">
                 {isActive ? 'Start trading now' : 'Competition will start soon'}
               </p>

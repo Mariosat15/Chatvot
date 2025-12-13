@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
         recentTransactions,
       },
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error fetching platform financials:', error);
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       transaction: result.transaction,
       updatedStats,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error recording admin withdrawal:', error);
     return NextResponse.json(
       { error: 'Failed to record withdrawal' },

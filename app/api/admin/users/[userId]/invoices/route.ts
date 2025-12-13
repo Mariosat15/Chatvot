@@ -30,9 +30,9 @@ export async function GET(
       invoices,
       total: invoices.length,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching user invoices:', error);
-    if (error.message === 'Unauthorized') {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 });

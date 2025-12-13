@@ -48,6 +48,7 @@ const tiePrizeOptions = [
 ];
 
 export default function CompetitionRulesSection({ rules, onChange }: CompetitionRulesSectionProps) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateRules = (field: keyof CompetitionRules, value: any) => {
     onChange({ ...rules, [field]: value });
   };
@@ -66,6 +67,7 @@ export default function CompetitionRulesSection({ rules, onChange }: Competition
         <CardContent className="space-y-4">
           <div>
             <Label>Primary Ranking Criteria</Label>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             <Select value={rules.rankingMethod} onValueChange={(value: any) => updateRules('rankingMethod', value)}>
               <SelectTrigger className="bg-dark-800 border-dark-600 mt-2">
                 <SelectValue />
@@ -107,6 +109,7 @@ export default function CompetitionRulesSection({ rules, onChange }: Competition
         <CardContent className="space-y-4">
           <div>
             <Label>First Tiebreaker</Label>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             <Select value={rules.tieBreaker1} onValueChange={(value: any) => updateRules('tieBreaker1', value)}>
               <SelectTrigger className="bg-dark-800 border-dark-600 mt-2">
                 <SelectValue />
@@ -128,6 +131,7 @@ export default function CompetitionRulesSection({ rules, onChange }: Competition
             <Label>Second Tiebreaker (Optional)</Label>
             <Select
               value={rules.tieBreaker2 || 'none'}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onValueChange={(value: any) => updateRules('tieBreaker2', value === 'none' ? undefined : value)}
             >
               <SelectTrigger className="bg-dark-800 border-dark-600 mt-2">
@@ -153,6 +157,7 @@ export default function CompetitionRulesSection({ rules, onChange }: Competition
             <Label>Prize Distribution for Ties</Label>
             <Select
               value={rules.tiePrizeDistribution}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onValueChange={(value: any) => updateRules('tiePrizeDistribution', value)}
             >
               <SelectTrigger className="bg-dark-800 border-dark-600 mt-2">

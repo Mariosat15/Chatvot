@@ -23,8 +23,8 @@ export async function GET() {
       success: true,
       settings: JSON.parse(JSON.stringify(settings))
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error fetching fraud settings:', error);
@@ -74,8 +74,8 @@ export async function PUT(request: Request) {
       settings: JSON.parse(JSON.stringify(settings)),
       message: 'Settings updated successfully'
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error updating fraud settings:', error);
@@ -112,8 +112,8 @@ export async function POST() {
       settings: JSON.parse(JSON.stringify(settings)),
       message: 'Settings reset to defaults'
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error resetting fraud settings:', error);

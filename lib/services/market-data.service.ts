@@ -6,6 +6,9 @@
 
 import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
 
+// Re-export ForexSymbol for use by other modules
+export type { ForexSymbol };
+
 // Map our symbols to Massive.com format
 const MASSIVE_SYMBOL_MAP: Record<ForexSymbol, string> = {
   'EUR/USD': 'EURUSD',

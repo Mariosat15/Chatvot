@@ -20,8 +20,8 @@ export async function GET() {
       profileImage: settings.profileImage || '/assets/images/PROFILE.png',
       dashboardPreview: settings.dashboardPreview || '/assets/images/dashboard-preview.png',
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Get images error:', error);
@@ -56,8 +56,8 @@ export async function PUT(request: NextRequest) {
       success: true,
       message: 'Image configuration saved',
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Update images error:', error);

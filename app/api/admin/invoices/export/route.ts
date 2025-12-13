@@ -238,22 +238,22 @@ export async function GET(request: NextRequest) {
       console.error('Failed to log audit action:', auditError);
     }
 
-    return new NextResponse(zipBuffer, {
+    return new NextResponse(new Uint8Array(zipBuffer), {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="invoices_${dateRange}.zip"`,
       },
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error exporting invoices:', error);
     
-    if (error.message === 'Unauthorized') {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
     return NextResponse.json(
-      { error: 'Failed to export invoices', details: error.message },
+      { error: 'Failed to export invoices', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -312,10 +312,10 @@ export async function POST(request: NextRequest) {
       totalSubtotal: summary.totalSubtotal,
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error getting invoice summary:', error);
     
-    if (error.message === 'Unauthorized') {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     

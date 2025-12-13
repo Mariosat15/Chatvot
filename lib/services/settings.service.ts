@@ -5,7 +5,9 @@ import { WhiteLabel } from '@/database/models/whitelabel.model';
 import PaymentProvider from '@/database/models/payment-provider.model';
 
 // Cache for settings to avoid repeated database queries
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let settingsCache: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let paymentProvidersCache: any = null;
 let lastFetch = 0;
 const CACHE_TTL = 60000; // 1 minute cache
@@ -87,6 +89,7 @@ export async function getPaymentProviders() {
 /**
  * Get a specific setting value
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getSetting(key: string, fallback: any = '') {
   try {
     const settings = await getSettings();
@@ -112,6 +115,7 @@ export async function getPaymentProviderCredentials(slug: string) {
 
     // Convert credentials array to object for easy access
     const credentials: Record<string, string> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     provider.credentials.forEach((cred: any) => {
       credentials[cred.key] = cred.value;
     });

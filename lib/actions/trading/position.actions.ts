@@ -52,6 +52,7 @@ export const getUserPositions = async (competitionId: string) => {
       .lean();
 
     // Update P&L for each position with current REAL prices
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const positionsWithCurrentPnL = await Promise.all(positions.map(async (position: any) => {
       const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
       if (currentPrice) {

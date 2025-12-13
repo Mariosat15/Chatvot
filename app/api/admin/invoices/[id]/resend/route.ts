@@ -32,7 +32,7 @@ export async function POST(
     await inngest.send({
       name: 'app/invoice.created',
       data: {
-        invoiceId: invoice._id.toString(),
+        invoiceId: (invoice._id as any).toString(),
         customerEmail: invoice.customerEmail,
         customerName: invoice.customerName,
         invoiceNumber: invoice.invoiceNumber,
@@ -45,9 +45,9 @@ export async function POST(
       success: true,
       message: `Invoice ${invoice.invoiceNumber} will be sent to ${invoice.customerEmail}`,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error resending invoice:', error);
-    if (error.message === 'Unauthorized') {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return NextResponse.json({ error: 'Failed to resend invoice' }, { status: 500 });
