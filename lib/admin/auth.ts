@@ -1,5 +1,5 @@
 import { jwtVerify } from 'jose';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { connectToDatabase } from '@/database/mongoose';
 import { Admin } from '@/database/models/admin.model';
 
@@ -14,8 +14,18 @@ export async function verifyAdminAuth(): Promise<{
   name?: string;
 }> {
   try {
+    // Try cookie-based auth first
     const cookieStore = await cookies();
-    const token = cookieStore.get('admin_token')?.value;
+    let token = cookieStore.get('admin_token')?.value;
+
+    // If no cookie, try Bearer token from Authorization header
+    if (!token) {
+      const headersList = await headers();
+      const authHeader = headersList.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
 
     if (!token) {
       return { isAuthenticated: false };
@@ -41,7 +51,7 @@ export async function verifyAdminAuth(): Promise<{
       email: payload.email as string,
       name: adminName,
     };
-  } catch (error) {
+  } catch {
     return { isAuthenticated: false };
   }
 }
