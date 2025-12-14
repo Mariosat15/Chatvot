@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/connection';
+import { connectToDatabase } from '@/database/mongoose';
 import XPConfig from '@/database/models/xp-config.model';
 import TradingRiskSettings from '@/database/models/trading-risk-settings.model';
 import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
 import AppSettings from '@/database/models/app-settings.model';
-import { getXPConfigFromDB, seedDefaultXPConfig, seedDefaultLevelProgression } from '@/lib/services/xp-config.service';
+import { getBadgeXPValues, getTitleLevels } from '@/lib/services/xp-config.service';
+import { BADGE_XP_VALUES, TITLE_LEVELS } from '@/lib/constants/levels';
 
 /**
  * GET /api/help-settings
@@ -16,16 +17,16 @@ export async function GET() {
     await connectToDatabase();
 
     // Fetch XP configuration (badge XP values and level progression)
-    let xpConfig = await getXPConfigFromDB();
+    let badgeXP;
+    let levels;
     
-    // If no XP config exists, seed defaults
-    if (!xpConfig.badgeXP) {
-      await seedDefaultXPConfig();
-      xpConfig = await getXPConfigFromDB();
-    }
-    if (!xpConfig.levels || xpConfig.levels.length === 0) {
-      await seedDefaultLevelProgression();
-      xpConfig = await getXPConfigFromDB();
+    try {
+      badgeXP = await getBadgeXPValues();
+      levels = await getTitleLevels();
+    } catch {
+      // Fallback to constants if service fails
+      badgeXP = BADGE_XP_VALUES;
+      levels = TITLE_LEVELS;
     }
 
     // Fetch trading risk settings
@@ -35,19 +36,16 @@ export async function GET() {
     const creditSettings = await CreditConversionSettings.getSingleton();
 
     // Fetch app settings
-    let appSettings = await AppSettings.findById('app-settings').lean();
-    if (!appSettings) {
-      // Create default app settings if none exist
-      appSettings = {
-        currency: { code: 'EUR', symbol: '€', name: 'Euro' },
-        credits: { name: 'Credits', symbol: '⚡', valueInEUR: 1, decimals: 2 },
-      };
-    }
+    const appSettingsDoc = await AppSettings.findById('app-settings').lean();
+    const appSettings = appSettingsDoc || {
+      currency: { code: 'EUR', symbol: '€', name: 'Euro' },
+      credits: { name: 'Credits', symbol: '⚡', valueInEUR: 1, decimals: 2 },
+    };
 
     // Format the response
     const helpSettings = {
       // Badge XP Values
-      badgeXP: xpConfig.badgeXP || {
+      badgeXP: badgeXP || {
         common: 10,
         rare: 25,
         epic: 50,
@@ -55,18 +53,7 @@ export async function GET() {
       },
 
       // Level Progression
-      levels: xpConfig.levels || [
-        { level: 1, title: 'Novice Trader', minXP: 0, icon: '🌱', color: 'text-gray-400' },
-        { level: 2, title: 'Apprentice Trader', minXP: 100, icon: '📚', color: 'text-green-400' },
-        { level: 3, title: 'Skilled Trader', minXP: 300, icon: '⚔️', color: 'text-blue-400' },
-        { level: 4, title: 'Expert Trader', minXP: 600, icon: '🎯', color: 'text-cyan-400' },
-        { level: 5, title: 'Elite Trader', minXP: 1000, icon: '💎', color: 'text-purple-400' },
-        { level: 6, title: 'Master Trader', minXP: 1600, icon: '👑', color: 'text-pink-400' },
-        { level: 7, title: 'Grand Master', minXP: 2400, icon: '🔥', color: 'text-orange-400' },
-        { level: 8, title: 'Trading Champion', minXP: 3400, icon: '⚡', color: 'text-red-400' },
-        { level: 9, title: 'Market Legend', minXP: 4600, icon: '🌟', color: 'text-yellow-400' },
-        { level: 10, title: 'Trading God', minXP: 6000, icon: '👑', color: 'text-yellow-300' },
-      ],
+      levels: levels || TITLE_LEVELS,
 
       // Margin Levels
       margin: {
@@ -126,4 +113,3 @@ export async function GET() {
     );
   }
 }
-
