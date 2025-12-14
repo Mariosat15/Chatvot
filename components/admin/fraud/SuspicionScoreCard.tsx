@@ -6,8 +6,9 @@ import { Progress } from '@/components/ui/progress';
 import { AlertTriangle, Shield, TrendingUp, Users, Clock } from 'lucide-react';
 
 interface ScoreBreakdown {
-  points: number;
-  evidence: string;
+  percentage?: number;  // Model stores 'percentage'
+  points?: number;      // Backward compatibility
+  evidence?: string;
   lastDetected?: string;
 }
 
@@ -100,10 +101,12 @@ export default function SuspicionScoreCard({ score }: Props) {
   const activeDetections = detectionMethods
     .map(method => {
       const breakdown = score.scoreBreakdown[method.key as keyof typeof score.scoreBreakdown];
+      // The model stores 'percentage', not 'points'
+      const detectionPercentage = breakdown?.percentage || breakdown?.points || 0;
       return {
         ...method,
         ...breakdown,
-        percentage: breakdown?.points || 0, // Use points as percentage
+        percentage: detectionPercentage,
       };
     })
     .filter(method => method.percentage > 0)
