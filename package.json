@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "dev": "next dev",
+    "dev:turbo": "next dev --turbopack",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "clean": "rimraf .next",
     "test:db": "node scripts/test-db.mjs"
   },
   "dependencies": {

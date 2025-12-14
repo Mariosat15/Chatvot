@@ -25,7 +25,7 @@ export async function GET() {
   try {
     // Verify admin authentication
     const cookieStore = await cookies();
-    const token = cookieStore.get('admin-token'); // Use hyphen, not underscore
+    const token = cookieStore.get('admin_token'); // Use underscore to match auth system
 
     if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
   try {
     // Verify admin authentication
     const cookieStore = await cookies();
-    const token = cookieStore.get('admin-token'); // Use hyphen, not underscore
+    const token = cookieStore.get('admin_token'); // Use underscore to match auth system
 
     if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
