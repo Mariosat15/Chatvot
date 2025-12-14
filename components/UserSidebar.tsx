@@ -97,7 +97,7 @@ const accountNavItems: NavItem[] = [
     gradient: 'from-green-500/20 to-green-600/5',
   },
   {
-    href: '/help/competitions',
+    href: '/help',
     label: 'Help Center',
     icon: <HelpCircle className="h-5 w-5" />,
     color: 'text-orange-400',
