@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   TrendingUp, 
@@ -84,13 +84,19 @@ export default function MarketplaceContent() {
   const [showFreeOnly, setShowFreeOnly] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
   
-  const fetchItems = useCallback(async () => {
+  // Use ref to store the current search value without triggering re-renders
+  const searchRef = useRef(search);
+  searchRef.current = search;
+
+  const fetchItems = useCallback(async (searchQuery?: string) => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
       if (category !== 'all') params.set('category', category);
       if (showFreeOnly) params.set('free', 'true');
-      if (search) params.set('search', search);
+      // Use provided searchQuery or current search ref
+      const currentSearch = searchQuery !== undefined ? searchQuery : searchRef.current;
+      if (currentSearch) params.set('search', currentSearch);
       
       const response = await fetch(`/api/marketplace?${params.toString()}`);
       const data = await response.json();
@@ -108,8 +114,9 @@ export default function MarketplaceContent() {
     } finally {
       setLoading(false);
     }
-  }, [category, showFreeOnly, search]);
+  }, [category, showFreeOnly]);
   
+  // Fetch on category or free filter change (not on search keystroke)
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
@@ -149,7 +156,7 @@ export default function MarketplaceContent() {
   
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchItems();
+    fetchItems(search);
   };
   
   const featuredItems = items.filter(i => i.isFeatured);

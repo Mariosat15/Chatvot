@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       {
         status: 'dismissed',
         resolvedAt: new Date(),
-        resolvedBy: adminUser.adminId || 'admin',
+        resolvedBy: adminUser.adminId || adminUser.email || 'system',
         actionTaken: 'none',
         resolution: `Investigation dismissed - Marked as false positive. After investigation, this alert was determined to be a false positive or acceptable use case (e.g., family members, shared device).`
       },

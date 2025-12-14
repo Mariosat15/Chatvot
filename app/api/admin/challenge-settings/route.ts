@@ -1,34 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
 import { connectToDatabase } from '@/database/mongoose';
 import ChallengeSettings from '@/database/models/trading/challenge-settings.model';
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.ADMIN_JWT_SECRET || 'admin-secret-key-change-in-production'
-);
-
-async function verifyAdminToken(request: NextRequest) {
-  const token = request.cookies.get('admin_token')?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return payload;
-  } catch {
-    return null;
-  }
-}
+import { requireAdminAuth, getAdminSession } from '@/lib/admin/auth';
 
 // GET - Get challenge settings
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await requireAdminAuth();
 
     await connectToDatabase();
 
@@ -36,6 +14,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ settings });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error('Error fetching challenge settings:', error);
     return NextResponse.json(
       { error: 'Failed to fetch challenge settings' },
@@ -47,11 +28,7 @@ export async function GET(request: NextRequest) {
 // PUT - Update challenge settings
 export async function PUT(request: NextRequest) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    await requireAdminAuth();
     await connectToDatabase();
 
     let body;
@@ -115,12 +92,15 @@ export async function PUT(request: NextRequest) {
     // Log audit
     try {
       const { auditLogService } = await import('@/lib/services/audit-log.service');
-      await auditLogService.logSettingsUpdated(
-        { id: admin.sub as string, email: admin.email as string },
-        'challenge_settings',
-        null,
-        body
-      );
+      const adminSession = await getAdminSession();
+      if (adminSession) {
+        await auditLogService.logSettingsUpdated(
+          { id: adminSession.id, email: adminSession.email, name: adminSession.name },
+          'challenge_settings',
+          null,
+          body
+        );
+      }
     } catch (auditError) {
       console.error('Error logging audit:', auditError);
     }
@@ -131,6 +111,10 @@ export async function PUT(request: NextRequest) {
       settings,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
     console.error('Error updating challenge settings:', error);
     
     // Handle Mongoose validation errors

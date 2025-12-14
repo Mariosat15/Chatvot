@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       {
         status: 'resolved',
         resolvedAt: new Date(),
-        resolvedBy: adminUser.adminId || 'unknown',
+        resolvedBy: adminUser.adminId || adminUser.email || 'system',
         actionTaken: 'account_suspended',
         resolution: `Suspended ${userIds.length} account(s) until ${new Date(suspendUntil).toLocaleString()}. Restricted trading, competitions, deposits, and withdrawals.`
       },

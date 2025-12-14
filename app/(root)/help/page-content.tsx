@@ -873,7 +873,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <h5 className="font-semibold text-yellow-400">⚠️ Warning Zone</h5>
-                      <span className="text-sm text-yellow-400">{settings.margin.marginCall + 1}% - {settings.margin.safe}%</span>
+                      <span className="text-sm text-yellow-400">{settings.margin.warning + 1}% - {settings.margin.safe}%</span>
                     </div>
                     <p className="text-sm text-gray-400">Caution! Consider reducing position sizes.</p>
                   </div>
@@ -881,9 +881,17 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <h5 className="font-semibold text-orange-400">🚨 Margin Call</h5>
-                      <span className="text-sm text-orange-400">{settings.margin.liquidation + 1}% - {settings.margin.marginCall}%</span>
+                      <span className="text-sm text-orange-400">{settings.margin.marginCall + 1}% - {settings.margin.warning}%</span>
                     </div>
                     <p className="text-sm text-gray-400">Danger! Close positions or risk liquidation.</p>
+                  </div>
+
+                  <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="font-semibold text-red-500">⚠️ Danger Zone</h5>
+                      <span className="text-sm text-red-500">{settings.margin.liquidation + 1}% - {settings.margin.marginCall}%</span>
+                    </div>
+                    <p className="text-sm text-gray-400">Danger! You&apos;re approaching liquidation. Close some trades or risk automatic liquidation.</p>
                   </div>
 
                   <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">

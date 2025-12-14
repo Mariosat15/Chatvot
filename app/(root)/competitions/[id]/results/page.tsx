@@ -82,7 +82,8 @@ const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prizeWon = competition.finalLeaderboard?.find((l: any) => l.userId === session.user.id)?.prizeAmount || 0;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const finalRank = participant.currentRank || competition.finalLeaderboard?.findIndex((l: any) => l.userId === session.user.id) + 1 || '—';
+  const leaderboardIndex = competition.finalLeaderboard?.findIndex((l: any) => l.userId === session.user.id) ?? -1;
+  const finalRank = participant.currentRank || (leaderboardIndex >= 0 ? leaderboardIndex + 1 : null) || '—';
 
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleString('en-US', {

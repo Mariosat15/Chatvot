@@ -38,7 +38,7 @@ export async function PUT(
 
     if (status === 'resolved' || status === 'dismissed') {
       alert.resolvedAt = new Date();
-      alert.resolvedBy = auth.adminId || 'admin';
+      alert.resolvedBy = auth.adminId || auth.email || 'system';
     }
 
     await alert.save();

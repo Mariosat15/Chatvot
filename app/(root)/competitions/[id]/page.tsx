@@ -856,7 +856,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                                 {index === 2 && <Trophy className={`h-5 w-5 ${isFilled ? 'text-orange-600' : 'text-gray-600'}`} />}
                                 {index > 2 && <Trophy className="h-5 w-5 text-gray-600" />}
                                 <span className={`text-sm font-bold ${isFilled ? 'text-gray-300' : 'text-gray-500'}`}>
-                                  Rank #{prize.rank}
+                                  Rank #{prize.rank ?? (index + 1)}
                                 </span>
                                 <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                                   isFilled ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-700 text-gray-500'

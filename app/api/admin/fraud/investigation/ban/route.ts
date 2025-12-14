@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       {
         status: 'resolved',
         resolvedAt: new Date(),
-        resolvedBy: adminUser.adminId || 'unknown',
+        resolvedBy: adminUser.adminId || adminUser.email || 'system',
         actionTaken: 'account_banned',
         resolution: `Permanently banned ${userIds.length} account(s). All access to trading, competitions, deposits, and withdrawals has been revoked.`
       },
