@@ -12,7 +12,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath } from 'next/cache';
 import { connectToDatabase } from '@/database/mongoose';
 import TradingRiskSettings from '@/database/models/trading-risk-settings.model';
 
@@ -169,7 +169,6 @@ export async function POST(req: Request) {
     console.log('📊 Updated settings:', settings);
 
     // Revalidate all trading pages to apply new settings immediately
-    revalidateTag('risk-settings');
     revalidatePath('/competitions/[id]/trade', 'page');
     console.log('♻️ Revalidated cache - new settings will apply immediately');
 
