@@ -27,8 +27,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // Check if user is admin (cast to any for role check)
-    if ((session.user as any).role !== 'admin') {
+    // Check if user is admin (support both isAdmin and role for backwards compatibility)
+    const user = session.user as any;
+    const isAdmin = user?.isAdmin === true || user?.role === 'admin';
+    
+    if (!isAdmin) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
     

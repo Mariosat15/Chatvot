@@ -19,7 +19,11 @@ export async function GET(request: Request) {
     // Verify admin authentication
     const session = await auth.api.getSession({ headers: await headers() });
     
-    if (!session?.user || (session.user as any).role !== 'admin') {
+    // Check both isAdmin and role for backwards compatibility
+    const user = session?.user as any;
+    const isAdmin = user?.isAdmin === true || user?.role === 'admin';
+    
+    if (!session?.user || !isAdmin) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
         { status: 401 }

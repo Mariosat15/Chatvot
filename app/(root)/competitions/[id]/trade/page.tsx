@@ -122,7 +122,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dailyRealizedPnl = tradeHistory
     .filter((trade: any) => trade.closedAt && new Date(trade.closedAt) >= today)
-    .reduce((sum: number, trade: any) => sum + (trade.pnl || trade.realizedPnl || 0), 0);
+    .reduce((sum: number, trade: any) => sum + (trade.pnl ?? trade.realizedPnl ?? 0), 0);
 
   return (
     <PriceProvider>
