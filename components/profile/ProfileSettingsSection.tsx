@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { User, MapPin, Building2, Mail, Save, Loader2, CheckCircle2, Globe, Lock, Eye, EyeOff } from 'lucide-react';
+import { User, MapPin, Building2, Mail, Save, Loader2, CheckCircle2, Globe, Lock, Eye, EyeOff, Camera, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import countryList from 'react-select-country-list';
+import Image from 'next/image';
 import {
   Select,
   SelectContent,
@@ -20,6 +22,8 @@ interface UserProfile {
   id: string;
   name: string;
   email: string;
+  profileImage?: string;
+  bio?: string;
   country?: string;
   address?: string;
   city?: string;
@@ -33,12 +37,16 @@ export default function ProfileSettingsSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Track original values to detect changes
-  const originalValues = useRef<{ name: string; country: string; address: string; city: string; postalCode: string } | null>(null);
+  const originalValues = useRef<{ name: string; bio: string; country: string; address: string; city: string; postalCode: string } | null>(null);
 
   // Form fields
   const [name, setName] = useState('');
+  const [profileImage, setProfileImage] = useState('');
+  const [bio, setBio] = useState('');
   const [country, setCountry] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
@@ -69,6 +77,7 @@ export default function ProfileSettingsSection() {
     if (!originalValues.current) return false;
     return (
       name !== originalValues.current.name ||
+      bio !== originalValues.current.bio ||
       country !== originalValues.current.country ||
       address !== originalValues.current.address ||
       city !== originalValues.current.city ||
@@ -90,20 +99,24 @@ export default function ProfileSettingsSection() {
       const response = await fetch('/api/user/profile');
       if (response.ok) {
         const data = await response.json();
-        setProfile(data);
-        setName(data.name || '');
-        setCountry(data.country || '');
-        setAddress(data.address || '');
-        setCity(data.city || '');
-        setPostalCode(data.postalCode || '');
+        const userData = data.user || data; // Handle both new and old response format
+        setProfile(userData);
+        setName(userData.name || '');
+        setProfileImage(userData.profileImage || '');
+        setBio(userData.bio || '');
+        setCountry(userData.country || '');
+        setAddress(userData.address || '');
+        setCity(userData.city || '');
+        setPostalCode(userData.postalCode || '');
         
         // Store original values
         originalValues.current = {
-          name: data.name || '',
-          country: data.country || '',
-          address: data.address || '',
-          city: data.city || '',
-          postalCode: data.postalCode || '',
+          name: userData.name || '',
+          bio: userData.bio || '',
+          country: userData.country || '',
+          address: userData.address || '',
+          city: userData.city || '',
+          postalCode: userData.postalCode || '',
         };
       } else {
         toast.error('Failed to load profile');
@@ -124,6 +137,7 @@ export default function ProfileSettingsSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
+          bio,
           country,
           address,
           city,
@@ -132,12 +146,14 @@ export default function ProfileSettingsSection() {
       });
 
       if (response.ok) {
-        const updatedProfile = await response.json();
+        const data = await response.json();
+        const updatedProfile = data.user || data;
         setProfile(updatedProfile);
         
         // Update original values
         originalValues.current = {
           name: updatedProfile.name || '',
+          bio: updatedProfile.bio || '',
           country: updatedProfile.country || '',
           address: updatedProfile.address || '',
           city: updatedProfile.city || '',
@@ -154,6 +170,49 @@ export default function ProfileSettingsSection() {
       toast.error('Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Invalid file type. Please use JPEG, PNG, WebP, or GIF.');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File too large. Maximum size is 5MB.');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch('/api/user/profile/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProfileImage(data.profileImage);
+        toast.success('Profile image uploaded successfully!');
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to upload image');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -209,6 +268,99 @@ export default function ProfileSettingsSection() {
 
   return (
     <div className="space-y-6">
+      {/* Profile Picture & Bio */}
+      <div className="bg-dark-700/50 rounded-2xl p-6 shadow-xl border border-dark-600">
+        <div className="flex items-center gap-3 mb-6">
+          <Camera className="h-6 w-6 text-pink-500" />
+          <h2 className="text-2xl font-bold text-white">Profile Picture & Bio</h2>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Profile Image */}
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative group">
+              <div className="w-32 h-32 rounded-full overflow-hidden bg-gradient-to-br from-pink-500 to-purple-600 p-1">
+                <div className="w-full h-full rounded-full overflow-hidden bg-dark-800 flex items-center justify-center">
+                  {profileImage ? (
+                    <Image
+                      src={profileImage}
+                      alt="Profile"
+                      width={128}
+                      height={128}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-4xl font-bold text-gray-400">
+                      {name ? name.charAt(0).toUpperCase() : '?'}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingImage}
+                className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              >
+                {uploadingImage ? (
+                  <Loader2 className="h-8 w-8 text-white animate-spin" />
+                ) : (
+                  <Camera className="h-8 w-8 text-white" />
+                )}
+              </button>
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+              className="hidden"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingImage}
+              className="text-pink-400 border-pink-500/50 hover:bg-pink-500/10"
+            >
+              {uploadingImage ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Camera className="mr-2 h-4 w-4" />
+                  Change Photo
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-gray-500">Max 5MB (JPEG, PNG, WebP, GIF)</p>
+          </div>
+
+          {/* Bio */}
+          <div className="flex-1 space-y-2">
+            <Label htmlFor="bio" className="text-gray-300 flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Bio / About Me
+            </Label>
+            <Textarea
+              id="bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Tell others about yourself, your trading style, and your goals..."
+              className="bg-dark-800 border-dark-600 text-white min-h-[120px] resize-none"
+              maxLength={500}
+            />
+            <div className="flex justify-between">
+              <p className="text-xs text-gray-500">This will be shown on your profile card</p>
+              <p className={`text-xs ${bio.length > 450 ? 'text-yellow-400' : 'text-gray-500'}`}>
+                {bio.length}/500
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Personal Information */}
       <div className="bg-dark-700/50 rounded-2xl p-6 shadow-xl border border-dark-600">
         <div className="flex items-center gap-3 mb-6">

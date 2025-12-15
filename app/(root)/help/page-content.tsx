@@ -31,7 +31,9 @@ import {
   Zap,
   Eye,
   Sparkles,
-  Loader2
+  Loader2,
+  Heart,
+  Users
 } from 'lucide-react';
 
 interface HelpPageContentProps {
@@ -92,6 +94,8 @@ const menuSections = [
   { id: 'dashboard', title: '📊 Dashboard', icon: LayoutDashboard },
   { id: 'competitions', title: '🏆 Competitions', icon: Trophy },
   { id: 'challenges', title: '⚔️ 1v1 Challenges', icon: Swords },
+  { id: 'matchmaking', title: '💖 Match Cards', icon: Heart },
+  { id: 'score-system', title: '⚡ Score System', icon: Zap },
   { id: 'trading', title: '📈 Trading Guide', icon: TrendingUp },
   { id: 'marketplace', title: '🛒 Marketplace', icon: ShoppingBag },
   { id: 'leaderboard', title: '🥇 Leaderboard', icon: Medal },
@@ -453,6 +457,266 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                 <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
                   <h5 className="font-semibold text-blue-400 mb-2">🎯 Join a Challenge</h5>
                   <p className="text-sm text-gray-400">Browse open challenges and accept one.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Match Cards (Matchmaking) */}
+          <section id="matchmaking" className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6">
+            <div className="flex items-center gap-3 mb-6">
+              <Heart className="h-6 w-6 text-pink-500" />
+              <h2 className="text-2xl font-bold text-white">💖 Match Cards</h2>
+            </div>
+            
+            <div className="space-y-4 text-gray-300">
+              <p className="leading-relaxed">
+                Find the perfect trading opponent using our smart matchmaking system! Swipe through traders and challenge those with similar skill levels.
+              </p>
+
+              <div className="bg-pink-500/10 border border-pink-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-3">🎴 How Match Cards Work:</h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-3 bg-gray-700/50 rounded-lg">
+                    <p className="text-sm"><span className="text-pink-400 font-bold">👈 Swipe Left</span> = Skip this trader</p>
+                  </div>
+                  <div className="p-3 bg-gray-700/50 rounded-lg">
+                    <p className="text-sm"><span className="text-green-400 font-bold">👉 Swipe Right</span> = Challenge this trader</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                  <h5 className="font-semibold text-purple-400 mb-2 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" /> Find Best Match
+                  </h5>
+                  <p className="text-sm text-gray-400">Our algorithm finds traders with similar stats, experience, and skill level for a fair competition.</p>
+                </div>
+                <div className="p-4 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
+                  <h5 className="font-semibold text-cyan-400 mb-2 flex items-center gap-2">
+                    <Users className="h-4 w-4" /> VS Screen
+                  </h5>
+                  <p className="text-sm text-gray-400">Before challenging, see a head-to-head comparison of you vs your opponent with stats and profile images.</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-white mb-3">📊 What the Card Shows:</h4>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <p className="text-sm text-gray-400">💖 <span className="text-white">Match %</span> - How well you match</p>
+                  </div>
+                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <p className="text-sm text-gray-400">🟢 <span className="text-white">Online Status</span> - Is trader online</p>
+                  </div>
+                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <p className="text-sm text-gray-400">🎯 <span className="text-white">Win Rate</span> - % of winning trades</p>
+                  </div>
+                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <p className="text-sm text-gray-400">💰 <span className="text-white">P&L</span> - Total profit/loss</p>
+                  </div>
+                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <p className="text-sm text-gray-400">🏆 <span className="text-white">Competitions</span> - Entries count</p>
+                  </div>
+                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <p className="text-sm text-gray-400">⚔️ <span className="text-white">1v1 Challenges</span> - Entries count</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2">✨ Why You Match Section:</h4>
+                <p className="text-sm text-gray-400 mb-3">Each card shows reasons why you&apos;re a good match:</p>
+                <ul className="space-y-1 text-sm">
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-400">✓</span> Similar experience level (beginner, intermediate, expert)
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-400">✓</span> Similar profit factor
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-400">✓</span> Online &amp; ready to compete
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-400">✓</span> Similar competition experience
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          {/* Score System */}
+          <section id="score-system" className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6">
+            <div className="flex items-center gap-3 mb-6">
+              <Zap className="h-6 w-6 text-yellow-500" />
+              <h2 className="text-2xl font-bold text-white">⚡ Score System</h2>
+            </div>
+            
+            <div className="space-y-4 text-gray-300">
+              <p className="leading-relaxed">
+                Your <strong className="text-yellow-400">Score</strong> is a composite rating that represents your overall trading performance. It&apos;s used in the Leaderboard and Match Cards.
+              </p>
+
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-3">📊 How Score is Calculated:</h4>
+                <div className="bg-gray-900/50 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+                  <p className="text-gray-400 mb-2">// Score Formula</p>
+                  <p className="text-white">Score = </p>
+                  <p className="text-green-400 ml-4">totalPnl × 0.3 +</p>
+                  <p className="text-blue-400 ml-4">totalPnlPercentage × 5 +</p>
+                  <p className="text-cyan-400 ml-4">winRate × 2 +</p>
+                  <p className="text-purple-400 ml-4">profitFactor × 10 +</p>
+                  <p className="text-yellow-400 ml-4">competitionsWon × 50 +</p>
+                  <p className="text-orange-400 ml-4">podiumFinishes × 20 +</p>
+                  <p className="text-red-400 ml-4">challengesWon × 25 +</p>
+                  <p className="text-pink-400 ml-4">totalBadges × 2 +</p>
+                  <p className="text-indigo-400 ml-4">legendaryBadges × 10</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-white mb-3">📈 Score Breakdown:</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/30">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">💰</span>
+                      <div>
+                        <p className="font-semibold text-green-400">Total P&L</p>
+                        <p className="text-xs text-gray-500">Your cumulative profit/loss</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-green-400 font-mono">× 0.3 pts</p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">📈</span>
+                      <div>
+                        <p className="font-semibold text-blue-400">ROI Percentage</p>
+                        <p className="text-xs text-gray-500">Return on investment %</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-blue-400 font-mono">× 5 pts</p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">🎯</span>
+                      <div>
+                        <p className="font-semibold text-cyan-400">Win Rate</p>
+                        <p className="text-xs text-gray-500">% of winning trades</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-cyan-400 font-mono">× 2 pts</p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">⚖️</span>
+                      <div>
+                        <p className="font-semibold text-purple-400">Profit Factor</p>
+                        <p className="text-xs text-gray-500">Gross profit ÷ gross loss</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-purple-400 font-mono">× 10 pts</p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">🥇</span>
+                      <div>
+                        <p className="font-semibold text-yellow-400">Competition Wins</p>
+                        <p className="text-xs text-gray-500">1st place finishes</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-yellow-400 font-mono">× 50 pts each</p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">🏅</span>
+                      <div>
+                        <p className="font-semibold text-orange-400">Podium Finishes</p>
+                        <p className="text-xs text-gray-500">Top 3 finishes</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-orange-400 font-mono">× 20 pts each</p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg border border-red-500/30">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">⚔️</span>
+                      <div>
+                        <p className="font-semibold text-red-400">Challenge Wins</p>
+                        <p className="text-xs text-gray-500">1v1 challenge victories</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-red-400 font-mono">× 25 pts each</p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-pink-500/10 rounded-lg border border-pink-500/30">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">🏅</span>
+                      <div>
+                        <p className="font-semibold text-pink-400">Total Badges</p>
+                        <p className="text-xs text-gray-500">All badges earned</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-pink-400 font-mono">× 2 pts each</p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-indigo-500/10 rounded-lg border border-indigo-500/30">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">🌟</span>
+                      <div>
+                        <p className="font-semibold text-indigo-400">Legendary Badges</p>
+                        <p className="text-xs text-gray-500">Legendary rarity badges</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-indigo-400 font-mono">× 10 pts each</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2">💡 Example Calculation:</h4>
+                <div className="bg-gray-900/50 rounded-lg p-3 text-sm">
+                  <p className="text-gray-400 mb-2">A trader with:</p>
+                  <ul className="space-y-1 text-gray-300 mb-3">
+                    <li>• P&L: $500 → 500 × 0.3 = <span className="text-green-400">150 pts</span></li>
+                    <li>• ROI: 8% → 8 × 5 = <span className="text-blue-400">40 pts</span></li>
+                    <li>• Win Rate: 60% → 60 × 2 = <span className="text-cyan-400">120 pts</span></li>
+                    <li>• Profit Factor: 1.5 → 1.5 × 10 = <span className="text-purple-400">15 pts</span></li>
+                    <li>• 2 Competition Wins → 2 × 50 = <span className="text-yellow-400">100 pts</span></li>
+                    <li>• 3 Podiums → 3 × 20 = <span className="text-orange-400">60 pts</span></li>
+                    <li>• 1 Challenge Win → 1 × 25 = <span className="text-red-400">25 pts</span></li>
+                    <li>• 10 Badges → 10 × 2 = <span className="text-pink-400">20 pts</span></li>
+                    <li>• 1 Legendary → 1 × 10 = <span className="text-indigo-400">10 pts</span></li>
+                  </ul>
+                  <p className="text-white font-bold">Total Score: <span className="text-yellow-400">540 pts</span> ⚡</p>
+                </div>
+              </div>
+
+              <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2">📍 Where Score is Shown:</h4>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="p-3 bg-gray-800/50 rounded-lg flex items-center gap-2">
+                    <Medal className="h-4 w-4 text-yellow-400" />
+                    <span className="text-sm">Leaderboard rankings</span>
+                  </div>
+                  <div className="p-3 bg-gray-800/50 rounded-lg flex items-center gap-2">
+                    <Heart className="h-4 w-4 text-pink-400" />
+                    <span className="text-sm">Match Cards</span>
+                  </div>
+                  <div className="p-3 bg-gray-800/50 rounded-lg flex items-center gap-2">
+                    <User className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm">Profile page</span>
+                  </div>
+                  <div className="p-3 bg-gray-800/50 rounded-lg flex items-center gap-2">
+                    <Swords className="h-4 w-4 text-red-400" />
+                    <span className="text-sm">VS Screen comparisons</span>
+                  </div>
                 </div>
               </div>
             </div>

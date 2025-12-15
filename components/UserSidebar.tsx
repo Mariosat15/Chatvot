@@ -29,8 +29,14 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+interface SidebarUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface UserSidebarProps {
-  user: User;
+  user: SidebarUser;
 }
 
 interface NavItem {

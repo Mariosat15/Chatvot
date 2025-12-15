@@ -12,6 +12,7 @@ export interface GlobalLeaderboardEntry {
   userId: string;
   email: string; // Primary identifier for traders
   username: string; // Display name (for reference only)
+  profileImage?: string; // Profile image URL
   rank: number;
   isTied?: boolean;
   tiedWith?: string[];
@@ -67,6 +68,7 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
       userId: string;
       email: string;
       username: string;
+      profileImage?: string;
       totalPnl: number;
       totalCapital: number;
       totalTrades: number;
@@ -90,6 +92,7 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
         userId: user.id,
         email: user.email, // Primary identifier
         username: user.name || user.email.split('@')[0] || 'Unknown', // Display name
+        profileImage: user.profileImage,
         totalPnl: 0,
         totalCapital: 0,
         totalTrades: 0,
@@ -214,6 +217,7 @@ export async function getGlobalLeaderboard(limit: number = 0): Promise<GlobalLea
         userId,
         email: stats.email, // Primary identifier for traders
         username: stats.username, // Display name (for reference only)
+        profileImage: stats.profileImage,
         rank: 0, // Will be assigned after sorting
         isTied: false,
         tiedWith: [],

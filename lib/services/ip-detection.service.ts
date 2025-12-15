@@ -101,13 +101,19 @@ function calculateRiskScore(
  * - IPHub (specialized in proxy detection)
  */
 export async function detectVPNProxy(ipAddress: string): Promise<IPDetectionResult> {
-  // Skip detection for localhost/private IPs
+  // Skip detection for localhost/private IPs (IPv4 and IPv6)
   if (
     ipAddress === 'unknown' ||
+    ipAddress === '::1' ||           // IPv6 localhost
+    ipAddress === '::ffff:127.0.0.1' || // IPv4-mapped IPv6 localhost
     ipAddress.startsWith('127.') ||
     ipAddress.startsWith('192.168.') ||
     ipAddress.startsWith('10.') ||
-    ipAddress.startsWith('172.')
+    ipAddress.startsWith('172.') ||
+    ipAddress.startsWith('::ffff:127.') ||
+    ipAddress.startsWith('::ffff:192.168.') ||
+    ipAddress.startsWith('::ffff:10.') ||
+    ipAddress.startsWith('fe80:')    // IPv6 link-local
   ) {
     return {
       success: true,

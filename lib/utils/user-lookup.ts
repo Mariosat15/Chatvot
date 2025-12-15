@@ -4,6 +4,8 @@ export interface UserInfo {
   id: string;
   email: string;
   name: string;
+  profileImage?: string;
+  bio?: string;
   role?: string; // 'trader', 'admin', 'backoffice'
   country?: string;
   address?: string;
@@ -51,6 +53,8 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
       id: user.id || user._id?.toString() || userId,
       email: user.email || 'unknown',
       name: user.name || user.email || 'Unknown User',
+      profileImage: user.profileImage,
+      bio: user.bio,
       role: user.role || 'trader',
       country: user.country,
       address: user.address,
@@ -125,6 +129,8 @@ export async function getAllUsers(): Promise<UserInfo[]> {
         id,
         email,
         name: user.name || email.split('@')[0] || 'Unknown User', // Name is for display only
+        profileImage: user.profileImage,
+        bio: user.bio,
         role: 'trader',
         country: user.country,
         address: user.address,
