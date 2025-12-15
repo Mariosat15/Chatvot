@@ -66,6 +66,13 @@ export default function ChallengeSettingsSection() {
   const handleSave = async () => {
     if (!settings) return;
 
+    // Log what we're saving for debugging
+    console.log('💾 Saving challenge settings:', {
+      challengeCooldownMinutes: settings.challengeCooldownMinutes,
+      maxPendingChallenges: settings.maxPendingChallenges,
+      maxActiveChallenges: settings.maxActiveChallenges,
+    });
+
     setSaving(true);
     try {
       const response = await fetch('/api/admin/challenge-settings', {
@@ -84,7 +91,12 @@ export default function ChallengeSettingsSection() {
         return;
       }
 
-      toast.success('Challenge settings saved successfully');
+      // Log the saved settings from server response
+      console.log('✅ Settings saved, server response:', data.settings);
+      
+      toast.success('Challenge settings saved successfully', {
+        description: `Cooldown: ${data.settings?.challengeCooldownMinutes || 0}min, Max Pending: ${data.settings?.maxPendingChallenges || 0}, Max Active: ${data.settings?.maxActiveChallenges || 0}`,
+      });
     } catch (error) {
       toast.error('Failed to save settings', {
         description: error instanceof Error ? error.message : 'Network or server error',
@@ -98,8 +110,19 @@ export default function ChallengeSettingsSection() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateSetting = (key: keyof ChallengeSettings, value: any) => {
     if (settings) {
+      // For number fields, ensure we don't save NaN
+      if (typeof value === 'number' && isNaN(value)) {
+        console.warn(`Ignoring NaN value for ${key}`);
+        return;
+      }
       setSettings({ ...settings, [key]: value });
     }
+  };
+  
+  // Helper to safely parse number input
+  const parseNumberInput = (value: string, min: number = 0): number => {
+    const parsed = parseInt(value, 10);
+    return isNaN(parsed) ? min : Math.max(min, parsed);
   };
 
   if (loading) {
@@ -358,7 +381,7 @@ export default function ChallengeSettingsSection() {
                   type="number"
                   min="1"
                   value={settings.maxPendingChallenges}
-                  onChange={(e) => updateSetting('maxPendingChallenges', parseInt(e.target.value))}
+                  onChange={(e) => updateSetting('maxPendingChallenges', parseNumberInput(e.target.value, 1))}
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
@@ -368,7 +391,7 @@ export default function ChallengeSettingsSection() {
                   type="number"
                   min="1"
                   value={settings.maxActiveChallenges}
-                  onChange={(e) => updateSetting('maxActiveChallenges', parseInt(e.target.value))}
+                  onChange={(e) => updateSetting('maxActiveChallenges', parseNumberInput(e.target.value, 1))}
                   className="bg-gray-800 border-gray-600 text-white"
                 />
               </div>
@@ -379,10 +402,10 @@ export default function ChallengeSettingsSection() {
                 type="number"
                 min="0"
                 value={settings.challengeCooldownMinutes}
-                onChange={(e) => updateSetting('challengeCooldownMinutes', parseInt(e.target.value))}
+                onChange={(e) => updateSetting('challengeCooldownMinutes', parseNumberInput(e.target.value, 0))}
                 className="bg-gray-800 border-gray-600 text-white"
               />
-              <p className="text-xs text-gray-500 mt-1">Between challenges to same user</p>
+              <p className="text-xs text-gray-500 mt-1">Between challenges to same user (0 = no cooldown)</p>
             </div>
           </CardContent>
         </Card>

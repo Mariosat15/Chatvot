@@ -95,8 +95,16 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Get challenge settings and universal trading risk settings
+    // Force fresh read by setting {new: true} context
     const settings = await ChallengeSettings.getSingleton();
     const tradingRiskSettings = await TradingRiskSettings.getSingleton();
+    
+    // Log current settings for debugging
+    console.log('📋 Challenge settings loaded:', {
+      challengeCooldownMinutes: settings.challengeCooldownMinutes,
+      maxPendingChallenges: settings.maxPendingChallenges,
+      maxActiveChallenges: settings.maxActiveChallenges
+    });
 
     // Validate challenges are enabled
     if (!settings.challengesEnabled) {

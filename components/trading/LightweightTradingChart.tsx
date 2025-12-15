@@ -71,6 +71,17 @@ interface LightweightTradingChartProps {
 }
 
 const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders = [] }: LightweightTradingChartProps) => {
+  // Track if component is mounted to prevent "Object is disposed" errors
+  const isMountedRef = useRef(true);
+  
+  // Set up mount tracking
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+  
   // Debug: Log positions received by chart component
   useEffect(() => {
     console.log('🎨 LightweightTradingChart received positions:', positions.length);
@@ -1824,9 +1835,17 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (chartRef.current) {
-        chartRef.current.remove();
-        chartRef.current = null;
+      // Store reference and clear refs before removing to prevent "Object is disposed" errors
+      const chart = chartRef.current;
+      chartRef.current = null;
+      candlestickSeriesRef.current = null;
+      if (chart) {
+        try {
+          chart.remove();
+        } catch (e) {
+          // Chart may already be disposed - ignore
+          console.warn('Chart already disposed:', e);
+        }
       }
     };
   }, [symbol, timeframe, showVolume, chartType, showBidAskLines, showPriceLabels]); // Chart reinitializes when these change
