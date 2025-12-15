@@ -210,7 +210,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="p-4 border-b border-gray-800/50">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/dashboard" className="flex items-center gap-3">
           <div className="relative">
             <div className="absolute inset-0 bg-yellow-500/20 blur-xl rounded-full" />
             <Image 
@@ -336,7 +336,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
 
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-gray-900/95 backdrop-blur-xl border-b border-gray-800/50 z-50 px-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center">
+        <Link href="/dashboard" className="flex items-center">
           <Image src="/assets/icons/logo.svg" alt="logo" width={120} height={28} className="h-7 w-auto" />
         </Link>
         

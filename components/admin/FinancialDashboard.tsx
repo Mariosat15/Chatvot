@@ -677,14 +677,14 @@ export default function FinancialDashboard() {
                 <Banknote className="h-4 w-4 mr-2" />
                 Record Withdrawal
               </Button>
-              <Button
-                onClick={fetchData}
-                disabled={refreshing}
-                className="bg-white/10 hover:bg-white/20 border border-white/30 text-white backdrop-blur-sm"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
+            <Button
+              onClick={fetchData}
+              disabled={refreshing}
+              className="bg-white/10 hover:bg-white/20 border border-white/30 text-white backdrop-blur-sm"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             </div>
           </div>
         </div>
@@ -1096,46 +1096,46 @@ export default function FinancialDashboard() {
           {/* Coverage Ratio */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className={`bg-gray-900 ${(liabilityMetrics?.coverageRatio || 1) >= 1 ? 'border-emerald-500/50' : 'border-red-500/50'}`}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-amber-400" />
                   Coverage Ratio
-                </CardTitle>
+            </CardTitle>
                 <CardDescription className="text-xs">
                   {vatEnabled ? 'Bank Balance ÷ Total Liabilities' : 'Bank Balance ÷ User Liabilities'}
                 </CardDescription>
-              </CardHeader>
-              <CardContent>
+          </CardHeader>
+          <CardContent>
                 <div className={`text-3xl font-bold ${(liabilityMetrics?.coverageRatio || 1) >= 1 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {((liabilityMetrics?.coverageRatio || 1) * 100).toFixed(1)}%
-                </div>
-                <p className="text-sm text-gray-400 mt-2">
+            </div>
+            <p className="text-sm text-gray-400 mt-2">
                   {(liabilityMetrics?.coverageRatio || 1) >= 1 
                     ? '✅ Fully covered - All obligations can be met' 
                     : '⚠️ Under-covered - Insufficient funds to cover all obligations'}
-                </p>
-              </CardContent>
-            </Card>
+            </p>
+          </CardContent>
+        </Card>
 
             <Card className="bg-gray-900 border-blue-500/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
                   <Wallet className="h-4 w-4 text-blue-400" />
                   Net Position
-                </CardTitle>
+            </CardTitle>
                 <CardDescription className="text-xs">
                   What We HAVE - What We OWE
                 </CardDescription>
-              </CardHeader>
-              <CardContent>
+          </CardHeader>
+          <CardContent>
                 <div className={`text-3xl font-bold ${(liabilityMetrics?.theoreticalBankBalance || 0) - ((liabilityMetrics?.totalUserCreditsEUR || 0) + (vatEnabled ? (platformFinancials?.outstandingVAT || 0) : 0)) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {currencySymbol}{((liabilityMetrics?.theoreticalBankBalance || 0) - ((liabilityMetrics?.totalUserCreditsEUR || 0) + (vatEnabled ? (platformFinancials?.outstandingVAT || 0) : 0))).toFixed(2)}
-                </div>
-                <p className="text-sm text-gray-400 mt-2">
+            </div>
+            <p className="text-sm text-gray-400 mt-2">
                   Platform's actual available funds
-                </p>
-              </CardContent>
-            </Card>
+            </p>
+          </CardContent>
+        </Card>
           </div>
 
           {/* Pending Withdrawals */}
@@ -1198,8 +1198,8 @@ export default function FinancialDashboard() {
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="bg-gray-900 border-emerald-500/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
                   <PiggyBank className="h-4 w-4 text-emerald-400" />
                   Gross Platform Fees
                 </CardTitle>
@@ -1208,7 +1208,7 @@ export default function FinancialDashboard() {
               <CardContent>
                 <div className="text-3xl font-bold text-emerald-400">
                   {currencySymbol}{platformFinancials?.totalGrossEarnings?.toFixed(2) || '0.00'}
-                </div>
+              </div>
               </CardContent>
             </Card>
 
@@ -1217,10 +1217,10 @@ export default function FinancialDashboard() {
                 <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-red-400" />
                   Bank/Provider Fees
-                </CardTitle>
+            </CardTitle>
                 <CardDescription className="text-xs">What Stripe/bank charges us</CardDescription>
-              </CardHeader>
-              <CardContent>
+          </CardHeader>
+          <CardContent>
                 <div className="text-3xl font-bold text-red-400">
                   -{currencySymbol}{platformFinancials?.totalBankFees?.toFixed(2) || '0.00'}
                 </div>
@@ -1336,17 +1336,17 @@ export default function FinancialDashboard() {
               <CardContent>
                 <div className="text-2xl font-bold text-white">
                   {creditSymbol} {platformFinancials?.totalPlatformFees.toLocaleString() || 0}
-                </div>
-                <p className="text-sm text-gray-400 mt-2">
+            </div>
+            <p className="text-sm text-gray-400 mt-2">
                   ≈ {currencySymbol}{creditsToEUR(platformFinancials?.totalPlatformFees || 0)}
-                </p>
+            </p>
                 <p className="text-xs text-gray-500 mt-1">% of competition prize pools</p>
-              </CardContent>
-            </Card>
+          </CardContent>
+        </Card>
 
             <Card className="bg-gray-900 border-orange-500/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
                   <Swords className="h-4 w-4 text-orange-400" />
                   Challenge Fees
                 </CardTitle>
@@ -1354,7 +1354,7 @@ export default function FinancialDashboard() {
               <CardContent>
                 <div className="text-2xl font-bold text-white">
                   {creditSymbol} {platformFinancials?.totalChallengeFees?.toLocaleString() || 0}
-                </div>
+              </div>
                 <p className="text-sm text-gray-400 mt-2">
                   ≈ {currencySymbol}{creditsToEUR(platformFinancials?.totalChallengeFees || 0)}
                 </p>
@@ -1367,22 +1367,22 @@ export default function FinancialDashboard() {
                 <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-purple-400" />
                   Marketplace Revenue
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
                 <div className="text-2xl font-bold text-white">
                   {creditSymbol} {platformFinancials?.totalMarketplaceSales?.toLocaleString() || 0}
-                </div>
-                <p className="text-sm text-gray-400 mt-2">
+            </div>
+            <p className="text-sm text-gray-400 mt-2">
                   ≈ {currencySymbol}{creditsToEUR(platformFinancials?.totalMarketplaceSales || 0)}
-                </p>
+            </p>
                 <p className="text-xs text-gray-500 mt-1">{platformFinancials?.marketplacePurchases || 0} items sold</p>
-              </CardContent>
-            </Card>
+          </CardContent>
+        </Card>
 
             <Card className="bg-gray-900 border-amber-500/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
                   <Target className="h-4 w-4 text-amber-400" />
                   Unclaimed Pools
                 </CardTitle>
@@ -1390,7 +1390,7 @@ export default function FinancialDashboard() {
               <CardContent>
                 <div className="text-2xl font-bold text-white">
                   {creditSymbol} {platformFinancials?.totalUnclaimedPools.toLocaleString() || 0}
-                </div>
+              </div>
                 <p className="text-sm text-gray-400 mt-2">
                   ≈ {currencySymbol}{creditsToEUR(platformFinancials?.totalUnclaimedPools || 0)}
                 </p>
@@ -1406,12 +1406,12 @@ export default function FinancialDashboard() {
                 <CardTitle className="text-white text-xl flex items-center gap-2">
                   <Target className="h-5 w-5 text-amber-400" />
                   Unclaimed Pools Breakdown
-                </CardTitle>
+            </CardTitle>
                 <CardDescription>
                   Competition pools kept by platform when NO prizes were awarded (all disqualified or no participants)
                 </CardDescription>
-              </CardHeader>
-              <CardContent>
+          </CardHeader>
+          <CardContent>
                 {/* Info Box explaining unclaimed pools */}
                 <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                   <div className="flex items-start gap-2">
@@ -1481,8 +1481,8 @@ export default function FinancialDashboard() {
                 <div>
                   <div className="text-4xl font-bold text-emerald-400">
                     {currencySymbol}{liabilityMetrics?.platformNetEUR.toFixed(2) || '0.00'}
-                  </div>
-                  <p className="text-sm text-gray-400 mt-2">
+            </div>
+            <p className="text-sm text-gray-400 mt-2">
                     {creditSymbol} {liabilityMetrics?.platformNetCredits.toLocaleString() || 0} available to withdraw
                   </p>
                 </div>
@@ -1495,8 +1495,8 @@ export default function FinancialDashboard() {
                   Convert to Bank
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
         </TabsContent>
 
         {/* VAT TAB */}
@@ -1505,8 +1505,8 @@ export default function FinancialDashboard() {
           {/* VAT Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <Card className="bg-gray-900 border-emerald-500/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-emerald-400" />
                   Total VAT Collected
                 </CardTitle>
@@ -1514,7 +1514,7 @@ export default function FinancialDashboard() {
               <CardContent>
                 <div className="text-3xl font-bold text-emerald-400">
                   {currencySymbol}{(vatData?.allTime.collected || platformFinancials?.totalVATCollected || 0).toFixed(2)}
-                </div>
+              </div>
                 <p className="text-xs text-gray-500 mt-1">All time</p>
               </CardContent>
             </Card>
@@ -1524,12 +1524,12 @@ export default function FinancialDashboard() {
                 <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-green-400" />
                   VAT Paid
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
                 <div className="text-3xl font-bold text-green-400">
                   {currencySymbol}{(vatData?.allTime.paid || platformFinancials?.totalVATPaid || 0).toFixed(2)}
-                </div>
+            </div>
                 <p className="text-xs text-gray-500 mt-1">Submitted to government</p>
               </CardContent>
             </Card>
@@ -1627,8 +1627,8 @@ export default function FinancialDashboard() {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh VAT Data
               </Button>
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
 
           {/* VAT Payment History */}
           <Card className="bg-gray-900 border-gray-700">
@@ -1679,7 +1679,7 @@ export default function FinancialDashboard() {
                 <div className="text-center py-8 text-gray-500">
                   <History className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p>No VAT payments recorded yet</p>
-                </div>
+      </div>
               )}
             </CardContent>
           </Card>
@@ -1689,36 +1689,36 @@ export default function FinancialDashboard() {
         {/* WALLETS TAB */}
         <TabsContent value="wallets" className="space-y-6">
           <Card className="bg-gray-900 border-gray-700">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-white text-xl flex items-center gap-2">
-                    <Wallet className="h-5 w-5 text-green-400" />
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-white text-xl flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-green-400" />
                     User Wallets ({wallets.length})
-                  </CardTitle>
+              </CardTitle>
                   <CardDescription>View all user credit balances and activity</CardDescription>
-                </div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="text"
+            </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
                     placeholder="Search by name, email, ID..."
                     value={walletSearch}
                     onChange={(e) => setWalletSearch(e.target.value)}
                     className="pl-10 bg-gray-800 border-gray-700 text-white w-64"
                   />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-gray-700">
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-gray-700">
                       <TableHead className="text-gray-400">User</TableHead>
-                      <TableHead className="text-gray-400">Balance</TableHead>
-                      <TableHead className="text-gray-400">Deposited</TableHead>
-                      <TableHead className="text-gray-400">Withdrawn</TableHead>
+                  <TableHead className="text-gray-400">Balance</TableHead>
+                  <TableHead className="text-gray-400">Deposited</TableHead>
+                  <TableHead className="text-gray-400">Withdrawn</TableHead>
                       <TableHead className="text-gray-400 text-center">
                         <div>Won</div>
                         <div className="text-xs font-normal">(Comp / Chall)</div>
@@ -1728,73 +1728,73 @@ export default function FinancialDashboard() {
                         <div className="text-xs font-normal">(Comp / Chall)</div>
                       </TableHead>
                       <TableHead className="text-gray-400">Net</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                     {filteredWallets.slice(0, 50).map((wallet) => {
                       const totalWon = (wallet.totalWonFromCompetitions || 0) + (wallet.totalWonFromChallenges || 0);
                       const totalSpent = (wallet.totalSpentOnCompetitions || 0) + (wallet.totalSpentOnChallenges || 0);
-                      const netPosition = wallet.creditBalance - wallet.totalDeposited;
-                      return (
-                        <TableRow key={wallet.userId} className="border-gray-700">
+                  const netPosition = wallet.creditBalance - wallet.totalDeposited;
+                  return (
+                    <TableRow key={wallet.userId} className="border-gray-700">
                           <TableCell>
                             <div>
                               <div className="font-medium text-white">{wallet.userName}</div>
                               <div className="text-xs text-gray-400">{wallet.userEmail}</div>
                             </div>
-                          </TableCell>
-                          <TableCell className="font-semibold text-white">
-                            {creditSymbol} {wallet.creditBalance.toLocaleString()}
-                            <div className="text-xs text-gray-500">
-                              {currencySymbol}{creditsToEUR(wallet.creditBalance)}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-green-400">
-                            {creditSymbol} {wallet.totalDeposited.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-blue-400">
-                            {creditSymbol} {wallet.totalWithdrawn.toLocaleString()}
-                          </TableCell>
+                      </TableCell>
+                      <TableCell className="font-semibold text-white">
+                        {creditSymbol} {wallet.creditBalance.toLocaleString()}
+                        <div className="text-xs text-gray-500">
+                          {currencySymbol}{creditsToEUR(wallet.creditBalance)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-green-400">
+                        {creditSymbol} {wallet.totalDeposited.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-blue-400">
+                        {creditSymbol} {wallet.totalWithdrawn.toLocaleString()}
+                      </TableCell>
                           <TableCell className="text-yellow-400 text-center">
                             <div className="font-semibold">{creditSymbol} {totalWon.toLocaleString()}</div>
                             <div className="text-xs text-gray-500">
                               🏆 {(wallet.totalWonFromCompetitions || 0).toLocaleString()} / ⚔️ {(wallet.totalWonFromChallenges || 0).toLocaleString()}
                             </div>
-                          </TableCell>
+                      </TableCell>
                           <TableCell className="text-red-400 text-center">
                             <div className="font-semibold">{creditSymbol} {totalSpent.toLocaleString()}</div>
                             <div className="text-xs text-gray-500">
                               🏆 {(wallet.totalSpentOnCompetitions || 0).toLocaleString()} / ⚔️ {(wallet.totalSpentOnChallenges || 0).toLocaleString()}
                             </div>
-                          </TableCell>
-                          <TableCell className={netPosition >= 0 ? 'text-green-400' : 'text-red-400'}>
-                            {netPosition >= 0 ? '+' : ''}{creditSymbol} {netPosition.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                      </TableCell>
+                      <TableCell className={netPosition >= 0 ? 'text-green-400' : 'text-red-400'}>
+                        {netPosition >= 0 ? '+' : ''}{creditSymbol} {netPosition.toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
               {filteredWallets.length > 50 && (
-                <p className="text-sm text-gray-500 mt-4 text-center">
+            <p className="text-sm text-gray-500 mt-4 text-center">
                   Showing 50 of {filteredWallets.length} wallets
-                </p>
-              )}
-            </CardContent>
-          </Card>
+            </p>
+          )}
+        </CardContent>
+      </Card>
         </TabsContent>
 
         {/* TRANSACTIONS TAB */}
         <TabsContent value="transactions" className="space-y-6">
           <Card className="bg-gray-900 border-gray-700">
-            <CardHeader>
+          <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-white text-xl flex items-center gap-2">
+            <CardTitle className="text-white text-xl flex items-center gap-2">
                     <History className="h-5 w-5 text-cyan-400" />
                     All Transactions
-                  </CardTitle>
+            </CardTitle>
                   <CardDescription>Complete transaction history with filters</CardDescription>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1859,8 +1859,8 @@ export default function FinancialDashboard() {
                   </Button>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
+          </CardHeader>
+          <CardContent>
               {txLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
@@ -1868,19 +1868,19 @@ export default function FinancialDashboard() {
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="border-gray-700">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-gray-700">
                           <TableHead className="text-gray-400">Date</TableHead>
                           <TableHead className="text-gray-400">User Info</TableHead>
                           <TableHead className="text-gray-400">Type</TableHead>
-                          <TableHead className="text-gray-400">Amount</TableHead>
+                  <TableHead className="text-gray-400">Amount</TableHead>
                           <TableHead className="text-gray-400">Status</TableHead>
                           <TableHead className="text-gray-400">Description</TableHead>
                           <TableHead className="text-gray-400">Transaction ID</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                         {transactions.map((tx) => (
                           <TableRow 
                             key={tx._id} 
@@ -1889,7 +1889,7 @@ export default function FinancialDashboard() {
                           >
                             <TableCell className="text-gray-400 text-sm whitespace-nowrap">
                               {new Date(tx.createdAt).toLocaleString()}
-                            </TableCell>
+                    </TableCell>
                             <TableCell>
                               <div className="space-y-0.5">
                                 <div className="font-medium text-white text-sm">
@@ -1902,7 +1902,7 @@ export default function FinancialDashboard() {
                                   ID: {tx.userInfo?.id || tx.userId}
                                 </div>
                               </div>
-                            </TableCell>
+                    </TableCell>
                             <TableCell>
                               <Badge className={`${getTransactionTypeColor(tx.transactionType)} text-white text-xs`}>
                                 {getTransactionTypeLabel(tx.transactionType)}
@@ -1912,11 +1912,11 @@ export default function FinancialDashboard() {
                                   {tx.source === 'platform' ? 'Admin' : 'VAT'}
                                 </Badge>
                               )}
-                            </TableCell>
+                    </TableCell>
                             <TableCell className={`font-semibold ${tx.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                               {tx.amount >= 0 ? '+' : ''}{tx.amount.toLocaleString()}
-                            </TableCell>
-                            <TableCell>
+                    </TableCell>
+                    <TableCell>
                               <Badge className={`${getStatusColor(tx.status)} text-white text-xs`}>
                                 {tx.status}
                               </Badge>
@@ -1934,11 +1934,11 @@ export default function FinancialDashboard() {
                               }}
                             >
                               {tx._id}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
                   </div>
 
                   {/* Pagination */}
@@ -1972,22 +1972,22 @@ export default function FinancialDashboard() {
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
         </TabsContent>
 
         {/* Invoices Tab */}
         <TabsContent value="invoices" className="space-y-6">
           <Card className="bg-gray-900 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-white text-xl flex items-center gap-2">
+        <CardHeader>
+          <CardTitle className="text-white text-xl flex items-center gap-2">
                 <FileText className="h-5 w-5 text-indigo-400" />
                 Invoice Export
-              </CardTitle>
+          </CardTitle>
               <CardDescription>
                 Download all invoices for the selected date range as PDF files or CSV
               </CardDescription>
-            </CardHeader>
+        </CardHeader>
             <CardContent className="space-y-6">
               {/* Date Range Selector */}
               <div className="bg-gray-800 rounded-lg p-4 space-y-4">
@@ -2529,33 +2529,33 @@ export default function FinancialDashboard() {
               {selectedTransaction.transactionType === 'deposit' && (
                 <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-indigo-400" />
                       <span className="text-white font-medium">Invoice</span>
-                    </div>
+                  </div>
                     {loadingInvoice && (
                       <RefreshCw className="h-4 w-4 animate-spin text-indigo-400" />
-                    )}
-                  </div>
+                  )}
+                </div>
 
                   {loadingInvoice ? (
                     <div className="text-center py-4 text-gray-400 text-sm">
                       Loading invoice...
-                    </div>
+                  </div>
                   ) : transactionInvoice ? (
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <div className="text-xs text-gray-500">Invoice Number</div>
                           <div className="text-white font-mono text-sm">{transactionInvoice.invoiceNumber}</div>
-                        </div>
+                  </div>
                         <div>
                           <div className="text-xs text-gray-500">Invoice Date</div>
                           <div className="text-white text-sm">
                             {new Date(transactionInvoice.invoiceDate).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </div>
+                </div>
+              </div>
+          </div>
 
                       <div className="grid grid-cols-3 gap-3 bg-gray-800 rounded-lg p-3">
                         <div>

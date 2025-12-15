@@ -64,6 +64,7 @@ import AuditLogSection from '@/components/admin/AuditLogSection';
 import EmailTemplatesSection from '@/components/admin/EmailTemplatesSection';
 import NotificationSystemSection from '@/components/admin/NotificationSystemSection';
 import MarketplaceSection from '@/components/admin/MarketplaceSection';
+import LandingPageBuilder from '@/components/admin/LandingPageBuilder';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -81,6 +82,13 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  {
+    id: 'hero-page',
+    label: 'Hero Page',
+    icon: <Home className="h-5 w-5" />,
+    color: 'text-yellow-400',
+    bgColor: 'bg-yellow-500/10 hover:bg-yellow-500/20',
+  },
   {
     id: 'competitions',
     label: 'Competitions',
@@ -235,6 +243,8 @@ export default function AdminDashboard({
 
   const renderContent = () => {
     switch (activeSection) {
+      case 'hero-page':
+        return <LandingPageBuilder />;
       case 'competitions':
         return <CompetitionsListSection />;
       case 'challenges':
