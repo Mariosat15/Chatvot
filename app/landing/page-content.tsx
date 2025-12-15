@@ -371,7 +371,7 @@ export default function LandingPageContent() {
         }} 
       />
       
-      {/* Sticky Header */}
+      {/* Sticky Header - Theme Aware */}
       <motion.header 
         className="fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-xl"
         style={{ 
@@ -387,37 +387,47 @@ export default function LandingPageContent() {
               ) : (
                 <>
                   <div className="relative">
-                    <div className="absolute inset-0 bg-yellow-500 blur-lg opacity-50" />
-                    <div className="relative w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center">
-                      <Zap className="h-6 w-6 text-gray-900" />
+                    <div className="absolute inset-0 blur-lg opacity-50" style={{ backgroundColor: effectiveColors.primary }} />
+                    <div 
+                      className="relative w-10 h-10 rounded-xl flex items-center justify-center"
+                      style={{ background: theme?.effects.gradientStyle || `linear-gradient(135deg, ${effectiveColors.primary}, ${effectiveColors.secondary})` }}
+                    >
+                      <span className="text-xl">{theme?.themeIcons?.special || '⚡'}</span>
                     </div>
                   </div>
-                  <span className="text-xl font-bold text-white hidden sm:block">{settings.siteName}</span>
+                  <span className="text-xl font-bold hidden sm:block" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>{settings.siteName}</span>
                 </>
               )}
             </Link>
             
             <nav className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-gray-400 hover:text-yellow-500 transition-colors text-sm font-medium">Features</a>
-              <a href="#competitions" className="text-gray-400 hover:text-yellow-500 transition-colors text-sm font-medium">Competitions</a>
-              <a href="#challenges" className="text-gray-400 hover:text-yellow-500 transition-colors text-sm font-medium">Challenges</a>
-              <Link href="/enterprise" className="text-gray-400 hover:text-yellow-500 transition-colors text-sm font-medium">Enterprise</Link>
+              <a href="#features" className="transition-colors text-sm font-medium" style={{ color: theme?.colors.textMuted }} onMouseOver={(e) => e.currentTarget.style.color = effectiveColors.primary || ''} onMouseOut={(e) => e.currentTarget.style.color = theme?.colors.textMuted || ''}>Features</a>
+              <a href="#competitions" className="transition-colors text-sm font-medium" style={{ color: theme?.colors.textMuted }} onMouseOver={(e) => e.currentTarget.style.color = effectiveColors.primary || ''} onMouseOut={(e) => e.currentTarget.style.color = theme?.colors.textMuted || ''}>Competitions</a>
+              <a href="#challenges" className="transition-colors text-sm font-medium" style={{ color: theme?.colors.textMuted }} onMouseOver={(e) => e.currentTarget.style.color = effectiveColors.primary || ''} onMouseOut={(e) => e.currentTarget.style.color = theme?.colors.textMuted || ''}>Challenges</a>
+              <Link href="/enterprise" className="transition-colors text-sm font-medium" style={{ color: theme?.colors.textMuted }}>Enterprise</Link>
             </nav>
 
             <div className="flex items-center gap-3">
               <Link href="/sign-in">
-                <Button variant="ghost" className="text-gray-400 hover:text-white hover:bg-gray-800 hidden sm:flex">
+                <Button variant="ghost" className="hidden sm:flex" style={{ color: theme?.colors.textMuted }}>
                   Sign In
                 </Button>
               </Link>
               <Link href="/sign-up">
-                <Button className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold shadow-lg shadow-yellow-500/25">
-                  <Sparkles className="h-4 w-4 mr-2" />
+                <Button 
+                  className="font-bold"
+                  style={{ 
+                    background: theme?.effects.gradientStyle || `linear-gradient(135deg, ${effectiveColors.primary}, ${effectiveColors.secondary})`,
+                    color: theme?.colors.background || '#030712',
+                    boxShadow: `0 10px 30px ${theme?.colors.accentGlow || 'rgba(234, 179, 8, 0.3)'}`,
+                  }}
+                >
+                  <span className="mr-2">{theme?.themeIcons?.power || '⚡'}</span>
                   Get Started
                 </Button>
               </Link>
               
-              <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 text-gray-400">
+              <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2" style={{ color: theme?.colors.textMuted }}>
                 {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </button>
             </div>
@@ -428,20 +438,21 @@ export default function LandingPageContent() {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="md:hidden border-t border-gray-800 bg-gray-950/95 backdrop-blur-xl"
+            className="md:hidden border-t backdrop-blur-xl"
+            style={{ backgroundColor: theme?.colors.backgroundOverlay, borderColor: theme?.colors.border }}
           >
             <nav className="px-4 py-4 space-y-2">
-              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-4 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg">Features</a>
-              <a href="#competitions" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-4 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg">Competitions</a>
-              <a href="#challenges" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-4 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg">Challenges</a>
-              <Link href="/enterprise" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-4 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg">Enterprise</Link>
-              <Link href="/sign-in" className="block py-3 px-4 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg">Sign In</Link>
+              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-4 rounded-lg" style={{ color: theme?.colors.textMuted }}>Features</a>
+              <a href="#competitions" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-4 rounded-lg" style={{ color: theme?.colors.textMuted }}>Competitions</a>
+              <a href="#challenges" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-4 rounded-lg" style={{ color: theme?.colors.textMuted }}>Challenges</a>
+              <Link href="/enterprise" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-4 rounded-lg" style={{ color: theme?.colors.textMuted }}>Enterprise</Link>
+              <Link href="/sign-in" className="block py-3 px-4 rounded-lg" style={{ color: theme?.colors.textMuted }}>Sign In</Link>
             </nav>
           </motion.div>
         )}
       </motion.header>
 
-      {/* EPIC Hero Section */}
+      {/* EPIC Hero Section - Fully Theme Aware */}
       {settings.sectionVisibility.hero && (
         <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
           {/* Theme-specific animated background */}
@@ -449,84 +460,89 @@ export default function LandingPageContent() {
 
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
             <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-              {/* Animated Badge */}
+              {/* Theme-specific badge with icon */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.2 }}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 text-yellow-400 text-sm font-bold mb-8"
+                className="inline-flex items-center gap-3 px-6 py-3 rounded-full text-sm font-bold mb-8"
+                style={{ 
+                  background: `linear-gradient(135deg, ${effectiveColors.primary}15, ${effectiveColors.secondary}15)`,
+                  border: `1px solid ${effectiveColors.primary}40`,
+                  color: effectiveColors.primary,
+                  fontFamily: theme?.fonts.accent,
+                }}
               >
-                <motion.div animate={{ rotate: [0, 360] }} transition={{ repeat: Infinity, duration: 3, ease: "linear" }}>
-                  <Sparkles className="h-4 w-4" />
-                </motion.div>
-                {settings.heroSubtitle}
-                <Flame className="h-4 w-4 text-orange-500" />
+                <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
+                  {theme?.heroTextStyle?.titlePrefix || theme?.themeIcons?.trophy || '🏆'}
+                </motion.span>
+                <span className={theme?.heroTextStyle?.subtitleStyle}>{settings.heroSubtitle}</span>
+                <span>{theme?.themeIcons?.power || '⚡'}</span>
               </motion.div>
 
-              {/* EPIC Title with Glow */}
+              {/* EPIC Title with Theme Glow */}
               <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
                 className="text-5xl md:text-7xl lg:text-8xl font-black mb-6 leading-tight tracking-tight"
-                style={{ fontFamily: theme?.fonts.heading }}
+                style={{ fontFamily: effectiveHeadingFont }}
               >
                 <span className="relative">
+                  {/* Glow layer */}
                   <span 
-                    className="absolute inset-0 bg-clip-text text-transparent blur-2xl opacity-50"
-                    style={{ backgroundImage: theme?.effects.gradientStyle || 'linear-gradient(to right, #fbbf24, #f97316, #fbbf24)' }}
+                    className="absolute inset-0 bg-clip-text text-transparent blur-2xl opacity-60"
+                    style={{ backgroundImage: theme?.effects.gradientStyle }}
                   >
-                    {settings.heroTitle}
+                    {theme?.heroTextStyle?.titlePrefix} {settings.heroTitle}
                   </span>
+                  {/* Main text */}
                   <span 
                     className={`relative bg-clip-text text-transparent bg-[length:200%_auto] ${theme?.effects.animationStyle === 'dynamic' || theme?.effects.animationStyle === 'intense' ? 'animate-gradient' : ''}`}
-                    style={{ backgroundImage: theme?.effects.gradientStyle || 'linear-gradient(to right, #fbbf24, #ffffff, #fbbf24)' }}
+                    style={{ backgroundImage: theme?.effects.gradientStyle }}
                   >
                     {settings.heroTitle}
                   </span>
                 </span>
               </motion.h1>
 
-              {/* Description */}
+              {/* Description with theme muted color */}
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
-                className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto mb-10 leading-relaxed"
+                className="text-lg md:text-xl max-w-3xl mx-auto mb-10 leading-relaxed"
+                style={{ color: theme?.colors.textMuted }}
               >
                 {settings.heroDescription}
               </motion.p>
 
-              {/* CTA Buttons */}
+              {/* CTA Buttons with theme styling */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
                 className="flex flex-col sm:flex-row items-center justify-center gap-4"
               >
-                {settings.heroCTAButtons.map((btn) => {
-                  const IconComponent = btn.icon ? iconMap[btn.icon] : null;
+                {settings.heroCTAButtons.filter(btn => btn.enabled).map((btn) => {
                   const isPrimary = btn.style === 'primary';
                   return (
                     <Link key={btn.id} href={btn.href}>
                       <Button
                         size="lg"
-                        className={`text-lg px-8 py-7 font-bold transition-all duration-300 hover:scale-105 ${
-                          isPrimary 
-                            ? 'shadow-2xl hover:shadow-xl'
-                            : 'border-2'
-                        }`}
+                        className={`text-lg px-8 py-7 font-bold transition-all duration-300 hover:scale-105 ${isPrimary ? '' : 'border-2'}`}
                         style={isPrimary ? { 
-                          background: theme?.effects.gradientStyle || 'linear-gradient(to right, #eab308, #f97316, #eab308)',
-                          color: theme?.colors.background || '#030712',
-                          boxShadow: `0 25px 50px -12px ${theme?.colors.accentGlow || 'rgba(234, 179, 8, 0.3)'}`,
+                          background: theme?.effects.gradientStyle,
+                          color: theme?.colors.background,
+                          boxShadow: `0 25px 50px -12px ${theme?.colors.accentGlow}`,
+                          fontFamily: effectiveHeadingFont,
                         } : {
-                          backgroundColor: theme?.colors.backgroundCard || 'rgba(31, 41, 55, 0.8)',
-                          borderColor: theme?.colors.primary || '#eab308',
-                          color: theme?.colors.primary || '#eab308',
+                          backgroundColor: theme?.colors.backgroundCard,
+                          borderColor: effectiveColors.primary,
+                          color: effectiveColors.primary,
                         }}
                       >
-                        {IconComponent && <IconComponent className="h-5 w-5 mr-2" />}
+                        <span className="mr-2">{isPrimary ? (theme?.heroTextStyle?.ctaIcon || theme?.themeIcons?.power || '🚀') : ''}</span>
                         {btn.text}
                         {!isPrimary && <ArrowRight className="h-5 w-5 ml-2" />}
                       </Button>
@@ -535,40 +551,48 @@ export default function LandingPageContent() {
                 })}
               </motion.div>
 
-              {/* Quick Stats Preview - Uses first 3 enabled stats */}
+              {/* Quick Stats with theme icons */}
               {settings.stats && settings.stats.filter(s => s.enabled).length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.8 }}
-                  className="mt-16 grid grid-cols-3 gap-4 md:gap-8 max-w-2xl mx-auto"
+                  className="mt-16 grid grid-cols-3 gap-4 md:gap-8 max-w-3xl mx-auto"
                 >
-                  {settings.stats.filter(s => s.enabled).slice(0, 3).map((stat, i) => (
-                    <motion.div
-                      key={stat.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.9 + i * 0.1 }}
-                      className="text-center"
-                    >
-                      <div 
-                        className="text-2xl md:text-4xl font-black mb-1"
-                        style={{ color: theme?.colors.primary || '#eab308' }}
+                  {settings.stats.filter(s => s.enabled).slice(0, 3).map((stat, i) => {
+                    const statIcons = [theme?.themeIcons?.users, theme?.themeIcons?.currency, theme?.themeIcons?.stats];
+                    return (
+                      <motion.div
+                        key={stat.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.9 + i * 0.1 }}
+                        className="text-center p-4 rounded-xl"
+                        style={{ 
+                          backgroundColor: `${effectiveColors.primary}08`,
+                          border: `1px solid ${effectiveColors.primary}20`,
+                        }}
                       >
-                        {settings.statsAnimated ? (
-                          <AnimatedCounter value={stat.value} suffix={stat.suffix} />
-                        ) : (
-                          `${stat.value}${stat.suffix}`
-                        )}
-                      </div>
-                      <div style={{ color: theme?.colors.textMuted || '#6b7280' }} className="text-xs md:text-sm">{stat.label}</div>
-                    </motion.div>
-                  ))}
+                        <div className="text-2xl mb-2">{statIcons[i] || ['👥', '💰', '📈'][i]}</div>
+                        <div 
+                          className="text-2xl md:text-4xl font-black mb-1"
+                          style={{ color: effectiveColors.primary, fontFamily: effectiveHeadingFont }}
+                        >
+                          {settings.statsAnimated ? (
+                            <AnimatedCounter value={stat.value} suffix={stat.suffix} />
+                          ) : (
+                            `${stat.value}${stat.suffix}`
+                          )}
+                        </div>
+                        <div style={{ color: theme?.colors.textMuted }} className="text-xs md:text-sm">{stat.label}</div>
+                      </motion.div>
+                    );
+                  })}
                 </motion.div>
               )}
             </motion.div>
 
-            {/* Scroll Indicator */}
+            {/* Scroll Indicator with theme color */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -580,12 +604,13 @@ export default function LandingPageContent() {
                 transition={{ repeat: Infinity, duration: 2 }}
                 className="flex flex-col items-center gap-2"
               >
-                <span className="text-xs text-gray-500 uppercase tracking-widest">Scroll</span>
-                <div className="w-6 h-10 rounded-full border-2 border-yellow-500/30 flex items-start justify-center pt-2">
+                <span className="text-xs uppercase tracking-widest" style={{ color: theme?.colors.textMuted }}>Scroll</span>
+                <div className="w-6 h-10 rounded-full border-2 flex items-start justify-center pt-2" style={{ borderColor: `${effectiveColors.primary}40` }}>
                   <motion.div
                     animate={{ y: [0, 12, 0] }}
                     transition={{ repeat: Infinity, duration: 1.5 }}
-                    className="w-1.5 h-3 rounded-full bg-yellow-500"
+                    className="w-1.5 h-3 rounded-full"
+                    style={{ backgroundColor: effectiveColors.primary }}
                   />
                 </div>
               </motion.div>
@@ -594,10 +619,10 @@ export default function LandingPageContent() {
         </section>
       )}
 
-      {/* Stats Section */}
+      {/* Stats Section - Theme Aware */}
       {settings.sectionVisibility.stats && settings.stats.length > 0 && (
         <section className="py-20 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/5 via-transparent to-orange-500/5" />
+          <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, ${effectiveColors.primary}08, transparent, ${effectiveColors.secondary}08)` }} />
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               {settings.stats.filter(s => s.enabled).map((stat, index) => (
@@ -611,7 +636,8 @@ export default function LandingPageContent() {
                 >
                   <motion.div
                     whileHover={{ scale: 1.1 }}
-                    className="text-5xl md:text-6xl font-black bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent mb-2"
+                    className="text-5xl md:text-6xl font-black bg-clip-text text-transparent mb-2"
+                    style={{ backgroundImage: theme?.effects.gradientStyle, fontFamily: effectiveHeadingFont }}
                   >
                     {settings.statsAnimated ? (
                       <AnimatedCounter value={stat.value} suffix={stat.suffix} />
@@ -619,7 +645,7 @@ export default function LandingPageContent() {
                       `${stat.value}${stat.suffix}`
                     )}
                   </motion.div>
-                  <p className="text-gray-400 text-sm font-medium group-hover:text-yellow-500 transition-colors">{stat.label}</p>
+                  <p className="text-sm font-medium transition-colors" style={{ color: theme?.colors.textMuted }}>{stat.label}</p>
                 </motion.div>
               ))}
             </div>
@@ -627,7 +653,7 @@ export default function LandingPageContent() {
         </section>
       )}
 
-      {/* Features Section */}
+      {/* Features Section - Theme Aware */}
       {settings.sectionVisibility.features && settings.features.length > 0 && (
         <section id="features" className="py-24 relative">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -637,17 +663,18 @@ export default function LandingPageContent() {
               viewport={{ once: true }}
               className="text-center mb-16"
             >
-              <h2 className="text-4xl md:text-6xl font-black mb-4">
-                <span className="bg-gradient-to-r from-white via-yellow-200 to-white bg-clip-text text-transparent">
+              <h2 className="text-4xl md:text-6xl font-black mb-4" style={{ fontFamily: effectiveHeadingFont }}>
+                <span className="bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(90deg, ${effectiveColors.text}, ${effectiveColors.primary}, ${effectiveColors.text})` }}>
                   {settings.featuresTitle}
                 </span>
               </h2>
-              <p className="text-gray-400 text-lg max-w-2xl mx-auto">{settings.featuresSubtitle}</p>
+              <p className="text-lg max-w-2xl mx-auto" style={{ color: theme?.colors.textMuted }}>{settings.featuresSubtitle}</p>
             </motion.div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {settings.features.filter(f => f.enabled).map((feature, index) => {
                 const IconComponent = iconMap[feature.icon];
+                const featureIcons = [theme?.themeIcons?.trophy, theme?.themeIcons?.battle, theme?.themeIcons?.users, theme?.themeIcons?.currency, theme?.themeIcons?.power, theme?.themeIcons?.achievement];
                 return (
                   <motion.div
                     key={feature.id}
@@ -656,17 +683,38 @@ export default function LandingPageContent() {
                     transition={{ delay: index * 0.1 }}
                     viewport={{ once: true }}
                     whileHover={{ y: -8, scale: 1.02 }}
-                    className="group relative p-8 rounded-2xl bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-gray-800/50 hover:border-yellow-500/50 transition-all duration-300 overflow-hidden"
+                    className="group relative p-8 rounded-2xl transition-all duration-300 overflow-hidden"
+                    style={{ 
+                      backgroundColor: theme?.colors.backgroundCard,
+                      border: `1px solid ${theme?.colors.border}`,
+                    }}
                   >
                     {/* Glow effect on hover */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/0 to-orange-500/0 group-hover:from-yellow-500/5 group-hover:to-orange-500/5 transition-all duration-500" />
+                    <div 
+                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-500" 
+                      style={{ background: `linear-gradient(135deg, ${effectiveColors.primary}08, ${effectiveColors.secondary}08)` }}
+                    />
                     
                     <div className="relative z-10">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-                        {IconComponent && <IconComponent className="h-8 w-8 text-yellow-500" />}
+                      <div 
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300"
+                        style={{ background: `linear-gradient(135deg, ${effectiveColors.primary}30, ${effectiveColors.secondary}30)` }}
+                      >
+                        {featureIcons[index % 6] ? (
+                          <span className="text-3xl">{featureIcons[index % 6]}</span>
+                        ) : IconComponent ? (
+                          <span style={{ color: effectiveColors.primary }}><IconComponent className="h-8 w-8" /></span>
+                        ) : (
+                          <span className="text-3xl">{theme?.themeIcons?.special || '⭐'}</span>
+                        )}
                       </div>
-                      <h3 className="text-xl font-bold text-white mb-3 group-hover:text-yellow-400 transition-colors">{feature.title}</h3>
-                      <p className="text-gray-400 leading-relaxed">{feature.description}</p>
+                      <h3 
+                        className="text-xl font-bold mb-3 transition-colors" 
+                        style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}
+                      >
+                        {feature.title}
+                      </h3>
+                      <p className="leading-relaxed" style={{ color: theme?.colors.textMuted }}>{feature.description}</p>
                     </div>
                   </motion.div>
                 );
@@ -676,10 +724,10 @@ export default function LandingPageContent() {
         </section>
       )}
 
-      {/* How It Works */}
+      {/* How It Works - Theme Aware */}
       {settings.sectionVisibility.howItWorks && settings.howItWorksSteps.length > 0 && (
         <section className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-900/5 to-transparent" />
+          <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent, ${effectiveColors.secondary}08, transparent)` }} />
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -687,13 +735,13 @@ export default function LandingPageContent() {
               viewport={{ once: true }}
               className="text-center mb-16"
             >
-              <h2 className="text-4xl md:text-6xl font-black mb-4 text-white">{settings.howItWorksTitle}</h2>
-              <p className="text-gray-400 text-lg">{settings.howItWorksSubtitle}</p>
+              <h2 className="text-4xl md:text-6xl font-black mb-4" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>{settings.howItWorksTitle}</h2>
+              <p className="text-lg" style={{ color: theme?.colors.textMuted }}>{settings.howItWorksSubtitle}</p>
             </motion.div>
 
             <div className="relative">
-              {/* Connection line */}
-              <div className="absolute top-16 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-yellow-500/30 to-transparent hidden lg:block" />
+              {/* Connection line with theme color */}
+              <div className="absolute top-16 left-0 right-0 h-1 hidden lg:block" style={{ background: `linear-gradient(90deg, transparent, ${effectiveColors.primary}40, transparent)` }} />
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 {settings.howItWorksSteps.filter(s => s.enabled).sort((a, b) => a.step - b.step).map((step, index) => (
@@ -707,12 +755,18 @@ export default function LandingPageContent() {
                   >
                     <motion.div
                       whileHover={{ scale: 1.1, rotate: 5 }}
-                      className="w-28 h-28 rounded-3xl mx-auto mb-6 flex items-center justify-center text-4xl font-black bg-gradient-to-br from-yellow-400 to-orange-500 text-gray-900 shadow-2xl shadow-yellow-500/30"
+                      className="w-28 h-28 rounded-3xl mx-auto mb-6 flex items-center justify-center text-4xl font-black"
+                      style={{ 
+                        background: theme?.effects.gradientStyle,
+                        color: theme?.colors.background,
+                        boxShadow: `0 25px 50px -12px ${theme?.colors.accentGlow}`,
+                        fontFamily: effectiveHeadingFont,
+                      }}
                     >
                       {step.step}
                     </motion.div>
-                    <h3 className="text-xl font-bold text-white mb-2">{step.title}</h3>
-                    <p className="text-gray-400">{step.description}</p>
+                    <h3 className="text-xl font-bold mb-2" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>{step.title}</h3>
+                    <p style={{ color: theme?.colors.textMuted }}>{step.description}</p>
                   </motion.div>
                 ))}
               </div>
@@ -721,21 +775,36 @@ export default function LandingPageContent() {
         </section>
       )}
 
-      {/* Competitions Section */}
+      {/* Competitions Section - Theme Aware */}
       {settings.sectionVisibility.competitions && (
         <section id="competitions" className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_left,_var(--tw-gradient-stops))] from-yellow-500/10 via-transparent to-transparent" />
+          <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at left, ${effectiveColors.primary}15, transparent)` }} />
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-sm font-bold mb-6">
-                  <Trophy className="h-4 w-4" />
+                <div 
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-6"
+                  style={{ 
+                    backgroundColor: `${effectiveColors.primary}15`,
+                    border: `1px solid ${effectiveColors.primary}30`,
+                    color: effectiveColors.primary,
+                  }}
+                >
+                  <span>{theme?.themeIcons?.trophy || '🏆'}</span>
                   {settings.competitionsSubtitle}
                 </div>
-                <h2 className="text-4xl md:text-5xl font-black text-white mb-6">{settings.competitionsTitle}</h2>
-                <p className="text-lg text-gray-400 mb-8 leading-relaxed">{settings.competitionsDescription}</p>
+                <h2 className="text-4xl md:text-5xl font-black mb-6" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>{settings.competitionsTitle}</h2>
+                <p className="text-lg mb-8 leading-relaxed" style={{ color: theme?.colors.textMuted }}>{settings.competitionsDescription}</p>
                 <Link href={settings.competitionsCTALink}>
-                  <Button size="lg" className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold shadow-lg shadow-yellow-500/25 hover:scale-105 transition-all">
+                  <Button 
+                    size="lg" 
+                    className="font-bold hover:scale-105 transition-all"
+                    style={{ 
+                      background: theme?.effects.gradientStyle,
+                      color: theme?.colors.background,
+                      boxShadow: `0 10px 30px ${theme?.colors.accentGlow}`,
+                    }}
+                  >
                     {settings.competitionsCTAText}
                     <ChevronRight className="h-5 w-5 ml-2" />
                   </Button>
@@ -747,27 +816,36 @@ export default function LandingPageContent() {
                   { name: 'Grand Championship', prize: '$50,000', status: 'LIVE', participants: 2847 },
                   { name: 'Weekly Showdown', prize: '$10,000', status: 'STARTING', participants: 1256 },
                   { name: 'Beginner League', prize: '$5,000', status: 'OPEN', participants: 892 },
-                ].map((comp, i) => (
+                ].map((comp) => (
                   <motion.div
                     key={comp.name}
                     whileHover={{ scale: 1.02, x: 10 }}
-                    className="p-6 rounded-2xl bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-gray-800/50 hover:border-yellow-500/30 transition-all"
+                    className="p-6 rounded-2xl transition-all"
+                    style={{ 
+                      backgroundColor: theme?.colors.backgroundCard,
+                      border: `1px solid ${theme?.colors.border}`,
+                    }}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center">
-                          <Trophy className="h-7 w-7 text-yellow-500" />
+                        <div 
+                          className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl"
+                          style={{ background: `linear-gradient(135deg, ${effectiveColors.primary}30, ${effectiveColors.secondary}30)` }}
+                        >
+                          {theme?.themeIcons?.trophy || '🏆'}
                         </div>
                         <div>
-                          <h4 className="font-bold text-white text-lg">{comp.name}</h4>
-                          <p className="text-sm text-gray-400">Prize: {comp.prize} • {comp.participants} traders</p>
+                          <h4 className="font-bold text-lg" style={{ color: effectiveColors.text }}>{comp.name}</h4>
+                          <p className="text-sm" style={{ color: theme?.colors.textMuted }}>Prize: {comp.prize} • {comp.participants} traders</p>
                         </div>
                       </div>
-                      <div className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-                        comp.status === 'LIVE' ? 'bg-green-500/20 text-green-400' :
-                        comp.status === 'STARTING' ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-blue-500/20 text-blue-400'
-                      }`}>
+                      <div 
+                        className="px-3 py-1.5 rounded-full text-xs font-bold"
+                        style={{ 
+                          backgroundColor: comp.status === 'LIVE' ? `${theme?.colors.success}20` : comp.status === 'STARTING' ? `${effectiveColors.accent}20` : `${effectiveColors.secondary}20`,
+                          color: comp.status === 'LIVE' ? theme?.colors.success : comp.status === 'STARTING' ? effectiveColors.accent : effectiveColors.secondary,
+                        }}
+                      >
                         {comp.status}
                       </div>
                     </div>
@@ -779,21 +857,36 @@ export default function LandingPageContent() {
         </section>
       )}
 
-      {/* Challenges Section */}
+      {/* Challenges Section - Theme Aware */}
       {settings.sectionVisibility.challenges && (
         <section id="challenges" className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_right,_var(--tw-gradient-stops))] from-purple-500/10 via-transparent to-transparent" />
+          <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at right, ${effectiveColors.secondary}15, transparent)` }} />
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="lg:order-2">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-sm font-bold mb-6">
-                  <Swords className="h-4 w-4" />
+                <div 
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-6"
+                  style={{ 
+                    backgroundColor: `${effectiveColors.secondary}15`,
+                    border: `1px solid ${effectiveColors.secondary}30`,
+                    color: effectiveColors.secondary,
+                  }}
+                >
+                  <span>{theme?.themeIcons?.battle || '⚔️'}</span>
                   {settings.challengesSubtitle}
                 </div>
-                <h2 className="text-4xl md:text-5xl font-black text-white mb-6">{settings.challengesTitle}</h2>
-                <p className="text-lg text-gray-400 mb-8 leading-relaxed">{settings.challengesDescription}</p>
+                <h2 className="text-4xl md:text-5xl font-black mb-6" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>{settings.challengesTitle}</h2>
+                <p className="text-lg mb-8 leading-relaxed" style={{ color: theme?.colors.textMuted }}>{settings.challengesDescription}</p>
                 <Link href={settings.challengesCTALink}>
-                  <Button size="lg" variant="outline" className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10 font-bold hover:scale-105 transition-all">
+                  <Button 
+                    size="lg" 
+                    variant="outline" 
+                    className="font-bold hover:scale-105 transition-all border-2"
+                    style={{ 
+                      borderColor: `${effectiveColors.secondary}80`,
+                      color: effectiveColors.secondary,
+                    }}
+                  >
                     {settings.challengesCTAText}
                     <ArrowRight className="h-5 w-5 ml-2" />
                   </Button>
@@ -801,48 +894,63 @@ export default function LandingPageContent() {
               </motion.div>
 
               <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="lg:order-1">
-                <div className="relative p-8 rounded-3xl bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-gray-800/50 overflow-hidden">
-                  {/* Decorative elements */}
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl" />
+                <div 
+                  className="relative p-8 rounded-3xl overflow-hidden"
+                  style={{ 
+                    backgroundColor: theme?.colors.backgroundCard,
+                    border: `1px solid ${theme?.colors.border}`,
+                  }}
+                >
+                  {/* Decorative glow */}
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full blur-3xl" style={{ backgroundColor: `${effectiveColors.secondary}30` }} />
                   
                   <div className="relative flex items-center justify-between gap-4">
                     <div className="text-center flex-1">
                       <motion.div
                         animate={{ scale: [1, 1.05, 1] }}
                         transition={{ repeat: Infinity, duration: 2 }}
-                        className="w-24 h-24 rounded-full mx-auto mb-4 bg-gradient-to-br from-yellow-400/30 to-orange-500/30 flex items-center justify-center text-4xl border-2 border-yellow-500/30"
+                        className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl border-2"
+                        style={{ 
+                          background: `linear-gradient(135deg, ${effectiveColors.primary}30, ${effectiveColors.accent}30)`,
+                          borderColor: `${effectiveColors.primary}40`,
+                        }}
                       >
-                        👑
+                        {theme?.themeIcons?.special || '👑'}
                       </motion.div>
-                      <p className="font-bold text-white text-lg">You</p>
-                      <p className="text-sm text-gray-400">Score: 0</p>
+                      <p className="font-bold text-lg" style={{ color: effectiveColors.text }}>You</p>
+                      <p className="text-sm" style={{ color: theme?.colors.textMuted }}>Score: 0</p>
                     </div>
                     
                     <motion.div
                       animate={{ scale: [1, 1.2, 1] }}
                       transition={{ repeat: Infinity, duration: 1.5 }}
-                      className="text-5xl font-black bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent"
+                      className="text-5xl font-black bg-clip-text text-transparent"
+                      style={{ backgroundImage: theme?.effects.gradientStyle, fontFamily: effectiveHeadingFont }}
                     >
                       VS
                     </motion.div>
                     
                     <div className="text-center flex-1">
-                      <div className="w-24 h-24 rounded-full mx-auto mb-4 bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center text-4xl border-2 border-purple-500/30">
-                        🎯
+                      <div 
+                        className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl border-2"
+                        style={{ 
+                          background: `linear-gradient(135deg, ${effectiveColors.secondary}30, ${effectiveColors.accent}30)`,
+                          borderColor: `${effectiveColors.secondary}40`,
+                        }}
+                      >
+                        {theme?.themeIcons?.battle || '🎯'}
                       </div>
-                      <p className="font-bold text-white text-lg">Opponent</p>
-                      <p className="text-sm text-gray-400">Score: 0</p>
+                      <p className="font-bold text-lg" style={{ color: effectiveColors.text }}>Opponent</p>
+                      <p className="text-sm" style={{ color: theme?.colors.textMuted }}>Score: 0</p>
                     </div>
                   </div>
 
                   <div className="mt-8 flex items-center justify-center gap-4">
-                    <div className="px-4 py-2 rounded-xl bg-gray-800/50 text-sm text-gray-300">
-                      <Timer className="h-4 w-4 inline mr-2 text-yellow-500" />
-                      Duration: 24h
+                    <div className="px-4 py-2 rounded-xl text-sm" style={{ backgroundColor: `${theme?.colors.backgroundSecondary}`, color: theme?.colors.textMuted }}>
+                      <span style={{ color: effectiveColors.primary }}>⏱️</span> Duration: 24h
                     </div>
-                    <div className="px-4 py-2 rounded-xl bg-gray-800/50 text-sm text-gray-300">
-                      <Coins className="h-4 w-4 inline mr-2 text-yellow-500" />
-                      Stake: 100 Credits
+                    <div className="px-4 py-2 rounded-xl text-sm" style={{ backgroundColor: `${theme?.colors.backgroundSecondary}`, color: theme?.colors.textMuted }}>
+                      <span style={{ color: effectiveColors.primary }}>{theme?.themeIcons?.currency || '💰'}</span> Stake: 100 Credits
                     </div>
                   </div>
                 </div>
@@ -852,11 +960,11 @@ export default function LandingPageContent() {
         </section>
       )}
 
-      {/* Final CTA */}
+      {/* Final CTA - Theme Aware */}
       {settings.sectionVisibility.cta && (
         <section className="py-32 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-orange-500/5 to-purple-500/10" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-500/10 via-transparent to-transparent" />
+          <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${effectiveColors.primary}15, ${effectiveColors.accent}08, ${effectiveColors.secondary}15)` }} />
+          <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at center, ${effectiveColors.primary}15, transparent)` }} />
           
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
@@ -865,20 +973,27 @@ export default function LandingPageContent() {
                 whileInView={{ scale: 1 }}
                 viewport={{ once: true }}
                 className="text-5xl md:text-7xl font-black mb-6"
+                style={{ fontFamily: effectiveHeadingFont }}
               >
-                <span className="bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 bg-clip-text text-transparent">
+                <span className="bg-clip-text text-transparent" style={{ backgroundImage: theme?.effects.gradientStyle }}>
                   {settings.ctaTitle}
                 </span>
               </motion.h2>
-              <p className="text-xl text-gray-300 mb-4">{settings.ctaSubtitle}</p>
-              <p className="text-gray-400 mb-12 max-w-2xl mx-auto">{settings.ctaDescription}</p>
+              <p className="text-xl mb-4" style={{ color: effectiveColors.text }}>{settings.ctaSubtitle}</p>
+              <p className="mb-12 max-w-2xl mx-auto" style={{ color: theme?.colors.textMuted }}>{settings.ctaDescription}</p>
               <Link href={settings.ctaButtonLink}>
                 <Button
                   size="lg"
-                  className="text-xl px-14 py-8 font-black bg-gradient-to-r from-yellow-500 via-orange-500 to-yellow-500 hover:from-yellow-400 hover:via-orange-400 hover:to-yellow-400 text-gray-900 shadow-2xl shadow-yellow-500/30 hover:shadow-yellow-500/50 hover:scale-110 transition-all duration-300"
+                  className="text-xl px-14 py-8 font-black hover:scale-110 transition-all duration-300"
+                  style={{ 
+                    background: theme?.effects.gradientStyle,
+                    color: theme?.colors.background,
+                    boxShadow: `0 25px 50px -12px ${theme?.colors.accentGlow}`,
+                    fontFamily: effectiveHeadingFont,
+                  }}
                 >
                   {settings.ctaButtonText}
-                  <Rocket className="h-7 w-7 ml-3" />
+                  <span className="ml-3 text-2xl">{theme?.heroTextStyle?.ctaIcon || '🚀'}</span>
                 </Button>
               </Link>
             </motion.div>
@@ -886,8 +1001,8 @@ export default function LandingPageContent() {
         </section>
       )}
 
-      {/* Footer */}
-      <footer className="bg-gray-900/50 border-t border-gray-800/50">
+      {/* Footer - Theme Aware */}
+      <footer style={{ backgroundColor: theme?.colors.backgroundSecondary, borderTop: `1px solid ${theme?.colors.border}` }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Main Footer */}
           <div className="py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -897,19 +1012,19 @@ export default function LandingPageContent() {
                   <Image src={settings.logo} alt={settings.siteName} width={120} height={28} className="h-7 w-auto" />
                 ) : (
                   <>
-                    <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
-                      <Zap className="h-5 w-5 text-gray-900" />
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: theme?.effects.gradientStyle }}>
+                      <span>{theme?.themeIcons?.special || '⚡'}</span>
                     </div>
-                    <span className="text-lg font-bold text-white">{settings.siteName}</span>
+                    <span className="text-lg font-bold" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>{settings.siteName}</span>
                   </>
                 )}
               </Link>
-              <p className="text-gray-400 text-sm">{settings.tagline}</p>
+              <p className="text-sm" style={{ color: theme?.colors.textMuted }}>{settings.tagline}</p>
             </div>
 
             {/* Platform Menu */}
             <div>
-              <h4 className="text-white font-semibold mb-4">Platform</h4>
+              <h4 className="font-semibold mb-4" style={{ color: effectiveColors.text }}>Platform</h4>
               <ul className="space-y-2">
                 {(settings.footerMenus?.platform || [
                   { label: 'Competitions', href: '/competitions', enabled: true },
@@ -918,7 +1033,7 @@ export default function LandingPageContent() {
                   { label: 'Marketplace', href: '/marketplace', enabled: true },
                 ]).filter(item => item.enabled).map((item, i) => (
                   <li key={i}>
-                    <Link href={item.href} className="text-gray-400 hover:text-yellow-500 text-sm transition-colors">
+                    <Link href={item.href} className="text-sm transition-colors hover:opacity-80" style={{ color: theme?.colors.textMuted }}>
                       {item.label}
                     </Link>
                   </li>
@@ -928,7 +1043,7 @@ export default function LandingPageContent() {
 
             {/* Support Menu */}
             <div>
-              <h4 className="text-white font-semibold mb-4">Support</h4>
+              <h4 className="font-semibold mb-4" style={{ color: effectiveColors.text }}>Support</h4>
               <ul className="space-y-2">
                 {(settings.footerMenus?.support || [
                   { label: 'Help Center', href: '/help', enabled: true },
@@ -938,11 +1053,11 @@ export default function LandingPageContent() {
                 ]).filter(item => item.enabled).map((item, i) => (
                   <li key={i}>
                     {item.href.startsWith('mailto:') ? (
-                      <a href={item.href} className="text-gray-400 hover:text-yellow-500 text-sm transition-colors">
+                      <a href={item.href} className="text-sm transition-colors hover:opacity-80" style={{ color: theme?.colors.textMuted }}>
                         {item.label}
                       </a>
                     ) : (
-                      <Link href={item.href} className="text-gray-400 hover:text-yellow-500 text-sm transition-colors">
+                      <Link href={item.href} className="text-sm transition-colors hover:opacity-80" style={{ color: theme?.colors.textMuted }}>
                         {item.label}
                       </Link>
                     )}
@@ -953,7 +1068,7 @@ export default function LandingPageContent() {
 
             {/* Business Menu */}
             <div>
-              <h4 className="text-white font-semibold mb-4">Business</h4>
+              <h4 className="font-semibold mb-4" style={{ color: effectiveColors.text }}>Business</h4>
               <ul className="space-y-2">
                 {(settings.footerMenus?.business || [
                   { label: 'Enterprise Solutions', href: '/enterprise', enabled: true },
@@ -961,7 +1076,7 @@ export default function LandingPageContent() {
                   { label: 'Contact Sales', href: '/enterprise#contact', enabled: true },
                 ]).filter(item => item.enabled).map((item, i) => (
                   <li key={i}>
-                    <Link href={item.href} className="text-gray-400 hover:text-yellow-500 text-sm transition-colors">
+                    <Link href={item.href} className="text-sm transition-colors hover:opacity-80" style={{ color: theme?.colors.textMuted }}>
                       {item.label}
                     </Link>
                   </li>
@@ -971,24 +1086,24 @@ export default function LandingPageContent() {
           </div>
 
           {/* Risk Disclaimer */}
-          <div className="py-6 border-t border-gray-800/50">
-            <p className="text-xs text-gray-500 leading-relaxed">
-              <strong className="text-gray-400">Risk Disclaimer:</strong>{' '}
+          <div className="py-6" style={{ borderTop: `1px solid ${theme?.colors.border}` }}>
+            <p className="text-xs leading-relaxed" style={{ color: theme?.colors.textMuted }}>
+              <strong style={{ color: effectiveColors.text }}>Risk Disclaimer:</strong>{' '}
               {settings.footerRiskDisclaimer || 'Trading in financial markets involves substantial risk of loss and is not suitable for every investor. The valuation of financial instruments may fluctuate, and as a result, traders may lose more than their original investment. Past performance is not indicative of future results. All trading strategies are used at your own risk. This platform is for educational and entertainment purposes only. Virtual currency used on this platform has no real monetary value.'}
               {settings.footerDisclaimer && ` ${settings.footerDisclaimer}`}
             </p>
           </div>
 
           {/* Copyright */}
-          <div className="py-6 border-t border-gray-800/50 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-gray-500 text-sm">{settings.footerCopyright}</p>
+          <div className="py-6 flex flex-col md:flex-row items-center justify-between gap-4" style={{ borderTop: `1px solid ${theme?.colors.border}` }}>
+            <p className="text-sm" style={{ color: theme?.colors.textMuted }}>{settings.footerCopyright}</p>
             <div className="flex items-center gap-4">
-              <span className="text-gray-600 text-xs">Powered by</span>
+              <span className="text-xs" style={{ color: theme?.colors.textMuted }}>Powered by</span>
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 bg-gradient-to-br from-yellow-400 to-orange-500 rounded flex items-center justify-center">
-                  <Zap className="h-3 w-3 text-gray-900" />
+                <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: theme?.effects.gradientStyle }}>
+                  <span className="text-xs">{theme?.themeIcons?.power || '⚡'}</span>
                 </div>
-                <span className="text-gray-400 text-sm font-medium">ChartVolt</span>
+                <span className="text-sm font-medium" style={{ color: theme?.colors.textMuted }}>ChartVolt</span>
               </div>
             </div>
           </div>
