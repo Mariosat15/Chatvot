@@ -405,7 +405,7 @@ export default function AdvancedIndicatorManager({
                 <SelectTrigger className="flex-1 bg-[#131722] border-[#2b2b43] text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-[#1e222d] border-[#2b2b43] max-h-80">
+                <SelectContent className="bg-[#1e222d] border-[#2b2b43] max-h-80" container={portalContainer}>
                   <div className="p-2 text-xs font-semibold text-[#787b86]">Moving Averages</div>
                   {['sma', 'ema', 'wma'].map(type => (
                     <SelectItem key={type} value={type} className="text-white">
@@ -461,6 +461,7 @@ export default function AdvancedIndicatorManager({
                     onDuplicate={() => duplicateIndicator(indicator)}
                     onRemove={() => removeIndicator(indicator.id)}
                     onUpdate={(updates) => updateIndicator(indicator.id, updates)}
+                    portalContainer={portalContainer}
                   />
                 ))}
               </div>
@@ -482,6 +483,7 @@ export default function AdvancedIndicatorManager({
                     onDuplicate={() => duplicateIndicator(indicator)}
                     onRemove={() => removeIndicator(indicator.id)}
                     onUpdate={(updates) => updateIndicator(indicator.id, updates)}
+                    portalContainer={portalContainer}
                   />
                 ))}
               </div>
@@ -509,7 +511,8 @@ function IndicatorItem({
   onEdit,
   onDuplicate,
   onRemove,
-  onUpdate
+  onUpdate,
+  portalContainer
 }: {
   indicator: CustomIndicator;
   isEditing: boolean;
@@ -518,6 +521,7 @@ function IndicatorItem({
   onDuplicate: () => void;
   onRemove: () => void;
   onUpdate: (updates: Partial<CustomIndicator>) => void;
+  portalContainer?: HTMLElement | null;
 }) {
   const template = INDICATOR_TEMPLATES[indicator.type as keyof typeof INDICATOR_TEMPLATES];
 
@@ -643,7 +647,7 @@ function IndicatorItem({
                     <SelectTrigger className="h-8 bg-[#1e222d] border-[#2b2b43] text-white">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#1e222d] border-[#2b2b43]">
+                    <SelectContent className="bg-[#1e222d] border-[#2b2b43]" container={portalContainer}>
                       {LINE_STYLES.map(style => (
                         <SelectItem key={style.value} value={String(style.value)} className="text-white">
                           {style.label}
@@ -662,7 +666,7 @@ function IndicatorItem({
                     <SelectTrigger className="h-8 bg-[#1e222d] border-[#2b2b43] text-white">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#1e222d] border-[#2b2b43]">
+                    <SelectContent className="bg-[#1e222d] border-[#2b2b43]" container={portalContainer}>
                       <SelectItem value="true" className="text-white">Yes</SelectItem>
                       <SelectItem value="false" className="text-white">No</SelectItem>
                     </SelectContent>
@@ -904,7 +908,7 @@ function IndicatorItem({
                   <SelectTrigger className="h-8 bg-[#1e222d] border-[#2b2b43] text-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#1e222d] border-[#2b2b43]">
+                  <SelectContent className="bg-[#1e222d] border-[#2b2b43]" container={portalContainer}>
                     <SelectItem value="close" className="text-white">Close</SelectItem>
                     <SelectItem value="open" className="text-white">Open</SelectItem>
                     <SelectItem value="high" className="text-white">High</SelectItem>

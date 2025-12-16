@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,7 +11,6 @@ import { usePrices } from '@/contexts/PriceProvider';
 import { toast } from 'sonner';
 import { X, Loader2, TrendingUp, TrendingDown, Filter, Edit } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useDragScroll } from '@/hooks/useDragScroll';
 import EditPositionModal from './EditPositionModal';
 
 interface Position {
@@ -42,13 +41,27 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
   const [livePositions, setLivePositions] = useState<Position[]>(positions);
   
+  // Track locally closed positions to prevent them from flickering back
+  const closedPositionIdsRef = useRef<Set<string>>(new Set());
+  
   // Edit Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
 
-  // Sync positions from props when they change
+  // Sync positions from props when they change - exclude locally closed ones
   useEffect(() => {
-    setLivePositions(positions);
+    // Filter out any positions that were closed locally (optimistic removal)
+    const filteredPositions = positions.filter(p => !closedPositionIdsRef.current.has(p._id));
+    
+    // If server confirms position is gone, remove from closed set
+    const serverPositionIds = new Set(positions.map(p => p._id));
+    closedPositionIdsRef.current.forEach(id => {
+      if (!serverPositionIds.has(id)) {
+        closedPositionIdsRef.current.delete(id);
+      }
+    });
+    
+    setLivePositions(filteredPositions);
   }, [positions]);
   
   // Filters
@@ -56,8 +69,8 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
   const [filterSide, setFilterSide] = useState<string>('all');
   const [filterPnL, setFilterPnL] = useState<string>('all');
   
-  // Drag-to-scroll for table
-  const tableContainerRef = useDragScroll<HTMLDivElement>();
+  // Table container ref
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to all position symbols
   useEffect(() => {
@@ -69,9 +82,12 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
     };
   }, [positions, subscribe, unsubscribe]);
 
-  // Update positions with real-time prices
+  // Update positions with real-time prices - exclude locally closed positions
   useEffect(() => {
-    const updatedPositions = positions.map((position) => {
+    // Filter out closed positions first
+    const activePositions = positions.filter(p => !closedPositionIdsRef.current.has(p._id));
+    
+    const updatedPositions = activePositions.map((position) => {
       const currentPrice = prices.get(position.symbol as ForexSymbol);
       if (!currentPrice) return position;
 
@@ -84,17 +100,6 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
         position.symbol as ForexSymbol
       );
       const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
-
-      console.log(`💰 Position Update ${position.symbol}:`, {
-        Side: position.side,
-        Quantity: position.quantity,
-        Entry: position.entryPrice,
-        Current: marketPrice,
-        'Margin Used': position.marginUsed,
-        'P&L $': pnl.toFixed(2),
-        'P&L %': pnlPercentage,
-        'Calculated %': ((pnl / position.marginUsed) * 100).toFixed(2)
-      });
 
       return {
         ...position,
@@ -117,6 +122,9 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
         toast.success('Position closed!', {
           description: result.message,
         });
+        
+        // Track this position as closed to prevent it from flickering back
+        closedPositionIdsRef.current.add(positionId);
         
         // Remove from local state immediately for instant UI feedback
         setLivePositions(prev => prev.filter(p => p._id !== positionId));
@@ -209,8 +217,7 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
       ) : (
     <div 
       ref={tableContainerRef}
-      className="overflow-x-auto overflow-y-auto scrollbar-hide max-h-[500px] md:max-h-[600px]"
-      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      className="overflow-auto max-h-[400px] dark-scrollbar"
     >
       <Table>
         <TableHeader className="sticky top-0 bg-dark-200 z-10">

@@ -253,14 +253,30 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
           {/* Market Status Banner with Better Styling */}
           <MarketStatusBanner className="mb-5 md:mb-7 shadow-lg" />
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-7">
-            {/* Left Column: Chart + Account Info + Positions */}
-            <div className="lg:col-span-2 space-y-5 md:space-y-7">
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 md:gap-5">
+            {/* Left Column: Chart + Account Info + Positions - Takes 3 of 5 columns on XL */}
+            <div className="xl:col-span-3 space-y-4 md:space-y-5">
               {/* Professional Chart Container */}
               <div className="group relative bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-2xl p-3 md:p-5 border border-dark-400/30 shadow-2xl hover:shadow-primary/10 transition-all duration-300">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none" />
                 <div className="relative">
-                  <ChartWrapper competitionId={competitionId} positions={positions} pendingOrders={pendingOrders} />
+                  <ChartWrapper 
+                    competitionId={competitionId} 
+                    positions={positions} 
+                    pendingOrders={pendingOrders}
+                    tradingProps={{
+                      availableCapital: participant.availableCapital,
+                      defaultLeverage,
+                      openPositionsCount: participant.currentOpenPositions,
+                      maxPositions: 10,
+                      currentEquity: equity,
+                      existingUsedMargin: participant.usedMargin,
+                      currentBalance: participant.currentCapital,
+                      marginThresholds,
+                      startingCapital: competition.startingCapital,
+                      dailyRealizedPnl,
+                    }}
+                  />
                 </div>
               </div>
 
@@ -343,8 +359,8 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
               </div>
             </div>
 
-            {/* Right Column: Professional Trading Interface */}
-            <div className="lg:col-span-1">
+            {/* Right Column: Professional Trading Interface - Takes 2 of 5 columns on XL */}
+            <div className="xl:col-span-2">
               {isViewOnly ? (
                 /* View-Only Mode - Show Summary Instead of Trading Interface */
                 <div className="bg-gradient-to-br from-purple-500/10 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-purple-500/30 shadow-2xl lg:sticky lg:top-6 backdrop-blur-sm">

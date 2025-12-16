@@ -145,6 +145,16 @@
   .container {
     @apply mx-auto max-w-screen-2xl px-4 md:px-6 lg:px-8;
   }
+  /* Wide container for trading pages - uses full width with minimal padding */
+  .container-custom {
+    @apply mx-auto w-full px-3 md:px-4 lg:px-6;
+    max-width: calc(100% - 1rem);
+  }
+  @media (min-width: 1536px) {
+    .container-custom {
+      max-width: calc(100% - 2rem);
+    }
+  }
   .yellow-btn {
     @apply h-12 cursor-pointer bg-gradient-to-b from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-gray-950 font-medium text-base rounded-lg shadow-lg disabled:opacity-50;
   }
@@ -392,15 +402,29 @@
 
 /* Market News Component Styles */
 .scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
   overflow: auto;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
+  cursor: grab;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+.scrollbar-hide::-webkit-scrollbar-thumb {
+  display: none !important;
+  background: transparent !important;
+}
+
+.scrollbar-hide::-webkit-scrollbar-track {
+  display: none !important;
+  background: transparent !important;
 }
 
 /* Heatmap Settings Panel Styles */
@@ -704,6 +728,45 @@
   .scrollbar-hide {
     scroll-behavior: smooth;
   }
+}
+
+/* Dark Mode Scrollbar - Thin and sleek */
+.dark-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3f4b #1a1d24;
+}
+
+.dark-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dark-scrollbar::-webkit-scrollbar-track {
+  background: #1a1d24;
+  border-radius: 3px;
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb {
+  background: #3a3f4b;
+  border-radius: 3px;
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4a5568;
+}
+
+.dark-scrollbar::-webkit-scrollbar-corner {
+  background: #1a1d24;
+}
+
+/* Hide Scrollbar Class (for drag-to-scroll) */
+.hide-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none !important;
 }
 
 /* Custom Scrollbar for Sidebar */

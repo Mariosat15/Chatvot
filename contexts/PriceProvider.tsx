@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 
 // Disable debug logging in production
@@ -107,22 +107,23 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
 
     fetchPrices();
 
-    // Update prices every 2 seconds (if market is open, prices will update; if closed, they stay the same)
-    const interval = setInterval(fetchPrices, 2000);
+    // Update prices every 3 seconds for better performance
+    const interval = setInterval(fetchPrices, 3000);
 
     return () => {
       clearInterval(interval);
     };
   }, [subscriptions]);
 
-  const value: PriceContextValue = {
+  // Memoize context value to prevent unnecessary re-renders
+  const value = useMemo<PriceContextValue>(() => ({
     prices,
     subscribe,
     unsubscribe,
     isConnected,
     marketOpen,
     marketStatus,
-  };
+  }), [prices, subscribe, unsubscribe, isConnected, marketOpen, marketStatus]);
 
   return <PriceContext.Provider value={value}>{children}</PriceContext.Provider>;
 };

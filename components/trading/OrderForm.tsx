@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { placeOrder } from '@/lib/actions/trading/order.actions';
@@ -170,11 +169,6 @@ const OrderForm = ({
       setValidForSell(false);
     }
   }, [orderType, limitPrice, limitPricePips, limitPriceMode, side, symbol, prices]);
-
-  // Handle symbol change - updates both form and chart
-  const handleSymbolChange = (newSymbol: ForexSymbol) => {
-    setChartSymbol(newSymbol);
-  };
 
   // Get current price
   const currentPrice = prices.get(symbol);
@@ -416,26 +410,7 @@ const OrderForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Section 1: Symbol Selection */}
-      <div className="bg-gradient-to-br from-dark-300/80 to-dark-400/50 rounded-xl p-4 border border-dark-400/30 shadow-lg">
-        <Label className="text-xs font-bold text-light-900 uppercase tracking-wider mb-2 flex items-center gap-2">
-          💱 Trading Pair
-        </Label>
-        <Select value={symbol} onValueChange={(value) => handleSymbolChange(value as ForexSymbol)}>
-          <SelectTrigger className="bg-dark-400 border-dark-500 h-11 text-base font-semibold">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-[#1e1e1e] border-dark-400">
-            {Object.keys(FOREX_PAIRS).map((sym) => (
-              <SelectItem key={sym} value={sym} className="text-base">
-                {sym} - {FOREX_PAIRS[sym as ForexSymbol].name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Section 2: Live Price Display */}
+      {/* Section 1: Live Price Display */}
       <div className="bg-gradient-to-br from-dark-300/80 to-dark-400/50 rounded-xl p-4 border border-dark-400/30 shadow-lg">
         <p className="text-xs font-bold text-light-900 uppercase tracking-wider mb-3 flex items-center gap-2">
           💰 Live Market Prices

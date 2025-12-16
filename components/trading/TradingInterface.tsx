@@ -4,6 +4,7 @@ import { useState, createContext, useContext } from 'react';
 import OrderForm from '@/components/trading/OrderForm';
 import GameModeOrderForm from '@/components/trading/GameModeOrderForm';
 import TradingModeSelector, { TradingMode } from '@/components/trading/TradingModeSelector';
+import Watchlist from '@/components/trading/Watchlist';
 import type { MarginThresholds } from '@/lib/services/margin-safety.service';
 
 interface TradingInterfaceProps {
@@ -69,6 +70,9 @@ export default function TradingInterface({
 
   return (
     <div className="space-y-4">
+      {/* Watchlist - Above Order Form */}
+      <Watchlist className="h-[260px]" />
+      
       {/* Mode Selector */}
       <div className="flex justify-center">
         <TradingModeSelector mode={mode} onModeChange={setMode} />

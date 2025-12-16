@@ -29,11 +29,20 @@ import {
   CandlestickChart,
   LineChart,
   ChevronDown,
-  Clock
+  Clock,
+  PanelRight,
+  PanelBottom,
+  LayoutGrid
 } from 'lucide-react';
 import AdvancedIndicatorManager, { CustomIndicator } from './AdvancedIndicatorManager';
 import DrawingToolsPanel from './DrawingToolsPanel';
 import DrawingCanvas, { DrawingToolType, DrawingItem, DrawingCanvasHandle } from './DrawingCanvas';
+import { SymbolSelector, SymbolSelectorButton } from './SymbolSelector';
+import OrderForm from './OrderForm';
+import PositionsTable from './PositionsTable';
+import { LiveAccountInfo } from './LiveAccountInfo';
+import Watchlist from './Watchlist';
+import { GripHorizontal } from 'lucide-react';
 import { useTradingArsenal } from '@/contexts/TradingArsenalContext';
 import {
   calculateSMA,
@@ -69,17 +78,36 @@ interface PendingOrder {
   quantity: number;
 }
 
+interface TradingProps {
+  availableCapital: number;
+  defaultLeverage: number;
+  openPositionsCount: number;
+  maxPositions: number;
+  currentEquity: number;
+  existingUsedMargin: number;
+  currentBalance: number;
+  startingCapital?: number;
+  dailyRealizedPnl?: number;
+  marginThresholds?: {
+    LIQUIDATION: number;
+    MARGIN_CALL: number;
+    WARNING: number;
+    SAFE: number;
+  };
+}
+
 interface LightweightTradingChartProps {
   competitionId: string;
   positions?: Position[];
   pendingOrders?: PendingOrder[];
+  tradingProps?: TradingProps;
 }
 
 // Debug logging - disable in production
 const DEBUG = process.env.NODE_ENV === 'development' && false; // Set to true only when debugging
 const log = (...args: unknown[]): void => { if (DEBUG) console.log(...args); };
 
-const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders = [] }: LightweightTradingChartProps) => {
+const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders = [], tradingProps }: LightweightTradingChartProps) => {
   // Track if component is mounted to prevent "Object is disposed" errors
   const isMountedRef = useRef(true);
   
@@ -2194,6 +2222,106 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const currentPrice = prices.get(symbol);
   const fullscreenRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Bottom panel (positions/account) height in fullscreen - resizable
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(280);
+  const isDraggingRef = useRef(false);
+  const dragStartYRef = useRef(0);
+  const dragStartHeightRef = useRef(0);
+  
+  // Panel visibility toggles for fullscreen
+  const [showRightPanel, setShowRightPanel] = useState(true);
+  const [showBottomPanel, setShowBottomPanel] = useState(true);
+  
+  // Calculate oscillator height to avoid overlap
+  const activeOscillators = indicators.filter(ind => ind.enabled && ind.displayType === 'oscillator');
+  
+  // Oscillator panel height - resizable
+  const [oscillatorHeight, setOscillatorHeight] = useState(130);
+  const isOscDraggingRef = useRef(false);
+  const oscDragStartYRef = useRef(0);
+  const oscDragStartHeightRef = useRef(0);
+
+  // Handle drag to resize oscillators
+  const handleOscDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isOscDraggingRef.current = true;
+    oscDragStartYRef.current = e.clientY;
+    oscDragStartHeightRef.current = oscillatorHeight;
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+  }, [oscillatorHeight]);
+
+  useEffect(() => {
+    const handleOscMouseMove = (e: MouseEvent) => {
+      if (!isOscDraggingRef.current) return;
+      // Inverted: drag down = larger oscillator panel
+      const deltaY = oscDragStartYRef.current - e.clientY;
+      const newHeight = Math.min(Math.max(oscDragStartHeightRef.current + deltaY, 80), 300);
+      setOscillatorHeight(newHeight);
+    };
+
+    const handleOscMouseUp = () => {
+      if (isOscDraggingRef.current) {
+        isOscDraggingRef.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+
+    document.addEventListener('mousemove', handleOscMouseMove);
+    document.addEventListener('mouseup', handleOscMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleOscMouseMove);
+      document.removeEventListener('mouseup', handleOscMouseUp);
+    };
+  }, []);
+
+  // Resize oscillator charts when height changes
+  useEffect(() => {
+    oscillatorChartsRef.current.forEach((oscChart) => {
+      try {
+        oscChart.resize(oscChart.options().width || 400, oscillatorHeight);
+      } catch {
+        // Chart might not be ready
+      }
+    });
+  }, [oscillatorHeight]);
+
+  // Handle drag to resize bottom panel
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    dragStartYRef.current = e.clientY;
+    dragStartHeightRef.current = bottomPanelHeight;
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+  }, [bottomPanelHeight]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const deltaY = dragStartYRef.current - e.clientY;
+      const newHeight = Math.min(Math.max(dragStartHeightRef.current + deltaY, 100), 500);
+      setBottomPanelHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   // Handle fullscreen change and resize chart
   useEffect(() => {
@@ -2246,43 +2374,10 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       <div className="flex items-center justify-between bg-[#0d0f14] px-3 py-2 border-b border-[#2b2b43] flex-shrink-0">
         {/* Left: Symbol & Market Status */}
         <div className="flex items-center gap-3">
-          {/* Symbol Selector Button */}
-          <Button
-            variant="ghost"
-            onClick={() => setSymbolDialogOpen(true)}
-            className="bg-[#1e222d] border border-[#2b2b43] text-white font-bold h-8 px-3 hover:bg-[#2a2e39] flex items-center gap-2"
-          >
-            <span>{symbol}</span>
-            <ChevronDown className="h-3 w-3 text-[#787b86]" />
-          </Button>
-
-          {/* Symbol Selector Dialog */}
-          <Dialog open={symbolDialogOpen} onOpenChange={setSymbolDialogOpen}>
-            <DialogContent className="bg-[#131722] border-[#2b2b43] text-white max-w-xs" style={{ zIndex: 99999 }} container={isFullscreen ? fullscreenRef.current : undefined}>
-              <DialogHeader>
-                <DialogTitle className="text-white">Select Symbol</DialogTitle>
-                <DialogDescription className="sr-only">Choose a currency pair to trade</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-1 mt-4 max-h-[300px] overflow-y-auto">
-                {Object.keys(FOREX_PAIRS).map((sym) => (
-                  <Button
-                    key={sym}
-                    variant="ghost"
-                    onClick={() => {
-                      setSymbol(sym as ForexSymbol);
-                      setSymbolDialogOpen(false);
-                    }}
-                    className={cn(
-                      "h-10 justify-start px-4 hover:bg-[#2a2e39]",
-                      symbol === sym && "bg-[#2962ff] text-white hover:bg-[#2962ff]"
-                    )}
-                  >
-                    {sym}
-                  </Button>
-                ))}
-              </div>
-            </DialogContent>
-          </Dialog>
+          {/* Symbol Display */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1e222d] border border-[#2b2b43] rounded">
+            <span className="text-sm font-bold text-white">{symbol}</span>
+          </div>
           
           <div className={cn(
             "px-2 py-0.5 rounded text-[10px] font-semibold",
@@ -2310,23 +2405,56 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           </div>
         )}
 
-        {/* Right: Fullscreen */}
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={toggleFullscreen}
-          className={cn(
-            "h-7 w-7 p-0 hover:bg-[#2a2e39]",
-            isFullscreen ? "text-white bg-red-500/20 hover:bg-red-500/40" : "text-[#787b86]"
+        {/* Right: Panel Toggles & Fullscreen */}
+        <div className="flex items-center gap-1">
+          {/* Panel toggles - only show in fullscreen */}
+          {isFullscreen && (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowRightPanel(!showRightPanel)}
+                className={cn(
+                  "h-7 w-7 p-0 hover:bg-[#2a2e39]",
+                  showRightPanel ? "text-[#2962ff]" : "text-[#787b86]"
+                )}
+                title="Toggle Order Panel"
+              >
+                <PanelRight className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowBottomPanel(!showBottomPanel)}
+                className={cn(
+                  "h-7 w-7 p-0 hover:bg-[#2a2e39]",
+                  showBottomPanel ? "text-[#2962ff]" : "text-[#787b86]"
+                )}
+                title="Toggle Positions Panel"
+              >
+                <PanelBottom className="h-4 w-4" />
+              </Button>
+              <div className="w-px h-5 bg-[#2b2b43] mx-1" />
+            </>
           )}
-          title={isFullscreen ? "Exit Fullscreen (ESC)" : "Fullscreen"}
-        >
-          {isFullscreen ? <X className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-        </Button>
+          
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={toggleFullscreen}
+            className={cn(
+              "h-7 w-7 p-0 hover:bg-[#2a2e39]",
+              isFullscreen ? "text-white bg-red-500/20 hover:bg-red-500/40" : "text-[#787b86]"
+            )}
+            title={isFullscreen ? "Exit Fullscreen (ESC)" : "Fullscreen"}
+          >
+            {isFullscreen ? <X className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
-      {/* Main Content - Sidebar + Chart */}
-      <div className={cn("flex flex-1 min-h-0", isFullscreen ? "h-full" : "h-[900px]")}>
+      {/* Main Content - Sidebar + Chart + Order Form (in fullscreen) */}
+      <div className={cn("flex flex-1 min-h-0", isFullscreen ? "h-full" : "h-[1000px]")}>
         {/* Left Sidebar - Tools */}
         <div className="w-12 bg-[#0d0f14] border-r border-[#2b2b43] flex flex-col items-center py-2 gap-1 overflow-y-auto">
           {/* Timeframe Selector */}
@@ -2608,9 +2736,15 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         </div>
 
         {/* Chart Area */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Chart */}
-          <div className="flex-1 relative">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Chart - takes remaining space after oscillators */}
+          <div 
+            className="relative min-h-0"
+            style={{ 
+              flex: `1 1 0`,
+              minHeight: isFullscreen ? '300px' : '400px'
+            }}
+          >
             {/* OHLCV Data Legend */}
             <div className="absolute top-2 left-2 z-20 flex items-center gap-3 text-xs font-mono bg-[#131722]/95 px-3 py-1.5 rounded border border-[#2b2b43]">
               <span className="text-[#d1d4dc] font-bold">{symbol}</span>
@@ -2690,18 +2824,157 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             )}
           </div>
 
-          {/* Oscillator Panels */}
-          {indicators.filter(ind => ind.enabled && ind.displayType === 'oscillator').map(indicator => (
-            <div key={indicator.id} className="border-t border-[#2b2b43]">
-              <div className="bg-[#1e222d] px-2 py-1 flex items-center gap-2">
-                <span className="text-xs font-semibold text-[#d1d4dc]">{indicator.name}</span>
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: indicator.color }} />
+          {/* Oscillator Panels - Resizable */}
+          {activeOscillators.length > 0 && (
+            <>
+              {/* Oscillator Drag Handle */}
+              <div 
+                onMouseDown={handleOscDragStart}
+                className="h-1.5 bg-[#1e222d] border-t border-[#2b2b43] cursor-ns-resize hover:bg-[#2962ff]/30 transition-colors flex items-center justify-center group flex-shrink-0"
+              >
+                <div className="w-10 h-0.5 rounded-full bg-[#787b86] group-hover:bg-[#2962ff]" />
               </div>
-              <div id={`oscillator-${indicator.id}`} style={{ height: '120px', width: '100%' }} />
-            </div>
-          ))}
+              
+              {activeOscillators.map(indicator => (
+                <div key={indicator.id} className="border-t border-[#2b2b43] flex-shrink-0">
+                  <div className="bg-[#1e222d] px-2 py-1 flex items-center gap-2">
+                    <span className="text-xs font-semibold text-[#d1d4dc]">{indicator.name}</span>
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: indicator.color }} />
+                  </div>
+                  <div id={`oscillator-${indicator.id}`} style={{ height: `${oscillatorHeight}px`, width: '100%' }} />
+                </div>
+              ))}
+            </>
+          )}
         </div>
+
+        {/* Right Panel - Watchlist + Order Form (only in fullscreen) */}
+        {isFullscreen && tradingProps && showRightPanel && (
+          <div className="w-[380px] bg-[#0d0f14] border-l border-[#2b2b43] overflow-hidden flex-shrink-0 flex flex-col">
+            {/* Watchlist */}
+            <Watchlist className="h-[280px] border-0 rounded-none border-b border-[#2b2b43]" />
+            
+            {/* Order Form */}
+            <div className="flex-1 overflow-y-auto dark-scrollbar p-3">
+              <OrderForm
+                competitionId={competitionId}
+                availableCapital={tradingProps.availableCapital}
+                defaultLeverage={tradingProps.defaultLeverage}
+                openPositionsCount={tradingProps.openPositionsCount}
+                maxPositions={tradingProps.maxPositions}
+                currentEquity={tradingProps.currentEquity}
+                existingUsedMargin={tradingProps.existingUsedMargin}
+                currentBalance={tradingProps.currentBalance}
+                marginThresholds={tradingProps.marginThresholds}
+              />
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Bottom Panel - Positions & Account (only in fullscreen) */}
+      {isFullscreen && tradingProps && showBottomPanel && (
+        <>
+          {/* Resizable Divider */}
+          <div 
+            onMouseDown={handleDragStart}
+            className="h-2 bg-[#0d0f14] border-y border-[#2b2b43] cursor-ns-resize hover:bg-[#2962ff]/30 transition-colors flex items-center justify-center group flex-shrink-0"
+          >
+            <GripHorizontal className="w-6 h-4 text-[#787b86] group-hover:text-[#2962ff]" />
+          </div>
+          
+          {/* Bottom Content */}
+          <div 
+            className="bg-[#0d0f14] overflow-hidden flex-shrink-0"
+            style={{ height: bottomPanelHeight }}
+          >
+            <div className="flex h-full">
+              {/* Positions Table */}
+              <div className="flex-1 overflow-auto dark-scrollbar border-r border-[#2b2b43]">
+                <div className="p-3">
+                  <PositionsTable 
+                    positions={positions.map(p => ({
+                      _id: p._id,
+                      symbol: p.symbol as ForexSymbol,
+                      side: p.side,
+                      quantity: p.quantity,
+                      orderType: 'market' as const,
+                      entryPrice: p.entryPrice,
+                      currentPrice: p.entryPrice,
+                      unrealizedPnl: p.unrealizedPnl,
+                      unrealizedPnlPercentage: tradingProps.existingUsedMargin > 0 
+                        ? (p.unrealizedPnl / tradingProps.existingUsedMargin) * 100 
+                        : 0,
+                      stopLoss: p.stopLoss,
+                      takeProfit: p.takeProfit,
+                      marginUsed: tradingProps.existingUsedMargin / Math.max(positions.length, 1),
+                      openedAt: new Date().toISOString(),
+                    }))}
+                    competitionId={competitionId}
+                  />
+                </div>
+              </div>
+              
+              {/* Compact Account Overview for Fullscreen */}
+              <div className="w-[400px] overflow-auto dark-scrollbar flex-shrink-0 bg-[#0d0f14]">
+                <div className="p-2 h-full flex flex-col">
+                  <div className="text-[10px] font-bold text-[#787b86] uppercase tracking-wider mb-2 px-1">Account</div>
+                  <div className="grid grid-cols-2 gap-2 flex-1">
+                    {/* Balance */}
+                    <div className="bg-[#1e222d] rounded-lg p-2.5 border border-[#2b2b43]">
+                      <div className="text-[10px] text-[#787b86] mb-0.5">Balance</div>
+                      <div className="text-sm font-bold text-white tabular-nums">${tradingProps.currentBalance.toFixed(2)}</div>
+                    </div>
+                    {/* Equity */}
+                    <div className="bg-[#1e222d] rounded-lg p-2.5 border border-[#2b2b43]">
+                      <div className="text-[10px] text-[#787b86] mb-0.5">Equity</div>
+                      <div className="text-sm font-bold text-[#2962ff] tabular-nums">${tradingProps.currentEquity.toFixed(2)}</div>
+                    </div>
+                    {/* Available */}
+                    <div className="bg-[#1e222d] rounded-lg p-2.5 border border-[#2b2b43]">
+                      <div className="text-[10px] text-[#787b86] mb-0.5">Available</div>
+                      <div className="text-sm font-bold text-[#26a69a] tabular-nums">${tradingProps.availableCapital.toFixed(2)}</div>
+                    </div>
+                    {/* Unrealized P&L */}
+                    <div className="bg-[#1e222d] rounded-lg p-2.5 border border-[#2b2b43]">
+                      <div className="text-[10px] text-[#787b86] mb-0.5">P&L</div>
+                      <div className={cn(
+                        "text-sm font-bold tabular-nums",
+                        (tradingProps.currentEquity - tradingProps.currentBalance) >= 0 ? "text-[#26a69a]" : "text-[#ef5350]"
+                      )}>
+                        {(tradingProps.currentEquity - tradingProps.currentBalance) >= 0 ? '+' : ''}
+                        ${(tradingProps.currentEquity - tradingProps.currentBalance).toFixed(2)}
+                      </div>
+                    </div>
+                    {/* Used Margin */}
+                    <div className="bg-[#1e222d] rounded-lg p-2.5 border border-[#2b2b43]">
+                      <div className="text-[10px] text-[#787b86] mb-0.5">Used Margin</div>
+                      <div className="text-sm font-bold text-[#f7931a] tabular-nums">${tradingProps.existingUsedMargin.toFixed(2)}</div>
+                    </div>
+                    {/* Margin Level */}
+                    <div className="bg-[#1e222d] rounded-lg p-2.5 border border-[#2b2b43]">
+                      <div className="text-[10px] text-[#787b86] mb-0.5">Margin Lvl</div>
+                      <div className={cn(
+                        "text-sm font-bold tabular-nums",
+                        tradingProps.existingUsedMargin > 0.01 
+                          ? ((tradingProps.currentEquity / tradingProps.existingUsedMargin) * 100) > 200 
+                            ? "text-[#26a69a]" 
+                            : "text-[#ef5350]"
+                          : "text-[#787b86]"
+                      )}>
+                        {tradingProps.existingUsedMargin > 0.01 
+                          ? `${((tradingProps.currentEquity / tradingProps.existingUsedMargin) * 100).toFixed(0)}%`
+                          : '—'
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
     </div>
   );

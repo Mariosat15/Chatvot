@@ -26,15 +26,13 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
         <UserSidebar user={user} />
 
         {/* Main Content Area */}
-        <main className="flex-1 min-h-screen">
+        <main className="flex-1 min-h-screen overflow-x-hidden">
           {/* Mobile header spacing */}
           <div className="lg:hidden h-16" />
           
-          {/* Page Content */}
-          <div className="p-4 md:p-6 lg:p-8">
-            <div className="max-w-7xl mx-auto">
-              {children}
-            </div>
+          {/* Page Content - Full width, minimal padding for trading pages */}
+          <div className="p-2 md:p-3 lg:p-4">
+            {children}
           </div>
         </main>
       </div>

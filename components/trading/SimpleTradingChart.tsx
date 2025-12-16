@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
 import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { SymbolSelector, SymbolSelectorButton } from './SymbolSelector';
 
 interface SimpleTradingChartProps {
   competitionId: string;
@@ -23,6 +23,7 @@ const SimpleTradingChart = ({ competitionId }: SimpleTradingChartProps) => {
   const { prices, subscribe, unsubscribe, marketOpen, marketStatus } = usePrices();
   const { symbol, setSymbol } = useChartSymbol();
   const [interval, setInterval] = useState<string>('5');
+  const [symbolDialogOpen, setSymbolDialogOpen] = useState(false);
 
   // Subscribe to price updates
   useEffect(() => {
@@ -82,18 +83,17 @@ const SimpleTradingChart = ({ competitionId }: SimpleTradingChartProps) => {
       <div className="flex items-center gap-4 flex-wrap">
         {/* Symbol Selector */}
         <div className="flex-1 min-w-[200px]">
-          <Select value={symbol} onValueChange={(value) => setSymbol(value as ForexSymbol)}>
-            <SelectTrigger className="bg-gray-800 border-gray-700 text-gray-100">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
-              {Object.keys(FOREX_PAIRS).map((sym) => (
-                <SelectItem key={sym} value={sym} className="text-gray-100">
-                  {sym}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SymbolSelectorButton
+            symbol={symbol}
+            onClick={() => setSymbolDialogOpen(true)}
+            className="w-full justify-start bg-gray-800 border border-gray-700 h-10"
+          />
+          <SymbolSelector
+            open={symbolDialogOpen}
+            onOpenChange={setSymbolDialogOpen}
+            selectedSymbol={symbol}
+            onSelectSymbol={setSymbol}
+          />
         </div>
 
         {/* Timeframe Selector */}
