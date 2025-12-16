@@ -13,18 +13,10 @@ interface SimpleTradingChartProps {
 }
 
 // Map our symbols to TradingView format
-const TV_SYMBOL_MAP: Record<ForexSymbol, string> = {
-  'EUR/USD': 'FX:EURUSD',
-  'GBP/USD': 'FX:GBPUSD',
-  'USD/JPY': 'FX:USDJPY',
-  'USD/CHF': 'FX:USDCHF',
-  'AUD/USD': 'FX:AUDUSD',
-  'USD/CAD': 'FX:USDCAD',
-  'NZD/USD': 'FX:NZDUSD',
-  'EUR/GBP': 'FX:EURGBP',
-  'EUR/JPY': 'FX:EURJPY',
-  'GBP/JPY': 'FX:GBPJPY',
-};
+// Dynamic mapping - converts any forex pair to TradingView format
+function getTradingViewSymbol(symbol: ForexSymbol): string {
+  return `FX:${symbol.replace('/', '')}`;
+}
 
 const SimpleTradingChart = ({ competitionId }: SimpleTradingChartProps) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -45,7 +37,7 @@ const SimpleTradingChart = ({ competitionId }: SimpleTradingChartProps) => {
     // Clear previous content
     chartContainerRef.current.innerHTML = '';
 
-    const tvSymbol = TV_SYMBOL_MAP[symbol];
+    const tvSymbol = getTradingViewSymbol(symbol);
 
     // Create widget div
     const widgetDiv = document.createElement('div');

@@ -40,24 +40,51 @@ const MASSIVE_API_BASE_URL = 'https://api.massive.com/v1'; // Fixed: .com not .i
 // Cache for last known prices (when market is closed or API unavailable)
 const lastKnownPrices: Map<ForexSymbol, PriceQuote> = new Map();
 
-// Fallback prices (approximate real values as of Nov 2024) - used when API is unavailable
+// Fallback prices (approximate real values as of Dec 2024) - used when API is unavailable
 const FALLBACK_PRICES: Record<ForexSymbol, number> = {
-  'EUR/USD': 1.09900,
+  // Major Pairs
+  'EUR/USD': 1.05000,
   'GBP/USD': 1.27000,
-  'USD/JPY': 149.500,
-  'USD/CHF': 0.87000,
-  'AUD/USD': 0.66000,
-  'USD/CAD': 1.36000,
-  'NZD/USD': 0.61000,
-  'EUR/GBP': 0.86500,
-  'EUR/JPY': 164.300,
-  'GBP/JPY': 189.900,
+  'USD/JPY': 153.500,
+  'USD/CHF': 0.88500,
+  'AUD/USD': 0.64000,
+  'USD/CAD': 1.42000,
+  'NZD/USD': 0.58000,
+  // Cross Pairs
+  'EUR/GBP': 0.82700,
+  'EUR/JPY': 161.200,
+  'EUR/CHF': 0.93000,
+  'EUR/AUD': 1.64000,
+  'EUR/CAD': 1.49000,
+  'EUR/NZD': 1.81000,
+  'GBP/JPY': 195.000,
+  'GBP/CHF': 1.12500,
+  'GBP/AUD': 1.98500,
+  'GBP/CAD': 1.80500,
+  'GBP/NZD': 2.19000,
+  'AUD/JPY': 98.300,
+  'AUD/CHF': 0.56700,
+  'AUD/CAD': 0.91000,
+  'AUD/NZD': 1.10500,
+  'CAD/JPY': 108.100,
+  'CAD/CHF': 0.62300,
+  'CHF/JPY': 173.500,
+  'NZD/JPY': 89.000,
+  'NZD/CHF': 0.51300,
+  'NZD/CAD': 0.82300,
+  // Exotic Pairs
+  'USD/MXN': 20.15000,
+  'USD/ZAR': 18.10000,
+  'USD/TRY': 34.50000,
+  'USD/SEK': 10.85000,
+  'USD/NOK': 11.15000,
 };
 
 // Map our symbols to Massive.com format
 // Massive.com uses "/v1/last_quote/currencies/{from}/{to}" format
 // Example: EUR/USD -> /v1/last_quote/currencies/EUR/USD
 const MASSIVE_SYMBOL_MAP: Record<ForexSymbol, { from: string; to: string }> = {
+  // Major Pairs
   'EUR/USD': { from: 'EUR', to: 'USD' },
   'GBP/USD': { from: 'GBP', to: 'USD' },
   'USD/JPY': { from: 'USD', to: 'JPY' },
@@ -65,9 +92,34 @@ const MASSIVE_SYMBOL_MAP: Record<ForexSymbol, { from: string; to: string }> = {
   'AUD/USD': { from: 'AUD', to: 'USD' },
   'USD/CAD': { from: 'USD', to: 'CAD' },
   'NZD/USD': { from: 'NZD', to: 'USD' },
+  // Cross Pairs
   'EUR/GBP': { from: 'EUR', to: 'GBP' },
   'EUR/JPY': { from: 'EUR', to: 'JPY' },
+  'EUR/CHF': { from: 'EUR', to: 'CHF' },
+  'EUR/AUD': { from: 'EUR', to: 'AUD' },
+  'EUR/CAD': { from: 'EUR', to: 'CAD' },
+  'EUR/NZD': { from: 'EUR', to: 'NZD' },
   'GBP/JPY': { from: 'GBP', to: 'JPY' },
+  'GBP/CHF': { from: 'GBP', to: 'CHF' },
+  'GBP/AUD': { from: 'GBP', to: 'AUD' },
+  'GBP/CAD': { from: 'GBP', to: 'CAD' },
+  'GBP/NZD': { from: 'GBP', to: 'NZD' },
+  'AUD/JPY': { from: 'AUD', to: 'JPY' },
+  'AUD/CHF': { from: 'AUD', to: 'CHF' },
+  'AUD/CAD': { from: 'AUD', to: 'CAD' },
+  'AUD/NZD': { from: 'AUD', to: 'NZD' },
+  'CAD/JPY': { from: 'CAD', to: 'JPY' },
+  'CAD/CHF': { from: 'CAD', to: 'CHF' },
+  'CHF/JPY': { from: 'CHF', to: 'JPY' },
+  'NZD/JPY': { from: 'NZD', to: 'JPY' },
+  'NZD/CHF': { from: 'NZD', to: 'CHF' },
+  'NZD/CAD': { from: 'NZD', to: 'CAD' },
+  // Exotic Pairs
+  'USD/MXN': { from: 'USD', to: 'MXN' },
+  'USD/ZAR': { from: 'USD', to: 'ZAR' },
+  'USD/TRY': { from: 'USD', to: 'TRY' },
+  'USD/SEK': { from: 'USD', to: 'SEK' },
+  'USD/NOK': { from: 'USD', to: 'NOK' },
 };
 
 /**
@@ -76,9 +128,11 @@ const MASSIVE_SYMBOL_MAP: Record<ForexSymbol, { from: string; to: string }> = {
  */
 function getTypicalSpread(symbol: ForexSymbol): number {
   const pairConfig = FOREX_PAIRS[symbol];
+  if (!pairConfig) return 0.0002; // Default spread for unknown pairs
   const pip = pairConfig.pip;
 
-  const spreadsInPips: Record<ForexSymbol, number> = {
+  const spreadsInPips: Partial<Record<ForexSymbol, number>> = {
+    // Major Pairs (tightest spreads)
     'EUR/USD': 1.0,
     'GBP/USD': 1.5,
     'USD/JPY': 1.0,
@@ -86,12 +140,37 @@ function getTypicalSpread(symbol: ForexSymbol): number {
     'AUD/USD': 1.5,
     'USD/CAD': 1.8,
     'NZD/USD': 2.0,
+    // Cross Pairs (medium spreads)
     'EUR/GBP': 1.2,
     'EUR/JPY': 1.5,
+    'EUR/CHF': 1.8,
+    'EUR/AUD': 2.5,
+    'EUR/CAD': 2.5,
+    'EUR/NZD': 3.0,
     'GBP/JPY': 2.5,
+    'GBP/CHF': 3.0,
+    'GBP/AUD': 3.5,
+    'GBP/CAD': 3.5,
+    'GBP/NZD': 4.0,
+    'AUD/JPY': 2.0,
+    'AUD/CHF': 3.0,
+    'AUD/CAD': 2.5,
+    'AUD/NZD': 2.5,
+    'CAD/JPY': 2.5,
+    'CAD/CHF': 3.0,
+    'CHF/JPY': 2.5,
+    'NZD/JPY': 2.5,
+    'NZD/CHF': 3.5,
+    'NZD/CAD': 3.0,
+    // Exotic Pairs (wider spreads)
+    'USD/MXN': 30.0,
+    'USD/ZAR': 80.0,
+    'USD/TRY': 50.0,
+    'USD/SEK': 25.0,
+    'USD/NOK': 30.0,
   };
 
-  return (spreadsInPips[symbol] || 1.5) * pip;
+  return (spreadsInPips[symbol] || 2.0) * pip;
 }
 
 /**

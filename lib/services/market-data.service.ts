@@ -9,19 +9,10 @@ import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
 // Re-export ForexSymbol for use by other modules
 export type { ForexSymbol };
 
-// Map our symbols to Massive.com format
-const MASSIVE_SYMBOL_MAP: Record<ForexSymbol, string> = {
-  'EUR/USD': 'EURUSD',
-  'GBP/USD': 'GBPUSD',
-  'USD/JPY': 'USDJPY',
-  'USD/CHF': 'USDCHF',
-  'AUD/USD': 'AUDUSD',
-  'USD/CAD': 'USDCAD',
-  'NZD/USD': 'NZDUSD',
-  'EUR/GBP': 'EURGBP',
-  'EUR/JPY': 'EURJPY',
-  'GBP/JPY': 'GBPJPY',
-};
+// Convert our symbols to Massive.com format dynamically
+function getMassiveSymbol(symbol: ForexSymbol): string {
+  return symbol.replace('/', '');
+}
 
 // Price data structure
 export interface PriceQuote {
@@ -43,18 +34,44 @@ export interface Candle {
   volume: number;
 }
 
-// Base prices for simulation (approximate real values as of late 2024)
-const BASE_PRICES: Record<ForexSymbol, number> = {
-  'EUR/USD': 1.10000,
+// Base prices for simulation (approximate real values as of Dec 2024)
+const BASE_PRICES: Partial<Record<ForexSymbol, number>> = {
+  // Major Pairs
+  'EUR/USD': 1.05000,
   'GBP/USD': 1.27000,
-  'USD/JPY': 149.000,
-  'USD/CHF': 0.87000,
-  'AUD/USD': 0.66000,
-  'USD/CAD': 1.36000,
-  'NZD/USD': 0.61000,
-  'EUR/GBP': 0.86500,
-  'EUR/JPY': 163.000,
-  'GBP/JPY': 189.000,
+  'USD/JPY': 153.500,
+  'USD/CHF': 0.88500,
+  'AUD/USD': 0.64000,
+  'USD/CAD': 1.42000,
+  'NZD/USD': 0.58000,
+  // Cross Pairs
+  'EUR/GBP': 0.82700,
+  'EUR/JPY': 161.200,
+  'EUR/CHF': 0.93000,
+  'EUR/AUD': 1.64000,
+  'EUR/CAD': 1.49000,
+  'EUR/NZD': 1.81000,
+  'GBP/JPY': 195.000,
+  'GBP/CHF': 1.12500,
+  'GBP/AUD': 1.98500,
+  'GBP/CAD': 1.80500,
+  'GBP/NZD': 2.19000,
+  'AUD/JPY': 98.300,
+  'AUD/CHF': 0.56700,
+  'AUD/CAD': 0.91000,
+  'AUD/NZD': 1.10500,
+  'CAD/JPY': 108.100,
+  'CAD/CHF': 0.62300,
+  'CHF/JPY': 173.500,
+  'NZD/JPY': 89.000,
+  'NZD/CHF': 0.51300,
+  'NZD/CAD': 0.82300,
+  // Exotic Pairs
+  'USD/MXN': 20.15000,
+  'USD/ZAR': 18.10000,
+  'USD/TRY': 34.50000,
+  'USD/SEK': 10.85000,
+  'USD/NOK': 11.15000,
 };
 
 // Store current prices
@@ -72,7 +89,7 @@ export function initializeMarketData() {
   // Initialize prices for all pairs with base values first
   Object.keys(FOREX_PAIRS).forEach((symbol) => {
     const forexSymbol = symbol as ForexSymbol;
-    const basePrice = BASE_PRICES[forexSymbol];
+    const basePrice = BASE_PRICES[forexSymbol] || 1.0; // Default to 1.0 if not found
     
     const spread = getTypicalSpread(forexSymbol);
     const mid = basePrice;
@@ -102,20 +119,47 @@ export function initializeMarketData() {
  */
 function getTypicalSpread(symbol: ForexSymbol): number {
   const pairConfig = FOREX_PAIRS[symbol];
+  if (!pairConfig) return 0.0002; // Default spread
   const pip = pairConfig.pip;
 
   // Typical spreads in pips
-  const spreadsInPips: Record<ForexSymbol, number> = {
-    'EUR/USD': 1.0, // Most liquid, smallest spread
+  const spreadsInPips: Partial<Record<ForexSymbol, number>> = {
+    // Major Pairs (tightest spreads)
+    'EUR/USD': 1.0,
     'GBP/USD': 1.5,
     'USD/JPY': 1.0,
     'USD/CHF': 2.0,
     'AUD/USD': 1.5,
     'USD/CAD': 1.8,
     'NZD/USD': 2.0,
-    'EUR/GBP': 1.5,
-    'EUR/JPY': 2.0,
-    'GBP/JPY': 3.0,
+    // Cross Pairs (medium spreads)
+    'EUR/GBP': 1.2,
+    'EUR/JPY': 1.5,
+    'EUR/CHF': 1.8,
+    'EUR/AUD': 2.5,
+    'EUR/CAD': 2.5,
+    'EUR/NZD': 3.0,
+    'GBP/JPY': 2.5,
+    'GBP/CHF': 3.0,
+    'GBP/AUD': 3.5,
+    'GBP/CAD': 3.5,
+    'GBP/NZD': 4.0,
+    'AUD/JPY': 2.0,
+    'AUD/CHF': 3.0,
+    'AUD/CAD': 2.5,
+    'AUD/NZD': 2.5,
+    'CAD/JPY': 2.5,
+    'CAD/CHF': 3.0,
+    'CHF/JPY': 2.5,
+    'NZD/JPY': 2.5,
+    'NZD/CHF': 3.5,
+    'NZD/CAD': 3.0,
+    // Exotic Pairs (wider spreads)
+    'USD/MXN': 30.0,
+    'USD/ZAR': 80.0,
+    'USD/TRY': 50.0,
+    'USD/SEK': 25.0,
+    'USD/NOK': 30.0,
   };
 
   const pipsSpread = spreadsInPips[symbol] || 2.0;
@@ -271,8 +315,9 @@ function generateSimulatedCandles(
   timeframe: '1m' | '5m' | '15m' | '1h' | '4h' | '1d',
   count: number
 ): Candle[] {
-  const basePrice = BASE_PRICES[symbol];
+  const basePrice = BASE_PRICES[symbol] || 1.0; // Default to 1.0 if not found
   const pairConfig = FOREX_PAIRS[symbol];
+  if (!pairConfig) return []; // Return empty if pair not configured
   const pip = pairConfig.pip;
   
   const timeframeMs: Record<string, number> = {

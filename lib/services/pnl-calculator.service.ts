@@ -13,6 +13,7 @@
 
 // Forex pair configurations
 export const FOREX_PAIRS = {
+  // Major Pairs
   'EUR/USD': { name: 'Euro vs US Dollar', pip: 0.0001, contractSize: 100000 },
   'GBP/USD': { name: 'British Pound vs US Dollar', pip: 0.0001, contractSize: 100000 },
   'USD/JPY': { name: 'US Dollar vs Japanese Yen', pip: 0.01, contractSize: 100000 },
@@ -20,9 +21,36 @@ export const FOREX_PAIRS = {
   'AUD/USD': { name: 'Australian Dollar vs US Dollar', pip: 0.0001, contractSize: 100000 },
   'USD/CAD': { name: 'US Dollar vs Canadian Dollar', pip: 0.0001, contractSize: 100000 },
   'NZD/USD': { name: 'New Zealand Dollar vs US Dollar', pip: 0.0001, contractSize: 100000 },
+  
+  // Cross Pairs
   'EUR/GBP': { name: 'Euro vs British Pound', pip: 0.0001, contractSize: 100000 },
   'EUR/JPY': { name: 'Euro vs Japanese Yen', pip: 0.01, contractSize: 100000 },
+  'EUR/CHF': { name: 'Euro vs Swiss Franc', pip: 0.0001, contractSize: 100000 },
+  'EUR/AUD': { name: 'Euro vs Australian Dollar', pip: 0.0001, contractSize: 100000 },
+  'EUR/CAD': { name: 'Euro vs Canadian Dollar', pip: 0.0001, contractSize: 100000 },
+  'EUR/NZD': { name: 'Euro vs New Zealand Dollar', pip: 0.0001, contractSize: 100000 },
   'GBP/JPY': { name: 'British Pound vs Japanese Yen', pip: 0.01, contractSize: 100000 },
+  'GBP/CHF': { name: 'British Pound vs Swiss Franc', pip: 0.0001, contractSize: 100000 },
+  'GBP/AUD': { name: 'British Pound vs Australian Dollar', pip: 0.0001, contractSize: 100000 },
+  'GBP/CAD': { name: 'British Pound vs Canadian Dollar', pip: 0.0001, contractSize: 100000 },
+  'GBP/NZD': { name: 'British Pound vs New Zealand Dollar', pip: 0.0001, contractSize: 100000 },
+  'AUD/JPY': { name: 'Australian Dollar vs Japanese Yen', pip: 0.01, contractSize: 100000 },
+  'AUD/CHF': { name: 'Australian Dollar vs Swiss Franc', pip: 0.0001, contractSize: 100000 },
+  'AUD/CAD': { name: 'Australian Dollar vs Canadian Dollar', pip: 0.0001, contractSize: 100000 },
+  'AUD/NZD': { name: 'Australian Dollar vs New Zealand Dollar', pip: 0.0001, contractSize: 100000 },
+  'CAD/JPY': { name: 'Canadian Dollar vs Japanese Yen', pip: 0.01, contractSize: 100000 },
+  'CAD/CHF': { name: 'Canadian Dollar vs Swiss Franc', pip: 0.0001, contractSize: 100000 },
+  'CHF/JPY': { name: 'Swiss Franc vs Japanese Yen', pip: 0.01, contractSize: 100000 },
+  'NZD/JPY': { name: 'New Zealand Dollar vs Japanese Yen', pip: 0.01, contractSize: 100000 },
+  'NZD/CHF': { name: 'New Zealand Dollar vs Swiss Franc', pip: 0.0001, contractSize: 100000 },
+  'NZD/CAD': { name: 'New Zealand Dollar vs Canadian Dollar', pip: 0.0001, contractSize: 100000 },
+  
+  // Exotic Pairs
+  'USD/MXN': { name: 'US Dollar vs Mexican Peso', pip: 0.0001, contractSize: 100000 },
+  'USD/ZAR': { name: 'US Dollar vs South African Rand', pip: 0.0001, contractSize: 100000 },
+  'USD/TRY': { name: 'US Dollar vs Turkish Lira', pip: 0.0001, contractSize: 100000 },
+  'USD/SEK': { name: 'US Dollar vs Swedish Krona', pip: 0.0001, contractSize: 100000 },
+  'USD/NOK': { name: 'US Dollar vs Norwegian Krone', pip: 0.0001, contractSize: 100000 },
 };
 
 export type ForexSymbol = keyof typeof FOREX_PAIRS;
