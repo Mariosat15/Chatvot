@@ -6,6 +6,12 @@
 
 import { ForexSymbol } from './pnl-calculator.service';
 
+// Disable debug logging in production
+const DEBUG = process.env.NODE_ENV === 'development' && false;
+const log = (...args: unknown[]): void => { if (DEBUG) console.log(...args); };
+const warn = (...args: unknown[]): void => { if (DEBUG) console.warn(...args); };
+const error = (...args: unknown[]): void => { if (DEBUG) console.error(...args); };
+
 export interface OHLCCandle {
   time: number; // Unix timestamp in seconds (required by lightweight-charts)
   open: number;
@@ -15,7 +21,7 @@ export interface OHLCCandle {
   volume?: number;
 }
 
-export type Timeframe = '1' | '5' | '15' | '60' | '240' | 'D';
+export type Timeframe = '1' | '5' | '15' | '30' | '60' | '120' | '240' | 'D' | 'W' | 'M';
 
 const MASSIVE_API_BASE_URL = 'https://api.massive.com';
 const MASSIVE_API_KEY = process.env.NEXT_PUBLIC_MASSIVE_API_KEY || process.env.MASSIVE_API_KEY;
@@ -25,9 +31,13 @@ const TIMEFRAME_MAP: Record<Timeframe, { multiplier: number; timespan: string }>
   '1': { multiplier: 1, timespan: 'minute' },
   '5': { multiplier: 5, timespan: 'minute' },
   '15': { multiplier: 15, timespan: 'minute' },
+  '30': { multiplier: 30, timespan: 'minute' },
   '60': { multiplier: 1, timespan: 'hour' },
+  '120': { multiplier: 2, timespan: 'hour' },
   '240': { multiplier: 4, timespan: 'hour' },
   'D': { multiplier: 1, timespan: 'day' },
+  'W': { multiplier: 1, timespan: 'week' },
+  'M': { multiplier: 1, timespan: 'month' },
 };
 
 // Convert our symbol format (EUR/USD) to Massive.com format (C:EURUSD)
@@ -46,7 +56,7 @@ export async function fetchHistoricalCandles(
   to: Date
 ): Promise<OHLCCandle[]> {
   if (!MASSIVE_API_KEY) {
-    console.error('❌ MASSIVE_API_KEY is not set');
+    error('❌ MASSIVE_API_KEY is not set');
     throw new Error('MASSIVE_API_KEY is required for historical data');
   }
 
@@ -60,8 +70,8 @@ export async function fetchHistoricalCandles(
   const endpoint = `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${fromDate}/${toDate}`;
   const url = `${MASSIVE_API_BASE_URL}${endpoint}?adjusted=true&sort=asc&limit=5000&apiKey=${MASSIVE_API_KEY}`;
 
-  console.log(`📊 Fetching historical candles: ${symbol} (${timeframe})`);
-  console.log(`📡 URL: ${endpoint}`);
+  log(`📊 Fetching historical candles: ${symbol} (${timeframe})`);
+  log(`📡 URL: ${endpoint}`);
 
   try {
     const response = await fetch(url, {
@@ -71,7 +81,7 @@ export async function fetchHistoricalCandles(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`❌ Historical data fetch failed: ${response.status} - ${errorText}`);
+      error(`❌ Historical data fetch failed: ${response.status} - ${errorText}`);
       throw new Error(`Failed to fetch historical data: ${response.status}`);
     }
 
@@ -79,15 +89,15 @@ export async function fetchHistoricalCandles(
 
     // Handle empty response (common when market is closed on weekends)
     if (!data.results || data.results.length === 0) {
-      console.warn(`⚠️ No historical data available for ${symbol} - market may be closed (weekend)`);
-      console.warn(`   Response:`, JSON.stringify(data).substring(0, 200));
+      warn(`⚠️ No historical data available for ${symbol} - market may be closed (weekend)`);
+      warn(`   Response:`, JSON.stringify(data).substring(0, 200));
       // Return empty array instead of throwing - UI will show "No data available"
       return [];
     }
 
     if (data.status !== 'OK') {
-      console.error('❌ Invalid response status from Massive.com:', data.status);
-      console.warn(`⚠️ Returning empty data - market may be closed`);
+      error('❌ Invalid response status from Massive.com:', data.status);
+      warn(`⚠️ Returning empty data - market may be closed`);
       return [];
     }
 
@@ -102,12 +112,12 @@ export async function fetchHistoricalCandles(
       volume: bar.v || 0,
     }));
 
-    console.log(`✅ Fetched ${candles.length} candles for ${symbol}`);
+    log(`✅ Fetched ${candles.length} candles for ${symbol}`);
     return candles;
-  } catch (error) {
-    console.error('❌ Error fetching historical candles:', error instanceof Error ? error.message : 'Unknown error');
+  } catch (err) {
+    error('❌ Error fetching historical candles:', err instanceof Error ? err.message : 'Unknown error');
     // Return empty array on error instead of crashing - more graceful for UI
-    console.warn(`⚠️ Returning empty data due to error - market may be closed`);
+    warn(`⚠️ Returning empty data due to error - market may be closed`);
     return [];
   }
 }
@@ -135,14 +145,26 @@ export async function getRecentCandles(
     case '15':
       from.setHours(from.getHours() - Math.ceil((bars * 15) / 60));
       break;
+    case '30':
+      from.setHours(from.getHours() - Math.ceil((bars * 30) / 60));
+      break;
     case '60':
       from.setHours(from.getHours() - bars);
+      break;
+    case '120':
+      from.setHours(from.getHours() - bars * 2);
       break;
     case '240':
       from.setHours(from.getHours() - bars * 4);
       break;
     case 'D':
       from.setDate(from.getDate() - bars);
+      break;
+    case 'W':
+      from.setDate(from.getDate() - bars * 7);
+      break;
+    case 'M':
+      from.setMonth(from.getMonth() - bars);
       break;
   }
 
@@ -155,20 +177,30 @@ export async function getRecentCandles(
     case '1':
     case '5':
     case '15':
-      // Intraday (1m, 5m, 15m): Max 1 day back (API typically only has 24-48 hours of intraday data)
-      minDaysBack.setDate(minDaysBack.getDate() - 1);
-      break;
-    case '60':
-      // 1h: Max 2 days back
+    case '30':
+      // Intraday: Max 2 days back
       minDaysBack.setDate(minDaysBack.getDate() - 2);
       break;
-    case '240':
-      // 4h: Max 7 days back
+    case '60':
+    case '120':
+      // 1h/2h: Max 7 days back
       minDaysBack.setDate(minDaysBack.getDate() - 7);
       break;
+    case '240':
+      // 4h: Max 30 days back
+      minDaysBack.setDate(minDaysBack.getDate() - 30);
+      break;
     case 'D':
-      // Daily: Max 365 days back
-      minDaysBack.setDate(minDaysBack.getDate() - 365);
+      // Daily: Max 2 years back
+      minDaysBack.setDate(minDaysBack.getDate() - 730);
+      break;
+    case 'W':
+      // Weekly: Max 5 years back
+      minDaysBack.setDate(minDaysBack.getDate() - 1825);
+      break;
+    case 'M':
+      // Monthly: Max 10 years back
+      minDaysBack.setDate(minDaysBack.getDate() - 3650);
       break;
   }
   
@@ -177,7 +209,7 @@ export async function getRecentCandles(
     from.setTime(minDaysBack.getTime());
   }
 
-  console.log(`📅 Fetching from ${from.toISOString()} to ${now.toISOString()} (${timeframe})`);
+  log(`📅 Fetching from ${from.toISOString()} to ${now.toISOString()} (${timeframe})`);
   return fetchHistoricalCandles(symbol, timeframe, from, now);
 }
 

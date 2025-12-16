@@ -3,6 +3,11 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 
+// Disable debug logging in production
+const DEBUG = false;
+const log = (...args: unknown[]): void => { if (DEBUG) console.log(...args); };
+const error = (...args: unknown[]): void => { if (DEBUG) console.error(...args); };
+
 // Price quote structure
 interface PriceQuote {
   symbol: ForexSymbol;
@@ -62,7 +67,7 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     const fetchPrices = async () => {
       try {
         const symbolsArray = Array.from(subscriptions);
-        console.log('🔄 Fetching REAL prices for:', symbolsArray);
+        log('🔄 Fetching REAL prices for:', symbolsArray);
         
         const response = await fetch('/api/trading/prices', {
           method: 'POST',
@@ -73,8 +78,8 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (response.ok) {
           const data = await response.json();
-          console.log('💰 Received REAL prices:', data.prices.length, 'quotes');
-          console.log(`📊 Market Status: ${data.status}`);
+          log('💰 Received REAL prices:', data.prices.length, 'quotes');
+          log(`📊 Market Status: ${data.status}`);
           
           setMarketOpen(data.marketOpen);
           setMarketStatus(data.status);
@@ -91,7 +96,7 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
           setIsConnected(false);
           return;
         } else {
-          console.error('❌ Price fetch failed:', response.status, response.statusText);
+          error('❌ Price fetch failed:', response.status, response.statusText);
           setMarketStatus('⚠️ Connection Error');
         }
       } catch (error) {

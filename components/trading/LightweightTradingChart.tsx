@@ -7,9 +7,8 @@ import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service'
 import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
 import { getRecentCandles, OHLCCandle, Timeframe } from '@/lib/services/forex-historical.service';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -20,15 +19,21 @@ import {
   BarChart3, 
   Settings, 
   Maximize2,
+  Minimize2,
   Grid3x3,
   Activity,
   BarChart,
   Grid,
-  CircleDot
+  CircleDot,
+  X,
+  CandlestickChart,
+  LineChart,
+  ChevronDown,
+  Clock
 } from 'lucide-react';
 import AdvancedIndicatorManager, { CustomIndicator } from './AdvancedIndicatorManager';
 import DrawingToolsPanel from './DrawingToolsPanel';
-import { DrawingTool, DrawingObject } from '@/lib/services/drawing-tools.service';
+import DrawingCanvas, { DrawingToolType, DrawingItem, DrawingCanvasHandle } from './DrawingCanvas';
 import { useTradingArsenal } from '@/contexts/TradingArsenalContext';
 import {
   calculateSMA,
@@ -70,6 +75,10 @@ interface LightweightTradingChartProps {
   pendingOrders?: PendingOrder[];
 }
 
+// Debug logging - disable in production
+const DEBUG = process.env.NODE_ENV === 'development' && false; // Set to true only when debugging
+const log = (...args: unknown[]): void => { if (DEBUG) console.log(...args); };
+
 const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders = [] }: LightweightTradingChartProps) => {
   // Track if component is mounted to prevent "Object is disposed" errors
   const isMountedRef = useRef(true);
@@ -84,8 +93,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   
   // Debug: Log positions received by chart component
   useEffect(() => {
-    console.log('🎨 LightweightTradingChart received positions:', positions.length);
-    console.log('📊 Positions with TP/SL:', positions.map(p => ({
+    log('🎨 LightweightTradingChart received positions:', positions.length);
+    log('📊 Positions with TP/SL:', positions.map(p => ({
       id: p._id,
       symbol: p.symbol,
       hasTP: !!p.takeProfit,
@@ -137,9 +146,30 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const [chartType, setChartType] = useState<'candlestick' | 'line' | 'renko' | 'heikinashi' | 'pointfigure'>('candlestick');
   const [showGrid, setShowGrid] = useState(true);
   const [indicators, setIndicators] = useState<CustomIndicator[]>([]);
-  const [activeTool, setActiveTool] = useState<DrawingTool | null>(null);
-  const [drawings, setDrawings] = useState<DrawingObject[]>([]);
+  const [activeTool, setActiveTool] = useState<DrawingToolType>(null);
+  const [drawings, setDrawings] = useState<DrawingItem[]>([]);
+  const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
+  const [drawingColor, setDrawingColor] = useState('#2962ff');
+  const [drawingLineWidth, setDrawingLineWidth] = useState(2);
+  const [drawingTextSize, setDrawingTextSize] = useState(14);
+  const [chartTypeOpen, setChartTypeOpen] = useState(false);
+  const [symbolDialogOpen, setSymbolDialogOpen] = useState(false);
+  const [timeframeDialogOpen, setTimeframeDialogOpen] = useState(false);
   const [signalUpdateTrigger, setSignalUpdateTrigger] = useState(0);
+  const drawingCanvasRef = useRef<DrawingCanvasHandle>(null);
+  const portalContainerRef = useRef<HTMLDivElement>(null);
+  
+  // OHLCV data display state
+  const [ohlcvData, setOhlcvData] = useState<{
+    time: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume?: number;
+    change: number;
+    changePercent: number;
+  } | null>(null);
   
   // Chart display settings - Load from localStorage
   const [showBidAskLines, setShowBidAskLines] = useState(() => {
@@ -206,7 +236,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
   // Sync arsenal indicators with chart indicators
   useEffect(() => {
-    console.log('📊 Arsenal indicators changed:', arsenalIndicators);
+    log('📊 Arsenal indicators changed:', arsenalIndicators);
     
     // Convert arsenal indicators to chart CustomIndicator format
     const chartIndicators: CustomIndicator[] = arsenalIndicators
@@ -227,7 +257,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     setIndicators(prev => {
       const existingNonArsenal = prev.filter(i => !i.id.startsWith('arsenal-'));
       const newIndicators = [...existingNonArsenal, ...chartIndicators];
-      console.log('📊 Updated chart indicators:', newIndicators.map(i => ({ id: i.id, type: i.type })));
+      log('📊 Updated chart indicators:', newIndicators.map(i => ({ id: i.id, type: i.type })));
       return newIndicators;
     });
   }, [arsenalIndicators, arsenalIndicators.length, arsenalIndicators.map(a => a.enabled).join(',')]);
@@ -246,8 +276,6 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const indicatorSeriesRef = useRef<Map<string, ISeriesApi<any>>>(new Map());
   const oscillatorChartsRef = useRef<Map<string, IChartApi>>(new Map());
   const candleDataRef = useRef<OHLCCandle[]>([]);
-  const drawingPointsRef = useRef<{ time: number; price: number }[]>([]);
-  const drawingLinesRef = useRef<any[]>([]);
 
   // Convert OHLC to Heikin Ashi
   const convertToHeikinAshi = (candles: OHLCCandle[]): OHLCCandle[] => {
@@ -435,7 +463,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     const b = parseInt(cleanHex.slice(5, 7), 16);
     const alpha = opacity / 100;
     const result = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    console.log(`🎨 hexToRgba: ${hex} @ ${opacity}% → ${result}`);
+    log(`🎨 hexToRgba: ${hex} @ ${opacity}% → ${result}`);
     return result;
   };
 
@@ -444,17 +472,17 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const applyOffset = (data: any[], offset: number = 0): any[] => {
     if (offset === 0) return data;
     
-    console.log(`📊 Applying offset ${offset} to ${data.length} data points`);
+    log(`📊 Applying offset ${offset} to ${data.length} data points`);
     
     if (offset > 0) {
       // Shift forward: remove last N points
       const result = data.slice(0, -offset);
-      console.log(`   → Shifted forward, result: ${result.length} points`);
+      log(`   → Shifted forward, result: ${result.length} points`);
       return result;
     } else {
       // Shift backward: remove first N points
       const result = data.slice(Math.abs(offset));
-      console.log(`   → Shifted backward, result: ${result.length} points`);
+      log(`   → Shifted backward, result: ${result.length} points`);
       return result;
     }
   };
@@ -484,7 +512,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const transformCandlesForPriceSource = (candles: OHLCCandle[], priceSource: string = 'close'): OHLCCandle[] => {
     if (priceSource === 'close') return candles; // Default, no transformation needed
     
-    console.log(`💱 Transforming ${candles.length} candles for price source: ${priceSource}`);
+    log(`💱 Transforming ${candles.length} candles for price source: ${priceSource}`);
     
     return candles.map(candle => {
       const price = getPriceFromCandle(candle, priceSource);
@@ -499,15 +527,15 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
   // Function to calculate and display indicators
   const updateIndicators = (candles: OHLCCandle[], chart: IChartApi, mainSeries: ISeriesApi<any>) => {
-    console.log('🔄 updateIndicators called with', indicators.length, 'indicators');
-    console.log('📊 Enabled indicators:', indicators.filter(i => i.enabled).map(i => i.type));
+    log('🔄 updateIndicators called with', indicators.length, 'indicators');
+    log('📊 Enabled indicators:', indicators.filter(i => i.enabled).map(i => i.type));
     
     // Clear existing indicator series
     indicatorSeriesRef.current.forEach(series => {
       try {
         chart.removeSeries(series);
-      } catch (e) {
-        console.warn('Could not remove series:', e);
+      } catch {
+        // Series might already be removed or chart disposed
       }
     });
     indicatorSeriesRef.current.clear();
@@ -516,18 +544,18 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     oscillatorChartsRef.current.forEach(oscChart => {
       try {
         oscChart.remove();
-      } catch (e) {
-        console.warn('Could not remove oscillator chart:', e);
+      } catch {
+        // Oscillator chart might already be removed
       }
     });
     oscillatorChartsRef.current.clear();
 
     const enabledIndicators = indicators.filter(ind => ind.enabled);
-    console.log('✅ Processing', enabledIndicators.length, 'enabled indicators');
+    log('✅ Processing', enabledIndicators.length, 'enabled indicators');
 
     enabledIndicators.forEach(indicator => {
-      console.log(`📈 Adding indicator: ${indicator.type} - ${indicator.name}`);
-      console.log('   Settings:', {
+      log(`📈 Adding indicator: ${indicator.type} - ${indicator.name}`);
+      log('   Settings:', {
         priceSource: indicator.priceSource || 'close',
         opacity: indicator.opacity,
         lineWidth: indicator.lineWidth,
@@ -924,7 +952,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             }
           });
           
-          console.log(`📊 S/R Indicator: Found ${levelIndex} levels`);
+          log(`📊 S/R Indicator: Found ${levelIndex} levels`);
         }
         else {
           console.warn(`⚠️ Unknown overlay indicator type: ${indicator.type}`);
@@ -1255,7 +1283,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       }
     });
     
-    console.log(`✅ Updated ${enabledIndicators.length} indicators`);
+    log(`✅ Updated ${enabledIndicators.length} indicators`);
   };
 
   // Subscribe to price updates
@@ -1266,12 +1294,12 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
   // Update indicators when they change
   useEffect(() => {
-    console.log('⚡ Indicators state changed! New indicators:', indicators);
+    log('⚡ Indicators state changed! New indicators:', indicators);
     if (chartRef.current && candlestickSeriesRef.current && candleDataRef.current.length > 0) {
-      console.log('🔄 Updating indicators:', indicators.length, 'total,', indicators.filter(i => i.enabled).length, 'enabled');
+      log('🔄 Updating indicators:', indicators.length, 'total,', indicators.filter(i => i.enabled).length, 'enabled');
       updateIndicators(candleDataRef.current, chartRef.current, candlestickSeriesRef.current);
     } else {
-      console.log('⚠️ Chart not ready yet, skipping indicator update');
+      log('⚠️ Chart not ready yet, skipping indicator update');
     }
   }, [indicators]); // Re-run when indicators change
 
@@ -1326,7 +1354,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       
       // Only log if signal count changed
       if (allSignals.length !== lastSignalCountRef.current) {
-        console.log('📊 Generated signals:', allSignals.length, 'from', enabledStrategies.length, 'strategies');
+        log('📊 Generated signals:', allSignals.length, 'from', enabledStrategies.length, 'strategies');
         lastSignalCountRef.current = allSignals.length;
       }
       
@@ -1387,145 +1415,6 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     return () => clearInterval(intervalId);
   }, [arsenalStrategies.filter(s => s.enabled).length, candlesLoaded, generateSignals]);
 
-  // Setup drawing tool click handler
-  useEffect(() => {
-    if (!chartRef.current || !candlestickSeriesRef.current) {
-      console.log('⚠️ Chart or series not ready for drawing handler');
-      return;
-    }
-
-    console.log('🎨 Setting up drawing handler, activeTool:', activeTool);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleChartClick = (param: any) => {
-      console.log('🖱️ Chart clicked!', { activeTool, hasParam: !!param, hasTime: !!param?.time });
-      
-      if (!activeTool) {
-        console.log('⚠️ No active tool, ignoring click');
-        return;
-      }
-      
-      if (!candlestickSeriesRef.current) {
-        console.log('⚠️ No candlestick series ref');
-        return;
-      }
-
-      const time = param.time;
-      const seriesData = param.seriesData.get(candlestickSeriesRef.current);
-      const price = seriesData?.close;
-
-      console.log('📊 Click data:', { time, price, hasSeriesData: !!seriesData });
-
-      if (!time || !price) {
-        console.log('⚠️ Missing time or price, time:', time, 'price:', price);
-        return;
-      }
-
-      drawingPointsRef.current.push({ time, price });
-      console.log('✅ Drawing point added:', { tool: activeTool, time, price, points: drawingPointsRef.current.length });
-
-      // For tools that need 2 points
-      if (activeTool === 'trend-line' || activeTool === 'fibonacci') {
-        if (drawingPointsRef.current.length === 2) {
-          const [start, end] = drawingPointsRef.current;
-          
-          if (activeTool === 'trend-line') {
-            // Draw trend line
-            const line = candlestickSeriesRef.current?.createPriceLine({
-              price: start.price,
-              color: '#2962ff',
-              lineWidth: 2,
-              lineStyle: 0,
-              axisLabelVisible: true,
-              title: 'Trend Line',
-            });
-            drawingLinesRef.current.push(line);
-            console.log('✅ Trend line drawn');
-            
-            // Create new drawing object
-            const newDrawing: DrawingObject = {
-              id: `drawing_${Date.now()}`,
-              type: activeTool,
-              points: [start, end],
-              color: '#2962ff',
-              lineWidth: 2,
-              lineStyle: 0,
-            };
-            setDrawings(prev => [...prev, newDrawing]);
-          } else if (activeTool === 'fibonacci') {
-            // Draw Fibonacci retracement levels
-            const diff = end.price - start.price;
-            const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
-            const colors = ['#808080', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA15E'];
-            
-            levels.forEach((level, idx) => {
-              const levelPrice = start.price + (diff * level);
-              const line = candlestickSeriesRef.current?.createPriceLine({
-                price: levelPrice,
-                color: colors[idx],
-                lineWidth: 1,
-                lineStyle: 2,
-                axisLabelVisible: true,
-                title: `${(level * 100).toFixed(1)}%`,
-              });
-              drawingLinesRef.current.push(line);
-            });
-            console.log('✅ Fibonacci levels drawn');
-            
-            const newDrawing: DrawingObject = {
-              id: `drawing_${Date.now()}`,
-              type: activeTool,
-              points: [start, end],
-              color: '#2962ff',
-              lineWidth: 1,
-              lineStyle: 2,
-            };
-            setDrawings(prev => [...prev, newDrawing]);
-          }
-          
-          // Reset points and deselect tool
-          drawingPointsRef.current = [];
-          setActiveTool(null);
-        }
-      } else if (activeTool === 'horizontal-line') {
-        // Draw horizontal line
-        const line = candlestickSeriesRef.current?.createPriceLine({
-          price: price,
-          color: '#2962ff',
-          lineWidth: 2,
-          lineStyle: 0,
-          axisLabelVisible: true,
-          title: 'H-Line',
-        });
-        drawingLinesRef.current.push(line);
-        console.log('✅ Horizontal line drawn at', price);
-        
-        const newDrawing: DrawingObject = {
-          id: `drawing_${Date.now()}`,
-          type: activeTool,
-          points: [{ time, price }],
-          color: '#2962ff',
-          lineWidth: 2,
-          lineStyle: 0,
-        };
-        setDrawings(prev => [...prev, newDrawing]);
-        
-        drawingPointsRef.current = [];
-        setActiveTool(null);
-      }
-    };
-
-    chartRef.current.subscribeClick(handleChartClick);
-    console.log('✅ Drawing handler subscribed for tool:', activeTool);
-
-    return () => {
-      if (chartRef.current) {
-        console.log('🧹 Unsubscribing drawing handler for tool:', activeTool);
-        chartRef.current.unsubscribeClick(handleChartClick);
-      }
-    };
-  }, [activeTool]); // Re-subscribe when activeTool changes
-
   // Initialize chart and load historical data
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -1537,11 +1426,12 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
       try {
         // Create chart with TradingView-like settings
-        // Responsive height: smaller on mobile, larger on desktop
-        const chartHeight = window.innerWidth < 768 ? 350 : 500;
+        // Use container dimensions for responsive sizing
+        const containerWidth = chartContainerRef.current!.clientWidth;
+        const containerHeight = chartContainerRef.current!.clientHeight || (window.innerWidth < 768 ? 350 : 500);
         const chart = createChart(chartContainerRef.current!, {
-          width: chartContainerRef.current!.clientWidth,
-          height: chartHeight,
+          width: containerWidth,
+          height: containerHeight,
           layout: {
             background: { color: '#131722' },
             textColor: '#d1d4dc',
@@ -1675,8 +1565,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         }
 
         // Fetch historical data from Massive.com
-        console.log(`📊 Loading historical data: ${symbol} (${timeframe})`);
-        const candles = await getRecentCandles(symbol, timeframe, 300);
+        log(`📊 Loading historical data: ${symbol} (${timeframe})`);
+        const candles = await getRecentCandles(symbol, timeframe, 500);
 
         if (candles.length === 0) {
           throw new Error('No historical data available');
@@ -1686,13 +1576,13 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         let processedCandles = candles;
         if (chartType === 'heikinashi') {
           processedCandles = convertToHeikinAshi(candles);
-          console.log(`🎨 Converted to Heikin Ashi: ${processedCandles.length} candles`);
+          log(`🎨 Converted to Heikin Ashi: ${processedCandles.length} candles`);
         } else if (chartType === 'renko') {
           processedCandles = convertToRenko(candles);
-          console.log(`🧱 Converted to Renko: ${processedCandles.length} bars`);
+          log(`🧱 Converted to Renko: ${processedCandles.length} bars`);
         } else if (chartType === 'pointfigure') {
           processedCandles = convertToPointFigure(candles);
-          console.log(`⭕ Converted to Point & Figure: ${processedCandles.length} columns`);
+          log(`⭕ Converted to Point & Figure: ${processedCandles.length} columns`);
         }
 
         // Deduplicate timestamps and ensure ascending order
@@ -1810,7 +1700,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           });
         }
 
-        console.log(`✅ Chart initialized with ${candles.length} candles`);
+        log(`✅ Chart initialized with ${candles.length} candles`);
         setLoading(false);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
@@ -1822,19 +1712,32 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
     initializeChart();
 
-    // Handle resize
+    // Handle resize with ResizeObserver for better responsiveness
     const handleResize = () => {
       if (chartRef.current && chartContainerRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-        });
+        const { clientWidth, clientHeight } = chartContainerRef.current;
+        try {
+          chartRef.current.applyOptions({
+            width: clientWidth,
+            height: clientHeight,
+          });
+        } catch {
+          // Chart may be disposed
+        }
       }
     };
 
+    // Use ResizeObserver for container size changes
+    const resizeObserver = new ResizeObserver(handleResize);
+    if (chartContainerRef.current) {
+      resizeObserver.observe(chartContainerRef.current);
+    }
+    
     window.addEventListener('resize', handleResize);
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       // Store reference and clear refs before removing to prevent "Object is disposed" errors
       const chart = chartRef.current;
       chartRef.current = null;
@@ -1850,9 +1753,71 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     };
   }, [symbol, timeframe, showVolume, chartType, showBidAskLines, showPriceLabels]); // Chart reinitializes when these change
 
+  // Subscribe to crosshair move to show OHLCV data
+  useEffect(() => {
+    if (!chartRef.current || !candlestickSeriesRef.current) return;
+    
+    const chart = chartRef.current;
+    const series = candlestickSeriesRef.current;
+    
+    const handleCrosshairMove = (param: any) => {
+      if (!param || !param.time || !param.seriesData) {
+        setOhlcvData(null);
+        return;
+      }
+      
+      const data = param.seriesData.get(series);
+      if (!data) {
+        setOhlcvData(null);
+        return;
+      }
+      
+      // Format the time
+      const timestamp = param.time as number;
+      const date = new Date(timestamp * 1000);
+      const timeStr = date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      
+      // Get OHLCV values
+      const open = data.open ?? data.value ?? 0;
+      const high = data.high ?? data.value ?? 0;
+      const low = data.low ?? data.value ?? 0;
+      const close = data.close ?? data.value ?? 0;
+      const volume = data.volume;
+      
+      // Calculate change
+      const change = close - open;
+      const changePercent = open !== 0 ? (change / open) * 100 : 0;
+      
+      setOhlcvData({
+        time: timeStr,
+        open,
+        high,
+        low,
+        close,
+        volume,
+        change,
+        changePercent,
+      });
+    };
+    
+    chart.subscribeCrosshairMove(handleCrosshairMove);
+    
+    return () => {
+      try {
+        chart.unsubscribeCrosshairMove(handleCrosshairMove);
+      } catch {}
+    };
+  }, [candlesLoaded]);
+
   // Update chart with real-time prices
   useEffect(() => {
-    if (!candlestickSeriesRef.current || !currentCandleRef.current) return;
+    // Check if component is still mounted and chart is valid
+    if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current || !currentCandleRef.current) return;
 
     const currentPrice = prices.get(symbol);
     if (!currentPrice) return;
@@ -1860,16 +1825,22 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     const now = Date.now();
     
     // Update price lines immediately (no throttle for precision)
-    if (bidPriceLineRef.current && askPriceLineRef.current) {
-      bidPriceLineRef.current.applyOptions({
-        price: currentPrice.bid,
-        title: `BID ${currentPrice.bid.toFixed(5)}`,
-      });
-      
-      askPriceLineRef.current.applyOptions({
-        price: currentPrice.ask,
-        title: `ASK ${currentPrice.ask.toFixed(5)}`,
-      });
+    // Wrap in try-catch to prevent "Object is disposed" errors
+    try {
+      if (bidPriceLineRef.current && askPriceLineRef.current) {
+        bidPriceLineRef.current.applyOptions({
+          price: currentPrice.bid,
+          title: `BID ${currentPrice.bid.toFixed(5)}`,
+        });
+        
+        askPriceLineRef.current.applyOptions({
+          price: currentPrice.ask,
+          title: `ASK ${currentPrice.ask.toFixed(5)}`,
+        });
+      }
+    } catch {
+      // Chart may be disposed, ignore
+      return;
     }
     
     // Throttle candle updates to once per second
@@ -1970,15 +1941,14 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           }
         }
       }
-    } catch (error) {
-      // Series type mismatch during chart type transition - chart will reinitialize
-      console.log('📊 Chart type transition in progress, skipping update');
+    } catch {
+      // Series type mismatch or disposed chart during transition - ignore
     }
   }, [prices, symbol, timeframe, chartType]);
 
   // Add/update position entry price lines on the chart
   useEffect(() => {
-    if (!candlestickSeriesRef.current) return;
+    if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
 
     const series = candlestickSeriesRef.current;
 
@@ -1986,8 +1956,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     positionLinesRef.current.forEach((line) => {
       try {
         series.removePriceLine(line);
-      } catch (error) {
-        // Line might already be removed
+      } catch {
+        // Line might already be removed or chart disposed
       }
     });
     positionLinesRef.current.clear();
@@ -1998,8 +1968,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         if (chartRef.current) {
           chartRef.current.removeSeries(areaSeries);
         }
-      } catch (error) {
-        // Series might already be removed
+      } catch {
+        // Series might already be removed or chart disposed
       }
     });
     tpSlSeriesRef.current.clear();
@@ -2009,7 +1979,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       const symbolPositions = positions.filter((p) => p.symbol === symbol);
       
       // Debug: Log positions with TP/SL and rendering state
-      console.log(`📊 Drawing TP/SL for ${symbolPositions.length} positions:`, 
+      log(`📊 Drawing TP/SL for ${symbolPositions.length} positions:`, 
         symbolPositions.map(p => ({
           id: p._id,
           symbol: p.symbol,
@@ -2019,7 +1989,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           sl: p.stopLoss
         }))
       );
-      console.log(`🎨 Chart state:`, {
+      log(`🎨 Chart state:`, {
         candlesLoaded,
         candleCount: candleDataRef.current.length,
         hasChart: !!chartRef.current,
@@ -2044,7 +2014,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
           // Take Profit filled area and line (light green zone)
           if (position.takeProfit && showTPSLLines && chartRef.current && candleDataRef.current.length > 0 && showTPSLZones) {
-            console.log(`✅ Drawing TP ZONE for position ${position._id}: TP=${position.takeProfit}, Candles=${candleDataRef.current.length}`);
+            log(`✅ Drawing TP ZONE for position ${position._id}: TP=${position.takeProfit}, Candles=${candleDataRef.current.length}`);
             // Create baseline series for TP zone (filled area from entry to TP)
             const tpAreaSeries = chartRef.current.addBaselineSeries({
               baseValue: { type: 'price', price: position.entryPrice },
@@ -2083,7 +2053,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
           // Stop Loss filled area and line (light red zone)
           if (position.stopLoss && showTPSLLines && chartRef.current && candleDataRef.current.length > 0 && showTPSLZones) {
-            console.log(`✅ Drawing SL ZONE for position ${position._id}: SL=${position.stopLoss}, Candles=${candleDataRef.current.length}`);
+            log(`✅ Drawing SL ZONE for position ${position._id}: SL=${position.stopLoss}, Candles=${candleDataRef.current.length}`);
             // Create baseline series for SL zone (filled area from entry to SL)
             const slAreaSeries = chartRef.current.addBaselineSeries({
               baseValue: { type: 'price', price: position.entryPrice },
@@ -2122,7 +2092,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
           // Debug: Log why zones might not be drawn
           if (position.takeProfit && showTPSLLines && showTPSLZones && (!chartRef.current || candleDataRef.current.length === 0)) {
-            console.log(`⚠️ TP ZONE skipped for position ${position._id}:`, {
+            log(`⚠️ TP ZONE skipped for position ${position._id}:`, {
               hasChart: !!chartRef.current,
               candleCount: candleDataRef.current.length,
               showLines: showTPSLLines,
@@ -2131,7 +2101,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             });
           }
           if (position.stopLoss && showTPSLLines && showTPSLZones && (!chartRef.current || candleDataRef.current.length === 0)) {
-            console.log(`⚠️ SL ZONE skipped for position ${position._id}:`, {
+            log(`⚠️ SL ZONE skipped for position ${position._id}:`, {
               hasChart: !!chartRef.current,
               candleCount: candleDataRef.current.length,
               showLines: showTPSLLines,
@@ -2176,7 +2146,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     if (showTradeMarkers && pendingOrders.length > 0) {
       const symbolPendingOrders = pendingOrders.filter((o) => o.symbol === symbol);
       
-      console.log(`📋 Drawing ${symbolPendingOrders.length} pending orders for ${symbol}`);
+      log(`📋 Drawing ${symbolPendingOrders.length} pending orders for ${symbol}`);
       
       symbolPendingOrders.forEach((order) => {
         try {
@@ -2191,7 +2161,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           });
           positionLinesRef.current.set(`pending-${order._id}`, pendingLine);
           
-          console.log(`✅ Drew pending order line: ${order.side} ${order.quantity} @ ${order.requestedPrice.toFixed(5)}`);
+          log(`✅ Drew pending order line: ${order.side} ${order.quantity} @ ${order.requestedPrice.toFixed(5)}`);
         } catch (error) {
           console.error('Error adding pending order price line:', error);
         }
@@ -2222,459 +2192,517 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   }, [positions, pendingOrders, symbol, candlestickSeriesRef.current, showTradeMarkers, showPriceLabels, showTPSLZones, showTPSLLines, candlesLoaded]);
 
   const currentPrice = prices.get(symbol);
+  const fullscreenRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Handle fullscreen change and resize chart
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isNowFullscreen = !!document.fullscreenElement;
+      setIsFullscreen(isNowFullscreen);
+      
+      // Resize chart after fullscreen transition
+      setTimeout(() => {
+        if (chartRef.current && chartContainerRef.current) {
+          try {
+            chartRef.current.applyOptions({
+              width: chartContainerRef.current.clientWidth,
+              height: chartContainerRef.current.clientHeight,
+            });
+          } catch {
+            // Chart may be disposed
+          }
+          chartRef.current.timeScale().fitContent();
+        }
+      }, 100);
+    };
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (fullscreenRef.current) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        fullscreenRef.current.requestFullscreen();
+      }
+    }
+  };
 
   return (
-    <div className="space-y-2">
-      {/* Top Bar - Symbol and Price */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:justify-between bg-[#131722] rounded-t-lg px-3 sm:px-4 py-2 border-b border-[#2b2b43]">
-        {/* Left: Symbol Selector */}
-        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-          <Select value={symbol} onValueChange={(value) => setSymbol(value as ForexSymbol)}>
-            <SelectTrigger className="bg-[#1e222d] border-[#2b2b43] text-white font-semibold w-[120px] sm:min-w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-[#1e222d] border-[#2b2b43]">
-              {Object.keys(FOREX_PAIRS).map((sym) => (
-                <SelectItem key={sym} value={sym} className="text-white hover:bg-[#2a2e39]">
-                  {sym}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div 
+      ref={fullscreenRef}
+      className={cn(
+        "bg-[#131722] rounded-lg border border-[#2b2b43] overflow-hidden flex flex-col relative",
+        isFullscreen && "!fixed !inset-0 !z-[9999] !rounded-none !border-none !w-screen !h-screen"
+      )}
+      style={isFullscreen ? { width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0 } : undefined}
+    >
+      {/* Portal container for dialogs in fullscreen */}
+      <div ref={portalContainerRef} className="absolute inset-0 pointer-events-none z-[99999]" />
+      {/* Top Bar - Compact Header */}
+      <div className="flex items-center justify-between bg-[#0d0f14] px-3 py-2 border-b border-[#2b2b43] flex-shrink-0">
+        {/* Left: Symbol & Market Status */}
+        <div className="flex items-center gap-3">
+          {/* Symbol Selector Button */}
+          <Button
+            variant="ghost"
+            onClick={() => setSymbolDialogOpen(true)}
+            className="bg-[#1e222d] border border-[#2b2b43] text-white font-bold h-8 px-3 hover:bg-[#2a2e39] flex items-center gap-2"
+          >
+            <span>{symbol}</span>
+            <ChevronDown className="h-3 w-3 text-[#787b86]" />
+          </Button>
 
-          {/* Market Status Badge */}
+          {/* Symbol Selector Dialog */}
+          <Dialog open={symbolDialogOpen} onOpenChange={setSymbolDialogOpen}>
+            <DialogContent className="bg-[#131722] border-[#2b2b43] text-white max-w-xs" style={{ zIndex: 99999 }} container={isFullscreen ? fullscreenRef.current : undefined}>
+              <DialogHeader>
+                <DialogTitle className="text-white">Select Symbol</DialogTitle>
+                <DialogDescription className="sr-only">Choose a currency pair to trade</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-1 mt-4 max-h-[300px] overflow-y-auto">
+                {Object.keys(FOREX_PAIRS).map((sym) => (
+                  <Button
+                    key={sym}
+                    variant="ghost"
+                    onClick={() => {
+                      setSymbol(sym as ForexSymbol);
+                      setSymbolDialogOpen(false);
+                    }}
+                    className={cn(
+                      "h-10 justify-start px-4 hover:bg-[#2a2e39]",
+                      symbol === sym && "bg-[#2962ff] text-white hover:bg-[#2962ff]"
+                    )}
+                  >
+                    {sym}
+                  </Button>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+          
           <div className={cn(
-            "px-2 py-1 rounded text-xs font-medium whitespace-nowrap",
-            marketOpen ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30"
+            "px-2 py-0.5 rounded text-[10px] font-semibold",
+            marketOpen ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
           )}>
-            {marketOpen ? '● OPEN' : '● CLOSED'}
+            {marketOpen ? '● LIVE' : '● CLOSED'}
           </div>
         </div>
 
-        {/* Right: Price Display */}
+        {/* Center: Price Display */}
         {currentPrice && (
-          <div 
-            ref={priceDisplayRef}
-            className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-hide"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            {/* Bid */}
-            <div className="text-center flex-shrink-0">
-              <div className="text-xs text-[#787b86] mb-0.5">BID</div>
-              <div className="text-sm sm:text-base font-mono font-bold text-[#2962ff]">
-                {currentPrice.bid.toFixed(5)}
-              </div>
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <div className="flex items-center gap-1">
+              <span className="text-[#787b86]">B:</span>
+              <span className="text-[#2962ff] font-bold">{currentPrice.bid.toFixed(5)}</span>
             </div>
-            
-            {/* Mid */}
-            <div className="text-center flex-shrink-0">
-              <div className="text-xs text-[#787b86] mb-0.5">MID</div>
-              <div className="text-base sm:text-lg font-mono font-bold text-white">
-                {currentPrice.mid.toFixed(5)}
-              </div>
+            <div className="text-white font-bold text-sm">{currentPrice.mid.toFixed(5)}</div>
+            <div className="flex items-center gap-1">
+              <span className="text-[#787b86]">A:</span>
+              <span className="text-[#f23645] font-bold">{currentPrice.ask.toFixed(5)}</span>
             </div>
-            
-            {/* Ask */}
-            <div className="text-center flex-shrink-0">
-              <div className="text-xs text-[#787b86] mb-0.5">ASK</div>
-              <div className="text-sm sm:text-base font-mono font-bold text-[#f23645]">
-                {currentPrice.ask.toFixed(5)}
-              </div>
-            </div>
-
-            {/* Spread */}
-            <div className="text-center border-l border-[#2b2b43] pl-2 sm:pl-4 flex-shrink-0">
-              <div className="text-xs text-[#787b86] mb-0.5">SPREAD</div>
-              <div className="text-sm sm:text-base font-mono text-[#787b86]">
-                {((currentPrice.spread / currentPrice.mid) * 10000).toFixed(1)} pips
-              </div>
+            <div className="text-[#787b86] text-[10px]">
+              {((currentPrice.spread / currentPrice.mid) * 10000).toFixed(1)}p
             </div>
           </div>
         )}
+
+        {/* Right: Fullscreen */}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={toggleFullscreen}
+          className={cn(
+            "h-7 w-7 p-0 hover:bg-[#2a2e39]",
+            isFullscreen ? "text-white bg-red-500/20 hover:bg-red-500/40" : "text-[#787b86]"
+          )}
+          title={isFullscreen ? "Exit Fullscreen (ESC)" : "Fullscreen"}
+        >
+          {isFullscreen ? <X className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </Button>
       </div>
 
-      {/* Toolbar - Chart Tools */}
-      <div 
-        ref={toolbarRef}
-        className="bg-[#131722] px-2 sm:px-4 py-2 border-b border-[#2b2b43] overflow-x-auto scrollbar-hide"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-      >
-        <div className="flex items-center justify-between gap-2 min-w-max">
-          {/* Left: Timeframes */}
-          <div className="flex items-center gap-1">
-            {[
-              { label: '1m', value: '1' as Timeframe },
-              { label: '5m', value: '5' as Timeframe },
-              { label: '15m', value: '15' as Timeframe },
-              { label: '1h', value: '60' as Timeframe },
-              { label: '4h', value: '240' as Timeframe },
-              { label: '1D', value: 'D' as Timeframe },
-            ].map((tf) => (
-              <Button
-                key={tf.value}
-                size="sm"
-                variant="ghost"
-                onClick={() => setTimeframe(tf.value)}
-                className={cn(
-                  "h-7 px-2 sm:px-3 text-xs font-medium hover:bg-[#2a2e39] flex-shrink-0",
-                  timeframe === tf.value 
-                    ? 'bg-[#2a2e39] text-white' 
-                    : 'text-[#787b86]'
-                )}
-              >
-                {tf.label}
-              </Button>
-            ))}
+      {/* Main Content - Sidebar + Chart */}
+      <div className={cn("flex flex-1 min-h-0", isFullscreen ? "h-full" : "h-[900px]")}>
+        {/* Left Sidebar - Tools */}
+        <div className="w-12 bg-[#0d0f14] border-r border-[#2b2b43] flex flex-col items-center py-2 gap-1 overflow-y-auto">
+          {/* Timeframe Selector */}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setTimeframeDialogOpen(true)}
+            className="h-8 w-10 p-0 hover:bg-[#2a2e39] text-white bg-[#2962ff] text-[9px] font-bold"
+            title="Timeframe"
+          >
+            {timeframe === 'D' ? '1D' : timeframe === 'W' ? '1W' : timeframe === 'M' ? '1M' : `${timeframe}m`}
+          </Button>
 
-            <div className="w-px h-5 bg-[#2b2b43] mx-1 sm:mx-2" />
+          {/* Timeframe Dialog */}
+          <Dialog open={timeframeDialogOpen} onOpenChange={setTimeframeDialogOpen}>
+            <DialogContent className="bg-[#131722] border-[#2b2b43] text-white max-w-xs" style={{ zIndex: 99999 }} container={isFullscreen ? fullscreenRef.current : undefined}>
+              <DialogHeader>
+                <DialogTitle className="text-white flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-blue-500" />
+                  Timeframe
+                </DialogTitle>
+                <DialogDescription className="sr-only">Select chart timeframe</DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-4 gap-2 mt-4">
+                {[
+                  { label: '1m', value: '1' as Timeframe },
+                  { label: '5m', value: '5' as Timeframe },
+                  { label: '15m', value: '15' as Timeframe },
+                  { label: '30m', value: '30' as Timeframe },
+                  { label: '1H', value: '60' as Timeframe },
+                  { label: '2H', value: '120' as Timeframe },
+                  { label: '4H', value: '240' as Timeframe },
+                  { label: '1D', value: 'D' as Timeframe },
+                  { label: '1W', value: 'W' as Timeframe },
+                  { label: '1M', value: 'M' as Timeframe },
+                ].map((tf) => (
+                  <Button
+                    key={tf.value}
+                    variant="ghost"
+                    onClick={() => {
+                      setTimeframe(tf.value);
+                      setTimeframeDialogOpen(false);
+                    }}
+                    className={cn(
+                      "h-10 hover:bg-[#2a2e39]",
+                      timeframe === tf.value && "bg-[#2962ff] text-white hover:bg-[#2962ff]"
+                    )}
+                  >
+                    {tf.label}
+                  </Button>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
 
-            {/* Chart Type Selector */}
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            <Select value={chartType} onValueChange={(value: any) => setChartType(value)}>
-              <SelectTrigger className="h-7 w-auto px-2 text-xs bg-transparent border-none hover:bg-[#2a2e39] text-[#787b86]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1e222d] border-[#2b2b43] min-w-[160px]">
-                <SelectItem value="candlestick" className="text-xs text-white hover:bg-[#2a2e39] cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-3.5 w-3.5" />
-                    Candlestick
-                  </div>
-                </SelectItem>
-                <SelectItem value="line" className="text-xs text-white hover:bg-[#2a2e39] cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <Minus className="h-3.5 w-3.5" />
-                    Line Chart
-                  </div>
-                </SelectItem>
-                <SelectItem value="heikinashi" className="text-xs text-white hover:bg-[#2a2e39] cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <BarChart className="h-3.5 w-3.5" />
-                    Heikin Ashi
-                  </div>
-                </SelectItem>
-                <SelectItem value="renko" className="text-xs text-white hover:bg-[#2a2e39] cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <Grid className="h-3.5 w-3.5" />
-                    Renko Bars
-                  </div>
-                </SelectItem>
-                <SelectItem value="pointfigure" className="text-xs text-white hover:bg-[#2a2e39] cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <CircleDot className="h-3.5 w-3.5" />
-                    Point & Figure
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="w-8 h-px bg-[#2b2b43] my-1" />
 
-            {/* Volume Toggle */}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowVolume(!showVolume)}
-              className={cn(
-                "h-7 px-2 sm:px-3 text-xs hover:bg-[#2a2e39] flex-shrink-0",
-                showVolume && "bg-[#2a2e39]"
-              )}
-              title="Toggle Volume"
-            >
-              <BarChart3 className={cn("h-4 w-4", showVolume ? "text-white" : "text-[#787b86]")} />
-            </Button>
+          {/* Chart Type Dialog */}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setChartTypeOpen(true)}
+            className="h-8 w-10 p-0 hover:bg-[#2a2e39] text-[#787b86]"
+            title={`Chart Type: ${chartType}`}
+          >
+            <CandlestickChart className="h-4 w-4" />
+          </Button>
 
-            {/* Grid Toggle */}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setShowGrid(!showGrid);
-                if (chartRef.current) {
+          {/* Chart Type Dialog */}
+          <Dialog open={chartTypeOpen} onOpenChange={setChartTypeOpen}>
+            <DialogContent className="bg-[#131722] border-[#2b2b43] text-white max-w-xs" style={{ zIndex: 99999 }} container={isFullscreen ? fullscreenRef.current : undefined}>
+              <DialogHeader>
+                <DialogTitle className="text-white flex items-center gap-2">
+                  <CandlestickChart className="h-5 w-5 text-blue-500" />
+                  Chart Type
+                </DialogTitle>
+                <DialogDescription className="sr-only">Select chart type</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-2 mt-4">
+                {[
+                  { value: 'candlestick', label: 'Candlestick', icon: CandlestickChart },
+                  { value: 'line', label: 'Line Chart', icon: LineChart },
+                  { value: 'heikinashi', label: 'Heikin Ashi', icon: BarChart },
+                  { value: 'renko', label: 'Renko Bars', icon: Grid },
+                  { value: 'pointfigure', label: 'Point & Figure', icon: CircleDot },
+                ].map(({ value, label, icon: Icon }) => (
+                  <Button
+                    key={value}
+                    variant="ghost"
+                    onClick={() => {
+                      setChartType(value as typeof chartType);
+                      setChartTypeOpen(false);
+                    }}
+                    className={cn(
+                      "h-12 flex items-center justify-start gap-3 px-4 hover:bg-[#2a2e39]",
+                      chartType === value && "bg-[#2962ff] text-white hover:bg-[#2962ff]"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span>{label}</span>
+                  </Button>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Volume */}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowVolume(!showVolume)}
+            className={cn("h-8 w-10 p-0 hover:bg-[#2a2e39]", showVolume ? "text-white bg-[#2a2e39]" : "text-[#787b86]")}
+            title="Volume"
+          >
+            <BarChart3 className="h-4 w-4" />
+          </Button>
+
+          {/* Grid */}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setShowGrid(!showGrid);
+              if (chartRef.current) {
+                try {
                   chartRef.current.applyOptions({
-                    grid: {
-                      vertLines: { visible: !showGrid },
-                      horzLines: { visible: !showGrid },
-                    },
+                    grid: { vertLines: { visible: !showGrid }, horzLines: { visible: !showGrid } },
                   });
+                } catch {
+                  // Chart may be disposed
                 }
-              }}
-              className={cn(
-                "h-7 px-2 sm:px-3 text-xs hover:bg-[#2a2e39] flex-shrink-0",
-                showGrid && "bg-[#2a2e39]"
-              )}
-              title="Toggle Grid"
-            >
-              <Grid3x3 className={cn("h-4 w-4", showGrid ? "text-white" : "text-[#787b86]")} />
-            </Button>
-          </div>
+              }
+            }}
+            className={cn("h-8 w-10 p-0 hover:bg-[#2a2e39]", showGrid ? "text-white bg-[#2a2e39]" : "text-[#787b86]")}
+            title="Grid"
+          >
+            <Grid3x3 className="h-4 w-4" />
+          </Button>
 
-          {/* Right: Tools */}
-          <div className="flex items-center gap-1">
-            <AdvancedIndicatorManager
-              indicators={indicators}
-              onIndicatorsChange={setIndicators}
-            />
-            
-            <div className="w-px h-5 bg-[#2b2b43] mx-1" />
-            
-            <DrawingToolsPanel
-              activeTool={activeTool}
-              drawings={drawings}
-              onToolSelect={setActiveTool}
-              onClearDrawings={() => {
-                // Remove all price lines from chart
-                drawingLinesRef.current.forEach(line => {
-                  if (line && candlestickSeriesRef.current) {
-                    try {
-                      candlestickSeriesRef.current.removePriceLine(line);
-                    } catch (e) {
-                      console.warn('Could not remove price line:', e);
-                    }
-                  }
-                });
-                drawingLinesRef.current = [];
-                drawingPointsRef.current = [];
-                setDrawings([]);
-                setActiveTool(null);
-                console.log('🗑️ Cleared all drawings');
-              }}
-            />
-            
-            <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 sm:px-3 text-xs hover:bg-[#2a2e39] text-[#787b86] hidden sm:flex flex-shrink-0"
-                  title="Chart Settings"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="bg-[#1e222d] border-[#2b2b43] w-[340px] sm:w-[420px]">
-                <SheetHeader className="pb-6 border-b border-[#2b2b43]">
-                  <SheetTitle className="text-xl font-bold text-white flex items-center gap-2">
-                    <Settings className="h-5 w-5 text-blue-500" />
-                    Chart Display
-                  </SheetTitle>
-                  <p className="text-sm text-[#787b86] mt-1">Customize your trading view</p>
-                </SheetHeader>
-                <div className="mt-8 space-y-8 px-1">
-                  {/* Bid/Ask Price Lines */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1 flex-1">
-                      <Label htmlFor="bid-ask-lines" className="text-base font-semibold text-white flex items-center gap-2">
-                        💰 Bid & Ask Lines
-                      </Label>
-                      <p className="text-sm text-[#787b86] leading-relaxed">
-                        Display real-time bid and ask price levels
-                      </p>
+          <div className="w-8 h-px bg-[#2b2b43] my-1" />
+
+          {/* Drawing Tools */}
+          <DrawingToolsPanel
+            activeTool={activeTool}
+            drawings={drawings}
+            onToolSelect={setActiveTool}
+            onClearDrawings={() => {
+              drawingCanvasRef.current?.clearAllDrawings();
+              setActiveTool(null);
+            }}
+            onDeleteSelected={() => {
+              drawingCanvasRef.current?.deleteSelectedDrawing();
+            }}
+            selectedDrawingId={selectedDrawingId}
+            onColorChange={setDrawingColor}
+            onLineWidthChange={setDrawingLineWidth}
+            onTextSizeChange={setDrawingTextSize}
+            onUpdateSelectedDrawing={(updates) => {
+              if (selectedDrawingId) {
+                setDrawings(drawings.map(d => 
+                  d.id === selectedDrawingId ? { ...d, ...updates } : d
+                ));
+              }
+            }}
+            currentColor={drawingColor}
+            currentLineWidth={drawingLineWidth}
+            currentTextSize={drawingTextSize}
+            portalContainer={isFullscreen ? fullscreenRef.current : undefined}
+          />
+
+          <div className="w-8 h-px bg-[#2b2b43] my-1" />
+
+          {/* Indicators */}
+          <AdvancedIndicatorManager
+            indicators={indicators}
+            onIndicatorsChange={setIndicators}
+            portalContainer={isFullscreen ? fullscreenRef.current : undefined}
+          />
+
+          {/* Settings Dialog */}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSettingsOpen(true)}
+            className="h-8 w-10 p-0 hover:bg-[#2a2e39] text-[#787b86]"
+            title="Chart Settings"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+
+          {/* Settings Dialog */}
+          <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <DialogContent className="bg-[#131722] border-[#2b2b43] text-white max-w-sm" style={{ zIndex: 99999 }} container={isFullscreen ? fullscreenRef.current : undefined}>
+              <DialogHeader>
+                <DialogTitle className="text-white flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-blue-500" />
+                  Chart Settings
+                </DialogTitle>
+                <DialogDescription className="sr-only">Configure chart appearance and display options</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-5 mt-4">
+                {/* Display Settings */}
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold text-[#787b86] uppercase tracking-wide">Display</h4>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm text-white">Show Volume</Label>
+                      <p className="text-xs text-[#787b86]">Display volume bars below chart</p>
                     </div>
-                    <Switch
-                      id="bid-ask-lines"
-                      checked={showBidAskLines}
-                      onCheckedChange={setShowBidAskLines}
-                      className="mt-1"
-                    />
+                    <Switch checked={showVolume} onCheckedChange={setShowVolume} />
                   </div>
-
-                  {/* Price Axis Labels */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1 flex-1">
-                      <Label htmlFor="price-labels" className="text-base font-semibold text-white flex items-center gap-2">
-                        🏷️ Price Axis Labels
-                      </Label>
-                      <p className="text-sm text-[#787b86] leading-relaxed">
-                        Show price values on the right axis
-                      </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm text-white">Show Grid</Label>
+                      <p className="text-xs text-[#787b86]">Display chart grid lines</p>
                     </div>
-                    <Switch
-                      id="price-labels"
-                      checked={showPriceLabels}
-                      onCheckedChange={setShowPriceLabels}
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {/* Position Markers */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1 flex-1">
-                      <Label htmlFor="trade-markers" className="text-base font-semibold text-white flex items-center gap-2">
-                        📍 Position Markers
-                      </Label>
-                      <p className="text-sm text-[#787b86] leading-relaxed">
-                        Highlight your active trades on the chart
-                      </p>
-                    </div>
-                    <Switch
-                      id="trade-markers"
-                      checked={showTradeMarkers}
-                      onCheckedChange={setShowTradeMarkers}
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {/* TP/SL Lines & Labels */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1 flex-1">
-                      <Label htmlFor="tpsl-lines" className="text-base font-semibold text-white flex items-center gap-2">
-                        📏 TP/SL Lines & Labels
-                      </Label>
-                      <p className="text-sm text-[#787b86] leading-relaxed">
-                        Show Take Profit and Stop Loss price lines
-                      </p>
-                    </div>
-                    <Switch
-                      id="tpsl-lines"
-                      checked={showTPSLLines}
-                      onCheckedChange={setShowTPSLLines}
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {/* TP/SL Visual Zones */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1 flex-1">
-                      <Label htmlFor="tpsl-zones" className="text-base font-semibold text-white flex items-center gap-2">
-                        🎨 TP/SL Visual Zones
-                      </Label>
-                      <p className="text-sm text-[#787b86] leading-relaxed">
-                        Show colored profit/loss zones for TP/SL
-                      </p>
-                    </div>
-                    <Switch
-                      id="tpsl-zones"
-                      checked={showTPSLZones}
-                      onCheckedChange={setShowTPSLZones}
-                      className="mt-1"
-                      disabled={!showTPSLLines}
-                    />
-                  </div>
-
-                  {/* Edit TP/SL Instructions */}
-                  <div className="mt-4 p-3 bg-[#0a0e27] rounded-lg border border-[#2b2b43]">
-                    <p className="text-xs font-semibold text-blue-400 mb-1">💡 How to Edit TP/SL</p>
-                    <p className="text-xs text-[#787b86] leading-relaxed">
-                      Click the <span className="text-white font-semibold">Edit</span> button in the Open Positions table to adjust Take Profit and Stop Loss levels for any position.
-                    </p>
+                    <Switch checked={showGrid} onCheckedChange={(v) => {
+                      setShowGrid(v);
+                      if (chartRef.current) {
+                        try {
+                          chartRef.current.applyOptions({
+                            grid: { vertLines: { visible: v }, horzLines: { visible: v } },
+                          });
+                        } catch {
+                          // Chart may be disposed
+                        }
+                      }
+                    }} />
                   </div>
                 </div>
-              </SheetContent>
-            </Sheet>
 
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                if (chartContainerRef.current) {
-                  if (document.fullscreenElement) {
-                    document.exitFullscreen();
-                  } else {
-                    chartContainerRef.current.requestFullscreen();
-                  }
-                }
-              }}
-              className="h-7 px-2 sm:px-3 text-xs hover:bg-[#2a2e39] text-[#787b86] flex-shrink-0"
-              title="Fullscreen"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
+                {/* Price Settings */}
+                <div className="space-y-4 pt-4 border-t border-[#2b2b43]">
+                  <h4 className="text-sm font-semibold text-[#787b86] uppercase tracking-wide">Price</h4>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm text-white">Bid/Ask Lines</Label>
+                      <p className="text-xs text-[#787b86]">Show bid/ask price lines</p>
+                    </div>
+                    <Switch checked={showBidAskLines} onCheckedChange={setShowBidAskLines} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm text-white">Price Labels</Label>
+                      <p className="text-xs text-[#787b86]">Show price on axis</p>
+                    </div>
+                    <Switch checked={showPriceLabels} onCheckedChange={setShowPriceLabels} />
+                  </div>
+                </div>
 
-       {/* Chart Container */}
-       <div className="rounded-b-lg overflow-hidden bg-[#131722] border border-[#2b2b43] border-t-0">
-         {/* Main Chart */}
-         <div className="relative">
-           {/* Active Drawing Tool Indicator */}
-           {activeTool && (
-             <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 bg-[#2962ff] text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
-               <Activity className="h-4 w-4 animate-pulse" />
-               <span className="text-sm font-semibold">
-                 {activeTool === 'horizontal-line' && 'Click on chart to draw horizontal line'}
-                 {activeTool === 'trend-line' && `Click ${drawingPointsRef.current.length === 0 ? 'first' : 'second'} point for trend line`}
-                 {activeTool === 'fibonacci' && `Click ${drawingPointsRef.current.length === 0 ? 'start' : 'end'} point for Fibonacci`}
-                 {activeTool === 'vertical-line' && 'Click on chart to draw vertical line'}
-                 {activeTool === 'rectangle' && 'Click two corners for rectangle'}
-                 {activeTool === 'text' && 'Click to place text label'}
-                 {activeTool === 'arrow' && 'Click two points for arrow'}
-               </span>
-             </div>
-           )}
-
-           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#131722] z-10">
-              <div className="text-center">
-                <Loader2 className="h-8 w-8 animate-spin text-[#2962ff] mx-auto mb-2" />
-                <p className="text-sm text-[#787b86]">Loading chart data from Massive.com...</p>
+                {/* Trading Settings */}
+                <div className="space-y-4 pt-4 border-t border-[#2b2b43]">
+                  <h4 className="text-sm font-semibold text-[#787b86] uppercase tracking-wide">Trading</h4>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm text-white">Position Markers</Label>
+                      <p className="text-xs text-[#787b86]">Show open position lines</p>
+                    </div>
+                    <Switch checked={showTradeMarkers} onCheckedChange={setShowTradeMarkers} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm text-white">TP/SL Lines</Label>
+                      <p className="text-xs text-[#787b86]">Show take profit/stop loss</p>
+                    </div>
+                    <Switch checked={showTPSLLines} onCheckedChange={setShowTPSLLines} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm text-white">TP/SL Zones</Label>
+                      <p className="text-xs text-[#787b86]">Show colored zones</p>
+                    </div>
+                    <Switch checked={showTPSLZones} onCheckedChange={setShowTPSLZones} disabled={!showTPSLLines} />
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-          
-          {error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#131722] z-10">
-              <div className="text-center text-[#f23645]">
-                <p className="text-sm">⚠️ {error}</p>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => window.location.reload()}
-                  className="mt-2 hover:bg-[#2a2e39]"
-                >
-                  Retry
-                </Button>
-              </div>
-            </div>
-          )}
-
-           <div 
-             ref={chartContainerRef} 
-             style={{ 
-               height: '500px', 
-               width: '100%',
-               cursor: activeTool ? 'crosshair' : 'default'
-             }}
-           />
+            </DialogContent>
+          </Dialog>
         </div>
 
-        {/* Oscillator Panels */}
-        {indicators.filter(ind => ind.enabled && ind.displayType === 'oscillator').map(indicator => (
-          <div key={indicator.id} className="border-t border-[#2b2b43]">
-            <div className="bg-[#1e222d] px-2 py-1 flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#d1d4dc]">{indicator.name}</span>
-              <span 
-                className="w-2 h-2 rounded-full" 
-                style={{ backgroundColor: indicator.color }}
-              />
+        {/* Chart Area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Chart */}
+          <div className="flex-1 relative">
+            {/* OHLCV Data Legend */}
+            <div className="absolute top-2 left-2 z-20 flex items-center gap-3 text-xs font-mono bg-[#131722]/95 px-3 py-1.5 rounded border border-[#2b2b43]">
+              <span className="text-[#d1d4dc] font-bold">{symbol}</span>
+              {ohlcvData ? (
+                <>
+                  <span className="text-[#787b86]">{ohlcvData.time}</span>
+                  <span><span className="text-[#787b86]">O</span> <span className="text-[#d1d4dc]">{ohlcvData.open.toFixed(5)}</span></span>
+                  <span><span className="text-[#787b86]">H</span> <span className="text-[#22c55e]">{ohlcvData.high.toFixed(5)}</span></span>
+                  <span><span className="text-[#787b86]">L</span> <span className="text-[#ef4444]">{ohlcvData.low.toFixed(5)}</span></span>
+                  <span><span className="text-[#787b86]">C</span> <span className={ohlcvData.change >= 0 ? 'text-[#22c55e]' : 'text-[#ef4444]'}>{ohlcvData.close.toFixed(5)}</span></span>
+                  <span className={ohlcvData.change >= 0 ? 'text-[#22c55e]' : 'text-[#ef4444]'}>
+                    {ohlcvData.change >= 0 ? '+' : ''}{ohlcvData.changePercent.toFixed(2)}%
+                  </span>
+                </>
+              ) : (
+                <span className="text-[#787b86]">Hover for OHLCV</span>
+              )}
             </div>
+
+            {/* Active Drawing Tool Indicator */}
+            {activeTool && (
+              <div className="absolute top-2 right-2 z-30 bg-[#2962ff] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-2">
+                <Activity className="h-3 w-3 animate-pulse" />
+                {activeTool === 'freehand' && 'Freehand'}
+                {activeTool === 'trend-line' && 'Trend Line'}
+                {activeTool === 'horizontal-line' && 'H-Line'}
+                {activeTool === 'vertical-line' && 'V-Line'}
+                {activeTool === 'rectangle' && 'Rectangle'}
+                {activeTool === 'arrow' && 'Arrow'}
+                {activeTool === 'fibonacci' && 'Fibonacci'}
+                {activeTool === 'ray' && 'Ray'}
+                {activeTool === 'extended-line' && 'Ext Line'}
+                {activeTool === 'text' && 'Text'}
+              </div>
+            )}
+
+            {loading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-[#131722] z-20">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-[#2962ff] mx-auto mb-2" />
+                  <p className="text-sm text-[#787b86]">Loading...</p>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="absolute inset-0 flex items-center justify-center bg-[#131722] z-20">
+                <div className="text-center text-[#f23645]">
+                  <p className="text-sm">⚠️ {error}</p>
+                  <Button size="sm" variant="ghost" onClick={() => window.location.reload()} className="mt-2">Retry</Button>
+                </div>
+              </div>
+            )}
+
+            {/* Chart Container */}
             <div 
-              id={`oscillator-${indicator.id}`}
-              style={{ height: '150px', width: '100%' }}
+              ref={chartContainerRef} 
+              className="absolute inset-0"
             />
+
+            {/* Drawing Canvas Overlay */}
+            {!loading && chartRef.current && candlestickSeriesRef.current && (
+              <DrawingCanvas
+                ref={drawingCanvasRef}
+                chart={chartRef.current}
+                series={candlestickSeriesRef.current}
+                activeTool={activeTool}
+                onToolComplete={() => setActiveTool(null)}
+                drawings={drawings}
+                onDrawingsChange={setDrawings}
+                containerRef={chartContainerRef}
+                drawingColor={drawingColor}
+                drawingLineWidth={drawingLineWidth}
+                drawingTextSize={drawingTextSize}
+                onSelectionChange={setSelectedDrawingId}
+              />
+            )}
           </div>
-        ))}
-      </div>
-      
-      {/* Legend & Attribution */}
-      <div className="flex items-center justify-between bg-[#131722] px-4 py-2 rounded-b-lg border border-[#2b2b43] border-t-0 text-xs">
-        <div className="flex items-center gap-4 text-[#787b86]">
-          <span className="flex items-center gap-2">
-            <span className="inline-block w-6 h-0.5 bg-[#2962ff]" style={{ borderTop: '2px dashed #2962ff' }}></span>
-            <span>Bid Price</span>
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="inline-block w-6 h-0.5 bg-[#f23645]" style={{ borderTop: '2px dashed #f23645' }}></span>
-            <span>Ask Price</span>
-          </span>
-          <span className="ml-4 text-[#787b86]">
-            <span className="font-semibold text-[#2962ff]">100% REAL PRICES</span> • Powered by Massive.com
-          </span>
-        </div>
-        
-        <div className="text-[#787b86] text-xs">
-          TradingView Lightweight Charts™
+
+          {/* Oscillator Panels */}
+          {indicators.filter(ind => ind.enabled && ind.displayType === 'oscillator').map(indicator => (
+            <div key={indicator.id} className="border-t border-[#2b2b43]">
+              <div className="bg-[#1e222d] px-2 py-1 flex items-center gap-2">
+                <span className="text-xs font-semibold text-[#d1d4dc]">{indicator.name}</span>
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: indicator.color }} />
+              </div>
+              <div id={`oscillator-${indicator.id}`} style={{ height: '120px', width: '100%' }} />
+            </div>
+          ))}
         </div>
       </div>
+
     </div>
   );
 };
