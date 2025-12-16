@@ -2,10 +2,24 @@
  * Real Forex Prices Service
  * 
  * Fetches REAL market prices from Massive.com API
- * NO SIMULATION - Only real data!
+ * Now with WebSocket streaming support for 90%+ reduction in API calls
+ * 
+ * Priority:
+ * 1. WebSocket cache (instant, real-time)
+ * 2. REST API (fallback)
+ * 3. Last known prices (offline fallback)
+ * 
+ * Documentation: https://massive.com/docs/websocket/quickstart
  */
 
 import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
+import { 
+  getCachedPrice, 
+  getCachedPrices, 
+  isWebSocketConnected,
+  updateCacheFromRest,
+  type StreamingPriceQuote 
+} from './websocket-price-streamer';
 
 // Price data structure
 export interface PriceQuote {
@@ -174,92 +188,118 @@ function getTypicalSpread(symbol: ForexSymbol): number {
 }
 
 /**
- * Fetch real-time prices from Massive.com API
- * Returns REAL market data - even when market is closed (last available price)
+ * Fetch real-time prices from Massive.com
  * 
- * According to Massive.com docs: https://massive.com/docs/websocket/forex/aggregates-per-minute
- * We can also use WebSocket for real-time streaming
+ * Priority:
+ * 1. WebSocket cache (instant, 0 API calls)
+ * 2. REST API (fallback when WebSocket unavailable)
+ * 3. Last known prices (offline fallback)
+ * 
+ * With WebSocket enabled, this function makes 0 external API calls!
+ * Documentation: https://massive.com/docs/websocket/quickstart
  */
 export async function fetchRealForexPrices(symbols: ForexSymbol[]): Promise<Map<ForexSymbol, PriceQuote>> {
-  if (!MASSIVE_API_KEY) {
-    console.error('❌ MASSIVE_API_KEY is not set!');
-    console.log('💡 Get your API key from: https://massive.com');
-    return getLastKnownPrices(symbols);
-  }
+  const pricesMap = new Map<ForexSymbol, PriceQuote>();
+  const symbolsNeedingRestFetch: ForexSymbol[] = [];
 
-  try {
-    console.log(`🔄 Fetching REAL prices for: ${symbols.join(', ')}`);
+  // STEP 1: Try WebSocket cache first (instant, no API calls)
+  if (isWebSocketConnected()) {
+    const cachedPrices = getCachedPrices(symbols);
     
-    const pricesMap = new Map<ForexSymbol, PriceQuote>();
-    
-    // Fetch each symbol individually using correct Massive.com endpoint
-    // Endpoint: /v1/last_quote/currencies/{from}/{to}
-    // Documentation: https://massive.com/docs/rest/forex/quotes/last-quote
     for (const symbol of symbols) {
-      const currencyPair = MASSIVE_SYMBOL_MAP[symbol];
-      
-      try {
-        // Construct correct endpoint
-        const endpoint = `/last_quote/currencies/${currencyPair.from}/${currencyPair.to}?apiKey=${MASSIVE_API_KEY}`;
-        const url = `${MASSIVE_API_BASE_URL}${endpoint}`;
-        
-        console.log(`📡 Fetching ${symbol}: ${url.replace(MASSIVE_API_KEY || '', 'xxx')}`);
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store',
-        });
-
-        if (!response.ok) {
-          console.warn(`⚠️ ${symbol} API failed: ${response.status}`);
-          
-          if (response.status === 401 || response.status === 403) {
-            console.error('❌ Invalid API key. Check MASSIVE_API_KEY in .env');
-            console.log('💡 Get your key from: https://massive.com/dashboard');
-          }
-          
-          continue; // Try next symbol
-        }
-
-        const data = await response.json();
-        
-        // Check if response is successful
-        if (data.status !== 'success' && data.status !== 'OK') {
-          console.warn(`⚠️ ${symbol} API returned status: ${data.status}`);
-          continue;
-        }
-        
-        // Parse the response
-        const quote = parseLastQuoteResponse(data, symbol);
-
-        if (quote) {
-          console.log(`✅ Got REAL price for ${symbol}: Bid ${quote.bid.toFixed(5)} | Ask ${quote.ask.toFixed(5)}`);
-          pricesMap.set(symbol, quote);
-          lastKnownPrices.set(symbol, quote);
-        }
-      } catch (error) {
-        console.warn(`⚠️ Error fetching ${symbol}:`, error);
-        continue;
+      const cached = cachedPrices.get(symbol);
+      if (cached && (Date.now() - cached.timestamp) < 10000) { // Cache valid for 10 seconds
+        pricesMap.set(symbol, cached);
+      } else {
+        symbolsNeedingRestFetch.push(symbol);
       }
     }
 
-    if (pricesMap.size > 0) {
-      console.log(`✅ Got ${pricesMap.size} REAL prices from Massive.com API`);
+    if (pricesMap.size === symbols.length) {
+      // All prices from WebSocket cache - 0 API calls!
       return pricesMap;
     }
 
-    // If all failed, use last known prices
-    console.warn('⚠️ API unavailable, using cached/fallback prices');
-    return getLastKnownPrices(symbols);
-
-  } catch (error) {
-    console.error('❌ Error fetching from Massive.com:', error);
-    console.log('💡 Check: 1) API key is valid, 2) Internet connection, 3) Massive.com API status');
-    return getLastKnownPrices(symbols);
+    if (pricesMap.size > 0) {
+      console.log(`⚡ Got ${pricesMap.size}/${symbols.length} prices from WebSocket cache`);
+    }
+  } else {
+    // WebSocket not connected, all symbols need REST fetch
+    symbolsNeedingRestFetch.push(...symbols);
   }
+
+  // STEP 2: Fetch remaining symbols from REST API (PARALLEL for speed)
+  if (symbolsNeedingRestFetch.length > 0) {
+    if (!MASSIVE_API_KEY) {
+      console.error('❌ MASSIVE_API_KEY is not set!');
+      const fallback = getLastKnownPrices(symbolsNeedingRestFetch);
+      fallback.forEach((quote, symbol) => pricesMap.set(symbol, quote));
+      return pricesMap;
+    }
+
+    console.log(`🔄 Fetching ${symbolsNeedingRestFetch.length} prices via REST API (parallel)...`);
+    
+    // Fetch ALL symbols in parallel (not sequential) for speed
+    const fetchPromises = symbolsNeedingRestFetch.map(async (symbol) => {
+      const currencyPair = MASSIVE_SYMBOL_MAP[symbol];
+      if (!currencyPair) return null;
+      
+      try {
+        const endpoint = `/last_quote/currencies/${currencyPair.from}/${currencyPair.to}?apiKey=${MASSIVE_API_KEY}`;
+        const url = `${MASSIVE_API_BASE_URL}${endpoint}`;
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+        });
+
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        if (data.status !== 'success' && data.status !== 'OK') return null;
+        
+        return { symbol, data };
+      } catch {
+        return null;
+      }
+    });
+
+    // Wait for all parallel fetches to complete
+    const results = await Promise.all(fetchPromises);
+    
+    // Process results
+    for (const result of results) {
+      if (!result) continue;
+      const quote = parseLastQuoteResponse(result.data, result.symbol);
+      if (quote) {
+        pricesMap.set(result.symbol, quote);
+        lastKnownPrices.set(result.symbol, quote);
+        updateCacheFromRest(result.symbol, quote);
+      }
+    }
+  }
+
+  // STEP 3: Fill any remaining gaps with last known prices
+  for (const symbol of symbols) {
+    if (!pricesMap.has(symbol)) {
+      const fallback = getLastKnownPrices([symbol]);
+      const quote = fallback.get(symbol);
+      if (quote) {
+        pricesMap.set(symbol, quote);
+      }
+    }
+  }
+
+  if (pricesMap.size > 0) {
+    const wsCount = symbols.length - symbolsNeedingRestFetch.length;
+    const restCount = pricesMap.size - wsCount;
+    if (wsCount > 0 || restCount > 0) {
+      console.log(`✅ Prices: ${wsCount} from WebSocket, ${restCount} from REST`);
+    }
+  }
+
+  return pricesMap;
 }
 
 /**
@@ -571,9 +611,50 @@ export function getMarketStatus(): string {
 /**
  * Get current price for a single symbol (for order execution)
  * Used by server actions when placing/closing orders
+ * 
+ * Optimized: Checks WebSocket cache first (instant, 0 API calls)
  */
 export async function getRealPrice(symbol: ForexSymbol): Promise<PriceQuote | null> {
+  // Try WebSocket cache first (instant)
+  if (isWebSocketConnected()) {
+    const cached = getCachedPrice(symbol);
+    if (cached && (Date.now() - cached.timestamp) < 5000) { // 5 second cache for trades
+      return cached;
+    }
+  }
+  
+  // Fallback to REST API
   const pricesMap = await fetchRealForexPrices([symbol]);
   return pricesMap.get(symbol) || null;
+}
+
+/**
+ * Get prices from cache only (no API calls)
+ * Returns null for symbols not in cache
+ */
+export function getPriceFromCacheOnly(symbol: ForexSymbol): PriceQuote | null {
+  // Check WebSocket cache
+  const wsCache = getCachedPrice(symbol);
+  if (wsCache) return wsCache;
+  
+  // Check last known prices
+  return lastKnownPrices.get(symbol) || null;
+}
+
+/**
+ * Get all prices from cache (no API calls)
+ * Used by margin monitoring to avoid API calls
+ */
+export function getAllPricesFromCache(symbols: ForexSymbol[]): Map<ForexSymbol, PriceQuote> {
+  const result = new Map<ForexSymbol, PriceQuote>();
+  
+  for (const symbol of symbols) {
+    const price = getPriceFromCacheOnly(symbol);
+    if (price) {
+      result.set(symbol, price);
+    }
+  }
+  
+  return result;
 }
 

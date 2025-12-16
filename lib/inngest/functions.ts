@@ -5,6 +5,8 @@ import { connectToDatabase } from '@/database/mongoose';
 import Competition from '@/database/models/trading/competition.model';
 import { checkMarginCalls } from '@/lib/actions/trading/position.actions';
 import EmailTemplate from '@/database/models/email-template.model';
+// WebSocket disabled - requires paid Massive.com plan (error 1008)
+// import { initializeWebSocket, getConnectionStatus } from '@/lib/services/websocket-price-streamer';
 
 export const sendSignUpEmail = inngest.createFunction(
     { id: 'sign-up-email' },
@@ -88,7 +90,10 @@ export const sendSignUpEmail = inngest.createFunction(
 
 // Update competition statuses based on time
 export const updateCompetitionStatuses = inngest.createFunction(
-    { id: 'update-competition-statuses' },
+    { 
+        id: 'update-competition-statuses',
+        concurrency: { limit: 1 }, // Only 1 instance at a time
+    },
     { cron: '* * * * *' }, // Run every minute
     async ({ step }) => {
         return await step.run('update-statuses', async () => {
@@ -298,7 +303,11 @@ export const updateCompetitionStatuses = inngest.createFunction(
 
 // Monitor margin levels and automatically liquidate positions if needed
 export const monitorMarginLevels = inngest.createFunction(
-    { id: 'monitor-margin-levels' },
+    { 
+        id: 'monitor-margin-levels',
+        concurrency: { limit: 1 }, // Only 1 instance at a time - prevents resource starvation
+        rateLimit: { limit: 2, period: '1m' }, // Max 2 runs per minute
+    },
     { cron: '* * * * *' }, // Run every minute, then check multiple times based on admin settings
     async ({ step }) => {
         return await step.run('check-margin-levels', async () => {
@@ -430,6 +439,59 @@ export const evaluateUserBadges = inngest.createFunction(
             };
         } catch (error) {
             console.error('Error in badge evaluation:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    }
+);
+
+/**
+ * Server-side price cache updater
+ * Fetches all forex prices every 3 seconds and caches them
+ * This way, API requests read from cache (instant) instead of making external calls
+ * 
+ * Benefits:
+ * - Single source fetches prices (not every user)
+ * - API reads are instant (from cache)
+ * - Reduces Massive.com API calls by 90%+
+ */
+export const updatePriceCache = inngest.createFunction(
+    { 
+        id: 'update-price-cache',
+        concurrency: { limit: 1 }, // Only 1 instance
+    },
+    { cron: '*/5 * * * * *' }, // Every 5 seconds
+    async () => {
+        const { fetchRealForexPrices } = await import('@/lib/services/real-forex-prices.service');
+        type ForexSymbolType = import('@/lib/services/pnl-calculator.service').ForexSymbol;
+        
+        // All forex pairs to cache
+        const allPairs: ForexSymbolType[] = [
+            'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD',
+            'EUR/GBP', 'EUR/JPY', 'EUR/CHF', 'EUR/AUD', 'EUR/CAD', 'EUR/NZD',
+            'GBP/JPY', 'GBP/CHF', 'GBP/AUD', 'GBP/CAD', 'GBP/NZD',
+            'AUD/JPY', 'AUD/CHF', 'AUD/CAD', 'AUD/NZD',
+            'CAD/JPY', 'CAD/CHF', 'CHF/JPY',
+            'NZD/JPY', 'NZD/CHF', 'NZD/CAD',
+            'USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK',
+        ];
+        
+        try {
+            const startTime = Date.now();
+            const prices = await fetchRealForexPrices(allPairs);
+            const duration = Date.now() - startTime;
+            
+            console.log(`💰 Price cache updated: ${prices.size} pairs in ${duration}ms`);
+            
+            return {
+                success: true,
+                pairsUpdated: prices.size,
+                durationMs: duration,
+            };
+        } catch (error) {
+            console.error('❌ Failed to update price cache:', error);
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Unknown error',

@@ -17,7 +17,7 @@ import {
   calculatePnLPercentage,
   ForexSymbol,
 } from '@/lib/services/pnl-calculator.service';
-import { getRealPrice, isForexMarketOpen, getMarketStatus } from '@/lib/services/real-forex-prices.service';
+import { getRealPrice, isForexMarketOpen, getMarketStatus, getPriceFromCacheOnly } from '@/lib/services/real-forex-prices.service';
 import { getMarginStatus } from '@/lib/services/risk-manager.service';
 
 /**
@@ -519,7 +519,11 @@ export const updateAllPositionsPnL = async (competitionId: string, userId: strin
     let totalUnrealizedPnl = 0;
 
     for (const position of positions) {
-      const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+      // Use cached price first (instant, 0 API calls)
+      let currentPrice = getPriceFromCacheOnly(position.symbol as ForexSymbol);
+      if (!currentPrice) {
+        currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+      }
       if (!currentPrice) continue;
 
       const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
@@ -587,7 +591,11 @@ export const checkStopLossTakeProfit = async (competitionId: string) => {
     });
 
     for (const position of positions) {
-      const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+      // Use cached price first (instant), fallback to REST if needed
+      let currentPrice = getPriceFromCacheOnly(position.symbol as ForexSymbol);
+      if (!currentPrice) {
+        currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+      }
       if (!currentPrice) continue;
 
       const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
@@ -898,7 +906,11 @@ export const checkMarginCalls = async (competitionId: string) => {
       
       let totalUnrealizedPnl = 0;
       for (const position of openPositions) {
-        const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+        // Use cached price first (instant, 0 API calls), fallback to REST if needed
+        let currentPrice = getPriceFromCacheOnly(position.symbol as ForexSymbol);
+        if (!currentPrice) {
+          currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+        }
         if (!currentPrice) continue;
         
         const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
@@ -944,7 +956,11 @@ export const checkMarginCalls = async (competitionId: string) => {
         console.log(`🚨 LIQUIDATING ${positions.length} positions for ${participant.username} (Margin: ${marginStatus.marginLevel.toFixed(2)}%)`);
 
         for (const position of positions) {
-          const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+          // Use cached price first, fallback to REST
+          let currentPrice = getPriceFromCacheOnly(position.symbol as ForexSymbol);
+          if (!currentPrice) {
+            currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+          }
           if (!currentPrice) continue;
 
           const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
