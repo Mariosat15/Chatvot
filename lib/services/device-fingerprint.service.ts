@@ -202,8 +202,6 @@ function parseUserAgent() {
     osVersion = ua.match(/CrOS [^ ]+ (\d+\.\d+)/)?.[1] || 'Unknown';
   }
   
-  console.log(`🔍 Detected: ${browser} ${browserVersion} on ${os} ${osVersion}`);
-  
   return { browser, browserVersion, os, osVersion };
 }
 
@@ -470,19 +468,6 @@ export async function generateDeviceFingerprint(): Promise<DeviceFingerprintData
       features
     };
 
-    console.log('🔍 Generated enhanced fingerprint with 50+ data points:', {
-      fingerprintId: fingerprintData.fingerprintId,
-      browser: fingerprintData.browser,
-      browserVersion: fingerprintData.browserVersion,
-      os: fingerprintData.os,
-      osVersion: fingerprintData.osVersion,
-      colorDepth: fingerprintData.colorDepth,
-      userAgent: fingerprintData.userAgent ? 'present' : 'MISSING',
-      gpuInfo: webglData.gpuInfo,
-      cpuCores: hardwareInfo.cpuCores,
-      deviceMemory: hardwareInfo.deviceMemory
-    });
-    
     return fingerprintData;
   } catch (error) {
     console.error('Error generating fingerprint:', error);
@@ -539,19 +524,6 @@ export async function generateDeviceFingerprint(): Promise<DeviceFingerprintData
 export async function trackDeviceFingerprint(): Promise<{ success: boolean; suspicious?: boolean; message?: string }> {
   try {
     const fingerprint = await generateDeviceFingerprint();
-    
-    console.log('📤 Sending fingerprint to API:', {
-      fingerprintId: fingerprint.fingerprintId,
-      browser: fingerprint.browser,
-      browserVersion: fingerprint.browserVersion,
-      os: fingerprint.os,
-      osVersion: fingerprint.osVersion,
-      colorDepth: fingerprint.colorDepth,
-      userAgent: fingerprint.userAgent ? `${fingerprint.userAgent.substring(0, 50)}...` : 'MISSING',
-      screenResolution: fingerprint.screenResolution,
-      timezone: fingerprint.timezone,
-      language: fingerprint.language
-    });
     
     const response = await fetch('/api/fraud/track-device', {
       method: 'POST',

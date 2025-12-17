@@ -102,14 +102,6 @@ export function LiveAccountInfo({
     setLiveUnrealizedPnl(totalUnrealizedPnl);
     setLiveEquity(newEquity);
     setLiveAvailableCapital(Math.max(0, newAvailableCapital));
-
-    console.log('📊 Live Account Update:', {
-      Balance: initialBalance,
-      'Unrealized P&L': totalUnrealizedPnl.toFixed(2),
-      Equity: newEquity.toFixed(2),
-      'Margin Used': initialUsedMargin.toFixed(2),
-      'Available Capital': newAvailableCapital.toFixed(2),
-    });
   }, [prices, initialPositions, initialBalance, initialUsedMargin]);
 
   // Real-time margin monitoring - check every 5 seconds
@@ -127,7 +119,6 @@ export function LiveAccountInfo({
         const result = await checkUserMargin(competitionId);
         
         if (result.liquidated) {
-          console.log('🚨 POSITIONS LIQUIDATED! Refreshing page...');
           // Refresh the page to show closed positions
           router.refresh();
         }

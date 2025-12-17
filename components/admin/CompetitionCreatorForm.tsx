@@ -70,7 +70,6 @@ export default function CompetitionCreatorForm() {
   // Reset submitted state when navigating away from step 7
   useEffect(() => {
     if (currentStep !== 7 && submitted) {
-      console.log('🔄 Resetting submitted state (navigated away from step 7)');
       setSubmitted(false);
     }
   }, [currentStep, submitted]);
@@ -230,16 +229,14 @@ export default function CompetitionCreatorForm() {
     
     // Prevent double submission
     if (submitted || loading) {
-      console.log('⚠️ Submission already in progress or completed');
-        return;
-      }
+      return;
+    }
 
     // Validate all steps before submission
     if (!validateAllSteps()) {
-        return;
-      }
+      return;
+    }
 
-    console.log('🚀 Starting competition creation...');
     setSubmitted(true);
     setLoading(true);
 
@@ -247,13 +244,6 @@ export default function CompetitionCreatorForm() {
       // Build start and end dates with explicit UTC timezone
       const startTime = new Date(`${formData.startDate}T${formData.startTime}:00Z`);
       const endTime = new Date(`${formData.endDate}T${formData.endTime}:00Z`);
-
-      console.log('🕐 Competition times:', {
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-        currentTime: new Date().toISOString(),
-        startTimeUTC: startTime.toUTCString(),
-      });
 
       // Validate dates
       if (startTime <= new Date()) {
@@ -523,13 +513,9 @@ export default function CompetitionCreatorForm() {
         <form 
           onSubmit={(e) => {
             e.preventDefault();
-            console.log('📝 Form onSubmit triggered, currentStep:', currentStep);
             // Only allow submission on final step (step 7)
             if (currentStep === 7) {
-              console.log('✅ On step 7, calling handleSubmit');
               handleSubmit(e);
-            } else {
-              console.log('⛔ Not on step 7, ignoring submission');
             }
           }}
           onKeyDown={(e) => {
@@ -1728,17 +1714,7 @@ export default function CompetitionCreatorForm() {
         <Button
           type="submit"
           disabled={loading || submitted || getTotalPrizePercentage() !== 100}
-          onClick={() => {
-            const prizeTotal = getTotalPrizePercentage();
-            console.log('🎯 Launch button clicked', {
-              loading,
-              submitted,
-              prizeTotal,
-              isValid: prizeTotal === 100,
-              disabled: loading || submitted || prizeTotal !== 100
-            });
-          }}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold shadow-lg shadow-green-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold shadow-lg shadow-green-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
             <>

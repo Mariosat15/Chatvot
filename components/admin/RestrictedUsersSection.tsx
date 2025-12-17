@@ -72,14 +72,10 @@ export default function RestrictedUsersSection() {
   const fetchRestrictions = async () => {
     setLoading(true);
     try {
-      console.log('🔍 Fetching restrictions...');
       const response = await fetch('/api/admin/fraud/restrictions');
       const data = await response.json();
       
-      console.log('📊 Restrictions response:', data);
-      
       if (data.success) {
-        console.log(`✅ Found ${data.restrictions.length} restriction(s)`);
         setRestrictions(data.restrictions);
       } else {
         console.error('❌ Failed to load restrictions:', data.message);
@@ -121,8 +117,6 @@ export default function RestrictedUsersSection() {
     }
 
     try {
-      console.log('✏️ Sending update restriction request for:', selectedUser._id);
-      
       const response = await fetch('/api/admin/fraud/update-restriction', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -140,8 +134,6 @@ export default function RestrictedUsersSection() {
       });
 
       const data = await response.json();
-      
-      console.log('📥 Update response:', { status: response.status, data });
 
       if (data.success) {
         toast.success(data.message || 'Restriction updated successfully');
@@ -165,8 +157,6 @@ export default function RestrictedUsersSection() {
     }
 
     try {
-      console.log('🔓 Sending unrestrict request for user:', selectedUser.userId);
-      
       const response = await fetch('/api/admin/fraud/unrestrict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -177,8 +167,6 @@ export default function RestrictedUsersSection() {
       });
 
       const data = await response.json();
-      
-      console.log('📥 Unrestrict response:', { status: response.status, data });
 
       if (data.success) {
         toast.success(data.message || 'User unrestricted successfully');

@@ -124,8 +124,6 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
     const currentPrice = prices.get(symbol);
     if (!currentPrice || !candlestickSeriesRef.current || isLoading) return;
 
-    console.log(`📊 Chart Update: ${symbol} @ ${currentPrice.mid.toFixed(5)}`);
-
     // Use current timestamp rounded to the nearest timeframe interval
     const getTimeframeSeconds = () => {
       switch (timeframe) {

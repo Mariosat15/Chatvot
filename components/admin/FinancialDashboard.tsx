@@ -268,7 +268,6 @@ export default function FinancialDashboard() {
         const result = await response.json();
         // API returns invoiceSettings object directly, not wrapped in 'data'
         const isVatEnabled = result.invoiceSettings?.vatEnabled || result.shouldApplyVat || false;
-        console.log('📋 VAT Enabled:', isVatEnabled, result);
         setVatEnabled(isVatEnabled);
       }
     } catch (error) {

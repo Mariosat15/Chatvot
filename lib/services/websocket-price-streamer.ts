@@ -1,18 +1,18 @@
 /**
- * WebSocket Price Streamer
+ * WebSocket Price Streamer for Massive.com
  * 
- * Maintains a single WebSocket connection to Massive.com for real-time price streaming.
- * All forex pairs are subscribed once, and prices are cached in memory.
+ * Documentation:
+ * - https://massive.com/docs/websocket/quickstart
+ * - https://massive.com/docs/websocket/forex/quotes
+ * - https://massive.com/docs/websocket/forex/aggregates-per-second
  * 
  * Benefits:
- * - Reduces API calls from 300+/minute to 0 (after initial connection)
  * - Real-time price updates (sub-second latency)
- * - Single connection shared across all users
- * 
- * Documentation: https://massive.com/docs/websocket/quickstart
+ * - Single connection for all forex pairs
+ * - Reduces API calls to zero after connection
  */
 
-import { ForexSymbol } from './pnl-calculator.service';
+import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
 
 export interface StreamingPriceQuote {
   symbol: ForexSymbol;
@@ -24,79 +24,64 @@ export interface StreamingPriceQuote {
   source: 'websocket' | 'rest' | 'cache' | 'fallback';
 }
 
-// Global price cache - accessible by all server processes
+// Global price cache
 const priceCache = new Map<ForexSymbol, StreamingPriceQuote>();
 let lastUpdateTime = 0;
 
+// Dynamic spread cache - learns from real bid/ask data
+// NOT hardcoded - populated from actual WebSocket quote messages!
+const dynamicSpreadCache = new Map<ForexSymbol, number>();
+
 // WebSocket state
-let ws: WebSocket | null = null;
+let ws: import('ws').WebSocket | null = null;
 let isConnecting = false;
 let isAuthenticated = false;
+let isSubscribed = false;
 let reconnectAttempts = 0;
 let reconnectTimer: NodeJS.Timeout | null = null;
+let heartbeatTimer: NodeJS.Timeout | null = null;
 
 // Configuration
 const MASSIVE_API_KEY = process.env.MASSIVE_API_KEY;
-const WS_URL_REALTIME = 'wss://socket.massive.com/forex';
-const WS_URL_DELAYED = 'wss://delayed.massive.com/forex'; // 15-min delayed (free tier)
+const WS_URL = 'wss://socket.massive.com/forex'; // Real-time
+// const WS_URL = 'wss://delayed.massive.com/forex'; // 15-min delayed (if needed)
 const MAX_RECONNECT_ATTEMPTS = 10;
-const RECONNECT_DELAY_MS = 5000;
+const RECONNECT_BASE_DELAY_MS = 3000;
+const HEARTBEAT_INTERVAL_MS = 30000;
 
-// All forex pairs to subscribe
-const FOREX_PAIRS_TO_SUBSCRIBE: ForexSymbol[] = [
-  // Major Pairs
-  'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD',
-  // Cross Pairs
-  'EUR/GBP', 'EUR/JPY', 'EUR/CHF', 'EUR/AUD', 'EUR/CAD', 'EUR/NZD',
-  'GBP/JPY', 'GBP/CHF', 'GBP/AUD', 'GBP/CAD', 'GBP/NZD',
-  'AUD/JPY', 'AUD/CHF', 'AUD/CAD', 'AUD/NZD',
-  'CAD/JPY', 'CAD/CHF', 'CHF/JPY',
-  'NZD/JPY', 'NZD/CHF', 'NZD/CAD',
-  // Exotic Pairs
-  'USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK',
-];
+// Symbol mapping: Our format (EUR/USD) -> Massive format (EURUSD)
+const SYMBOL_TO_MASSIVE: Record<string, string> = {
+  'EUR/USD': 'EURUSD', 'GBP/USD': 'GBPUSD', 'USD/JPY': 'USDJPY',
+  'USD/CHF': 'USDCHF', 'AUD/USD': 'AUDUSD', 'USD/CAD': 'USDCAD',
+  'NZD/USD': 'NZDUSD', 'EUR/GBP': 'EURGBP', 'EUR/JPY': 'EURJPY',
+  'EUR/CHF': 'EURCHF', 'EUR/AUD': 'EURAUD', 'EUR/CAD': 'EURCAD',
+  'EUR/NZD': 'EURNZD', 'GBP/JPY': 'GBPJPY', 'GBP/CHF': 'GBPCHF',
+  'GBP/AUD': 'GBPAUD', 'GBP/CAD': 'GBPCAD', 'GBP/NZD': 'GBPNZD',
+  'AUD/JPY': 'AUDJPY', 'AUD/CHF': 'AUDCHF', 'AUD/CAD': 'AUDCAD',
+  'AUD/NZD': 'AUDNZD', 'CAD/JPY': 'CADJPY', 'CAD/CHF': 'CADCHF',
+  'CHF/JPY': 'CHFJPY', 'NZD/JPY': 'NZDJPY', 'NZD/CHF': 'NZDCHF',
+  'NZD/CAD': 'NZDCAD', 'USD/MXN': 'USDMXN', 'USD/ZAR': 'USDZAR',
+  'USD/TRY': 'USDTRY', 'USD/SEK': 'USDSEK', 'USD/NOK': 'USDNOK',
+};
 
-// Convert our symbol format to Massive.com WebSocket format
-// EUR/USD -> C:EURUSD (Currency pair format)
-function toMassiveSymbol(symbol: ForexSymbol): string {
-  return `C:${symbol.replace('/', '')}`;
-}
-
-// Convert Massive.com symbol back to our format
-// C:EURUSD -> EUR/USD
-function fromMassiveSymbol(massiveSymbol: string): ForexSymbol | null {
-  if (!massiveSymbol.startsWith('C:')) return null;
-  const pair = massiveSymbol.substring(2); // Remove "C:"
-  
-  // Map back to our format
-  const symbolMap: Record<string, ForexSymbol> = {
-    'EURUSD': 'EUR/USD', 'GBPUSD': 'GBP/USD', 'USDJPY': 'USD/JPY',
-    'USDCHF': 'USD/CHF', 'AUDUSD': 'AUD/USD', 'USDCAD': 'USD/CAD',
-    'NZDUSD': 'NZD/USD', 'EURGBP': 'EUR/GBP', 'EURJPY': 'EUR/JPY',
-    'EURCHF': 'EUR/CHF', 'EURAUD': 'EUR/AUD', 'EURCAD': 'EUR/CAD',
-    'EURNZD': 'EUR/NZD', 'GBPJPY': 'GBP/JPY', 'GBPCHF': 'GBP/CHF',
-    'GBPAUD': 'GBP/AUD', 'GBPCAD': 'GBP/CAD', 'GBPNZD': 'GBP/NZD',
-    'AUDJPY': 'AUD/JPY', 'AUDCHF': 'AUD/CHF', 'AUDCAD': 'AUD/CAD',
-    'AUDNZD': 'AUD/NZD', 'CADJPY': 'CAD/JPY', 'CADCHF': 'CAD/CHF',
-    'CHFJPY': 'CHF/JPY', 'NZDJPY': 'NZD/JPY', 'NZDCHF': 'NZD/CHF',
-    'NZDCAD': 'NZD/CAD', 'USDMXN': 'USD/MXN', 'USDZAR': 'USD/ZAR',
-    'USDTRY': 'USD/TRY', 'USDSEK': 'USD/SEK', 'USDNOK': 'USD/NOK',
-  };
-  
-  return symbolMap[pair] || null;
+// Reverse mapping: Massive format -> Our format
+const MASSIVE_TO_SYMBOL: Record<string, ForexSymbol> = {};
+for (const [symbol, massive] of Object.entries(SYMBOL_TO_MASSIVE)) {
+  MASSIVE_TO_SYMBOL[massive] = symbol as ForexSymbol;
 }
 
 /**
- * Initialize WebSocket connection to Massive.com
+ * Initialize WebSocket connection
  */
-export function initializeWebSocket(): void {
+export async function initializeWebSocket(): Promise<void> {
+  // Only run on server
   if (typeof window !== 'undefined') {
-    console.warn('⚠️ WebSocket streamer should only run on server side');
+    console.warn('⚠️ WebSocket streamer only runs on server');
     return;
   }
 
   if (!MASSIVE_API_KEY) {
-    console.error('❌ MASSIVE_API_KEY not set - WebSocket streaming disabled');
+    console.error('❌ MASSIVE_API_KEY not set - WebSocket disabled');
     return;
   }
 
@@ -105,49 +90,60 @@ export function initializeWebSocket(): void {
     return;
   }
 
-  connectWebSocket();
+  await connectWebSocket();
 }
 
 /**
- * Connect to WebSocket server
+ * Connect to Massive.com WebSocket
  */
-function connectWebSocket(): void {
+async function connectWebSocket(): Promise<void> {
   if (isConnecting) return;
   isConnecting = true;
 
   console.log('🔌 Connecting to Massive.com WebSocket...');
 
   try {
-    // Use real-time feed (requires paid plan) or delayed feed
-    const wsUrl = WS_URL_REALTIME;
-    ws = new WebSocket(wsUrl);
+    // Dynamic import ws module (only on server)
+    const WebSocket = (await import('ws')).default;
+    
+    ws = new WebSocket(WS_URL);
 
-    ws.onopen = () => {
-      console.log('✅ WebSocket connected to Massive.com');
+    ws.on('open', () => {
+      console.log('✅ WebSocket connected');
       isConnecting = false;
       reconnectAttempts = 0;
       
-      // Authenticate
-      authenticate();
-    };
-
-    ws.onmessage = (event) => {
-      handleMessage(event.data);
-    };
-
-    ws.onerror = (error) => {
-      console.error('❌ WebSocket error:', error);
-    };
-
-    ws.onclose = (event) => {
-      console.log(`🔌 WebSocket closed: ${event.code} ${event.reason}`);
-      ws = null;
-      isConnecting = false;
-      isAuthenticated = false;
+      // Start heartbeat to keep connection alive
+      startHeartbeat();
       
-      // Attempt reconnection
+      // Server sends a welcome message first, then we authenticate
+    });
+
+    ws.on('message', (data: Buffer) => {
+      try {
+        const message = data.toString();
+        handleMessage(message);
+      } catch (err) {
+        console.error('❌ Error handling message:', err);
+      }
+    });
+
+    ws.on('error', (error: Error) => {
+      console.error('❌ WebSocket error:', error.message);
+    });
+
+    ws.on('close', (code: number, reason: Buffer) => {
+      const reasonStr = reason.toString() || 'No reason';
+      console.log(`🔌 WebSocket closed: ${code} - ${reasonStr}`);
+      
+      cleanup();
       scheduleReconnect();
-    };
+    });
+
+    ws.on('ping', () => {
+      ws?.pong();
+    });
+
   } catch (error) {
     console.error('❌ Failed to create WebSocket:', error);
     isConnecting = false;
@@ -156,13 +152,37 @@ function connectWebSocket(): void {
 }
 
 /**
+ * Start heartbeat to keep connection alive
+ */
+function startHeartbeat(): void {
+  stopHeartbeat();
+  heartbeatTimer = setInterval(() => {
+    if (ws && ws.readyState === 1) { // OPEN
+      ws.ping();
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+}
+
+/**
+ * Stop heartbeat
+ */
+function stopHeartbeat(): void {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
+
+/**
  * Authenticate with API key
  */
 function authenticate(): void {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (!ws || ws.readyState !== 1) return;
 
-  console.log('🔐 Authenticating with Massive.com...');
+  console.log('🔐 Authenticating...');
   
+  // Send auth message
+  // Format: {"action":"auth","params":"YOUR_API_KEY"}
   ws.send(JSON.stringify({
     action: 'auth',
     params: MASSIVE_API_KEY,
@@ -170,20 +190,21 @@ function authenticate(): void {
 }
 
 /**
- * Subscribe to forex price feeds
+ * Subscribe to forex feeds
  */
 function subscribeToFeeds(): void {
-  if (!ws || ws.readyState !== WebSocket.OPEN || !isAuthenticated) return;
+  if (!ws || ws.readyState !== 1 || !isAuthenticated) return;
 
-  // Subscribe to forex quotes
-  // Format: CQ.* for all currency quotes or CQ.EURUSD for specific pairs
-  const symbols = FOREX_PAIRS_TO_SUBSCRIBE.map(toMassiveSymbol);
+  console.log('📊 Subscribing to forex feeds...');
   
-  console.log(`📊 Subscribing to ${symbols.length} forex pairs...`);
+  // Subscribe to:
+  // - C.* = All forex quotes (bid/ask)
+  // - CAS.* = All forex second aggregates (OHLC per second)
+  // Format: {"action":"subscribe","params":"C.*,CAS.*"}
   
   ws.send(JSON.stringify({
     action: 'subscribe',
-    params: symbols.join(','),
+    params: 'C.*,CAS.*', // All forex quotes and second aggregates
   }));
 }
 
@@ -192,81 +213,165 @@ function subscribeToFeeds(): void {
  */
 function handleMessage(data: string): void {
   try {
-    const messages = JSON.parse(data);
-    
-    // Handle array of messages (Massive.com can batch them)
-    const messageArray = Array.isArray(messages) ? messages : [messages];
-    
-    for (const msg of messageArray) {
-      switch (msg.ev) {
+    // Massive.com can send arrays of messages
+    const parsed = JSON.parse(data);
+    const messages = Array.isArray(parsed) ? parsed : [parsed];
+
+    for (const msg of messages) {
+      // Check event type
+      const eventType = msg.ev || msg.status;
+
+      switch (eventType) {
         case 'status':
           handleStatusMessage(msg);
           break;
-        case 'CQ': // Currency Quote
+        case 'connected':
+          // Initial connection message - now authenticate
+          console.log('📡 Received connected status');
+          authenticate();
+          break;
+        case 'C':
+          // Forex Quote: {"ev":"C","p":"EUR-USD","x":1,"a":1.0510,"b":1.0509,"t":1234567890}
           handleQuoteMessage(msg);
           break;
-        case 'CA': // Currency Aggregate
+        case 'CA':
+          // Forex Aggregate (minute): {"ev":"CA","pair":"EUR-USD","o":1.05,"h":1.051,"l":1.049,"c":1.0505}
           handleAggregateMessage(msg);
           break;
-        default:
-          // Unknown event type, ignore
+        case 'CAS':
+          // Forex Aggregate (second): same format as CA but per second
+          handleAggregateMessage(msg);
           break;
+        case 'auth_success':
+          console.log('✅ Authentication successful');
+          isAuthenticated = true;
+          subscribeToFeeds();
+          break;
+        case 'auth_failed':
+          console.error('❌ Authentication failed:', msg.message);
+          ws?.close();
+          break;
+        default:
+          // Check if it's a status update
+          if (msg.status === 'auth_success') {
+            console.log('✅ Authentication successful');
+            isAuthenticated = true;
+            subscribeToFeeds();
+          } else if (msg.status === 'success' && msg.message?.includes('subscribed')) {
+            console.log('✅ Subscribed to feeds:', msg.message);
+            isSubscribed = true;
+          } else if (msg.message) {
+            console.log('📨 Server message:', msg.message);
+          }
       }
     }
   } catch (error) {
-    console.error('❌ Error parsing WebSocket message:', error);
+    // Sometimes Massive sends non-JSON status messages
+    if (data.includes('connected')) {
+      console.log('📡 Connected to Massive.com');
+      authenticate();
+    }
   }
 }
 
 /**
- * Handle status messages (auth success/failure)
+ * Handle status messages
  */
-function handleStatusMessage(msg: { status: string; message: string }): void {
-  if (msg.status === 'auth_success') {
-    console.log('✅ WebSocket authenticated successfully');
+function handleStatusMessage(msg: { status?: string; message?: string; ev?: string }): void {
+  const status = msg.status || msg.ev;
+  
+  if (status === 'auth_success') {
+    console.log('✅ Authenticated with Massive.com');
     isAuthenticated = true;
     subscribeToFeeds();
-  } else if (msg.status === 'auth_failed') {
-    console.error('❌ WebSocket authentication failed:', msg.message);
+  } else if (status === 'auth_failed') {
+    console.error('❌ Auth failed:', msg.message);
     ws?.close();
-  } else if (msg.status === 'success' && msg.message?.includes('subscribed')) {
-    console.log('✅ Subscribed to forex feeds');
+  } else if (status === 'connected') {
+    console.log('📡 Connected, authenticating...');
+    authenticate();
+  } else if (msg.message?.includes('subscribed')) {
+    console.log('✅ Subscription confirmed');
+    isSubscribed = true;
   }
 }
 
 /**
- * Handle real-time quote messages
- * Format: { ev: "CQ", pair: "EUR/USD", b: 1.05000, a: 1.05010, t: 1702000000000 }
+ * Handle forex quote messages
+ * Format: {"ev":"C","p":"EUR-USD","x":1,"a":1.0510,"b":1.0509,"t":1702000000000}
+ * OR: {"ev":"C","pair":"EURUSD","a":1.0510,"b":1.0509,"t":1702000000000}
  */
 function handleQuoteMessage(msg: {
   ev: string;
-  pair?: string;
-  sym?: string;
-  b?: number;  // bid
-  a?: number;  // ask
-  t?: number;  // timestamp
+  p?: string;      // pair like "EUR-USD"
+  pair?: string;   // pair like "EURUSD"
+  a?: number;      // ask
+  b?: number;      // bid
+  t?: number;      // timestamp (milliseconds)
+  x?: number;      // exchange
 }): void {
-  const symbolStr = msg.pair || msg.sym;
-  if (!symbolStr) return;
+  // Get symbol - handle different formats
+  let symbolKey = msg.p || msg.pair || '';
   
-  // Convert symbol format
-  const symbol = symbolStr.includes('/') 
-    ? symbolStr as ForexSymbol 
-    : fromMassiveSymbol(`C:${symbolStr}`);
+  // Handle different formats: "EUR-USD", "EUR/USD", "EURUSD"
+  symbolKey = symbolKey.replace('-', '').replace('/', '').toUpperCase();
   
-  if (!symbol || !msg.b || !msg.a) return;
+  const symbol = MASSIVE_TO_SYMBOL[symbolKey];
+  if (!symbol) {
+    // Unknown symbol, skip
+    return;
+  }
 
   const bid = msg.b;
   const ask = msg.a;
+  
+  if (bid === undefined || ask === undefined) return;
+
+  // CRITICAL: Validate bid < ask (reject invalid data)
+  if (bid >= ask) {
+    console.warn(`⚠️ Invalid quote for ${symbol}: bid (${bid}) >= ask (${ask}) - skipping`);
+    return;
+  }
+
   const mid = (bid + ask) / 2;
   const spread = ask - bid;
 
+  // Round values
+  const roundedBid = Number(bid.toFixed(5));
+  const roundedAsk = Number(ask.toFixed(5));
+  const roundedMid = Number(mid.toFixed(5));
+  const roundedSpread = Number(spread.toFixed(5));
+
+  // CRITICAL: Ensure mid is between bid and ask after rounding
+  const safeMid = Math.max(roundedBid, Math.min(roundedAsk, roundedMid));
+
+  // Cache the spread with basic smoothing to prevent wild jumps
+  if (spread > 0) {
+    const currentSpread = dynamicSpreadCache.get(symbol);
+    if (currentSpread) {
+      // Check for unrealistic spread change (> 5x jump = likely bad data)
+      const ratio = Math.max(spread / currentSpread, currentSpread / spread);
+      if (ratio > 5) {
+        // Apply small weight to suspicious data (10%)
+        const smoothedSpread = currentSpread * 0.9 + spread * 0.1;
+        dynamicSpreadCache.set(symbol, smoothedSpread);
+      } else {
+        // Normal update with slight smoothing (30% new, 70% old)
+        const smoothedSpread = currentSpread * 0.7 + spread * 0.3;
+        dynamicSpreadCache.set(symbol, smoothedSpread);
+      }
+    } else {
+      // First spread for this symbol
+      dynamicSpreadCache.set(symbol, spread);
+    }
+  }
+
   const quote: StreamingPriceQuote = {
     symbol,
-    bid: Number(bid.toFixed(5)),
-    ask: Number(ask.toFixed(5)),
-    mid: Number(mid.toFixed(5)),
-    spread: Number(spread.toFixed(5)),
+    bid: roundedBid,
+    ask: roundedAsk,
+    mid: safeMid,
+    spread: roundedSpread,
     timestamp: msg.t || Date.now(),
     source: 'websocket',
   };
@@ -277,104 +382,176 @@ function handleQuoteMessage(msg: {
 
 /**
  * Handle aggregate messages (per-second or per-minute bars)
- * Format: { ev: "CA", pair: "EUR/USD", o: 1.05, h: 1.051, l: 1.049, c: 1.0505, ... }
+ * Format: {"ev":"CA","pair":"EUR-USD","o":1.05,"h":1.051,"l":1.049,"c":1.0505,"v":1000,"s":..,"e":..}
  */
 function handleAggregateMessage(msg: {
   ev: string;
   pair?: string;
-  sym?: string;
-  o?: number;  // open
-  h?: number;  // high
-  l?: number;  // low
-  c?: number;  // close
-  t?: number;  // timestamp
+  p?: string;
+  o?: number;      // open
+  h?: number;      // high
+  l?: number;      // low
+  c?: number;      // close
+  v?: number;      // volume
+  s?: number;      // start timestamp
+  e?: number;      // end timestamp
 }): void {
-  const symbolStr = msg.pair || msg.sym;
-  if (!symbolStr || !msg.c) return;
-
-  const symbol = symbolStr.includes('/') 
-    ? symbolStr as ForexSymbol 
-    : fromMassiveSymbol(`C:${symbolStr}`);
+  let symbolKey = msg.pair || msg.p || '';
+  symbolKey = symbolKey.replace('-', '').replace('/', '').toUpperCase();
   
-  if (!symbol) return;
+  const symbol = MASSIVE_TO_SYMBOL[symbolKey];
+  if (!symbol || msg.c === undefined) return;
 
-  // Use close price to estimate bid/ask
+  // Use close price to derive bid/ask with typical spread
   const mid = msg.c;
   const spread = getTypicalSpread(symbol);
   const bid = mid - spread / 2;
   const ask = mid + spread / 2;
 
+  // Round values
+  const roundedBid = Number(bid.toFixed(5));
+  const roundedAsk = Number(ask.toFixed(5));
+  const roundedMid = Number(mid.toFixed(5));
+  const roundedSpread = Number(spread.toFixed(5));
+
+  // CRITICAL: Ensure mid is between bid and ask after rounding
+  const safeMid = Math.max(roundedBid, Math.min(roundedAsk, roundedMid));
+
   const quote: StreamingPriceQuote = {
     symbol,
-    bid: Number(bid.toFixed(5)),
-    ask: Number(ask.toFixed(5)),
-    mid: Number(mid.toFixed(5)),
-    spread: Number(spread.toFixed(5)),
-    timestamp: msg.t || Date.now(),
+    bid: roundedBid,
+    ask: roundedAsk,
+    mid: safeMid,
+    spread: roundedSpread,
+    timestamp: msg.e || msg.s || Date.now(),
     source: 'websocket',
   };
 
-  priceCache.set(symbol, quote);
-  lastUpdateTime = Date.now();
+  // Only update if we don't have a more recent quote
+  const existing = priceCache.get(symbol);
+  if (!existing || existing.timestamp <= quote.timestamp) {
+    priceCache.set(symbol, quote);
+    lastUpdateTime = Date.now();
+  }
 }
 
 /**
- * Get typical spread for a forex pair
+ * Get spread for a forex pair - DYNAMIC, not hardcoded!
+ * Priority: 1) Cached real spread from quote messages 2) Smart default based on pair type
+ * Used when aggregate messages only provide close price
  */
 function getTypicalSpread(symbol: ForexSymbol): number {
-  const spreads: Partial<Record<ForexSymbol, number>> = {
-    'EUR/USD': 0.00010, 'GBP/USD': 0.00015, 'USD/JPY': 0.010,
-    'USD/CHF': 0.00020, 'AUD/USD': 0.00015, 'USD/CAD': 0.00018,
-    'NZD/USD': 0.00020,
-  };
-  return spreads[symbol] || 0.00025;
+  // First: Try to use cached spread from actual quote messages
+  const cachedSpread = dynamicSpreadCache.get(symbol);
+  if (cachedSpread && cachedSpread > 0) {
+    return cachedSpread;
+  }
+  
+  // Second: Use smart default based on pair type (only until we get real data)
+  const pairConfig = FOREX_PAIRS[symbol];
+  if (!pairConfig) {
+    return 0.0002; // Conservative default for unknown pairs
+  }
+  
+  const pip = pairConfig.pip;
+  
+  // Determine pair type and use reasonable defaults
+  const majorPairs = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD'];
+  const exoticPairs = ['USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK'];
+  
+  let defaultPips: number;
+  if (majorPairs.includes(symbol)) {
+    defaultPips = 1.5; // Major pairs: ~1.5 pips
+  } else if (exoticPairs.includes(symbol)) {
+    defaultPips = 40; // Exotic pairs: ~40 pips
+  } else {
+    defaultPips = 3; // Cross pairs: ~3 pips
+  }
+  
+  return defaultPips * pip;
 }
 
 /**
- * Schedule reconnection attempt
+ * Cleanup resources
+ */
+function cleanup(): void {
+  ws = null;
+  isConnecting = false;
+  isAuthenticated = false;
+  isSubscribed = false;
+  stopHeartbeat();
+}
+
+/**
+ * Schedule reconnection
  */
 function scheduleReconnect(): void {
   if (reconnectTimer) return;
-  
+
   if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.error('❌ Max reconnect attempts reached. WebSocket streaming disabled.');
+    console.error('❌ Max reconnect attempts reached');
     return;
   }
 
   reconnectAttempts++;
-  const delay = RECONNECT_DELAY_MS * Math.pow(1.5, reconnectAttempts - 1);
-  
-  console.log(`🔄 Reconnecting in ${delay / 1000}s (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
-  
+  const delay = RECONNECT_BASE_DELAY_MS * Math.pow(1.5, reconnectAttempts - 1);
+
+  console.log(`🔄 Reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     connectWebSocket();
   }, delay);
 }
 
+// ============================================
+// Public API
+// ============================================
+
 /**
- * Get cached price for a symbol
+ * Normalize a price quote - ensures mid = (bid + ask) / 2
+ * Prevents mid from lagging behind bid/ask updates
+ */
+function normalizeQuote(quote: StreamingPriceQuote): StreamingPriceQuote {
+  const mid = (quote.bid + quote.ask) / 2;
+  const spread = quote.ask - quote.bid;
+  const safeMid = Math.max(quote.bid, Math.min(quote.ask, mid));
+  
+  return {
+    ...quote,
+    mid: Number(safeMid.toFixed(5)),
+    spread: Number(Math.abs(spread).toFixed(5)),
+  };
+}
+
+/**
+ * Get cached price for a symbol (normalized)
  */
 export function getCachedPrice(symbol: ForexSymbol): StreamingPriceQuote | null {
-  return priceCache.get(symbol) || null;
+  const cached = priceCache.get(symbol);
+  return cached ? normalizeQuote(cached) : null;
 }
 
 /**
- * Get all cached prices
+ * Get all cached prices (normalized)
  */
 export function getAllCachedPrices(): Map<ForexSymbol, StreamingPriceQuote> {
-  return new Map(priceCache);
+  const result = new Map<ForexSymbol, StreamingPriceQuote>();
+  priceCache.forEach((quote, symbol) => {
+    result.set(symbol, normalizeQuote(quote));
+  });
+  return result;
 }
 
 /**
- * Get multiple cached prices
+ * Get multiple cached prices (normalized)
  */
 export function getCachedPrices(symbols: ForexSymbol[]): Map<ForexSymbol, StreamingPriceQuote> {
   const result = new Map<ForexSymbol, StreamingPriceQuote>();
   for (const symbol of symbols) {
     const cached = priceCache.get(symbol);
     if (cached) {
-      result.set(symbol, cached);
+      result.set(symbol, normalizeQuote(cached));
     }
   }
   return result;
@@ -384,22 +561,24 @@ export function getCachedPrices(symbols: ForexSymbol[]): Map<ForexSymbol, Stream
  * Check if WebSocket is connected and streaming
  */
 export function isWebSocketConnected(): boolean {
-  return ws !== null && ws.readyState === WebSocket.OPEN && isAuthenticated;
+  return ws !== null && ws.readyState === 1 && isAuthenticated;
 }
 
 /**
- * Get WebSocket connection status
+ * Get WebSocket status
  */
 export function getConnectionStatus(): {
   connected: boolean;
   authenticated: boolean;
+  subscribed: boolean;
   cachedPairs: number;
   lastUpdate: number;
   reconnectAttempts: number;
 } {
   return {
-    connected: ws !== null && ws.readyState === WebSocket.OPEN,
+    connected: ws !== null && ws.readyState === 1,
     authenticated: isAuthenticated,
+    subscribed: isSubscribed,
     cachedPairs: priceCache.size,
     lastUpdate: lastUpdateTime,
     reconnectAttempts,
@@ -407,11 +586,15 @@ export function getConnectionStatus(): {
 }
 
 /**
- * Update cache with price from REST API (fallback)
+ * Update cache from REST API (fallback)
  */
 export function updateCacheFromRest(symbol: ForexSymbol, quote: Omit<StreamingPriceQuote, 'source'>): void {
-  priceCache.set(symbol, { ...quote, source: 'rest' });
-  lastUpdateTime = Date.now();
+  // Only update if WebSocket hasn't provided a more recent price
+  const existing = priceCache.get(symbol);
+  if (!existing || existing.source !== 'websocket' || existing.timestamp < quote.timestamp) {
+    priceCache.set(symbol, { ...quote, source: 'rest' });
+    lastUpdateTime = Date.now();
+  }
 }
 
 /**
@@ -422,26 +605,27 @@ export function closeWebSocket(): void {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
-  
+
+  stopHeartbeat();
+
   if (ws) {
-    ws.close();
+    try {
+      ws.close(1000, 'Client closing');
+    } catch {
+      // Ignore close errors
+    }
     ws = null;
   }
-  
-  isConnecting = false;
-  isAuthenticated = false;
-  console.log('🔌 WebSocket connection closed');
+
+  cleanup();
+  console.log('🔌 WebSocket closed');
 }
 
-// NOTE: Auto-init disabled - WebSocket requires paid Massive.com plan
-// Enable this manually after confirming your plan supports WebSocket
-// Error code 1008 = "Policy Violation" typically means WebSocket not available on your plan
-//
-// To enable manually, call initializeWebSocket() from your code or Inngest job
-// if (typeof window === 'undefined' && MASSIVE_API_KEY) {
-//   setTimeout(() => {
-//     console.log('🚀 Auto-initializing WebSocket price streamer...');
-//     initializeWebSocket();
-//   }, 2000);
-// }
-
+/**
+ * Reset and reconnect
+ */
+export function resetWebSocket(): void {
+  closeWebSocket();
+  reconnectAttempts = 0;
+  initializeWebSocket();
+}

@@ -78,7 +78,6 @@ export const TradingArsenalProvider = ({ children }: { children: ReactNode }) =>
   
   // Indicator management
   const addIndicator = useCallback((indicator: ArsenalIndicator) => {
-    console.log('📊 TradingArsenal: Adding indicator', indicator);
     setActiveIndicators(prev => {
       const existingIndex = prev.findIndex(i => i.id === indicator.id);
       if (existingIndex >= 0) {
@@ -91,7 +90,6 @@ export const TradingArsenalProvider = ({ children }: { children: ReactNode }) =>
   }, []);
   
   const removeIndicator = useCallback((id: string) => {
-    console.log('📊 TradingArsenal: Removing indicator', id);
     setActiveIndicators(prev => prev.filter(i => i.id !== id));
   }, []);
   
@@ -109,7 +107,6 @@ export const TradingArsenalProvider = ({ children }: { children: ReactNode }) =>
   
   // Strategy management
   const addStrategy = useCallback((strategy: ArsenalStrategy) => {
-    console.log('📊 TradingArsenal: Adding strategy', strategy);
     setActiveStrategies(prev => {
       const existingIndex = prev.findIndex(s => s.id === strategy.id);
       if (existingIndex >= 0) {
@@ -122,7 +119,6 @@ export const TradingArsenalProvider = ({ children }: { children: ReactNode }) =>
   }, []);
   
   const removeStrategy = useCallback((id: string) => {
-    console.log('📊 TradingArsenal: Removing strategy', id);
     setActiveStrategies(prev => prev.filter(s => s.id !== id));
     // Also remove signals from this strategy
     setSignals(prev => prev.filter(s => s.strategyId !== id));
@@ -261,8 +257,6 @@ export function marketplaceItemToIndicator(
     lineWidth: settings?.lineWidth || 2,
     parameters: params,
   };
-  
-  console.log(`📊 Converted "${item.name}" to indicator:`, result);
   
   return result;
 }

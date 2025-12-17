@@ -9,7 +9,7 @@ const Header = async ({ user }: { user: User }) => {
         <header className="sticky top-0 header">
             <div className="container header-wrapper">
                 <Link href="/dashboard">
-                    <Image src="/assets/icons/logo.svg" alt="chatvolt logo" width={140} height={32} className="h-8 w-auto cursor-pointer" />
+                    <Image src="/assets/icons/logo.svg" alt="chatvolt logo" width={140} height={32} priority className="cursor-pointer" style={{ width: 'auto', height: '32px' }} />
                 </Link>
                 <nav className="hidden sm:block">
                     <NavItems />

@@ -71,8 +71,6 @@ const SimpleTradingChart = ({ competitionId }: SimpleTradingChartProps) => {
 
     chartContainerRef.current.appendChild(widgetDiv);
     chartContainerRef.current.appendChild(script);
-
-    console.log(`📊 TradingView Chart loaded: ${symbol} (${interval}min)`);
   }, [symbol, interval]);
 
   const currentPrice = prices.get(symbol);

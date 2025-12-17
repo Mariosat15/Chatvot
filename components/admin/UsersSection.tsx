@@ -278,11 +278,6 @@ export default function UsersSection() {
       return;
     }
 
-    // Debug logging
-    console.log('Selected user:', selectedUser);
-    console.log('User ID:', selectedUser.id);
-    console.log('Amount:', amount);
-
     if (!selectedUser.id) {
       toast.error('User ID is missing. Please refresh and try again.');
       return;
@@ -295,8 +290,6 @@ export default function UsersSection() {
         amount,
         reason: creditReason || `Admin ${amount > 0 ? 'credited' : 'removed'} ${Math.abs(amount)} credits`,
       };
-      
-      console.log('Sending payload:', payload);
 
       const response = await fetch('/api/admin/users/credit', {
         method: 'POST',

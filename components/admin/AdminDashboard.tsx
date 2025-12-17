@@ -39,6 +39,7 @@ import {
   ScrollText,
   Mail,
   ShoppingBag,
+  Terminal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -65,6 +66,8 @@ import EmailTemplatesSection from '@/components/admin/EmailTemplatesSection';
 import NotificationSystemSection from '@/components/admin/NotificationSystemSection';
 import MarketplaceSection from '@/components/admin/MarketplaceSection';
 import LandingPageBuilder from '@/components/admin/LandingPageBuilder';
+import RedisSettingsSection from '@/components/admin/RedisSettingsSection';
+import DevSettingsSection from '@/components/admin/DevSettingsSection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -177,8 +180,10 @@ const menuItems: MenuItem[] = [
       { id: 'currency', label: 'Currency', icon: <Coins className="h-4 w-4" /> },
       { id: 'fees', label: 'Fees', icon: <DollarSign className="h-4 w-4" /> },
       { id: 'payment-providers', label: 'Payment Providers', icon: <CreditCard className="h-4 w-4" /> },
+      { id: 'redis', label: 'Redis Cache', icon: <Server className="h-4 w-4" /> },
       { id: 'database', label: 'Database', icon: <Database className="h-4 w-4" /> },
       { id: 'audit-logs', label: 'Audit Logs', icon: <ScrollText className="h-4 w-4" /> },
+      { id: 'dev-settings', label: 'Dev Settings', icon: <Terminal className="h-4 w-4" /> },
     ],
   },
 ];
@@ -287,10 +292,14 @@ export default function AdminDashboard({
         return <FeeSettingsSection />;
       case 'payment-providers':
         return <PaymentProvidersSection />;
+      case 'redis':
+        return <RedisSettingsSection />;
       case 'database':
         return <DatabaseSection />;
       case 'audit-logs':
         return <AuditLogSection />;
+      case 'dev-settings':
+        return <DevSettingsSection />;
       default:
         return <CompetitionsListSection />;
     }

@@ -11,12 +11,16 @@ import TradeHistory from '@/database/models/trading/trade-history.model';
 import { getRealPrice } from '@/lib/services/real-forex-prices.service';
 import { ForexSymbol, calculateUnrealizedPnL } from '@/lib/services/pnl-calculator.service';
 
+// Disable verbose logging in production
+const DEBUG = false;
+const log = (...args: unknown[]): void => { if (DEBUG) log(...args); };
+
 // Get user's dashboard data (for API routes - takes userId directly, no redirect)
 export const getUserDashboardDataForApi = async (userId: string) => {
   try {
     await connectToDatabase();
     
-    console.log('📊 Dashboard API: Fetching data for user:', userId);
+    log('📊 Dashboard API: Fetching data for user:', userId);
 
     // Get all active competitions the user is participating in (only LIVE competitions)
     const activeParticipations = await CompetitionParticipant.find({
@@ -24,7 +28,7 @@ export const getUserDashboardDataForApi = async (userId: string) => {
       status: 'active',
     }).lean();
     
-    console.log('📊 Active participations found:', activeParticipations.length);
+    log('📊 Active participations found:', activeParticipations.length);
 
     // Filter to only include competitions that are currently active (live now)
     const liveCompetitionIds = await Competition.find({
@@ -156,7 +160,7 @@ export const getUserDashboardData = async () => {
 
     await connectToDatabase();
     
-    console.log('📊 Dashboard: Fetching data for user:', session.user.id, session.user.name);
+    log('📊 Dashboard: Fetching data for user:', session.user.id, session.user.name);
 
     // Get all active competitions the user is participating in (only LIVE competitions)
     const activeParticipations = await CompetitionParticipant.find({
@@ -164,7 +168,7 @@ export const getUserDashboardData = async () => {
       status: 'active',
     }).lean();
     
-    console.log('📊 Active participations found:', activeParticipations.length);
+    log('📊 Active participations found:', activeParticipations.length);
 
     // Filter to only include competitions that are currently active (live now)
     const liveCompetitionIds = await Competition.find({
@@ -179,25 +183,25 @@ export const getUserDashboardData = async () => {
       liveCompetitionIds.some((id) => id.toString() === participation.competitionId.toString())
     );
     
-    console.log('📊 Live competitions:', liveCompetitionIds.length);
-    console.log('📊 Live participations:', liveParticipations.length);
+    log('📊 Live competitions:', liveCompetitionIds.length);
+    log('📊 Live participations:', liveParticipations.length);
 
     // Get competition details for each participation (only live ones)
     const competitionsWithStats = await Promise.all(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       liveParticipations.map(async (participation: any) => {
         try {
-          console.log(`📊 Processing competition for user ${session.user.id}, participationId: ${participation._id}`);
+          log(`📊 Processing competition for user ${session.user.id}, participationId: ${participation._id}`);
           
           const competition = await Competition.findById(participation.competitionId).lean();
           
           if (!competition) {
-            console.log(`⚠️ Competition not found: ${participation.competitionId}`);
+            log(`⚠️ Competition not found: ${participation.competitionId}`);
             return null;
           }
           
           const comp = competition as { name?: string };
-          console.log(`✅ Competition found: ${comp.name || 'Unknown'}`);
+          log(`✅ Competition found: ${comp.name || 'Unknown'}`);
 
         // Get participant statistics for this competition
         const participantStats = await CompetitionParticipant.aggregate([
@@ -310,13 +314,13 @@ export const getUserDashboardData = async () => {
           });
         }
 
-        console.log(`📊 User ${session.user.id} - Competition ${participation.competitionId}:`);
-        console.log(`   - Open positions: ${openPositions.length}`);
-        console.log(`   - Open positions with prices: ${openPositionsWithPrices.length}`);
-        console.log(`   - Closed trades: ${recentClosedTrades.length}`);
-        console.log(`   - Win rate: ${participation.winRate}%`);
-        console.log(`   - Total trades: ${participation.totalTrades}`);
-        console.log(`   - Unrealized P&L: $${totalUnrealizedPnL.toFixed(2)}`);
+        log(`📊 User ${session.user.id} - Competition ${participation.competitionId}:`);
+        log(`   - Open positions: ${openPositions.length}`);
+        log(`   - Open positions with prices: ${openPositionsWithPrices.length}`);
+        log(`   - Closed trades: ${recentClosedTrades.length}`);
+        log(`   - Win rate: ${participation.winRate}%`);
+        log(`   - Total trades: ${participation.totalTrades}`);
+        log(`   - Unrealized P&L: $${totalUnrealizedPnL.toFixed(2)}`);
 
         // We've removed the heavy chart data generation for performance
 
@@ -463,15 +467,15 @@ export const getUserDashboardData = async () => {
       trades: data.trades
     }));
 
-    console.log('📊 Dashboard Summary:');
-    console.log(`   - Total Capital: $${totalCapital.toFixed(2)}`);
-    console.log(`   - Total P&L: $${totalPnL.toFixed(2)}`);
-    console.log(`   - Total Positions: ${totalPositions}`);
-    console.log(`   - Total Trades: ${totalTrades}`);
-    console.log(`   - Winning Trades: ${totalWinningTrades}`);
-    console.log(`   - Losing Trades: ${totalLosingTrades}`);
-    console.log(`   - Overall Win Rate: ${overallWinRate.toFixed(2)}%`);
-    console.log(`   - Profit Factor: ${profitFactor === 9999 ? '∞' : profitFactor.toFixed(2)}`);
+    log('📊 Dashboard Summary:');
+    log(`   - Total Capital: $${totalCapital.toFixed(2)}`);
+    log(`   - Total P&L: $${totalPnL.toFixed(2)}`);
+    log(`   - Total Positions: ${totalPositions}`);
+    log(`   - Total Trades: ${totalTrades}`);
+    log(`   - Winning Trades: ${totalWinningTrades}`);
+    log(`   - Losing Trades: ${totalLosingTrades}`);
+    log(`   - Overall Win Rate: ${overallWinRate.toFixed(2)}%`);
+    log(`   - Profit Factor: ${profitFactor === 9999 ? '∞' : profitFactor.toFixed(2)}`);
     
     return {
       activeCompetitions: validCompetitions,

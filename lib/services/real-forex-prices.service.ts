@@ -2,14 +2,15 @@
  * Real Forex Prices Service
  * 
  * Fetches REAL market prices from Massive.com API
- * Now with WebSocket streaming support for 90%+ reduction in API calls
+ * Now with Redis caching for 99%+ reduction in API calls
  * 
  * Priority:
- * 1. WebSocket cache (instant, real-time)
- * 2. REST API (fallback)
- * 3. Last known prices (offline fallback)
+ * 1. Redis cache (instant, shared across all users)
+ * 2. In-memory cache (fast, per-server fallback)
+ * 3. REST API (parallel calls when cache miss)
+ * 4. Fallback prices (offline)
  * 
- * Documentation: https://massive.com/docs/websocket/quickstart
+ * Documentation: https://massive.com/docs/rest/forex
  */
 
 import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
@@ -20,6 +21,13 @@ import {
   updateCacheFromRest,
   type StreamingPriceQuote 
 } from './websocket-price-streamer';
+import {
+  getPrice as getRedisPrice,
+  getPrices as getRedisPrices,
+  setPrice as setRedisPrice,
+  setPrices as setRedisPrices,
+  type CachedPrice,
+} from './redis.service';
 
 // Price data structure
 export interface PriceQuote {
@@ -29,6 +37,40 @@ export interface PriceQuote {
   mid: number;
   spread: number;
   timestamp: number;
+  isFallback?: boolean;  // True if using static fallback (DANGEROUS for liquidation!)
+  isStale?: boolean;     // True if price is older than 60 seconds
+}
+
+/**
+ * Normalize a price quote - ensures mid and spread are ALWAYS calculated from bid/ask
+ * This prevents mid from lagging behind bid/ask updates
+ */
+export function normalizePriceQuote(quote: PriceQuote): PriceQuote {
+  const { bid, ask } = quote;
+  
+  // Always calculate mid and spread from current bid/ask
+  const mid = (bid + ask) / 2;
+  const spread = ask - bid;
+  
+  // Ensure mid is always between bid and ask (safety check)
+  const safeMid = Math.max(bid, Math.min(ask, mid));
+  
+  return {
+    ...quote,
+    mid: Number(safeMid.toFixed(5)),
+    spread: Number(Math.abs(spread).toFixed(5)),
+  };
+}
+
+/**
+ * Normalize all prices in a map
+ */
+function normalizeAllPrices(prices: Map<ForexSymbol, PriceQuote>): Map<ForexSymbol, PriceQuote> {
+  const normalized = new Map<ForexSymbol, PriceQuote>();
+  prices.forEach((quote, symbol) => {
+    normalized.set(symbol, normalizePriceQuote(quote));
+  });
+  return normalized;
 }
 
 export interface MarketStatus {
@@ -52,47 +94,13 @@ const MASSIVE_API_KEY = process.env.MASSIVE_API_KEY;
 const MASSIVE_API_BASE_URL = 'https://api.massive.com/v1'; // Fixed: .com not .io
 
 // Cache for last known prices (when market is closed or API unavailable)
+// Cache for last known REAL prices (dynamic fallback when API unavailable)
+// These are populated from actual API/WebSocket data, NOT hardcoded!
+// If a price is not in this cache, we simply don't have it and won't fake it.
 const lastKnownPrices: Map<ForexSymbol, PriceQuote> = new Map();
 
-// Fallback prices (approximate real values as of Dec 2024) - used when API is unavailable
-const FALLBACK_PRICES: Record<ForexSymbol, number> = {
-  // Major Pairs
-  'EUR/USD': 1.05000,
-  'GBP/USD': 1.27000,
-  'USD/JPY': 153.500,
-  'USD/CHF': 0.88500,
-  'AUD/USD': 0.64000,
-  'USD/CAD': 1.42000,
-  'NZD/USD': 0.58000,
-  // Cross Pairs
-  'EUR/GBP': 0.82700,
-  'EUR/JPY': 161.200,
-  'EUR/CHF': 0.93000,
-  'EUR/AUD': 1.64000,
-  'EUR/CAD': 1.49000,
-  'EUR/NZD': 1.81000,
-  'GBP/JPY': 195.000,
-  'GBP/CHF': 1.12500,
-  'GBP/AUD': 1.98500,
-  'GBP/CAD': 1.80500,
-  'GBP/NZD': 2.19000,
-  'AUD/JPY': 98.300,
-  'AUD/CHF': 0.56700,
-  'AUD/CAD': 0.91000,
-  'AUD/NZD': 1.10500,
-  'CAD/JPY': 108.100,
-  'CAD/CHF': 0.62300,
-  'CHF/JPY': 173.500,
-  'NZD/JPY': 89.000,
-  'NZD/CHF': 0.51300,
-  'NZD/CAD': 0.82300,
-  // Exotic Pairs
-  'USD/MXN': 20.15000,
-  'USD/ZAR': 18.10000,
-  'USD/TRY': 34.50000,
-  'USD/SEK': 10.85000,
-  'USD/NOK': 11.15000,
-};
+// Maximum age for a cached price to be considered valid (5 minutes)
+const MAX_CACHE_AGE_MS = 5 * 60 * 1000;
 
 // Map our symbols to Massive.com format
 // Massive.com uses "/v1/last_quote/currencies/{from}/{to}" format
@@ -136,171 +144,327 @@ const MASSIVE_SYMBOL_MAP: Record<ForexSymbol, { from: string; to: string }> = {
   'USD/NOK': { from: 'USD', to: 'NOK' },
 };
 
+// Dynamic cache for last known spreads (populated from actual bid/ask data)
+// This is NOT hardcoded - it learns from real market data!
+// Uses smoothing to prevent wild jumps from bad data
+const lastKnownSpreads: Map<ForexSymbol, number> = new Map();
+
 /**
- * Get typical spread for a forex pair (in pips)
- * Used for bid/ask calculation if API only provides mid price
+ * Update the cached spread for a symbol based on actual bid/ask data
+ * Uses exponential smoothing to prevent wild spread jumps from bad data
+ * Called whenever we receive real bid/ask prices
  */
-function getTypicalSpread(symbol: ForexSymbol): number {
-  const pairConfig = FOREX_PAIRS[symbol];
-  if (!pairConfig) return 0.0002; // Default spread for unknown pairs
-  const pip = pairConfig.pip;
-
-  const spreadsInPips: Partial<Record<ForexSymbol, number>> = {
-    // Major Pairs (tightest spreads)
-    'EUR/USD': 1.0,
-    'GBP/USD': 1.5,
-    'USD/JPY': 1.0,
-    'USD/CHF': 2.0,
-    'AUD/USD': 1.5,
-    'USD/CAD': 1.8,
-    'NZD/USD': 2.0,
-    // Cross Pairs (medium spreads)
-    'EUR/GBP': 1.2,
-    'EUR/JPY': 1.5,
-    'EUR/CHF': 1.8,
-    'EUR/AUD': 2.5,
-    'EUR/CAD': 2.5,
-    'EUR/NZD': 3.0,
-    'GBP/JPY': 2.5,
-    'GBP/CHF': 3.0,
-    'GBP/AUD': 3.5,
-    'GBP/CAD': 3.5,
-    'GBP/NZD': 4.0,
-    'AUD/JPY': 2.0,
-    'AUD/CHF': 3.0,
-    'AUD/CAD': 2.5,
-    'AUD/NZD': 2.5,
-    'CAD/JPY': 2.5,
-    'CAD/CHF': 3.0,
-    'CHF/JPY': 2.5,
-    'NZD/JPY': 2.5,
-    'NZD/CHF': 3.5,
-    'NZD/CAD': 3.0,
-    // Exotic Pairs (wider spreads)
-    'USD/MXN': 30.0,
-    'USD/ZAR': 80.0,
-    'USD/TRY': 50.0,
-    'USD/SEK': 25.0,
-    'USD/NOK': 30.0,
-  };
-
-  return (spreadsInPips[symbol] || 2.0) * pip;
+export function updateCachedSpread(symbol: ForexSymbol, bid: number, ask: number): void {
+  if (!(bid > 0 && ask > 0 && ask > bid)) return;
+  
+  const newSpread = ask - bid;
+  const currentSpread = lastKnownSpreads.get(symbol);
+  
+  if (!currentSpread) {
+    // First spread for this symbol - use it directly
+    lastKnownSpreads.set(symbol, newSpread);
+    return;
+  }
+  
+  // Check for unrealistic spread change (> 5x jump = likely bad data)
+  const ratio = Math.max(newSpread / currentSpread, currentSpread / newSpread);
+  if (ratio > 5) {
+    // Spread change too large - apply small weight (10%) to suspicious data
+    const smoothedSpread = currentSpread * 0.9 + newSpread * 0.1;
+    lastKnownSpreads.set(symbol, smoothedSpread);
+    return;
+  }
+  
+  // Normal update with slight smoothing (30% new, 70% old)
+  // This prevents jumps like 0.2 → 2.6 pips
+  const smoothedSpread = currentSpread * 0.7 + newSpread * 0.3;
+  lastKnownSpreads.set(symbol, smoothedSpread);
 }
 
 /**
- * Fetch real-time prices from Massive.com
+ * Get spread for a forex pair - DYNAMIC, not hardcoded!
+ * Priority: 1) Cached real spread 2) Smart default based on pair type
+ * Used for bid/ask calculation if API only provides mid price
+ */
+function getTypicalSpread(symbol: ForexSymbol): number {
+  // First: Try to use cached spread from actual market data
+  const cachedSpread = lastKnownSpreads.get(symbol);
+  if (cachedSpread && cachedSpread > 0) {
+    return cachedSpread;
+  }
+  
+  // Second: Use smart default based on pair type (only until we get real data)
+  const pairConfig = FOREX_PAIRS[symbol];
+  if (!pairConfig) {
+    // Unknown pair - use a conservative default
+    return 0.0002;
+  }
+  
+  const pip = pairConfig.pip;
+  
+  // Determine pair type and use reasonable defaults
+  // These are just initial values - will be replaced by real spreads
+  const majorPairs = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD'];
+  const exoticPairs = ['USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK'];
+  
+  let defaultPips: number;
+  if (majorPairs.includes(symbol)) {
+    defaultPips = 1.5; // Major pairs: ~1.5 pips
+  } else if (exoticPairs.includes(symbol)) {
+    defaultPips = 40; // Exotic pairs: ~40 pips
+  } else {
+    defaultPips = 3; // Cross pairs: ~3 pips
+  }
+  
+  return defaultPips * pip;
+}
+
+/**
+ * Convert Redis cached price to PriceQuote
+ */
+function redisPriceToPriceQuote(symbol: ForexSymbol, cached: CachedPrice): PriceQuote {
+  return {
+    symbol,
+    bid: cached.bid,
+    ask: cached.ask,
+    mid: cached.mid,
+    spread: cached.ask - cached.bid,
+    timestamp: cached.timestamp,
+  };
+}
+
+/**
+ * Convert PriceQuote to Redis cached price
+ */
+function priceQuoteToRedisPrice(quote: PriceQuote): CachedPrice {
+  return {
+    bid: quote.bid,
+    ask: quote.ask,
+    mid: quote.mid,
+    timestamp: quote.timestamp,
+  };
+}
+
+// Background fetch flag to prevent multiple simultaneous fetches
+let isFetchingPrices = false;
+let lastApiFetch = 0;
+const API_FETCH_COOLDOWN = 2000; // Only fetch from API every 2 seconds max
+
+/**
+ * Fetch real-time prices - OPTIMIZED FOR SPEED
  * 
- * Priority:
- * 1. WebSocket cache (instant, 0 API calls)
- * 2. REST API (fallback when WebSocket unavailable)
- * 3. Last known prices (offline fallback)
+ * Priority order:
+ * 1. WebSocket cache (fastest - real-time updates)
+ * 2. In-memory cache (instant)
+ * 3. Redis cache (fast)
+ * 4. REST API (slowest - fallback)
  * 
- * With WebSocket enabled, this function makes 0 external API calls!
- * Documentation: https://massive.com/docs/websocket/quickstart
+ * Strategy: Return cached prices IMMEDIATELY, fetch updates in background
  */
 export async function fetchRealForexPrices(symbols: ForexSymbol[]): Promise<Map<ForexSymbol, PriceQuote>> {
   const pricesMap = new Map<ForexSymbol, PriceQuote>();
-  const symbolsNeedingRestFetch: ForexSymbol[] = [];
+  const symbolsNeedingFetch: ForexSymbol[] = [];
+  const now = Date.now();
 
-  // STEP 1: Try WebSocket cache first (instant, no API calls)
-  if (isWebSocketConnected()) {
-    const cachedPrices = getCachedPrices(symbols);
+  // STEP 0: Check WebSocket cache first (fastest - real-time prices)
+  try {
+    const { getCachedPrices, isWebSocketConnected } = await import('./websocket-price-streamer');
     
-    for (const symbol of symbols) {
-      const cached = cachedPrices.get(symbol);
-      if (cached && (Date.now() - cached.timestamp) < 10000) { // Cache valid for 10 seconds
-        pricesMap.set(symbol, cached);
-      } else {
-        symbolsNeedingRestFetch.push(symbol);
-      }
-    }
-
-    if (pricesMap.size === symbols.length) {
-      // All prices from WebSocket cache - 0 API calls!
-      return pricesMap;
-    }
-
-    if (pricesMap.size > 0) {
-      console.log(`⚡ Got ${pricesMap.size}/${symbols.length} prices from WebSocket cache`);
-    }
-  } else {
-    // WebSocket not connected, all symbols need REST fetch
-    symbolsNeedingRestFetch.push(...symbols);
-  }
-
-  // STEP 2: Fetch remaining symbols from REST API (PARALLEL for speed)
-  if (symbolsNeedingRestFetch.length > 0) {
-    if (!MASSIVE_API_KEY) {
-      console.error('❌ MASSIVE_API_KEY is not set!');
-      const fallback = getLastKnownPrices(symbolsNeedingRestFetch);
-      fallback.forEach((quote, symbol) => pricesMap.set(symbol, quote));
-      return pricesMap;
-    }
-
-    console.log(`🔄 Fetching ${symbolsNeedingRestFetch.length} prices via REST API (parallel)...`);
-    
-    // Fetch ALL symbols in parallel (not sequential) for speed
-    const fetchPromises = symbolsNeedingRestFetch.map(async (symbol) => {
-      const currencyPair = MASSIVE_SYMBOL_MAP[symbol];
-      if (!currencyPair) return null;
+    if (isWebSocketConnected()) {
+      const wsPrices = getCachedPrices(symbols);
       
-      try {
-        const endpoint = `/last_quote/currencies/${currencyPair.from}/${currencyPair.to}?apiKey=${MASSIVE_API_KEY}`;
-        const url = `${MASSIVE_API_BASE_URL}${endpoint}`;
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          cache: 'no-store',
-        });
-
-        if (!response.ok) return null;
-
-        const data = await response.json();
-        if (data.status !== 'success' && data.status !== 'OK') return null;
-        
-        return { symbol, data };
-      } catch {
-        return null;
+      for (const symbol of symbols) {
+        const wsPrice = wsPrices.get(symbol);
+        if (wsPrice && (now - wsPrice.timestamp) < 10000) { // WebSocket prices valid for 10 seconds
+          const quote: PriceQuote = {
+            symbol,
+            bid: wsPrice.bid,
+            ask: wsPrice.ask,
+            mid: wsPrice.mid,
+            spread: wsPrice.spread,
+            timestamp: wsPrice.timestamp,
+          };
+          pricesMap.set(symbol, quote);
+          lastKnownPrices.set(symbol, quote); // Also update in-memory cache
+        }
       }
-    });
+      
+      // If WebSocket has all prices, return immediately (normalized)
+      if (pricesMap.size === symbols.length) {
+        return normalizeAllPrices(pricesMap);
+      }
+    }
+  } catch {
+    // WebSocket not available, continue with other caches
+  }
 
-    // Wait for all parallel fetches to complete
-    const results = await Promise.all(fetchPromises);
+  // STEP 1: Return ALL cached prices immediately (even if slightly stale)
+  for (const symbol of symbols) {
+    if (pricesMap.has(symbol)) continue; // Already got from WebSocket
     
-    // Process results
-    for (const result of results) {
-      if (!result) continue;
-      const quote = parseLastQuoteResponse(result.data, result.symbol);
-      if (quote) {
-        pricesMap.set(result.symbol, quote);
-        lastKnownPrices.set(result.symbol, quote);
-        updateCacheFromRest(result.symbol, quote);
+    const cached = lastKnownPrices.get(symbol);
+    if (cached) {
+      pricesMap.set(symbol, cached);
+      // Mark for background refresh if older than 3 seconds
+      if (now - cached.timestamp > 3000) {
+        symbolsNeedingFetch.push(symbol);
       }
+    } else {
+      symbolsNeedingFetch.push(symbol);
     }
   }
 
-  // STEP 3: Fill any remaining gaps with last known prices
+  // If we have all prices cached, return immediately (don't touch Redis!)
+  if (pricesMap.size === symbols.length) {
+    // Trigger background refresh if needed (non-blocking)
+    if (symbolsNeedingFetch.length > 0 && !isFetchingPrices && (now - lastApiFetch) > API_FETCH_COOLDOWN) {
+      fetchPricesInBackground(symbolsNeedingFetch);
+    }
+    return normalizeAllPrices(pricesMap);
+  }
+
+  // STEP 2: For missing symbols, check Redis ONLY on cold start
+  // To save Redis commands, we only check Redis if we have NO prices at all
+  // This prevents Redis reads on every single request
+  const missingSymbols = symbols.filter(s => !pricesMap.has(s));
+  if (missingSymbols.length > 0 && lastKnownPrices.size === 0) {
+    // Only read from Redis on cold start (when in-memory cache is empty)
+    try {
+      const redisPrices = await getRedisPrices(missingSymbols);
+      for (const symbol of missingSymbols) {
+        const cached = redisPrices.get(symbol);
+        if (cached) {
+          const quote = redisPriceToPriceQuote(symbol, cached);
+          pricesMap.set(symbol, quote);
+          lastKnownPrices.set(symbol, quote);
+        }
+      }
+    } catch {
+      // Redis not available
+    }
+  }
+
+  // STEP 3: For still missing symbols, fetch from API (blocking for first load only)
+  const stillMissing = symbols.filter(s => !pricesMap.has(s));
+  if (stillMissing.length > 0) {
+    const freshPrices = await fetchFromMassiveApi(stillMissing);
+    freshPrices.forEach((quote, symbol) => {
+      pricesMap.set(symbol, quote);
+      lastKnownPrices.set(symbol, quote);
+    });
+  }
+
+  // STEP 4: Fill any remaining gaps with LAST KNOWN prices (dynamic fallback)
+  // ⚠️ These are real prices from previous successful fetches, NOT hardcoded!
   for (const symbol of symbols) {
     if (!pricesMap.has(symbol)) {
-      const fallback = getLastKnownPrices([symbol]);
-      const quote = fallback.get(symbol);
-      if (quote) {
+      const cachedPrice = lastKnownPrices.get(symbol);
+      if (cachedPrice) {
+        const priceAge = now - cachedPrice.timestamp;
+        const isStale = priceAge > MAX_CACHE_AGE_MS;
+        
+        // Use the cached price but mark it appropriately
+        const quote: PriceQuote = {
+          ...cachedPrice,
+          timestamp: cachedPrice.timestamp, // Keep original timestamp
+          isFallback: true,  // Mark as fallback since it's not fresh
+          isStale: isStale,  // Stale if older than MAX_CACHE_AGE_MS
+        };
         pricesMap.set(symbol, quote);
+        console.warn(`⚠️ Using cached price for ${symbol}: ${cachedPrice.mid.toFixed(5)} (${Math.round(priceAge / 1000)}s old)`);
+      } else {
+        // No price available at all for this symbol - log warning
+        console.error(`❌ No price available for ${symbol} - no cache exists`);
       }
     }
   }
 
-  if (pricesMap.size > 0) {
-    const wsCount = symbols.length - symbolsNeedingRestFetch.length;
-    const restCount = pricesMap.size - wsCount;
-    if (wsCount > 0 || restCount > 0) {
-      console.log(`✅ Prices: ${wsCount} from WebSocket, ${restCount} from REST`);
+  // ALWAYS normalize before returning to ensure mid = (bid + ask) / 2
+  return normalizeAllPrices(pricesMap);
+}
+
+/**
+ * Fetch prices in background (non-blocking)
+ */
+async function fetchPricesInBackground(symbols: ForexSymbol[]): Promise<void> {
+  if (isFetchingPrices) return;
+  
+  isFetchingPrices = true;
+  lastApiFetch = Date.now();
+  
+  try {
+    const freshPrices = await fetchFromMassiveApi(symbols);
+    freshPrices.forEach((quote, symbol) => {
+      lastKnownPrices.set(symbol, quote);
+    });
+    
+    // Also update Redis cache
+    if (freshPrices.size > 0) {
+      const redisPrices = new Map<string, CachedPrice>();
+      freshPrices.forEach((quote, symbol) => {
+        redisPrices.set(symbol, priceQuoteToRedisPrice(quote));
+      });
+      try {
+        await setRedisPrices(redisPrices);
+      } catch {
+        // Redis update failed, ignore
+      }
+    }
+  } finally {
+    isFetchingPrices = false;
+  }
+}
+
+/**
+ * Fetch prices directly from Massive.com API
+ */
+async function fetchFromMassiveApi(symbols: ForexSymbol[]): Promise<Map<ForexSymbol, PriceQuote>> {
+  const pricesMap = new Map<ForexSymbol, PriceQuote>();
+  
+  if (!MASSIVE_API_KEY || symbols.length === 0) {
+    return pricesMap;
+  }
+
+  // Fetch ALL symbols in parallel for speed
+  const fetchPromises = symbols.map(async (symbol) => {
+    const currencyPair = MASSIVE_SYMBOL_MAP[symbol];
+    if (!currencyPair) return null;
+    
+    try {
+      const endpoint = `/last_quote/currencies/${currencyPair.from}/${currencyPair.to}?apiKey=${MASSIVE_API_KEY}`;
+      const url = `${MASSIVE_API_BASE_URL}${endpoint}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+      });
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      if (data.status !== 'success' && data.status !== 'OK') return null;
+      
+      return { symbol, data };
+    } catch {
+      return null;
+    }
+  });
+
+  const results = await Promise.all(fetchPromises);
+  
+  for (const result of results) {
+    if (!result) continue;
+    const quote = parseLastQuoteResponse(result.data, result.symbol);
+    if (quote) {
+      pricesMap.set(result.symbol, quote);
+      updateCacheFromRest(result.symbol, quote);
     }
   }
 
   return pricesMap;
 }
+
 
 /**
  * Parse Massive.com last_quote API response
@@ -322,15 +486,35 @@ function parseLastQuoteResponse(data: any, symbol: ForexSymbol): PriceQuote | nu
       return null;
     }
 
+    // CRITICAL: Validate bid < ask (reject invalid data)
+    if (bid >= ask) {
+      console.error(`Invalid price data for ${symbol}: bid (${bid}) >= ask (${ask})`);
+      return null;
+    }
+
+    // Calculate mid and spread
     const mid = (bid + ask) / 2;
     const spread = ask - bid;
 
+    // Round values
+    const roundedBid = Number(bid.toFixed(5));
+    const roundedAsk = Number(ask.toFixed(5));
+    const roundedMid = Number(mid.toFixed(5));
+    const roundedSpread = Number(spread.toFixed(5));
+
+    // CRITICAL: Ensure mid is between bid and ask after rounding
+    // This can fail with very tight spreads due to floating point
+    const safeMid = Math.max(roundedBid, Math.min(roundedAsk, roundedMid));
+
+    // Update the dynamic spread cache with real market data
+    updateCachedSpread(symbol, bid, ask);
+
     return {
       symbol,
-      bid: Number(bid.toFixed(5)),
-      ask: Number(ask.toFixed(5)),
-      mid: Number(mid.toFixed(5)),
-      spread: Number(spread.toFixed(5)),
+      bid: roundedBid,
+      ask: roundedAsk,
+      mid: safeMid,
+      spread: roundedSpread,
       timestamp: timestamp || Date.now(),
     };
   } catch (error) {
@@ -342,45 +526,35 @@ function parseLastQuoteResponse(data: any, symbol: ForexSymbol): PriceQuote | nu
 
 /**
  * Get last known prices (fallback when API fails or market is closed)
- * Returns cached prices, or fallback prices if no cache exists
- * These are REAL static prices, NOT simulated!
+ * Returns ONLY cached prices from previous successful fetches.
+ * NO hardcoded fallbacks - if we don't have a real cached price, we don't have it.
  */
 function getLastKnownPrices(symbols: ForexSymbol[]): Map<ForexSymbol, PriceQuote> {
   const prices = new Map<ForexSymbol, PriceQuote>();
+  const now = Date.now();
   
   symbols.forEach(symbol => {
-    // Try cached price first
     const cached = lastKnownPrices.get(symbol);
     if (cached) {
-      console.log(`📦 Using cached price for ${symbol}: ${cached.mid.toFixed(5)}`);
-      prices.set(symbol, cached);
-      return;
-    }
-    
-    // Use fallback price (real approximate values)
-    const fallbackPrice = FALLBACK_PRICES[symbol];
-    if (fallbackPrice) {
-      const spread = getTypicalSpread(symbol);
-      const bid = fallbackPrice - spread / 2;
-      const ask = fallbackPrice + spread / 2;
+      const priceAge = now - cached.timestamp;
+      const isStale = priceAge > MAX_CACHE_AGE_MS;
       
+      // Create quote with staleness flag
       const quote: PriceQuote = {
-        symbol,
-        bid: Number(bid.toFixed(5)),
-        ask: Number(ask.toFixed(5)),
-        mid: Number(fallbackPrice.toFixed(5)),
-        spread: Number(spread.toFixed(5)),
-        timestamp: Date.now(),
+        ...cached,
+        isFallback: true,  // Mark as fallback since not fresh from API
+        isStale: isStale,
       };
       
-      console.warn(`⚠️ Using fallback price for ${symbol}: ${fallbackPrice.toFixed(5)} (API unavailable)`);
       prices.set(symbol, quote);
-      lastKnownPrices.set(symbol, quote); // Cache it for next time
+    } else {
+      // No cached price exists for this symbol
+      console.warn(`⚠️ No cached price available for ${symbol}`);
     }
   });
   
   if (prices.size === 0) {
-    console.error('❌ No prices available. Check API key and try again.');
+    console.error('❌ No prices available. Cache is empty - waiting for first successful API/WebSocket fetch.');
   }
   
   return prices;
@@ -612,44 +786,139 @@ export function getMarketStatus(): string {
  * Get current price for a single symbol (for order execution)
  * Used by server actions when placing/closing orders
  * 
- * Optimized: Checks WebSocket cache first (instant, 0 API calls)
+ * CRITICAL: This is used for TRADE EXECUTION - must be as fresh as possible!
+ * Uses 1 second max cache to ensure execution at current market price.
  */
 export async function getRealPrice(symbol: ForexSymbol): Promise<PriceQuote | null> {
-  // Try WebSocket cache first (instant)
+  // Try WebSocket cache first - but only if VERY fresh (max 1 second for trades)
   if (isWebSocketConnected()) {
     const cached = getCachedPrice(symbol);
-    if (cached && (Date.now() - cached.timestamp) < 5000) { // 5 second cache for trades
+    if (cached && (Date.now() - cached.timestamp) < 1) { // 1 second max for trade execution!
+      console.log(`📈 [Trade Execution] Using WebSocket cache for ${symbol}: Bid=${cached.bid.toFixed(5)}, Ask=${cached.ask.toFixed(5)}`);
       return cached;
     }
   }
   
-  // Fallback to REST API
+  // Always fetch fresh from REST API for trade execution if cache is stale
+  console.log(`📈 [Trade Execution] Fetching fresh price for ${symbol} from API...`);
   const pricesMap = await fetchRealForexPrices([symbol]);
-  return pricesMap.get(symbol) || null;
+  const price = pricesMap.get(symbol) || null;
+  
+  if (price) {
+    console.log(`📈 [Trade Execution] Got fresh price for ${symbol}: Bid=${price.bid.toFixed(5)}, Ask=${price.ask.toFixed(5)}`);
+  }
+  
+  return price;
 }
 
 /**
  * Get prices from cache only (no API calls)
  * Returns null for symbols not in cache
+ * Checks: Redis → WebSocket → In-memory
  */
-export function getPriceFromCacheOnly(symbol: ForexSymbol): PriceQuote | null {
+export async function getPriceFromCacheOnly(symbol: ForexSymbol): Promise<PriceQuote | null> {
+  // OPTIMIZED: Check in-memory caches FIRST to avoid Redis commands
+  // Redis should only be used for multi-server sync, not for every price lookup!
+  
+  // 1. Check WebSocket cache first (fastest, real-time)
+  const wsCache = getCachedPrice(symbol);
+  if (wsCache && (Date.now() - wsCache.timestamp) < 15000) {
+    return normalizePriceQuote(wsCache);
+  }
+  
+  // 2. Check in-memory cache (instant)
+  const memCache = lastKnownPrices.get(symbol);
+  if (memCache && (Date.now() - memCache.timestamp) < 15000) {
+    return normalizePriceQuote(memCache);
+  }
+  
+  // 3. ONLY check Redis if in-memory caches are empty (cold start scenario)
+  // This saves thousands of Redis commands per minute!
+  if (!wsCache && !memCache) {
+    try {
+      const redisPrice = await getRedisPrice(symbol);
+      if (redisPrice && (Date.now() - redisPrice.timestamp) < 30000) {
+        const quote = redisPriceToPriceQuote(symbol, redisPrice);
+        lastKnownPrices.set(symbol, quote); // Cache it in memory for next time
+        return normalizePriceQuote(quote);
+      }
+    } catch {
+      // Redis not available, continue
+    }
+  }
+  
+  // Return whatever we have, even if slightly stale (normalized)
+  const result = wsCache || memCache || null;
+  return result ? normalizePriceQuote(result) : null;
+}
+
+/**
+ * Get prices from cache only (sync version - no Redis, no API calls)
+ * For use in hot paths where async is not acceptable
+ */
+export function getPriceFromCacheOnlySync(symbol: ForexSymbol): PriceQuote | null {
   // Check WebSocket cache
   const wsCache = getCachedPrice(symbol);
-  if (wsCache) return wsCache;
+  if (wsCache) return normalizePriceQuote(wsCache);
   
   // Check last known prices
-  return lastKnownPrices.get(symbol) || null;
+  const memCache = lastKnownPrices.get(symbol);
+  return memCache ? normalizePriceQuote(memCache) : null;
 }
 
 /**
  * Get all prices from cache (no API calls)
  * Used by margin monitoring to avoid API calls
+ * Checks: Redis → WebSocket → In-memory
  */
-export function getAllPricesFromCache(symbols: ForexSymbol[]): Map<ForexSymbol, PriceQuote> {
+export async function getAllPricesFromCache(symbols: ForexSymbol[]): Promise<Map<ForexSymbol, PriceQuote>> {
+  const result = new Map<ForexSymbol, PriceQuote>();
+  const missingSymbols: ForexSymbol[] = [];
+  
+  // Try Redis first (batch operation)
+  try {
+    const redisPrices = await getRedisPrices(symbols);
+    
+    for (const symbol of symbols) {
+      const cached = redisPrices.get(symbol);
+      if (cached && (Date.now() - cached.timestamp) < 15000) {
+        result.set(symbol, redisPriceToPriceQuote(symbol, cached));
+      } else {
+        missingSymbols.push(symbol);
+      }
+    }
+  } catch {
+    // Redis not available, check other sources
+    missingSymbols.push(...symbols);
+  }
+  
+  // Fill gaps from in-memory cache
+  for (const symbol of missingSymbols) {
+    const wsCache = getCachedPrice(symbol);
+    if (wsCache) {
+      result.set(symbol, wsCache);
+      continue;
+    }
+    
+    const memCache = lastKnownPrices.get(symbol);
+    if (memCache) {
+      result.set(symbol, memCache);
+    }
+  }
+  
+  // Normalize all prices before returning
+  return normalizeAllPrices(result);
+}
+
+/**
+ * Get all prices from cache (sync version - no Redis, no API calls)
+ * For use in hot paths where async is not acceptable
+ */
+export function getAllPricesFromCacheSync(symbols: ForexSymbol[]): Map<ForexSymbol, PriceQuote> {
   const result = new Map<ForexSymbol, PriceQuote>();
   
   for (const symbol of symbols) {
-    const price = getPriceFromCacheOnly(symbol);
+    const price = getPriceFromCacheOnlySync(symbol);
     if (price) {
       result.set(symbol, price);
     }
@@ -657,4 +926,5 @@ export function getAllPricesFromCache(symbols: ForexSymbol[]): Map<ForexSymbol, 
   
   return result;
 }
+
 

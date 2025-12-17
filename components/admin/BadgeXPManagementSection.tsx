@@ -108,7 +108,6 @@ export default function BadgeXPManagementSection() {
         const badgesData = await badgesRes.json();
         if (badgesData.success) {
           setBadgesFromDB(badgesData.badges);
-          console.log('✅ Loaded badges from database:', badgesData.badges.length);
         }
 
         // Fetch XP config
@@ -118,12 +117,10 @@ export default function BadgeXPManagementSection() {
           if (xpData.badgeXP) {
             setBadgeXPValues(xpData.badgeXP);
             setXpValues(xpData.badgeXP);
-            console.log('✅ Loaded Badge XP values from database:', xpData.badgeXP);
           }
           if (xpData.levels) {
             setTitleLevels(xpData.levels);
             setLevels(xpData.levels);
-            console.log('✅ Loaded Level Progression from database:', xpData.levels.length, 'levels');
           }
         }
       } catch (error) {
@@ -276,8 +273,6 @@ export default function BadgeXPManagementSection() {
 
   const saveXPValues = async () => {
     try {
-      console.log('Saving XP values:', xpValues);
-      
       const response = await fetch('/api/admin/badges-xp/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -285,21 +280,17 @@ export default function BadgeXPManagementSection() {
       });
 
       const data = await response.json();
-      console.log('Save XP response:', data);
       
       if (data.success) {
         toast.success('XP values saved to database!');
         setEditingBadgeXP(false);
-        // Update local state with DB values
         setBadgeXPValues(xpValues);
         
-        // Refresh data from database to confirm
         const refreshRes = await fetch('/api/admin/badges-xp/manage');
         const refreshData = await refreshRes.json();
         if (refreshData.success && refreshData.badgeXP) {
           setXpValues(refreshData.badgeXP);
           setBadgeXPValues(refreshData.badgeXP);
-          console.log('✅ Refreshed XP values from database:', refreshData.badgeXP);
         }
       } else {
         toast.error(data.error || 'Failed to update XP values');
@@ -312,8 +303,6 @@ export default function BadgeXPManagementSection() {
 
   const saveLevels = async () => {
     try {
-      console.log('Saving levels:', levels);
-      
       const response = await fetch('/api/admin/badges-xp/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -321,21 +310,17 @@ export default function BadgeXPManagementSection() {
       });
 
       const data = await response.json();
-      console.log('Save levels response:', data);
       
       if (data.success) {
         toast.success('Level progression saved to database!');
         setEditingLevel(false);
-        // Update local state with DB values
         setTitleLevels(levels);
         
-        // Refresh data from database to confirm
         const refreshRes = await fetch('/api/admin/badges-xp/manage');
         const refreshData = await refreshRes.json();
         if (refreshData.success && refreshData.levels) {
           setLevels(refreshData.levels);
           setTitleLevels(refreshData.levels);
-          console.log('✅ Refreshed levels from database:', refreshData.levels.length, 'levels');
         }
       } else {
         toast.error(data.error || 'Failed to update levels');
@@ -539,7 +524,6 @@ export default function BadgeXPManagementSection() {
                         onChange={(e) => {
                           const newLevels = [...levels];
                           newLevels[level.level - 1].description = e.target.value;
-                          console.log('Updated description for level', level.level, ':', e.target.value);
                           setLevels(newLevels);
                         }}
                       />
@@ -1150,8 +1134,6 @@ export default function BadgeXPManagementSection() {
                     icon: badgeForm.icon || '🏆',
                   };
 
-                  console.log('Saving badge:', editingBadge ? 'UPDATE' : 'CREATE', formData);
-
                   const method = editingBadge ? 'PUT' : 'POST';
                   const response = await fetch('/api/admin/badges', {
                     method,
@@ -1167,7 +1149,6 @@ export default function BadgeXPManagementSection() {
                     const refreshData = await refreshRes.json();
                     if (refreshData.success) {
                       setBadgesFromDB(refreshData.badges);
-                      console.log('✅ Refreshed badges from database:', refreshData.badges.length);
                     }
                     
                     setIsClosing(true);

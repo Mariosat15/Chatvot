@@ -61,10 +61,8 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
 
   // Subscribe to price updates (CRITICAL - same as Professional mode!)
   useEffect(() => {
-    console.log('🎮 Game Mode: Subscribing to price updates for', symbol);
     subscribe(symbol);
     return () => {
-      console.log('🎮 Game Mode: Unsubscribing from', symbol);
       unsubscribe(symbol);
     };
   }, [symbol, subscribe, unsubscribe]);
@@ -83,7 +81,6 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         };
         
         const apiTimeframe = timeframeMap[timeframe];
-        console.log(`📊 Game Mode: Loading ${timeframe} candles for ${symbol}`);
         
         // Fetch enough candles to support zoom (fetch more than max zoom)
         const historicalCandles = await getRecentCandles(symbol, apiTimeframe as any, Math.max(60, visibleCandles + 10));
@@ -108,7 +105,6 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
             lastPriceRef.current = formattedCandles[formattedCandles.length - 1].close;
           }
           
-          console.log(`✅ Game Mode: Loaded ${formattedCandles.length} ${timeframe} candles`);
         }
       } catch (error) {
         console.error('❌ Game Mode: Error loading historical candles:', error);
@@ -127,8 +123,6 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     const mid = latestPrice.mid;
     const bid = latestPrice.bid;
     const ask = latestPrice.ask;
-    
-    console.log(`🎮 Game Mode: Price tick - ${symbol} @ ${mid.toFixed(5)}`);
     
     // Calculate price change
     if (lastPriceRef.current > 0) {
@@ -153,7 +147,6 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         lastCandle.low = Math.min(lastCandle.low, bid);
         lastCandle.close = mid;
         lastCandle.isUp = lastCandle.close >= lastCandle.open;
-        console.log(`📊 Updated candle: O:${lastCandle.open.toFixed(5)} H:${lastCandle.high.toFixed(5)} L:${lastCandle.low.toFixed(5)} C:${lastCandle.close.toFixed(5)}`);
       } else {
         // New minute, create a new candle
         const previousClose = lastCandle.close;
@@ -173,7 +166,6 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
           newCandles.shift();
         }
         
-        console.log(`🆕 New candle created for ${new Date(currentMinute).toLocaleTimeString()}`);
       }
 
       return newCandles;
@@ -362,15 +354,6 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
       const entryPrice = position.entryPrice;
       if (entryPrice < minPrice || entryPrice > maxPrice) return; // Out of visible range
       
-      console.log('🎮 Drawing position:', { 
-        symbol: position.symbol, 
-        entry: entryPrice, 
-        tp: position.takeProfit, 
-        sl: position.stopLoss,
-        minPrice,
-        maxPrice
-      });
-      
       const yEntry = paddingTop + chartHeight - ((entryPrice - minPrice) / priceRange) * chartHeight;
       const isProfit = position.unrealizedPnl >= 0;
       const isLong = position.side === 'long';
@@ -412,8 +395,6 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
       // Draw Take Profit line if set (NO LABEL)
       if (position.takeProfit) {
         const tpValue = position.takeProfit;
-        console.log('🎯 Drawing TP line at:', tpValue);
-        
         // Draw TP line even if slightly outside range (for visibility)
         const yTP = paddingTop + chartHeight - ((tpValue - minPrice) / priceRange) * chartHeight;
         
@@ -434,8 +415,6 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
       // Draw Stop Loss line if set (NO LABEL)
       if (position.stopLoss) {
         const slValue = position.stopLoss;
-        console.log('🛑 Drawing SL line at:', slValue);
-        
         // Draw SL line even if slightly outside range (for visibility)
         const ySL = paddingTop + chartHeight - ((slValue - minPrice) / priceRange) * chartHeight;
         

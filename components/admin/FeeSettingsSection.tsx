@@ -52,8 +52,6 @@ export default function FeeSettingsSection() {
       const response = await fetch('/api/admin/fee-settings');
       if (response.ok) {
         const data = await response.json();
-        console.log('📊 Fetched fee settings:', data.settings);
-        
         // Ensure all values are valid numbers with defaults
         setSettings({
           platformDepositFeePercentage: data.settings?.platformDepositFeePercentage ?? 2,

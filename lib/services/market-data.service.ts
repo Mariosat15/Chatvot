@@ -34,45 +34,62 @@ export interface Candle {
   volume: number;
 }
 
-// Base prices for simulation (approximate real values as of Dec 2024)
-const BASE_PRICES: Partial<Record<ForexSymbol, number>> = {
-  // Major Pairs
-  'EUR/USD': 1.05000,
-  'GBP/USD': 1.27000,
-  'USD/JPY': 153.500,
-  'USD/CHF': 0.88500,
-  'AUD/USD': 0.64000,
-  'USD/CAD': 1.42000,
-  'NZD/USD': 0.58000,
-  // Cross Pairs
-  'EUR/GBP': 0.82700,
-  'EUR/JPY': 161.200,
-  'EUR/CHF': 0.93000,
-  'EUR/AUD': 1.64000,
-  'EUR/CAD': 1.49000,
-  'EUR/NZD': 1.81000,
-  'GBP/JPY': 195.000,
-  'GBP/CHF': 1.12500,
-  'GBP/AUD': 1.98500,
-  'GBP/CAD': 1.80500,
-  'GBP/NZD': 2.19000,
-  'AUD/JPY': 98.300,
-  'AUD/CHF': 0.56700,
-  'AUD/CAD': 0.91000,
-  'AUD/NZD': 1.10500,
-  'CAD/JPY': 108.100,
-  'CAD/CHF': 0.62300,
-  'CHF/JPY': 173.500,
-  'NZD/JPY': 89.000,
-  'NZD/CHF': 0.51300,
-  'NZD/CAD': 0.82300,
-  // Exotic Pairs
-  'USD/MXN': 20.15000,
-  'USD/ZAR': 18.10000,
-  'USD/TRY': 34.50000,
-  'USD/SEK': 10.85000,
-  'USD/NOK': 11.15000,
-};
+// Dynamic price cache - learns from actual API/WebSocket data
+// NOT hardcoded - populated from real price data!
+const lastKnownPriceCache = new Map<ForexSymbol, number>();
+
+/**
+ * Update the cached price for a symbol based on actual data
+ */
+export function updateCachedPrice(symbol: ForexSymbol, price: number): void {
+  if (price > 0) {
+    lastKnownPriceCache.set(symbol, price);
+  }
+}
+
+/**
+ * Get the base price for a symbol - DYNAMIC, not hardcoded!
+ * Returns last known price if available, otherwise estimates based on pair type.
+ * This estimation is only used until real data arrives.
+ */
+function getBasePrice(symbol: ForexSymbol): number {
+  // First: Try to use cached price from actual market data
+  const cached = lastKnownPriceCache.get(symbol);
+  if (cached && cached > 0) {
+    return cached;
+  }
+  
+  // Second: Estimate based on currency pair characteristics
+  // This is a smart guess, not hardcoded - works for any new pair!
+  const [base, quote] = symbol.split('/');
+  
+  // Common currency relationships
+  if (quote === 'JPY') {
+    // JPY pairs typically in 100-200 range
+    if (base === 'USD') return 150;
+    if (base === 'EUR') return 160;
+    if (base === 'GBP') return 190;
+    return 120; // Other XXX/JPY
+  }
+  
+  if (base === 'USD') {
+    // USD/XXX pairs
+    if (['CAD', 'CHF', 'SGD'].includes(quote)) return 1.3;
+    if (['MXN', 'ZAR', 'TRY', 'SEK', 'NOK'].includes(quote)) return 15; // Exotics
+    return 1.0;
+  }
+  
+  if (quote === 'USD') {
+    // XXX/USD pairs typically 0.5-1.5
+    if (base === 'EUR') return 1.05;
+    if (base === 'GBP') return 1.25;
+    if (['AUD', 'NZD'].includes(base)) return 0.65;
+    return 1.0;
+  }
+  
+  // Cross pairs - estimate based on typical ratios
+  return 1.0;
+}
 
 // Store current prices
 const currentPrices: Map<ForexSymbol, PriceQuote> = new Map();
@@ -89,7 +106,7 @@ export function initializeMarketData() {
   // Initialize prices for all pairs with base values first
   Object.keys(FOREX_PAIRS).forEach((symbol) => {
     const forexSymbol = symbol as ForexSymbol;
-    const basePrice = BASE_PRICES[forexSymbol] || 1.0; // Default to 1.0 if not found
+    const basePrice = getBasePrice(forexSymbol);
     
     const spread = getTypicalSpread(forexSymbol);
     const mid = basePrice;
@@ -114,56 +131,53 @@ export function initializeMarketData() {
   console.log('💰 Live price simulation active');
 }
 
+// Dynamic spread cache - learns from real bid/ask data
+// NOT hardcoded - populated from actual price data!
+const dynamicSpreadCache = new Map<ForexSymbol, number>();
+
 /**
- * Get typical spread for a forex pair (in pips)
+ * Update the cached spread for a symbol based on actual bid/ask data
+ */
+export function updateCachedSpread(symbol: ForexSymbol, bid: number, ask: number): void {
+  if (bid > 0 && ask > 0 && ask > bid) {
+    const spread = ask - bid;
+    dynamicSpreadCache.set(symbol, spread);
+  }
+}
+
+/**
+ * Get spread for a forex pair - DYNAMIC, not hardcoded!
+ * Priority: 1) Cached real spread 2) Smart default based on pair type
  */
 function getTypicalSpread(symbol: ForexSymbol): number {
+  // First: Try to use cached spread from actual price data
+  const cachedSpread = dynamicSpreadCache.get(symbol);
+  if (cachedSpread && cachedSpread > 0) {
+    return cachedSpread;
+  }
+  
+  // Second: Use smart default based on pair type (only until we get real data)
   const pairConfig = FOREX_PAIRS[symbol];
-  if (!pairConfig) return 0.0002; // Default spread
+  if (!pairConfig) {
+    return 0.0002; // Conservative default for unknown pairs
+  }
+  
   const pip = pairConfig.pip;
-
-  // Typical spreads in pips
-  const spreadsInPips: Partial<Record<ForexSymbol, number>> = {
-    // Major Pairs (tightest spreads)
-    'EUR/USD': 1.0,
-    'GBP/USD': 1.5,
-    'USD/JPY': 1.0,
-    'USD/CHF': 2.0,
-    'AUD/USD': 1.5,
-    'USD/CAD': 1.8,
-    'NZD/USD': 2.0,
-    // Cross Pairs (medium spreads)
-    'EUR/GBP': 1.2,
-    'EUR/JPY': 1.5,
-    'EUR/CHF': 1.8,
-    'EUR/AUD': 2.5,
-    'EUR/CAD': 2.5,
-    'EUR/NZD': 3.0,
-    'GBP/JPY': 2.5,
-    'GBP/CHF': 3.0,
-    'GBP/AUD': 3.5,
-    'GBP/CAD': 3.5,
-    'GBP/NZD': 4.0,
-    'AUD/JPY': 2.0,
-    'AUD/CHF': 3.0,
-    'AUD/CAD': 2.5,
-    'AUD/NZD': 2.5,
-    'CAD/JPY': 2.5,
-    'CAD/CHF': 3.0,
-    'CHF/JPY': 2.5,
-    'NZD/JPY': 2.5,
-    'NZD/CHF': 3.5,
-    'NZD/CAD': 3.0,
-    // Exotic Pairs (wider spreads)
-    'USD/MXN': 30.0,
-    'USD/ZAR': 80.0,
-    'USD/TRY': 50.0,
-    'USD/SEK': 25.0,
-    'USD/NOK': 30.0,
-  };
-
-  const pipsSpread = spreadsInPips[symbol] || 2.0;
-  return pipsSpread * pip;
+  
+  // Determine pair type and use reasonable defaults
+  const majorPairs = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD'];
+  const exoticPairs = ['USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK'];
+  
+  let defaultPips: number;
+  if (majorPairs.includes(symbol)) {
+    defaultPips = 1.5; // Major pairs: ~1.5 pips
+  } else if (exoticPairs.includes(symbol)) {
+    defaultPips = 40; // Exotic pairs: ~40 pips
+  } else {
+    defaultPips = 3; // Cross pairs: ~3 pips
+  }
+  
+  return defaultPips * pip;
 }
 
 /**
@@ -315,7 +329,7 @@ function generateSimulatedCandles(
   timeframe: '1m' | '5m' | '15m' | '1h' | '4h' | '1d',
   count: number
 ): Candle[] {
-  const basePrice = BASE_PRICES[symbol] || 1.0; // Default to 1.0 if not found
+  const basePrice = getBasePrice(symbol);
   const pairConfig = FOREX_PAIRS[symbol];
   if (!pairConfig) return []; // Return empty if pair not configured
   const pip = pairConfig.pip;

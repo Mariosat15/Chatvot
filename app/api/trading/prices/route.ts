@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchRealForexPrices, isForexMarketOpen, getMarketStatusFromAPI, isMarketOpenSync } from '@/lib/services/real-forex-prices.service';
+import { fetchRealForexPrices, isMarketOpenSync } from '@/lib/services/real-forex-prices.service';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
+
+// Cache market status for 30 seconds (don't check on every request)
+let cachedMarketOpen = true;
+let cachedMarketStatus = '🟢 Market Open';
+let lastMarketCheck = 0;
+const MARKET_CHECK_INTERVAL = 30000; // 30 seconds
+
+function getMarketStatus(): { marketOpen: boolean; status: string } {
+  const now = Date.now();
+  
+  if (now - lastMarketCheck > MARKET_CHECK_INTERVAL) {
+    cachedMarketOpen = isMarketOpenSync();
+    cachedMarketStatus = cachedMarketOpen ? '🟢 Market Open' : '🔴 Market Closed';
+    lastMarketCheck = now;
+  }
+  
+  return { marketOpen: cachedMarketOpen, status: cachedMarketStatus };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,25 +32,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get REAL market prices from Massive.com
+    // Get prices from Redis cache (instant) or Massive.com API (fallback)
     const pricesMap = await fetchRealForexPrices(symbols as ForexSymbol[]);
     
     // Convert Map to array for JSON response
     const prices = Array.from(pricesMap.values());
 
-    // Get market status from Massive.com API
-    let marketOpen = true;
-    let status = '🟢 Market Open';
-    
-    try {
-      const marketStatusData = await getMarketStatusFromAPI();
-      marketOpen = marketStatusData.isOpen;
-      status = marketStatusData.isOpen ? '🟢 Market Open' : '🔴 Market Closed';
-    } catch (_error) {
-      console.warn('Using fallback market status detection');
-      marketOpen = isMarketOpenSync();
-      status = marketOpen ? '🟢 Market Open' : '🔴 Market Closed';
-    }
+    // Get cached market status (fast, no API call)
+    const { marketOpen, status } = getMarketStatus();
 
     return NextResponse.json({ 
       prices,
@@ -41,26 +48,16 @@ export async function POST(request: NextRequest) {
       timestamp: Date.now(),
     });
   } catch (error) {
-    console.error('Error fetching REAL prices:', error);
+    console.error('Error fetching prices:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch real market prices' },
+      { error: 'Failed to fetch prices' },
       { status: 500 }
     );
   }
 }
 
 export async function GET() {
-  let marketOpen = true;
-  let status = 'Checking...';
-  
-  try {
-    const marketStatusData = await getMarketStatusFromAPI();
-    marketOpen = marketStatusData.isOpen;
-    status = marketStatusData.isOpen ? '🟢 Market Open' : '🔴 Market Closed';
-  } catch (_error) {
-    marketOpen = isMarketOpenSync();
-    status = marketOpen ? '🟢 Market Open' : '🔴 Market Closed';
-  }
+  const { marketOpen, status } = getMarketStatus();
   
   return NextResponse.json({
     marketOpen,

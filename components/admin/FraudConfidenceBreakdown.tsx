@@ -44,11 +44,6 @@ export default function FraudConfidenceBreakdown({
   const [selectedMethod, setSelectedMethod] = useState<DetectionMethod | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
-  // Debug logging
-  console.log('🔍 [CONFIDENCE] Alert ID:', alertId);
-  console.log('🔍 [CONFIDENCE] Suspicious User IDs:', suspiciousUserIds);
-  console.log('🔍 [CONFIDENCE] Evidence:', evidence);
-
   // Calculate detection methods and their confidence scores
   const deviceConfidence = calculateDeviceFingerprintConfidence(evidence);
   const ipConfidence = calculateIPTrackingConfidence(evidence);

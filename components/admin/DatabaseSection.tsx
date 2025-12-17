@@ -37,15 +37,13 @@ export default function DatabaseSection() {
       const data = await response.json();
 
       if (data.success) {
-        console.log('📊 DATABASE CHECK:', data);
         toast.success(
           `✅ Database Check:\n\n` +
           `Participants: ${data.summary.totalParticipants}\n` +
           `Positions: ${data.summary.totalPositions} (${data.summary.openPositions} open, ${data.summary.closedPositions} closed)\n` +
           `Trade History: ${data.summary.totalTradeHistory}\n\n` +
           `Recent Trades: ${data.recentTrades.length}\n` +
-          `Active Participants: ${data.participantsWithStats.length}\n\n` +
-          `Check console (F12) for full details!`,
+          `Active Participants: ${data.participantsWithStats.length}`,
           { id: 'check', duration: 8000 }
         );
       } else {
@@ -294,15 +292,13 @@ export default function DatabaseSection() {
                   
                   const response = await fetch('/api/admin/test-badge-models');
                   const data = await response.json();
-                  console.log('Test response:', data);
 
                   if (data.success) {
                     toast.success(
                       `✅ Models working!\n\n` +
                       `Collections: ${data.details.collections.join(', ')}\n` +
                       `Badges: ${data.details.counts.badges}\n` +
-                      `XP Configs: ${data.details.counts.xpConfigs}\n\n` +
-                      `Check console (F12) for full details!`,
+                      `XP Configs: ${data.details.counts.xpConfigs}`,
                       { id: 'test', duration: 5000 }
                     );
                   } else {
@@ -337,14 +333,12 @@ export default function DatabaseSection() {
                   });
 
                   const data = await response.json();
-                  console.log('Seed response:', data);
 
                   if (data.success) {
                     toast.success(
                       `✅ Seeding complete!\n\n` +
                       `Badges: ${data.counts.badges}\n` +
-                      `XP Configs: ${data.counts.xpConfigs}\n\n` +
-                      `Check console (F12) for details!`,
+                      `XP Configs: ${data.counts.xpConfigs}`,
                       { id: 'seed', duration: 5000 }
                     );
                   } else {

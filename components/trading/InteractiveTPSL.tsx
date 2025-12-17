@@ -50,36 +50,34 @@ const InteractiveTPSL = ({ positions }: InteractiveTPSLProps) => {
   // Listen for position updates from order placement
   useEffect(() => {
     const handleOrderPlaced = () => {
-      console.log('🔄 Order placed, refreshing positions in 2 seconds to ensure TP/SL are saved...');
-      // Increased delay to ensure database transaction completes and TP/SL are saved
+      // ⚡ FAST REFRESH - reduced from 2s to 300ms
+      // Transaction is already committed before the response is sent
       setTimeout(() => {
-        console.log('✅ Refreshing now...');
         router.refresh();
-        
-        // Show success after refresh
-        setTimeout(() => {
-          toast.success('TP/SL loaded on chart!', {
-            description: 'Your Take Profit and Stop Loss levels are now visible',
-          });
-        }, 500);
-      }, 2000); // 2 seconds delay to ensure transaction completes
+      }, 300); // 300ms is enough for Next.js revalidation to propagate
+    };
+
+    const handlePositionOpened = () => {
+      // ⚡ IMMEDIATE refresh when new position is opened
+      router.refresh();
     };
 
     const handleTPSLUpdated = () => {
-      console.log('🔄 TP/SL updated, refreshing chart...');
       setTimeout(() => {
         router.refresh();
         toast.success('TP/SL updated!', {
           description: 'Your changes are now visible on the chart',
         });
-      }, 500);
+      }, 300);
     };
 
     window.addEventListener('orderPlaced', handleOrderPlaced);
+    window.addEventListener('positionOpened', handlePositionOpened);
     window.addEventListener('tpslUpdated', handleTPSLUpdated);
     
     return () => {
       window.removeEventListener('orderPlaced', handleOrderPlaced);
+      window.removeEventListener('positionOpened', handlePositionOpened);
       window.removeEventListener('tpslUpdated', handleTPSLUpdated);
     };
   }, [router]);

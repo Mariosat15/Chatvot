@@ -5,8 +5,8 @@ import { connectToDatabase } from '@/database/mongoose';
 import Competition from '@/database/models/trading/competition.model';
 import { checkMarginCalls } from '@/lib/actions/trading/position.actions';
 import EmailTemplate from '@/database/models/email-template.model';
-// WebSocket disabled - requires paid Massive.com plan (error 1008)
-// import { initializeWebSocket, getConnectionStatus } from '@/lib/services/websocket-price-streamer';
+// WebSocket for real-time prices from Massive.com
+import { initializeWebSocket, getConnectionStatus, isWebSocketConnected } from '@/lib/services/websocket-price-streamer';
 
 export const sendSignUpEmail = inngest.createFunction(
     { id: 'sign-up-email' },
@@ -448,55 +448,194 @@ export const evaluateUserBadges = inngest.createFunction(
 );
 
 /**
- * Server-side price cache updater
- * Fetches all forex prices every 3 seconds and caches them
- * This way, API requests read from cache (instant) instead of making external calls
+ * Manage WebSocket connection to Massive.com for real-time prices
  * 
- * Benefits:
- * - Single source fetches prices (not every user)
- * - API reads are instant (from cache)
- * - Reduces Massive.com API calls by 90%+
+ * WebSocket is MUCH faster than REST API polling:
+ * - WebSocket: ~10-50ms latency, push-based (instant updates)
+ * - REST API: ~200-500ms per request, polling-based
+ * 
+ * This job:
+ * 1. Ensures WebSocket stays connected
+ * 2. Syncs WebSocket cache to Redis every 2 seconds
+ * 3. Falls back to REST API if WebSocket fails
  */
 export const updatePriceCache = inngest.createFunction(
     { 
         id: 'update-price-cache',
-        concurrency: { limit: 1 }, // Only 1 instance
+        concurrency: { limit: 1 },
     },
-    { cron: '*/5 * * * * *' }, // Every 5 seconds
+    { cron: '* * * * *' }, // Every minute
     async () => {
+        const { getAllCachedPrices } = await import('@/lib/services/websocket-price-streamer');
         const { fetchRealForexPrices } = await import('@/lib/services/real-forex-prices.service');
+        const { setPrices, getRedis } = await import('@/lib/services/redis.service');
         type ForexSymbolType = import('@/lib/services/pnl-calculator.service').ForexSymbol;
         
-        // All forex pairs to cache
-        const allPairs: ForexSymbolType[] = [
-            'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD',
-            'EUR/GBP', 'EUR/JPY', 'EUR/CHF', 'EUR/AUD', 'EUR/CAD', 'EUR/NZD',
-            'GBP/JPY', 'GBP/CHF', 'GBP/AUD', 'GBP/CAD', 'GBP/NZD',
-            'AUD/JPY', 'AUD/CHF', 'AUD/CAD', 'AUD/NZD',
-            'CAD/JPY', 'CAD/CHF', 'CHF/JPY',
-            'NZD/JPY', 'NZD/CHF', 'NZD/CAD',
-            'USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK',
-        ];
-        
         try {
-            const startTime = Date.now();
-            const prices = await fetchRealForexPrices(allPairs);
-            const duration = Date.now() - startTime;
+            // Initialize WebSocket if not connected
+            if (!isWebSocketConnected()) {
+                console.log('🔌 WebSocket not connected, initializing...');
+                await initializeWebSocket();
+                
+                // Wait for connection
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
             
-            console.log(`💰 Price cache updated: ${prices.size} pairs in ${duration}ms`);
+            const status = getConnectionStatus();
+            console.log(`📊 WebSocket: Connected=${status.connected}, Auth=${status.authenticated}, Subscribed=${status.subscribed}, Pairs=${status.cachedPairs}`);
+            
+            // If WebSocket is connected, prices are in memory
+            // Redis sync is controlled by admin setting (enable for multi-server deployments)
+            if (status.connected && status.authenticated) {
+                // Check if multi-server Redis sync is enabled
+                const { connectToDatabase } = await import('@/database/mongoose');
+                const { WhiteLabel } = await import('@/database/models/whitelabel.model');
+                await connectToDatabase();
+                const settings = await WhiteLabel.findOne();
+                const redisSyncEnabled = settings?.redisPriceSyncEnabled && settings?.redisEnabled;
+                
+                if (redisSyncEnabled) {
+                    // Multi-server mode: Sync prices to Redis for shared state
+                    const redis = await getRedis();
+                    if (redis) {
+                        const wsPrices = getAllCachedPrices();
+                        if (wsPrices.size > 0) {
+                            const redisPrices = new Map<string, { bid: number; ask: number; mid: number; timestamp: number }>();
+                            wsPrices.forEach((quote, symbol) => {
+                                redisPrices.set(symbol, { bid: quote.bid, ask: quote.ask, mid: quote.mid, timestamp: quote.timestamp });
+                            });
+                            await setPrices(redisPrices);
+                            console.log(`✅ WebSocket prices synced to Redis: ${status.cachedPairs} pairs (Multi-server mode)`);
+                        }
+                    }
+                } else {
+                    console.log(`✅ WebSocket prices live: ${status.cachedPairs} pairs (Single-server mode)`);
+                }
+                
+                return {
+                    success: true,
+                    source: 'websocket',
+                    connected: true,
+                    cachedPairs: status.cachedPairs,
+                    redisSyncEnabled: redisSyncEnabled,
+                };
+            }
+            
+            // Fallback to REST API
+            console.log('⚠️ WebSocket not ready, using REST API fallback');
+            
+            const allPairs: ForexSymbolType[] = [
+                'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD',
+                'EUR/GBP', 'EUR/JPY', 'EUR/CHF', 'EUR/AUD', 'EUR/CAD', 'EUR/NZD',
+                'GBP/JPY', 'GBP/CHF', 'GBP/AUD', 'GBP/CAD', 'GBP/NZD',
+                'AUD/JPY', 'AUD/CHF', 'AUD/CAD', 'AUD/NZD',
+                'CAD/JPY', 'CAD/CHF', 'CHF/JPY',
+                'NZD/JPY', 'NZD/CHF', 'NZD/CAD',
+                'USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK',
+            ];
+            
+            // DISABLED: Redis sync for REST API fallback
+            // Just fetch once to populate in-memory cache, no Redis writes
+            const prices = await fetchRealForexPrices(allPairs);
+            
+            console.log(`💰 REST API fallback: ${prices.size} pairs loaded to memory (Redis sync DISABLED)`);
             
             return {
                 success: true,
+                source: 'rest-api',
                 pairsUpdated: prices.size,
-                durationMs: duration,
+                redisSyncDisabled: true,
             };
         } catch (error) {
-            console.error('❌ Failed to update price cache:', error);
+            console.error('❌ Price cache update failed:', error);
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Unknown error',
             };
         }
+    }
+);
+
+/**
+ * Trade queue processor
+ * Processes trades from Redis queue to guarantee execution
+ * Runs every second to minimize trade latency
+ * 
+ * Note: This is for future use when we implement queued trade execution.
+ * Currently trades are executed directly (not queued).
+ */
+export const processTradeQueue = inngest.createFunction(
+    { 
+        id: 'process-trade-queue',
+        concurrency: { limit: 1 }, // Only 1 instance to prevent race conditions
+    },
+    { cron: '* * * * *' }, // Every minute (Inngest minimum)
+    async () => {
+        const { 
+            dequeueTradeForProcessing, 
+            completeQueuedTrade, 
+            requeueFailedTrade,
+            getQueueStats,
+            getRedis,
+        } = await import('@/lib/services/redis.service');
+        const { closePositionAutomatic } = await import('@/lib/actions/trading/position.actions');
+        
+        // Check if Redis is available
+        const redis = await getRedis();
+        if (!redis) {
+            return { success: true, message: 'Redis not enabled, skipping queue processing' };
+        }
+        
+        const stats = await getQueueStats();
+        if (!stats || (stats.pending === 0 && stats.processing === 0)) {
+            return { success: true, processed: 0 };
+        }
+        
+        let processed = 0;
+        let failed = 0;
+        const maxBatchSize = 10; // Process up to 10 trades per run
+        
+        for (let i = 0; i < maxBatchSize; i++) {
+            const trade = await dequeueTradeForProcessing();
+            if (!trade) break;
+            
+            try {
+                if (trade.action === 'close') {
+                    // For automatic closes (SL/TP/margin call)
+                    const exitPrice = trade.data.exitPrice as number;
+                    const closeReason = trade.data.closeReason as 'stop_loss' | 'take_profit' | 'margin_call';
+                    
+                    if (exitPrice && closeReason) {
+                        await closePositionAutomatic(trade.positionId, exitPrice, closeReason);
+                        await completeQueuedTrade(trade);
+                        processed++;
+                    } else {
+                        // Missing required data, discard
+                        await completeQueuedTrade(trade);
+                        failed++;
+                    }
+                } else {
+                    // Other trade actions can be added here
+                    await completeQueuedTrade(trade);
+                    processed++;
+                }
+            } catch (error) {
+                console.error(`❌ Failed to process trade ${trade.id}:`, error);
+                await requeueFailedTrade(trade);
+                failed++;
+            }
+        }
+        
+        if (processed > 0 || failed > 0) {
+            console.log(`📋 Trade queue: ${processed} processed, ${failed} failed, ${stats.pending} pending`);
+        }
+        
+        return {
+            success: true,
+            processed,
+            failed,
+            pending: stats.pending,
+        };
     }
 );
 

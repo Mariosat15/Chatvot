@@ -22,13 +22,7 @@ export function FingerprintProvider({ children }: { children: React.ReactNode })
         const result = await trackDeviceFingerprint();
         
         if (result.success) {
-          console.log('✅ Global fingerprint tracked');
           setTracked(true);
-          
-          // Show warning if suspicious
-          if (result.suspicious) {
-            console.warn('⚠️ Suspicious device detected:', result.message);
-          }
         }
       } catch (error) {
         console.error('Failed to track fingerprint:', error);

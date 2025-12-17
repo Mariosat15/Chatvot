@@ -112,13 +112,29 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
     setLivePositions(updatedPositions);
   }, [prices, positions]);
 
-  const handleClosePosition = async (positionId: string) => {
+  const handleClosePosition = async (positionId: string, symbol: ForexSymbol) => {
     setClosingPosition(positionId);
 
     try {
-      const result = await closePosition(positionId);
+      // 🔒 LOCK THE CURRENT PRICE at the moment user clicks close
+      const currentPrice = prices.get(symbol);
+      const lockedPrice = currentPrice ? {
+        bid: currentPrice.bid,
+        ask: currentPrice.ask,
+        timestamp: Date.now(), // Lock timestamp
+      } : undefined;
+
+
+      const result = await closePosition(positionId, lockedPrice);
 
       if (result.success) {
+        // ⚡ IMMEDIATE UI UPDATE - dispatch event so chart removes the position line instantly
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('positionClosed', { 
+            detail: { positionId, symbol } 
+          }));
+        }
+
         toast.success('Position closed!', {
           description: result.message,
         });
@@ -129,7 +145,7 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
         // Remove from local state immediately for instant UI feedback
         setLivePositions(prev => prev.filter(p => p._id !== positionId));
         
-        // Refresh server data to get updated stats
+        // Refresh server data to get updated stats (non-blocking visual feedback already done)
         router.refresh();
       }
     } catch (error) {
@@ -238,14 +254,6 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
         <TableBody>
           {filteredPositions.map((position) => {
             const isProfit = position.unrealizedPnl >= 0;
-            console.log(`Position ${position.symbol}:`, {
-              Entry: position.entryPrice,
-              Current: position.currentPrice,
-              'P&L': position.unrealizedPnl,
-              'Margin Used': position.marginUsed,
-              'P&L %': position.unrealizedPnlPercentage,
-              'Calculated %': ((position.unrealizedPnl / position.marginUsed) * 100).toFixed(2)
-            });
             return (
               <TableRow 
                 key={position._id} 
@@ -344,7 +352,7 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => handleClosePosition(position._id)}
+                      onClick={() => handleClosePosition(position._id, position.symbol)}
                       disabled={closingPosition === position._id}
                       className="text-red hover:text-red hover:bg-red/10"
                       title="Close Position"

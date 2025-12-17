@@ -66,13 +66,6 @@ export default function ChallengeSettingsSection() {
   const handleSave = async () => {
     if (!settings) return;
 
-    // Log what we're saving for debugging
-    console.log('💾 Saving challenge settings:', {
-      challengeCooldownMinutes: settings.challengeCooldownMinutes,
-      maxPendingChallenges: settings.maxPendingChallenges,
-      maxActiveChallenges: settings.maxActiveChallenges,
-    });
-
     setSaving(true);
     try {
       const response = await fetch('/api/admin/challenge-settings', {
@@ -91,9 +84,6 @@ export default function ChallengeSettingsSection() {
         return;
       }
 
-      // Log the saved settings from server response
-      console.log('✅ Settings saved, server response:', data.settings);
-      
       toast.success('Challenge settings saved successfully', {
         description: `Cooldown: ${data.settings?.challengeCooldownMinutes || 0}min, Max Pending: ${data.settings?.maxPendingChallenges || 0}, Max Active: ${data.settings?.maxActiveChallenges || 0}`,
       });

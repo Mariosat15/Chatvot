@@ -158,7 +158,6 @@ export default function FraudMonitoringSection() {
       }
 
       const data = await response.json();
-      console.log('✅ Fraud alerts fetched:', data);
       
       if (data.success === false) {
         console.error('API returned success:false:', data);
@@ -179,8 +178,6 @@ export default function FraudMonitoringSection() {
         critical: 0,
         high: 0
       });
-      
-      console.log(`📊 Loaded ${alertsArray.length} alerts`);
     } catch (error) {
       console.error('❌ Error fetching alerts:', error);
       console.error('Error details:', error instanceof Error ? error.message : error);
@@ -200,7 +197,6 @@ export default function FraudMonitoringSection() {
       }
 
       const data = await response.json();
-      console.log('✅ Suspicious devices fetched:', data);
       
       if (data.success === false) {
         console.error('Devices API returned success:false:', data);
@@ -217,8 +213,6 @@ export default function FraudMonitoringSection() {
         vpnDevices: 0,
         proxyDevices: 0
       });
-      
-      console.log(`📊 Loaded ${devicesArray.length} suspicious devices`);
     } catch (error) {
       console.error('❌ Error fetching devices:', error);
       console.error('Error details:', error instanceof Error ? error.message : error);

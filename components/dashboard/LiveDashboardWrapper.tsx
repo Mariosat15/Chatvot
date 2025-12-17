@@ -42,7 +42,6 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
     
     setIsRefreshing(true);
     try {
-      console.log('🔄 Client: Fetching dashboard data...');
       const response = await fetch('/api/dashboard/live-stats?t=' + Date.now(), {
         method: 'GET',
         cache: 'no-store',
@@ -54,29 +53,11 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
       
       if (response.ok) {
         const newData = await response.json();
-        console.log('✅ Client: Dashboard data received:', {
-          activeCompetitions: newData.activeCompetitions?.length || 0,
-          totalCapital: newData.overallStats?.totalCapital || 0,
-          totalPnL: newData.overallStats?.totalPnL || 0,
-          totalPositions: newData.overallStats?.totalPositions || 0,
-          totalTrades: newData.overallStats?.totalTrades || 0,
-        });
-        
-        // Log open positions for debugging
-        newData.activeCompetitions?.forEach((comp: any, index: number) => {
-          console.log(`Competition ${index + 1} (${comp.competition?.name}):`, {
-            openPositionsCount: comp.openPositionsCount,
-            openPositionsArray: comp.openPositions?.length || 0,
-            currentOpenPositions: comp.participation?.currentOpenPositions || 0,
-          });
-        });
         setDashboardData(newData);
         setLastUpdate(Date.now());
-      } else {
-        console.error('❌ Client: Failed to fetch dashboard data:', response.status, response.statusText);
       }
-    } catch (error) {
-      console.error('❌ Client Error refreshing dashboard:', error);
+    } catch {
+      // Silently handle refresh errors
     } finally {
       setIsRefreshing(false);
     }
@@ -95,21 +76,17 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
 
   // Auto-refresh every 10 seconds
   useEffect(() => {
-    console.log('🔄 Setting up auto-refresh interval (10 seconds)');
     const interval = setInterval(() => {
-      console.log('⏰ Auto-refresh triggered');
       refreshData();
     }, 10000); // 10 seconds
 
     return () => {
-      console.log('🛑 Clearing auto-refresh interval');
       clearInterval(interval);
     };
   }, []); // Empty dependency array - only set up once
 
   // Manual refresh handler
   const handleManualRefresh = () => {
-    console.log('🔄 Manual refresh triggered');
     refreshData();
   };
 

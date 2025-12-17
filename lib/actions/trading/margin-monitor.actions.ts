@@ -7,7 +7,7 @@ import CompetitionParticipant from '@/database/models/trading/competition-partic
 import TradingPosition from '@/database/models/trading/trading-position.model';
 import { getMarginStatus } from '@/lib/services/risk-manager.service';
 import { getMarginThresholds } from '@/lib/actions/trading/risk-settings.actions';
-import { getRealPrice } from '@/lib/services/real-forex-prices.service';
+import { getRealPrice, fetchRealForexPrices } from '@/lib/services/real-forex-prices.service';
 import { calculateUnrealizedPnL, ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { closePositionAutomatic } from '@/lib/actions/trading/position.actions';
 
@@ -49,10 +49,18 @@ export const checkUserMargin = async (competitionId: string) => {
       status: 'open',
     });
 
+    if (openPositions.length === 0) {
+      return { liquidated: false, marginLevel: Infinity };
+    }
+
+    // OPTIMIZATION: Fetch all prices at once (single batch)
+    const uniqueSymbols = [...new Set(openPositions.map(p => p.symbol))] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+
     // Calculate REAL-TIME unrealized P&L
     let totalUnrealizedPnl = 0;
     for (const position of openPositions) {
-      const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+      const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (!currentPrice) continue;
 
       const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
@@ -106,7 +114,8 @@ export const checkUserMargin = async (competitionId: string) => {
       }
 
       for (const position of openPositions) {
-        const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+        // Reuse prices from batch (instant!)
+        const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
         if (!currentPrice) continue;
 
         const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;

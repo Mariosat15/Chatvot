@@ -12,9 +12,53 @@ import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
 import { useRiskSettings } from '@/hooks/useRiskSettings';
 import { toast } from 'sonner';
-import { Loader2, RefreshCw, CheckCircle2, XCircle, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Loader2, RefreshCw, CheckCircle2, XCircle, AlertCircle, TrendingUp, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { validateLimitOrderPrice, getPipValue } from '@/lib/utils/limit-order-validation';
+
+// Collapsible Section Component
+const CollapsibleSection = ({ 
+  title, 
+  icon, 
+  children, 
+  defaultOpen = true,
+  className = ""
+}: { 
+  title: string; 
+  icon: string; 
+  children: React.ReactNode; 
+  defaultOpen?: boolean;
+  className?: string;
+}) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  
+  return (
+    <div className={cn("bg-gradient-to-br from-dark-300/80 to-dark-400/50 rounded-xl border border-dark-400/30 shadow-lg overflow-hidden", className)}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full p-4 flex items-center justify-between hover:bg-dark-400/20 transition-colors"
+      >
+        <p className="text-xs font-bold text-light-900 uppercase tracking-wider flex items-center gap-2">
+          {icon} {title}
+        </p>
+        {isOpen ? (
+          <ChevronUp className="size-5 text-dark-600 transition-transform" />
+        ) : (
+          <ChevronDown className="size-5 text-dark-600 transition-transform" />
+        )}
+      </button>
+      <div className={cn(
+        "transition-all duration-300 ease-in-out",
+        isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0 overflow-hidden"
+      )}>
+        <div className="p-4 pt-0 space-y-4">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface OrderFormProps {
   competitionId: string;
@@ -356,6 +400,15 @@ const OrderForm = ({
     setIsSubmitting(true);
 
     try {
+      // 🔒 LOCK THE CURRENT PRICE at the moment user clicks trade
+      const currentPrice = prices.get(symbol);
+      const lockedPrice = currentPrice && orderType === 'market' ? {
+        bid: currentPrice.bid,
+        ask: currentPrice.ask,
+        timestamp: Date.now(),
+      } : undefined;
+
+
       const result = await placeOrder({
         competitionId,
         symbol,
@@ -366,14 +419,22 @@ const OrderForm = ({
         stopLoss: getEffectiveSLPrice(),
         takeProfit: getEffectiveTPPrice(),
         leverage,
+        lockedPrice,
       });
 
       if (result.success) {
+        // ⚡ IMMEDIATE UI UPDATE - dispatch position data for instant chart update
+        if (result.position && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('positionOpened', { 
+            detail: result.position 
+          }));
+        }
+
         toast.success('Order placed!', {
           description: result.message,
         });
 
-        // Show loading toast for refresh
+        // Show loading toast for refresh (only if TP/SL)
         if (stopLoss || takeProfit || stopLossPips || takeProfitPips) {
           toast.loading('Loading TP/SL on chart...', {
             id: 'tpsl-refresh',
@@ -394,7 +455,7 @@ const OrderForm = ({
         setTakeProfitPips('50');
         setStopLossPips('30');
 
-        // Dispatch event for position refresh
+        // Dispatch event for other components to refresh
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('orderPlaced'));
         }
@@ -411,10 +472,7 @@ const OrderForm = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Section 1: Live Price Display */}
-      <div className="bg-gradient-to-br from-dark-300/80 to-dark-400/50 rounded-xl p-4 border border-dark-400/30 shadow-lg">
-        <p className="text-xs font-bold text-light-900 uppercase tracking-wider mb-3 flex items-center gap-2">
-          💰 Live Market Prices
-        </p>
+      <CollapsibleSection title="Live Market Prices" icon="💰" defaultOpen={true}>
         <div className="space-y-2">
           <div className="flex items-center justify-between bg-dark-400/50 rounded-lg p-3">
             <div className="flex items-center gap-2">
@@ -442,14 +500,10 @@ const OrderForm = ({
             </p>
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
       {/* Section 3: Order Configuration */}
-      <div className="bg-gradient-to-br from-dark-300/80 to-dark-400/50 rounded-xl p-4 border border-dark-400/30 shadow-lg space-y-4">
-        <p className="text-xs font-bold text-light-900 uppercase tracking-wider flex items-center gap-2">
-          ⚙️ Order Setup
-        </p>
-        
+      <CollapsibleSection title="Order Setup" icon="⚙️" defaultOpen={true}>
         {/* Order Type Tabs */}
         <div>
           <Label className="text-xs font-semibold text-dark-600 mb-2 uppercase tracking-wide">Order Type</Label>
@@ -513,14 +567,10 @@ const OrderForm = ({
             </Tabs>
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
       {/* Section 4: Trading Size */}
-      <div className="bg-gradient-to-br from-dark-300/80 to-dark-400/50 rounded-xl p-4 border border-dark-400/30 shadow-lg space-y-4">
-        <p className="text-xs font-bold text-light-900 uppercase tracking-wider flex items-center gap-2">
-          📐 Trade Size & Risk
-        </p>
-        
+      <CollapsibleSection title="Trade Size & Risk" icon="📐" defaultOpen={true}>
         {/* Quantity */}
         <div>
           <Label className="text-xs font-semibold text-dark-600 mb-2 uppercase tracking-wide flex items-center gap-2">
@@ -540,20 +590,23 @@ const OrderForm = ({
         </div>
 
         {/* Leverage Display (Admin-controlled, read-only) */}
-      <div className="bg-dark-300/50 border border-dark-400 rounded-lg p-3">
-        <div className="flex items-center justify-between mb-1">
-          <Label className="text-xs text-dark-600">Leverage (Admin-controlled)</Label>
-          <div className="flex items-center gap-1">
-            <RefreshCw className="size-3 text-green-500 animate-spin" style={{ animationDuration: '3s' }} />
-            <span className="text-xs text-green-500">Live</span>
+        <div className="bg-dark-300/50 border border-dark-400 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <Label className="text-xs text-dark-600">Leverage (Admin-controlled)</Label>
+            <div className="flex items-center gap-1">
+              <RefreshCw className="size-3 text-green-500 animate-spin" style={{ animationDuration: '3s' }} />
+              <span className="text-xs text-green-500">Live</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-2xl font-bold text-gray-100">1:{leverage}</span>
+            <span className="text-xs text-dark-600">Auto-updates</span>
           </div>
         </div>
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-2xl font-bold text-gray-100">1:{leverage}</span>
-          <span className="text-xs text-dark-600">Auto-updates</span>
-        </div>
-      </div>
+      </CollapsibleSection>
 
+      {/* Section 5: Take Profit & Stop Loss */}
+      <CollapsibleSection title="Take Profit / Stop Loss" icon="🎯" defaultOpen={false}>
         {/* Take Profit Toggle & Input */}
         <div className="bg-dark-400/30 rounded-lg p-3 border border-dark-500/30 space-y-3">
           <div className="flex items-center justify-between">
@@ -721,7 +774,7 @@ const OrderForm = ({
           </>
         )}
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Limit Order Validation Status */}
       {orderType === 'limit' && (
@@ -802,10 +855,10 @@ const OrderForm = ({
       )}
 
       {/* Margin Required */}
-      <div className="bg-dark-300 p-3 rounded-lg">
+      <CollapsibleSection title="Margin Required" icon="💳" defaultOpen={true}>
         <div className="flex items-center justify-between">
           <span className="text-sm text-dark-600 flex items-center gap-1">
-            💳 Margin Required:
+            Margin Required:
           </span>
           <span className="text-lg font-bold text-light-900">
             ${marginRequired.toFixed(2)}
@@ -845,7 +898,7 @@ const OrderForm = ({
             )}
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
       {/* Buy/Sell Buttons */}
       <div className="grid grid-cols-2 gap-3">

@@ -17,8 +17,9 @@ import {
   calculatePnLPercentage,
   ForexSymbol,
 } from '@/lib/services/pnl-calculator.service';
-import { getRealPrice, isForexMarketOpen, getMarketStatus, getPriceFromCacheOnly } from '@/lib/services/real-forex-prices.service';
+import { getRealPrice, fetchRealForexPrices, isForexMarketOpen, getMarketStatus, getPriceFromCacheOnly } from '@/lib/services/real-forex-prices.service';
 import { getMarginStatus } from '@/lib/services/risk-manager.service';
+import PriceLog from '@/database/models/trading/price-log.model';
 
 /**
  * Check if market is open and throw error if closed
@@ -51,10 +52,14 @@ export const getUserPositions = async (competitionId: string) => {
       .sort({ openedAt: -1 })
       .lean();
 
-    // Update P&L for each position with current REAL prices
+    // OPTIMIZATION: Fetch all prices at once (single batch request)
+    const uniqueSymbols = [...new Set(positions.map(p => p.symbol))] as ForexSymbol[];
+    const pricesMap = uniqueSymbols.length > 0 ? await fetchRealForexPrices(uniqueSymbols) : new Map();
+
+    // Update P&L for each position with current REAL prices (instant - from batch)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const positionsWithCurrentPnL = await Promise.all(positions.map(async (position: any) => {
-      const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+    const positionsWithCurrentPnL = positions.map((position: any) => {
+      const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (currentPrice) {
         const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
         const pnl = calculateUnrealizedPnL(
@@ -84,19 +89,7 @@ export const getUserPositions = async (competitionId: string) => {
         takeProfit: position.takeProfit,
         stopLoss: position.stopLoss,
       };
-    }));
-
-    // Debug: Log TP/SL data being returned
-    console.log(`📊 Fetched ${positionsWithCurrentPnL.length} positions with TP/SL:`, 
-      positionsWithCurrentPnL.map(p => ({
-        id: p._id,
-        symbol: p.symbol,
-        hasTP: !!p.takeProfit,
-        hasSL: !!p.stopLoss,
-        tp: p.takeProfit,
-        sl: p.stopLoss
-      }))
-    );
+    });
 
     return JSON.parse(JSON.stringify(positionsWithCurrentPnL));
   } catch (error) {
@@ -181,7 +174,11 @@ export const updatePositionTPSL = async (
 };
 
 // Close a position manually
-export const closePosition = async (positionId: string) => {
+// requestedPrice: Optional locked price from frontend (what user saw when they clicked close)
+export const closePosition = async (
+  positionId: string,
+  requestedPrice?: { bid: number; ask: number; timestamp: number }
+) => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) redirect('/sign-in');
@@ -215,13 +212,53 @@ export const closePosition = async (positionId: string) => {
       throw new Error('Position not found or already closed');
     }
 
-    // Get current REAL market price
-    const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
-    if (!currentPrice) {
-      throw new Error('Unable to get current market price. Market may be closed or API unavailable.');
-    }
+    // Determine exit price - use locked price from frontend if provided and fresh
+    let exitPrice: number;
+    let currentPrice: { bid: number; ask: number; mid: number; spread: number; timestamp: number };
+    
+    const MAX_PRICE_AGE_MS = 2000; // Max 2 seconds old for locked price
+    const MAX_SLIPPAGE_PIPS = 5; // Max 5 pips slippage allowed
+    const pipSize = position.symbol.includes('JPY') ? 0.01 : 0.0001;
 
-    const exitPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
+    if (requestedPrice && (Date.now() - requestedPrice.timestamp) < MAX_PRICE_AGE_MS) {
+      // User provided a locked price that's still fresh - USE IT
+      console.log(`🔒 [EXIT] Using LOCKED price from frontend (age: ${Date.now() - requestedPrice.timestamp}ms)`);
+      console.log(`   Locked BID: ${requestedPrice.bid.toFixed(5)}`);
+      console.log(`   Locked ASK: ${requestedPrice.ask.toFixed(5)}`);
+      
+      exitPrice = position.side === 'long' ? requestedPrice.bid : requestedPrice.ask;
+      currentPrice = {
+        bid: requestedPrice.bid,
+        ask: requestedPrice.ask,
+        mid: (requestedPrice.bid + requestedPrice.ask) / 2,
+        spread: requestedPrice.ask - requestedPrice.bid,
+        timestamp: requestedPrice.timestamp,
+      };
+      
+      console.log(`   Exit Price: ${exitPrice.toFixed(5)} (${position.side === 'long' ? 'BID' : 'ASK'}) ✅ LOCKED`);
+    } else {
+      // No locked price or too old - fetch fresh price
+      console.log(`🔄 [EXIT] Fetching fresh price (no locked price or expired)`);
+      const freshPrice = await getRealPrice(position.symbol as ForexSymbol);
+      if (!freshPrice) {
+        throw new Error('Unable to get current market price. Market may be closed or API unavailable.');
+      }
+      
+      currentPrice = freshPrice;
+      exitPrice = position.side === 'long' ? freshPrice.bid : freshPrice.ask;
+      
+      console.log(`   Fresh BID: ${freshPrice.bid.toFixed(5)}`);
+      console.log(`   Fresh ASK: ${freshPrice.ask.toFixed(5)}`);
+      console.log(`   Exit Price: ${exitPrice.toFixed(5)} (${position.side === 'long' ? 'BID' : 'ASK'})`);
+      
+      // If user provided a price but it's stale, warn about slippage
+      if (requestedPrice) {
+        const expectedExit = position.side === 'long' ? requestedPrice.bid : requestedPrice.ask;
+        const slippagePips = Math.abs(exitPrice - expectedExit) / pipSize;
+        console.log(`   ⚠️ Locked price expired (age: ${Date.now() - requestedPrice.timestamp}ms)`);
+        console.log(`   Slippage: ${slippagePips.toFixed(2)} pips from expected ${expectedExit.toFixed(5)}`);
+      }
+    }
 
     // Calculate spread costs
     const entrySpread = position.entryPrice * 0.0001; // Approximate entry spread (we don't store it)
@@ -346,6 +383,31 @@ export const closePosition = async (positionId: string) => {
       const newPnl = participant.pnl + realizedPnl;
       const newPnlPercentage = ((newCapital - participant.startingCapital) / participant.startingCapital) * 100;
 
+      // 📝 Log price snapshot for trade validation/auditing (NON-BLOCKING)
+      const expectedExitPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
+      const pipSize = position.symbol.includes('JPY') ? 0.01 : 0.0001;
+      const exitSlippagePips = Math.abs(exitPrice - expectedExitPrice) / pipSize;
+      
+      // Don't await - this is non-critical and shouldn't block the response
+      PriceLog.create({
+        symbol: position.symbol,
+        bid: currentPrice.bid,
+        ask: currentPrice.ask,
+        mid: currentPrice.mid,
+        spread: currentPrice.spread,
+        timestamp: new Date(),
+        tradeId: position._id.toString(),
+        tradeType: 'exit',
+        tradeSide: position.side,
+        executionPrice: exitPrice,
+        expectedPrice: expectedExitPrice,
+        priceMatchesExpected: exitSlippagePips < 0.5,
+        slippagePips: exitSlippagePips,
+        priceSource: 'rest',
+      }).catch(logError => {
+        console.warn('⚠️ Failed to create exit price log (non-critical):', logError);
+      });
+
       // Log trade details for transparency
       console.log('💰 POSITION CLOSED:');
       console.log(`   Symbol: ${position.symbol}`);
@@ -353,6 +415,8 @@ export const closePosition = async (positionId: string) => {
       console.log(`   Quantity: ${position.quantity} lots`);
       console.log(`   Entry Price: ${position.entryPrice.toFixed(5)}`);
       console.log(`   Exit Price: ${exitPrice.toFixed(5)}`);
+      console.log(`   Bid/Ask at Exit: ${currentPrice.bid.toFixed(5)} / ${currentPrice.ask.toFixed(5)}`);
+      console.log(`   Exit Slippage: ${exitSlippagePips.toFixed(2)} pips`);
       console.log(`   📊 Spread Costs:`);
       console.log(`      Entry Spread: ${(entrySpread * 10000).toFixed(1)} pips`);
       console.log(`      Exit Spread: ${(exitSpread * 10000).toFixed(1)} pips`);
@@ -404,6 +468,7 @@ export const closePosition = async (positionId: string) => {
       );
 
       await mongoSession.commitTransaction();
+      mongoSession.endSession(); // End session immediately after commit
 
       console.log(`✅ Position closed: ${position.symbol}, P&L: $${realizedPnl.toFixed(2)}`);
 
@@ -494,10 +559,12 @@ export const closePosition = async (positionId: string) => {
         message: `Position closed. ${realizedPnl >= 0 ? 'Profit' : 'Loss'}: $${Math.abs(realizedPnl).toFixed(2)}`,
       };
     } catch (error) {
-      await mongoSession.abortTransaction();
-      throw error;
-    } finally {
+      // Only abort if session is still in a transaction (not yet committed)
+      if (mongoSession.inTransaction()) {
+        await mongoSession.abortTransaction();
+      }
       mongoSession.endSession();
+      throw error;
     }
   } catch (error) {
     console.error('Error closing position:', error);
@@ -516,14 +583,17 @@ export const updateAllPositionsPnL = async (competitionId: string, userId: strin
       status: 'open',
     });
 
+    if (positions.length === 0) return { success: true, unrealizedPnl: 0 };
+
+    // OPTIMIZATION: Fetch all prices at once (single batch)
+    const uniqueSymbols = [...new Set(positions.map(p => p.symbol))] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+
     let totalUnrealizedPnl = 0;
 
     for (const position of positions) {
-      // Use cached price first (instant, 0 API calls)
-      let currentPrice = getPriceFromCacheOnly(position.symbol as ForexSymbol);
-      if (!currentPrice) {
-        currentPrice = await getRealPrice(position.symbol as ForexSymbol);
-      }
+      // Get price from batch (instant!)
+      const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (!currentPrice) continue;
 
       const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
@@ -590,13 +660,32 @@ export const checkStopLossTakeProfit = async (competitionId: string) => {
       $or: [{ stopLoss: { $exists: true, $ne: null } }, { takeProfit: { $exists: true, $ne: null } }],
     });
 
+    if (positions.length === 0) return;
+
+    // OPTIMIZATION: Fetch all prices at once (single batch)
+    const uniqueSymbols = [...new Set(positions.map(p => p.symbol))] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+
+    const now = Date.now();
+    const MAX_PRICE_AGE_MS = 60000; // 60 seconds
+    
     for (const position of positions) {
-      // Use cached price first (instant), fallback to REST if needed
-      let currentPrice = getPriceFromCacheOnly(position.symbol as ForexSymbol);
-      if (!currentPrice) {
-        currentPrice = await getRealPrice(position.symbol as ForexSymbol);
-      }
+      // Get price from batch (instant!)
+      const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (!currentPrice) continue;
+      
+      // ⚠️ SAFETY CHECK: Skip if using fallback/stale prices
+      if (currentPrice.isFallback || currentPrice.isStale) {
+        console.warn(`⚠️ Skipping SL/TP check for ${position.symbol} - using fallback/stale price`);
+        continue;
+      }
+      
+      // Check if price is too old
+      const priceAge = now - currentPrice.timestamp;
+      if (priceAge > MAX_PRICE_AGE_MS) {
+        console.warn(`⚠️ Skipping SL/TP check for ${position.symbol} - price is ${Math.round(priceAge / 1000)}s old`);
+        continue;
+      }
 
       const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
 
@@ -890,27 +979,42 @@ export const checkMarginCalls = async (competitionId: string) => {
 
     console.log(`\n✅ Active participants with open positions: ${participants.length}`);
 
+    // OPTIMIZATION: Get ALL open positions for ALL participants at once
+    const allOpenPositions = await TradingPosition.find({
+      participantId: { $in: participants.map(p => p._id) },
+      status: 'open',
+    });
+
+    // Batch fetch ALL prices at once (single request for all symbols!)
+    const allSymbols = [...new Set(allOpenPositions.map(p => p.symbol))] as ForexSymbol[];
+    const pricesMap = allSymbols.length > 0 ? await fetchRealForexPrices(allSymbols) : new Map();
+    console.log(`📊 Fetched ${pricesMap.size} prices for margin check`);
+
+    // Group positions by participant for processing
+    const positionsByParticipant = new Map<string, typeof allOpenPositions>();
+    for (const position of allOpenPositions) {
+      const participantId = position.participantId.toString();
+      if (!positionsByParticipant.has(participantId)) {
+        positionsByParticipant.set(participantId, []);
+      }
+      positionsByParticipant.get(participantId)!.push(position);
+    }
+
     for (const participant of participants) {
       console.log(`\n👤 Checking: ${participant.username}`);
       console.log(`   💰 Current Capital (DB): $${participant.currentCapital.toFixed(2)}`);
       console.log(`   📈 Unrealized P&L (DB): $${participant.unrealizedPnl.toFixed(2)}`);
       console.log(`   🔒 Used Margin (DB): $${participant.usedMargin.toFixed(2)}`);
       
-      // RECALCULATE unrealized P&L from actual open positions (real-time)
-      const openPositions = await TradingPosition.find({
-        participantId: participant._id,
-        status: 'open',
-      });
+      // Get positions for this participant from our pre-fetched list
+      const openPositions = positionsByParticipant.get(participant._id.toString()) || [];
       
       console.log(`   📊 Found ${openPositions.length} open positions`);
       
       let totalUnrealizedPnl = 0;
       for (const position of openPositions) {
-        // Use cached price first (instant, 0 API calls), fallback to REST if needed
-        let currentPrice = getPriceFromCacheOnly(position.symbol as ForexSymbol);
-        if (!currentPrice) {
-          currentPrice = await getRealPrice(position.symbol as ForexSymbol);
-        }
+        // Get price from batch (instant!)
+        const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
         if (!currentPrice) continue;
         
         const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
@@ -947,27 +1051,64 @@ export const checkMarginCalls = async (competitionId: string) => {
       console.log(`   🎯 Threshold Check: ${marginStatus.marginLevel.toFixed(2)}% < ${thresholds.liquidation}% ? ${marginStatus.marginLevel < thresholds.liquidation}`);
 
       if (marginStatus.status === 'liquidation') {
-        // Liquidate all positions
-        const positions = await TradingPosition.find({
-          participantId: participant._id,
-          status: 'open',
-        });
-
-        console.log(`🚨 LIQUIDATING ${positions.length} positions for ${participant.username} (Margin: ${marginStatus.marginLevel.toFixed(2)}%)`);
-
-        for (const position of positions) {
-          // Use cached price first, fallback to REST
-          let currentPrice = getPriceFromCacheOnly(position.symbol as ForexSymbol);
+        // ⚠️ CRITICAL SAFETY CHECK: NEVER liquidate with fallback/stale prices!
+        // This prevents catastrophic losses from bad price data
+        let hasFallbackPrices = false;
+        let hasStalePrices = false;
+        const MAX_PRICE_AGE_MS = 60000; // 60 seconds
+        const now = Date.now();
+        
+        for (const position of openPositions) {
+          const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
           if (!currentPrice) {
-            currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+            console.error(`🚨 BLOCKED: No price available for ${position.symbol}`);
+            hasFallbackPrices = true;
+            break;
           }
+          
+          // Check if price is marked as fallback
+          if (currentPrice.isFallback) {
+            console.error(`🚨 BLOCKED LIQUIDATION: ${position.symbol} is using FALLBACK price ${currentPrice.mid.toFixed(5)} - REFUSING to liquidate!`);
+            hasFallbackPrices = true;
+            break;
+          }
+          
+          // Check if price is stale (older than 60 seconds)
+          const priceAge = now - currentPrice.timestamp;
+          if (priceAge > MAX_PRICE_AGE_MS || currentPrice.isStale) {
+            console.error(`🚨 BLOCKED LIQUIDATION: ${position.symbol} price is STALE (${Math.round(priceAge / 1000)}s old) - REFUSING to liquidate!`);
+            hasStalePrices = true;
+            break;
+          }
+          
+          // Check for suspicious price difference from entry (> 10% is very suspicious for forex)
+          const priceDiff = Math.abs(currentPrice.mid - position.entryPrice) / position.entryPrice;
+          if (priceDiff > 0.10) { // > 10% difference = definitely bad data
+            console.error(`🚨 BLOCKED LIQUIDATION: ${position.symbol} price ${currentPrice.mid.toFixed(5)} differs ${(priceDiff * 100).toFixed(2)}% from entry ${position.entryPrice.toFixed(5)} - likely BAD DATA!`);
+            hasFallbackPrices = true;
+            break;
+          }
+        }
+        
+        if (hasFallbackPrices || hasStalePrices) {
+          console.log(`⚠️ SKIPPING liquidation for ${participant.username} due to unreliable price data`);
+          console.log(`   This is a SAFETY FEATURE to prevent liquidation at wrong prices!`);
+          continue; // Skip this participant entirely
+        }
+        
+        console.log(`🚨 LIQUIDATING ${openPositions.length} positions for ${participant.username} (Margin: ${marginStatus.marginLevel.toFixed(2)}%)`);
+        console.log(`   ✅ All prices verified as REAL and FRESH`);
+
+        for (const position of openPositions) {
+          // Get price from batch (instant!)
+          const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
           if (!currentPrice) continue;
 
           const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
           await closePositionAutomatic(position._id.toString(), marketPrice, 'margin_call');
         }
 
-        console.log(`   ⚠️ ✅ Liquidated all ${positions.length} positions for: ${participant.username}`);
+        console.log(`   ⚠️ ✅ Liquidated all ${openPositions.length} positions for: ${participant.username}`);
       } else {
         console.log(`   ✅ No liquidation needed (Status: ${marginStatus.status})`);
       }
