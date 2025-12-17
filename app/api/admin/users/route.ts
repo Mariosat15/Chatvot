@@ -4,7 +4,8 @@ import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
 import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
 import { UserPurchase } from '@/database/models/marketplace/user-purchase.model';
-import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
+// Force model registration before populate is called
+import '@/database/models/marketplace/marketplace-item.model';
 
 /**
  * GET /api/admin/users

@@ -51,7 +51,6 @@ export async function GET(request: NextRequest) {
       purchases = purchases.filter((p: any) => p.itemId?.category === category);
     }
     
-    console.log(`📦 Found ${purchases.length} purchases for user ${session.user.id}`);
     
     // Transform for response - ensure IDs are strings
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -71,9 +70,6 @@ export async function GET(request: NextRequest) {
       totalTradesExecuted: purchase.totalTradesExecuted,
       userRating: purchase.userRating,
     }));
-    
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    console.log(`📦 Returning ${items.length} items:`, items.map((i: any) => i.item?.name || 'no item'));
     
     return NextResponse.json({
       success: true,
