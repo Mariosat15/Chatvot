@@ -120,15 +120,8 @@ export const executeLiquidation = async (
       thresholds
     );
 
-    console.log(`🔍 LIQUIDATION CHECK for ${session.user.name}:`);
-    console.log(`   Client margin: ${clientMarginLevel.toFixed(2)}%`);
-    console.log(`   Server margin: ${marginStatus.marginLevel.toFixed(2)}%`);
-    console.log(`   Threshold: ${thresholds.liquidation}%`);
-    console.log(`   Status: ${marginStatus.status}`);
-
     // VALIDATION: Only liquidate if SERVER confirms liquidation is needed
     if (marginStatus.status !== 'liquidation') {
-      console.log(`   ❌ Liquidation REJECTED - Server margin (${marginStatus.marginLevel.toFixed(2)}%) is above threshold`);
       return {
         success: true,
         liquidated: false,
@@ -139,8 +132,6 @@ export const executeLiquidation = async (
     }
 
     // EXECUTE LIQUIDATION
-    console.log(`   🚨 EXECUTING LIQUIDATION for ${openPositions.length} positions`);
-
     // Send liquidation notifications
     try {
       const { notificationService } = await import('@/lib/services/notification.service');
@@ -162,12 +153,10 @@ export const executeLiquidation = async (
       try {
         await closePositionAutomatic(position._id.toString(), marketPrice, 'margin_call');
         closedCount++;
-      } catch (error) {
-        console.error(`   ❌ Failed to close position ${position._id}:`, error);
+      } catch {
+        // Position close failed - continue with others
       }
     }
-
-    console.log(`   ✅ LIQUIDATION COMPLETE: ${closedCount}/${openPositions.length} positions closed`);
 
     return {
       success: true,
@@ -177,7 +166,6 @@ export const executeLiquidation = async (
       message: `Liquidated ${closedCount} positions`,
     };
   } catch (error) {
-    console.error('❌ Liquidation error:', error);
     return {
       success: false,
       liquidated: false,

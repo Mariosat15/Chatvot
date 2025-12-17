@@ -164,8 +164,6 @@ export function LiveAccountInfo({
     liquidationRequestedRef.current = true;
     setLiquidationState('pending');
 
-    console.log(`🚨 LOCAL LIQUIDATION TRIGGERED - Margin: ${calculatedData.marginLevel.toFixed(2)}%`);
-
     try {
       setLiquidationState('executing');
       
@@ -173,19 +171,15 @@ export function LiveAccountInfo({
       const result = await executeLiquidation(competitionId, calculatedData.marginLevel);
       
       if (result.liquidated) {
-        console.log(`✅ LIQUIDATION EXECUTED: ${result.positionsClosed} positions closed`);
         setLiquidationState('completed');
-        
         // Refresh to show updated positions
         router.refresh();
       } else {
         // Server rejected liquidation (margin was okay server-side)
-        console.log(`ℹ️ Liquidation not needed - Server margin: ${result.serverMarginLevel.toFixed(2)}%`);
         setLiquidationState('idle');
         liquidationRequestedRef.current = false;
       }
-    } catch (error) {
-      console.error('❌ Liquidation error:', error);
+    } catch {
       setLiquidationState('idle');
       liquidationRequestedRef.current = false;
     }
@@ -216,7 +210,6 @@ export function LiveAccountInfo({
         const result = await backupMarginCheck(competitionId);
         
         if (result.needsLiquidation && !liquidationRequestedRef.current) {
-          console.log(`🔄 BACKUP CHECK triggered liquidation - Server margin: ${result.marginLevel.toFixed(2)}%`);
           triggerLiquidation();
         }
       } catch {
