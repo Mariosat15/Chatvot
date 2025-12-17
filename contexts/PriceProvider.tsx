@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 // Disable debug logging in production
 const DEBUG = false;
@@ -65,8 +66,8 @@ interface PriceState {
 
 const PriceContext = createContext<PriceContextValue | undefined>(undefined);
 
-// Polling interval - 1000ms is smoother and less CPU intensive
-const POLLING_INTERVAL = 1000;
+// Polling interval - 2000ms reduces CPU load significantly while still being responsive
+const POLLING_INTERVAL = PERFORMANCE_INTERVALS.PRICE_POLLING;
 
 export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
   // Combined state to batch all updates into single re-render
@@ -104,15 +105,24 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, []);
 
-  // Fetch prices effect
+  // Fetch prices effect with visibility awareness
   useEffect(() => {
     if (subscriptions.size === 0) {
       setState(prev => prev.isConnected ? { ...prev, isConnected: false } : prev);
       return;
     }
 
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let isTabVisible = !document.hidden;
+
     // Fetch REAL prices from API
     const fetchPrices = async () => {
+      // Skip if tab is hidden - save resources
+      if (document.hidden) {
+        log('⏸️ Skipping fetch - tab is hidden');
+        return;
+      }
+
       // Prevent overlapping requests
       if (fetchingRef.current) {
         log('⏳ Skipping fetch - previous request still in progress');
@@ -186,14 +196,30 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
+    // Handle visibility change - pause/resume polling
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        isTabVisible = false;
+        log('👁️ Tab hidden - pausing price updates');
+      } else {
+        isTabVisible = true;
+        log('👁️ Tab visible - resuming price updates');
+        fetchPrices(); // Fetch immediately when tab becomes visible
+      }
+    };
+
     // Initial fetch
     fetchPrices();
 
-    // Update prices at reduced interval (1000ms instead of 500ms)
-    const interval = setInterval(fetchPrices, POLLING_INTERVAL);
+    // Update prices at polling interval (pauses when tab hidden)
+    intervalId = setInterval(fetchPrices, POLLING_INTERVAL);
+
+    // Listen for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      clearInterval(interval);
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [subscriptions]);
 

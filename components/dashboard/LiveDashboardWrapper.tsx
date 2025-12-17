@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, memo } from 'react';
 import DashboardStats from './DashboardStats';
 import GlobalRiskMetrics from './GlobalRiskMetrics';
 import CompetitionsTable from './CompetitionsTable';
@@ -9,6 +9,7 @@ import OpenPositions from './OpenPositions';
 import DailyPnLChart from './DailyPnLChart';
 import Link from 'next/link';
 import { Trophy, TrendingUp, RefreshCw } from 'lucide-react';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface LiveDashboardWrapperProps {
   initialData: {
@@ -69,19 +70,32 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeSinceUpdate(Math.floor((Date.now() - lastUpdate) / 1000));
-    }, 1000);
+    }, PERFORMANCE_INTERVALS.COUNTDOWN_UPDATE);
 
     return () => clearInterval(timer);
   }, [lastUpdate]);
 
-  // Auto-refresh every 10 seconds
+  // Auto-refresh with visibility awareness - optimized to 15 seconds
   useEffect(() => {
-    const interval = setInterval(() => {
+    const handleRefresh = () => {
+      // Skip if tab is hidden
+      if (document.hidden) return;
       refreshData();
-    }, 10000); // 10 seconds
+    };
+
+    const interval = setInterval(handleRefresh, PERFORMANCE_INTERVALS.DASHBOARD_REFRESH);
+    
+    // Refresh when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []); // Empty dependency array - only set up once
 

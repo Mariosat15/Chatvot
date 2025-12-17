@@ -538,6 +538,8 @@ export async function finalizeCompetition(competitionId: string) {
     await competition.save({ session });
 
     await session.commitTransaction();
+    // End session immediately after commit to prevent "abortTransaction after commitTransaction" error
+    session.endSession();
 
     console.log(`✅ Competition ${competition.name} finalized successfully!`);
     console.log(`   Winners: ${winnerTransactions.length}`);
@@ -545,7 +547,7 @@ export async function finalizeCompetition(competitionId: string) {
     console.log(`   Platform Fee: ${actualPlatformFee.toFixed(2)} credits`);
     console.log(`   Platform Earned: ${(prizePool - totalDistributed).toFixed(2)} credits`);
 
-    // Evaluate badges for ALL participants after competition ends (fire and forget)
+    // Evaluate badges for ALL participants after competition ends (fire and forget - non-blocking)
     try {
       const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
       const uniqueUserIds = [...new Set(participants.map(p => p.userId.toString()))];
@@ -564,70 +566,70 @@ export async function finalizeCompetition(competitionId: string) {
       console.error('Error importing badge service:', error);
     }
 
-    // Send notifications to all participants about competition end (fire and forget)
+    // Send notifications to all participants about competition end (fire and forget - non-blocking)
     try {
       const { notificationService } = await import('@/lib/services/notification.service');
       
       console.log(`🔔 Sending competition end notifications...`);
       
-      // Notify winners (rank 1 gets special notification)
+      // Notify winners (rank 1 gets special notification) - non-blocking
       for (const dist of prizeDistributions) {
         const winner = leaderboard.find((l) => l.userId === dist.userId);
         if (winner) {
           if (dist.rank === 1) {
             // Winner notification
-            await notificationService.notifyCompetitionWon(
+            notificationService.notifyCompetitionWon(
               winner.userId,
               competition.name,
               dist.prizeAmount
-            );
+            ).catch(e => console.error('Failed to send winner notification:', e));
           } else if (dist.rank <= 3) {
             // Podium notification
-            await notificationService.notifyPodiumFinish(
+            notificationService.notifyPodiumFinish(
               winner.userId,
               competition.name,
               dist.rank,
               dist.prizeAmount
-            );
+            ).catch(e => console.error('Failed to send podium notification:', e));
           }
           
           // Send prize received notification to all winners
-          await notificationService.notifyPrizeReceived(
+          notificationService.notifyPrizeReceived(
             winner.userId,
             competition.name,
             dist.prizeAmount,
             dist.rank
-          );
+          ).catch(e => console.error('Failed to send prize notification:', e));
         }
       }
       
-      // Notify disqualified participants
+      // Notify disqualified participants - non-blocking
       const disqualifiedParticipants = leaderboard.filter(p => p.qualificationStatus === 'disqualified');
       for (const participant of disqualifiedParticipants) {
-        await notificationService.notifyDisqualified(
+        notificationService.notifyDisqualified(
           participant.userId,
           competition._id.toString(),
           competition.name,
           participant.disqualificationReason || 'Did not meet competition requirements'
-        );
+        ).catch(e => console.error('Failed to send disqualification notification:', e));
       }
       if (disqualifiedParticipants.length > 0) {
         console.log(`🔔 Sent ${disqualifiedParticipants.length} disqualification notifications`);
       }
 
-      // Notify all participants about competition end
+      // Notify all participants about competition end - non-blocking
       for (const participant of leaderboard) {
         const pnl = participant.pnl || 0;
-        await notificationService.notifyCompetitionEnded(
+        notificationService.notifyCompetitionEnded(
           participant.userId,
           competition._id.toString(),
           competition.name,
           participant.rank || 0,
           pnl
-        );
+        ).catch(e => console.error('Failed to send competition end notification:', e));
       }
       
-      console.log(`🔔 Sent ${leaderboard.length} competition end notifications`);
+      console.log(`🔔 Queued ${leaderboard.length} competition end notifications`);
     } catch (error) {
       console.error('Error sending competition end notifications:', error);
     }
@@ -648,11 +650,19 @@ export async function finalizeCompetition(competitionId: string) {
       },
     };
   } catch (error) {
-    await session.abortTransaction();
+    // Only abort if session is still in transaction
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     console.error('❌ Error finalizing competition:', error);
     throw error;
   } finally {
-    session.endSession();
+    // End session if it hasn't been ended yet (for error cases)
+    try {
+      session.endSession();
+    } catch {
+      // Session already ended after successful commit
+    }
   }
 }
 

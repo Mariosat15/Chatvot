@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface CompetitionStatusMonitorProps {
   competitionId: string;
@@ -103,11 +104,11 @@ export default function CompetitionStatusMonitor({
       }
     };
 
-    // Initial check after 3 seconds (faster than before)
+    // Initial check after 3 seconds
     const timeoutId = setTimeout(checkCompetitionStatus, 3000);
 
-    // Poll every 5 seconds (faster to catch cancellations)
-    pollIntervalRef.current = setInterval(checkCompetitionStatus, 5000);
+    // Poll at optimized interval (10 seconds instead of 5)
+    pollIntervalRef.current = setInterval(checkCompetitionStatus, PERFORMANCE_INTERVALS.COMPETITION_STATUS);
 
     // Cleanup
     return () => {

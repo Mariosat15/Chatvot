@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { AccountInfoPanel } from './AccountInfoPanel';
 import { usePrices } from '@/contexts/PriceProvider';
 import { calculateUnrealizedPnL, type ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { useTradingMode } from './TradingInterface';
 import { checkUserMargin } from '@/lib/actions/trading/margin-monitor.actions';
 import { useRouter } from 'next/navigation';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface Position {
   _id: string;
@@ -59,31 +60,30 @@ export function LiveAccountInfo({
   const [liveUnrealizedPnl, setLiveUnrealizedPnl] = useState(initialUnrealizedPnl);
   const [liveAvailableCapital, setLiveAvailableCapital] = useState(initialAvailableCapital);
   const lastMarginCheck = useRef<number>(0);
+  const marginCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Update metrics in real-time based on price changes
-  useEffect(() => {
+  // Memoize position symbols to avoid re-subscribing unnecessarily
+  const positionSymbols = useMemo(() => 
+    initialPositions.map(p => p.symbol as ForexSymbol),
+    [initialPositions]
+  );
+
+  // Calculate PnL - memoized to prevent recalculation on every render
+  const calculatedPnl = useMemo(() => {
     if (initialPositions.length === 0) {
-      setLiveUnrealizedPnl(0);
-      setLiveEquity(initialBalance);
-      setLiveAvailableCapital(initialBalance - initialUsedMargin);
-      return;
+      return { totalUnrealizedPnl: 0, newEquity: initialBalance, newAvailableCapital: initialBalance - initialUsedMargin };
     }
 
-    // Recalculate total unrealized P&L from all positions with current prices
     let totalUnrealizedPnl = 0;
 
     for (const position of initialPositions) {
       const currentPrice = prices.get(position.symbol as ForexSymbol);
       if (!currentPrice) {
-        // Use stored price if real-time price not available
         totalUnrealizedPnl += position.unrealizedPnl;
         continue;
       }
 
-      // Get current market price based on position side
       const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
-
-      // Calculate P&L with current price
       const pnl = calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
@@ -95,41 +95,57 @@ export function LiveAccountInfo({
       totalUnrealizedPnl += pnl;
     }
 
-    // Update derived values
     const newEquity = initialBalance + totalUnrealizedPnl;
-    const newAvailableCapital = newEquity - initialUsedMargin;
+    const newAvailableCapital = Math.max(0, newEquity - initialUsedMargin);
 
-    setLiveUnrealizedPnl(totalUnrealizedPnl);
-    setLiveEquity(newEquity);
-    setLiveAvailableCapital(Math.max(0, newAvailableCapital));
+    return { totalUnrealizedPnl, newEquity, newAvailableCapital };
   }, [prices, initialPositions, initialBalance, initialUsedMargin]);
 
-  // Real-time margin monitoring - check every 5 seconds
+  // Update state only when calculated values change
+  useEffect(() => {
+    setLiveUnrealizedPnl(calculatedPnl.totalUnrealizedPnl);
+    setLiveEquity(calculatedPnl.newEquity);
+    setLiveAvailableCapital(calculatedPnl.newAvailableCapital);
+  }, [calculatedPnl]);
+
+  // Margin check callback - memoized
+  const checkMarginCallback = useCallback(async () => {
+    if (initialPositions.length === 0) return;
+    
+    const now = Date.now();
+    // Extra throttle protection
+    if (now - lastMarginCheck.current < PERFORMANCE_INTERVALS.MARGIN_CHECK) return;
+    
+    lastMarginCheck.current = now;
+
+    try {
+      const result = await checkUserMargin(competitionId);
+      
+      if (result.liquidated) {
+        router.refresh();
+      }
+    } catch (error) {
+      // Silent fail - margin check is non-critical
+    }
+  }, [competitionId, initialPositions.length, router]);
+
+  // Margin monitoring - uses interval instead of running on every price update
   useEffect(() => {
     if (initialPositions.length === 0) return;
 
-    const checkMargin = async () => {
-      const now = Date.now();
-      // Throttle to once every 5 seconds
-      if (now - lastMarginCheck.current < 5000) return;
-      
-      lastMarginCheck.current = now;
+    // Initial check after 2 seconds
+    const timeoutId = setTimeout(checkMarginCallback, 2000);
 
-      try {
-        const result = await checkUserMargin(competitionId);
-        
-        if (result.liquidated) {
-          // Refresh the page to show closed positions
-          router.refresh();
-        }
-      } catch (error) {
-        console.error('Error checking margin:', error);
+    // Then check at regular intervals (not on every price tick!)
+    marginCheckIntervalRef.current = setInterval(checkMarginCallback, PERFORMANCE_INTERVALS.MARGIN_CHECK);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (marginCheckIntervalRef.current) {
+        clearInterval(marginCheckIntervalRef.current);
       }
     };
-
-    // Check margin on every price update
-    checkMargin();
-  }, [prices, initialPositions, competitionId, router]);
+  }, [initialPositions.length, checkMarginCallback]);
 
   return (
     <AccountInfoPanel

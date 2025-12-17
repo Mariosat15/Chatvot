@@ -661,8 +661,10 @@ export async function finalizeChallenge(challengeId: string) {
     }
 
     await session.commitTransaction();
+    // End session immediately after commit to prevent "abortTransaction after commitTransaction" error
+    session.endSession();
 
-    // Send notifications
+    // Send notifications (outside of transaction - fire and forget)
     try {
       const { notificationService } = await import(
         '@/lib/services/notification.service'
@@ -670,7 +672,7 @@ export async function finalizeChallenge(challengeId: string) {
 
       if (winnerId && !isTie) {
         // Notify winner
-        await notificationService.send({
+        notificationService.send({
           userId: winnerId,
           templateId: 'challenge_won',
           variables: {
@@ -679,11 +681,11 @@ export async function finalizeChallenge(challengeId: string) {
             prize: winnerPrize,
             pnl: winnerPnL?.toFixed(2) || '0',
           },
-        });
+        }).catch(e => console.error('Failed to send winner notification:', e));
 
         // Notify loser
         if (loserId) {
-          await notificationService.send({
+          notificationService.send({
             userId: loserId,
             templateId: 'challenge_lost',
             variables: {
@@ -691,7 +693,7 @@ export async function finalizeChallenge(challengeId: string) {
               opponentName: winnerName || 'opponent',
               pnl: loserPnL?.toFixed(2) || '0',
             },
-          });
+          }).catch(e => console.error('Failed to send loser notification:', e));
         }
       } else if (isTie) {
         // Notify both about tie
@@ -702,7 +704,7 @@ export async function finalizeChallenge(challengeId: string) {
             ? 'Challenger wins by default.'
             : 'No prize awarded.';
 
-        await notificationService.send({
+        notificationService.send({
           userId: challenger.userId,
           templateId: 'challenge_tie',
           variables: {
@@ -710,9 +712,9 @@ export async function finalizeChallenge(challengeId: string) {
             opponentName: challenged.username || 'opponent',
             tieResolution,
           },
-        });
+        }).catch(e => console.error('Failed to send tie notification:', e));
 
-        await notificationService.send({
+        notificationService.send({
           userId: challenged.userId,
           templateId: 'challenge_tie',
           variables: {
@@ -720,12 +722,12 @@ export async function finalizeChallenge(challengeId: string) {
             opponentName: challenger.username || 'opponent',
             tieResolution,
           },
-        });
+        }).catch(e => console.error('Failed to send tie notification:', e));
       }
 
       // Notify disqualified players
       if (challengerDisqualified) {
-        await notificationService.send({
+        notificationService.send({
           userId: challenger.userId,
           templateId: 'challenge_disqualified',
           variables: {
@@ -733,11 +735,11 @@ export async function finalizeChallenge(challengeId: string) {
             opponentName: challenged.username || 'opponent',
             reason: challenger.disqualificationReason || 'Did not meet minimum trade requirement',
           },
-        });
+        }).catch(e => console.error('Failed to send disqualification notification:', e));
       }
 
       if (challengedDisqualified) {
-        await notificationService.send({
+        notificationService.send({
           userId: challenged.userId,
           templateId: 'challenge_disqualified',
           variables: {
@@ -745,7 +747,7 @@ export async function finalizeChallenge(challengeId: string) {
             opponentName: challenger.username || 'opponent',
             reason: challenged.disqualificationReason || 'Did not meet minimum trade requirement',
           },
-        });
+        }).catch(e => console.error('Failed to send disqualification notification:', e));
       }
     } catch (notifError) {
       console.error('Error sending challenge notifications:', notifError);
@@ -756,11 +758,19 @@ export async function finalizeChallenge(challengeId: string) {
     );
     return { success: true, winnerId, winnerName, isTie };
   } catch (error) {
-    await session.abortTransaction();
+    // Only abort if session is still in transaction
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     console.error(`Error finalizing challenge ${challengeId}:`, error);
     throw error;
   } finally {
-    session.endSession();
+    // End session if it hasn't been ended yet (for error cases)
+    try {
+      session.endSession();
+    } catch {
+      // Session already ended after successful commit
+    }
   }
 }
 

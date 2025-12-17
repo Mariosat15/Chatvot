@@ -41,6 +41,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from '@/components/ui/alert';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface RedisSettings {
   upstashRedisUrl: string;
@@ -120,7 +121,7 @@ export default function RedisSettingsSection() {
   useEffect(() => {
     if (settings.redisEnabled) {
       fetchCacheStats();
-      const interval = setInterval(fetchCacheStats, 10000); // Refresh every 10s
+      const interval = setInterval(fetchCacheStats, PERFORMANCE_INTERVALS.REDIS_STATS);
       return () => clearInterval(interval);
     }
   }, [settings.redisEnabled]);
@@ -129,7 +130,7 @@ export default function RedisSettingsSection() {
   useEffect(() => {
     if (settings.priceFeedWebsocketEnabled) {
       fetchWebSocketStatus();
-      const interval = setInterval(fetchWebSocketStatus, 5000); // Refresh every 5s
+      const interval = setInterval(fetchWebSocketStatus, PERFORMANCE_INTERVALS.WEBSOCKET_STATUS);
       return () => clearInterval(interval);
     }
   }, [settings.priceFeedWebsocketEnabled]);

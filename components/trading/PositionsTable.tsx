@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -391,5 +391,15 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
   );
 };
 
-export default PositionsTable;
+// Memoize the component to prevent re-renders when parent re-renders but positions haven't changed
+export default memo(PositionsTable, (prevProps, nextProps) => {
+  // Only re-render if positions array or competitionId changed
+  if (prevProps.competitionId !== nextProps.competitionId) return false;
+  if (prevProps.positions.length !== nextProps.positions.length) return false;
+  
+  // Check if any position IDs changed
+  const prevIds = prevProps.positions.map(p => p._id).join(',');
+  const nextIds = nextProps.positions.map(p => p._id).join(',');
+  return prevIds === nextIds;
+});
 

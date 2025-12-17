@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Play, Eye, TrendingUp, TrendingDown, Trophy, BarChart3, Clock, RefreshCw } from 'lucide-react';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface UserParticipant {
   _id: string;
@@ -62,13 +63,18 @@ export default function CompetitionStatusWrapper({
           setIsTransitioning(false);
         }, 500);
       }
+
+      return start.getTime() - now.getTime(); // Return time until start
     };
 
     // Check immediately
-    checkStatus();
+    const timeUntilStart = checkStatus();
 
-    // Check every second for more responsive updates
-    const interval = setInterval(checkStatus, 1000);
+    // Use adaptive interval: 1 second when close to starting, otherwise 10 seconds
+    const isCloseToStart = timeUntilStart > 0 && timeUntilStart < 60000; // Within 1 minute
+    const intervalTime = isCloseToStart ? PERFORMANCE_INTERVALS.COUNTDOWN_UPDATE : PERFORMANCE_INTERVALS.COMPETITION_STATUS;
+    
+    const interval = setInterval(checkStatus, intervalTime);
 
     return () => clearInterval(interval);
   }, [startTime, endTime, status]);

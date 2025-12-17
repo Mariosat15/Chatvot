@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface ChallengeStatusMonitorProps {
   challengeId: string;
@@ -128,8 +129,8 @@ export default function ChallengeStatusMonitor({
     // Initial check after 3 seconds
     const timeoutId = setTimeout(checkChallengeStatus, 3000);
 
-    // Poll every 5 seconds
-    pollIntervalRef.current = setInterval(checkChallengeStatus, 5000);
+    // Poll at optimized interval (10 seconds instead of 5)
+    pollIntervalRef.current = setInterval(checkChallengeStatus, PERFORMANCE_INTERVALS.CHALLENGE_STATUS);
 
     return () => {
       clearTimeout(timeoutId);

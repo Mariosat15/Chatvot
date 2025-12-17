@@ -35,6 +35,7 @@ import RestrictedUsersSection from '@/components/admin/RestrictedUsersSection';
 import SuspicionScoreCard from '@/components/admin/fraud/SuspicionScoreCard';
 import FraudHistorySection from '@/components/admin/FraudHistorySection';
 import { History } from 'lucide-react';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface FraudAlert {
   _id: string;
@@ -133,11 +134,13 @@ export default function FraudMonitoringSection() {
     fetchAlerts();
     fetchDevices();
     
-    // Auto-refresh every 30 seconds
+    // Auto-refresh - optimized to 60 seconds (was 30)
     const interval = setInterval(() => {
+      // Skip if tab is hidden
+      if (document.hidden) return;
       fetchAlerts();
       fetchDevices();
-    }, 30000);
+    }, PERFORMANCE_INTERVALS.FRAUD_MONITORING);
 
     return () => clearInterval(interval);
   }, [statusFilter]);

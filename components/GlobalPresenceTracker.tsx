@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 /**
  * Global presence tracker component that should be added to the root layout.
@@ -30,8 +31,8 @@ export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
     // Send initial heartbeat
     sendHeartbeat();
 
-    // Set up interval for heartbeats every 10 seconds
-    heartbeatRef.current = setInterval(sendHeartbeat, 10000);
+    // Set up interval for heartbeats - optimized to 30 seconds (was 10)
+    heartbeatRef.current = setInterval(sendHeartbeat, PERFORMANCE_INTERVALS.PRESENCE_HEARTBEAT);
 
     // Handle visibility change
     const handleVisibilityChange = () => {
