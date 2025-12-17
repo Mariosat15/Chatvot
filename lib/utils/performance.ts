@@ -275,7 +275,8 @@ export const PERFORMANCE_INTERVALS = {
   // Countdowns - keep at 1 second for accuracy
   COUNTDOWN_UPDATE: 1000,
   
-  // Margin checks
-  MARGIN_CHECK: 10000,          // 10 seconds (was on every price tick!)
+  // Margin checks - now formula-based (local calculation triggers server call)
+  // These are only used as backup safety net intervals
+  MARGIN_BACKUP_CHECK: 60000,   // 60 seconds - backup check (primary is formula-based)
 } as const;
 

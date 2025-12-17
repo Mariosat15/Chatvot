@@ -318,8 +318,10 @@ export function validateQuantity(
     return { valid: false, error: `Maximum lot size is ${maxLot}` };
   }
   // Check if quantity is a valid increment (0.01)
-  const remainder = (quantity * 100) % 1;
-  if (remainder !== 0) {
+  // Use tolerance for floating-point precision (0.07 * 100 might give 7.0000000001)
+  const scaledQuantity = quantity * 100;
+  const remainder = Math.abs(scaledQuantity - Math.round(scaledQuantity));
+  if (remainder > 0.0001) { // Allow tiny floating-point errors
     return { valid: false, error: 'Lot size must be in increments of 0.01' };
   }
   return { valid: true };
