@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { TrendingUp, TrendingDown, Star, Zap, Trophy, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePrices } from '@/contexts/PriceProvider';
@@ -35,26 +35,30 @@ interface Candle {
   isUp: boolean;
 }
 
-export default function GameChart({ competitionId, positions = [] }: GameChartProps) {
+function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
   const { prices, subscribe, unsubscribe } = usePrices();
   const { symbol, setSymbol } = useChartSymbol();
   const [candles, setCandles] = useState<Candle[]>([]);
   const [priceChange, setPriceChange] = useState<number>(0);
-  const [forceUpdate, setForceUpdate] = useState<number>(0); // Force re-render
   const [visibleCandles, setVisibleCandles] = useState<number>(10); // Zoom control
   const [chartType, setChartType] = useState<'line' | 'candle'>('line'); // Chart type toggle
   const [timeframe, setTimeframe] = useState<'1m' | '5m' | '15m' | '30m' | '1h'>('1m'); // Timeframe
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastPriceRef = useRef<number>(0);
+  const lastUpdateRef = useRef<number>(0); // Throttle updates
   
-  // Calculate P&L and hasPositions from props
-  const symbolPositions = positions.filter((p) => p.symbol === symbol);
-  const totalPnL = symbolPositions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
-  const hasPositions = symbolPositions.length > 0;
-  
-  // Get entry price from first position (for profit/loss zones)
-  const entryPrice = symbolPositions.length > 0 ? symbolPositions[0].entryPrice : null;
-  const positionSide = symbolPositions.length > 0 ? symbolPositions[0].side : null;
+  // Memoize expensive position calculations
+  const { symbolPositions, totalPnL, hasPositions, entryPrice, positionSide } = useMemo(() => {
+    const filtered = positions.filter((p) => p.symbol === symbol);
+    const pnl = filtered.reduce((sum, p) => sum + p.unrealizedPnl, 0);
+    return {
+      symbolPositions: filtered,
+      totalPnL: pnl,
+      hasPositions: filtered.length > 0,
+      entryPrice: filtered.length > 0 ? filtered[0].entryPrice : null,
+      positionSide: filtered.length > 0 ? filtered[0].side : null,
+    };
+  }, [positions, symbol]);
 
   // Get current price
   const currentPrice = prices.get(symbol);
@@ -114,11 +118,17 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     loadHistoricalCandles();
   }, [symbol, visibleCandles, timeframe]);
 
-  // Update current candle with LIVE real-time price ticks (immediate updates!)
+  // Update current candle with real-time price ticks (throttled for performance)
   useEffect(() => {
-    // Get fresh price from the prices Map (this triggers on every price update)
     const latestPrice = prices.get(symbol);
     if (!latestPrice || candles.length === 0) return;
+
+    const now = Date.now();
+    
+    // Throttle candle updates to max once per 500ms for performance
+    // Price lines update in real-time, candle drawing is less critical
+    if (now - lastUpdateRef.current < 500) return;
+    lastUpdateRef.current = now;
 
     const mid = latestPrice.mid;
     const bid = latestPrice.bid;
@@ -131,17 +141,16 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     }
     lastPriceRef.current = mid;
 
-    // Update IMMEDIATELY on every price tick (no delay!)
+    // Update candles (throttled)
     setCandles((prev) => {
       if (prev.length === 0) return prev;
       
       const newCandles = [...prev];
       const lastCandle = newCandles[newCandles.length - 1];
-      const now = Date.now();
       const currentMinute = Math.floor(now / 60000) * 60000;
       const lastCandleMinute = Math.floor(lastCandle.time / 60000) * 60000;
 
-      // If we're in the same minute, update the last candle LIVE
+      // If we're in the same minute, update the last candle
       if (currentMinute === lastCandleMinute) {
         lastCandle.high = Math.max(lastCandle.high, ask);
         lastCandle.low = Math.min(lastCandle.low, bid);
@@ -165,15 +174,12 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         if (newCandles.length > visibleCandles) {
           newCandles.shift();
         }
-        
       }
 
       return newCandles;
     });
-    
-    // Force re-render to update the canvas
-    setForceUpdate(prev => prev + 1);
-  }, [prices, symbol]); // Triggers on EVERY price update in the prices Map!
+    // Note: setCandles triggers re-render automatically, no forceUpdate needed
+  }, [prices, symbol, candles.length, visibleCandles]);
 
   // Draw gaming candles
   useEffect(() => {
@@ -508,7 +514,7 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
       ctx.fillText(`${month}/${day}`, x, yDate);
       ctx.fillStyle = '#d1d5db'; // Reset color
     }
-  }, [candles, hasPositions, totalPnL, symbolPositions, forceUpdate, entryPrice, positionSide, visibleCandles, chartType, timeframe]); // forceUpdate triggers redraw on every price tick
+  }, [candles, hasPositions, totalPnL, symbolPositions, entryPrice, positionSide, visibleCandles, chartType, timeframe]);
 
   const lastCandle = candles.length > 0 ? candles[candles.length - 1] : null;
   const isGoingUp = lastCandle?.isUp ?? false;
@@ -808,4 +814,18 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     </div>
   );
 }
+
+// Memoize to prevent re-renders when parent re-renders but props haven't changed
+const GameChart = memo(GameChartInner, (prevProps, nextProps) => {
+  // Only re-render if positions or competitionId changed
+  if (prevProps.competitionId !== nextProps.competitionId) return false;
+  if (prevProps.positions?.length !== nextProps.positions?.length) return false;
+  
+  // Check if any position data changed
+  const prevIds = prevProps.positions?.map(p => `${p._id}-${p.unrealizedPnl.toFixed(2)}`).join(',') || '';
+  const nextIds = nextProps.positions?.map(p => `${p._id}-${p.unrealizedPnl.toFixed(2)}`).join(',') || '';
+  return prevIds === nextIds;
+});
+
+export default GameChart;
 
