@@ -1446,6 +1446,9 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   // Initialize chart and load historical data
   useEffect(() => {
     if (!chartContainerRef.current) return;
+    
+    // Reset mounted state when chart initializes
+    isMountedRef.current = true;
 
     const initializeChart = async () => {
       setLoading(true);
@@ -1764,18 +1767,29 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     window.addEventListener('resize', handleResize);
 
     return () => {
+      // CRITICAL: Mark as unmounted FIRST to stop all updates
+      isMountedRef.current = false;
+      
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();
-      // Store reference and clear refs before removing to prevent "Object is disposed" errors
+      
+      // Clear all refs BEFORE removing chart to prevent "Object is disposed" errors
       const chart = chartRef.current;
       chartRef.current = null;
       candlestickSeriesRef.current = null;
+      bidPriceLineRef.current = null;
+      askPriceLineRef.current = null;
+      currentCandleRef.current = null;
+      volumeSeriesRef.current = null;
+      positionLinesRef.current.clear();
+      tpSlSeriesRef.current.clear();
+      
+      // Remove chart last
       if (chart) {
         try {
           chart.remove();
-        } catch (e) {
-          // Chart may already be disposed - ignore
-          console.warn('Chart already disposed:', e);
+        } catch {
+          // Chart may already be disposed - ignore silently
         }
       }
     };
