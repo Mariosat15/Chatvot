@@ -40,6 +40,12 @@ import {
   Mail,
   ShoppingBag,
   Terminal,
+  History,
+  Wallet,
+  LineChart,
+  ShieldAlert,
+  Cog,
+  LayoutDashboard,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -68,6 +74,7 @@ import MarketplaceSection from '@/components/admin/MarketplaceSection';
 import LandingPageBuilder from '@/components/admin/LandingPageBuilder';
 import RedisSettingsSection from '@/components/admin/RedisSettingsSection';
 import DevSettingsSection from '@/components/admin/DevSettingsSection';
+import TradingHistorySection from '@/components/admin/TradingHistorySection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -84,109 +91,191 @@ interface MenuItem {
   children?: { id: string; label: string; icon: React.ReactNode }[];
 }
 
-const menuItems: MenuItem[] = [
+interface MenuGroup {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+  items: MenuItem[];
+}
+
+// Menu organized by groups
+const menuGroups: MenuGroup[] = [
+  // Content Management
   {
-    id: 'hero-page',
-    label: 'Hero Page',
-    icon: <Home className="h-5 w-5" />,
+    id: 'content',
+    label: 'Content',
+    icon: <LayoutDashboard className="h-4 w-4" />,
     color: 'text-yellow-400',
-    bgColor: 'bg-yellow-500/10 hover:bg-yellow-500/20',
+    items: [
+      {
+        id: 'hero-page',
+        label: 'Hero Page',
+        icon: <Home className="h-5 w-5" />,
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-500/10 hover:bg-yellow-500/20',
+      },
+      {
+        id: 'marketplace',
+        label: 'Marketplace',
+        icon: <ShoppingBag className="h-5 w-5" />,
+        color: 'text-fuchsia-400',
+        bgColor: 'bg-fuchsia-500/10 hover:bg-fuchsia-500/20',
+      },
+    ],
   },
+  // Trading
   {
-    id: 'competitions',
-    label: 'Competitions',
-    icon: <Trophy className="h-5 w-5" />,
+    id: 'trading',
+    label: 'Trading',
+    icon: <LineChart className="h-4 w-4" />,
     color: 'text-orange-400',
-    bgColor: 'bg-orange-500/10 hover:bg-orange-500/20',
+    items: [
+      {
+        id: 'competitions',
+        label: 'Competitions',
+        icon: <Trophy className="h-5 w-5" />,
+        color: 'text-orange-400',
+        bgColor: 'bg-orange-500/10 hover:bg-orange-500/20',
+      },
+      {
+        id: 'challenges',
+        label: '1v1 Challenges',
+        icon: <Swords className="h-5 w-5" />,
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/10 hover:bg-red-500/20',
+      },
+      {
+        id: 'trading-history',
+        label: 'Trading History',
+        icon: <History className="h-5 w-5" />,
+        color: 'text-cyan-400',
+        bgColor: 'bg-cyan-500/10 hover:bg-cyan-500/20',
+      },
+      {
+        id: 'analytics',
+        label: 'Analytics',
+        icon: <BarChart3 className="h-5 w-5" />,
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-500/10 hover:bg-blue-500/20',
+      },
+    ],
   },
+  // User Management
   {
-    id: 'challenges',
-    label: '1v1 Challenges',
-    icon: <Swords className="h-5 w-5" />,
-    color: 'text-red-400',
-    bgColor: 'bg-red-500/10 hover:bg-red-500/20',
-  },
-  {
-    id: 'marketplace',
-    label: 'Marketplace',
-    icon: <ShoppingBag className="h-5 w-5" />,
-    color: 'text-fuchsia-400',
-    bgColor: 'bg-fuchsia-500/10 hover:bg-fuchsia-500/20',
-  },
-  {
-    id: 'users',
-    label: 'Users',
-    icon: <Users className="h-5 w-5" />,
+    id: 'user-management',
+    label: 'User Management',
+    icon: <Users className="h-4 w-4" />,
     color: 'text-cyan-400',
-    bgColor: 'bg-cyan-500/10 hover:bg-cyan-500/20',
+    items: [
+      {
+        id: 'users',
+        label: 'Users',
+        icon: <Users className="h-5 w-5" />,
+        color: 'text-cyan-400',
+        bgColor: 'bg-cyan-500/10 hover:bg-cyan-500/20',
+      },
+      {
+        id: 'badges',
+        label: 'Badges & XP',
+        icon: <Award className="h-5 w-5" />,
+        color: 'text-pink-400',
+        bgColor: 'bg-pink-500/10 hover:bg-pink-500/20',
+      },
+    ],
   },
+  // Finance & Payments
   {
-    id: 'financial',
-    label: 'Financial',
-    icon: <DollarSign className="h-5 w-5" />,
+    id: 'finance',
+    label: 'Finance',
+    icon: <Wallet className="h-4 w-4" />,
     color: 'text-emerald-400',
-    bgColor: 'bg-emerald-500/10 hover:bg-emerald-500/20',
+    items: [
+      {
+        id: 'financial',
+        label: 'Financial Dashboard',
+        icon: <DollarSign className="h-5 w-5" />,
+        color: 'text-emerald-400',
+        bgColor: 'bg-emerald-500/10 hover:bg-emerald-500/20',
+      },
+      {
+        id: 'payments',
+        label: 'Pending Payments',
+        icon: <CreditCard className="h-5 w-5" />,
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-500/10 hover:bg-yellow-500/20',
+      },
+    ],
   },
+  // Security
   {
-    id: 'analytics',
-    label: 'Analytics',
-    icon: <BarChart3 className="h-5 w-5" />,
-    color: 'text-blue-400',
-    bgColor: 'bg-blue-500/10 hover:bg-blue-500/20',
-  },
-  {
-    id: 'payments',
-    label: 'Payments',
-    icon: <CreditCard className="h-5 w-5" />,
-    color: 'text-yellow-400',
-    bgColor: 'bg-yellow-500/10 hover:bg-yellow-500/20',
-  },
-  {
-    id: 'fraud',
-    label: 'Fraud Detection',
-    icon: <AlertTriangle className="h-5 w-5" />,
+    id: 'security',
+    label: 'Security',
+    icon: <ShieldAlert className="h-4 w-4" />,
     color: 'text-red-400',
-    bgColor: 'bg-red-500/10 hover:bg-red-500/20',
+    items: [
+      {
+        id: 'fraud',
+        label: 'Fraud Detection',
+        icon: <AlertTriangle className="h-5 w-5" />,
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/10 hover:bg-red-500/20',
+      },
+    ],
   },
+  // Help
   {
-    id: 'badges',
-    label: 'Badges & XP',
-    icon: <Award className="h-5 w-5" />,
-    color: 'text-pink-400',
-    bgColor: 'bg-pink-500/10 hover:bg-pink-500/20',
-  },
-  {
-    id: 'wiki',
-    label: 'Documentation',
-    icon: <BookOpen className="h-5 w-5" />,
+    id: 'help',
+    label: 'Help',
+    icon: <BookOpen className="h-4 w-4" />,
     color: 'text-indigo-400',
-    bgColor: 'bg-indigo-500/10 hover:bg-indigo-500/20',
+    items: [
+      {
+        id: 'wiki',
+        label: 'Documentation',
+        icon: <BookOpen className="h-5 w-5" />,
+        color: 'text-indigo-400',
+        bgColor: 'bg-indigo-500/10 hover:bg-indigo-500/20',
+      },
+    ],
   },
+  // Settings
   {
-    id: 'settings',
+    id: 'settings-group',
     label: 'Settings',
-    icon: <SettingsIcon className="h-5 w-5" />,
+    icon: <Cog className="h-4 w-4" />,
     color: 'text-purple-400',
-    bgColor: 'bg-purple-500/10 hover:bg-purple-500/20',
-    children: [
-      { id: 'credentials', label: 'Credentials', icon: <Key className="h-4 w-4" /> },
-      { id: 'environment', label: 'Environment', icon: <Globe className="h-4 w-4" /> },
-      { id: 'branding', label: 'Branding', icon: <Palette className="h-4 w-4" /> },
-      { id: 'company', label: 'Company', icon: <Building2 className="h-4 w-4" /> },
-      { id: 'invoices', label: 'Invoices', icon: <FileText className="h-4 w-4" /> },
-      { id: 'email-templates', label: 'Email Templates', icon: <Mail className="h-4 w-4" /> },
-      { id: 'notifications', label: 'Notifications', icon: <Bell className="h-4 w-4" /> },
-      { id: 'trading', label: 'Trading Risk', icon: <Gauge className="h-4 w-4" /> },
-      { id: 'currency', label: 'Currency', icon: <Coins className="h-4 w-4" /> },
-      { id: 'fees', label: 'Fees', icon: <DollarSign className="h-4 w-4" /> },
-      { id: 'payment-providers', label: 'Payment Providers', icon: <CreditCard className="h-4 w-4" /> },
-      { id: 'redis', label: 'Redis Cache', icon: <Server className="h-4 w-4" /> },
-      { id: 'database', label: 'Database', icon: <Database className="h-4 w-4" /> },
-      { id: 'audit-logs', label: 'Audit Logs', icon: <ScrollText className="h-4 w-4" /> },
-      { id: 'dev-settings', label: 'Dev Settings', icon: <Terminal className="h-4 w-4" /> },
+    items: [
+      {
+        id: 'settings',
+        label: 'Settings',
+        icon: <SettingsIcon className="h-5 w-5" />,
+        color: 'text-purple-400',
+        bgColor: 'bg-purple-500/10 hover:bg-purple-500/20',
+        children: [
+          { id: 'credentials', label: 'Credentials', icon: <Key className="h-4 w-4" /> },
+          { id: 'environment', label: 'Environment', icon: <Globe className="h-4 w-4" /> },
+          { id: 'branding', label: 'Branding', icon: <Palette className="h-4 w-4" /> },
+          { id: 'company', label: 'Company', icon: <Building2 className="h-4 w-4" /> },
+          { id: 'invoices', label: 'Invoices', icon: <FileText className="h-4 w-4" /> },
+          { id: 'email-templates', label: 'Email Templates', icon: <Mail className="h-4 w-4" /> },
+          { id: 'notifications', label: 'Notifications', icon: <Bell className="h-4 w-4" /> },
+          { id: 'trading', label: 'Trading Risk', icon: <Gauge className="h-4 w-4" /> },
+          { id: 'currency', label: 'Currency', icon: <Coins className="h-4 w-4" /> },
+          { id: 'fees', label: 'Fees', icon: <DollarSign className="h-4 w-4" /> },
+          { id: 'payment-providers', label: 'Payment Providers', icon: <CreditCard className="h-4 w-4" /> },
+          { id: 'redis', label: 'Redis Cache', icon: <Server className="h-4 w-4" /> },
+          { id: 'database', label: 'Database', icon: <Database className="h-4 w-4" /> },
+          { id: 'audit-logs', label: 'Audit Logs', icon: <ScrollText className="h-4 w-4" /> },
+          { id: 'dev-settings', label: 'Dev Settings', icon: <Terminal className="h-4 w-4" /> },
+        ],
+      },
     ],
   },
 ];
+
+// Flat menuItems for backward compatibility
+const menuItems: MenuItem[] = menuGroups.flatMap(group => group.items);
 
 export default function AdminDashboard({
   isFirstLogin,
@@ -228,19 +317,23 @@ export default function AdminDashboard({
 
   const isActive = (itemId: string, childId?: string) => {
     if (childId) return activeSection === childId;
-    const item = menuItems.find(m => m.id === itemId);
-    if (item?.children) {
-      return item.children.some(c => c.id === activeSection);
+    for (const group of menuGroups) {
+      const item = group.items.find(m => m.id === itemId);
+      if (item?.children) {
+        return item.children.some(c => c.id === activeSection);
+      }
     }
     return activeSection === itemId;
   };
 
   const getPageTitle = () => {
-    for (const item of menuItems) {
-      if (item.id === activeSection) return item.label;
-      if (item.children) {
-        const child = item.children.find(c => c.id === activeSection);
-        if (child) return `Settings → ${child.label}`;
+    for (const group of menuGroups) {
+      for (const item of group.items) {
+        if (item.id === activeSection) return item.label;
+        if (item.children) {
+          const child = item.children.find(c => c.id === activeSection);
+          if (child) return `${item.label} → ${child.label}`;
+        }
       }
     }
     return 'Dashboard';
@@ -258,6 +351,8 @@ export default function AdminDashboard({
         return <MarketplaceSection />;
       case 'users':
         return <UsersSection />;
+      case 'trading-history':
+        return <TradingHistorySection />;
       case 'financial':
         return <FinancialDashboard />;
       case 'analytics':
@@ -340,63 +435,80 @@ export default function AdminDashboard({
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {menuItems.map((item) => (
-          <div key={item.id}>
-            <button
-              onClick={() => handleMenuClick(item)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group",
-                isActive(item.id) && !item.children
-                  ? `${item.bgColor} ${item.color}`
-                  : "text-gray-400 hover:text-white hover:bg-gray-800/50",
-                sidebarCollapsed && "justify-center px-2"
-              )}
-            >
-              <span className={cn(
-                "shrink-0 transition-colors",
-                isActive(item.id) ? item.color : "group-hover:text-white"
-              )}>
-                {item.icon}
-              </span>
-              {!sidebarCollapsed && (
-                <>
-                  <span className="flex-1 text-left text-sm font-medium truncate">
-                    {item.label}
-                  </span>
-                  {item.children && (
-                    <span className="shrink-0">
-                      {expandedMenus.includes(item.id) ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </span>
-                  )}
-                </>
-              )}
-            </button>
-
-            {/* Submenu */}
-            {item.children && expandedMenus.includes(item.id) && !sidebarCollapsed && (
-              <div className="mt-1 ml-4 pl-4 border-l border-gray-700/50 space-y-1">
-                {item.children.map((child) => (
-                  <button
-                    key={child.id}
-                    onClick={() => handleMenuClick(item, child.id)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 text-sm",
-                      activeSection === child.id
-                        ? "bg-purple-500/20 text-purple-400"
-                        : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/30"
-                    )}
-                  >
-                    <span className="shrink-0">{child.icon}</span>
-                    <span className="truncate">{child.label}</span>
-                  </button>
-                ))}
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4">
+        {menuGroups.map((group) => (
+          <div key={group.id}>
+            {/* Group Header */}
+            {!sidebarCollapsed && (
+              <div className="flex items-center gap-2 px-3 mb-2">
+                <span className={cn("shrink-0", group.color)}>{group.icon}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                  {group.label}
+                </span>
               </div>
             )}
+            
+            {/* Group Items */}
+            <div className="space-y-1">
+              {group.items.map((item) => (
+                <div key={item.id}>
+                  <button
+                    onClick={() => handleMenuClick(item)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group",
+                      isActive(item.id) && !item.children
+                        ? `${item.bgColor} ${item.color}`
+                        : "text-gray-400 hover:text-white hover:bg-gray-800/50",
+                      sidebarCollapsed && "justify-center px-2"
+                    )}
+                  >
+                    <span className={cn(
+                      "shrink-0 transition-colors",
+                      isActive(item.id) ? item.color : "group-hover:text-white"
+                    )}>
+                      {item.icon}
+                    </span>
+                    {!sidebarCollapsed && (
+                      <>
+                        <span className="flex-1 text-left text-sm font-medium truncate">
+                          {item.label}
+                        </span>
+                        {item.children && (
+                          <span className="shrink-0">
+                            {expandedMenus.includes(item.id) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </button>
+
+                  {/* Submenu */}
+                  {item.children && expandedMenus.includes(item.id) && !sidebarCollapsed && (
+                    <div className="mt-1 ml-4 pl-4 border-l border-gray-700/50 space-y-1">
+                      {item.children.map((child) => (
+                        <button
+                          key={child.id}
+                          onClick={() => handleMenuClick(item, child.id)}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 text-sm",
+                            activeSection === child.id
+                              ? "bg-purple-500/20 text-purple-400"
+                              : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/30"
+                          )}
+                        >
+                          <span className="shrink-0">{child.icon}</span>
+                          <span className="truncate">{child.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </nav>
