@@ -5,18 +5,20 @@ import { useRouter } from 'next/navigation';
 
 /**
  * Hook to sync positions with server in real-time
- * Detects when positions are closed (via TP/SL or otherwise) and refreshes the UI
+ * 
+ * NOTE: This is now a BACKUP mechanism. Primary updates come via SSE (PositionEventsProvider).
+ * Polling is reduced to catch any missed events.
  * 
  * This solves the issue where positions closed by TP/SL don't disappear from the UI
  * until the user manually refreshes the page.
  */
 
 // How often to check for position changes (in ms)
-// Set to 3 seconds for faster TP/SL detection
-const POSITION_SYNC_INTERVAL = 3000; // 3 seconds
+// Set to 10 seconds since SSE handles instant updates - this is just backup
+const POSITION_SYNC_INTERVAL = 10000; // 10 seconds (reduced from 3s since SSE is primary)
 
 // Throttle between checks (prevents rapid-fire requests)
-const CHECK_THROTTLE_MS = 2000; // 2 seconds
+const CHECK_THROTTLE_MS = 5000; // 5 seconds
 
 // Custom event types
 export const POSITION_EVENTS = {

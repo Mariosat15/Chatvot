@@ -21,6 +21,7 @@ import { LiveAccountInfo } from '@/components/trading/LiveAccountInfo';
 import { PriceProvider } from '@/contexts/PriceProvider';
 import { ChartSymbolProvider } from '@/contexts/ChartSymbolContext';
 import { TradingArsenalProvider } from '@/contexts/TradingArsenalContext';
+import { PositionEventsProvider } from '@/contexts/PositionEventsProvider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CompetitionInfoHeader } from '@/components/trading/CompetitionInfoHeader';
 import CompetitionStatusMonitor from '@/components/trading/CompetitionStatusMonitor';
@@ -128,6 +129,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
     <PriceProvider>
       <ChartSymbolProvider>
         <TradingArsenalProvider>
+        <PositionEventsProvider competitionId={competitionId} contestType="competition">
         <TradingModeProvider>
         {/* Monitor competition status and redirect when it ends - ONLY when not in view-only mode */}
         {!isViewOnly && (
@@ -449,6 +451,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
       )}
       
       </TradingModeProvider>
+        </PositionEventsProvider>
         </TradingArsenalProvider>
       </ChartSymbolProvider>
     </PriceProvider>

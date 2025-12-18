@@ -20,6 +20,7 @@ import { LiveAccountInfo } from '@/components/trading/LiveAccountInfo';
 import { PriceProvider } from '@/contexts/PriceProvider';
 import { ChartSymbolProvider } from '@/contexts/ChartSymbolContext';
 import { TradingArsenalProvider } from '@/contexts/TradingArsenalContext';
+import { PositionEventsProvider } from '@/contexts/PositionEventsProvider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChallengeInfoHeader } from '@/components/trading/ChallengeInfoHeader';
 import ChallengeStatusMonitor from '@/components/trading/ChallengeStatusMonitor';
@@ -143,6 +144,7 @@ const ChallengeTradingPage = async ({ params, searchParams }: ChallengeTradingPa
     <PriceProvider>
       <ChartSymbolProvider>
         <TradingArsenalProvider>
+        <PositionEventsProvider competitionId={challengeId} contestType="challenge">
         <TradingModeProvider>
         {/* Monitor challenge status */}
         {!isViewOnly && (
@@ -497,6 +499,7 @@ const ChallengeTradingPage = async ({ params, searchParams }: ChallengeTradingPa
       )}
       
       </TradingModeProvider>
+        </PositionEventsProvider>
         </TradingArsenalProvider>
       </ChartSymbolProvider>
     </PriceProvider>

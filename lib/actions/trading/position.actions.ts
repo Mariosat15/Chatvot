@@ -570,6 +570,27 @@ export const closePosition = async (
         revalidatePath(`/challenges/${position.competitionId}/trade`);
         revalidatePath(`/challenges/${position.competitionId}`);
       }
+      
+      // ⚡ Emit real-time SSE event for instant UI update (manual close)
+      try {
+        const PositionEvent = (await import('@/database/models/position-event.model')).default;
+        await PositionEvent.create({
+          userId: position.userId,
+          competitionId: position.competitionId,
+          contestType: contestType,
+          positionId: position._id.toString(),
+          symbol: position.symbol,
+          side: position.side,
+          eventType: 'closed',
+          closeReason: 'user',
+          realizedPnl: realizedPnl,
+          exitPrice: marketPrice,
+          createdAt: new Date(),
+        });
+        console.log(`⚡ [SSE] Manual close event emitted: ${position.symbol}`);
+      } catch (sseError) {
+        console.error('Error emitting SSE event:', sseError);
+      }
 
       return {
         success: true,
@@ -940,6 +961,27 @@ export async function closePositionAutomatic(
       );
     } catch (notifError) {
       console.error('Error sending position close notification:', notifError);
+    }
+    
+    // ⚡ Emit real-time SSE event for instant UI update
+    try {
+      const PositionEvent = (await import('@/database/models/position-event.model')).default;
+      await PositionEvent.create({
+        userId: position.userId,
+        competitionId: position.competitionId,
+        contestType: contestTypeForSLTP,
+        positionId: position._id.toString(),
+        symbol: position.symbol,
+        side: position.side,
+        eventType: 'closed',
+        closeReason: closeReason,
+        realizedPnl: realizedPnl,
+        exitPrice: exitPrice,
+        createdAt: new Date(),
+      });
+      console.log(`⚡ [SSE] Position closed event emitted: ${position.symbol} ${closeReason}`);
+    } catch (sseError) {
+      console.error('Error emitting SSE event:', sseError);
     }
   } catch (error) {
     await mongoSession.abortTransaction();

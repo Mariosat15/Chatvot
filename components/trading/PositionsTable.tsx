@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,6 +9,7 @@ import { closePosition } from '@/lib/actions/trading/position.actions';
 import { calculateUnrealizedPnL, calculatePnLPercentage, ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { usePrices } from '@/contexts/PriceProvider';
 import { usePositionSync, POSITION_EVENTS, getAuthoritativePositionIds, setAuthoritativePositionIds } from '@/hooks/usePositionSync';
+import { usePositionEventListener, PositionEvent, POSITION_SSE_EVENT } from '@/contexts/PositionEventsProvider';
 import { toast } from 'sonner';
 import { X, Loader2, TrendingUp, TrendingDown, Filter, Edit, AlertTriangle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -55,15 +56,38 @@ const PositionsTable = ({ positions, competitionId, challengeId }: PositionsTabl
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
 
-  // ⚡ Position sync for real-time TP/SL closure detection
+  // ⚡ SSE Event Listener for INSTANT position updates (< 100ms latency)
+  // This receives events directly from the server when TP/SL triggers
+  usePositionEventListener((event: PositionEvent) => {
+    console.log('⚡ [SSE] Position event received in table:', event);
+    
+    if (event.eventType === 'closed') {
+      // Instantly remove position from UI
+      closedPositionIdsRef.current.add(event.positionId);
+      setLivePositions(prev => prev.filter(p => p._id !== event.positionId));
+      
+      // Update authoritative IDs
+      const authIds = getAuthoritativePositionIds();
+      if (authIds) {
+        authIds.delete(event.positionId);
+        setAuthoritativePositionIds(authIds);
+      }
+      
+      // Toast is handled by PositionEventsProvider, but we still refresh data
+      router.refresh();
+    }
+  }, [router]);
+
+  // ⚡ Position sync as BACKUP (in case SSE fails)
+  // Reduced importance since SSE handles most cases now
   usePositionSync({
     competitionId,
     challengeId,
     enabled: true,
     onPositionClosed: (positionId, reason) => {
-      // Show toast notification when position is closed by TP/SL
+      // Only show toast if not already handled by SSE
       const closedPosition = livePositions.find(p => p._id === positionId);
-      if (closedPosition) {
+      if (closedPosition && !closedPositionIdsRef.current.has(positionId)) {
         const reasonText = reason === 'tp' ? 'Take Profit' : reason === 'sl' ? 'Stop Loss' : reason === 'margin' ? 'Margin Call' : 'TP/SL';
         toast.success(`Position closed by ${reasonText}`, {
           description: `${closedPosition.symbol} ${closedPosition.side} position closed`,
