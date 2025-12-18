@@ -5,11 +5,20 @@
   "scripts": {
     "dev": "next dev",
     "dev:turbo": "next dev --turbopack",
+    "dev:admin": "cd apps/admin && npm run dev",
+    "dev:all": "concurrently -n \"WEB,ADMIN,WORKER\" -c \"blue,yellow,green\" \"npm run dev\" \"npm run dev:admin\" \"npm run worker\"",
+    "setup": "npm install && cd apps/admin && npm install && cd ../..",
     "build": "next build",
+    "build:admin": "cd apps/admin && npm run build",
+    "build:all": "npm run build && npm run build:admin && npm run worker:build",
     "start": "next start",
+    "start:admin": "cd apps/admin && npm run start",
     "lint": "eslint",
-    "clean": "rimraf .next",
-    "test:db": "node scripts/test-db.mjs"
+    "clean": "rimraf .next && rimraf apps/admin/.next",
+    "test:db": "node scripts/test-db.mjs",
+    "worker": "npx tsx worker/index.ts",
+    "worker:build": "tsc -p worker/tsconfig.json",
+    "worker:start": "node dist/worker/index.js"
   },
   "dependencies": {
     "@fingerprintjs/fingerprintjs": "^5.0.1",
@@ -37,6 +46,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/react-grid-layout": "^1.3.6",
     "@upstash/redis": "^1.35.8",
+    "agenda": "^5.0.0",
     "archiver": "^7.0.1",
     "bcryptjs": "^3.0.3",
     "better-auth": "^1.4.7",
@@ -85,6 +95,7 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",
+    "concurrently": "^9.2.1",
     "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "^16.0.10",
@@ -93,6 +104,7 @@
     "rimraf": "^6.1.2",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "tw-animate-css": "^1.3.7",
     "typescript": "^5"
   }

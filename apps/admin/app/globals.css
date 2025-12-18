@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Import shared styles from root */
+@import "../../../app/globals.css";
+

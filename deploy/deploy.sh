@@ -1,0 +1,60 @@
+#!/bin/bash
+# ============================================
+# CHARTVOLT DEPLOYMENT SCRIPT
+# ============================================
+# 
+# Run this to deploy updates to the server.
+#
+# Usage:
+#   chmod +x deploy.sh
+#   ./deploy.sh
+#
+
+set -e
+
+echo "╔══════════════════════════════════════════════════════════╗"
+echo "║           CHARTVOLT DEPLOYMENT                            ║"
+echo "╚══════════════════════════════════════════════════════════╝"
+
+cd /var/www/chartvolt
+
+# Pull latest code
+echo "📥 Pulling latest code..."
+git pull origin main
+
+# Install dependencies
+echo "📦 Installing dependencies..."
+npm install
+
+# Install admin dependencies
+echo "📦 Installing admin dependencies..."
+cd apps/admin && npm install && cd ../..
+
+# Build all apps
+echo "🔨 Building main app..."
+npm run build
+
+echo "🔨 Building admin app..."
+npm run build:admin
+
+echo "🔨 Building worker..."
+npm run worker:build
+
+# Reload PM2
+echo "🔄 Reloading PM2 apps..."
+pm2 reload ecosystem.config.js
+
+# Check status
+echo "📊 Current status:"
+pm2 status
+
+echo ""
+echo "╔══════════════════════════════════════════════════════════╗"
+echo "║           DEPLOYMENT COMPLETE!                            ║"
+echo "╚══════════════════════════════════════════════════════════╝"
+echo ""
+echo "View logs:"
+echo "  pm2 logs chartvolt-web"
+echo "  pm2 logs chartvolt-admin"
+echo "  pm2 logs chartvolt-worker"
+
