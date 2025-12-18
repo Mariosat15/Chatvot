@@ -371,7 +371,7 @@ const ChallengeTradingPage = async ({ params, searchParams }: ChallengeTradingPa
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                       <PositionsTable 
                         positions={positions} 
-                        competitionId={challengeId}
+                        challengeId={challengeId}
                       />
                     </div>
                   </TabsContent>

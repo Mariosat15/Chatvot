@@ -153,6 +153,24 @@ export const updatePositionTPSL = async (
     position.stopLoss = stopLoss || undefined;
     await position.save();
 
+    // ⚡ Update real-time TP/SL cache for instant triggering
+    try {
+      const { updatePositionInCache } = await import('@/lib/services/tpsl-realtime.service');
+      updatePositionInCache(
+        position._id.toString(),
+        position.symbol,
+        position.side,
+        takeProfit,
+        stopLoss,
+        position.entryPrice,
+        position.quantity,
+        position.userId.toString(),
+        position.competitionId.toString()
+      );
+    } catch {
+      // Cache update is optional, don't fail the operation
+    }
+
     revalidatePath('/');
 
     return {

@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { closePosition } from '@/lib/actions/trading/position.actions';
 import { calculateUnrealizedPnL, calculatePnLPercentage, ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { usePrices } from '@/contexts/PriceProvider';
+import { usePositionSync, POSITION_EVENTS, getAuthoritativePositionIds, setAuthoritativePositionIds } from '@/hooks/usePositionSync';
 import { toast } from 'sonner';
-import { X, Loader2, TrendingUp, TrendingDown, Filter, Edit } from 'lucide-react';
+import { X, Loader2, TrendingUp, TrendingDown, Filter, Edit, AlertTriangle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EditPositionModal from './EditPositionModal';
 
@@ -32,32 +33,224 @@ interface Position {
 
 interface PositionsTableProps {
   positions: Position[];
-  competitionId: string;
+  competitionId?: string;
+  challengeId?: string;
 }
 
-const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
+const PositionsTable = ({ positions, competitionId, challengeId }: PositionsTableProps) => {
   const router = useRouter();
-  const { prices, subscribe, unsubscribe } = usePrices();
+  const { prices, subscribe, unsubscribe, isStale, forceRefresh } = usePrices();
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
   const [livePositions, setLivePositions] = useState<Position[]>(positions);
   
   // Track locally closed positions to prevent them from flickering back
   const closedPositionIdsRef = useRef<Set<string>>(new Set());
   
+  // ⚡ Track pending TP/SL edits to prevent race conditions with price updates
+  // Key: positionId, Value: {takeProfit, stopLoss, timestamp}
+  const pendingTPSLEditsRef = useRef<Map<string, { takeProfit?: number; stopLoss?: number; timestamp: number }>>(new Map());
+  const PENDING_EDIT_TIMEOUT = 5000; // Clear pending edit after 5 seconds (server should have synced by then)
+  
   // Edit Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
 
+  // ⚡ Position sync for real-time TP/SL closure detection
+  usePositionSync({
+    competitionId,
+    challengeId,
+    enabled: true,
+    onPositionClosed: (positionId, reason) => {
+      // Show toast notification when position is closed by TP/SL
+      const closedPosition = livePositions.find(p => p._id === positionId);
+      if (closedPosition) {
+        const reasonText = reason === 'tp' ? 'Take Profit' : reason === 'sl' ? 'Stop Loss' : reason === 'margin' ? 'Margin Call' : 'TP/SL';
+        toast.success(`Position closed by ${reasonText}`, {
+          description: `${closedPosition.symbol} ${closedPosition.side} position closed`,
+        });
+        
+        // Optimistically remove from UI
+        closedPositionIdsRef.current.add(positionId);
+        setLivePositions(prev => prev.filter(p => p._id !== positionId));
+      }
+    },
+  });
+
+  // Listen for position closed events from other sources
+  useEffect(() => {
+    const handlePositionClosed = (event: CustomEvent) => {
+      const { positionId, reason, serverPositionIds } = event.detail;
+      console.log('🔔 [PositionsTable] Position closed event:', positionId, reason);
+      console.log('   Current positions:', livePositions.map(p => p._id));
+      
+      // Always add to closed set to prevent flicker, even if not in current list
+      if (positionId !== 'unknown') {
+        closedPositionIdsRef.current.add(positionId);
+      }
+      
+      // If server sent position IDs, use those to filter
+      if (serverPositionIds && Array.isArray(serverPositionIds)) {
+        const validIds = new Set<string>(serverPositionIds);
+        setLivePositions(prev => {
+          const filtered = prev.filter(p => validIds.has(p._id));
+          if (filtered.length < prev.length) {
+            console.log('🔔 [PositionsTable] Removed', prev.length - filtered.length, 'positions via serverPositionIds');
+            prev.forEach(p => {
+              if (!validIds.has(p._id)) {
+                closedPositionIdsRef.current.add(p._id);
+                toast.success(`Position closed`, {
+                  description: `${p.symbol} ${p.side} position`,
+                });
+              }
+            });
+          }
+          return filtered;
+        });
+      } else {
+        // Remove specific position from local state
+        setLivePositions(prev => {
+          const filtered = prev.filter(p => p._id !== positionId);
+          const wasRemoved = filtered.length < prev.length;
+          
+          if (wasRemoved) {
+            const closedPosition = prev.find(p => p._id === positionId);
+            if (closedPosition) {
+              const reasonText = reason === 'tp' ? 'Take Profit' : reason === 'sl' ? 'Stop Loss' : reason === 'margin' ? 'Margin Call' : 'TP/SL';
+              toast.success(`Position closed by ${reasonText}`, {
+                description: `${closedPosition.symbol} ${closedPosition.side} position`,
+              });
+            }
+          } else {
+            console.log('   Position not found in livePositions');
+          }
+          
+          return filtered;
+        });
+      }
+      
+      // Always refresh to update stats
+      router.refresh();
+    };
+
+    // Also listen for general positions changed event to trigger refresh
+    const handlePositionsChanged = (event: CustomEvent) => {
+      console.log('🔔 [PositionsTable] Positions changed event:', event.detail);
+      console.log('   Current livePositions:', livePositions.map(p => p._id));
+      
+      const { serverPositionIds, closedPositions, isInitialSync } = event.detail;
+      
+      // ⚡ IMPORTANT: Add any explicitly closed positions to closedPositionIdsRef
+      // This ensures we track them even if livePositions is empty/stale
+      if (closedPositions && Array.isArray(closedPositions)) {
+        closedPositions.forEach((id: string) => {
+          closedPositionIdsRef.current.add(id);
+          console.log('🔔 [PositionsTable] Marked position as closed:', id);
+        });
+      }
+      
+      // If server sent position IDs, store them as the authoritative source
+      // This prevents router.refresh() from restoring stale positions
+      if (serverPositionIds && Array.isArray(serverPositionIds)) {
+        const validIds = new Set<string>(serverPositionIds);
+        
+        // ⚡ IMPORTANT: Store server's position IDs as the authoritative source (in global state)
+        setAuthoritativePositionIds(validIds);
+        console.log('🔔 [PositionsTable] Stored server position IDs:', Array.from(validIds));
+        
+        setLivePositions(prev => {
+          // Check if there are any positions to remove
+          const positionsToRemove = prev.filter(p => !validIds.has(p._id));
+          
+          if (positionsToRemove.length > 0) {
+            console.log('🔔 [PositionsTable] Removing', positionsToRemove.length, 'stale positions:', positionsToRemove.map(p => p._id));
+            
+            // Mark removed positions
+            positionsToRemove.forEach(p => {
+              closedPositionIdsRef.current.add(p._id);
+              // Only show toast if not initial sync (to avoid spamming on page load)
+              if (!isInitialSync) {
+                toast.success(`Position closed`, {
+                  description: `${p.symbol} ${p.side} position`,
+                });
+              }
+            });
+            
+            // Return filtered list
+            return prev.filter(p => validIds.has(p._id));
+          }
+          
+          return prev;
+        });
+      }
+      
+      // Force router refresh to get latest stats
+      router.refresh();
+    };
+
+    window.addEventListener(POSITION_EVENTS.POSITION_CLOSED, handlePositionClosed as EventListener);
+    window.addEventListener(POSITION_EVENTS.POSITIONS_CHANGED, handlePositionsChanged as EventListener);
+    
+    return () => {
+      window.removeEventListener(POSITION_EVENTS.POSITION_CLOSED, handlePositionClosed as EventListener);
+      window.removeEventListener(POSITION_EVENTS.POSITIONS_CHANGED, handlePositionsChanged as EventListener);
+    };
+  }, [router, livePositions]);
+
   // Sync positions from props when they change - exclude locally closed ones
   useEffect(() => {
     // Filter out any positions that were closed locally (optimistic removal)
-    const filteredPositions = positions.filter(p => !closedPositionIdsRef.current.has(p._id));
+    let filteredPositions = positions.filter(p => !closedPositionIdsRef.current.has(p._id));
+    
+    // ⚡ IMPORTANT: Also filter against the authoritative server position list
+    // This prevents router.refresh() from restoring stale positions that position sync already knows are closed
+    // Uses GLOBAL state that persists across component remounts
+    const authoritativeIds = getAuthoritativePositionIds();
+    if (authoritativeIds !== null) {
+      const beforeCount = filteredPositions.length;
+      
+      // Filter positions: only keep those that are either:
+      // 1. In the authoritative server list, OR
+      // 2. NOT in closedPositionIdsRef (meaning they could be new)
+      filteredPositions = filteredPositions.filter(p => {
+        // If position is in authoritative list, keep it
+        if (authoritativeIds.has(p._id)) return true;
+        
+        // If position was explicitly closed (in closedPositionIdsRef), filter it out
+        if (closedPositionIdsRef.current.has(p._id)) {
+          console.log('🔔 [PositionsTable] Filtering out closed position:', p._id);
+          return false;
+        }
+        
+        // Position not in server list and not explicitly closed
+        // This is likely a NEW position opened after the last sync
+        // Add it to authoritative list to track it going forward
+        console.log('🔔 [PositionsTable] Detected new position in props:', p._id);
+        authoritativeIds.add(p._id);
+        return true;
+      });
+      
+      if (filteredPositions.length < beforeCount) {
+        console.log('🔔 [PositionsTable] Filtered out', beforeCount - filteredPositions.length, 'stale positions from props');
+      }
+    }
     
     // If server confirms position is gone, remove from closed set
-    const serverPositionIds = new Set(positions.map(p => p._id));
+    const propsPositionIds = new Set(positions.map(p => p._id));
     closedPositionIdsRef.current.forEach(id => {
-      if (!serverPositionIds.has(id)) {
+      if (!propsPositionIds.has(id)) {
         closedPositionIdsRef.current.delete(id);
+      }
+    });
+    
+    // Clear pending edits if server data now matches (sync complete)
+    pendingTPSLEditsRef.current.forEach((edit, positionId) => {
+      const serverPosition = positions.find(p => p._id === positionId);
+      if (serverPosition) {
+        // If server TP/SL matches pending edit, clear it
+        if (serverPosition.takeProfit === edit.takeProfit && 
+            serverPosition.stopLoss === edit.stopLoss) {
+          pendingTPSLEditsRef.current.delete(positionId);
+        }
       }
     });
     
@@ -83,7 +276,17 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
   }, [positions, subscribe, unsubscribe]);
 
   // Update positions with real-time prices - exclude locally closed positions
+  // ⚡ PRESERVE pending TP/SL edits to prevent race condition
   useEffect(() => {
+    const now = Date.now();
+    
+    // Clean up expired pending edits
+    pendingTPSLEditsRef.current.forEach((edit, positionId) => {
+      if (now - edit.timestamp > PENDING_EDIT_TIMEOUT) {
+        pendingTPSLEditsRef.current.delete(positionId);
+      }
+    });
+    
     // Filter out closed positions first
     const activePositions = positions.filter(p => !closedPositionIdsRef.current.has(p._id));
     
@@ -101,11 +304,19 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
       );
       const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
 
+      // ⚡ Check if there's a pending TP/SL edit for this position
+      const pendingEdit = pendingTPSLEditsRef.current.get(position._id);
+      
       return {
         ...position,
         currentPrice: marketPrice,
         unrealizedPnl: pnl,
         unrealizedPnlPercentage: pnlPercentage,
+        // Preserve pending TP/SL edits until server syncs
+        ...(pendingEdit && {
+          takeProfit: pendingEdit.takeProfit,
+          stopLoss: pendingEdit.stopLoss,
+        }),
       };
     });
 
@@ -180,6 +391,25 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
 
   return (
     <div className="space-y-3">
+      {/* Stale Price Warning */}
+      {isStale && (
+        <div className="flex items-center justify-between px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <div className="flex items-center gap-2 text-amber-500">
+            <AlertTriangle className="size-4" />
+            <span className="text-sm">Prices may be outdated. Connection interrupted.</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={forceRefresh}
+            className="text-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+          >
+            <RefreshCw className="size-4 mr-1" />
+            Refresh
+          </Button>
+        </div>
+      )}
+
       {/* Filters - Bigger & More Visible */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
@@ -381,9 +611,40 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
           setEditModalOpen(false);
           setSelectedPosition(null);
         }}
-        onSuccess={() => {
-          // Trigger positions refresh event and refresh server data
-          window.dispatchEvent(new CustomEvent('tpslUpdated'));
+        onSuccess={(updatedData) => {
+          // ⚡ IMMEDIATE UI UPDATE - update local state with new TP/SL values
+          if (selectedPosition) {
+            // Store pending edit to prevent price update effect from overwriting
+            pendingTPSLEditsRef.current.set(selectedPosition._id, {
+              takeProfit: updatedData.takeProfit,
+              stopLoss: updatedData.stopLoss,
+              timestamp: Date.now(),
+            });
+            
+            setLivePositions(prev => prev.map(p => 
+              p._id === selectedPosition._id 
+                ? { ...p, takeProfit: updatedData.takeProfit, stopLoss: updatedData.stopLoss }
+                : p
+            ));
+            
+            // Also update the selected position reference
+            setSelectedPosition(prev => prev ? {
+              ...prev,
+              takeProfit: updatedData.takeProfit,
+              stopLoss: updatedData.stopLoss
+            } : null);
+          }
+          
+          // Dispatch event so chart updates TP/SL lines immediately
+          window.dispatchEvent(new CustomEvent('tpslUpdated', {
+            detail: { 
+              positionId: selectedPosition?._id,
+              takeProfit: updatedData.takeProfit,
+              stopLoss: updatedData.stopLoss
+            }
+          }));
+          
+          // Also refresh server data for full sync
           router.refresh();
         }}
       />
@@ -392,14 +653,20 @@ const PositionsTable = ({ positions, competitionId }: PositionsTableProps) => {
 };
 
 // Memoize the component to prevent re-renders when parent re-renders but positions haven't changed
+// But be lenient - always re-render if length or IDs change
 export default memo(PositionsTable, (prevProps, nextProps) => {
-  // Only re-render if positions array or competitionId changed
+  // Always re-render if competitionId or challengeId changed
   if (prevProps.competitionId !== nextProps.competitionId) return false;
+  if (prevProps.challengeId !== nextProps.challengeId) return false;
+  
+  // Always re-render if positions count changed (important for TP/SL closures!)
   if (prevProps.positions.length !== nextProps.positions.length) return false;
   
-  // Check if any position IDs changed
-  const prevIds = prevProps.positions.map(p => p._id).join(',');
-  const nextIds = nextProps.positions.map(p => p._id).join(',');
+  // Check if any position data changed (not just IDs, but also TP/SL values, etc.)
+  const prevIds = prevProps.positions.map(p => `${p._id}:${p.takeProfit}:${p.stopLoss}`).join(',');
+  const nextIds = nextProps.positions.map(p => `${p._id}:${p.takeProfit}:${p.stopLoss}`).join(',');
+  
+  // Return true to skip re-render, false to re-render
   return prevIds === nextIds;
 });
 

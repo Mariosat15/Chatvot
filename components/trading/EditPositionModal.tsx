@@ -29,7 +29,7 @@ interface EditPositionModalProps {
   position: Position | null;
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (updatedData: { takeProfit?: number; stopLoss?: number }) => void;
 }
 
 const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositionModalProps) => {
@@ -188,7 +188,11 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
         toast.success('Position updated successfully!', {
           description: 'Your TP/SL levels have been set'
         });
-        onSuccess();
+        // Pass updated TP/SL values back to parent for immediate UI update
+        onSuccess({
+          takeProfit: result.position?.takeProfit,
+          stopLoss: result.position?.stopLoss
+        });
         onClose();
       } else {
         throw new Error(result.error || 'Failed to update position');

@@ -112,9 +112,15 @@ const InteractiveTPSL = ({ positions }: InteractiveTPSLProps) => {
             setEditingPosition(null);
             // Don't refresh here - only refresh on success to avoid unnecessary reloads
           }}
-          onSuccess={() => {
-            // Trigger refresh event
-            window.dispatchEvent(new CustomEvent('tpslUpdated'));
+          onSuccess={(updatedData) => {
+            // Trigger refresh event with updated data for immediate UI update
+            window.dispatchEvent(new CustomEvent('tpslUpdated', {
+              detail: {
+                positionId: positionToEdit._id,
+                takeProfit: updatedData.takeProfit,
+                stopLoss: updatedData.stopLoss
+              }
+            }));
           }}
           position={positionToEdit}
         />

@@ -3,6 +3,9 @@
  * 
  * Processes pending limit orders and checks for TP/SL triggers.
  * Runs every minute (same as Inngest: process-trade-queue)
+ * 
+ * 📦 IMPORTANT: Worker reads prices from MongoDB cache (written by WEB app)
+ * This allows a single WebSocket connection in WEB while Worker still gets prices!
  */
 
 import { connectToDatabase } from '../config/database';
@@ -10,8 +13,57 @@ import { connectToDatabase } from '../config/database';
 // Import models
 import TradingOrder from '../../database/models/trading/trading-order.model';
 import TradingPosition from '../../database/models/trading/trading-position.model';
+import PriceCache from '../../database/models/price-cache.model';
 import { fetchRealForexPrices } from '../../lib/services/real-forex-prices.service';
 import type { ForexSymbol } from '../../lib/services/pnl-calculator.service';
+
+/**
+ * Fetch prices - tries MongoDB cache first, falls back to REST API
+ * MongoDB cache is populated by WEB app's WebSocket connection
+ */
+async function fetchPricesFromCacheOrAPI(symbols: ForexSymbol[]): Promise<Map<ForexSymbol, { bid: number; ask: number }>> {
+  const priceMap = new Map<ForexSymbol, { bid: number; ask: number }>();
+  
+  try {
+    // Try MongoDB cache first (populated by WEB WebSocket)
+    const cachedPrices = await PriceCache.getAllPrices();
+    
+    // Check which symbols we got from cache
+    const missingSymbols: ForexSymbol[] = [];
+    for (const symbol of symbols) {
+      const cached = cachedPrices.get(symbol);
+      if (cached && Date.now() - cached.timestamp < 60000) { // Use if less than 1 min old
+        priceMap.set(symbol, { bid: cached.bid, ask: cached.ask });
+      } else {
+        missingSymbols.push(symbol);
+      }
+    }
+    
+    // If we have some from cache, log it
+    if (priceMap.size > 0) {
+      console.log(`   📦 Got ${priceMap.size}/${symbols.length} prices from MongoDB cache`);
+    }
+    
+    // Fetch missing symbols from REST API
+    if (missingSymbols.length > 0) {
+      console.log(`   🌐 Fetching ${missingSymbols.length} prices from REST API`);
+      const apiPrices = await fetchRealForexPrices(missingSymbols);
+      for (const [symbol, price] of apiPrices.entries()) {
+        priceMap.set(symbol, { bid: price.bid, ask: price.ask });
+      }
+    }
+    
+    return priceMap;
+  } catch (error) {
+    // If cache fails, fall back to REST API entirely
+    console.log(`   ⚠️ Cache error, using REST API: ${error}`);
+    const apiPrices = await fetchRealForexPrices(symbols);
+    for (const [symbol, price] of apiPrices.entries()) {
+      priceMap.set(symbol, { bid: price.bid, ask: price.ask });
+    }
+    return priceMap;
+  }
+}
 
 export interface TradeQueueResult {
   pendingOrdersChecked: number;
@@ -44,7 +96,7 @@ export async function runTradeQueueProcessor(): Promise<TradeQueueResult> {
     if (pendingOrders.length > 0) {
       // Get unique symbols
       const symbols = [...new Set(pendingOrders.map(o => o.symbol))] as ForexSymbol[];
-      const pricesMap = await fetchRealForexPrices(symbols);
+      const pricesMap = await fetchPricesFromCacheOrAPI(symbols);
 
       for (const order of pendingOrders) {
         try {
@@ -95,7 +147,7 @@ export async function runTradeQueueProcessor(): Promise<TradeQueueResult> {
     if (openPositions.length > 0) {
       // Get unique symbols
       const symbols = [...new Set(openPositions.map(p => p.symbol))] as ForexSymbol[];
-      const pricesMap = await fetchRealForexPrices(symbols);
+      const pricesMap = await fetchPricesFromCacheOrAPI(symbols);
 
       for (const position of openPositions) {
         try {

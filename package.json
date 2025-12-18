@@ -16,7 +16,7 @@
     "lint": "eslint",
     "clean": "rimraf .next && rimraf apps/admin/.next",
     "test:db": "node scripts/test-db.mjs",
-    "worker": "npx tsx worker/index.ts",
+    "worker": "npx cross-env IS_WORKER=true tsx worker/index.ts",
     "worker:build": "tsc -p worker/tsconfig.json",
     "worker:start": "node dist/worker/index.js"
   },
@@ -96,6 +96,7 @@
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",
     "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
     "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "^16.0.10",

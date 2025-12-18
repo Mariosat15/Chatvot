@@ -1,13 +1,17 @@
 {
-  "extends": "../tsconfig.json",
   "compilerOptions": {
-    "module": "commonjs",
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "../dist/worker",
     "rootDir": ".",
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "declaration": true,
-    "noEmit": false
+    "noEmit": false,
+    "strict": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
   "include": [
     "./**/*.ts"

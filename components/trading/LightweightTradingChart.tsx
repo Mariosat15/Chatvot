@@ -132,6 +132,23 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     })));
   }, [positions]);
 
+  // ⚡ State to track TP/SL updates for immediate UI refresh
+  const [tpslVersion, setTpslVersion] = useState(0);
+  
+  // Listen for TP/SL updates to immediately redraw position lines
+  useEffect(() => {
+    const handleTPSLUpdate = (event: CustomEvent) => {
+      log('⚡ Chart received tpslUpdated event:', event.detail);
+      // Increment version to trigger position line redraw
+      setTpslVersion(v => v + 1);
+    };
+
+    window.addEventListener('tpslUpdated', handleTPSLUpdate as EventListener);
+    return () => {
+      window.removeEventListener('tpslUpdated', handleTPSLUpdate as EventListener);
+    };
+  }, []);
+
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -144,7 +161,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const positionLinesRef = useRef<Map<string, any>>(new Map());
   const tpSlSeriesRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
   
-  const { prices, subscribe, unsubscribe, marketOpen, marketStatus } = usePrices();
+  const { prices, subscribe, unsubscribe, marketOpen, marketStatus, isStale, forceRefresh } = usePrices();
   const { symbol, setSymbol } = useChartSymbol();
   
   // Get indicators and strategies from Trading Arsenal (marketplace purchases)
@@ -2231,7 +2248,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       });
       tpSlSeriesRef.current.clear();
     };
-  }, [positions, pendingOrders, symbol, candlestickSeriesRef.current, showTradeMarkers, showPriceLabels, showTPSLZones, showTPSLLines, candlesLoaded]);
+  }, [positions, pendingOrders, symbol, candlestickSeriesRef.current, showTradeMarkers, showPriceLabels, showTPSLZones, showTPSLLines, candlesLoaded, tpslVersion]);
 
   const currentPrice = prices.get(symbol);
   const fullscreenRef = useRef<HTMLDivElement>(null);
@@ -2399,6 +2416,17 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           )}>
             {marketOpen ? '● LIVE' : '● CLOSED'}
           </div>
+          
+          {/* Stale Price Warning */}
+          {isStale && (
+            <button
+              onClick={forceRefresh}
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors cursor-pointer"
+              title="Click to refresh prices"
+            >
+              ⚠ STALE
+            </button>
+          )}
         </div>
 
         {/* Center: Price Display */}

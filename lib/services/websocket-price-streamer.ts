@@ -24,22 +24,67 @@ export interface StreamingPriceQuote {
   source: 'websocket' | 'rest' | 'cache' | 'fallback';
 }
 
-// Global price cache
-const priceCache = new Map<ForexSymbol, StreamingPriceQuote>();
-let lastUpdateTime = 0;
+// ============================================
+// GLOBAL SINGLETON STATE (survives Next.js HMR)
+// ============================================
+// IMPORTANT: In Turbopack, different server contexts may have different globalThis
+// We use a STRICT singleton pattern with connection state tracking
+// The priceCache/dynamicSpreadCache are per-context but that's OK - they get populated from WebSocket
 
-// Dynamic spread cache - learns from real bid/ask data
-// NOT hardcoded - populated from actual WebSocket quote messages!
-const dynamicSpreadCache = new Map<ForexSymbol, number>();
+interface WebSocketGlobalState {
+  ws: import('ws').WebSocket | null;
+  isConnecting: boolean;
+  isAuthenticated: boolean;
+  isSubscribed: boolean;
+  reconnectAttempts: number;
+  reconnectTimer: NodeJS.Timeout | null;
+  heartbeatTimer: NodeJS.Timeout | null;
+  priceCache: Map<ForexSymbol, StreamingPriceQuote>;
+  dynamicSpreadCache: Map<ForexSymbol, number>;
+  lastUpdateTime: number;
+  initialized: boolean;
+  connectionId: string;
+  initializationTime: number; // Track when this context was initialized
+}
 
-// WebSocket state
-let ws: import('ws').WebSocket | null = null;
-let isConnecting = false;
-let isAuthenticated = false;
-let isSubscribed = false;
-let reconnectAttempts = 0;
-let reconnectTimer: NodeJS.Timeout | null = null;
-let heartbeatTimer: NodeJS.Timeout | null = null;
+// Use globalThis to persist state across HMR in Next.js
+const GLOBAL_KEY = '__MASSIVE_WEBSOCKET_SINGLETON__';
+
+// Track if THIS context has already logged initialization (reduce log spam)
+let hasLoggedInit = false;
+
+function getGlobalState(): WebSocketGlobalState {
+  if (!(globalThis as Record<string, unknown>)[GLOBAL_KEY]) {
+    // Only log once per context to reduce spam
+    if (!hasLoggedInit) {
+      console.log('🔧 [WebSocket] Initializing WebSocket state');
+      hasLoggedInit = true;
+    }
+    (globalThis as Record<string, unknown>)[GLOBAL_KEY] = {
+      ws: null,
+      isConnecting: false,
+      isAuthenticated: false,
+      isSubscribed: false,
+      reconnectAttempts: 0,
+      reconnectTimer: null,
+      heartbeatTimer: null,
+      priceCache: new Map<ForexSymbol, StreamingPriceQuote>(),
+      dynamicSpreadCache: new Map<ForexSymbol, number>(),
+      lastUpdateTime: 0,
+      initialized: false,
+      connectionId: Math.random().toString(36).substring(7),
+      initializationTime: Date.now(),
+    };
+  }
+  return (globalThis as Record<string, unknown>)[GLOBAL_KEY] as WebSocketGlobalState;
+}
+
+// Helper accessor for cleaner code
+function getState() { return getGlobalState(); }
+
+// Price caches reference the global state
+const priceCache = getGlobalState().priceCache;
+const dynamicSpreadCache = getGlobalState().dynamicSpreadCache;
 
 // Configuration
 const MASSIVE_API_KEY = process.env.MASSIVE_API_KEY;
@@ -48,6 +93,87 @@ const WS_URL = 'wss://socket.massive.com/forex'; // Real-time
 const MAX_RECONNECT_ATTEMPTS = 10;
 const RECONNECT_BASE_DELAY_MS = 3000;
 const HEARTBEAT_INTERVAL_MS = 30000;
+
+// ⚡ Real-time TP/SL checking - throttled per symbol
+const lastTPSLCheck = new Map<string, number>();
+const TPSL_CHECK_THROTTLE_MS = 500; // Check max every 500ms per symbol
+
+// 📦 MongoDB Price Cache - for sharing prices with Worker
+// Batches price updates and writes to MongoDB periodically
+const pendingPriceUpdates = new Map<string, { bid: number; ask: number; timestamp: number }>();
+let mongoPriceWriteTimer: NodeJS.Timeout | null = null;
+const MONGO_PRICE_WRITE_INTERVAL_MS = 1000; // Write to MongoDB every 1 second (batched)
+
+/**
+ * Check TP/SL when price updates - throttled to prevent resource overload
+ * This is the INSTANT trigger - worker is just backup
+ */
+function checkTPSLOnPriceUpdate(symbol: ForexSymbol, bid: number, ask: number): void {
+  const now = Date.now();
+  const lastCheck = lastTPSLCheck.get(symbol) || 0;
+  
+  // Throttle checks per symbol (500ms minimum between checks)
+  if (now - lastCheck < TPSL_CHECK_THROTTLE_MS) return;
+  lastTPSLCheck.set(symbol, now);
+  
+  // Fire and forget - don't block price updates
+  import('./tpsl-realtime.service')
+    .then(({ checkTPSLForSymbol }) => checkTPSLForSymbol(symbol, bid, ask))
+    .catch(() => {
+      // Silently ignore - worker will catch it
+    });
+}
+
+/**
+ * Queue price update for MongoDB cache (batched writes)
+ * Called on every price update, but only writes to MongoDB periodically
+ */
+function queuePriceForMongoCache(symbol: string, bid: number, ask: number, timestamp: number): void {
+  pendingPriceUpdates.set(symbol, { bid, ask, timestamp });
+  
+  // Start write timer if not already running
+  if (!mongoPriceWriteTimer) {
+    mongoPriceWriteTimer = setTimeout(flushPricesToMongo, MONGO_PRICE_WRITE_INTERVAL_MS);
+  }
+}
+
+/**
+ * Flush pending price updates to MongoDB (batched)
+ * This writes all queued prices in a single bulk operation
+ */
+async function flushPricesToMongo(): Promise<void> {
+  mongoPriceWriteTimer = null;
+  
+  if (pendingPriceUpdates.size === 0) return;
+  
+  // Copy and clear pending updates
+  const updates = Array.from(pendingPriceUpdates.entries()).map(([symbol, data]) => ({
+    symbol,
+    bid: data.bid,
+    ask: data.ask,
+    timestamp: data.timestamp,
+  }));
+  pendingPriceUpdates.clear();
+  
+  try {
+    // Dynamic import to avoid circular dependencies
+    const { connectToDatabase } = await import('@/database/mongoose');
+    const PriceCache = (await import('@/database/models/price-cache.model')).default;
+    
+    await connectToDatabase();
+    await PriceCache.bulkUpdatePrices(updates);
+    
+    // Debug: Log occasionally (every ~10 seconds)
+    if (Math.random() < 0.1) {
+      console.log(`📦 [MongoDB Cache] Wrote ${updates.length} prices to cache`);
+    }
+  } catch (error) {
+    // Don't log every error - just occasionally
+    if (Math.random() < 0.1) {
+      console.error('⚠️ [MongoDB Cache] Failed to write prices:', error);
+    }
+  }
+}
 
 // Symbol mapping: Our format (EUR/USD) -> Massive format (EURUSD)
 const SYMBOL_TO_MASSIVE: Record<string, string> = {
@@ -71,7 +197,7 @@ for (const [symbol, massive] of Object.entries(SYMBOL_TO_MASSIVE)) {
 }
 
 /**
- * Initialize WebSocket connection
+ * Initialize WebSocket connection and TP/SL cache
  */
 export async function initializeWebSocket(): Promise<void> {
   // Only run on server
@@ -85,9 +211,26 @@ export async function initializeWebSocket(): Promise<void> {
     return;
   }
 
-  if (ws || isConnecting) {
-    console.log('🔄 WebSocket already connected or connecting');
+  const state = getState();
+  const existingWs = state.ws;
+  
+  // Check if we already have an active connection
+  if (existingWs && existingWs.readyState <= 1) { // CONNECTING (0) or OPEN (1)
+    console.log(`🔄 WebSocket already ${existingWs.readyState === 1 ? 'connected' : 'connecting'} (ID: ${state.connectionId})`);
     return;
+  }
+  
+  if (state.isConnecting) {
+    console.log(`🔄 WebSocket connection already in progress (ID: ${state.connectionId})`);
+    return;
+  }
+
+  // ⚡ Initialize TP/SL cache for real-time triggering
+  try {
+    const { initializeTPSLCache } = await import('./tpsl-realtime.service');
+    await initializeTPSLCache();
+  } catch (error) {
+    console.error('⚠️ Failed to initialize TP/SL cache:', error);
   }
 
   await connectWebSocket();
@@ -97,21 +240,26 @@ export async function initializeWebSocket(): Promise<void> {
  * Connect to Massive.com WebSocket
  */
 async function connectWebSocket(): Promise<void> {
-  if (isConnecting) return;
-  isConnecting = true;
+  const state = getState();
+  
+  if (state.isConnecting) return;
+  state.isConnecting = true;
 
-  console.log('🔌 Connecting to Massive.com WebSocket...');
+  // Generate new connection ID for debugging
+  state.connectionId = Math.random().toString(36).substring(7);
+  console.log(`🔌 Connecting to Massive.com WebSocket... (ID: ${state.connectionId})`);
 
   try {
     // Dynamic import ws module (only on server)
     const WebSocket = (await import('ws')).default;
     
-    ws = new WebSocket(WS_URL);
+    const newWs = new WebSocket(WS_URL);
+    state.ws = newWs;
 
-    ws.on('open', () => {
-      console.log('✅ WebSocket connected');
-      isConnecting = false;
-      reconnectAttempts = 0;
+    newWs.on('open', () => {
+      console.log(`✅ WebSocket connected (ID: ${state.connectionId})`);
+      state.isConnecting = false;
+      state.reconnectAttempts = 0;
       
       // Start heartbeat to keep connection alive
       startHeartbeat();
@@ -119,7 +267,7 @@ async function connectWebSocket(): Promise<void> {
       // Server sends a welcome message first, then we authenticate
     });
 
-    ws.on('message', (data: Buffer) => {
+    newWs.on('message', (data: Buffer) => {
       try {
         const message = data.toString();
         handleMessage(message);
@@ -128,25 +276,25 @@ async function connectWebSocket(): Promise<void> {
       }
     });
 
-    ws.on('error', (error: Error) => {
+    newWs.on('error', (error: Error) => {
       console.error('❌ WebSocket error:', error.message);
     });
 
-    ws.on('close', (code: number, reason: Buffer) => {
+    newWs.on('close', (code: number, reason: Buffer) => {
       const reasonStr = reason.toString() || 'No reason';
-      console.log(`🔌 WebSocket closed: ${code} - ${reasonStr}`);
+      console.log(`🔌 WebSocket closed: ${code} - ${reasonStr} (ID: ${state.connectionId})`);
       
       cleanup();
       scheduleReconnect();
     });
 
-    ws.on('ping', () => {
-      ws?.pong();
+    newWs.on('ping', () => {
+      newWs.pong();
     });
 
   } catch (error) {
     console.error('❌ Failed to create WebSocket:', error);
-    isConnecting = false;
+    state.isConnecting = false;
     scheduleReconnect();
   }
 }
@@ -155,8 +303,10 @@ async function connectWebSocket(): Promise<void> {
  * Start heartbeat to keep connection alive
  */
 function startHeartbeat(): void {
+  const state = getState();
   stopHeartbeat();
-  heartbeatTimer = setInterval(() => {
+  state.heartbeatTimer = setInterval(() => {
+    const ws = state.ws;
     if (ws && ws.readyState === 1) { // OPEN
       ws.ping();
     }
@@ -167,9 +317,10 @@ function startHeartbeat(): void {
  * Stop heartbeat
  */
 function stopHeartbeat(): void {
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
+  const state = getState();
+  if (state.heartbeatTimer) {
+    clearInterval(state.heartbeatTimer);
+    state.heartbeatTimer = null;
   }
 }
 
@@ -177,6 +328,8 @@ function stopHeartbeat(): void {
  * Authenticate with API key
  */
 function authenticate(): void {
+  const state = getState();
+  const ws = state.ws;
   if (!ws || ws.readyState !== 1) return;
 
   console.log('🔐 Authenticating...');
@@ -193,7 +346,9 @@ function authenticate(): void {
  * Subscribe to forex feeds
  */
 function subscribeToFeeds(): void {
-  if (!ws || ws.readyState !== 1 || !isAuthenticated) return;
+  const state = getState();
+  const ws = state.ws;
+  if (!ws || ws.readyState !== 1 || !state.isAuthenticated) return;
 
   console.log('📊 Subscribing to forex feeds...');
   
@@ -242,27 +397,33 @@ function handleMessage(data: string): void {
           // Forex Aggregate (second): same format as CA but per second
           handleAggregateMessage(msg);
           break;
-        case 'auth_success':
+        case 'auth_success': {
+          const state = getState();
           console.log('✅ Authentication successful');
-          isAuthenticated = true;
+          state.isAuthenticated = true;
           subscribeToFeeds();
           break;
-        case 'auth_failed':
+        }
+        case 'auth_failed': {
+          const state = getState();
           console.error('❌ Authentication failed:', msg.message);
-          ws?.close();
+          state.ws?.close();
           break;
-        default:
+        }
+        default: {
+          const state = getState();
           // Check if it's a status update
           if (msg.status === 'auth_success') {
             console.log('✅ Authentication successful');
-            isAuthenticated = true;
+            state.isAuthenticated = true;
             subscribeToFeeds();
           } else if (msg.status === 'success' && msg.message?.includes('subscribed')) {
             console.log('✅ Subscribed to feeds:', msg.message);
-            isSubscribed = true;
+            state.isSubscribed = true;
           } else if (msg.message) {
             console.log('📨 Server message:', msg.message);
           }
+        }
       }
     }
   } catch (error) {
@@ -278,21 +439,22 @@ function handleMessage(data: string): void {
  * Handle status messages
  */
 function handleStatusMessage(msg: { status?: string; message?: string; ev?: string }): void {
+  const state = getState();
   const status = msg.status || msg.ev;
   
   if (status === 'auth_success') {
     console.log('✅ Authenticated with Massive.com');
-    isAuthenticated = true;
+    state.isAuthenticated = true;
     subscribeToFeeds();
   } else if (status === 'auth_failed') {
     console.error('❌ Auth failed:', msg.message);
-    ws?.close();
+    state.ws?.close();
   } else if (status === 'connected') {
     console.log('📡 Connected, authenticating...');
     authenticate();
   } else if (msg.message?.includes('subscribed')) {
     console.log('✅ Subscription confirmed');
-    isSubscribed = true;
+    state.isSubscribed = true;
   }
 }
 
@@ -377,7 +539,14 @@ function handleQuoteMessage(msg: {
   };
 
   priceCache.set(symbol, quote);
-  lastUpdateTime = Date.now();
+  getState().lastUpdateTime = Date.now();
+  
+  // ⚡ REAL-TIME TP/SL CHECK - Triggers INSTANTLY when price hits levels!
+  // This is fire-and-forget, doesn't block price updates
+  checkTPSLOnPriceUpdate(symbol, roundedBid, roundedAsk);
+  
+  // 📦 Queue price for MongoDB cache (Worker reads from here)
+  queuePriceForMongoCache(symbol, roundedBid, roundedAsk, quote.timestamp);
 }
 
 /**
@@ -431,7 +600,13 @@ function handleAggregateMessage(msg: {
   const existing = priceCache.get(symbol);
   if (!existing || existing.timestamp <= quote.timestamp) {
     priceCache.set(symbol, quote);
-    lastUpdateTime = Date.now();
+    getState().lastUpdateTime = Date.now();
+    
+    // ⚡ REAL-TIME TP/SL CHECK - Also check on aggregate updates
+    checkTPSLOnPriceUpdate(symbol, roundedBid, roundedAsk);
+    
+    // 📦 Queue price for MongoDB cache (Worker reads from here)
+    queuePriceForMongoCache(symbol, roundedBid, roundedAsk, quote.timestamp);
   }
 }
 
@@ -475,10 +650,11 @@ function getTypicalSpread(symbol: ForexSymbol): number {
  * Cleanup resources
  */
 function cleanup(): void {
-  ws = null;
-  isConnecting = false;
-  isAuthenticated = false;
-  isSubscribed = false;
+  const state = getState();
+  state.ws = null;
+  state.isConnecting = false;
+  state.isAuthenticated = false;
+  state.isSubscribed = false;
   stopHeartbeat();
 }
 
@@ -486,20 +662,21 @@ function cleanup(): void {
  * Schedule reconnection
  */
 function scheduleReconnect(): void {
-  if (reconnectTimer) return;
+  const state = getState();
+  if (state.reconnectTimer) return;
 
-  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+  if (state.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
     console.error('❌ Max reconnect attempts reached');
     return;
   }
 
-  reconnectAttempts++;
-  const delay = RECONNECT_BASE_DELAY_MS * Math.pow(1.5, reconnectAttempts - 1);
+  state.reconnectAttempts++;
+  const delay = RECONNECT_BASE_DELAY_MS * Math.pow(1.5, state.reconnectAttempts - 1);
 
-  console.log(`🔄 Reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+  console.log(`🔄 Reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${state.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
 
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
+  state.reconnectTimer = setTimeout(() => {
+    state.reconnectTimer = null;
     connectWebSocket();
   }, delay);
 }
@@ -561,7 +738,9 @@ export function getCachedPrices(symbols: ForexSymbol[]): Map<ForexSymbol, Stream
  * Check if WebSocket is connected and streaming
  */
 export function isWebSocketConnected(): boolean {
-  return ws !== null && ws.readyState === 1 && isAuthenticated;
+  const state = getState();
+  const ws = state.ws;
+  return ws !== null && ws.readyState === 1 && state.isAuthenticated;
 }
 
 /**
@@ -575,13 +754,15 @@ export function getConnectionStatus(): {
   lastUpdate: number;
   reconnectAttempts: number;
 } {
+  const state = getState();
+  const ws = state.ws;
   return {
     connected: ws !== null && ws.readyState === 1,
-    authenticated: isAuthenticated,
-    subscribed: isSubscribed,
+    authenticated: state.isAuthenticated,
+    subscribed: state.isSubscribed,
     cachedPairs: priceCache.size,
-    lastUpdate: lastUpdateTime,
-    reconnectAttempts,
+    lastUpdate: state.lastUpdateTime,
+    reconnectAttempts: state.reconnectAttempts,
   };
 }
 
@@ -593,7 +774,7 @@ export function updateCacheFromRest(symbol: ForexSymbol, quote: Omit<StreamingPr
   const existing = priceCache.get(symbol);
   if (!existing || existing.source !== 'websocket' || existing.timestamp < quote.timestamp) {
     priceCache.set(symbol, { ...quote, source: 'rest' });
-    lastUpdateTime = Date.now();
+    getState().lastUpdateTime = Date.now();
   }
 }
 
@@ -601,20 +782,22 @@ export function updateCacheFromRest(symbol: ForexSymbol, quote: Omit<StreamingPr
  * Close WebSocket connection
  */
 export function closeWebSocket(): void {
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
+  const state = getState();
+  
+  if (state.reconnectTimer) {
+    clearTimeout(state.reconnectTimer);
+    state.reconnectTimer = null;
   }
 
   stopHeartbeat();
 
-  if (ws) {
+  if (state.ws) {
     try {
-      ws.close(1000, 'Client closing');
+      state.ws.close(1000, 'Client closing');
     } catch {
       // Ignore close errors
     }
-    ws = null;
+    state.ws = null;
   }
 
   cleanup();
@@ -626,6 +809,107 @@ export function closeWebSocket(): void {
  */
 export function resetWebSocket(): void {
   closeWebSocket();
-  reconnectAttempts = 0;
+  getState().reconnectAttempts = 0;
   initializeWebSocket();
 }
+
+// ============================================
+// AUTO-INITIALIZATION ON SERVER STARTUP
+// ============================================
+// This ensures the WebSocket and TP/SL cache are initialized
+// when the module is first imported on the server
+
+/**
+ * Detect if we're running in the Worker process
+ * Checks multiple signals to reliably detect Worker context
+ */
+function isWorkerProcess(): boolean {
+  // Check 1: Environment variable (set via cross-env in npm script)
+  if (process.env.IS_WORKER === 'true') return true;
+  
+  // Check 2: Process arguments contain "worker"
+  const args = process.argv.join(' ').toLowerCase();
+  if (args.includes('worker/index') || args.includes('worker\\index')) return true;
+  
+  // Check 3: npm_lifecycle_event (if running via npm run worker)
+  if (process.env.npm_lifecycle_event === 'worker') return true;
+  
+  return false;
+}
+
+/**
+ * Detect if we're running in the ADMIN app (port 3001)
+ * ADMIN app should NOT connect to WebSocket - only WEB app should
+ */
+function isAdminProcess(): boolean {
+  // Check 1: Environment variable
+  if (process.env.IS_ADMIN === 'true') return true;
+  
+  // Check 2: PORT is 3001 (admin default port)
+  if (process.env.PORT === '3001') return true;
+  
+  // Check 3: Process arguments contain "apps/admin" or "apps\\admin"
+  const args = process.argv.join(' ').toLowerCase();
+  if (args.includes('apps/admin') || args.includes('apps\\admin')) return true;
+  
+  // Check 4: Current working directory contains apps/admin
+  const cwd = process.cwd().toLowerCase();
+  if (cwd.includes('apps/admin') || cwd.includes('apps\\admin')) return true;
+  
+  // Check 5: npm_lifecycle_event for admin scripts
+  const lifecycle = process.env.npm_lifecycle_event || '';
+  if (lifecycle.includes('admin')) return true;
+  
+  return false;
+}
+
+/**
+ * Check if this process should skip WebSocket initialization
+ * Only the main WEB app (port 3000) should connect to WebSocket
+ */
+function shouldSkipWebSocket(): boolean {
+  if (isWorkerProcess()) return true;
+  if (isAdminProcess()) return true;
+  return false;
+}
+
+async function autoInitialize(): Promise<void> {
+  const state = getState();
+  
+  // Use global state to prevent re-initialization across HMR
+  if (state.initialized) {
+    console.log(`ℹ️ [AUTO-INIT] Already initialized (ID: ${state.connectionId})`);
+    return;
+  }
+  state.initialized = true;
+  
+  // Only initialize on server-side
+  if (typeof window !== 'undefined') return;
+  
+  // ⚠️ IMPORTANT: Only WEB app (port 3000) connects to WebSocket
+  // Worker and ADMIN use MongoDB cache for prices (written by WEB)
+  // This prevents the "1 connection per asset class" conflict with Massive.com
+  if (isWorkerProcess()) {
+    console.log('ℹ️ [WEBSOCKET] Worker detected - skipping WebSocket init');
+    console.log('   Worker will read prices from MongoDB cache (written by WEB app)');
+    return;
+  }
+  
+  if (isAdminProcess()) {
+    console.log('ℹ️ [WEBSOCKET] Admin app detected - skipping WebSocket init');
+    console.log('   Admin will read WebSocket status from WEB app via API');
+    return;
+  }
+  
+  console.log('🚀 [AUTO-INIT] Starting WebSocket and TP/SL cache initialization...');
+  
+  try {
+    await initializeWebSocket();
+    console.log('✅ [AUTO-INIT] WebSocket and TP/SL cache ready');
+  } catch (error) {
+    console.error('❌ [AUTO-INIT] Failed:', error);
+  }
+}
+
+// Trigger auto-initialization
+autoInitialize();

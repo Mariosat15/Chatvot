@@ -470,6 +470,26 @@ export const placeOrder = async (params: {
           hasStopLoss: !!position[0].stopLoss
         });
 
+        // ⚡ Add to real-time TP/SL cache for instant triggering
+        if (stopLoss || takeProfit) {
+          try {
+            const { updatePositionInCache } = await import('@/lib/services/tpsl-realtime.service');
+            updatePositionInCache(
+              position[0]._id.toString(),
+              symbol,
+              side === 'buy' ? 'long' : 'short',
+              takeProfit ?? null,
+              stopLoss ?? null,
+              executionPrice,
+              quantity,
+              session.user.id,
+              competitionId
+            );
+          } catch {
+            // Cache update is optional
+          }
+        }
+
         // Update participant (use correct model based on contest type)
         const ParticipantModel = await getParticipantModel(contestType);
         await ParticipantModel.findByIdAndUpdate(

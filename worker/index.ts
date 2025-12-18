@@ -25,18 +25,15 @@
 import Agenda from 'agenda';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-// Get __dirname equivalent for ES modules
-const __filename_esm = typeof __filename !== 'undefined' 
-  ? __filename 
-  : fileURLToPath(import.meta.url);
-const __dirname_esm = typeof __dirname !== 'undefined' 
-  ? __dirname 
-  : path.dirname(__filename_esm);
 
 // Load environment variables from root .env
-dotenv.config({ path: path.resolve(__dirname_esm, '../.env') });
+// Use process.cwd() since worker is always run from project root
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+// ⚠️ IMPORTANT: Set IS_WORKER flag BEFORE any other imports
+// This tells websocket-price-streamer to NOT connect (WEB app handles WebSocket)
+// Worker reads prices from MongoDB cache instead
+process.env.IS_WORKER = 'true';
 
 import { connectToDatabase, disconnectFromDatabase } from './config/database';
 import { runMarginCheck } from './jobs/margin-check.job';
@@ -150,7 +147,9 @@ agenda.define('challenge-finalize', async () => {
 
 /**
  * Trade Queue Processor Job
- * Processes limit orders and TP/SL triggers every minute
+ * - Processes pending limit orders every minute
+ * - BACKUP sweep for TP/SL (real-time triggering happens in WebSocket handler!)
+ * - Catches any positions that real-time check might have missed
  * (Replaces Inngest: process-trade-queue)
  */
 agenda.define('trade-queue', async () => {
@@ -164,7 +163,7 @@ agenda.define('trade-queue', async () => {
     if (result.ordersExecuted > 0 || result.tpSlTriggered > 0) {
       console.log(`\n📋 [TRADE QUEUE] Completed in ${duration}ms`);
       console.log(`   Orders checked: ${result.pendingOrdersChecked}, executed: ${result.ordersExecuted}`);
-      console.log(`   Positions checked: ${result.positionsChecked}, TP/SL triggered: ${result.tpSlTriggered}`);
+      console.log(`   Positions checked: ${result.positionsChecked}, TP/SL backup triggered: ${result.tpSlTriggered}`);
     }
     
     if (result.errors.length > 0) {
@@ -254,6 +253,7 @@ async function startWorker(): Promise<void> {
   console.log('╔══════════════════════════════════════════════════════════╗');
   console.log('║           CHARTVOLT BACKGROUND WORKER                    ║');
   console.log('║           No Redis Required - Uses MongoDB               ║');
+  console.log('║           Real-Time TP/SL + Backup Sweep                 ║');
   console.log('╚══════════════════════════════════════════════════════════╝');
   console.log('\n');
 
@@ -269,26 +269,28 @@ async function startWorker(): Promise<void> {
     await agenda.every('5 minutes', 'margin-check');
     await agenda.every('1 minute', 'competition-end');
     await agenda.every('1 minute', 'challenge-finalize');
-    await agenda.every('1 minute', 'trade-queue');
+    await agenda.every('1 minute', 'trade-queue');  // BACKUP sweep - real-time happens in main app
     await agenda.every('1 minute', 'price-cache');
     await agenda.every('1 hour', 'evaluate-badges');
 
-    console.log('\n📅 Scheduled Jobs (Replaces Inngest):');
+    console.log('\n📅 Scheduled Jobs:');
     console.log('   • margin-check: every 5 minutes');
     console.log('   • competition-end: every 1 minute');
     console.log('   • challenge-finalize: every 1 minute');
-    console.log('   • trade-queue: every 1 minute (TP/SL & limit orders)');
+    console.log('   • trade-queue: every 1 minute (backup TP/SL sweep & limit orders)');
     console.log('   • price-cache: every 1 minute');
     console.log('   • evaluate-badges: every 1 hour');
+    console.log('\n⚡ TP/SL Note: Real-time triggers happen in main app on price updates!');
+    console.log('   Worker trade-queue is a BACKUP sweep to catch any missed closures.');
     console.log('\n🚀 Worker is running! Press Ctrl+C to stop.\n');
 
     // Run initial checks immediately
     console.log('🔄 Running initial checks...');
-    await agenda.now('margin-check');
-    await agenda.now('competition-end');
-    await agenda.now('challenge-finalize');
-    await agenda.now('trade-queue');
-    await agenda.now('price-cache');
+    await agenda.now('margin-check', {});
+    await agenda.now('competition-end', {});
+    await agenda.now('challenge-finalize', {});
+    await agenda.now('trade-queue', {});
+    await agenda.now('price-cache', {});
 
   } catch (error) {
     console.error('❌ Failed to start worker:', error);

@@ -54,6 +54,9 @@ interface PriceContextValue {
   isConnected: boolean;
   marketOpen: boolean;
   marketStatus: string;
+  isStale: boolean;
+  lastUpdate: number;
+  forceRefresh: () => void;
 }
 
 // Combined state to batch updates (prevents multiple re-renders)
@@ -62,12 +65,21 @@ interface PriceState {
   isConnected: boolean;
   marketOpen: boolean;
   marketStatus: string;
+  isStale: boolean;
+  lastUpdate: number;
 }
 
 const PriceContext = createContext<PriceContextValue | undefined>(undefined);
 
 // Polling interval - 2000ms reduces CPU load significantly while still being responsive
 const POLLING_INTERVAL = PERFORMANCE_INTERVALS.PRICE_POLLING;
+
+// Stale price threshold - if no update for this long, prices are considered stale
+// Increased to 15 seconds to reduce false positives during TP/SL processing
+const STALE_THRESHOLD_MS = 15000; // 15 seconds
+
+// Max consecutive errors before showing stale indicator
+const MAX_CONSECUTIVE_ERRORS = 8;
 
 export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
   // Combined state to batch all updates into single re-render
@@ -76,6 +88,8 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     isConnected: false,
     marketOpen: true,
     marketStatus: 'Connecting...',
+    isStale: false,
+    lastUpdate: 0,
   });
 
   const [subscriptions, setSubscriptions] = useState<Set<ForexSymbol>>(new Set());
@@ -84,6 +98,10 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
   const fetchingRef = useRef(false);
   // Track last successful fetch time
   const lastFetchRef = useRef(0);
+  // Track consecutive errors
+  const errorCountRef = useRef(0);
+  // Track stale check interval
+  const staleCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Subscribe to a symbol
   const subscribe = useCallback((symbol: ForexSymbol) => {
@@ -105,6 +123,41 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, []);
 
+  // Force refresh prices (can be called manually)
+  const forceRefresh = useCallback(() => {
+    fetchingRef.current = false;
+    errorCountRef.current = 0;
+    // Reset stale state immediately
+    setState(prev => ({ ...prev, isStale: false, marketStatus: 'Refreshing...' }));
+    log('🔄 Force refresh triggered');
+  }, []);
+
+  // Stale price detection
+  useEffect(() => {
+    // Check for stale prices every second
+    staleCheckRef.current = setInterval(() => {
+      const now = Date.now();
+      const timeSinceUpdate = now - lastFetchRef.current;
+      const isStale = timeSinceUpdate > STALE_THRESHOLD_MS && lastFetchRef.current > 0;
+      
+      setState(prev => {
+        if (prev.isStale !== isStale) {
+          if (isStale) {
+            log('⚠️ Prices are stale - no update for', timeSinceUpdate, 'ms');
+          }
+          return { ...prev, isStale };
+        }
+        return prev;
+      });
+    }, 1000);
+
+    return () => {
+      if (staleCheckRef.current) {
+        clearInterval(staleCheckRef.current);
+      }
+    };
+  }, []);
+
   // Fetch prices effect with visibility awareness
   useEffect(() => {
     if (subscriptions.size === 0) {
@@ -113,7 +166,6 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     let intervalId: ReturnType<typeof setInterval> | null = null;
-    let isTabVisible = !document.hidden;
 
     // Fetch REAL prices from API
     const fetchPrices = async () => {
@@ -135,18 +187,27 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
         const symbolsArray = Array.from(subscriptions);
         log('🔄 Fetching REAL prices for:', symbolsArray);
         
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+        
         const response = await fetch('/api/trading/prices', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ symbols: symbolsArray }),
           cache: 'no-store',
+          signal: controller.signal,
         });
+        
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           const data = await response.json();
           log('💰 Received REAL prices:', data.prices.length, 'quotes');
           
-          lastFetchRef.current = Date.now();
+          const now = Date.now();
+          lastFetchRef.current = now;
+          errorCountRef.current = 0; // Reset error count on success
 
           // BATCHED STATE UPDATE - single setState call
           setState(prev => {
@@ -169,7 +230,8 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
             if (!hasChanges && 
                 prev.isConnected === true && 
                 prev.marketOpen === data.marketOpen && 
-                prev.marketStatus === data.status) {
+                prev.marketStatus === data.status &&
+                !prev.isStale) {
               return prev;
             }
 
@@ -178,19 +240,41 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
               isConnected: true,
               marketOpen: data.marketOpen,
               marketStatus: data.status,
+              isStale: false,
+              lastUpdate: now,
             };
           });
         } else if (response.status === 404) {
           setState(prev => prev.isConnected ? { ...prev, isConnected: false } : prev);
         } else {
+          errorCountRef.current++;
           setState(prev => ({ 
             ...prev, 
-            marketStatus: '⚠️ Connection Error' 
+            marketStatus: '⚠️ Connection Error',
+            isStale: true,
           }));
         }
-      } catch {
-        // Fail silently if not on a page that uses prices
-        setState(prev => prev.isConnected ? { ...prev, isConnected: false } : prev);
+      } catch (error) {
+        // Check if this is an abort error (expected during timeout or navigation)
+        const isAbortError = error instanceof Error && error.name === 'AbortError';
+        
+        if (!isAbortError) {
+          errorCountRef.current++;
+          log('❌ Price fetch error:', error);
+          
+          // If too many consecutive errors, show stale indicator
+          if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
+            setState(prev => ({ 
+              ...prev, 
+              isConnected: false,
+              isStale: true,
+              marketStatus: '⚠️ Reconnecting...',
+            }));
+          }
+        } else {
+          // Abort is expected - don't count as error, just log
+          log('⏹️ Price fetch aborted (timeout or navigation)');
+        }
       } finally {
         fetchingRef.current = false;
       }
@@ -199,11 +283,11 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     // Handle visibility change - pause/resume polling
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        isTabVisible = false;
         log('👁️ Tab hidden - pausing price updates');
       } else {
-        isTabVisible = true;
         log('👁️ Tab visible - resuming price updates');
+        // Reset stale state when tab becomes visible
+        errorCountRef.current = 0;
         fetchPrices(); // Fetch immediately when tab becomes visible
       }
     };
@@ -231,7 +315,10 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     isConnected: state.isConnected,
     marketOpen: state.marketOpen,
     marketStatus: state.marketStatus,
-  }), [state, subscribe, unsubscribe]);
+    isStale: state.isStale,
+    lastUpdate: state.lastUpdate,
+    forceRefresh,
+  }), [state, subscribe, unsubscribe, forceRefresh]);
 
   return <PriceContext.Provider value={value}>{children}</PriceContext.Provider>;
 };
