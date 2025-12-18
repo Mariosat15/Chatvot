@@ -4,4 +4,3 @@ export default function AdminHome() {
   // Redirect to dashboard
   redirect('/dashboard');
 }
-

@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-
-// Note: In production, import from shared components
-// import { Button } from '@components/ui/button';
-// import { Input } from '@components/ui/input';
+import { Shield } from 'lucide-react';
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -16,19 +16,15 @@ export default function AdminLogin() {
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  // API URL - points to main app's API
-  const API_BASE = process.env.NEXT_PUBLIC_MAIN_APP_URL || 'http://localhost:3000';
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/api/admin/auth/login`, {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
-        credentials: 'include', // Important for cookies
       });
 
       const data = await response.json();
@@ -58,9 +54,7 @@ export default function AdminLogin() {
           {/* Header */}
           <div className="flex flex-col items-center mb-8">
             <div className="h-16 w-16 bg-yellow-500 rounded-full flex items-center justify-center mb-4">
-              <svg className="h-8 w-8 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
+              <Shield className="h-8 w-8 text-gray-900" />
             </div>
             <h1 className="text-2xl font-bold text-gray-100">
               Admin Panel
@@ -73,46 +67,46 @@ export default function AdminLogin() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
+              <Label htmlFor="email" className="text-gray-300">
                 Email Address
-              </label>
-              <input
+              </Label>
+              <Input
                 id="email"
                 type="email"
                 value={formData.email}
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                className="mt-2 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                className="mt-2 bg-gray-700 border-gray-600 text-gray-100"
                 placeholder="admin@email.com"
                 required
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
+              <Label htmlFor="password" className="text-gray-300">
                 Password
-              </label>
-              <input
+              </Label>
+              <Input
                 id="password"
                 type="password"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
                 }
-                className="mt-2 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                className="mt-2 bg-gray-700 border-gray-600 text-gray-100"
                 placeholder="••••••••"
                 required
               />
             </div>
 
-            <button
+            <Button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold rounded-md disabled:opacity-50"
+              className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold"
             >
               {isLoading ? 'Signing in...' : 'Sign In'}
-            </button>
+            </Button>
           </form>
 
           {/* Default Credentials Info */}
