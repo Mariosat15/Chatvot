@@ -19,15 +19,16 @@ if(!cached) {
 // Optimized connection options for performance
 const connectionOptions: mongoose.ConnectOptions = {
     bufferCommands: false,
-    // Connection pool settings - optimized for trading app workload
-    maxPoolSize: 20, // Max connections in pool (default is 100, too high for most apps)
-    minPoolSize: 5,  // Keep minimum connections ready
+    // Connection pool settings - INCREASED for peak load handling
+    // Rule of thumb: maxPoolSize = expectedConcurrentUsers / 5
+    maxPoolSize: 50, // Increased from 20 for better throughput under load
+    minPoolSize: 10, // Keep more connections warm for faster response
     // Timeouts - CRITICAL for preventing 30+ second hangs
     serverSelectionTimeoutMS: 5000, // Fail fast if can't connect
     socketTimeoutMS: 10000, // Reduced from 45s to 10s - prevents long hangs
     connectTimeoutMS: 10000, // Connection timeout
     // Performance options
-    maxIdleTimeMS: 30000, // Close idle connections after 30s
+    maxIdleTimeMS: 60000, // Increased to 60s - keep connections alive longer under load
     // Retry options for resilience
     retryWrites: true,
     retryReads: true,

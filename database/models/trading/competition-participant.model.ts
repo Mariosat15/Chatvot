@@ -227,6 +227,10 @@ CompetitionParticipantSchema.index({ competitionId: 1, userId: 1 }, { unique: tr
 CompetitionParticipantSchema.index({ competitionId: 1, currentRank: 1 });
 CompetitionParticipantSchema.index({ competitionId: 1, pnl: -1 }); // For leaderboard
 CompetitionParticipantSchema.index({ userId: 1, status: 1 });
+// PERFORMANCE: Additional indexes for common queries
+CompetitionParticipantSchema.index({ competitionId: 1, status: 1, pnl: -1 }); // Active participants leaderboard
+CompetitionParticipantSchema.index({ userId: 1, enteredAt: -1 }); // User's competition history
+CompetitionParticipantSchema.index({ competitionId: 1, currentCapital: -1 }); // Capital-based ranking
 
 // Virtual for profit factor (average win / average loss)
 CompetitionParticipantSchema.virtual('profitFactor').get(function () {

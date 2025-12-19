@@ -246,7 +246,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate prize pool and fees
-    const actualEntryFee = entryFee ?? 10;
+    // BUG FIX: Use settings.minEntryFee as default (consistent with validation)
+    const actualEntryFee = entryFee ?? settings.minEntryFee;
     const prizePool = actualEntryFee * 2;
     const platformFeePercentage = settings.platformFeePercentage;
     const platformFeeAmount = Math.floor(prizePool * (platformFeePercentage / 100));
@@ -285,7 +286,7 @@ export async function POST(request: NextRequest) {
       platformFeeAmount,
       winnerPrize,
       acceptDeadline: new Date(Date.now() + settings.acceptDeadlineMinutes * 60 * 1000),
-      duration,
+      duration: duration ?? settings.minDurationMinutes, // Use settings default if not provided
       status: 'pending',
       assetClasses: assetClasses || settings.defaultAssetClasses,
       allowedSymbols: [],

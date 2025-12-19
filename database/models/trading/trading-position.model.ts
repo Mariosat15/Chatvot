@@ -196,6 +196,10 @@ TradingPositionSchema.index({ userId: 1, status: 1 });
 TradingPositionSchema.index({ symbol: 1, status: 1 });
 TradingPositionSchema.index({ participantId: 1, status: 1 });
 TradingPositionSchema.index({ competitionId: 1, userId: 1, status: 1 });
+// PERFORMANCE: Additional indexes for common operations
+TradingPositionSchema.index({ userId: 1, competitionId: 1, openedAt: -1 }); // User's positions in competition
+TradingPositionSchema.index({ status: 1, lastPriceUpdate: 1 }); // For price update jobs
+TradingPositionSchema.index({ competitionId: 1, symbol: 1, status: 1 }); // Symbol-based queries in competition
 
 // Virtual for is profitable
 TradingPositionSchema.virtual('isProfitable').get(function () {

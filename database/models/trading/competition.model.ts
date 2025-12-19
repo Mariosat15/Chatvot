@@ -365,6 +365,10 @@ CompetitionSchema.index({ status: 1, startTime: -1 });
 // Note: slug already has unique index from schema definition (unique: true)
 CompetitionSchema.index({ createdBy: 1 });
 CompetitionSchema.index({ status: 1, registrationDeadline: 1 });
+// PERFORMANCE: Additional indexes for common queries
+CompetitionSchema.index({ status: 1, endTime: 1 }); // Finding active/ending competitions
+CompetitionSchema.index({ status: 1, currentParticipants: 1 }); // Finding competitions with spots
+CompetitionSchema.index({ tags: 1, status: 1 }); // Tag-based filtering
 
 // Virtual for days until start
 CompetitionSchema.virtual('daysUntilStart').get(function () {
