@@ -821,9 +821,16 @@ export async function POST(request: Request) {
       });
     }
   } catch (error) {
-    console.error('Error tracking device fingerprint:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('❌ Error tracking device fingerprint:', errorMessage);
+    console.error('Stack:', errorStack);
     return NextResponse.json(
-      { success: false, message: 'Failed to track device' },
+      { 
+        success: false, 
+        message: 'Failed to track device',
+        error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { status: 500 }
     );
   }

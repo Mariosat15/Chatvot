@@ -28,11 +28,13 @@ export default function CreditConversionSection() {
       const response = await fetch('/api/credit-conversion');
       if (!response.ok) throw new Error('Failed to fetch settings');
       const data = await response.json();
+      // Use nullish coalescing (??) for numeric values that can legitimately be 0
+      // (e.g., 0% withdrawal fee for free withdrawals)
       setSettings({
-        eurToCreditsRate: data.eurToCreditsRate || 100,
-        minimumDeposit: data.minimumDeposit || 10,
-        minimumWithdrawal: data.minimumWithdrawal || 20,
-        withdrawalFeePercentage: data.withdrawalFeePercentage || 2,
+        eurToCreditsRate: data.eurToCreditsRate ?? 100,
+        minimumDeposit: data.minimumDeposit ?? 10,
+        minimumWithdrawal: data.minimumWithdrawal ?? 20,
+        withdrawalFeePercentage: data.withdrawalFeePercentage ?? 2,
       });
     } catch (error) {
       toast.error('Failed to load credit conversion settings');
@@ -132,7 +134,10 @@ export default function CreditConversionSection() {
                 min="1"
                 max="10000"
                 value={settings.eurToCreditsRate}
-                onChange={(e) => setSettings({ ...settings, eurToCreditsRate: parseFloat(e.target.value) || 100 })}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  setSettings({ ...settings, eurToCreditsRate: isNaN(value) ? 100 : value });
+                }}
                 className="bg-gray-900 border-gray-700 text-white"
               />
               <p className="text-xs text-gray-500">
@@ -149,7 +154,10 @@ export default function CreditConversionSection() {
                 type="number"
                 min="1"
                 value={settings.minimumDeposit}
-                onChange={(e) => setSettings({ ...settings, minimumDeposit: parseFloat(e.target.value) || 10 })}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  setSettings({ ...settings, minimumDeposit: isNaN(value) ? 10 : value });
+                }}
                 className="bg-gray-900 border-gray-700 text-white"
               />
               <p className="text-xs text-gray-500">
@@ -164,7 +172,10 @@ export default function CreditConversionSection() {
                 type="number"
                 min="1"
                 value={settings.minimumWithdrawal}
-                onChange={(e) => setSettings({ ...settings, minimumWithdrawal: parseFloat(e.target.value) || 20 })}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  setSettings({ ...settings, minimumWithdrawal: isNaN(value) ? 20 : value });
+                }}
                 className="bg-gray-900 border-gray-700 text-white"
               />
               <p className="text-xs text-gray-500">
@@ -181,7 +192,11 @@ export default function CreditConversionSection() {
                 max="20"
                 step="0.1"
                 value={settings.withdrawalFeePercentage}
-                onChange={(e) => setSettings({ ...settings, withdrawalFeePercentage: parseFloat(e.target.value) || 2 })}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  // Use isNaN check to allow 0 values (|| would treat 0 as falsy)
+                  setSettings({ ...settings, withdrawalFeePercentage: isNaN(value) ? 2 : value });
+                }}
                 className="bg-gray-900 border-gray-700 text-white"
               />
               <p className="text-xs text-gray-500">

@@ -306,10 +306,13 @@ export default function CurrencySettingsSection() {
                 type="number"
                 min="1"
                 value={settings.transactions.minimumDeposit}
-                onChange={(e) => setSettings(prev => ({
-                  ...prev,
-                  transactions: { ...prev.transactions, minimumDeposit: parseFloat(e.target.value) || 1 },
-                }))}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  setSettings(prev => ({
+                    ...prev,
+                    transactions: { ...prev.transactions, minimumDeposit: isNaN(value) ? 1 : value },
+                  }));
+                }}
                 className="mt-2 bg-gray-700 border-gray-600 text-gray-100"
               />
             </div>
@@ -320,10 +323,13 @@ export default function CurrencySettingsSection() {
                 type="number"
                 min="1"
                 value={settings.transactions.minimumWithdrawal}
-                onChange={(e) => setSettings(prev => ({
-                  ...prev,
-                  transactions: { ...prev.transactions, minimumWithdrawal: parseFloat(e.target.value) || 1 },
-                }))}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  setSettings(prev => ({
+                    ...prev,
+                    transactions: { ...prev.transactions, minimumWithdrawal: isNaN(value) ? 1 : value },
+                  }));
+                }}
                 className="mt-2 bg-gray-700 border-gray-600 text-gray-100"
               />
             </div>

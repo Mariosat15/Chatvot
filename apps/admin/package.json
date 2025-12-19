@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "cross-env IS_ADMIN=true PORT=3001 next dev -p 3001",
+    "dev:network": "cross-env IS_ADMIN=true PORT=3001 next dev -p 3001 -H 0.0.0.0",
     "build": "next build",
     "start": "cross-env IS_ADMIN=true PORT=3001 next start -p 3001",
+    "start:network": "cross-env IS_ADMIN=true PORT=3001 next start -p 3001 -H 0.0.0.0",
     "lint": "eslint ."
   },
   "dependencies": {

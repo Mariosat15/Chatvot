@@ -48,7 +48,9 @@ async function getInngestCredentials(): Promise<InngestConfig> {
   const now = Date.now();
   
   // Return cached credentials if still valid
-  if (cachedSigningKey && (now - lastCredentialsFetch) < CREDENTIALS_CACHE_TTL) {
+  // Check lastCredentialsFetch > 0 instead of cachedSigningKey to properly cache
+  // even in dev mode where signing key may be undefined
+  if (lastCredentialsFetch > 0 && (now - lastCredentialsFetch) < CREDENTIALS_CACHE_TTL) {
     return { signingKey: cachedSigningKey, eventKey: cachedEventKey, mode: cachedMode };
   }
 
@@ -121,6 +123,7 @@ export async function PUT(request: NextRequest) {
   try {
     const contentLength = request.headers.get('content-length');
     if (contentLength === '0' || !contentLength) {
+      // Empty PUT requests are valid health checks from Inngest
       return NextResponse.json({ ok: true }, { status: 200 });
     }
     
@@ -129,7 +132,14 @@ export async function PUT(request: NextRequest) {
       ? createHandler(config) 
       : defaultHandler;
     return handler.PUT(request, undefined);
-  } catch {
-    return NextResponse.json({ ok: true }, { status: 200 });
+  } catch (error) {
+    // Log the error for debugging - don't silently swallow errors
+    console.error('❌ Inngest PUT handler error:', error instanceof Error ? error.message : error);
+    
+    // Return error response so Inngest knows the operation failed and can retry
+    return NextResponse.json(
+      { ok: false, error: 'Internal server error processing Inngest request' }, 
+      { status: 500 }
+    );
   }
 }

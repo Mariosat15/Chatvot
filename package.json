@@ -5,8 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "dev:turbo": "next dev --turbopack",
+    "dev:network": "next dev -H 0.0.0.0",
     "dev:admin": "cd apps/admin && npm run dev",
+    "dev:admin:network": "cd apps/admin && npm run dev:network",
     "dev:all": "concurrently -n \"WEB,ADMIN,WORKER\" -c \"blue,yellow,green\" \"npm run dev\" \"npm run dev:admin\" \"npm run worker\"",
+    "dev:all:network": "concurrently -n \"WEB,ADMIN,WORKER\" -c \"blue,yellow,green\" \"npm run dev:network\" \"npm run dev:admin:network\" \"npm run worker\"",
     "setup": "npm install && cd apps/admin && npm install && cd ../..",
     "build": "next build",
     "build:admin": "cd apps/admin && npm run build",

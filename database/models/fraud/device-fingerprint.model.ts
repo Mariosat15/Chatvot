@@ -96,8 +96,7 @@ export interface IDeviceFingerprint extends Document {
 const DeviceFingerprintSchema = new Schema<IDeviceFingerprint>({
   fingerprintId: { 
     type: String, 
-    required: true, 
-    unique: true,
+    required: true,
     index: true 
   },
   userId: { 
@@ -199,7 +198,9 @@ const DeviceFingerprintSchema = new Schema<IDeviceFingerprint>({
 });
 
 // Indexes for fast queries
-DeviceFingerprintSchema.index({ fingerprintId: 1, userId: 1 });
+// Compound unique index: same fingerprintId can exist for different users (fraud detection)
+// but same user can't have duplicate fingerprintIds
+DeviceFingerprintSchema.index({ fingerprintId: 1, userId: 1 }, { unique: true });
 DeviceFingerprintSchema.index({ ipAddress: 1 });
 DeviceFingerprintSchema.index({ linkedUserIds: 1 });
 DeviceFingerprintSchema.index({ riskScore: -1 });

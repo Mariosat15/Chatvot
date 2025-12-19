@@ -83,14 +83,16 @@ export async function GET() {
       },
 
       // Credit/Currency Settings
+      // Use nullish coalescing (??) for numeric values that can legitimately be 0
+      // (e.g., 0% withdrawal fee for free withdrawals, 0 minimum deposit, etc.)
       credits: {
         name: (appSettings as any)?.credits?.name || 'Credits',
         symbol: (appSettings as any)?.credits?.symbol || '⚡',
-        valueInEUR: (appSettings as any)?.credits?.valueInEUR || 1,
-        eurToCreditsRate: creditSettings.eurToCreditsRate || 100,
-        minimumDeposit: creditSettings.minimumDeposit || 10,
-        minimumWithdrawal: creditSettings.minimumWithdrawal || 20,
-        withdrawalFee: creditSettings.platformWithdrawalFeePercentage || creditSettings.withdrawalFeePercentage || 2,
+        valueInEUR: (appSettings as any)?.credits?.valueInEUR ?? 1,
+        eurToCreditsRate: creditSettings.eurToCreditsRate ?? 100,
+        minimumDeposit: creditSettings.minimumDeposit ?? 10,
+        minimumWithdrawal: creditSettings.minimumWithdrawal ?? 20,
+        withdrawalFee: creditSettings.platformWithdrawalFeePercentage ?? creditSettings.withdrawalFeePercentage ?? 2,
       },
 
       // Currency
