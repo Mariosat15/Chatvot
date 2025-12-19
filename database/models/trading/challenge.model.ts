@@ -283,12 +283,16 @@ const ChallengeSchema = new Schema<IChallenge>(
   }
 );
 
-// Indexes
+// Indexes - Optimized for common queries
 ChallengeSchema.index({ status: 1, createdAt: -1 });
 ChallengeSchema.index({ challengerId: 1, status: 1 });
 ChallengeSchema.index({ challengedId: 1, status: 1 });
 ChallengeSchema.index({ status: 1, acceptDeadline: 1 });
 ChallengeSchema.index({ status: 1, endTime: 1 });
+// Compound index for cooldown check query (challengerId + challengedId + createdAt)
+ChallengeSchema.index({ challengerId: 1, challengedId: 1, createdAt: -1 });
+// Combined $or query optimization for active challenges count
+ChallengeSchema.index({ challengerId: 1, challengedId: 1, status: 1 });
 
 const Challenge = models?.Challenge || model<IChallenge>('Challenge', ChallengeSchema);
 

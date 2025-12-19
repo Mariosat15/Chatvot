@@ -119,18 +119,22 @@ async function createSimulatorUser(
 }
 
 /**
- * Create multiple users in batch
+ * Create multiple users in batch with optimized parallelism
+ * Uses concurrent processing while respecting resource limits
  */
 async function createBatchUsers(
   users: Array<{ email: string; password: string; name: string }>
 ): Promise<Array<{ email: string; success: boolean; userId?: string; error?: string }>> {
-  const results = [];
+  const results: Array<{ email: string; success: boolean; userId?: string; error?: string }> = [];
 
-  // Process in smaller batches to avoid overwhelming the database
-  const batchSize = 10;
+  // PERFORMANCE: Increased batch size from 10 to 25 for better throughput
+  // bcrypt is CPU-bound, but modern servers can handle 20-30 concurrent hashes
+  const batchSize = 25;
+  
   for (let i = 0; i < users.length; i += batchSize) {
     const batch = users.slice(i, i + batchSize);
     
+    // Process entire batch in parallel
     const batchResults = await Promise.all(
       batch.map(async (user) => {
         const result = await createSimulatorUser(user.email, user.password, user.name);
@@ -144,6 +148,11 @@ async function createBatchUsers(
     );
 
     results.push(...batchResults);
+    
+    // Small delay between batches to prevent connection exhaustion
+    if (i + batchSize < users.length) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
   }
 
   return results;

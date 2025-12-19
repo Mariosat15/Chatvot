@@ -3,7 +3,14 @@ import { Schema, model, models, Document, Model } from 'mongoose';
 // Interface for the static methods
 interface IChallengeSettingsModel extends Model<IChallengeSettings> {
   getSingleton(): Promise<IChallengeSettings>;
+  clearCache(): void;
 }
+
+// In-memory cache for singleton settings (60 second TTL)
+// This avoids DB query on every challenge creation
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+let cachedSettings: IChallengeSettings | null = null;
+let cacheTimestamp = 0;
 
 // Admin settings for 1v1 Challenges - Only challenge-specific settings
 // Trading settings (leverage, position size, margin) come from TradingRiskSettings (universal)
@@ -154,15 +161,34 @@ const ChallengeSettingsSchema = new Schema<IChallengeSettings>(
   }
 );
 
-// Singleton pattern - only one settings document
+// Singleton pattern with in-memory caching
 ChallengeSettingsSchema.statics.getSingleton = async function () {
+  const now = Date.now();
+  
+  // Return cached settings if valid
+  if (cachedSettings && (now - cacheTimestamp) < CACHE_TTL_MS) {
+    return cachedSettings;
+  }
+  
+  // Fetch from DB
   let settings = await this.findOne();
   if (!settings) {
     settings = await this.create({
       defaultAssetClasses: ['stocks', 'forex', 'crypto', 'indices'],
     });
   }
+  
+  // Update cache
+  cachedSettings = settings;
+  cacheTimestamp = now;
+  
   return settings;
+};
+
+// Clear cache (call after admin updates settings)
+ChallengeSettingsSchema.statics.clearCache = function () {
+  cachedSettings = null;
+  cacheTimestamp = 0;
 };
 
 const ChallengeSettings =

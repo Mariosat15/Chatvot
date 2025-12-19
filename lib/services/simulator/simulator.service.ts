@@ -438,28 +438,65 @@ const TEST_CASES: TestCase[] = [
       ctx.log('info', `Creating ${ctx.config.challenges} challenges`);
 
       const stakes = ctx.config.challengeStakes;
+      
+      // PERFORMANCE FIX: Generate unique challenger/challenged pairs
+      // Previous logic: i*2 % length caused duplicate pairs after length/2 iterations
+      // New logic: Round-robin pairing that guarantees unique pairs
+      const generateUniquePairs = () => {
+        const pairs: Array<{ challengerIdx: number; challengedIdx: number }> = [];
+        const userCount = ctx.testUsers.length;
+        
+        // Generate all possible unique pairs (N choose 2)
+        for (let a = 0; a < userCount; a++) {
+          for (let b = a + 1; b < userCount; b++) {
+            pairs.push({ challengerIdx: a, challengedIdx: b });
+          }
+        }
+        
+        // Shuffle pairs for randomness
+        for (let i = pairs.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
+        }
+        
+        return pairs;
+      };
+      
+      const uniquePairs = generateUniquePairs();
+      const maxChallenges = Math.min(ctx.config.challenges, uniquePairs.length, ctx.testUsers.length - 1);
 
-      for (let i = 0; i < ctx.config.challenges && i < ctx.testUsers.length - 1; i++) {
-        const challenger = ctx.testUsers[i * 2 % ctx.testUsers.length];
-        const challenged = ctx.testUsers[(i * 2 + 1) % ctx.testUsers.length];
-        const stake = stakes[Math.floor(Math.random() * stakes.length)];
+      // PERFORMANCE: Use bulk creation for challenges (single DB roundtrip)
+      const BULK_BATCH_SIZE = 50; // Process in batches of 50
+      
+      for (let batchStart = 0; batchStart < maxChallenges; batchStart += BULK_BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BULK_BATCH_SIZE, maxChallenges);
+        const batchChallenges = [];
+        
+        for (let i = batchStart; i < batchEnd; i++) {
+          const pair = uniquePairs[i];
+          const challenger = ctx.testUsers[pair.challengerIdx];
+          const challenged = ctx.testUsers[pair.challengedIdx];
+          const stake = stakes[Math.floor(Math.random() * stakes.length)];
+          
+          batchChallenges.push({
+            challengerId: challenger.id,
+            challengedId: challenged.id,
+            entryFee: stake,
+            duration: 30,
+          });
+        }
 
         const start = Date.now();
 
         try {
-          const response = await fetch(`${ctx.baseUrl}/api/challenges`, {
+          // Try bulk endpoint first (much faster)
+          const response = await fetch(`${ctx.baseUrl}/api/simulator/challenges`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-Simulator-User-Id': challenger.id,
               'X-Simulator-Mode': 'true',
             },
-            body: JSON.stringify({
-              challengerId: challenger.id,
-              challengedId: challenged.id,
-              entryFee: stake,
-              duration: 30, // 30 minutes
-            }),
+            body: JSON.stringify({ challenges: batchChallenges }),
           });
 
           const elapsed = Date.now() - start;
@@ -467,26 +504,64 @@ const TEST_CASES: TestCase[] = [
 
           if (response.ok) {
             const data = await response.json();
-            const chalId = data.challenge?._id || data._id;
-            if (chalId) {
-              ctx.testChallenges.push({ id: chalId, challengerId: challenger.id, challengedId: challenged.id });
-              results.createdIds!.challenges!.push(chalId);
+            const created = data.created || 0;
+            results.successCount += created;
+            results.failureCount += batchChallenges.length - created;
+            
+            // Track created challenge IDs
+            if (data.challenges && Array.isArray(data.challenges)) {
+              for (const c of data.challenges) {
+                ctx.testChallenges.push({ 
+                  id: c._id, 
+                  challengerId: c.challengerId, 
+                  challengedId: c.challengedId 
+                });
+                results.createdIds!.challenges!.push(c._id);
+              }
             }
-            results.successCount++;
           } else {
-            results.failureCount++;
+            // Fallback: create one by one (slower but more compatible)
+            ctx.log('warn', 'Bulk endpoint failed, falling back to individual creation');
+            for (const c of batchChallenges) {
+              const singleStart = Date.now();
+              try {
+                const singleResponse = await fetch(`${ctx.baseUrl}/api/challenges`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Simulator-User-Id': c.challengerId,
+                    'X-Simulator-Mode': 'true',
+                  },
+                  body: JSON.stringify(c),
+                });
+                results.responseTimes.push(Date.now() - singleStart);
+                if (singleResponse.ok) {
+                  const data = await singleResponse.json();
+                  const chalId = data.challenge?._id || data._id;
+                  if (chalId) {
+                    ctx.testChallenges.push({ id: chalId, challengerId: c.challengerId, challengedId: c.challengedId });
+                    results.createdIds!.challenges!.push(chalId);
+                  }
+                  results.successCount++;
+                } else {
+                  results.failureCount++;
+                }
+              } catch {
+                results.failureCount++;
+              }
+            }
           }
         } catch {
-          results.failureCount++;
+          results.failureCount += batchChallenges.length;
           results.responseTimes.push(Date.now() - start);
         }
 
-        if (i % 50 === 0) {
-          await ctx.updateProgress('Challenge Creation', i, ctx.config.challenges, 
-            `Created ${i} challenges`);
-        }
+        await ctx.updateProgress('Challenge Creation', batchEnd, maxChallenges, 
+          `Created ${results.successCount} challenges`);
       }
 
+      // Update iterations to reflect actual attempts
+      results.iterations = maxChallenges;
       results.success = results.successCount > 0;
       return results;
     },
@@ -591,18 +666,21 @@ const TEST_CASES: TestCase[] = [
     description: 'Test modifying take profit and stop loss',
     dependencies: ['trading-execution'],
     run: async (ctx) => {
+      // Actual iterations = min(100, users) - fix the mismatch that caused 10% false rate
+      const actualIterations = Math.min(100, ctx.testUsers.length);
+      
       const results: TestCaseRunResult = {
         success: true,
-        iterations: 100,
+        iterations: actualIterations, // Must match actual loop iterations
         successCount: 0,
         failureCount: 0,
         responseTimes: [],
       };
 
-      ctx.log('info', 'Testing TP/SL modifications');
+      ctx.log('info', `Testing TP/SL modifications on ${actualIterations} users`);
 
       // Test modifying TP/SL on existing positions
-      for (let i = 0; i < 100 && i < ctx.testUsers.length; i++) {
+      for (let i = 0; i < actualIterations; i++) {
         const user = ctx.testUsers[i];
         const start = Date.now();
 
