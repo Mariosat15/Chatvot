@@ -16,9 +16,14 @@ export interface WhiteLabelDocument extends Document {
   nodemailerPassword: string;
   
   // API Keys & URLs
-  geminiApiKey: string;
   massiveApiKey: string;
   nextPublicMassiveApiKey: string;
+  
+  // OpenAI Configuration
+  openaiApiKey: string;
+  openaiModel: string;
+  openaiEnabled: boolean;
+  openaiForEmails: boolean;
   
   // Database
   mongodbUri: string;
@@ -101,10 +106,6 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     },
     
     // API Keys & URLs
-    geminiApiKey: { 
-      type: String, 
-      default: '' 
-    },
     massiveApiKey: { 
       type: String, 
       default: '' 
@@ -112,6 +113,24 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     nextPublicMassiveApiKey: { 
       type: String, 
       default: '' 
+    },
+    
+    // OpenAI Configuration
+    openaiApiKey: {
+      type: String,
+      default: ''
+    },
+    openaiModel: {
+      type: String,
+      default: 'gpt-4o-mini' // Fast and cheap default
+    },
+    openaiEnabled: {
+      type: Boolean,
+      default: false // Disabled by default
+    },
+    openaiForEmails: {
+      type: Boolean,
+      default: false // AI for email personalization disabled by default
     },
     
     // Database

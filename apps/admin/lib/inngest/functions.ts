@@ -5,6 +5,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import Competition from '@/database/models/trading/competition.model';
 import { checkMarginCalls } from '@/lib/actions/trading/position.actions';
 import EmailTemplate from '@/database/models/email-template.model';
+import { WhiteLabel } from '@/database/models/whitelabel.model';
 // WebSocket for real-time prices from Massive.com
 import { initializeWebSocket, getConnectionStatus, isWebSocketConnected } from '@/lib/services/websocket-price-streamer';
 
@@ -12,20 +13,26 @@ export const sendSignUpEmail = inngest.createFunction(
     { id: 'sign-up-email' },
     { event: 'app/user.created'},
     async ({ event, step }) => {
-        // Fetch email template settings from database
-        const templateSettings = await step.run('get-email-template', async () => {
+        // Fetch email template settings and AI config from database
+        const settings = await step.run('get-settings', async () => {
             await connectToDatabase();
             const template = await EmailTemplate.findOne({ templateType: 'welcome' });
+            const whitelabel = await WhiteLabel.findOne();
             return {
                 useAIPersonalization: template?.useAIPersonalization ?? true,
                 aiPersonalizationPrompt: template?.aiPersonalizationPrompt || PERSONALIZED_WELCOME_EMAIL_PROMPT,
                 defaultIntro: template?.introText || 'Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.',
                 isActive: template?.isActive ?? true,
+                // OpenAI settings
+                openaiEnabled: whitelabel?.openaiEnabled ?? false,
+                openaiForEmails: whitelabel?.openaiForEmails ?? false,
+                openaiApiKey: whitelabel?.openaiApiKey || process.env.OPENAI_API_KEY || '',
+                openaiModel: whitelabel?.openaiModel || 'gpt-4o-mini',
             };
         });
 
         // Check if welcome emails are disabled
-        if (!templateSettings.isActive) {
+        if (!settings.isActive) {
             console.log('📧 Welcome email is disabled in settings, skipping...');
             return {
                 success: true,
@@ -34,38 +41,50 @@ export const sendSignUpEmail = inngest.createFunction(
             };
         }
 
-        let introText = templateSettings.defaultIntro;
+        let introText = settings.defaultIntro;
 
-        // Only use AI if enabled in settings
-        if (templateSettings.useAIPersonalization) {
+        // Only use AI if enabled globally and for emails specifically
+        const shouldUseAI = settings.useAIPersonalization && 
+                           settings.openaiEnabled && 
+                           settings.openaiForEmails && 
+                           settings.openaiApiKey;
+
+        if (shouldUseAI) {
             const userProfile = `
                 - Country: ${event.data.country || 'Not specified'}
             `;
 
             // Use the prompt from database or fallback to default
-            const prompt = templateSettings.aiPersonalizationPrompt.replace('{{userProfile}}', userProfile);
+            const prompt = settings.aiPersonalizationPrompt.replace('{{userProfile}}', userProfile);
 
             try {
+                // Use Inngest's OpenAI integration
                 const response = await step.ai.infer('generate-welcome-intro', {
-                    model: step.ai.models.gemini({ model: 'gemini-2.5-flash-lite' }),
+                    model: step.ai.models.openai({ 
+                        model: settings.openaiModel,
+                        apiKey: settings.openaiApiKey 
+                    }),
                     body: {
-                        contents: [
+                        messages: [
+                            {
+                                role: 'system',
+                                content: 'You are a friendly email copywriter. Write engaging, personalized welcome email content. Keep it concise (2-3 sentences max).'
+                            },
                             {
                                 role: 'user',
-                                parts: [
-                                    { text: prompt }
-                                ]
+                                content: prompt
                             }
-                        ]
+                        ],
+                        max_tokens: 200,
+                        temperature: 0.7
                     }
                 });
 
-                const part = response.candidates?.[0]?.content?.parts?.[0];
-                const aiGeneratedText = part && 'text' in part ? part.text : null;
+                const aiGeneratedText = response.choices?.[0]?.message?.content;
                 
                 if (aiGeneratedText) {
                     introText = aiGeneratedText;
-                    console.log('✨ AI generated personalized intro text');
+                    console.log('✨ AI generated personalized intro text using OpenAI');
                 }
             } catch (error) {
                 console.error('⚠️ AI personalization failed, using default intro:', error);
@@ -83,7 +102,7 @@ export const sendSignUpEmail = inngest.createFunction(
         return {
             success: true,
             message: 'Welcome email sent successfully',
-            aiPersonalized: templateSettings.useAIPersonalization,
+            aiPersonalized: shouldUseAI,
         };
     }
 );

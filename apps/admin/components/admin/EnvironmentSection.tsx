@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Save, Eye, EyeOff, RefreshCw, Settings, Globe, Mail, Key, Database, Shield, AlertCircle, Server, Lock } from 'lucide-react';
+import { Save, Eye, EyeOff, RefreshCw, Settings, Globe, Mail, Key, Database, Shield, AlertCircle, Server, Lock, Brain, Sparkles } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 export default function EnvironmentSection() {
   const [formData, setFormData] = useState({
@@ -20,9 +21,14 @@ export default function EnvironmentSection() {
     nodemailerPassword: '',
     
     // API Keys & URLs
-    geminiApiKey: '',
     massiveApiKey: '',
     nextPublicMassiveApiKey: '',
+    
+    // OpenAI Configuration
+    openaiApiKey: '',
+    openaiModel: 'gpt-4o-mini',
+    openaiEnabled: false,
+    openaiForEmails: false,
     
     // Database
     mongodbUri: '',
@@ -34,9 +40,9 @@ export default function EnvironmentSection() {
   
   const [showPasswords, setShowPasswords] = useState({
     nodemailerPassword: false,
-    geminiApiKey: false,
     massiveApiKey: false,
     nextPublicMassiveApiKey: false,
+    openaiApiKey: false,
     mongodbUri: false,
     betterAuthSecret: false,
   });
@@ -167,6 +173,13 @@ export default function EnvironmentSection() {
                 >
                   <Shield className="h-4 w-4 mr-2" />
                   Auth
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="ai"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-500 data-[state=active]:to-violet-600 data-[state=active]:text-white data-[state=inactive]:text-gray-400"
+                >
+                  <Brain className="h-4 w-4 mr-2" />
+                  AI
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -307,38 +320,9 @@ export default function EnvironmentSection() {
                   <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
                     <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
                       <Key className="h-5 w-5 text-orange-400" />
-                      API Keys & URLs (Read-Only)
+                      Massive.com API Keys (Read-Only)
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Gemini API Key */}
-                      <div className="md:col-span-2">
-                        <Label htmlFor="geminiApiKey" className="text-gray-300 flex items-center gap-2 mb-2">
-                          <Key className="h-4 w-4 text-orange-400" />
-                          Gemini API Key
-                        </Label>
-                        <div className="relative">
-                          <Input
-                            id="geminiApiKey"
-                            type={showPasswords.geminiApiKey ? 'text' : 'password'}
-                            value={formData.geminiApiKey}
-                            disabled
-                            className="bg-gray-900 border-gray-700 text-gray-400 h-11 pr-10 cursor-not-allowed"
-                            placeholder="Managed in Payment Providers"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => togglePasswordVisibility('geminiApiKey')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                          >
-                            {showPasswords.geminiApiKey ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
                       {/* Massive API Key */}
                       <div>
                         <Label htmlFor="massiveApiKey" className="text-gray-300 flex items-center gap-2 mb-2">
@@ -494,6 +478,140 @@ export default function EnvironmentSection() {
                           className="bg-gray-800 border-gray-600 text-gray-100 h-11"
                           placeholder="http://localhost:3000"
                         />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="ai" className="mt-0">
+                <div className="space-y-6">
+                  {/* AI Feature Toggles */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-violet-400" />
+                      AI Features
+                    </h3>
+                    <div className="space-y-6">
+                      {/* Main AI Toggle */}
+                      <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                        <div>
+                          <Label className="text-gray-100 font-medium">Enable AI Features</Label>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Master toggle for all AI-powered features in the application
+                          </p>
+                        </div>
+                        <Switch
+                          checked={formData.openaiEnabled}
+                          onCheckedChange={(checked) =>
+                            setFormData({ ...formData, openaiEnabled: checked })
+                          }
+                        />
+                      </div>
+
+                      {/* AI for Emails Toggle */}
+                      <div className={`flex items-center justify-between p-4 bg-gray-900/50 rounded-lg border border-gray-700 ${!formData.openaiEnabled ? 'opacity-50' : ''}`}>
+                        <div>
+                          <Label className="text-gray-100 font-medium">AI for Email Personalization</Label>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Use AI to generate personalized welcome emails for new users
+                          </p>
+                        </div>
+                        <Switch
+                          checked={formData.openaiForEmails}
+                          onCheckedChange={(checked) =>
+                            setFormData({ ...formData, openaiForEmails: checked })
+                          }
+                          disabled={!formData.openaiEnabled}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* OpenAI Configuration */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-violet-400" />
+                      OpenAI Configuration
+                    </h3>
+                    <div className="space-y-4">
+                      {/* API Key */}
+                      <div>
+                        <Label htmlFor="openaiApiKey" className="text-gray-300 flex items-center gap-2 mb-2">
+                          <Key className="h-4 w-4 text-violet-400" />
+                          OpenAI API Key
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id="openaiApiKey"
+                            type={showPasswords.openaiApiKey ? 'text' : 'password'}
+                            value={formData.openaiApiKey}
+                            onChange={(e) =>
+                              setFormData({ ...formData, openaiApiKey: e.target.value })
+                            }
+                            className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
+                            placeholder="sk-..."
+                          />
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility('openaiApiKey')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                          >
+                            {showPasswords.openaiApiKey ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Get your API key from{' '}
+                          <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300">
+                            platform.openai.com/api-keys
+                          </a>
+                        </p>
+                      </div>
+
+                      {/* Model Selection */}
+                      <div>
+                        <Label htmlFor="openaiModel" className="text-gray-300 flex items-center gap-2 mb-2">
+                          <Settings className="h-4 w-4 text-violet-400" />
+                          AI Model
+                        </Label>
+                        <Select
+                          value={formData.openaiModel}
+                          onValueChange={(value) =>
+                            setFormData({ ...formData, openaiModel: value })
+                          }
+                        >
+                          <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-100 h-11">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</SelectItem>
+                            <SelectItem value="gpt-4o">GPT-4o (Smart & Fast)</SelectItem>
+                            <SelectItem value="gpt-4-turbo">GPT-4 Turbo (High Quality)</SelectItem>
+                            <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Recommended: <strong>GPT-4o Mini</strong> for best balance of speed and cost
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Usage Info */}
+                  <div className="bg-violet-500/10 border border-violet-500/30 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <Brain className="h-5 w-5 text-violet-400 mt-0.5" />
+                      <div>
+                        <h4 className="text-sm font-semibold text-violet-400">AI Features Include</h4>
+                        <ul className="text-xs text-gray-400 mt-2 space-y-1 list-disc list-inside">
+                          <li>Performance Simulator Analysis - AI-powered test result analysis</li>
+                          <li>Email Personalization - Personalized welcome emails for new users</li>
+                          <li>Future: Trading pattern analysis, fraud detection enhancements</li>
+                        </ul>
                       </div>
                     </div>
                   </div>

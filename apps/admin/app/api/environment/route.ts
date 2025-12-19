@@ -43,9 +43,14 @@ export async function GET() {
       nodemailerPassword: settings.nodemailerPassword || getEnvValue('NODEMAILER_PASSWORD', ''),
       
       // API Keys & URLs
-      geminiApiKey: settings.geminiApiKey || getEnvValue('GEMINI_API_KEY', ''),
       massiveApiKey: settings.massiveApiKey || getEnvValue('MASSIVE_API_KEY', ''),
       nextPublicMassiveApiKey: settings.nextPublicMassiveApiKey || getEnvValue('NEXT_PUBLIC_MASSIVE_API_KEY', ''),
+      
+      // OpenAI Configuration
+      openaiApiKey: settings.openaiApiKey || getEnvValue('OPENAI_API_KEY', ''),
+      openaiModel: settings.openaiModel || 'gpt-4o-mini',
+      openaiEnabled: settings.openaiEnabled ?? false,
+      openaiForEmails: settings.openaiForEmails ?? false,
       
       // Database
       mongodbUri: settings.mongodbUri || getEnvValue('MONGODB_URI', ''),
@@ -104,10 +109,6 @@ export async function PUT(request: NextRequest) {
     }
     
     // API Keys & URLs
-    if (body.geminiApiKey !== undefined) {
-      console.log('  ✏️ Updating geminiApiKey: [HIDDEN]');
-      settings.geminiApiKey = body.geminiApiKey;
-    }
     if (body.massiveApiKey !== undefined) {
       console.log('  ✏️ Updating massiveApiKey: [HIDDEN]');
       settings.massiveApiKey = body.massiveApiKey;
@@ -115,6 +116,24 @@ export async function PUT(request: NextRequest) {
     if (body.nextPublicMassiveApiKey !== undefined) {
       console.log('  ✏️ Updating nextPublicMassiveApiKey: [HIDDEN]');
       settings.nextPublicMassiveApiKey = body.nextPublicMassiveApiKey;
+    }
+    
+    // OpenAI Configuration
+    if (body.openaiApiKey !== undefined) {
+      console.log('  ✏️ Updating openaiApiKey: [HIDDEN]');
+      settings.openaiApiKey = body.openaiApiKey;
+    }
+    if (body.openaiModel !== undefined) {
+      console.log('  ✏️ Updating openaiModel:', body.openaiModel);
+      settings.openaiModel = body.openaiModel;
+    }
+    if (body.openaiEnabled !== undefined) {
+      console.log('  ✏️ Updating openaiEnabled:', body.openaiEnabled);
+      settings.openaiEnabled = body.openaiEnabled;
+    }
+    if (body.openaiForEmails !== undefined) {
+      console.log('  ✏️ Updating openaiForEmails:', body.openaiForEmails);
+      settings.openaiForEmails = body.openaiForEmails;
     }
     
     // Database
@@ -174,9 +193,12 @@ export async function PUT(request: NextRequest) {
     envLines.push('BETTER_AUTH_URL=' + (settings.betterAuthUrl || 'http://localhost:3000'));
     envLines.push('');
     
-    // Gemini
-    envLines.push('# GEMINI');
-    envLines.push('GEMINI_API_KEY=' + (settings.geminiApiKey || ''));
+    // OpenAI
+    envLines.push('# OPENAI');
+    envLines.push('OPENAI_API_KEY=' + (settings.openaiApiKey || ''));
+    envLines.push('OPENAI_MODEL=' + (settings.openaiModel || 'gpt-4o-mini'));
+    envLines.push('OPENAI_ENABLED=' + (settings.openaiEnabled ? 'true' : 'false'));
+    envLines.push('OPENAI_FOR_EMAILS=' + (settings.openaiForEmails ? 'true' : 'false'));
     envLines.push('');
     
     // Nodemailer

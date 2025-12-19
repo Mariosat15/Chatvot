@@ -50,8 +50,11 @@ export async function getSettings() {
       nextPublicBaseUrl: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
       nodemailerEmail: process.env.NODEMAILER_EMAIL || '',
       nodemailerPassword: process.env.NODEMAILER_PASSWORD || '',
-      geminiApiKey: process.env.GEMINI_API_KEY || '',
       massiveApiKey: process.env.MASSIVE_API_KEY || '',
+      openaiApiKey: process.env.OPENAI_API_KEY || '',
+      openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      openaiEnabled: process.env.OPENAI_ENABLED === 'true',
+      openaiForEmails: process.env.OPENAI_FOR_EMAILS === 'true',
       nextPublicMassiveApiKey: process.env.NEXT_PUBLIC_MASSIVE_API_KEY || '',
       mongodbUri: process.env.MONGODB_URI || '',
       betterAuthSecret: process.env.BETTER_AUTH_SECRET || '',
@@ -177,10 +180,13 @@ export async function getEnv(key: string, fallback: string = ''): Promise<string
     const dbKeyMap: Record<string, string> = {
       'NODEMAILER_EMAIL': 'nodemailerEmail',
       'NODEMAILER_PASSWORD': 'nodemailerPassword',
-      'GEMINI_API_KEY': 'geminiApiKey',
       'MASSIVE_API_KEY': 'massiveApiKey',
       'NEXT_PUBLIC_MASSIVE_API_KEY': 'nextPublicMassiveApiKey',
       'NEXT_PUBLIC_BASE_URL': 'nextPublicBaseUrl',
+      'OPENAI_API_KEY': 'openaiApiKey',
+      'OPENAI_MODEL': 'openaiModel',
+      'OPENAI_ENABLED': 'openaiEnabled',
+      'OPENAI_FOR_EMAILS': 'openaiForEmails',
     };
 
     const dbKey = dbKeyMap[key];

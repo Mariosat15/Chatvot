@@ -62,9 +62,46 @@ export async function GET(request: NextRequest) {
 // POST - Create a new challenge
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check for simulator mode
+    const isSimulatorMode = request.headers.get('X-Simulator-Mode') === 'true';
+    const simulatorUserId = request.headers.get('X-Simulator-User-Id');
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    let challengerId: string;
+    let challengerName: string;
+    let challengerEmail: string;
+    
+    const body = await request.json();
+    const {
+      challengedId,
+      entryFee,
+      duration, // in minutes
+      startingCapital,
+      assetClasses,
+      rankingMethod,
+      tieBreaker1,
+      tieBreaker2,
+      minimumTrades,
+    } = body;
+    
+    if ((isSimulatorMode || simulatorUserId) && isDev) {
+      // Simulator mode - accept challengerId from header or body
+      const simUserId = simulatorUserId || body.challengerId;
+      if (!simUserId) {
+        return NextResponse.json({ error: 'challengerId required in simulator mode (X-Simulator-User-Id header or body.challengerId)' }, { status: 400 });
+      }
+      challengerId = simUserId;
+      challengerName = `SimUser_${challengerId.slice(-6)}`;
+      challengerEmail = `simuser_${challengerId.slice(-6)}@test.simulator`;
+    } else {
+      // Normal mode - require authentication
+      const session = await auth.api.getSession({ headers: await headers() });
+      if (!session?.user?.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      challengerId = session.user.id;
+      challengerName = session.user.name || 'Unknown';
+      challengerEmail = session.user.email || '';
     }
 
     await connectToDatabase();
@@ -81,19 +118,6 @@ export async function POST(request: NextRequest) {
       // Index might not exist - that's OK
     }
 
-    const body = await request.json();
-    const {
-      challengedId,
-      entryFee,
-      duration, // in minutes
-      startingCapital,
-      assetClasses,
-      rankingMethod,
-      tieBreaker1,
-      tieBreaker2,
-      minimumTrades,
-    } = body;
-
     // Get challenge settings and universal trading risk settings
     // Force fresh read by setting {new: true} context
     const settings = await ChallengeSettings.getSingleton();
@@ -106,126 +130,148 @@ export async function POST(request: NextRequest) {
       maxActiveChallenges: settings.maxActiveChallenges
     });
 
-    // Validate challenges are enabled
-    if (!settings.challengesEnabled) {
-      return NextResponse.json(
-        { error: 'Challenges are currently disabled' },
-        { status: 400 }
-      );
-    }
-
-    // Can't challenge yourself
-    if (challengedId === session.user.id) {
-      return NextResponse.json(
-        { error: 'You cannot challenge yourself' },
-        { status: 400 }
-      );
-    }
-
-    // Validate entry fee
-    if (entryFee < settings.minEntryFee || entryFee > settings.maxEntryFee) {
-      return NextResponse.json(
-        { error: `Entry fee must be between ${settings.minEntryFee} and ${settings.maxEntryFee} credits` },
-        { status: 400 }
-      );
-    }
-
-    // Validate duration
-    if (duration < settings.minDurationMinutes || duration > settings.maxDurationMinutes) {
-      return NextResponse.json(
-        { error: `Duration must be between ${settings.minDurationMinutes} and ${settings.maxDurationMinutes} minutes` },
-        { status: 400 }
-      );
-    }
-
-    // Check challenger's wallet balance
-    const challengerWallet = await CreditWallet.findOne({ userId: session.user.id });
-    if (!challengerWallet || challengerWallet.creditBalance < entryFee) {
-      return NextResponse.json(
-        { error: 'Insufficient credits' },
-        { status: 400 }
-      );
-    }
-
-    // Check if challenged user exists and is online
-    const challengedUser = await getUserById(challengedId);
-    if (!challengedUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check if challenged user is accepting challenges
-    const challengedPresence = await UserPresence.findOne({ userId: challengedId });
-    if (settings.requireBothOnline && (!challengedPresence || challengedPresence.status !== 'online')) {
-      return NextResponse.json(
-        { error: 'User is not online' },
-        { status: 400 }
-      );
-    }
-
-    if (challengedPresence && !challengedPresence.acceptingChallenges) {
-      return NextResponse.json(
-        { error: 'User is not accepting challenges' },
-        { status: 400 }
-      );
-    }
-
-    // Check pending challenges limit
-    const pendingChallenges = await Challenge.countDocuments({
-      challengerId: session.user.id,
-      status: 'pending',
-    });
-
-    if (pendingChallenges >= settings.maxPendingChallenges) {
-      return NextResponse.json(
-        { error: `You have too many pending challenges (max: ${settings.maxPendingChallenges})` },
-        { status: 400 }
-      );
-    }
-
-    // Check active challenges limit
-    const activeChallenges = await Challenge.countDocuments({
-      $or: [
-        { challengerId: session.user.id },
-        { challengedId: session.user.id },
-      ],
-      status: 'active',
-    });
-
-    if (activeChallenges >= settings.maxActiveChallenges) {
-      return NextResponse.json(
-        { error: `You have too many active challenges (max: ${settings.maxActiveChallenges})` },
-        { status: 400 }
-      );
-    }
-
-    // Check cooldown with same user
-    if (settings.challengeCooldownMinutes > 0) {
-      const cooldownTime = new Date(Date.now() - settings.challengeCooldownMinutes * 60 * 1000);
-      const recentChallenge = await Challenge.findOne({
-        challengerId: session.user.id,
-        challengedId,
-        createdAt: { $gte: cooldownTime },
-      });
-
-      if (recentChallenge) {
+    // Skip most validation in simulator mode
+    const isInSimulatorMode = (isSimulatorMode || simulatorUserId) && isDev;
+    if (!isInSimulatorMode) {
+      // Validate challenges are enabled
+      if (!settings.challengesEnabled) {
         return NextResponse.json(
-          { error: `Please wait ${settings.challengeCooldownMinutes} minutes before challenging this user again` },
+          { error: 'Challenges are currently disabled' },
           { status: 400 }
         );
+      }
+
+      // Can't challenge yourself
+      if (challengedId === challengerId) {
+        return NextResponse.json(
+          { error: 'You cannot challenge yourself' },
+          { status: 400 }
+        );
+      }
+
+      // Validate entry fee
+      if (entryFee < settings.minEntryFee || entryFee > settings.maxEntryFee) {
+        return NextResponse.json(
+          { error: `Entry fee must be between ${settings.minEntryFee} and ${settings.maxEntryFee} credits` },
+          { status: 400 }
+        );
+      }
+
+      // Validate duration
+      if (duration < settings.minDurationMinutes || duration > settings.maxDurationMinutes) {
+        return NextResponse.json(
+          { error: `Duration must be between ${settings.minDurationMinutes} and ${settings.maxDurationMinutes} minutes` },
+          { status: 400 }
+        );
+      }
+
+      // Check challenger's wallet balance
+      const challengerWallet = await CreditWallet.findOne({ userId: challengerId });
+      if (!challengerWallet || challengerWallet.creditBalance < entryFee) {
+        return NextResponse.json(
+          { error: 'Insufficient credits' },
+          { status: 400 }
+        );
+      }
+
+      // Check if challenged user exists and is online
+      const challengedUser = await getUserById(challengedId);
+      if (!challengedUser) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        );
+      }
+
+      // Check if challenged user is accepting challenges
+      const challengedPresence = await UserPresence.findOne({ userId: challengedId });
+      if (settings.requireBothOnline && (!challengedPresence || challengedPresence.status !== 'online')) {
+        return NextResponse.json(
+          { error: 'User is not online' },
+          { status: 400 }
+        );
+      }
+
+      if (challengedPresence && !challengedPresence.acceptingChallenges) {
+        return NextResponse.json(
+          { error: 'User is not accepting challenges' },
+          { status: 400 }
+        );
+      }
+
+      // Check pending challenges limit
+      const pendingChallenges = await Challenge.countDocuments({
+        challengerId,
+        status: 'pending',
+      });
+
+      if (pendingChallenges >= settings.maxPendingChallenges) {
+        return NextResponse.json(
+          { error: `You have too many pending challenges (max: ${settings.maxPendingChallenges})` },
+          { status: 400 }
+        );
+      }
+
+      // Check active challenges limit
+      const activeChallenges = await Challenge.countDocuments({
+        $or: [
+          { challengerId },
+          { challengedId },
+        ],
+        status: 'active',
+      });
+
+      if (activeChallenges >= settings.maxActiveChallenges) {
+        return NextResponse.json(
+          { error: `You have too many active challenges (max: ${settings.maxActiveChallenges})` },
+          { status: 400 }
+        );
+      }
+
+      // Check cooldown with same user
+      if (settings.challengeCooldownMinutes > 0) {
+        const cooldownTime = new Date(Date.now() - settings.challengeCooldownMinutes * 60 * 1000);
+        const recentChallenge = await Challenge.findOne({
+          challengerId,
+          challengedId,
+          createdAt: { $gte: cooldownTime },
+        });
+
+        if (recentChallenge) {
+          return NextResponse.json(
+            { error: `Please wait ${settings.challengeCooldownMinutes} minutes before challenging this user again` },
+            { status: 400 }
+          );
+        }
       }
     }
 
     // Calculate prize pool and fees
-    const prizePool = entryFee * 2;
+    const actualEntryFee = entryFee ?? 10;
+    const prizePool = actualEntryFee * 2;
     const platformFeePercentage = settings.platformFeePercentage;
     const platformFeeAmount = Math.floor(prizePool * (platformFeePercentage / 100));
     const winnerPrize = prizePool - platformFeeAmount;
 
-    // Get challenger info
-    const challengerUser = await getUserById(session.user.id);
+    // Get challenger info (skip in simulator mode - we already have it)
+    if (!isInSimulatorMode) {
+      const challengerUser = await getUserById(challengerId);
+      if (challengerUser) {
+        challengerName = challengerUser.name || challengerName;
+        challengerEmail = challengerUser.email || challengerEmail;
+      }
+    }
+    
+    // Get challenged user name (use placeholder in simulator mode)
+    let challengedName = `SimUser_${challengedId.slice(-6)}`;
+    let challengedEmail = `simuser_${challengedId.slice(-6)}@test.simulator`;
+    if (!isInSimulatorMode) {
+      const challengedUser = await getUserById(challengedId);
+      if (challengedUser) {
+        challengedName = challengedUser.name || challengedName;
+        challengedEmail = challengedUser.email || challengedEmail;
+      }
+    }
     
     // Generate unique slug
     const slug = `challenge-${nanoid(10)}`;
@@ -233,13 +279,13 @@ export async function POST(request: NextRequest) {
     // Create the challenge - uses universal TradingRiskSettings for trading rules
     const challenge = await Challenge.create({
       slug,
-      challengerId: session.user.id,
-      challengerName: challengerUser?.name || session.user.name || 'Unknown',
-      challengerEmail: challengerUser?.email || session.user.email || '',
+      challengerId,
+      challengerName,
+      challengerEmail,
       challengedId,
-      challengedName: challengedUser.name || 'Unknown',
-      challengedEmail: challengedUser.email || '',
-      entryFee,
+      challengedName,
+      challengedEmail,
+      entryFee: actualEntryFee,
       startingCapital: startingCapital || settings.defaultStartingCapital,
       prizePool,
       platformFeePercentage,
@@ -269,22 +315,24 @@ export async function POST(request: NextRequest) {
       marginCallThreshold: 50, // Default 50% - same as competitions
     });
 
-    // Send notification to challenged user
-    try {
-      const { notificationService } = await import('@/lib/services/notification.service');
-      await notificationService.send({
-        userId: challengedId,
-        templateId: 'challenge_received',
-        metadata: {
-          challengeId: challenge._id.toString(),
-          challengerName: challenge.challengerName,
-          entryFee,
-          duration,
-          winnerPrize,
-        },
-      });
-    } catch (notifError) {
-      console.error('Error sending challenge notification:', notifError);
+    // Send notification to challenged user (skip in simulator mode)
+    if (!isInSimulatorMode) {
+      try {
+        const { notificationService } = await import('@/lib/services/notification.service');
+        await notificationService.send({
+          userId: challengedId,
+          templateId: 'challenge_received',
+          metadata: {
+            challengeId: challenge._id.toString(),
+            challengerName: challenge.challengerName,
+            entryFee: actualEntryFee,
+            duration,
+            winnerPrize,
+          },
+        });
+      } catch (notifError) {
+        console.error('Error sending challenge notification:', notifError);
+      }
     }
 
     return NextResponse.json({

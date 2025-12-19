@@ -46,6 +46,7 @@ import {
   ShieldAlert,
   Cog,
   LayoutDashboard,
+  Activity,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -75,6 +76,7 @@ import LandingPageBuilder from '@/components/admin/LandingPageBuilder';
 import RedisSettingsSection from '@/components/admin/RedisSettingsSection';
 import DevSettingsSection from '@/components/admin/DevSettingsSection';
 import TradingHistorySection from '@/components/admin/TradingHistorySection';
+import PerformanceSimulatorSection from '@/components/admin/PerformanceSimulatorSection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -264,10 +266,29 @@ const menuGroups: MenuGroup[] = [
           { id: 'currency', label: 'Currency', icon: <Coins className="h-4 w-4" /> },
           { id: 'fees', label: 'Fees', icon: <DollarSign className="h-4 w-4" /> },
           { id: 'payment-providers', label: 'Payment Providers', icon: <CreditCard className="h-4 w-4" /> },
-          { id: 'redis', label: 'Redis Cache', icon: <Server className="h-4 w-4" /> },
           { id: 'database', label: 'Database', icon: <Database className="h-4 w-4" /> },
           { id: 'audit-logs', label: 'Audit Logs', icon: <ScrollText className="h-4 w-4" /> },
-          { id: 'dev-settings', label: 'Dev Settings', icon: <Terminal className="h-4 w-4" /> },
+        ],
+      },
+    ],
+  },
+  // Dev Zone
+  {
+    id: 'dev-zone',
+    label: 'Dev Zone',
+    icon: <Terminal className="h-4 w-4" />,
+    color: 'text-lime-400',
+    items: [
+      {
+        id: 'dev-zone-menu',
+        label: 'Dev Zone',
+        icon: <Terminal className="h-5 w-5" />,
+        color: 'text-lime-400',
+        bgColor: 'bg-lime-500/10 hover:bg-lime-500/20',
+        children: [
+          { id: 'redis', label: 'Redis Cache', icon: <Server className="h-4 w-4" /> },
+          { id: 'dev-settings', label: 'Test', icon: <Terminal className="h-4 w-4" /> },
+          { id: 'performance-simulator', label: 'Performance Simulator', icon: <Activity className="h-4 w-4" /> },
         ],
       },
     ],
@@ -284,7 +305,7 @@ export default function AdminDashboard({
 }: AdminDashboardProps) {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState(isFirstLogin ? 'credentials' : 'competitions');
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['settings']);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['settings', 'dev-zone-menu']);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -395,6 +416,8 @@ export default function AdminDashboard({
         return <AuditLogSection />;
       case 'dev-settings':
         return <DevSettingsSection />;
+      case 'performance-simulator':
+        return <PerformanceSimulatorSection />;
       default:
         return <CompetitionsListSection />;
     }
