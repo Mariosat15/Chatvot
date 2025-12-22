@@ -81,7 +81,7 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
     // If still not found, try as string _id
     if (!user) {
       user = await db.collection('user').findOne(
-        { _id: userId as unknown },
+        { _id: userId } as Record<string, unknown>,
         { projection: USER_PROJECTION }
       );
     }

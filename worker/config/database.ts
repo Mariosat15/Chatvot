@@ -17,17 +17,16 @@ const envPath = isCompiledBuild
   : path.resolve(__dirname, '../../.env');     // From worker/config/
 dotenv.config({ path: envPath });
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  throw new Error('MONGODB_URI not found in environment variables');
-}
-
 let isConnected = false;
 
 export async function connectToDatabase(): Promise<void> {
   if (isConnected) {
     return;
+  }
+
+  const MONGODB_URI = process.env.MONGODB_URI;
+  if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI not found in environment variables');
   }
 
   try {

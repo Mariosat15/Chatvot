@@ -584,7 +584,7 @@ export const closePosition = async (
           eventType: 'closed',
           closeReason: 'user',
           realizedPnl: realizedPnl,
-          exitPrice: marketPrice,
+          exitPrice: exitPrice,
           createdAt: new Date(),
         });
         console.log(`⚡ [SSE] Manual close event emitted: ${position.symbol}`);

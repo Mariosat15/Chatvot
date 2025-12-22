@@ -1513,7 +1513,7 @@ export default function CompetitionCreatorForm() {
         </p>
         <CompetitionRulesSection
           rules={competitionRules}
-          onChange={(newRules) => setCompetitionRules(newRules)}
+          onChange={(newRules: any) => setCompetitionRules(newRules)}
         />
       </div>
 

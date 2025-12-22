@@ -37,10 +37,15 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
     console.log('📊 Database connection in progress, waiting...');
     // Wait for connection to complete
     await new Promise<void>((resolve, reject) => {
-      mongoose.connection.once('connected', resolve);
-      mongoose.connection.once('error', reject);
-      // Timeout after 30 seconds
-      setTimeout(() => reject(new Error('Connection timeout')), 30000);
+      const timeout = setTimeout(() => reject(new Error('Connection timeout')), 30000);
+      mongoose.connection.once('connected', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      mongoose.connection.once('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
     });
     return mongoose;
   }

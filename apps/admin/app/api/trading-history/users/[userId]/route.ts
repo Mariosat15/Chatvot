@@ -121,7 +121,7 @@ export async function GET(
       name: string;
       type: 'competition' | 'challenge';
       status: string;
-      trades: typeof trades;
+      trades: any[];
       summary: {
         totalTrades: number;
         winningTrades: number;
@@ -135,7 +135,7 @@ export async function GET(
     }> = [];
 
     // Helper function to create trade entry
-    const createTradeEntry = (t: typeof trades[0]) => ({
+    const createTradeEntry = (t: any) => ({
       _id: t._id.toString(),
       symbol: t.symbol,
       side: t.side,
@@ -158,7 +158,7 @@ export async function GET(
     });
 
     // Helper function to calculate summary
-    const calculateSummary = (contestTrades: typeof trades) => {
+    const calculateSummary = (contestTrades: any[]) => {
       const winningTrades = contestTrades.filter(t => t.isWinner).length;
       const losingTrades = contestTrades.length - winningTrades;
       const totalPnl = contestTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0);
@@ -180,8 +180,8 @@ export async function GET(
 
     // Add competitions
     if (contestType === 'all' || contestType === 'competition') {
-      for (const comp of competitions) {
-        const compId = comp._id.toString();
+      for (const comp of competitions as any[]) {
+        const compId = (comp._id as any).toString();
         const compTrades = tradesByContest.get(compId) || [];
         
         if (compTrades.length === 0 && dateRange !== 'all') continue;
@@ -199,8 +199,8 @@ export async function GET(
 
     // Add challenges
     if (contestType === 'all' || contestType === 'challenge') {
-      for (const chal of challenges) {
-        const chalId = chal._id.toString();
+      for (const chal of challenges as any[]) {
+        const chalId = (chal._id as any).toString();
         const chalTrades = tradesByContest.get(chalId) || [];
         
         if (chalTrades.length === 0 && dateRange !== 'all') continue;

@@ -190,8 +190,8 @@ async function cleanupTestData(run: typeof SimulatorRun.prototype): Promise<Reco
     if (run.testDataIds.competitions.length > 0) {
       const { ObjectId } = mongoose.Types;
       const compIds = run.testDataIds.competitions
-        .filter(id => ObjectId.isValid(id))
-        .map(id => new ObjectId(id));
+        .filter((id: string) => ObjectId.isValid(id))
+        .map((id: string) => new ObjectId(id));
       
       if (compIds.length > 0) {
         const compResult = await db.collection('competitions').deleteMany({
@@ -210,8 +210,8 @@ async function cleanupTestData(run: typeof SimulatorRun.prototype): Promise<Reco
     if (run.testDataIds.challenges.length > 0) {
       const { ObjectId } = mongoose.Types;
       const chalIds = run.testDataIds.challenges
-        .filter(id => ObjectId.isValid(id))
-        .map(id => new ObjectId(id));
+        .filter((id: string) => ObjectId.isValid(id))
+        .map((id: string) => new ObjectId(id));
       
       if (chalIds.length > 0) {
         const chalResult = await db.collection('challenges').deleteMany({
@@ -225,8 +225,8 @@ async function cleanupTestData(run: typeof SimulatorRun.prototype): Promise<Reco
     if (run.testDataIds.positions.length > 0) {
       const { ObjectId } = mongoose.Types;
       const posIds = run.testDataIds.positions
-        .filter(id => ObjectId.isValid(id))
-        .map(id => new ObjectId(id));
+        .filter((id: string) => ObjectId.isValid(id))
+        .map((id: string) => new ObjectId(id));
       
       if (posIds.length > 0) {
         const posResult = await db.collection('tradingpositions').deleteMany({
@@ -240,8 +240,8 @@ async function cleanupTestData(run: typeof SimulatorRun.prototype): Promise<Reco
     if (run.testDataIds.transactions.length > 0) {
       const { ObjectId } = mongoose.Types;
       const txIds = run.testDataIds.transactions
-        .filter(id => ObjectId.isValid(id))
-        .map(id => new ObjectId(id));
+        .filter((id: string) => ObjectId.isValid(id))
+        .map((id: string) => new ObjectId(id));
       
       if (txIds.length > 0) {
         const txResult = await db.collection('wallettransactions').deleteMany({

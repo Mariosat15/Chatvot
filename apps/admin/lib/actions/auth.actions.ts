@@ -7,6 +7,22 @@ import { ObjectId } from 'mongodb';
 import { sendWelcomeEmail } from "@/lib/nodemailer";
 import EmailTemplate from "@/database/models/email-template.model";
 
+// Local type definitions (duplicated from root types/global.d.ts)
+type SignUpFormData = {
+    fullName: string;
+    email: string;
+    password: string;
+    country: string;
+    address: string;
+    city: string;
+    postalCode: string;
+};
+
+type SignInFormData = {
+    email: string;
+    password: string;
+};
+
 export const signUpWithEmail = async ({ email, password, fullName, country, address, city, postalCode }: SignUpFormData) => {
     try {
         // SECURITY: Prevent users from signing up with admin email

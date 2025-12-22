@@ -55,7 +55,7 @@ export async function GET(
       const userParticipant = await CompetitionParticipant.findOne({
         competitionId: id,
         userId: userId,
-      }).lean();
+      }).lean() as any;
 
       if (userParticipant) {
         // Get all participants sorted by finalRank

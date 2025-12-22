@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { SuspicionScoringService } from '@/lib/services/fraud/suspicion-scoring.service';
 import { verifyAdminAuth } from '@/lib/admin/auth';
-import { cookies } from 'next/headers';
 
 /**
  * GET /api/fraud/suspicion-score
@@ -14,11 +13,9 @@ import { cookies } from 'next/headers';
 export async function GET(request: Request) {
   try {
     // Check admin auth
-    const cookieStore = await cookies();
-    const adminToken = cookieStore.get('admin_session')?.value;
-    const admin = await verifyAdminAuth(adminToken);
+    const admin = await verifyAdminAuth();
 
-    if (!admin) {
+    if (!admin.isAuthenticated) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
         { status: 401 }
@@ -100,11 +97,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     // Check admin auth
-    const cookieStore = await cookies();
-    const adminToken = cookieStore.get('admin_session')?.value;
-    const admin = await verifyAdminAuth(adminToken);
+    const admin = await verifyAdminAuth();
 
-    if (!admin) {
+    if (!admin.isAuthenticated) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
         { status: 401 }
@@ -149,11 +144,9 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     // Check admin auth
-    const cookieStore = await cookies();
-    const adminToken = cookieStore.get('admin_session')?.value;
-    const admin = await verifyAdminAuth(adminToken);
+    const admin = await verifyAdminAuth();
 
-    if (!admin) {
+    if (!admin.isAuthenticated) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
         { status: 401 }
@@ -186,4 +179,3 @@ export async function DELETE(request: Request) {
     );
   }
 }
-

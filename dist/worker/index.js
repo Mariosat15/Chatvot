@@ -63976,7 +63976,7 @@ function enableQueryProfiling() {
 }
 async function connectWithRetry(retries = MAX_RETRIES) {
   try {
-    return await import_mongoose5.default.connect(MONGODB_URI2, connectionOptions);
+    return await import_mongoose5.default.connect(MONGODB_URI, connectionOptions);
   } catch (err) {
     if (retries > 0) {
       console.warn(`\u26A0\uFE0F MongoDB connection failed, retrying in ${RETRY_DELAY_MS}ms... (${retries} retries left)`);
@@ -64014,12 +64014,12 @@ async function safeDbOperation(operation, options = {}) {
   }
   throw lastError;
 }
-var import_mongoose5, MONGODB_URI2, cached2, connectionOptions, SLOW_QUERY_THRESHOLD_MS, MAX_RETRIES, RETRY_DELAY_MS, connectToDatabase2;
+var import_mongoose5, MONGODB_URI, cached2, connectionOptions, SLOW_QUERY_THRESHOLD_MS, MAX_RETRIES, RETRY_DELAY_MS, connectToDatabase2;
 var init_mongoose = __esm({
   "database/mongoose.ts"() {
     "use strict";
     import_mongoose5 = __toESM(require("mongoose"));
-    MONGODB_URI2 = process.env.MONGODB_URI;
+    MONGODB_URI = process.env.MONGODB_URI;
     cached2 = global.mongooseCache;
     if (!cached2) {
       cached2 = global.mongooseCache = { conn: null, promise: null };
@@ -64050,7 +64050,7 @@ var init_mongoose = __esm({
     MAX_RETRIES = 3;
     RETRY_DELAY_MS = 1e3;
     connectToDatabase2 = async () => {
-      if (!MONGODB_URI2) throw new Error("MONGODB_URI must be set within .env");
+      if (!MONGODB_URI) throw new Error("MONGODB_URI must be set within .env");
       if (cached2.conn) return cached2.conn;
       if (!cached2.promise) {
         if (process.env.NODE_ENV === "development" || process.env.ENABLE_QUERY_PROFILING === "true") {
@@ -73964,6 +73964,10 @@ var init_position_event_model = __esm({
 });
 
 // database/models/trading-risk-settings.model.ts
+var trading_risk_settings_model_exports = {};
+__export2(trading_risk_settings_model_exports, {
+  default: () => trading_risk_settings_model_default
+});
 var import_mongoose45, CACHE_TTL_MS, cachedRiskSettings, riskCacheTimestamp, TradingRiskSettingsSchema, TradingRiskSettings, trading_risk_settings_model_default;
 var init_trading_risk_settings_model = __esm({
   "database/models/trading-risk-settings.model.ts"() {
@@ -73974,7 +73978,7 @@ var init_trading_risk_settings_model = __esm({
     riskCacheTimestamp = 0;
     TradingRiskSettingsSchema = new import_mongoose45.Schema({
       _id: {
-        type: String,
+        type: import_mongoose45.Schema.Types.Mixed,
         default: "global-trading-risk-settings"
       },
       // Margin Levels
@@ -74474,11 +74478,11 @@ var init_position_actions = __esm({
         const positionsWithCurrentPnL = positions.map((position) => {
           const currentPrice = pricesMap.get(position.symbol);
           if (currentPrice) {
-            const marketPrice2 = position.side === "long" ? currentPrice.bid : currentPrice.ask;
+            const marketPrice = position.side === "long" ? currentPrice.bid : currentPrice.ask;
             const pnl = calculateUnrealizedPnL(
               position.side,
               position.entryPrice,
-              marketPrice2,
+              marketPrice,
               position.quantity,
               position.symbol
             );
@@ -74490,7 +74494,7 @@ var init_position_actions = __esm({
               limitPrice: position.limitPrice,
               takeProfit: position.takeProfit,
               stopLoss: position.stopLoss,
-              currentPrice: marketPrice2,
+              currentPrice: marketPrice,
               unrealizedPnl: pnl,
               unrealizedPnlPercentage: pnlPercentage
             };
@@ -74896,7 +74900,7 @@ var init_position_actions = __esm({
               eventType: "closed",
               closeReason: "user",
               realizedPnl,
-              exitPrice: marketPrice,
+              exitPrice,
               createdAt: /* @__PURE__ */ new Date()
             });
             console.log(`\u26A1 [SSE] Manual close event emitted: ${position.symbol}`);
@@ -74935,16 +74939,16 @@ var init_position_actions = __esm({
         for (const position of positions) {
           const currentPrice = pricesMap.get(position.symbol);
           if (!currentPrice) continue;
-          const marketPrice2 = position.side === "long" ? currentPrice.bid : currentPrice.ask;
+          const marketPrice = position.side === "long" ? currentPrice.bid : currentPrice.ask;
           const pnl = calculateUnrealizedPnL(
             position.side,
             position.entryPrice,
-            marketPrice2,
+            marketPrice,
             position.quantity,
             position.symbol
           );
           const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
-          position.currentPrice = marketPrice2;
+          position.currentPrice = marketPrice;
           position.unrealizedPnl = pnl;
           position.unrealizedPnlPercentage = pnlPercentage;
           position.lastPriceUpdate = /* @__PURE__ */ new Date();
@@ -75001,29 +75005,29 @@ var init_position_actions = __esm({
             console.warn(`\u26A0\uFE0F Skipping SL/TP check for ${position.symbol} - price is ${Math.round(priceAge / 1e3)}s old`);
             continue;
           }
-          const marketPrice2 = position.side === "long" ? currentPrice.bid : currentPrice.ask;
+          const marketPrice = position.side === "long" ? currentPrice.bid : currentPrice.ask;
           let shouldClose = false;
           let closeReason;
           if (position.stopLoss) {
-            if (position.side === "long" && marketPrice2 <= position.stopLoss) {
+            if (position.side === "long" && marketPrice <= position.stopLoss) {
               shouldClose = true;
               closeReason = "stop_loss";
-            } else if (position.side === "short" && marketPrice2 >= position.stopLoss) {
+            } else if (position.side === "short" && marketPrice >= position.stopLoss) {
               shouldClose = true;
               closeReason = "stop_loss";
             }
           }
           if (!shouldClose && position.takeProfit) {
-            if (position.side === "long" && marketPrice2 >= position.takeProfit) {
+            if (position.side === "long" && marketPrice >= position.takeProfit) {
               shouldClose = true;
               closeReason = "take_profit";
-            } else if (position.side === "short" && marketPrice2 <= position.takeProfit) {
+            } else if (position.side === "short" && marketPrice <= position.takeProfit) {
               shouldClose = true;
               closeReason = "take_profit";
             }
           }
           if (shouldClose && closeReason) {
-            await closePositionAutomatic(position._id.toString(), marketPrice2, closeReason);
+            await closePositionAutomatic(position._id.toString(), marketPrice, closeReason);
             console.log(`\u2705 Auto-closed position: ${position.symbol}, reason: ${closeReason}`);
           }
         }
@@ -75096,11 +75100,11 @@ var init_position_actions = __esm({
           for (const position of openPositions) {
             const currentPrice = pricesMap.get(position.symbol);
             if (!currentPrice) continue;
-            const marketPrice2 = position.side === "long" ? currentPrice.bid : currentPrice.ask;
+            const marketPrice = position.side === "long" ? currentPrice.bid : currentPrice.ask;
             const unrealizedPnl = calculateUnrealizedPnL(
               position.side,
               position.entryPrice,
-              marketPrice2,
+              marketPrice,
               position.quantity,
               position.symbol
             );
@@ -75160,8 +75164,8 @@ var init_position_actions = __esm({
             for (const position of openPositions) {
               const currentPrice = pricesMap.get(position.symbol);
               if (!currentPrice) continue;
-              const marketPrice2 = position.side === "long" ? currentPrice.bid : currentPrice.ask;
-              await closePositionAutomatic(position._id.toString(), marketPrice2, "margin_call");
+              const marketPrice = position.side === "long" ? currentPrice.bid : currentPrice.ask;
+              await closePositionAutomatic(position._id.toString(), marketPrice, "margin_call");
             }
             console.log(`   \u26A0\uFE0F \u2705 Liquidated all ${openPositions.length} positions for: ${participant.username}`);
           } else {
@@ -75199,22 +75203,22 @@ async function checkTPSLForSymbol(symbol2, bid, ask) {
     if (lastTrigger && now2 - lastTrigger < TRIGGER_COOLDOWN) continue;
     if (now2 - position.lastChecked < POSITION_COOLDOWN) continue;
     position.lastChecked = now2;
-    const marketPrice2 = position.side === "long" ? bid : ask;
+    const marketPrice = position.side === "long" ? bid : ask;
     if (position.stopLoss !== null) {
-      if (position.side === "long" && marketPrice2 <= position.stopLoss) {
-        triggeredPositions.push({ position, price: marketPrice2, reason: "stop_loss" });
+      if (position.side === "long" && marketPrice <= position.stopLoss) {
+        triggeredPositions.push({ position, price: marketPrice, reason: "stop_loss" });
         continue;
-      } else if (position.side === "short" && marketPrice2 >= position.stopLoss) {
-        triggeredPositions.push({ position, price: marketPrice2, reason: "stop_loss" });
+      } else if (position.side === "short" && marketPrice >= position.stopLoss) {
+        triggeredPositions.push({ position, price: marketPrice, reason: "stop_loss" });
         continue;
       }
     }
     if (position.takeProfit !== null) {
-      if (position.side === "long" && marketPrice2 >= position.takeProfit) {
-        triggeredPositions.push({ position, price: marketPrice2, reason: "take_profit" });
+      if (position.side === "long" && marketPrice >= position.takeProfit) {
+        triggeredPositions.push({ position, price: marketPrice, reason: "take_profit" });
         continue;
-      } else if (position.side === "short" && marketPrice2 <= position.takeProfit) {
-        triggeredPositions.push({ position, price: marketPrice2, reason: "take_profit" });
+      } else if (position.side === "short" && marketPrice <= position.takeProfit) {
+        triggeredPositions.push({ position, price: marketPrice, reason: "take_profit" });
         continue;
       }
     }
@@ -85191,7 +85195,7 @@ var init_credit_conversion_settings_model = __esm({
     CreditConversionSettingsSchema = new import_mongoose54.Schema(
       {
         _id: {
-          type: String,
+          type: import_mongoose54.Schema.Types.Mixed,
           default: "global-credit-conversion"
         },
         eurToCreditsRate: {
@@ -87250,6 +87254,7 @@ var order_actions_exports = {};
 __export2(order_actions_exports, {
   cancelOrder: () => cancelOrder,
   checkLimitOrders: () => checkLimitOrders,
+  executeLimitOrder: () => executeLimitOrder,
   getOrderById: () => getOrderById,
   getUserOrders: () => getUserOrders,
   placeOrder: () => placeOrder
@@ -87355,7 +87360,7 @@ Trading will resume tomorrow at 00:00 UTC.`
   console.log(`\u2705 [RISK] Risk limits check passed - Drawdown: ${((startingCapital - currentCapital) / startingCapital * 100).toFixed(1)}%/${maxDrawdownPercent}%, Daily Loss: $${Math.abs(todaysRealizedPnL).toFixed(2)}/$${dailyLossThresholdAmount.toFixed(2)}`);
   return { allowed: true };
 }
-var import_cache4, import_headers2, import_navigation2, import_mongoose64, placeOrder, getUserOrders, cancelOrder, getOrderById, checkLimitOrders;
+var import_cache4, import_headers2, import_navigation2, import_mongoose64, placeOrder, getUserOrders, cancelOrder, getOrderById, checkLimitOrders, executeLimitOrder;
 var init_order_actions = __esm({
   "lib/actions/trading/order.actions.ts"() {
     "use strict";
@@ -87804,12 +87809,12 @@ ${limitValidation.explanation}` : limitValidation.error;
         for (const order of pendingOrders) {
           const currentPrice = await getRealPrice(order.symbol);
           if (!currentPrice) continue;
-          const marketPrice2 = order.side === "buy" ? currentPrice.ask : currentPrice.bid;
+          const marketPrice = order.side === "buy" ? currentPrice.ask : currentPrice.bid;
           let shouldExecute = false;
           if (order.side === "buy") {
-            shouldExecute = marketPrice2 <= order.requestedPrice;
+            shouldExecute = marketPrice <= order.requestedPrice;
           } else {
-            shouldExecute = marketPrice2 >= order.requestedPrice;
+            shouldExecute = marketPrice >= order.requestedPrice;
           }
           if (shouldExecute) {
             const mongoSession = await import_mongoose64.default.startSession();
@@ -87827,7 +87832,7 @@ ${limitValidation.explanation}` : limitValidation.error;
                 continue;
               }
               order.status = "filled";
-              order.executedPrice = marketPrice2;
+              order.executedPrice = marketPrice;
               order.filledQuantity = order.quantity;
               order.remainingQuantity = 0;
               order.executedAt = /* @__PURE__ */ new Date();
@@ -87841,8 +87846,8 @@ ${limitValidation.explanation}` : limitValidation.error;
                     symbol: order.symbol,
                     side: order.side === "buy" ? "long" : "short",
                     quantity: order.quantity,
-                    entryPrice: marketPrice2,
-                    currentPrice: marketPrice2,
+                    entryPrice: marketPrice,
+                    currentPrice: marketPrice,
                     unrealizedPnl: 0,
                     unrealizedPnlPercentage: 0,
                     stopLoss: order.stopLoss,
@@ -87877,7 +87882,7 @@ ${limitValidation.explanation}` : limitValidation.error;
                 { session: mongoSession }
               );
               await mongoSession.commitTransaction();
-              console.log(`\u2705 Limit order executed: ${order.symbol} @ ${marketPrice2}`);
+              console.log(`\u2705 Limit order executed: ${order.symbol} @ ${marketPrice}`);
             } catch (error47) {
               await mongoSession.abortTransaction();
               console.error("Error executing limit order:", error47);
@@ -87888,6 +87893,93 @@ ${limitValidation.explanation}` : limitValidation.error;
         }
       } catch (error47) {
         console.error("Error checking limit orders:", error47);
+      }
+    };
+    executeLimitOrder = async (orderId, marketPrice) => {
+      try {
+        await connectToDatabase2();
+        const order = await trading_order_model_default.findById(orderId);
+        if (!order || order.status !== "pending") {
+          return { success: false, message: "Order not found or not pending" };
+        }
+        const mongoSession = await import_mongoose64.default.startSession();
+        mongoSession.startTransaction();
+        try {
+          const participant = await competition_participant_model_default.findById(order.participantId).session(mongoSession);
+          if (!participant) {
+            await mongoSession.abortTransaction();
+            return { success: false, message: "Participant not found" };
+          }
+          if (participant.availableCapital < order.marginRequired) {
+            order.status = "cancelled";
+            order.rejectionReason = "Insufficient capital";
+            await order.save({ session: mongoSession });
+            await mongoSession.commitTransaction();
+            return { success: false, message: "Insufficient capital" };
+          }
+          order.status = "filled";
+          order.executedPrice = marketPrice;
+          order.filledQuantity = order.quantity;
+          order.remainingQuantity = 0;
+          order.executedAt = /* @__PURE__ */ new Date();
+          await order.save({ session: mongoSession });
+          const position = await trading_position_model_default.create(
+            [
+              {
+                competitionId: order.competitionId,
+                userId: order.userId,
+                participantId: order.participantId,
+                symbol: order.symbol,
+                side: order.side === "buy" ? "long" : "short",
+                quantity: order.quantity,
+                entryPrice: marketPrice,
+                currentPrice: marketPrice,
+                unrealizedPnl: 0,
+                unrealizedPnlPercentage: 0,
+                stopLoss: order.stopLoss,
+                takeProfit: order.takeProfit,
+                leverage: order.leverage,
+                marginUsed: order.marginRequired,
+                maintenanceMargin: order.marginRequired * 0.5,
+                status: "open",
+                openedAt: /* @__PURE__ */ new Date(),
+                openOrderId: order._id.toString(),
+                lastPriceUpdate: /* @__PURE__ */ new Date(),
+                priceUpdateCount: 0
+              }
+            ],
+            { session: mongoSession }
+          );
+          order.positionId = position[0]._id.toString();
+          await order.save({ session: mongoSession });
+          await competition_participant_model_default.findByIdAndUpdate(
+            participant._id,
+            {
+              $inc: {
+                currentOpenPositions: 1,
+                totalTrades: 1
+              },
+              $set: {
+                availableCapital: participant.availableCapital - order.marginRequired,
+                usedMargin: participant.usedMargin + order.marginRequired,
+                lastTradeAt: /* @__PURE__ */ new Date()
+              }
+            },
+            { session: mongoSession }
+          );
+          await mongoSession.commitTransaction();
+          console.log(`\u2705 Limit order executed: ${order.symbol} @ ${marketPrice}`);
+          return { success: true, positionId: position[0]._id.toString() };
+        } catch (error47) {
+          await mongoSession.abortTransaction();
+          console.error("Error executing limit order:", error47);
+          return { success: false, message: "Transaction failed" };
+        } finally {
+          mongoSession.endSession();
+        }
+      } catch (error47) {
+        console.error("Error in executeLimitOrder:", error47);
+        return { success: false, message: "Failed to execute order" };
       }
     };
   }
@@ -87905,17 +87997,17 @@ var import_path = __toESM(require("path"));
 var isCompiledBuild = __dirname.includes("dist");
 var envPath = isCompiledBuild ? import_path.default.resolve(__dirname, "../../../.env") : import_path.default.resolve(__dirname, "../../.env");
 import_dotenv.default.config({ path: envPath });
-var MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  throw new Error("MONGODB_URI not found in environment variables");
-}
 var isConnected = false;
 async function connectToDatabase() {
   if (isConnected) {
     return;
   }
+  const MONGODB_URI3 = process.env.MONGODB_URI;
+  if (!MONGODB_URI3) {
+    throw new Error("MONGODB_URI not found in environment variables");
+  }
   try {
-    await import_mongoose.default.connect(MONGODB_URI, {
+    await import_mongoose.default.connect(MONGODB_URI3, {
       dbName: "chartvolt"
       // Ensure same database as main app
     });
@@ -87949,8 +88041,8 @@ init_risk_manager_service();
 init_position_actions();
 async function getRiskSettings() {
   try {
-    const RiskSettings = (await import("../../database/models/trading/risk-settings.model")).default;
-    return await RiskSettings.findOne();
+    const TradingRiskSettings2 = (await Promise.resolve().then(() => (init_trading_risk_settings_model(), trading_risk_settings_model_exports))).default;
+    return await TradingRiskSettings2.findOne();
   } catch {
     return null;
   }
@@ -87970,9 +88062,9 @@ async function runMarginCheck() {
     try {
       const riskSettings = await getRiskSettings();
       if (riskSettings) {
-        liquidationThreshold = riskSettings.LIQUIDATION ?? 50;
-        marginCallThreshold = riskSettings.MARGIN_CALL ?? 100;
-        warningThreshold = riskSettings.WARNING ?? 150;
+        liquidationThreshold = riskSettings.marginLiquidation ?? 50;
+        marginCallThreshold = riskSettings.marginCall ?? 100;
+        warningThreshold = riskSettings.marginWarning ?? 150;
       }
     } catch {
     }
@@ -88008,11 +88100,11 @@ async function runMarginCheck() {
         for (const position of positions) {
           const currentPrice = pricesMap.get(position.symbol);
           if (!currentPrice) continue;
-          const marketPrice2 = position.side === "long" ? currentPrice.bid : currentPrice.ask;
+          const marketPrice = position.side === "long" ? currentPrice.bid : currentPrice.ask;
           const unrealizedPnl = calculateUnrealizedPnL(
             position.side,
             position.entryPrice,
-            marketPrice2,
+            marketPrice,
             position.quantity,
             position.symbol
           );
@@ -88034,8 +88126,8 @@ async function runMarginCheck() {
             try {
               const currentPrice = pricesMap.get(position.symbol);
               if (!currentPrice) continue;
-              const marketPrice2 = position.side === "long" ? currentPrice.bid : currentPrice.ask;
-              await closePositionAutomatic(position._id.toString(), marketPrice2, "margin_call");
+              const marketPrice = position.side === "long" ? currentPrice.bid : currentPrice.ask;
+              await closePositionAutomatic(position._id.toString(), marketPrice, "margin_call");
               result.liquidatedPositions++;
             } catch (posError) {
               result.errors.push(`Failed to close position ${position._id}: ${posError}`);
@@ -88204,24 +88296,24 @@ async function runTradeQueueProcessor() {
         try {
           const currentPrice = pricesMap.get(order.symbol);
           if (!currentPrice) continue;
-          const marketPrice2 = order.side === "buy" ? currentPrice.ask : currentPrice.bid;
+          const marketPrice = order.side === "buy" ? currentPrice.ask : currentPrice.bid;
           let shouldExecute = false;
           if (order.orderType === "limit") {
-            if (order.side === "buy" && marketPrice2 <= order.price) {
+            if (order.side === "buy" && marketPrice <= order.price) {
               shouldExecute = true;
-            } else if (order.side === "sell" && marketPrice2 >= order.price) {
+            } else if (order.side === "sell" && marketPrice >= order.price) {
               shouldExecute = true;
             }
           } else if (order.orderType === "stop") {
-            if (order.side === "buy" && marketPrice2 >= order.price) {
+            if (order.side === "buy" && marketPrice >= order.price) {
               shouldExecute = true;
-            } else if (order.side === "sell" && marketPrice2 <= order.price) {
+            } else if (order.side === "sell" && marketPrice <= order.price) {
               shouldExecute = true;
             }
           }
           if (shouldExecute) {
-            const { executeLimitOrder } = await Promise.resolve().then(() => (init_order_actions(), order_actions_exports));
-            await executeLimitOrder(order._id.toString(), marketPrice2);
+            const { executeLimitOrder: executeLimitOrder2 } = await Promise.resolve().then(() => (init_order_actions(), order_actions_exports));
+            await executeLimitOrder2(order._id.toString(), marketPrice);
             result.ordersExecuted++;
           }
         } catch (orderError) {
@@ -88244,30 +88336,30 @@ async function runTradeQueueProcessor() {
         try {
           const currentPrice = pricesMap.get(position.symbol);
           if (!currentPrice) continue;
-          const marketPrice2 = position.side === "long" ? currentPrice.bid : currentPrice.ask;
+          const marketPrice = position.side === "long" ? currentPrice.bid : currentPrice.ask;
           let shouldClose = false;
           let closeReason = "";
           if (position.takeProfit) {
-            if (position.side === "long" && marketPrice2 >= position.takeProfit) {
+            if (position.side === "long" && marketPrice >= position.takeProfit) {
               shouldClose = true;
               closeReason = "take_profit";
-            } else if (position.side === "short" && marketPrice2 <= position.takeProfit) {
+            } else if (position.side === "short" && marketPrice <= position.takeProfit) {
               shouldClose = true;
               closeReason = "take_profit";
             }
           }
           if (!shouldClose && position.stopLoss) {
-            if (position.side === "long" && marketPrice2 <= position.stopLoss) {
+            if (position.side === "long" && marketPrice <= position.stopLoss) {
               shouldClose = true;
               closeReason = "stop_loss";
-            } else if (position.side === "short" && marketPrice2 >= position.stopLoss) {
+            } else if (position.side === "short" && marketPrice >= position.stopLoss) {
               shouldClose = true;
               closeReason = "stop_loss";
             }
           }
           if (shouldClose) {
             const { closePositionAutomatic: closePositionAutomatic2 } = await Promise.resolve().then(() => (init_position_actions(), position_actions_exports));
-            await closePositionAutomatic2(position._id.toString(), marketPrice2, closeReason);
+            await closePositionAutomatic2(position._id.toString(), marketPrice, closeReason);
             result.tpSlTriggered++;
           }
         } catch (posError) {
@@ -88335,14 +88427,14 @@ async function runBadgeEvaluation() {
 // worker/index.ts
 import_dotenv2.default.config({ path: import_path3.default.resolve(process.cwd(), ".env") });
 process.env.IS_WORKER = "true";
-var MONGODB_URI3 = process.env.MONGODB_URI;
-if (!MONGODB_URI3) {
+var MONGODB_URI2 = process.env.MONGODB_URI;
+if (!MONGODB_URI2) {
   console.error("\u274C MONGODB_URI not found in environment variables");
   process.exit(1);
 }
 var agenda = new import_agenda.default({
   db: {
-    address: MONGODB_URI3,
+    address: MONGODB_URI2,
     collection: "worker_jobs"
   },
   processEvery: "30 seconds",

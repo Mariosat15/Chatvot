@@ -15,7 +15,10 @@ export * from '../../lib/services/risk-manager.service';
 export * from '../../lib/services/real-forex-prices.service';
 export * from '../../lib/services/margin-safety.service';
 export * from '../../lib/services/competition-ranking.service';
-export * from '../../lib/services/market-data.service';
+// Note: market-data.service exports are duplicated in real-forex-prices.service
+// Only export unique items from market-data
+export { updateCachedPrice } from '../../lib/services/market-data.service';
+export type { Candle } from '../../lib/services/market-data.service';
 export * from '../../lib/services/forex-historical.service';
 export * from '../../lib/services/matchmaking.service';
 export * from '../../lib/services/win-probability.service';

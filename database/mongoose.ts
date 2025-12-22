@@ -71,7 +71,7 @@ function enableQueryProfiling() {
                 const duration = Date.now() - startTime;
                 if (duration > SLOW_QUERY_THRESHOLD_MS) {
                     const filter = this.getFilter ? this.getFilter() : {};
-                    console.warn(`🐢 SLOW QUERY [${duration}ms]: ${this.model?.modelName || 'Unknown'}.${this.op}`,
+                    console.warn(`🐢 SLOW QUERY [${duration}ms]: ${this.model?.modelName || 'Unknown'}.${(this as unknown as { op?: string }).op}`,
                         JSON.stringify(filter).slice(0, 200));
                 }
             }

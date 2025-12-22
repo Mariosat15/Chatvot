@@ -6,7 +6,6 @@ interface ICreditConversionSettingsModel extends Model<ICreditConversionSettings
 }
 
 export interface ICreditConversionSettings extends Document {
-  _id: string;
   eurToCreditsRate: number; // How many credits for 1 EUR (e.g., 100 credits = 1 EUR)
   minimumDeposit: number; // Minimum EUR deposit amount
   minimumWithdrawal: number; // Minimum EUR withdrawal amount
@@ -31,7 +30,7 @@ export interface ICreditConversionSettings extends Document {
 const CreditConversionSettingsSchema = new Schema<ICreditConversionSettings>(
   {
     _id: {
-      type: String,
+      type: Schema.Types.Mixed,
       default: 'global-credit-conversion',
     },
     eurToCreditsRate: {

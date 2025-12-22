@@ -161,19 +161,52 @@ interface SimulatorRun {
   aiAnalysis?: {
     summary: string;
     performanceScore: number;
+    overallGrade?: 'A' | 'B' | 'C' | 'D' | 'F';
+    productionReadiness?: 'ready' | 'needs_work' | 'not_ready';
+    scalabilityAssessment?: {
+      currentCapacity: string;
+      limitingFactor: string;
+    };
+    responseTimeAnalysis?: {
+      assessment: 'excellent' | 'good' | 'acceptable' | 'concerning';
+      p95Analysis: string;
+      p99Analysis: string;
+      outlierConcerns?: string;
+    };
+    resourceUtilization?: {
+      cpuAssessment: string;
+      memoryAssessment: string;
+      databaseAssessment: string;
+      headroom: string;
+    };
     findings: Array<{
       type: 'success' | 'warning' | 'error' | 'info';
       title: string;
       description: string;
       recommendation?: string;
+      priority?: 'high' | 'medium' | 'low';
+      impact?: string;
     }>;
     bottlenecks: Array<{
       component: string;
       severity: 'low' | 'medium' | 'high' | 'critical';
       description: string;
       suggestedFix?: string;
+      evidence?: string;
+      estimatedEffort?: string;
     }>;
-    recommendations: string[];
+    recommendations: Array<string | {
+      title: string;
+      priority: 'critical' | 'high' | 'medium' | 'low';
+      effort: string;
+      description: string;
+      impact?: string;
+    }>;
+    riskAssessment?: {
+      productionRisks: string[];
+      mitigations: string[];
+    };
+    nextSteps?: string[];
   };
   cleanedUp: boolean;
   createdAt: string;
@@ -1569,12 +1602,12 @@ export default function PerformanceSimulatorSection() {
                         )}
 
                         {/* Next Steps */}
-                        {currentRun.aiAnalysis.nextSteps?.length > 0 && (
+                        {(currentRun.aiAnalysis.nextSteps?.length ?? 0) > 0 && (
                           <Card className="bg-blue-500/5 border-blue-500/30">
                             <CardContent className="p-4">
                               <p className="text-xs text-blue-400 uppercase font-medium mb-3">📝 Next Steps</p>
                               <ol className="space-y-2">
-                                {currentRun.aiAnalysis.nextSteps.map((step, i) => (
+                                {currentRun.aiAnalysis.nextSteps?.map((step, i) => (
                                   <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
                                     <span className="text-blue-400 font-medium shrink-0">{i + 1}.</span>
                                     {step.replace(/^\d+\.\s*/, '')}
@@ -1631,7 +1664,7 @@ export default function PerformanceSimulatorSection() {
                           <YAxis stroke="#9ca3af" />
                           <Tooltip 
                             contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
-                            formatter={(value: number) => [`${value.toFixed(0)}ms`, 'Time']}
+                            formatter={(value: number | undefined) => [`${(value ?? 0).toFixed(0)}ms`, 'Time']}
                           />
                           <Bar dataKey="value" fill="#3b82f6" />
                         </BarChart>
@@ -1683,7 +1716,7 @@ export default function PerformanceSimulatorSection() {
                   <CardContent>
                     <div className="grid grid-cols-5 gap-2 text-center">
                       {[
-                        { label: 'Min', value: currentRun.metrics.minResponseTime === Infinity ? 0 : currentRun.metrics.minResponseTime, color: 'text-emerald-400' },
+                        { label: 'Min', value: 0, color: 'text-emerald-400' }, // minResponseTime not tracked
                         { label: 'Avg', value: currentRun.metrics.avgResponseTime, color: 'text-blue-400' },
                         { label: 'P95', value: currentRun.metrics.p95ResponseTime, color: 'text-amber-400' },
                         { label: 'P99', value: currentRun.metrics.p99ResponseTime, color: 'text-orange-400' },
@@ -1717,7 +1750,7 @@ export default function PerformanceSimulatorSection() {
                             <YAxis stroke="#9ca3af" domain={[0, 100]} tick={{ fontSize: 10 }} />
                             <Tooltip 
                               contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', fontSize: 12 }}
-                              formatter={(value: number) => [`${value.toFixed(1)}%`, '']}
+                              formatter={(value: number | undefined) => [`${(value ?? 0).toFixed(1)}%`, '']}
                             />
                             <Legend wrapperStyle={{ fontSize: 10 }} />
                             <Area type="monotone" dataKey="cpu" stroke="#ef4444" fill="#ef4444" fillOpacity={0.2} name="CPU" />

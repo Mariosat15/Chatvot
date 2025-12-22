@@ -36,7 +36,7 @@ interface ITradingRiskSettingsModel extends Model<ITradingRiskSettings> {
 
 const TradingRiskSettingsSchema = new Schema<ITradingRiskSettings>({
   _id: {
-    type: String,
+    type: Schema.Types.Mixed,
     default: 'global-trading-risk-settings',
   },
   // Margin Levels

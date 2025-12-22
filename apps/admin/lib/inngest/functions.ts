@@ -75,7 +75,6 @@ export const sendSignUpEmail = inngest.createFunction(
                                 content: prompt
                             }
                         ],
-                        max_tokens: 200,
                         temperature: 0.7
                     }
                 });

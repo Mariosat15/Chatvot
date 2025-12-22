@@ -217,10 +217,10 @@ export async function POST(request: NextRequest) {
         recentChallenge,
       ] = await withTimeout(
         Promise.all([
-          CreditWallet.findOne({ userId: challengerId }).lean().exec(),
+          CreditWallet.findOne({ userId: challengerId }).lean().exec() as Promise<any>,
           getUserById(challengerId),
           getUserById(challengedId),
-          UserPresence.findOne({ userId: challengedId }).lean().exec(),
+          UserPresence.findOne({ userId: challengedId }).lean().exec() as Promise<any>,
           Challenge.countDocuments({ challengerId, status: 'pending' }),
           Challenge.countDocuments({
             $or: [{ challengerId }, { challengedId }],

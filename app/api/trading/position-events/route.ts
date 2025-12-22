@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
               );
 
               // Send each event
-              for (const event of events) {
+              for (const event of events as any[]) {
                 const eventData = {
                   type: 'position_event',
                   event: {

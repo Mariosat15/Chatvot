@@ -36,7 +36,7 @@ export async function GET(
       { _id: 1 }
     ).lean();
 
-    const positionIds = positions.map(p => p._id.toString());
+    const positionIds = positions.map((p: any) => p._id.toString());
 
     return NextResponse.json({
       positionIds,

@@ -857,3 +857,108 @@ export const checkLimitOrders = async (competitionId: string) => {
   }
 };
 
+// Execute a single limit order (used by worker)
+export const executeLimitOrder = async (orderId: string, marketPrice: number) => {
+  try {
+    await connectToDatabase();
+
+    const order = await TradingOrder.findById(orderId);
+    if (!order || order.status !== 'pending') {
+      return { success: false, message: 'Order not found or not pending' };
+    }
+
+    const mongoSession = await mongoose.startSession();
+    mongoSession.startTransaction();
+
+    try {
+      // Get participant
+      const participant = await CompetitionParticipant.findById(order.participantId).session(mongoSession);
+      if (!participant) {
+        await mongoSession.abortTransaction();
+        return { success: false, message: 'Participant not found' };
+      }
+
+      // Check if still have capital
+      if (participant.availableCapital < order.marginRequired) {
+        order.status = 'cancelled';
+        order.rejectionReason = 'Insufficient capital';
+        await order.save({ session: mongoSession });
+        await mongoSession.commitTransaction();
+        return { success: false, message: 'Insufficient capital' };
+      }
+
+      // Update order
+      order.status = 'filled';
+      order.executedPrice = marketPrice;
+      order.filledQuantity = order.quantity;
+      order.remainingQuantity = 0;
+      order.executedAt = new Date();
+      await order.save({ session: mongoSession });
+
+      // Create position
+      const position = await TradingPosition.create(
+        [
+          {
+            competitionId: order.competitionId,
+            userId: order.userId,
+            participantId: order.participantId,
+            symbol: order.symbol,
+            side: order.side === 'buy' ? 'long' : 'short',
+            quantity: order.quantity,
+            entryPrice: marketPrice,
+            currentPrice: marketPrice,
+            unrealizedPnl: 0,
+            unrealizedPnlPercentage: 0,
+            stopLoss: order.stopLoss,
+            takeProfit: order.takeProfit,
+            leverage: order.leverage,
+            marginUsed: order.marginRequired,
+            maintenanceMargin: order.marginRequired * 0.5,
+            status: 'open',
+            openedAt: new Date(),
+            openOrderId: order._id.toString(),
+            lastPriceUpdate: new Date(),
+            priceUpdateCount: 0,
+          },
+        ],
+        { session: mongoSession }
+      );
+
+      // Update order with position ID
+      order.positionId = position[0]._id.toString();
+      await order.save({ session: mongoSession });
+
+      // Update participant
+      await CompetitionParticipant.findByIdAndUpdate(
+        participant._id,
+        {
+          $inc: {
+            currentOpenPositions: 1,
+            totalTrades: 1,
+          },
+          $set: {
+            availableCapital: participant.availableCapital - order.marginRequired,
+            usedMargin: participant.usedMargin + order.marginRequired,
+            lastTradeAt: new Date(),
+          },
+        },
+        { session: mongoSession }
+      );
+
+      await mongoSession.commitTransaction();
+
+      console.log(`✅ Limit order executed: ${order.symbol} @ ${marketPrice}`);
+      return { success: true, positionId: position[0]._id.toString() };
+    } catch (error) {
+      await mongoSession.abortTransaction();
+      console.error('Error executing limit order:', error);
+      return { success: false, message: 'Transaction failed' };
+    } finally {
+      mongoSession.endSession();
+    }
+  } catch (error) {
+    console.error('Error in executeLimitOrder:', error);
+    return { success: false, message: 'Failed to execute order' };
+  }
+};
+

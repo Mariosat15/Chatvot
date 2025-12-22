@@ -78,11 +78,11 @@ export async function GET(request: NextRequest) {
 
     // Get competitions and challenges
     const competitionIds = [...new Set(trades.filter(t => t.competitionId).map(t => t.competitionId))];
-    const competitions = await Competition.find({ _id: { $in: competitionIds } }).select('_id name').lean();
+    const competitions = await Competition.find({ _id: { $in: competitionIds } }).select('_id name').lean() as unknown as Array<{ _id: any; name: string }>;
     const competitionMap = new Map(competitions.map(c => [c._id.toString(), c.name]));
 
     const challengeIds = [...new Set(trades.filter(t => t.challengeId).map(t => t.challengeId))];
-    const challenges = await Challenge.find({ _id: { $in: challengeIds } }).select('_id name').lean();
+    const challenges = await Challenge.find({ _id: { $in: challengeIds } }).select('_id name').lean() as unknown as Array<{ _id: any; name: string }>;
     const challengeMap = new Map(challenges.map(c => [c._id.toString(), c.name]));
 
     // Filter trades
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
       'Is Winner',
     ];
 
-    const rows = filteredTrades.map(trade => {
+    const rows = filteredTrades.map((trade: any) => {
       const user = userMap.get(trade.userId.toString());
       const isCompetition = trade.competitionId && !trade.challengeId;
       const contestId = trade.challengeId || trade.competitionId;

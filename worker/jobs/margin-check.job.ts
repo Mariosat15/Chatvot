@@ -27,8 +27,8 @@ import { closePositionAutomatic } from '../../lib/actions/trading/position.actio
 // Get risk settings dynamically (might not exist)
 async function getRiskSettings() {
   try {
-    const RiskSettings = (await import('../../database/models/trading/risk-settings.model')).default;
-    return await RiskSettings.findOne();
+    const TradingRiskSettings = (await import('../../database/models/trading-risk-settings.model')).default;
+    return await TradingRiskSettings.findOne();
   } catch {
     return null;
   }
@@ -60,9 +60,9 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
     try {
       const riskSettings = await getRiskSettings();
       if (riskSettings) {
-        liquidationThreshold = riskSettings.LIQUIDATION ?? 50;
-        marginCallThreshold = riskSettings.MARGIN_CALL ?? 100;
-        warningThreshold = riskSettings.WARNING ?? 150;
+        liquidationThreshold = riskSettings.marginLiquidation ?? 50;
+        marginCallThreshold = riskSettings.marginCall ?? 100;
+        warningThreshold = riskSettings.marginWarning ?? 150;
       }
     } catch {
       // Use defaults

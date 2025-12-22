@@ -549,7 +549,7 @@ export const InvoiceService = {
     return Invoice.find({ userId })
       .sort({ createdAt: -1 })
       .limit(limit)
-      .lean();
+      .lean() as unknown as IInvoice[];
   },
   
   /**
