@@ -14,6 +14,8 @@ exports.disconnectFromDatabase = disconnectFromDatabase;
 exports.getConnectionStatus = getConnectionStatus;
 exports.ensureDbReady = ensureDbReady;
 const mongoose_1 = __importDefault(require("mongoose"));
+// Track if event listeners are already registered to prevent duplicates
+let listenersRegistered = false;
 // Connection options optimized for performance
 const connectionOptions = {
     maxPoolSize: 50,
@@ -54,15 +56,19 @@ async function connectToDatabase() {
         console.log('📊 Connecting to database...');
         const db = await mongoose_1.default.connect(MONGODB_URI, connectionOptions);
         console.log('✅ Database connected');
-        mongoose_1.default.connection.on('error', (err) => {
-            console.error('❌ MongoDB connection error:', err);
-        });
-        mongoose_1.default.connection.on('disconnected', () => {
-            console.warn('⚠️ MongoDB disconnected - will auto-reconnect');
-        });
-        mongoose_1.default.connection.on('reconnected', () => {
-            console.log('✅ MongoDB reconnected');
-        });
+        // Only register listeners once to prevent accumulation on reconnects
+        if (!listenersRegistered) {
+            mongoose_1.default.connection.on('error', (err) => {
+                console.error('❌ MongoDB connection error:', err);
+            });
+            mongoose_1.default.connection.on('disconnected', () => {
+                console.warn('⚠️ MongoDB disconnected - will auto-reconnect');
+            });
+            mongoose_1.default.connection.on('reconnected', () => {
+                console.log('✅ MongoDB reconnected');
+            });
+            listenersRegistered = true;
+        }
         return db;
     }
     catch (error) {

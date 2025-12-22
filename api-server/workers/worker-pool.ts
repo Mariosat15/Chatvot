@@ -22,6 +22,7 @@ interface PendingTask {
 interface WorkerInfo {
   worker: Worker;
   busy: boolean;
+  currentTaskId: string | null; // Track which task this worker is processing
 }
 
 class BcryptWorkerPool {
@@ -71,7 +72,7 @@ class BcryptWorkerPool {
         : undefined,
     });
 
-    const workerInfo: WorkerInfo = { worker, busy: false };
+    const workerInfo: WorkerInfo = { worker, busy: false, currentTaskId: null };
 
     worker.on('message', (result: { id: string; success: boolean; result?: any; error?: string }) => {
       const task = this.pendingTasks.get(result.id);
@@ -87,12 +88,24 @@ class BcryptWorkerPool {
       }
 
       workerInfo.busy = false;
+      workerInfo.currentTaskId = null;
       this.processQueue();
     });
 
     worker.on('error', (error) => {
       console.error('❌ Worker error:', error);
+      
+      // Reject the orphaned task if there was one
+      if (workerInfo.currentTaskId) {
+        const orphanedTask = this.pendingTasks.get(workerInfo.currentTaskId);
+        if (orphanedTask) {
+          this.pendingTasks.delete(workerInfo.currentTaskId);
+          orphanedTask.reject(new Error(`Worker crashed: ${error.message}`));
+        }
+      }
+      
       workerInfo.busy = false;
+      workerInfo.currentTaskId = null;
       
       // Remove and recreate worker
       const index = this.workers.indexOf(workerInfo);
@@ -107,6 +120,16 @@ class BcryptWorkerPool {
     worker.on('exit', (code) => {
       if (code !== 0 && !this.isShuttingDown) {
         console.warn(`⚠️ Worker exited with code ${code}, recreating...`);
+        
+        // Reject the orphaned task if there was one
+        if (workerInfo.currentTaskId) {
+          const orphanedTask = this.pendingTasks.get(workerInfo.currentTaskId);
+          if (orphanedTask) {
+            this.pendingTasks.delete(workerInfo.currentTaskId);
+            orphanedTask.reject(new Error(`Worker exited unexpectedly with code ${code}`));
+          }
+        }
+        
         const index = this.workers.indexOf(workerInfo);
         if (index !== -1) {
           this.workers.splice(index, 1);
@@ -129,6 +152,7 @@ class BcryptWorkerPool {
 
     const { message, task } = this.taskQueue.shift()!;
     availableWorker.busy = true;
+    availableWorker.currentTaskId = task.id;
     this.pendingTasks.set(task.id, task);
     availableWorker.worker.postMessage(message);
   }
@@ -152,6 +176,7 @@ class BcryptWorkerPool {
       
       if (availableWorker) {
         availableWorker.busy = true;
+        availableWorker.currentTaskId = id;
         this.pendingTasks.set(id, task);
         availableWorker.worker.postMessage(message);
       } else {

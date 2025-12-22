@@ -12,7 +12,15 @@ exports.authenticateToken = authenticateToken;
 exports.optionalAuth = optionalAuth;
 exports.getSessionUser = getSessionUser;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const JWT_SECRET = process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET || 'fallback-secret';
+// SECURITY: No fallback - must be configured via environment
+function getJwtSecret() {
+    const secret = process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET;
+    if (!secret) {
+        throw new Error('CRITICAL: JWT_SECRET or BETTER_AUTH_SECRET must be set. ' +
+            'Without a secret, authentication is disabled for security.');
+    }
+    return secret;
+}
 /**
  * Verify JWT token and attach user to request
  */
@@ -24,7 +32,7 @@ function authenticateToken(req, res, next) {
         return;
     }
     try {
-        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        const decoded = jsonwebtoken_1.default.verify(token, getJwtSecret());
         req.user = decoded;
         next();
     }
@@ -51,7 +59,7 @@ function optionalAuth(req, res, next) {
         return;
     }
     try {
-        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        const decoded = jsonwebtoken_1.default.verify(token, getJwtSecret());
         req.user = decoded;
     }
     catch {

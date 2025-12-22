@@ -8,18 +8,14 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-// Get __dirname equivalent for ES modules
-const __filename_esm = typeof __filename !== 'undefined' 
-  ? __filename 
-  : fileURLToPath(import.meta.url);
-const __dirname_esm = typeof __dirname !== 'undefined' 
-  ? __dirname 
-  : path.dirname(__filename_esm);
 
 // Load environment variables from root .env file
-dotenv.config({ path: path.resolve(__dirname_esm, '../../.env') });
+// Works for both dev (tsx) and production (compiled to dist/worker)
+const isCompiledBuild = __dirname.includes('dist');
+const envPath = isCompiledBuild 
+  ? path.resolve(__dirname, '../../../.env')  // From dist/worker/config/
+  : path.resolve(__dirname, '../../.env');     // From worker/config/
+dotenv.config({ path: envPath });
 
 const MONGODB_URI = process.env.MONGODB_URI;
 

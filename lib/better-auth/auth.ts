@@ -2,12 +2,20 @@ import { betterAuth } from "better-auth";
 import { mongodbAdapter} from "better-auth/adapters/mongodb";
 import { connectToDatabase} from "@/database/mongoose";
 import { nextCookies} from "better-auth/next-js";
+import { validateEnvironment } from "@/lib/utils/validate-env";
 
 let authInstance: ReturnType<typeof betterAuth> | null = null;
 let authInitPromise: Promise<ReturnType<typeof betterAuth>> | null = null;
+let envValidated = false;
 
 export const getAuth = async (): Promise<ReturnType<typeof betterAuth>> => {
     if(authInstance) return authInstance;
+
+    // Validate environment on first auth initialization
+    if (!envValidated) {
+        validateEnvironment();
+        envValidated = true;
+    }
 
     // Prevent multiple simultaneous initialization attempts
     if (authInitPromise) return authInitPromise;

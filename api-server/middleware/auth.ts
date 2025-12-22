@@ -7,7 +7,17 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET || 'fallback-secret';
+// SECURITY: No fallback - must be configured via environment
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET;
+  if (!secret) {
+    throw new Error(
+      'CRITICAL: JWT_SECRET or BETTER_AUTH_SECRET must be set. ' +
+      'Without a secret, authentication is disabled for security.'
+    );
+  }
+  return secret;
+}
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -34,7 +44,7 @@ export function authenticateToken(
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as {
+    const decoded = jwt.verify(token, getJwtSecret()) as {
       id: string;
       email: string;
       name?: string;
@@ -72,7 +82,7 @@ export function optionalAuth(
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as {
+    const decoded = jwt.verify(token, getJwtSecret()) as {
       id: string;
       email: string;
       name?: string;

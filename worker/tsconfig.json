@@ -5,10 +5,14 @@
     "moduleResolution": "NodeNext",
     "outDir": "../dist/worker",
     "rootDir": ".",
+    "baseUrl": "..",
+    "paths": {
+      "@/*": ["./*"]
+    },
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "noEmit": false,
+    "declaration": false,
+    "noEmit": true,
     "strict": false,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
@@ -21,4 +25,3 @@
     "../node_modules"
   ]
 }
-

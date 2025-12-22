@@ -7,6 +7,9 @@
 
 import mongoose from 'mongoose';
 
+// Track if event listeners are already registered to prevent duplicates
+let listenersRegistered = false;
+
 // Connection options optimized for performance
 const connectionOptions: mongoose.ConnectOptions = {
   maxPoolSize: 50,
@@ -53,17 +56,22 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
     const db = await mongoose.connect(MONGODB_URI, connectionOptions);
     console.log('✅ Database connected');
     
-    mongoose.connection.on('error', (err) => {
-      console.error('❌ MongoDB connection error:', err);
-    });
+    // Only register listeners once to prevent accumulation on reconnects
+    if (!listenersRegistered) {
+      mongoose.connection.on('error', (err) => {
+        console.error('❌ MongoDB connection error:', err);
+      });
 
-    mongoose.connection.on('disconnected', () => {
-      console.warn('⚠️ MongoDB disconnected - will auto-reconnect');
-    });
+      mongoose.connection.on('disconnected', () => {
+        console.warn('⚠️ MongoDB disconnected - will auto-reconnect');
+      });
 
-    mongoose.connection.on('reconnected', () => {
-      console.log('✅ MongoDB reconnected');
-    });
+      mongoose.connection.on('reconnected', () => {
+        console.log('✅ MongoDB reconnected');
+      });
+      
+      listenersRegistered = true;
+    }
 
     return db;
   } catch (error) {
