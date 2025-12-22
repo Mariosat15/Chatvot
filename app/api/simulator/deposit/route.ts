@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { connectToDatabase } from '@/database/mongoose';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
@@ -32,56 +33,69 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
-    // Find or create wallet
-    let wallet = await CreditWallet.findOne({ userId });
-    const balanceBefore = wallet?.creditBalance || 0;
-    
-    if (!wallet) {
-      wallet = new CreditWallet({
+    // Start MongoDB transaction for atomic operations
+    const mongoSession = await mongoose.startSession();
+    mongoSession.startTransaction();
+
+    try {
+      // Find or create wallet
+      let wallet = await CreditWallet.findOne({ userId }).session(mongoSession);
+      const balanceBefore = wallet?.creditBalance || 0;
+      
+      if (!wallet) {
+        [wallet] = await CreditWallet.create([{
+          userId,
+          creditBalance: 0,
+          totalDeposited: 0,
+          totalWithdrawn: 0,
+          totalSpentOnCompetitions: 0,
+          totalWonFromCompetitions: 0,
+          totalSpentOnChallenges: 0,
+          totalWonFromChallenges: 0,
+          isActive: true,
+          kycVerified: false,
+          withdrawalEnabled: false,
+        }], { session: mongoSession });
+      }
+
+      // Add credits
+      wallet.creditBalance += amount;
+      wallet.totalDeposited += amount;
+      await wallet.save({ session: mongoSession });
+
+      // Create transaction record
+      const [transaction] = await WalletTransaction.create([{
         userId,
-        creditBalance: 0,
-        totalDeposited: 0,
-        totalWithdrawn: 0,
-        totalSpentOnCompetitions: 0,
-        totalWonFromCompetitions: 0,
-        totalSpentOnChallenges: 0,
-        totalWonFromChallenges: 0,
-        isActive: true,
-        kycVerified: false,
-        withdrawalEnabled: false,
+        transactionType: 'deposit',
+        amount,
+        balanceBefore,
+        balanceAfter: wallet.creditBalance,
+        currency: 'EUR',
+        exchangeRate: 1,
+        status: 'completed',
+        description: 'Simulator deposit',
+        processedAt: new Date(),
+        metadata: {
+          simulatorMode: true,
+        },
+      }], { session: mongoSession });
+
+      // Commit transaction
+      await mongoSession.commitTransaction();
+      mongoSession.endSession();
+
+      return NextResponse.json({
+        success: true,
+        wallet: {
+          balance: wallet.creditBalance,
+        },
+        transactionId: transaction._id.toString(),
       });
+    } catch (txError) {
+      await mongoSession.abortTransaction();
+      mongoSession.endSession();
+      throw txError;
     }
-
-    // Add credits
-    wallet.creditBalance += amount;
-    wallet.totalDeposited += amount;
-    await wallet.save();
-
-    // Create transaction record
-    const transaction = new WalletTransaction({
-      userId,
-      transactionType: 'deposit',
-      amount,
-      balanceBefore,
-      balanceAfter: wallet.creditBalance,
-      currency: 'EUR',
-      exchangeRate: 1,
-      status: 'completed',
-      description: 'Simulator deposit',
-      processedAt: new Date(),
-      metadata: {
-        simulatorMode: true,
-      },
-    });
-    await transaction.save();
-
-    return NextResponse.json({
-      success: true,
-      wallet: {
-        balance: wallet.creditBalance,
-      },
-      transactionId: transaction._id.toString(),
-    });
   } catch (error) {
     console.error('Simulator deposit error:', error);
     return NextResponse.json(

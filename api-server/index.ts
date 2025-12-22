@@ -32,7 +32,13 @@ import path from 'path';
 import dotenv from 'dotenv';
 
 // Load environment variables from root .env
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// When compiled: api-server/dist/index.js → ../../.env (project root)
+// When running ts directly: api-server/index.ts → ../.env (project root)
+const isCompiledBuild = __dirname.includes('dist');
+const envPath = isCompiledBuild 
+  ? path.resolve(__dirname, '../../.env')  // From dist/ folder
+  : path.resolve(__dirname, '../.env');     // From api-server/ folder
+dotenv.config({ path: envPath });
 
 import { bcryptPool } from './workers/worker-pool';
 import { connectToDatabase } from './config/database';

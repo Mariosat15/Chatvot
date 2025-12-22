@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { connectToDatabase } from '@/database/mongoose';
 import Competition from '@/database/models/trading/competition.model';
 import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
@@ -83,134 +84,157 @@ export async function POST(request: NextRequest) {
     const entryFee = competition.entryFee || 0;
     const now = new Date();
 
-    // If there's an entry fee, handle wallet operations
-    if (entryFee > 0) {
-      // Get all wallets in one query
-      const wallets = await CreditWallet.find({ userId: { $in: usersToJoin } }).lean();
-      const walletMap = new Map(wallets.map(w => [w.userId, w]));
+    // Start MongoDB transaction for atomic operations
+    const mongoSession = await mongoose.startSession();
+    mongoSession.startTransaction();
 
-      // Filter users with sufficient balance
-      const usersWithBalance = usersToJoin.filter((userId: string) => {
-        const wallet = walletMap.get(userId);
-        return wallet && wallet.creditBalance >= entryFee;
-      });
+    try {
+      // If there's an entry fee, handle wallet operations
+      if (entryFee > 0) {
+        // Get all wallets in one query
+        const wallets = await CreditWallet.find({ userId: { $in: usersToJoin } })
+          .session(mongoSession)
+          .lean();
+        const walletMap = new Map(wallets.map(w => [w.userId, w]));
 
-      if (usersWithBalance.length === 0) {
-        return NextResponse.json({
-          success: false,
-          error: 'No users have sufficient balance',
-        }, { status: 400 });
-      }
+        // Filter users with sufficient balance
+        const usersWithBalance = usersToJoin.filter((userId: string) => {
+          const wallet = walletMap.get(userId);
+          return wallet && wallet.creditBalance >= entryFee;
+        });
 
-      // Bulk update wallets
-      const walletOps = usersWithBalance.map((userId: string) => ({
-        updateOne: {
-          filter: { userId },
-          update: {
-            $inc: { 
-              creditBalance: -entryFee, 
-              totalSpentOnCompetitions: entryFee 
+        if (usersWithBalance.length === 0) {
+          await mongoSession.abortTransaction();
+          mongoSession.endSession();
+          return NextResponse.json({
+            success: false,
+            error: 'No users have sufficient balance',
+          }, { status: 400 });
+        }
+
+        // Bulk update wallets
+        const walletOps = usersWithBalance.map((userId: string) => ({
+          updateOne: {
+            filter: { userId },
+            update: {
+              $inc: { 
+                creditBalance: -entryFee, 
+                totalSpentOnCompetitions: entryFee 
+              },
             },
           },
-        },
-      }));
+        }));
 
-      // Create transactions
-      const transactions = usersWithBalance.map((userId: string) => {
-        const wallet = walletMap.get(userId);
-        return {
-          userId,
-          transactionType: 'competition_entry',
-          amount: -entryFee,
-          balanceBefore: wallet?.creditBalance || 0,
-          balanceAfter: (wallet?.creditBalance || 0) - entryFee,
-          currency: 'EUR',
-          exchangeRate: 1,
-          status: 'completed',
+        // Create transactions
+        const transactions = usersWithBalance.map((userId: string) => {
+          const wallet = walletMap.get(userId);
+          return {
+            userId,
+            transactionType: 'competition_entry',
+            amount: -entryFee,
+            balanceBefore: wallet?.creditBalance || 0,
+            balanceAfter: (wallet?.creditBalance || 0) - entryFee,
+            currency: 'EUR',
+            exchangeRate: 1,
+            status: 'completed',
+            competitionId,
+            description: `Entry fee for ${competition.name}`,
+            processedAt: now,
+            metadata: { simulatorMode: true },
+          };
+        });
+
+        // Create participants
+        const participants = usersWithBalance.map((userId: string) => ({
           competitionId,
-          description: `Entry fee for ${competition.name}`,
-          processedAt: now,
-          metadata: { simulatorMode: true },
-        };
-      });
+          userId,
+          username: `SimUser_${userId.slice(-6)}`,
+          email: `simuser_${userId.slice(-6)}@test.simulator`,
+          startingCapital: competition.startingCapital,
+          currentCapital: competition.startingCapital,
+          availableCapital: competition.startingCapital,
+          pnl: 0,
+          pnlPercent: 0,
+          unrealizedPnl: 0,
+          currentPnl: 0,
+          currentPnlPercent: 0,
+          tradesCount: 0,
+          winningTrades: 0,
+          losingTrades: 0,
+          winRate: 0,
+          maxDrawdown: 0,
+          currentDrawdown: 0,
+          status: 'active',
+          joinedAt: now,
+        }));
 
-      // Create participants
-      const participants = usersWithBalance.map((userId: string) => ({
-        competitionId,
-        userId,
-        username: `SimUser_${userId.slice(-6)}`,
-        email: `simuser_${userId.slice(-6)}@test.simulator`,
-        startingCapital: competition.startingCapital,
-        currentCapital: competition.startingCapital,
-        availableCapital: competition.startingCapital,
-        pnl: 0,
-        pnlPercent: 0,
-        unrealizedPnl: 0,
-        currentPnl: 0,
-        currentPnlPercent: 0,
-        tradesCount: 0,
-        winningTrades: 0,
-        losingTrades: 0,
-        winRate: 0,
-        maxDrawdown: 0,
-        currentDrawdown: 0,
-        status: 'active',
-        joinedAt: now,
-      }));
+        // Execute all operations atomically within transaction
+        await CreditWallet.bulkWrite(walletOps, { ordered: false, session: mongoSession });
+        await WalletTransaction.insertMany(transactions, { ordered: false, session: mongoSession });
+        await CompetitionParticipant.insertMany(participants, { ordered: false, session: mongoSession });
+        await Competition.findByIdAndUpdate(
+          competitionId,
+          { $inc: { currentParticipants: usersWithBalance.length } },
+          { session: mongoSession }
+        );
 
-      // Execute all operations in parallel
-      await Promise.all([
-        CreditWallet.bulkWrite(walletOps, { ordered: false }),
-        WalletTransaction.insertMany(transactions, { ordered: false }),
-        CompetitionParticipant.insertMany(participants, { ordered: false }),
-        Competition.findByIdAndUpdate(competitionId, {
-          $inc: { currentParticipants: usersWithBalance.length },
-        }),
-      ]);
+        // Commit transaction - all operations succeed or all fail
+        await mongoSession.commitTransaction();
+        mongoSession.endSession();
 
-      return NextResponse.json({
-        success: true,
-        joined: usersWithBalance.length,
-        alreadyJoined: alreadyJoinedSet.size,
-        insufficientBalance: usersToJoin.length - usersWithBalance.length,
-      });
-    } else {
-      // No entry fee - just create participants
-      const participants = usersToJoin.map((userId: string) => ({
-        competitionId,
-        userId,
-        username: `SimUser_${userId.slice(-6)}`,
-        email: `simuser_${userId.slice(-6)}@test.simulator`,
-        startingCapital: competition.startingCapital,
-        currentCapital: competition.startingCapital,
-        availableCapital: competition.startingCapital,
-        pnl: 0,
-        pnlPercent: 0,
-        unrealizedPnl: 0,
-        currentPnl: 0,
-        currentPnlPercent: 0,
-        tradesCount: 0,
-        winningTrades: 0,
-        losingTrades: 0,
-        winRate: 0,
-        maxDrawdown: 0,
-        currentDrawdown: 0,
-        status: 'active',
-        joinedAt: now,
-      }));
+        return NextResponse.json({
+          success: true,
+          joined: usersWithBalance.length,
+          alreadyJoined: alreadyJoinedSet.size,
+          insufficientBalance: usersToJoin.length - usersWithBalance.length,
+        });
+      } else {
+        // No entry fee - just create participants (still use transaction for consistency)
+        const participants = usersToJoin.map((userId: string) => ({
+          competitionId,
+          userId,
+          username: `SimUser_${userId.slice(-6)}`,
+          email: `simuser_${userId.slice(-6)}@test.simulator`,
+          startingCapital: competition.startingCapital,
+          currentCapital: competition.startingCapital,
+          availableCapital: competition.startingCapital,
+          pnl: 0,
+          pnlPercent: 0,
+          unrealizedPnl: 0,
+          currentPnl: 0,
+          currentPnlPercent: 0,
+          tradesCount: 0,
+          winningTrades: 0,
+          losingTrades: 0,
+          winRate: 0,
+          maxDrawdown: 0,
+          currentDrawdown: 0,
+          status: 'active',
+          joinedAt: now,
+        }));
 
-      await Promise.all([
-        CompetitionParticipant.insertMany(participants, { ordered: false }),
-        Competition.findByIdAndUpdate(competitionId, {
-          $inc: { currentParticipants: usersToJoin.length },
-        }),
-      ]);
+        await CompetitionParticipant.insertMany(participants, { ordered: false, session: mongoSession });
+        await Competition.findByIdAndUpdate(
+          competitionId,
+          { $inc: { currentParticipants: usersToJoin.length } },
+          { session: mongoSession }
+        );
 
-      return NextResponse.json({
-        success: true,
-        joined: usersToJoin.length,
-        alreadyJoined: alreadyJoinedSet.size,
-      });
+        // Commit transaction
+        await mongoSession.commitTransaction();
+        mongoSession.endSession();
+
+        return NextResponse.json({
+          success: true,
+          joined: usersToJoin.length,
+          alreadyJoined: alreadyJoinedSet.size,
+        });
+      }
+    } catch (txError) {
+      // Rollback on any error - no credits lost
+      await mongoSession.abortTransaction();
+      mongoSession.endSession();
+      throw txError;
     }
   } catch (error) {
     console.error('Batch competition join error:', error);

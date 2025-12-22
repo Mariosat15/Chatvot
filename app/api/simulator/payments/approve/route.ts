@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { connectToDatabase } from '@/database/mongoose';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
@@ -24,114 +25,136 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
-    // If transactionId is provided, approve specific transaction
-    if (transactionId) {
-      const transaction = await WalletTransaction.findById(transactionId);
-      if (!transaction) {
-        return NextResponse.json(
-          { success: false, error: 'Transaction not found' },
-          { status: 404 }
-        );
-      }
+    // Start MongoDB transaction for atomic operations
+    const mongoSession = await mongoose.startSession();
+    mongoSession.startTransaction();
 
-      if (transaction.status !== 'pending') {
+    try {
+      // If transactionId is provided, approve specific transaction
+      if (transactionId) {
+        const transaction = await WalletTransaction.findById(transactionId).session(mongoSession);
+        if (!transaction) {
+          await mongoSession.abortTransaction();
+          mongoSession.endSession();
+          return NextResponse.json(
+            { success: false, error: 'Transaction not found' },
+            { status: 404 }
+          );
+        }
+
+        if (transaction.status !== 'pending') {
+          await mongoSession.abortTransaction();
+          mongoSession.endSession();
+          return NextResponse.json({
+            success: true,
+            message: 'Transaction already processed',
+          });
+        }
+
+        // Update transaction status
+        transaction.status = 'completed';
+        transaction.processedAt = new Date();
+        await transaction.save({ session: mongoSession });
+
+        // Update wallet balance
+        const wallet = await CreditWallet.findOne({ userId: transaction.userId }).session(mongoSession);
+        if (wallet) {
+          wallet.creditBalance += transaction.amount;
+          wallet.totalDeposited += transaction.amount;
+          await wallet.save({ session: mongoSession });
+        }
+
+        await mongoSession.commitTransaction();
+        mongoSession.endSession();
+
         return NextResponse.json({
           success: true,
-          message: 'Transaction already processed',
+          transactionId: transaction._id.toString(),
         });
       }
 
-      // Update transaction status
-      transaction.status = 'completed';
-      transaction.processedAt = new Date();
-      await transaction.save();
+      // If userId and amount provided, create and approve a new transaction
+      if (userId && amount) {
+        let wallet = await CreditWallet.findOne({ userId }).session(mongoSession);
+        const balanceBefore = wallet?.creditBalance || 0;
 
-      // Update wallet balance
-      const wallet = await CreditWallet.findOne({ userId: transaction.userId });
-      if (wallet) {
-        wallet.creditBalance += transaction.amount;
-        wallet.totalDeposited += transaction.amount;
-        await wallet.save();
-      }
+        if (!wallet) {
+          [wallet] = await CreditWallet.create([{
+            userId,
+            creditBalance: 0,
+            totalDeposited: 0,
+            totalWithdrawn: 0,
+            totalSpentOnCompetitions: 0,
+            totalWonFromCompetitions: 0,
+            totalSpentOnChallenges: 0,
+            totalWonFromChallenges: 0,
+            isActive: true,
+            kycVerified: false,
+            withdrawalEnabled: false,
+          }], { session: mongoSession });
+        }
 
-      return NextResponse.json({
-        success: true,
-        transactionId: transaction._id.toString(),
-      });
-    }
+        wallet.creditBalance += amount;
+        wallet.totalDeposited += amount;
+        await wallet.save({ session: mongoSession });
 
-    // If userId and amount provided, create and approve a new transaction
-    if (userId && amount) {
-      let wallet = await CreditWallet.findOne({ userId });
-      const balanceBefore = wallet?.creditBalance || 0;
-
-      if (!wallet) {
-        wallet = new CreditWallet({
+        const [transaction] = await WalletTransaction.create([{
           userId,
-          creditBalance: 0,
-          totalDeposited: 0,
-          totalWithdrawn: 0,
-          totalSpentOnCompetitions: 0,
-          totalWonFromCompetitions: 0,
-          totalSpentOnChallenges: 0,
-          totalWonFromChallenges: 0,
-          isActive: true,
-          kycVerified: false,
-          withdrawalEnabled: false,
+          transactionType: 'deposit',
+          amount,
+          balanceBefore,
+          balanceAfter: wallet.creditBalance,
+          currency: 'EUR',
+          exchangeRate: 1,
+          status: 'completed',
+          description: 'Simulator approved payment',
+          processedAt: new Date(),
+          metadata: {
+            simulatorMode: true,
+            approvedBy: 'simulator',
+          },
+        }], { session: mongoSession });
+
+        await mongoSession.commitTransaction();
+        mongoSession.endSession();
+
+        return NextResponse.json({
+          success: true,
+          transactionId: transaction._id.toString(),
+          newBalance: wallet.creditBalance,
         });
       }
 
-      wallet.creditBalance += amount;
-      wallet.totalDeposited += amount;
-      await wallet.save();
+      // Approve all pending transactions (each in its own mini-transaction for safety)
+      const pendingTransactions = await WalletTransaction.find({ status: 'pending' }).session(mongoSession);
+      let approvedCount = 0;
 
-      const transaction = new WalletTransaction({
-        userId,
-        transactionType: 'deposit',
-        amount,
-        balanceBefore,
-        balanceAfter: wallet.creditBalance,
-        currency: 'EUR',
-        exchangeRate: 1,
-        status: 'completed',
-        description: 'Simulator approved payment',
-        processedAt: new Date(),
-        metadata: {
-          simulatorMode: true,
-          approvedBy: 'simulator',
-        },
-      });
-      await transaction.save();
+      for (const transaction of pendingTransactions) {
+        transaction.status = 'completed';
+        transaction.processedAt = new Date();
+        await transaction.save({ session: mongoSession });
+
+        const wallet = await CreditWallet.findOne({ userId: transaction.userId }).session(mongoSession);
+        if (wallet && transaction.amount > 0) {
+          wallet.creditBalance += transaction.amount;
+          wallet.totalDeposited += transaction.amount;
+          await wallet.save({ session: mongoSession });
+        }
+        approvedCount++;
+      }
+
+      await mongoSession.commitTransaction();
+      mongoSession.endSession();
 
       return NextResponse.json({
         success: true,
-        transactionId: transaction._id.toString(),
-        newBalance: wallet.creditBalance,
+        approvedCount,
       });
+    } catch (txError) {
+      await mongoSession.abortTransaction();
+      mongoSession.endSession();
+      throw txError;
     }
-
-    // Approve all pending transactions
-    const pendingTransactions = await WalletTransaction.find({ status: 'pending' });
-    let approvedCount = 0;
-
-    for (const transaction of pendingTransactions) {
-      transaction.status = 'completed';
-      transaction.processedAt = new Date();
-      await transaction.save();
-
-      const wallet = await CreditWallet.findOne({ userId: transaction.userId });
-      if (wallet && transaction.amount > 0) {
-        wallet.creditBalance += transaction.amount;
-        wallet.totalDeposited += transaction.amount;
-        await wallet.save();
-      }
-      approvedCount++;
-    }
-
-    return NextResponse.json({
-      success: true,
-      approvedCount,
-    });
   } catch (error) {
     console.error('Simulator payment approval error:', error);
     return NextResponse.json(

@@ -15,7 +15,7 @@ const connectionOptions: mongoose.ConnectOptions = {
   serverSelectionTimeoutMS: 10000,
   socketTimeoutMS: 45000,
   // CRITICAL: Disable buffering to get immediate errors instead of timeouts
-  bufferCommands: true,
+  bufferCommands: false,
   // Auto-reconnect
   autoIndex: true,
 };
