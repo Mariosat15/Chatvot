@@ -192,14 +192,13 @@ router.post('/register-batch', async (req: Request, res: Response) => {
     const results: Array<{ success: boolean; email: string; userId?: string; error?: string }> = [];
     let successCount = 0;
     let failureCount = 0;
-    let totalBcryptTime = 0;
 
     // Process users with parallel bcrypt hashing
+    // Track wall-clock time for the parallel operation (not sum of individual times)
+    const bcryptStart = Date.now();
     const hashPromises = users.map(async (userData: { email: string; password: string; name?: string }) => {
-      const hashStart = Date.now();
       try {
         const hashedPassword = await hashPassword(userData.password, 12);
-        totalBcryptTime += Date.now() - hashStart;
         return { ...userData, hashedPassword };
       } catch {
         return { ...userData, hashedPassword: null };
@@ -207,6 +206,7 @@ router.post('/register-batch', async (req: Request, res: Response) => {
     });
 
     const hashedUsers = await Promise.all(hashPromises);
+    const totalBcryptTime = Date.now() - bcryptStart; // Actual wall-clock time for all parallel hashes
 
     // Save users sequentially (to handle duplicates gracefully)
     for (const userData of hashedUsers) {

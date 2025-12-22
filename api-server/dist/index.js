@@ -35,7 +35,13 @@ const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const path_1 = __importDefault(require("path"));
 const dotenv_1 = __importDefault(require("dotenv"));
 // Load environment variables from root .env
-dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../.env') });
+// When compiled: api-server/dist/index.js → ../../.env (project root)
+// When running ts directly: api-server/index.ts → ../.env (project root)
+const isCompiledBuild = __dirname.includes('dist');
+const envPath = isCompiledBuild
+    ? path_1.default.resolve(__dirname, '../../.env') // From dist/ folder
+    : path_1.default.resolve(__dirname, '../.env'); // From api-server/ folder
+dotenv_1.default.config({ path: envPath });
 const worker_pool_1 = require("./workers/worker-pool");
 const database_1 = require("./config/database");
 // Import routes - ONLY auth and health (minimal dependencies)
