@@ -1,0 +1,45 @@
+import { Document } from 'mongoose';
+export interface ITradeHistory extends Document {
+    competitionId: string;
+    userId: string;
+    participantId: string;
+    symbol: string;
+    side: 'long' | 'short';
+    quantity: number;
+    orderType: 'market' | 'limit';
+    limitPrice?: number;
+    entryPrice: number;
+    exitPrice: number;
+    priceChange: number;
+    priceChangePercentage: number;
+    realizedPnl: number;
+    realizedPnlPercentage: number;
+    openedAt: Date;
+    closedAt: Date;
+    holdingTimeSeconds: number;
+    closeReason: 'user' | 'stop_loss' | 'take_profit' | 'margin_call' | 'competition_end' | 'challenge_end';
+    leverage: number;
+    marginUsed: number;
+    hadStopLoss: boolean;
+    stopLossPrice?: number;
+    hadTakeProfit: boolean;
+    takeProfitPrice?: number;
+    openOrderId: string;
+    closeOrderId: string;
+    positionId: string;
+    isWinner: boolean;
+    riskRewardRatio?: number;
+    entrySpread?: number;
+    entryVolatility?: number;
+    exitSpread?: number;
+    exitVolatility?: number;
+    commission?: number;
+    swap?: number;
+    totalCosts?: number;
+    netPnl?: number;
+    createdAt: Date;
+    updatedAt: Date;
+}
+declare const TradeHistory: import("mongoose").Model<any, {}, {}, {}, any, any>;
+export default TradeHistory;
+//# sourceMappingURL=trade-history.model.d.ts.map

@@ -86,7 +86,7 @@ export default function CompetitionCreatorForm() {
     rankingMethod: 'pnl',
     tieBreaker1: 'trades_count',
     tieBreaker2: undefined,
-    minimumTrades: 0,
+    minimumTrades: 1,
     minimumWinRate: undefined,
     tiePrizeDistribution: 'split_equally',
     disqualifyOnLiquidation: true,
@@ -97,6 +97,57 @@ export default function CompetitionCreatorForm() {
     minLevel: 1,
     maxLevel: undefined as number | undefined,
   });
+
+  // Market status state for validation
+  const [marketStatus, setMarketStatus] = useState<{
+    isOpen: boolean;
+    status: string;
+    message: string;
+    warnings: string[];
+    canCreateCompetition: boolean;
+    loading: boolean;
+  }>({
+    isOpen: true,
+    status: 'unknown',
+    message: 'Checking market status...',
+    warnings: [],
+    canCreateCompetition: true,
+    loading: true,
+  });
+
+  // Fetch market status on load and when dates change
+  useEffect(() => {
+    const fetchMarketStatus = async () => {
+      try {
+        let url = '/api/market-status';
+        
+        // Add date params if set
+        if (formData.startDate && formData.endDate) {
+          const startDateTime = new Date(`${formData.startDate}T${formData.startTime || '00:00'}:00Z`);
+          const endDateTime = new Date(`${formData.endDate}T${formData.endTime || '23:59'}:00Z`);
+          url += `?startDate=${startDateTime.toISOString()}&endDate=${endDateTime.toISOString()}`;
+        }
+        
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          setMarketStatus({
+            isOpen: data.currentStatus?.isOpen ?? true,
+            status: data.currentStatus?.status ?? 'unknown',
+            message: data.currentStatus?.message ?? '',
+            warnings: data.warnings ?? [],
+            canCreateCompetition: data.canCreateCompetition ?? true,
+            loading: false,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch market status:', error);
+        setMarketStatus(prev => ({ ...prev, loading: false }));
+      }
+    };
+
+    fetchMarketStatus();
+  }, [formData.startDate, formData.startTime, formData.endDate, formData.endTime]);
 
   // Get current UTC time for display
   const [currentUTC, setCurrentUTC] = useState(new Date());
@@ -237,6 +288,12 @@ export default function CompetitionCreatorForm() {
       return;
     }
 
+    // BLOCK competition creation when market is closed
+    if (!marketStatus.isOpen) {
+      toast.error('❌ Cannot create competition: Forex market is currently closed. Please wait until market opens (Sunday 10pm - Friday 10pm UTC).');
+      return;
+    }
+
     setSubmitted(true);
     setLoading(true);
 
@@ -293,7 +350,7 @@ export default function CompetitionCreatorForm() {
 
       // Redirect after 2 seconds
       setTimeout(() => {
-        router.push('/admin/dashboard');
+        router.push('/dashboard');
         router.refresh();
       }, 2000);
     } catch (error) {
@@ -504,6 +561,55 @@ export default function CompetitionCreatorForm() {
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* Market Status Indicator */}
+          <div className={`p-4 rounded-xl border ${
+            marketStatus.loading 
+              ? 'bg-gray-700/50 border-gray-600' 
+              : marketStatus.isOpen 
+                ? 'bg-green-500/10 border-green-500/30' 
+                : 'bg-red-500/10 border-red-500/30'
+          }`}>
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`h-3 w-3 rounded-full ${
+                marketStatus.loading 
+                  ? 'bg-gray-400 animate-pulse' 
+                  : marketStatus.isOpen 
+                    ? 'bg-green-500' 
+                    : 'bg-red-500 animate-pulse'
+              }`} />
+              <span className={`text-xs font-semibold ${
+                marketStatus.isOpen ? 'text-gray-300' : 'text-red-300'
+              }`}>
+                {marketStatus.loading ? 'Checking...' : marketStatus.isOpen ? 'Forex Market' : '⛔ MARKET CLOSED'}
+              </span>
+            </div>
+            <p className={`text-xs ${
+              marketStatus.isOpen ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {marketStatus.loading ? 'Fetching market status...' : marketStatus.message}
+            </p>
+            {!marketStatus.loading && !marketStatus.isOpen && (
+              <div className="mt-3 p-2 bg-red-500/20 rounded-lg">
+                <p className="text-xs text-red-300 font-semibold">
+                  ❌ Competition creation is BLOCKED
+                </p>
+                <p className="text-xs text-red-400 mt-1">
+                  Market hours: Sun 10pm - Fri 10pm UTC
+                </p>
+              </div>
+            )}
+            {marketStatus.warnings.length > 0 && marketStatus.isOpen && (
+              <div className="mt-2 space-y-1">
+                {marketStatus.warnings.slice(0, 3).map((warning, idx) => (
+                  <p key={idx} className="text-xs text-yellow-300 flex items-start gap-1">
+                    <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                    {warning}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1588,7 +1694,7 @@ export default function CompetitionCreatorForm() {
                 if (currentStep > 1) {
                   setCurrentStep(currentStep - 1);
                 } else {
-                  router.push('/admin/dashboard');
+                  router.push('/dashboard');
                 }
               }}
               className="border-gray-600 hover:bg-gray-700"

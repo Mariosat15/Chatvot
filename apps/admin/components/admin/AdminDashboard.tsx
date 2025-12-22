@@ -629,7 +629,7 @@ export default function AdminDashboard({
               </div>
               
               {/* Quick Create (Desktop) */}
-              <Link href="/admin/competitions/create" className="hidden sm:block">
+              <Link href="/competitions/create" className="hidden sm:block">
                 <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold">
                   <Plus className="h-4 w-4 mr-1" />
                   Create

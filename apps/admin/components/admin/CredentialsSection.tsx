@@ -70,7 +70,7 @@ export default function CredentialsSection({
         if (data.email !== currentEmail) {
           toast.info('Please login with your new email');
           setTimeout(() => {
-            router.push('/admin/login');
+            router.push('/login');
           }, 2000);
         } else {
           router.refresh();

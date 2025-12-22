@@ -143,7 +143,7 @@ export async function cancelCompetitionAndRefund(
     revalidatePath(`/competitions/${competitionId}`);
     revalidatePath(`/competitions/${competitionId}/trade`);
     revalidatePath('/competitions');
-    revalidatePath('/admin/competitions');
+    revalidatePath('/competitions');
 
     return {
       success: true,

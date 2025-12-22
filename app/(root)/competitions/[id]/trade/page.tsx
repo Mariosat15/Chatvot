@@ -136,6 +136,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
           <CompetitionStatusMonitor 
             competitionId={competitionId} 
             initialStatus={competition.status}
+            userId={session.user.id}
           />
         )}
         

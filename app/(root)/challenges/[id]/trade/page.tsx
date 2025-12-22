@@ -151,6 +151,7 @@ const ChallengeTradingPage = async ({ params, searchParams }: ChallengeTradingPa
           <ChallengeStatusMonitor 
             challengeId={challengeId} 
             initialStatus={challenge.status}
+            userId={session.user.id}
           />
         )}
         

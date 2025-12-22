@@ -244,7 +244,7 @@ export default function CompetitionsListSection() {
         <Trophy className="h-16 w-16 text-gray-600 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-gray-300 mb-2">No Competitions Yet</h3>
         <p className="text-gray-500 mb-6">Create your first trading competition to get started</p>
-        <Link href="/admin/competitions/create">
+        <Link href="/competitions/create">
           <Button className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-bold">
             Create Competition
           </Button>

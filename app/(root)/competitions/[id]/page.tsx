@@ -13,6 +13,8 @@ import LiveCountdown from '@/components/trading/LiveCountdown';
 import InlineCountdown from '@/components/trading/InlineCountdown';
 import { notFound } from 'next/navigation';
 import { unstable_noStore as noStore } from 'next/cache';
+import { auth } from '@/lib/better-auth/auth';
+import { headers } from 'next/headers';
 
 interface CompetitionDetailsPageProps {
   params: Promise<{ id: string }>;
@@ -23,6 +25,10 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
   noStore();
   
   const { id } = await params;
+
+  // Get session for user identification
+  const session = await auth.api.getSession({ headers: await headers() });
+  const userId = session?.user?.id || '';
 
   try {
     // Get competition data
@@ -70,7 +76,8 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
         {/* Auto-refresh when competition status changes */}
         <CompetitionStatusMonitor 
           competitionId={id} 
-          initialStatus={competition.status} 
+          initialStatus={competition.status}
+          userId={userId}
         />
         
         {/* Header with Back Button and UTC Clock */}

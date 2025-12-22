@@ -107,7 +107,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Revalidate admin pages
-    revalidatePath('/admin/dashboard');
+    revalidatePath('/dashboard');
 
     // Log audit action
     try {

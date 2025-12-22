@@ -214,7 +214,7 @@ export default function CompetitionEditorForm({ competitionId }: CompetitionEdit
       }
 
       toast.success('Competition updated successfully!');
-      router.push('/admin/dashboard?activeTab=competitions');
+      router.push('/dashboard?activeTab=competitions');
       router.refresh();
     } catch (error) {
       console.error('Error updating competition:', error);
@@ -244,7 +244,7 @@ export default function CompetitionEditorForm({ competitionId }: CompetitionEdit
           <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-100 mb-2">Competition Not Found</h2>
           <p className="text-gray-400 mb-6">The competition you're trying to edit doesn't exist.</p>
-          <Button onClick={() => router.push('/admin/dashboard?activeTab=competitions')}>
+          <Button onClick={() => router.push('/dashboard?activeTab=competitions')}>
             Back to Dashboard
           </Button>
         </div>
@@ -262,7 +262,7 @@ export default function CompetitionEditorForm({ competitionId }: CompetitionEdit
           <p className="text-gray-400 mb-6">
             This competition is active and has participants. It cannot be edited to maintain fairness.
           </p>
-          <Button onClick={() => router.push('/admin/dashboard?activeTab=competitions')}>
+          <Button onClick={() => router.push('/dashboard?activeTab=competitions')}>
             Back to Dashboard
           </Button>
         </div>
@@ -655,7 +655,7 @@ export default function CompetitionEditorForm({ competitionId }: CompetitionEdit
         <Button
           type="button"
           variant="outline"
-          onClick={() => router.push('/admin/dashboard?activeTab=competitions')}
+          onClick={() => router.push('/dashboard?activeTab=competitions')}
           className="flex-1 border-gray-600 text-gray-300"
         >
           Cancel

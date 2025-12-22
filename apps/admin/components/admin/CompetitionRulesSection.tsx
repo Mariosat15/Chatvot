@@ -192,14 +192,14 @@ export default function CompetitionRulesSection({ rules, onChange }: Competition
             <Label>Minimum Trades Required</Label>
             <Input
               type="number"
-              min="0"
+              min="1"
               value={rules.minimumTrades}
-              onChange={(e) => updateRules('minimumTrades', parseInt(e.target.value) || 0)}
+              onChange={(e) => updateRules('minimumTrades', Math.max(1, parseInt(e.target.value) || 1))}
               className="bg-dark-800 border-dark-600 mt-2"
-              placeholder="0 = No minimum"
+              placeholder="Minimum 1 trade required"
             />
             <p className="text-xs text-dark-300 mt-1">
-              Participants must complete at least this many trades to qualify for prizes
+              Participants must complete at least this many trades to qualify for prizes (minimum 1)
             </p>
           </div>
 

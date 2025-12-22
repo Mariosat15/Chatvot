@@ -171,6 +171,51 @@ export const createCompetition = async (competitionData: {
 
     await connectToDatabase();
 
+    // ⏰ CHECK MARKET STATUS - Block creation when market is closed
+    try {
+      const MASSIVE_API_KEY = process.env.MASSIVE_API_KEY;
+      if (MASSIVE_API_KEY) {
+        const statusRes = await fetch(
+          `https://api.massive.com/v1/marketstatus/now?apiKey=${encodeURIComponent(MASSIVE_API_KEY)}`,
+          { headers: { 'Accept': 'application/json' } }
+        );
+        
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          const fxStatus = statusData?.currencies?.fx || 'unknown';
+          const isOpen = fxStatus.toLowerCase() === 'open';
+          
+          if (!isOpen) {
+            throw new Error(`Cannot create competition: Forex market is currently ${fxStatus}. Please wait until market opens (Sunday 10pm - Friday 10pm UTC).`);
+          }
+        }
+      } else {
+        // Fallback: time-based check
+        const now = new Date();
+        const utcDay = now.getUTCDay();
+        const utcHour = now.getUTCHours();
+        const isClosed = utcDay === 6 || (utcDay === 0 && utcHour < 22) || (utcDay === 5 && utcHour >= 22);
+        
+        if (isClosed) {
+          throw new Error('Cannot create competition: Forex market is currently closed (Weekend). Please wait until market opens (Sunday 10pm UTC).');
+        }
+      }
+    } catch (marketError) {
+      if (marketError instanceof Error && marketError.message.includes('Cannot create competition')) {
+        throw marketError; // Re-throw our custom error
+      }
+      console.warn('⚠️ Market status check failed:', marketError);
+      // Use fallback time-based check
+      const now = new Date();
+      const utcDay = now.getUTCDay();
+      const utcHour = now.getUTCHours();
+      const isClosed = utcDay === 6 || (utcDay === 0 && utcHour < 22) || (utcDay === 5 && utcHour >= 22);
+      
+      if (isClosed) {
+        throw new Error('Cannot create competition: Forex market is currently closed (Weekend). Please wait until market opens (Sunday 10pm UTC).');
+      }
+    }
+
     // Validate prize distribution totals 100%
     const totalPrizePercentage = competitionData.prizeDistribution.reduce(
       (sum, prize) => sum + prize.percentage,
@@ -179,6 +224,40 @@ export const createCompetition = async (competitionData: {
 
     if (Math.abs(totalPrizePercentage - 100) > 0.01) {
       throw new Error('Prize distribution must total 100%');
+    }
+
+    // ⏰ CHECK MARKET HOLIDAYS - Warn if competition overlaps with market closures
+    try {
+      const startDate = new Date(competitionData.startTime);
+      const endDate = new Date(competitionData.endTime);
+      
+      // Fetch upcoming holidays from Massive.com API
+      const MASSIVE_API_KEY = process.env.MASSIVE_API_KEY;
+      if (MASSIVE_API_KEY) {
+        const holidaysRes = await fetch(
+          `https://api.massive.com/v1/marketstatus/upcoming?apiKey=${encodeURIComponent(MASSIVE_API_KEY)}`,
+          { headers: { 'Accept': 'application/json' } }
+        );
+        
+        if (holidaysRes.ok) {
+          const holidaysData = await holidaysRes.json();
+          const holidays = holidaysData?.response || [];
+          
+          // Check for forex market closures during competition period
+          for (const holiday of holidays) {
+            if (holiday.status === 'closed') {
+              const holidayDate = new Date(holiday.date);
+              if (holidayDate >= startDate && holidayDate <= endDate) {
+                console.warn(`⚠️ Competition "${competitionData.name}" overlaps with market holiday: ${holiday.name} on ${holiday.date}`);
+                // Note: We warn but don't block - admin can decide to proceed
+              }
+            }
+          }
+        }
+      }
+    } catch (holidayError) {
+      console.warn('⚠️ Could not check market holidays:', holidayError);
+      // Non-blocking - continue with competition creation
     }
 
     // Validate dates
@@ -261,7 +340,7 @@ export const createCompetition = async (competitionData: {
     });
 
     revalidatePath('/competitions');
-    revalidatePath('/admin/competitions');
+    revalidatePath('/competitions');
 
     console.log(`✅ Competition created: ${competition.name} (ID: ${competition._id})`);
 

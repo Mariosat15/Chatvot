@@ -34,7 +34,7 @@ export default function AdminDashboard({
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
       toast.success('Logged out successfully');
-      router.push('/admin/login');
+      router.push('/login');
     } catch (error) {
       toast.error('Logout failed');
     }
@@ -62,7 +62,7 @@ export default function AdminDashboard({
 
             {/* Actions */}
             <div className="flex items-center gap-3">
-              <Link href="/admin/competitions/create">
+              <Link href="/competitions/create">
                 <Button
                   variant="outline"
                   className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 border-0 font-bold shadow-lg shadow-yellow-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/70"
@@ -146,7 +146,7 @@ export default function AdminDashboard({
                           </p>
                         </div>
                       </div>
-                      <Link href="/admin/competitions/create">
+                      <Link href="/competitions/create">
                         <Button className="bg-white hover:bg-gray-100 text-orange-600 font-bold shadow-xl h-12 px-6 transition-all hover:scale-105">
                           <Plus className="h-5 w-5 mr-2" />
                           Create New Competition

@@ -144,6 +144,36 @@ export async function POST(request: NextRequest) {
 
     // Skip most validation in simulator mode
     const isInSimulatorMode = (isSimulatorMode || simulatorUserId) && isDev;
+
+    // ⏰ CHECK MARKET STATUS - Challenges require open market
+    // Skip check in simulator mode for testing
+    if (!isInSimulatorMode) {
+      try {
+        const { isForexMarketOpen } = await import('@/lib/services/real-forex-prices.service');
+        const marketOpen = await isForexMarketOpen();
+        
+        if (!marketOpen) {
+          return errorResponse(
+            'Cannot create challenge: Forex market is currently closed. Challenges can only be created during market hours (Sunday 10pm - Friday 10pm UTC).',
+            400
+          );
+        }
+      } catch (marketError) {
+        console.warn('⚠️ Market status check failed, using fallback:', marketError);
+        // Fallback: time-based check
+        const now = new Date();
+        const utcDay = now.getUTCDay();
+        const utcHour = now.getUTCHours();
+        const isClosed = utcDay === 6 || (utcDay === 0 && utcHour < 22) || (utcDay === 5 && utcHour >= 22);
+        
+        if (isClosed) {
+          return errorResponse(
+            'Cannot create challenge: Forex market is currently closed (Weekend). Challenges can only be created during market hours.',
+            400
+          );
+        }
+      }
+    }
     
     // Variables to store fetched user data (reused later)
     let challengerUser: Awaited<ReturnType<typeof getUserById>> | null = null;

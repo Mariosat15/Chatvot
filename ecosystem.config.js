@@ -86,6 +86,29 @@ module.exports = {
       // Graceful shutdown
       kill_timeout: 10000,
     },
+
+    // ============================================
+    // API SERVER (Bcrypt Worker Threads)
+    // Handles CPU-intensive auth operations
+    // ============================================
+    {
+      name: 'chartvolt-api',
+      script: 'dist/index.js',
+      cwd: __dirname + '/api-server',
+      env: {
+        NODE_ENV: 'production',
+        API_PORT: 4000,
+      },
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '512M',
+      error_file: './logs/api-error.log',
+      out_file: './logs/api-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      kill_timeout: 5000,
+    },
   ],
 
   // ============================================

@@ -112,7 +112,8 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
         {/* Auto-refresh when challenge status changes */}
         <ChallengeStatusMonitor 
           challengeId={id} 
-          initialStatus={challenge.status} 
+          initialStatus={challenge.status}
+          userId={session.user.id}
         />
 
         {/* Header with Back Button and UTC Clock */}
