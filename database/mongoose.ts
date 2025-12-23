@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI;
+// NOTE: Don't capture MONGODB_URI at module load time!
+// It must be read at runtime because the worker loads .env after imports are resolved.
+// See: worker/index.ts dotenv.config() runs after all imports are hoisted.
 
 declare global {
     var mongooseCache: {
@@ -85,21 +87,25 @@ function enableQueryProfiling() {
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
-async function connectWithRetry(retries = MAX_RETRIES): Promise<typeof mongoose> {
+async function connectWithRetry(uri: string, retries = MAX_RETRIES): Promise<typeof mongoose> {
     try {
-        return await mongoose.connect(MONGODB_URI!, connectionOptions);
+        return await mongoose.connect(uri, connectionOptions);
     } catch (err) {
         if (retries > 0) {
             console.warn(`⚠️ MongoDB connection failed, retrying in ${RETRY_DELAY_MS}ms... (${retries} retries left)`);
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-            return connectWithRetry(retries - 1);
+            return connectWithRetry(uri, retries - 1);
         }
         throw err;
     }
 }
 
 export const connectToDatabase = async () => {
-    if(!MONGODB_URI) throw new Error('MONGODB_URI must be set within .env');
+    // Read MONGODB_URI at RUNTIME, not module load time!
+    // This is critical for the worker which loads dotenv after imports are resolved.
+    const mongoUri = process.env.MONGODB_URI;
+    
+    if(!mongoUri) throw new Error('MONGODB_URI must be set within .env');
 
     if(cached.conn) return cached.conn;
 
@@ -109,7 +115,7 @@ export const connectToDatabase = async () => {
             enableQueryProfiling();
         }
         
-        cached.promise = connectWithRetry();
+        cached.promise = connectWithRetry(mongoUri);
     }
 
     try {
