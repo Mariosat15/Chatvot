@@ -11,9 +11,7 @@
  */
 
 import { connectToDatabase } from '../config/database';
-
-// Import models directly
-import Challenge from '../../database/models/trading/challenge.model';
+import mongoose from 'mongoose';
 
 export interface ChallengeFinalizeResult {
   checkedChallenges: number;
@@ -31,12 +29,21 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
   try {
     await connectToDatabase();
 
+    // IMPORTANT: Use mongoose.connection.db directly to avoid model instance issues
+    // When bundled, imported models may use a different mongoose instance
+    const db = mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database not connected');
+    }
+    
+    const challengesCollection = db.collection('challenges');
+
     // Find all active challenges that should have ended
     const now = new Date();
-    const expiredChallenges = await Challenge.find({
+    const expiredChallenges = await challengesCollection.find({
       status: 'active',
       endTime: { $lte: now },
-    });
+    }).toArray();
 
     result.checkedChallenges = expiredChallenges.length;
 

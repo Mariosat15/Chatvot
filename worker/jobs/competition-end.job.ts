@@ -11,9 +11,7 @@
  */
 
 import { connectToDatabase } from '../config/database';
-
-// Import models directly
-import Competition from '../../database/models/trading/competition.model';
+import mongoose from 'mongoose';
 
 export interface CompetitionEndResult {
   checkedCompetitions: number;
@@ -31,11 +29,20 @@ export async function runCompetitionEndCheck(): Promise<CompetitionEndResult> {
   try {
     await connectToDatabase();
 
+    // IMPORTANT: Use mongoose.connection.db directly to avoid model instance issues
+    // When bundled, imported models may use a different mongoose instance
+    const db = mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database not connected');
+    }
+    
+    const competitionsCollection = db.collection('competitions');
+
     // Find all active competitions that should have ended
     const now = new Date();
     
     // Debug: Check what competitions exist
-    const allActiveCompetitions = await Competition.find({ status: 'active' }).select('_id name status endTime');
+    const allActiveCompetitions = await competitionsCollection.find({ status: 'active' }).toArray();
     if (allActiveCompetitions.length > 0) {
       console.log(`   📊 Found ${allActiveCompetitions.length} active competition(s):`);
       allActiveCompetitions.forEach(c => {
@@ -46,10 +53,10 @@ export async function runCompetitionEndCheck(): Promise<CompetitionEndResult> {
       });
     }
     
-    const expiredCompetitions = await Competition.find({
+    const expiredCompetitions = await competitionsCollection.find({
       status: 'active',
       endTime: { $lte: now },
-    });
+    }).toArray();
 
     result.checkedCompetitions = expiredCompetitions.length;
 
