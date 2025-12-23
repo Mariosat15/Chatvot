@@ -50,6 +50,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3001,
+        IS_ADMIN: 'true',   // Prevents WebSocket connection - admin reads via API
         MAIN_APP_URL: 'http://localhost:3000',
       },
       instances: 1,
@@ -72,6 +73,7 @@ module.exports = {
       cwd: __dirname,
       env: {
         NODE_ENV: 'production',
+        IS_WORKER: 'true',  // CRITICAL: Prevents WebSocket connection - worker reads from MongoDB cache
       },
       instances: 1, // Only 1 worker needed
       exec_mode: 'fork',
