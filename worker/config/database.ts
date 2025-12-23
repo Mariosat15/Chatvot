@@ -30,9 +30,9 @@ export async function connectToDatabase(): Promise<void> {
   }
 
   try {
-    await mongoose.connect(MONGODB_URI, {
-      dbName: 'chartvolt', // Ensure same database as main app
-    });
+    // Don't override dbName - use whatever is in the connection string
+    // The URI already specifies the database (e.g., .../chatvolt?...)
+    await mongoose.connect(MONGODB_URI);
     
     isConnected = true;
     console.log('✅ Worker connected to MongoDB');
