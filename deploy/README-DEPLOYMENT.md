@@ -138,18 +138,26 @@ npm run build:all
 ### Step 4: Configure Nginx
 
 ```bash
-# Copy nginx config
+# STEP 1: Add rate limiting to main nginx.conf
+sudo nano /etc/nginx/nginx.conf
+
+# Add these lines inside the http {} block (before any server blocks):
+# limit_req_zone $binary_remote_addr zone=admin_limit:10m rate=1r/s;
+# limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+# limit_req_status 429;
+
+# STEP 2: Copy site config
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
 
-# Edit domain names in the config
+# STEP 3: Edit domain names in the config
 sudo nano /etc/nginx/sites-available/chartvolt
 # Replace chartvolt.com with your domain
 
-# Enable the site
+# STEP 4: Enable the site
 sudo ln -sf /etc/nginx/sites-available/chartvolt /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 
-# Test and reload
+# STEP 5: Test and reload
 sudo nginx -t
 sudo systemctl reload nginx
 ```

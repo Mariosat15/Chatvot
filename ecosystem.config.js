@@ -93,8 +93,8 @@ module.exports = {
     // ============================================
     {
       name: 'chartvolt-api',
-      script: 'dist/index.js',
-      cwd: __dirname + '/api-server',
+      script: 'api-server/dist/index.js',
+      cwd: __dirname,
       env: {
         NODE_ENV: 'production',
         API_PORT: 4000,
@@ -125,10 +125,14 @@ module.exports = {
       
       // Commands to run after pulling code
       'post-deploy': `
-        npm install &&
-        npm run build &&
-        npm run worker:build &&
         mkdir -p logs &&
+        npm install &&
+        cd apps/admin && npm install && cd ../.. &&
+        cd api-server && npm install && cd .. &&
+        npm run build &&
+        npm run build:admin &&
+        npm run build:api &&
+        npm run worker:build &&
         pm2 reload ecosystem.config.js --env production
       `.trim().replace(/\s+/g, ' '),
       

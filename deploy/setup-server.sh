@@ -44,10 +44,12 @@ apt install -y certbot python3-certbot-nginx
 # Create app directory
 echo "📁 Creating app directory..."
 mkdir -p /var/www/chartvolt
-chown -R $USER:$USER /var/www/chartvolt
-
-# Create logs directory
 mkdir -p /var/www/chartvolt/logs
+
+# Set ownership (use SUDO_USER if running with sudo, otherwise current user)
+DEPLOY_USER="${SUDO_USER:-$USER}"
+echo "📁 Setting ownership to user: $DEPLOY_USER"
+chown -R $DEPLOY_USER:$DEPLOY_USER /var/www/chartvolt
 
 # Configure firewall
 echo "🔒 Configuring firewall..."

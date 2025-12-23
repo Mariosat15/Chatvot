@@ -86,15 +86,28 @@ deploy_to_server() {
     echo "📥 Pulling latest code..."
     git pull origin main
     
-    echo "📦 Installing dependencies..."
+    echo "📁 Ensuring logs directory exists..."
+    mkdir -p logs
+    
+    echo "📦 Installing main app dependencies..."
     npm install
+    
+    echo "📦 Installing admin dependencies..."
     cd apps/admin && npm install && cd ../..
+    
+    echo "📦 Installing API server dependencies..."
     cd api-server && npm install && cd ..
     
-    echo "🔨 Building apps..."
+    echo "🔨 Building main app..."
     npm run build
-    npm run build:api
+    
+    echo "🔨 Building admin app..."
     npm run build:admin
+    
+    echo "🔨 Building API server..."
+    npm run build:api
+    
+    echo "🔨 Building worker..."
     npm run worker:build
     
     echo "🔄 Reloading PM2..."
