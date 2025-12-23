@@ -273,8 +273,8 @@ async function startWorker(): Promise<void> {
 
     // Schedule recurring jobs (replaces ALL Inngest functions)
     await agenda.every('5 minutes', 'margin-check');
-    await agenda.every('1 minute', 'competition-end');
-    await agenda.every('1 minute', 'challenge-finalize');
+    await agenda.every('1 minute', 'competition-end');  // BACKUP - client-side auto-finalizes on access
+    await agenda.every('1 minute', 'challenge-finalize');  // BACKUP - client-side auto-finalizes on access
     await agenda.every('1 minute', 'trade-queue');  // BACKUP sweep - real-time happens in main app
     await agenda.every('1 minute', 'price-cache');
     await agenda.every('1 hour', 'evaluate-badges');
@@ -284,8 +284,8 @@ async function startWorker(): Promise<void> {
 
     console.log('\n📅 Scheduled Jobs:');
     console.log('   • margin-check: every 5 minutes');
-    console.log('   • competition-end: every 1 minute');
-    console.log('   • challenge-finalize: every 1 minute');
+    console.log('   • competition-end: every 1 minute (backup - client auto-finalizes on access)');
+    console.log('   • challenge-finalize: every 1 minute (backup - client auto-finalizes on access)');
     console.log('   • trade-queue: every 1 minute (backup TP/SL sweep & limit orders)');
     console.log('   • price-cache: every 1 minute');
     console.log('   • evaluate-badges: every 1 hour');

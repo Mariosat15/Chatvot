@@ -116,6 +116,24 @@ export const getCompetitionById = async (competitionId: string) => {
           console.error('Error cancelling active competition:', cancelError);
         }
       }
+      
+      // AUTO-FINALIZE: If competition is active but end time has passed, finalize it immediately
+      // This provides instant finalization when user accesses the page - no waiting for worker
+      const endTime = new Date(competition.endTime);
+      if (endTime <= now) {
+        console.log(`🏁 AUTO-FINALIZING "${competition.name}" on access - end time passed`);
+        
+        try {
+          const { finalizeCompetition } = await import('@/lib/actions/trading/competition-end.actions');
+          await finalizeCompetition(competitionId);
+          
+          // Refresh the competition data
+          competition = await Competition.findById(competitionId).lean() as any;
+          console.log(`✅ Competition "${competition.name}" auto-finalized successfully`);
+        } catch (finalizeError) {
+          console.error('Error auto-finalizing competition:', finalizeError);
+        }
+      }
     }
 
     return JSON.parse(JSON.stringify({ ...competition, participantCount }));
