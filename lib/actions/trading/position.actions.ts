@@ -384,22 +384,22 @@ export const closePosition = async (
       position.tradeHistoryId = tradeHistory[0]._id.toString();
       await position.save({ session: mongoSession });
 
+      // Check if this is a simulator position (skip participant updates for simulator)
+      const isSimulatorPosition = position.metadata?.simulatorMode === true;
+      
       // Detect contest type and get participant
       const contestInfo = await getParticipant(position.competitionId, position.userId);
       const contestType: ContestType = contestInfo?.type || 'competition';
       const ParticipantModel = contestType === 'competition' ? CompetitionParticipant : ChallengeParticipant;
       
-      // Update participant
-      const participant = await ParticipantModel.findById(position.participantId).session(
-        mongoSession
-      );
-      if (!participant) throw new Error('Participant not found');
-
-      const newCapital = participant.currentCapital + realizedPnl;
-      const newAvailableCapital = participant.availableCapital + position.marginUsed + realizedPnl;
-      const newRealizedPnl = participant.realizedPnl + realizedPnl;
-      const newPnl = participant.pnl + realizedPnl;
-      const newPnlPercentage = ((newCapital - participant.startingCapital) / participant.startingCapital) * 100;
+      // Update participant (skip for simulator positions - they have fake participantIds)
+      const participant = isSimulatorPosition 
+        ? null 
+        : await ParticipantModel.findById(position.participantId).session(mongoSession);
+      
+      if (!participant && !isSimulatorPosition) {
+        throw new Error('Participant not found');
+      }
 
       // 📝 Log price snapshot for trade validation/auditing (NON-BLOCKING)
       const expectedExitPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
@@ -442,48 +442,60 @@ export const closePosition = async (
       console.log(`   Realized P&L: ${realizedPnl >= 0 ? '+' : ''}$${realizedPnl.toFixed(2)} (${realizedPnlPercentage.toFixed(2)}%)`);
       console.log(`   Note: P&L already includes spread costs (you bought at ASK, sold at BID)`);
       console.log(`   Margin Released: $${position.marginUsed.toFixed(2)}`);
-      console.log(`   Previous Available Capital: $${participant.availableCapital.toFixed(2)}`);
-      console.log(`   New Available Capital: $${newAvailableCapital.toFixed(2)} (${realizedPnl >= 0 ? 'PROFIT ADDED ✅' : 'LOSS DEDUCTED ❌'})`);
+      
+      // Only update participant stats for real positions (not simulator)
+      if (participant && !isSimulatorPosition) {
+        const newCapital = participant.currentCapital + realizedPnl;
+        const newAvailableCapital = participant.availableCapital + position.marginUsed + realizedPnl;
+        const newRealizedPnl = participant.realizedPnl + realizedPnl;
+        const newPnl = participant.pnl + realizedPnl;
+        const newPnlPercentage = ((newCapital - participant.startingCapital) / participant.startingCapital) * 100;
 
-      const isWinner = realizedPnl > 0;
-      const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
-      const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
-      const totalTrades = participant.totalTrades + 1; // INCREMENT total trades!
-      const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+        console.log(`   Previous Available Capital: $${participant.availableCapital.toFixed(2)}`);
+        console.log(`   New Available Capital: $${newAvailableCapital.toFixed(2)} (${realizedPnl >= 0 ? 'PROFIT ADDED ✅' : 'LOSS DEDUCTED ❌'})`);
 
-      // Update averages
-      const averageWin = winningTrades > 0
-        ? (participant.averageWin * participant.winningTrades + (isWinner ? realizedPnl : 0)) / winningTrades
-        : 0;
-      const averageLoss = losingTrades > 0
-        ? (participant.averageLoss * participant.losingTrades + (!isWinner ? Math.abs(realizedPnl) : 0)) / losingTrades
-        : 0;
+        const isWinner = realizedPnl > 0;
+        const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
+        const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
+        const totalTrades = participant.totalTrades + 1; // INCREMENT total trades!
+        const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
 
-      await ParticipantModel.findByIdAndUpdate(
-        participant._id,
-        {
-          $inc: {
-            currentOpenPositions: -1,
-            totalTrades: 1, // INCREMENT total trades!
-            winningTrades: isWinner ? 1 : 0,
-            losingTrades: isWinner ? 0 : 1,
+        // Update averages
+        const averageWin = winningTrades > 0
+          ? (participant.averageWin * participant.winningTrades + (isWinner ? realizedPnl : 0)) / winningTrades
+          : 0;
+        const averageLoss = losingTrades > 0
+          ? (participant.averageLoss * participant.losingTrades + (!isWinner ? Math.abs(realizedPnl) : 0)) / losingTrades
+          : 0;
+
+        await ParticipantModel.findByIdAndUpdate(
+          participant._id,
+          {
+            $inc: {
+              currentOpenPositions: -1,
+              totalTrades: 1, // INCREMENT total trades!
+              winningTrades: isWinner ? 1 : 0,
+              losingTrades: isWinner ? 0 : 1,
+            },
+            $set: {
+              currentCapital: newCapital,
+              availableCapital: newAvailableCapital,
+              usedMargin: participant.usedMargin - position.marginUsed,
+              realizedPnl: newRealizedPnl,
+              pnl: newPnl,
+              pnlPercentage: newPnlPercentage,
+              winRate: winRate,
+              averageWin: averageWin,
+              averageLoss: averageLoss,
+              largestWin: Math.max(participant.largestWin, realizedPnl),
+              largestLoss: Math.min(participant.largestLoss, realizedPnl),
+            },
           },
-          $set: {
-            currentCapital: newCapital,
-            availableCapital: newAvailableCapital,
-            usedMargin: participant.usedMargin - position.marginUsed,
-            realizedPnl: newRealizedPnl,
-            pnl: newPnl,
-            pnlPercentage: newPnlPercentage,
-            winRate: winRate,
-            averageWin: averageWin,
-            averageLoss: averageLoss,
-            largestWin: Math.max(participant.largestWin, realizedPnl),
-            largestLoss: Math.min(participant.largestLoss, realizedPnl),
-          },
-        },
-        { session: mongoSession }
-      );
+          { session: mongoSession }
+        );
+      } else if (isSimulatorPosition) {
+        console.log(`   🧪 Simulator position - skipping participant update`);
+      }
 
       await mongoSession.commitTransaction();
       mongoSession.endSession(); // End session immediately after commit
@@ -866,69 +878,80 @@ export async function closePositionAutomatic(
     position.tradeHistoryId = tradeHistory[0]._id.toString();
     await position.save({ session: mongoSession });
 
+    // Check if this is a simulator position (skip participant updates for simulator)
+    const isSimulatorPositionSLTP = position.metadata?.simulatorMode === true;
+    
     // Detect contest type and use correct participant model
     const contestInfoForSLTP = await getParticipant(position.competitionId, position.userId);
     const contestTypeForSLTP: ContestType = contestInfoForSLTP?.type || 'competition';
     const ParticipantModelForSLTP = contestTypeForSLTP === 'competition' ? CompetitionParticipant : ChallengeParticipant;
     
-    // Update participant
-    const participant = await ParticipantModelForSLTP.findById(position.participantId).session(
-      mongoSession
-    );
-    if (!participant) throw new Error('Participant not found');
+    // Update participant (skip for simulator positions - they have fake participantIds)
+    const participant = isSimulatorPositionSLTP 
+      ? null 
+      : await ParticipantModelForSLTP.findById(position.participantId).session(mongoSession);
+    
+    if (!participant && !isSimulatorPositionSLTP) {
+      throw new Error('Participant not found');
+    }
 
-    const newCapital = participant.currentCapital + realizedPnl;
-    const newAvailableCapital = participant.availableCapital + position.marginUsed + realizedPnl;
-    const newRealizedPnl = participant.realizedPnl + realizedPnl;
-    const newPnl = participant.pnl + realizedPnl;
-    const newPnlPercentage =
-      ((newCapital - participant.startingCapital) / participant.startingCapital) * 100;
+    // Only update participant stats for real positions (not simulator)
+    if (participant && !isSimulatorPositionSLTP) {
+      const newCapital = participant.currentCapital + realizedPnl;
+      const newAvailableCapital = participant.availableCapital + position.marginUsed + realizedPnl;
+      const newRealizedPnl = participant.realizedPnl + realizedPnl;
+      const newPnl = participant.pnl + realizedPnl;
+      const newPnlPercentage =
+        ((newCapital - participant.startingCapital) / participant.startingCapital) * 100;
 
-    const isWinner = realizedPnl > 0;
-    const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
-    const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
-    const totalTrades = participant.totalTrades + 1; // INCREMENT total trades!
-    const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+      const isWinner = realizedPnl > 0;
+      const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
+      const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
+      const totalTrades = participant.totalTrades + 1; // INCREMENT total trades!
+      const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
 
-    const averageWin =
-      winningTrades > 0
-        ? (participant.averageWin * participant.winningTrades + (isWinner ? realizedPnl : 0)) / winningTrades
-        : 0;
-    const averageLoss =
-      losingTrades > 0
-        ? (participant.averageLoss * participant.losingTrades + (!isWinner ? Math.abs(realizedPnl) : 0)) /
-          losingTrades
-        : 0;
+      const averageWin =
+        winningTrades > 0
+          ? (participant.averageWin * participant.winningTrades + (isWinner ? realizedPnl : 0)) / winningTrades
+          : 0;
+      const averageLoss =
+        losingTrades > 0
+          ? (participant.averageLoss * participant.losingTrades + (!isWinner ? Math.abs(realizedPnl) : 0)) /
+            losingTrades
+          : 0;
 
-    await ParticipantModelForSLTP.findByIdAndUpdate(
-      participant._id,
-      {
-        $inc: {
-          currentOpenPositions: -1,
-          totalTrades: 1, // INCREMENT total trades!
-          winningTrades: isWinner ? 1 : 0,
-          losingTrades: isWinner ? 0 : 1,
-          marginCallWarnings: closeReason === 'margin_call' ? 1 : 0,
+      await ParticipantModelForSLTP.findByIdAndUpdate(
+        participant._id,
+        {
+          $inc: {
+            currentOpenPositions: -1,
+            totalTrades: 1, // INCREMENT total trades!
+            winningTrades: isWinner ? 1 : 0,
+            losingTrades: isWinner ? 0 : 1,
+            marginCallWarnings: closeReason === 'margin_call' ? 1 : 0,
+          },
+          $set: {
+            currentCapital: newCapital,
+            availableCapital: newAvailableCapital,
+            usedMargin: participant.usedMargin - position.marginUsed,
+            realizedPnl: newRealizedPnl,
+            pnl: newPnl,
+            pnlPercentage: newPnlPercentage,
+            winRate: winRate,
+            averageWin: averageWin,
+            averageLoss: averageLoss,
+            largestWin: Math.max(participant.largestWin, realizedPnl),
+            largestLoss: Math.min(participant.largestLoss, realizedPnl),
+            status: closeReason === 'margin_call' && newCapital <= 0 ? 'liquidated' : participant.status,
+            liquidationReason: closeReason === 'margin_call' && newCapital <= 0 ? 'Margin call' : undefined,
+            lastMarginCallAt: closeReason === 'margin_call' ? new Date() : participant.lastMarginCallAt,
+          },
         },
-        $set: {
-          currentCapital: newCapital,
-          availableCapital: newAvailableCapital,
-          usedMargin: participant.usedMargin - position.marginUsed,
-          realizedPnl: newRealizedPnl,
-          pnl: newPnl,
-          pnlPercentage: newPnlPercentage,
-          winRate: winRate,
-          averageWin: averageWin,
-          averageLoss: averageLoss,
-          largestWin: Math.max(participant.largestWin, realizedPnl),
-          largestLoss: Math.min(participant.largestLoss, realizedPnl),
-          status: closeReason === 'margin_call' && newCapital <= 0 ? 'liquidated' : participant.status,
-          liquidationReason: closeReason === 'margin_call' && newCapital <= 0 ? 'Margin call' : undefined,
-          lastMarginCallAt: closeReason === 'margin_call' ? new Date() : participant.lastMarginCallAt,
-        },
-      },
-      { session: mongoSession }
-    );
+        { session: mongoSession }
+      );
+    } else if (isSimulatorPositionSLTP) {
+      console.log(`   🧪 Simulator position - skipping participant update (TP/SL close)`);
+    }
 
     await mongoSession.commitTransaction();
     
