@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getAdminSession } from '@/lib/admin/auth';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -163,11 +164,8 @@ export const createCompetition = async (competitionData: {
   };
 }) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
-
-    // TODO: Add admin check here
-    // if (!session.user.isAdmin) throw new Error('Unauthorized');
+    const admin = await getAdminSession();
+    if (!admin) redirect('/sign-in');
 
     await connectToDatabase();
 
@@ -336,7 +334,7 @@ export const createCompetition = async (competitionData: {
         equityCheckEnabled: false,
         enabled: false,
       },
-      createdBy: session.user.id,
+      createdBy: admin.id,
     });
 
     revalidatePath('/competitions');
