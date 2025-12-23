@@ -7,13 +7,29 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { Zap, Loader2, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
+import { Zap, Loader2, CheckCircle2, XCircle, ArrowRight, CreditCard, Globe } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 
 interface DepositModalProps {
   children: React.ReactNode;
 }
+
+interface PaymentProviders {
+  stripe: {
+    available: boolean;
+    publishableKey: string;
+    testMode: boolean;
+  };
+  paddle: {
+    available: boolean;
+    clientToken: string | null;
+    environment: 'sandbox' | 'production';
+    vendorId: string | null;
+  };
+}
+
+type PaymentProvider = 'stripe' | 'paddle';
 
 export default function DepositModal({ children }: DepositModalProps) {
   const { settings, eurToCredits } = useAppSettings();
@@ -25,9 +41,14 @@ export default function DepositModal({ children }: DepositModalProps) {
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [paymentConfigured, setPaymentConfigured] = useState<boolean | null>(null);
   const [checkingConfig, setCheckingConfig] = useState(true);
-  const [processingFee, setProcessingFee] = useState(0); // Percentage
+  const [processingFee, setProcessingFee] = useState(0);
   const [vatEnabled, setVatEnabled] = useState(false);
   const [vatPercentage, setVatPercentage] = useState(0);
+  
+  // Multi-provider support
+  const [providers, setProviders] = useState<PaymentProviders | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<PaymentProvider>('stripe');
+  const [step, setStep] = useState<'amount' | 'provider' | 'payment'>('amount');
 
   const minDeposit = (settings as { transactions?: { minimumDeposit?: number } })?.transactions?.minimumDeposit || 10;
 
@@ -37,20 +58,20 @@ export default function DepositModal({ children }: DepositModalProps) {
     return amountEur * (vatPercentage / 100);
   };
 
-  // Calculate platform fee on the EUR amount (charged to card, not deducted from credits)
+  // Calculate platform fee on the EUR amount
   const calculatePlatformFee = (amountEur: number) => {
     if (processingFee <= 0) return 0;
     return amountEur * (processingFee / 100);
   };
 
-  // Calculate total payment (base + VAT + platform fee)
+  // Calculate total payment
   const calculateTotalPayment = (amountEur: number) => {
     const vat = calculateVAT(amountEur);
     const platformFee = calculatePlatformFee(amountEur);
     return amountEur + vat + platformFee;
   };
 
-  // Check if payment provider is configured on mount
+  // Check payment configuration on mount
   useEffect(() => {
     async function checkPaymentConfig() {
       try {
@@ -58,80 +79,140 @@ export default function DepositModal({ children }: DepositModalProps) {
         const config = await response.json();
         
         setPaymentConfigured(config.configured);
-        setProcessingFee(config.processingFee || 0); // Store fee percentage
+        setProcessingFee(config.processingFee || 0);
         setVatEnabled(config.vatEnabled || false);
         setVatPercentage(config.vatPercentage || 0);
+        setProviders(config.providers || null);
         
-        if (config.configured && config.publishableKey) {
-          // Initialize Stripe with database credentials
+        // Determine default provider
+        if (config.providers) {
+          if (config.providers.stripe?.available) {
+            setSelectedProvider('stripe');
+            const stripe = loadStripe(config.providers.stripe.publishableKey);
+            setStripePromise(stripe);
+          } else if (config.providers.paddle?.available) {
+            setSelectedProvider('paddle');
+          }
+        } else if (config.configured && config.publishableKey) {
+          // Fallback to legacy config
           const stripe = loadStripe(config.publishableKey);
           setStripePromise(stripe);
-        } else {
-          setStripePromise(Promise.resolve(null));
         }
       } catch (error) {
         console.error('Error checking payment configuration:', error);
         setPaymentConfigured(false);
-        setStripePromise(Promise.resolve(null));
       } finally {
         setCheckingConfig(false);
       }
     }
     
     if (open) {
+      setCheckingConfig(true);
       checkPaymentConfig();
     }
   }, [open]);
 
+  // Get available provider count
+  const getAvailableProviders = () => {
+    if (!providers) return [];
+    const available: PaymentProvider[] = [];
+    if (providers.stripe?.available) available.push('stripe');
+    if (providers.paddle?.available) available.push('paddle');
+    return available;
+  };
+
   const handleAmountSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    const amountNum = parseFloat(amount);
+    const currencySymbol = settings?.currency.symbol || '€';
+
+    if (isNaN(amountNum) || amountNum < minDeposit) {
+      setError(`Minimum is ${currencySymbol}${minDeposit}`);
+      return;
+    }
+
+    if (amountNum > 10000) {
+      setError(`Maximum is ${currencySymbol}10,000`);
+      return;
+    }
+
+    const availableProviders = getAvailableProviders();
+    
+    // If multiple providers available, show provider selection
+    if (availableProviders.length > 1) {
+      setStep('provider');
+    } else if (availableProviders.length === 1) {
+      // Single provider - proceed directly
+      setSelectedProvider(availableProviders[0]);
+      await proceedWithProvider(availableProviders[0]);
+    } else {
+      setError('No payment provider configured');
+    }
+  };
+
+  const proceedWithProvider = async (provider: PaymentProvider) => {
     setLoading(true);
+    setError('');
 
     try {
       const amountNum = parseFloat(amount);
-      const currencySymbol = settings?.currency.symbol || '€';
-
-      if (isNaN(amountNum) || amountNum < minDeposit) {
-        setError(`Minimum is ${currencySymbol}${minDeposit}`);
-        setLoading(false);
-        return;
-      }
-
-      if (amountNum > 10000) {
-        setError(`Maximum is ${currencySymbol}10,000`);
-        setLoading(false);
-        return;
-      }
-
-      // Calculate fees (all charged to card)
       const vatAmount = calculateVAT(amountNum);
       const platformFeeAmount = calculatePlatformFee(amountNum);
       const totalPayment = calculateTotalPayment(amountNum);
 
-      // Create payment intent with total including all fees
-      const response = await fetch('/api/stripe/create-payment-intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          amount: amountNum, // Base amount for credits (user receives full credits)
-          totalAmount: totalPayment, // Amount to charge (including VAT + platform fee)
-          vatAmount: vatAmount,
-          vatPercentage: vatEnabled ? vatPercentage : 0,
-          platformFeeAmount: platformFeeAmount,
-          platformFeePercentage: processingFee,
-        }),
-      });
+      if (provider === 'stripe') {
+        // Create Stripe payment intent
+        const response = await fetch('/api/stripe/create-payment-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            amount: amountNum,
+            totalAmount: totalPayment,
+            vatAmount,
+            vatPercentage: vatEnabled ? vatPercentage : 0,
+            platformFeeAmount,
+            platformFeePercentage: processingFee,
+          }),
+        });
 
-      if (!response.ok) {
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to create payment intent');
+        }
+
         const data = await response.json();
-        throw new Error(data.error || 'Failed to create payment intent');
-      }
+        setClientSecret(data.clientSecret);
+        setStep('payment');
+      } else if (provider === 'paddle') {
+        // Create Paddle checkout
+        const response = await fetch('/api/paddle/create-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            amount: amountNum,
+            currency: settings?.currency.code || 'EUR',
+          }),
+        });
 
-      const data = await response.json();
-      setClientSecret(data.clientSecret);
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to create Paddle checkout');
+        }
+
+        const data = await response.json();
+        
+        // Paddle redirects to hosted checkout
+        if (data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+        } else {
+          throw new Error('No checkout URL received from Paddle');
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
+      setStep('amount');
     } finally {
       setLoading(false);
     }
@@ -142,6 +223,34 @@ export default function DepositModal({ children }: DepositModalProps) {
     setClientSecret('');
     setError('');
     setLoading(false);
+    setStep('amount');
+  };
+
+  const renderProviderIcon = (provider: PaymentProvider) => {
+    switch (provider) {
+      case 'stripe':
+        return <CreditCard className="h-5 w-5" />;
+      case 'paddle':
+        return <Globe className="h-5 w-5" />;
+    }
+  };
+
+  const getProviderName = (provider: PaymentProvider) => {
+    switch (provider) {
+      case 'stripe':
+        return 'Credit/Debit Card';
+      case 'paddle':
+        return 'Paddle (Global)';
+    }
+  };
+
+  const getProviderDescription = (provider: PaymentProvider) => {
+    switch (provider) {
+      case 'stripe':
+        return 'Pay securely with your card';
+      case 'paddle':
+        return 'Multiple payment methods, taxes included';
+    }
   };
 
   return (
@@ -164,7 +273,27 @@ export default function DepositModal({ children }: DepositModalProps) {
           </DialogDescription>
         </DialogHeader>
 
-        {!clientSecret ? (
+        {checkingConfig ? (
+          <div className="py-8 text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-green-500" />
+            <p className="text-sm text-gray-400">Checking payment options...</p>
+          </div>
+        ) : !paymentConfigured ? (
+          <div className="py-8 text-center space-y-4">
+            <div className="mx-auto w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+              <XCircle className="h-8 w-8 text-red-500" />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-gray-100">Payment System Not Configured</h3>
+              <p className="text-sm text-gray-400 mt-2">
+                No payment provider is set up. Please contact the administrator.
+              </p>
+            </div>
+            <Button onClick={() => setOpen(false)} variant="outline" className="mt-4">
+              Close
+            </Button>
+          </div>
+        ) : step === 'amount' ? (
           // Step 1: Enter Amount
           <form onSubmit={handleAmountSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -189,17 +318,16 @@ export default function DepositModal({ children }: DepositModalProps) {
               <p className="text-xs text-gray-500">Minimum: {settings?.currency.symbol || '€'}{minDeposit} • Maximum: {settings?.currency.symbol || '€'}10,000</p>
             </div>
 
-            {/* Conversion Preview with Fee Breakdown */}
+            {/* Conversion Preview */}
             {amount && !isNaN(parseFloat(amount)) && settings && (() => {
               const amountNum = parseFloat(amount);
               const vatAmount = calculateVAT(amountNum);
               const platformFeeAmount = calculatePlatformFee(amountNum);
               const totalPayment = calculateTotalPayment(amountNum);
-              const creditsReceived = eurToCredits(amountNum); // Full credits, no deduction
+              const creditsReceived = eurToCredits(amountNum);
               
               return (
                 <div className="space-y-3">
-                  {/* Main Conversion */}
                   <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -214,14 +342,12 @@ export default function DepositModal({ children }: DepositModalProps) {
                       </div>
                     </div>
                     
-                    {/* Fee Breakdown - All fees charged to card */}
                     <div className="mt-3 pt-3 border-t border-yellow-500/20 space-y-1 text-sm">
                       <div className="flex justify-between text-gray-400">
                         <span>Credits Value:</span>
                         <span className="text-gray-300">{settings.currency.symbol}{amountNum.toFixed(2)}</span>
                       </div>
                       
-                      {/* VAT Line */}
                       {vatEnabled && vatAmount > 0 && (
                         <div className="flex justify-between text-gray-400">
                           <span>VAT ({vatPercentage}%):</span>
@@ -229,7 +355,6 @@ export default function DepositModal({ children }: DepositModalProps) {
                         </div>
                       )}
                       
-                      {/* Platform Fee Line */}
                       {processingFee > 0 && (
                         <div className="flex justify-between text-gray-400">
                           <span>Platform Fee ({processingFee}%):</span>
@@ -237,7 +362,6 @@ export default function DepositModal({ children }: DepositModalProps) {
                         </div>
                       )}
                       
-                      {/* Total Payment Line */}
                       {(vatEnabled || processingFee > 0) && (
                         <div className="flex justify-between font-semibold text-white pt-1 border-t border-yellow-500/20">
                           <span>Total to Pay:</span>
@@ -251,17 +375,6 @@ export default function DepositModal({ children }: DepositModalProps) {
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Info Messages */}
-                  {(vatEnabled || processingFee > 0) && (
-                    <div className="text-xs text-gray-500 flex items-start gap-2 bg-gray-800/50 rounded-lg p-3 border border-gray-700">
-                      <span className="text-yellow-500">ℹ️</span>
-                      <span>
-                        {vatEnabled && vatAmount > 0 && `VAT (${vatPercentage}%) applies to EU customers. `}
-                        {processingFee > 0 && `Platform fee (${processingFee}%) is charged to your card.`}
-                      </span>
-                    </div>
-                  )}
                 </div>
               );
             })()}
@@ -304,37 +417,81 @@ export default function DepositModal({ children }: DepositModalProps) {
               )}
             </Button>
           </form>
-        ) : checkingConfig ? (
-          // Checking configuration
-          <div className="py-8 text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-green-500" />
-            <p className="text-sm text-gray-400">Checking payment configuration...</p>
-          </div>
-        ) : !paymentConfigured || !stripePromise ? (
-          // Stripe not configured error
-          <div className="py-8 text-center space-y-4">
-            <div className="mx-auto w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
-              <XCircle className="h-8 w-8 text-red-500" />
+        ) : step === 'provider' ? (
+          // Step 2: Select Payment Provider
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <Label className="text-gray-300">Select Payment Method</Label>
+              
+              {getAvailableProviders().map((provider) => (
+                <button
+                  key={provider}
+                  type="button"
+                  onClick={() => {
+                    setSelectedProvider(provider);
+                    proceedWithProvider(provider);
+                  }}
+                  disabled={loading}
+                  className={`w-full p-4 rounded-lg border-2 transition-all ${
+                    selectedProvider === provider
+                      ? 'border-yellow-500 bg-yellow-500/10'
+                      : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                  } ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`p-2 rounded-lg ${
+                      selectedProvider === provider ? 'bg-yellow-500/20 text-yellow-500' : 'bg-gray-700 text-gray-400'
+                    }`}>
+                      {renderProviderIcon(provider)}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold text-gray-100">{getProviderName(provider)}</div>
+                      <div className="text-sm text-gray-400">{getProviderDescription(provider)}</div>
+                    </div>
+                    {loading && selectedProvider === provider && (
+                      <Loader2 className="h-5 w-5 animate-spin text-yellow-500" />
+                    )}
+                  </div>
+                </button>
+              ))}
             </div>
-            <div>
-              <h3 className="text-xl font-semibold text-gray-100">Payment System Not Configured</h3>
-              <p className="text-sm text-gray-400 mt-2">
-                Stripe payment system is not set up. Please contact the administrator.
-              </p>
-              <p className="text-xs text-gray-500 mt-2">
-                Admin: Configure Stripe in Admin Panel → Settings → Payment Providers
-              </p>
+
+            {/* Summary */}
+            <div className="rounded-lg bg-gray-800/50 border border-gray-700 p-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-400">Total to Pay</span>
+                <span className="text-lg font-bold text-white">
+                  {settings?.currency.symbol || '€'}{calculateTotalPayment(parseFloat(amount)).toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-sm text-gray-400">You Receive</span>
+                <span className="text-yellow-400 font-bold flex items-center gap-1">
+                  <Zap className="h-4 w-4" />
+                  {eurToCredits(parseFloat(amount)).toFixed(settings?.credits.decimals || 2)} {settings?.credits.symbol || 'Credits'}
+                </span>
+              </div>
             </div>
+
+            {error && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 flex items-start gap-2">
+                <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-red-400">{error}</p>
+              </div>
+            )}
+
             <Button
-              onClick={resetModal}
+              type="button"
               variant="outline"
-              className="mt-4"
+              onClick={() => setStep('amount')}
+              disabled={loading}
+              className="w-full bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-100"
             >
-              Close
+              Back
             </Button>
           </div>
-        ) : stripePromise ? (
-          // Step 2: Payment Form
+        ) : step === 'payment' && clientSecret && stripePromise ? (
+          // Step 3: Stripe Payment Form
           <Elements
             stripe={stripePromise}
             options={{
@@ -363,7 +520,7 @@ export default function DepositModal({ children }: DepositModalProps) {
                 setOpen(false);
                 resetModal();
               }}
-              onCancel={resetModal}
+              onCancel={() => setStep('provider')}
             />
           </Elements>
         ) : null}
@@ -403,7 +560,6 @@ function PaymentForm({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // User receives FULL credits (fees are charged to card, not deducted)
   const creditsReceived = eurToCredits(amount);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -512,7 +668,7 @@ function PaymentForm({
           disabled={loading}
           className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-100"
         >
-          Cancel
+          Back
         </Button>
         <Button
           type="submit"
@@ -536,4 +692,3 @@ function PaymentForm({
     </form>
   );
 }
-

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
+import mongoose from 'mongoose';
 import Competition from '@/database/models/trading/competition.model';
 import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
 import Challenge from '@/database/models/trading/challenge.model';
@@ -23,13 +24,16 @@ import Notification from '@/database/models/notification.model';
 import NotificationTemplate from '@/database/models/notification-template.model';
 import { UserPurchase } from '@/database/models/marketplace/user-purchase.model';
 import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
+import WithdrawalRequest from '@/database/models/withdrawal-request.model';
+import UserBankAccount from '@/database/models/user-bank-account.model';
+import ReconciliationLog from '@/database/models/reconciliation-log.model';
 import { resetBadgeAndXPConfigs } from '@/lib/services/badge-config-seed.service';
 import { auditLogService } from '@/lib/services/audit-log.service';
 import { getAdminSession } from '@/lib/admin/auth';
 
 /**
  * ⚠️ DANGER: Reset ALL trading data
- * This will DELETE everything except user accounts:
+ * This will DELETE everything except user accounts and settings:
  * - All competitions and competition participants
  * - All 1v1 challenges and challenge participants
  * - All trading positions
@@ -44,13 +48,20 @@ import { getAdminSession } from '@/lib/admin/auth';
  * - All audit logs
  * - All sent notifications
  * - All marketplace user purchases (keeps items, removes user purchases)
+ * - All withdrawal requests
+ * - All user bank accounts
+ * - All auth sessions (Better Auth 'account' collection)
+ * - All orphan credit wallets (where user no longer exists)
+ * - All reconciliation logs (audit history)
  * 
  * ✅ PRESERVES (will NOT delete):
- * - User accounts
+ * - User accounts (the actual users in 'user' collection)
  * - WhiteLabel settings (environment variables, API keys)
  * - Payment provider configurations
  * - Admin settings (including fee settings, challenge settings)
  * - Marketplace items created by admin (only resets purchase counts)
+ * - Dashboard layouts and preferences
+ * - All settings collections (appsettings, challengesettings, etc.)
  * 
  * ✅ RESETS TO DEFAULTS:
  * - Badge configurations
@@ -79,6 +90,22 @@ export async function POST(request: Request) {
 
     console.log('🚨🚨🚨 STARTING FULL DATA RESET 🚨🚨🚨');
 
+    // Get collections directly via mongoose (for collections without explicit models)
+    const accountCollection = mongoose.connection.collection('account');
+    const userCollection = mongoose.connection.collection('user');
+    const alertsCollection = mongoose.connection.collection('alerts');
+    const botExecutionsCollection = mongoose.connection.collection('botexecutions');
+    
+    // Get all existing user IDs
+    const existingUsers = await userCollection.find({}, { projection: { _id: 1 } }).toArray();
+    const existingUserIds = new Set(existingUsers.map(u => u._id.toString()));
+    
+    // Count orphan wallets (wallets where userId doesn't exist in user collection)
+    const allWallets = await CreditWallet.find({}, { userId: 1 }).lean();
+    const orphanWalletIds = allWallets
+      .filter(w => !existingUserIds.has(w.userId.toString()))
+      .map(w => w._id);
+
     // Count documents before deletion
     const before = {
       competitions: await Competition.countDocuments(),
@@ -90,6 +117,7 @@ export async function POST(request: Request) {
       orders: await TradingOrder.countDocuments(),
       walletTransactions: await WalletTransaction.countDocuments(),
       wallets: await CreditWallet.countDocuments(),
+      orphanWallets: orphanWalletIds.length,
       userLevels: await UserLevel.countDocuments(),
       userBadges: await UserBadge.countDocuments(),
       fraudAlerts: await FraudAlert.countDocuments(),
@@ -103,6 +131,12 @@ export async function POST(request: Request) {
       auditLogs: await AuditLog.countDocuments(),
       notifications: await Notification.countDocuments(),
       marketplacePurchases: await UserPurchase.countDocuments(),
+      withdrawalRequests: await WithdrawalRequest.countDocuments(),
+      userBankAccounts: await UserBankAccount.countDocuments(),
+      authSessions: await accountCollection.countDocuments(),
+      alerts: await alertsCollection.countDocuments(),
+      botExecutions: await botExecutionsCollection.countDocuments(),
+      reconciliationLogs: await ReconciliationLog.countDocuments(),
     };
 
     console.log('📊 Before deletion:', before);
@@ -181,6 +215,36 @@ export async function POST(request: Request) {
     await UserPurchase.deleteMany({});
     console.log('✅ Deleted all marketplace user purchases');
 
+    // Delete all withdrawal requests
+    await WithdrawalRequest.deleteMany({});
+    console.log('✅ Deleted all withdrawal requests');
+
+    // Delete all user bank accounts
+    await UserBankAccount.deleteMany({});
+    console.log('✅ Deleted all user bank accounts');
+
+    // Delete all auth sessions (Better Auth 'account' collection)
+    const authSessionsDeleted = await accountCollection.deleteMany({});
+    console.log(`✅ Deleted ${authSessionsDeleted.deletedCount} auth sessions`);
+
+    // Delete alerts collection data (price alerts, system alerts)
+    const alertsDeleted = await alertsCollection.deleteMany({});
+    console.log(`✅ Deleted ${alertsDeleted.deletedCount} alerts`);
+
+    // Delete bot executions collection data
+    const botExecutionsDeleted = await botExecutionsCollection.deleteMany({});
+    console.log(`✅ Deleted ${botExecutionsDeleted.deletedCount} bot executions`);
+
+    // Delete reconciliation logs (audit data)
+    await ReconciliationLog.deleteMany({});
+    console.log('✅ Deleted all reconciliation logs');
+
+    // Delete orphan credit wallets (where user no longer exists)
+    if (orphanWalletIds.length > 0) {
+      const orphanDeleteResult = await CreditWallet.deleteMany({ _id: { $in: orphanWalletIds } });
+      console.log(`✅ Deleted ${orphanDeleteResult.deletedCount} orphan credit wallets`);
+    }
+
     // Reset marketplace item purchase counts
     await MarketplaceItem.updateMany({}, { $set: { totalPurchases: 0 } });
     console.log('✅ Reset marketplace item purchase counts');
@@ -221,6 +285,7 @@ export async function POST(request: Request) {
       orders: await TradingOrder.countDocuments(),
       walletTransactions: await WalletTransaction.countDocuments(),
       wallets: await CreditWallet.countDocuments(),
+      orphanWallets: 0, // All orphans deleted
       userLevels: await UserLevel.countDocuments(),
       userBadges: await UserBadge.countDocuments(),
       fraudAlerts: await FraudAlert.countDocuments(),
@@ -234,6 +299,12 @@ export async function POST(request: Request) {
       auditLogs: await AuditLog.countDocuments(),
       notifications: await Notification.countDocuments(),
       marketplacePurchases: await UserPurchase.countDocuments(),
+      withdrawalRequests: await WithdrawalRequest.countDocuments(),
+      userBankAccounts: await UserBankAccount.countDocuments(),
+      authSessions: await accountCollection.countDocuments(),
+      alerts: await alertsCollection.countDocuments(),
+      botExecutions: await botExecutionsCollection.countDocuments(),
+      reconciliationLogs: await ReconciliationLog.countDocuments(),
     };
 
     console.log('📊 After deletion:', after);
@@ -271,6 +342,7 @@ export async function POST(request: Request) {
         tradeHistory: before.tradeHistory,
         orders: before.orders,
         walletTransactions: before.walletTransactions,
+        orphanWallets: before.orphanWallets,
         userLevels: before.userLevels,
         userBadges: before.userBadges,
         fraudAlerts: before.fraudAlerts,
@@ -283,6 +355,12 @@ export async function POST(request: Request) {
         invoices: before.invoices,
         auditLogs: before.auditLogs,
         marketplacePurchases: before.marketplacePurchases,
+        withdrawalRequests: before.withdrawalRequests,
+        userBankAccounts: before.userBankAccounts,
+        authSessions: before.authSessions,
+        alerts: before.alerts,
+        botExecutions: before.botExecutions,
+        reconciliationLogs: before.reconciliationLogs,
       },
       walletsReset: walletResetResult.modifiedCount,
     });

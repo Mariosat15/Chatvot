@@ -31,7 +31,7 @@ export const getOrCreateWallet = async () => {
         totalWonFromCompetitions: 0,
         isActive: true,
         kycVerified: false,
-        withdrawalEnabled: false,
+        withdrawalEnabled: true, // Enable withdrawals by default - admin settings control actual eligibility
       });
       
       console.log(`✅ Created new wallet for user ${session.user.id}`);
@@ -93,7 +93,34 @@ export const getWalletTransactions = async (limit: number = 50) => {
       .limit(limit)
       .lean();
 
-    return JSON.parse(JSON.stringify(transactions));
+    // For withdrawals, get actual status from WithdrawalRequest (source of truth)
+    const WithdrawalRequest = (await import('@/database/models/withdrawal-request.model')).default;
+    
+    const enrichedTransactions = await Promise.all(
+      transactions.map(async (t) => {
+        if (t.transactionType === 'withdrawal' && t.metadata?.withdrawalRequestId) {
+          const withdrawalReq = await WithdrawalRequest.findById(t.metadata.withdrawalRequestId).lean();
+          if (withdrawalReq) {
+            // Map withdrawal request status to wallet transaction status
+            let actualStatus = t.status;
+            if (withdrawalReq.status === 'completed') actualStatus = 'completed';
+            else if (withdrawalReq.status === 'rejected' || withdrawalReq.status === 'failed') actualStatus = 'failed';
+            else if (withdrawalReq.status === 'cancelled') actualStatus = 'cancelled';
+            else actualStatus = 'pending'; // pending, approved, processing all show as pending
+            
+            return {
+              ...t,
+              status: actualStatus,
+              // Include failure reason for rejected withdrawals
+              failureReason: withdrawalReq.rejectionReason || withdrawalReq.failureReason,
+            };
+          }
+        }
+        return t;
+      })
+    );
+
+    return JSON.parse(JSON.stringify(enrichedTransactions));
   } catch (error) {
     // Re-throw redirect errors so Next.js can handle them
     if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
@@ -203,7 +230,19 @@ export const initiateDeposit = async (amount: number, currency: string = 'EUR') 
 };
 
 // Complete a deposit after successful Stripe payment
-export const completeDeposit = async (transactionId: string, paymentId: string, paymentMethod: string) => {
+export const completeDeposit = async (
+  transactionId: string, 
+  paymentId: string, 
+  paymentMethod: string,
+  cardDetails?: {
+    brand?: string;
+    last4?: string;
+    expMonth?: number;
+    expYear?: number;
+    country?: string;
+    fingerprint?: string;
+  }
+) => {
   try {
     await connectToDatabase();
 
@@ -238,11 +277,26 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
         { session: mongoSession }
       );
 
-      // Update transaction
+      // Update transaction with payment info and card details
       transaction.status = 'completed';
       transaction.paymentId = paymentId;
       transaction.paymentMethod = paymentMethod;
       transaction.processedAt = new Date();
+      
+      // Store card details for potential refunds/withdrawals
+      if (cardDetails) {
+        transaction.metadata = {
+          ...transaction.metadata,
+          paymentIntentId: paymentId,
+          cardBrand: cardDetails.brand,
+          cardLast4: cardDetails.last4,
+          cardExpMonth: cardDetails.expMonth,
+          cardExpYear: cardDetails.expYear,
+          cardCountry: cardDetails.country,
+          cardFingerprint: cardDetails.fingerprint,
+        };
+      }
+      
       await transaction.save({ session: mongoSession });
 
       // Commit transaction
@@ -475,14 +529,18 @@ export const initiateWithdrawal = async (creditsAmount: number) => {
     const wallet = await CreditWallet.findOne({ userId: session.user.id });
     if (!wallet) throw new Error('Wallet not found');
 
-    // Validate KYC
-    if (!wallet.kycVerified) {
+    // Check withdrawal settings - KYC requirement is now configurable in admin
+    const WithdrawalSettings = (await import('@/database/models/withdrawal-settings.model')).default;
+    const settings = await WithdrawalSettings.getSingleton();
+    
+    // Validate KYC only if required in settings
+    if (settings.requireKYC && !wallet.kycVerified) {
       throw new Error('KYC verification required for withdrawals');
     }
 
-    // Validate withdrawal enabled
-    if (!wallet.withdrawalEnabled) {
-      throw new Error('Withdrawals not enabled for this account');
+    // Validate wallet is active
+    if (!wallet.isActive) {
+      throw new Error('Wallet is not active');
     }
 
     // Validate amount

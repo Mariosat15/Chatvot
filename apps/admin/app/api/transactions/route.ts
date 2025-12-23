@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/admin/auth';
 import { connectToDatabase } from '@/database/mongoose';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import WithdrawalRequest from '@/database/models/withdrawal-request.model';
 import { PlatformTransaction } from '@/database/models/platform-financials.model';
 import VATPayment from '@/database/models/vat-payment.model';
 import { getUsersByIds } from '@/lib/utils/user-lookup';
@@ -129,14 +130,50 @@ export async function GET(request: NextRequest) {
     const userIds = [...new Set(walletTransactions.map(t => t.userId).filter(id => id !== 'platform'))];
     const usersMap = await getUsersByIds(userIds);
 
-    // Enrich wallet transactions with user info
-    const enrichedWalletTransactions = walletTransactions.map(t => ({
-      ...t,
-      source: 'wallet' as const,
-      userInfo: t.userId === 'platform' 
-        ? { id: 'platform', name: 'Platform', email: 'system' }
-        : usersMap.get(t.userId) || { id: t.userId, name: 'Unknown', email: 'Unknown' },
-    }));
+    // Get withdrawal request IDs for enriching withdrawal transactions
+    const withdrawalTxs = walletTransactions.filter(t => t.transactionType === 'withdrawal' && t.metadata?.withdrawalRequestId);
+    const withdrawalRequestIds = withdrawalTxs.map(t => t.metadata?.withdrawalRequestId).filter(Boolean);
+    
+    // Fetch withdrawal requests to get fee details
+    const withdrawalRequests = withdrawalRequestIds.length > 0 
+      ? await WithdrawalRequest.find({ _id: { $in: withdrawalRequestIds } }).lean()
+      : [];
+    const withdrawalRequestMap = new Map(withdrawalRequests.map(w => [w._id.toString(), w]));
+
+    // Enrich wallet transactions with user info and withdrawal details
+    const enrichedWalletTransactions = walletTransactions.map(t => {
+      const enriched: any = {
+        ...t,
+        source: 'wallet' as const,
+        userInfo: t.userId === 'platform' 
+          ? { id: 'platform', name: 'Platform', email: 'system' }
+          : usersMap.get(t.userId) || { id: t.userId, name: 'Unknown', email: 'Unknown' },
+      };
+      
+      // Enrich withdrawal transactions with fee details from WithdrawalRequest
+      if (t.transactionType === 'withdrawal' && t.metadata?.withdrawalRequestId) {
+        const withdrawalReq = withdrawalRequestMap.get(t.metadata.withdrawalRequestId.toString());
+        if (withdrawalReq) {
+          // Update status from withdrawal request (source of truth)
+          if (withdrawalReq.status === 'completed') enriched.status = 'completed';
+          else if (withdrawalReq.status === 'rejected' || withdrawalReq.status === 'failed') enriched.status = 'failed';
+          else if (withdrawalReq.status === 'cancelled') enriched.status = 'cancelled';
+          else enriched.status = 'pending';
+          
+          // Add fee details to metadata
+          enriched.metadata = {
+            ...enriched.metadata,
+            amountEUR: withdrawalReq.amountEUR,
+            platformFee: withdrawalReq.platformFee,
+            bankFee: withdrawalReq.bankFee,
+            netAmountEUR: withdrawalReq.netAmountEUR,
+            withdrawalStatus: withdrawalReq.status,
+          };
+        }
+      }
+      
+      return enriched;
+    });
 
     // Format platform transactions
     const enrichedPlatformTransactions = platformTransactions.map(t => ({

@@ -158,29 +158,82 @@ export const auditLogService = {
 
   // ==================== FINANCIAL ====================
 
-  async logWithdrawalApproved(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amount: number): Promise<void> {
+  async logWithdrawalApproved(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number): Promise<void> {
     await this.log({
       admin,
       action: 'withdrawal_approved',
       category: 'financial',
-      description: `Approved withdrawal of ${amount} credits for ${userName}`,
+      description: `Approved withdrawal of €${amountEUR.toFixed(2)} for ${userName}`,
       targetType: 'transaction',
       targetId: withdrawalId,
       targetName: userName,
-      metadata: { amount, userId },
+      metadata: { amountEUR, userId },
     });
   },
 
-  async logWithdrawalRejected(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amount: number, reason?: string): Promise<void> {
+  async logWithdrawalRejected(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number, reason?: string): Promise<void> {
     await this.log({
       admin,
       action: 'withdrawal_rejected',
       category: 'financial',
-      description: `Rejected withdrawal of ${amount} credits for ${userName}${reason ? ` - Reason: ${reason}` : ''}`,
+      description: `Rejected withdrawal of €${amountEUR.toFixed(2)} for ${userName}${reason ? ` - Reason: ${reason}` : ''}`,
       targetType: 'transaction',
       targetId: withdrawalId,
       targetName: userName,
-      metadata: { amount, userId, reason },
+      metadata: { amountEUR, userId, reason },
+    });
+  },
+
+  async logWithdrawalProcessing(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number): Promise<void> {
+    await this.log({
+      admin,
+      action: 'withdrawal_processing',
+      category: 'financial',
+      description: `Started processing withdrawal of €${amountEUR.toFixed(2)} for ${userName}`,
+      targetType: 'transaction',
+      targetId: withdrawalId,
+      targetName: userName,
+      metadata: { amountEUR, userId },
+    });
+  },
+
+  async logWithdrawalCompleted(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number, netAmountEUR: number, payoutMethod: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'withdrawal_completed',
+      category: 'financial',
+      description: `Completed withdrawal of €${amountEUR.toFixed(2)} (net €${netAmountEUR.toFixed(2)}) for ${userName} via ${payoutMethod}`,
+      targetType: 'transaction',
+      targetId: withdrawalId,
+      targetName: userName,
+      metadata: { amountEUR, netAmountEUR, userId, payoutMethod },
+    });
+  },
+
+  async logWithdrawalFailed(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number, reason?: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'withdrawal_failed',
+      category: 'financial',
+      description: `Withdrawal of €${amountEUR.toFixed(2)} failed for ${userName}${reason ? ` - Reason: ${reason}` : ''}`,
+      targetType: 'transaction',
+      targetId: withdrawalId,
+      targetName: userName,
+      metadata: { amountEUR, userId, reason },
+      status: 'failed',
+    });
+  },
+
+  async logWithdrawalCancelled(admin: AdminInfo, withdrawalId: string, userId: string, userName: string, amountEUR: number, reason?: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'withdrawal_cancelled',
+      category: 'financial',
+      description: `Cancelled withdrawal of €${amountEUR.toFixed(2)} for ${userName}${reason ? ` - Reason: ${reason}` : ''}`,
+      targetType: 'transaction',
+      targetId: withdrawalId,
+      targetName: userName,
+      metadata: { amountEUR, userId, reason },
     });
   },
 

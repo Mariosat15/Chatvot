@@ -17,6 +17,10 @@ import {
   X,
   AlertCircle,
   DollarSign,
+  Zap,
+  Copy,
+  ExternalLink,
+  Terminal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -85,9 +89,10 @@ const BUILT_IN_PROVIDERS = [
     displayName: 'Paddle',
     logo: '🏓',
     defaultCredentials: [
-      { key: 'vendor_id', isSecret: false, description: 'Paddle vendor ID' },
-      { key: 'api_key', isSecret: true, description: 'Paddle API key' },
-      { key: 'public_key', isSecret: false, description: 'Paddle public key' },
+      { key: 'vendor_id', isSecret: false, description: 'Paddle vendor ID (from Settings → Business)' },
+      { key: 'api_key', isSecret: true, description: 'Paddle API key (pdl_live_ or pdl_test_)' },
+      { key: 'public_key', isSecret: false, description: 'Paddle public key (for inline checkout)' },
+      { key: 'webhook_secret', isSecret: true, description: 'Paddle webhook signing secret (optional)' },
     ],
   },
 ];
@@ -100,6 +105,16 @@ export default function PaymentProvidersSection() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [isRegenerating, setIsRegenerating] = useState(false);
+  
+  // Auto-configure webhook state
+  const [isAutoConfiguring, setIsAutoConfiguring] = useState(false);
+  const [autoConfigResult, setAutoConfigResult] = useState<{
+    success?: boolean;
+    message?: string;
+    isLocalhost?: boolean;
+    suggestion?: string;
+    webhookSecret?: string;
+  } | null>(null);
   
   // New provider form state
   const [newProvider, setNewProvider] = useState({
@@ -189,7 +204,118 @@ export default function PaymentProvidersSection() {
 
   const handleOpenConfig = (provider: PaymentProvider) => {
     setSelectedProvider(provider);
+    setAutoConfigResult(null); // Reset auto-config result
     setConfigDialogOpen(true);
+  };
+
+  // Auto-configure webhooks for Stripe/Paddle
+  const handleAutoConfigureWebhook = async () => {
+    if (!selectedProvider) return;
+    
+    // Only supported for Stripe and Paddle
+    if (!['stripe', 'paddle'].includes(selectedProvider.slug)) {
+      toast.error('Auto-configure only supported for Stripe and Paddle');
+      return;
+    }
+
+    // Use custom main app URL if provided, otherwise use current origin
+    const baseUrl = mainAppUrl || window.location.origin;
+    const webhookPath = selectedProvider.slug === 'stripe' 
+      ? '/api/stripe/webhook' 
+      : '/api/paddle/webhook';
+    const webhookUrl = `${baseUrl}${webhookPath}`;
+
+    setIsAutoConfiguring(true);
+    setAutoConfigResult(null);
+
+    try {
+      const response = await fetch('/api/payment-providers/auto-configure-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: selectedProvider.slug,
+          webhookUrl,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setAutoConfigResult({ 
+          success: true, 
+          message: result.message,
+          webhookSecret: result.webhookSecret,
+        });
+        toast.success(result.message);
+        
+        // Update the selected provider's credentials in state immediately
+        if (selectedProvider && result.webhookSecret) {
+          const updatedCredentials = [...selectedProvider.credentials];
+          const secretIndex = updatedCredentials.findIndex(c => c.key === 'webhook_secret');
+          if (secretIndex >= 0) {
+            updatedCredentials[secretIndex].value = result.webhookSecret;
+          } else {
+            updatedCredentials.push({
+              key: 'webhook_secret',
+              value: result.webhookSecret,
+              isSecret: true,
+              description: 'Stripe webhook signing secret (auto-configured)',
+            });
+          }
+          setSelectedProvider({ ...selectedProvider, credentials: updatedCredentials });
+        }
+        
+        // Refresh providers to get updated data from database
+        fetchProviders();
+      } else {
+        setAutoConfigResult({
+          success: false,
+          message: result.error,
+          isLocalhost: result.isLocalhost,
+          suggestion: result.suggestion,
+        });
+        if (!result.isLocalhost) {
+          toast.error(result.error);
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to auto-configure';
+      setAutoConfigResult({ success: false, message });
+      toast.error(message);
+    } finally {
+      setIsAutoConfiguring(false);
+    }
+  };
+
+  // State for custom main app URL
+  const [mainAppUrl, setMainAppUrl] = useState('');
+
+  // Get detected webhook URL - use main app URL if provided, otherwise current origin
+  const getDetectedWebhookUrl = () => {
+    if (!selectedProvider) return '';
+    const webhookPath = selectedProvider.slug === 'stripe' 
+      ? '/api/stripe/webhook' 
+      : '/api/paddle/webhook';
+    // Use custom main app URL if provided (for when admin runs on different port)
+    const baseUrl = mainAppUrl || window.location.origin;
+    return `${baseUrl}${webhookPath}`;
+  };
+
+  // Check if target URL is localhost
+  const isLocalhost = () => {
+    if (typeof window === 'undefined') return false;
+    // Check main app URL if provided
+    if (mainAppUrl) {
+      try {
+        const url = new URL(mainAppUrl);
+        return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+      } catch {
+        return true; // Invalid URL, treat as localhost
+      }
+    }
+    // Otherwise check current origin
+    return window.location.hostname === 'localhost' || 
+           window.location.hostname === '127.0.0.1';
   };
 
   const handleSaveConfig = async () => {
@@ -544,6 +670,136 @@ export default function PaymentProvidersSection() {
                   className="bg-gray-900 border-gray-700 text-gray-100 mt-2"
                 />
               </div>
+
+              {/* Auto-Configure Webhooks - Only for Stripe and Paddle */}
+              {['stripe', 'paddle'].includes(selectedProvider.slug) && (
+                <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Zap className="h-5 w-5 text-purple-400" />
+                    <Label className="text-purple-300 font-semibold">Auto-Configure Webhooks (Optional)</Label>
+                  </div>
+                  
+                  <p className="text-xs text-gray-400 mb-3">
+                    Automatically create webhook endpoint in {selectedProvider.displayName} and save the secret.
+                    This is optional - you can still configure webhooks manually.
+                  </p>
+
+                  {/* Main App URL Input */}
+                  <div className="mb-3">
+                    <Label className="text-xs text-gray-400 mb-1 block">
+                      Main App URL (if different from current)
+                    </Label>
+                    <Input
+                      type="url"
+                      placeholder="https://your-main-app.ngrok-free.app"
+                      value={mainAppUrl}
+                      onChange={(e) => setMainAppUrl(e.target.value)}
+                      className="bg-gray-900 border-gray-700 text-gray-100 text-xs h-8"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Leave empty to use current URL. Set this if admin runs on different port (e.g., 3001) than main app (3000).
+                    </p>
+                  </div>
+
+                  {/* Detected URL */}
+                  <div className="bg-gray-900/50 rounded p-2 mb-3 flex items-center justify-between">
+                    <code className="text-xs text-gray-300 break-all">
+                      {typeof window !== 'undefined' ? getDetectedWebhookUrl() : 'Loading...'}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(getDetectedWebhookUrl());
+                        toast.success('URL copied!');
+                      }}
+                      className="ml-2 p-1 hover:bg-gray-700 rounded"
+                    >
+                      <Copy className="h-3 w-3 text-gray-400" />
+                    </button>
+                  </div>
+
+                  {/* Localhost Warning */}
+                  {isLocalhost() ? (
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3">
+                      <p className="text-sm text-yellow-400 font-semibold flex items-center gap-2">
+                        <Terminal className="h-4 w-4" />
+                        Localhost Detected
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Auto-configure requires a public URL. For local development, use:
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        <div className="bg-gray-900 rounded p-2">
+                          <code className="text-xs text-green-400">
+                            {selectedProvider.slug === 'stripe' 
+                              ? 'stripe listen --forward-to localhost:3000/api/stripe/webhook'
+                              : '# Use ngrok: ngrok http 3000'}
+                          </code>
+                        </div>
+                        {selectedProvider.slug === 'stripe' && (
+                          <a
+                            href="https://stripe.com/docs/stripe-cli"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-400 hover:underline flex items-center gap-1"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Stripe CLI Documentation
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Auto-configure button */}
+                      <Button
+                        type="button"
+                        onClick={handleAutoConfigureWebhook}
+                        disabled={isAutoConfiguring}
+                        className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold"
+                      >
+                        {isAutoConfiguring ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                            Configuring...
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="h-4 w-4 mr-2" />
+                            Auto-Configure Webhooks
+                          </>
+                        )}
+                      </Button>
+
+                      {/* Result message */}
+                      {autoConfigResult && (
+                        <div className={`mt-3 rounded-lg p-3 ${
+                          autoConfigResult.success 
+                            ? 'bg-green-500/10 border border-green-500/30' 
+                            : 'bg-red-500/10 border border-red-500/30'
+                        }`}>
+                          <p className={`text-sm ${autoConfigResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                            {autoConfigResult.success ? '✅ ' : '❌ '}
+                            {autoConfigResult.message}
+                          </p>
+                          {autoConfigResult.success && autoConfigResult.webhookSecret && (
+                            <div className="mt-2 p-2 bg-gray-900 rounded">
+                              <p className="text-xs text-gray-400 mb-1">Webhook Secret (saved to database & .env):</p>
+                              <code className="text-xs text-green-300 break-all">
+                                {autoConfigResult.webhookSecret}
+                              </code>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <p className="text-xs text-gray-500 mt-3">
+                    💡 This creates the webhook in {selectedProvider.displayName}&apos;s system and saves the secret to both database and .env file.
+                  </p>
+                </div>
+              )}
 
               {/* Credentials */}
               <div>

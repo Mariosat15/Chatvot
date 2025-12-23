@@ -21,6 +21,9 @@ import { FraudHistory } from '@/database/models/fraud/fraud-history.model';
 import Invoice from '@/database/models/invoice.model';
 // Platform financials (for user-specific transactions)
 import { PlatformTransaction } from '@/database/models/platform-financials.model';
+// Withdrawal models
+import WithdrawalRequest from '@/database/models/withdrawal-request.model';
+import UserBankAccount from '@/database/models/user-bank-account.model';
 import { ObjectId } from 'mongodb';
 import { getAdminSession } from '@/lib/admin/auth';
 import { auditLogService } from '@/lib/services/audit-log.service';
@@ -37,6 +40,8 @@ import { auditLogService } from '@/lib/services/audit-log.service';
  *          payment fingerprints, behavioral similarity, trading profiles, fraud history
  * - Invoices
  * - Platform transactions (user-specific)
+ * - Withdrawal requests
+ * - User bank accounts
  */
 export async function DELETE(request: Request) {
   try {
@@ -233,6 +238,30 @@ export async function DELETE(request: Request) {
     } catch (e) {
       console.log(`⚠️ No platform transactions to delete`);
       deletionResults.platformTransactions = 0;
+    }
+
+    // ============================================
+    // 7. DELETE WITHDRAWAL DATA
+    // ============================================
+
+    // Delete withdrawal requests
+    try {
+      const withdrawalResult = await WithdrawalRequest.deleteMany({ userId });
+      deletionResults.withdrawalRequests = withdrawalResult.deletedCount;
+      console.log(`✅ Deleted ${deletionResults.withdrawalRequests} withdrawal requests`);
+    } catch (e) {
+      console.log(`⚠️ No withdrawal requests to delete`);
+      deletionResults.withdrawalRequests = 0;
+    }
+
+    // Delete user bank accounts
+    try {
+      const bankAccountResult = await UserBankAccount.deleteMany({ userId });
+      deletionResults.userBankAccounts = bankAccountResult.deletedCount;
+      console.log(`✅ Deleted ${deletionResults.userBankAccounts} user bank accounts`);
+    } catch (e) {
+      console.log(`⚠️ No user bank accounts to delete`);
+      deletionResults.userBankAccounts = 0;
     }
 
     console.log('');

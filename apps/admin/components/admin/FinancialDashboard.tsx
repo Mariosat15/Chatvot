@@ -41,6 +41,7 @@ import {
   Swords,
 } from 'lucide-react';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+import ReconciliationSection from './ReconciliationSection';
 
 interface WalletData {
   userId: string;
@@ -61,7 +62,12 @@ interface PendingWithdrawal {
   userName: string;
   userEmail: string;
   amount: number;
+  amountEUR: number;
+  status: string;
   createdAt: string;
+  platformFee: number;
+  bankFee: number;
+  netAmountEUR: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
@@ -699,6 +705,7 @@ export default function FinancialDashboard() {
           <TabsTrigger value="wallets">User Wallets</TabsTrigger>
           <TabsTrigger value="transactions">All Transactions</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
+          <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
         </TabsList>
 
         {/* OVERVIEW TAB */}
@@ -721,14 +728,42 @@ export default function FinancialDashboard() {
                   {currencySymbol}{liabilityMetrics?.theoreticalBankBalance.toFixed(2) || '0.00'}
                 </div>
                 <div className="space-y-2 text-sm border-t border-green-500/20 pt-4">
+                  {/* Money IN */}
+                  <div className="text-xs text-gray-500 uppercase font-semibold mb-1">💰 Money Received</div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">User Deposits</span>
+                    <span className="text-gray-400">User Deposits (Base)</span>
                     <span className="text-green-400">+{currencySymbol}{(platformFinancials?.totalUserDeposits || 0).toFixed(2)}</span>
                   </div>
+                  
+                  {/* Deposit Fees Section */}
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Deposit/Withdrawal Fees (Gross)</span>
-                    <span className="text-green-400">+{currencySymbol}{((platformFinancials?.totalDepositFeesGross || 0) + (platformFinancials?.totalWithdrawalFeesGross || 0)).toFixed(2)}</span>
+                    <span className="text-gray-400">Deposit Fees (We Charge)</span>
+                    <span className="text-green-400">+{currencySymbol}{(platformFinancials?.totalDepositFeesGross || 0).toFixed(2)}</span>
                   </div>
+                  <div className="flex justify-between text-xs pl-2">
+                    <span className="text-gray-500">↳ Stripe Takes</span>
+                    <span className="text-red-400/70">-{currencySymbol}{(platformFinancials?.totalBankDepositFees || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs pl-2 pb-1 border-b border-gray-700/50">
+                    <span className="text-emerald-400/80 font-medium">↳ We Keep (Net)</span>
+                    <span className="text-emerald-400/80 font-medium">{currencySymbol}{(platformFinancials?.netDepositEarnings || 0).toFixed(2)}</span>
+                  </div>
+                  
+                  {/* Withdrawal Fees Section */}
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Withdrawal Fees (We Charge)</span>
+                    <span className="text-green-400">+{currencySymbol}{(platformFinancials?.totalWithdrawalFeesGross || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs pl-2">
+                    <span className="text-gray-500">↳ Bank Takes</span>
+                    <span className="text-red-400/70">-{currencySymbol}{(platformFinancials?.totalBankWithdrawalFees || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs pl-2 pb-1 border-b border-gray-700/50">
+                    <span className="text-emerald-400/80 font-medium">↳ We Keep (Net)</span>
+                    <span className="text-emerald-400/80 font-medium">{currencySymbol}{(platformFinancials?.netWithdrawalEarnings || 0).toFixed(2)}</span>
+                  </div>
+                  
+                  {/* Other Platform Earnings */}
                   <div className="flex justify-between">
                     <span className="text-gray-400">Competition Fees</span>
                     <span className="text-emerald-400">+{currencySymbol}{(platformFinancials?.totalPlatformFees || 0).toFixed(2)}</span>
@@ -741,18 +776,17 @@ export default function FinancialDashboard() {
                     <span className="text-gray-400">Marketplace Sales</span>
                     <span className="text-purple-400">+{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Bank Fees (Stripe/Provider)</span>
-                    <span className="text-red-400">-{currencySymbol}{(platformFinancials?.totalBankFees || 0).toFixed(2)}</span>
-                  </div>
                   {vatEnabled && (
                     <div className="flex justify-between">
                       <span className="text-gray-400">VAT Collected</span>
                       <span className="text-green-400">+{currencySymbol}{(platformFinancials?.totalVATCollected || 0).toFixed(2)}</span>
                     </div>
                   )}
+                  
+                  {/* Money OUT */}
+                  <div className="text-xs text-gray-500 uppercase font-semibold mt-3 mb-1">💸 Money Paid Out</div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">User Withdrawals</span>
+                    <span className="text-gray-400">User Withdrawals (Net)</span>
                     <span className="text-red-400">-{currencySymbol}{(platformFinancials?.totalUserWithdrawals || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
@@ -800,10 +834,20 @@ export default function FinancialDashboard() {
                     </div>
                   )}
                   {pendingWithdrawals.length > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Pending Withdrawals</span>
-                      <span className="text-yellow-400">{currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)} ({pendingWithdrawals.length})</span>
-                    </div>
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Pending Withdrawals (Gross)</span>
+                        <span className="text-yellow-400">{currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)} ({pendingWithdrawals.length})</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-500 pl-2">↳ Net to Users</span>
+                        <span className="text-yellow-500/80">{currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.netAmountEUR || 0), 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-500 pl-2">↳ Platform Fees</span>
+                        <span className="text-green-500/80">+{currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.platformFee || 0), 0).toFixed(2)}</span>
+                      </div>
+                    </>
                   )}
                 </div>
               </CardContent>
@@ -859,7 +903,7 @@ export default function FinancialDashboard() {
               <CardDescription>Where our revenue comes from</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">
                   <div className="text-xs text-gray-400 uppercase">Competition Fees</div>
                   <div className="text-2xl font-bold text-emerald-400">{currencySymbol}{(platformFinancials?.totalPlatformFees || 0).toFixed(2)}</div>
@@ -876,14 +920,24 @@ export default function FinancialDashboard() {
                   <div className="text-xs text-gray-500">{platformFinancials?.marketplacePurchases || 0} purchases</div>
                 </div>
                 <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-                  <div className="text-xs text-gray-400 uppercase">Deposit Fees</div>
+                  <div className="text-xs text-gray-400 uppercase">Deposit Fees (Net)</div>
                   <div className="text-2xl font-bold text-green-400">{currencySymbol}{(platformFinancials?.netDepositEarnings || 0).toFixed(2)}</div>
-                  <div className="text-xs text-gray-500">After bank fees</div>
+                  <div className="text-xs text-gray-500">
+                    Charged: {currencySymbol}{(platformFinancials?.totalDepositFeesGross || 0).toFixed(2)}
+                  </div>
+                  <div className="text-xs text-red-400/60">
+                    Stripe: -{currencySymbol}{(platformFinancials?.totalBankDepositFees || 0).toFixed(2)}
+                  </div>
                 </div>
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                  <div className="text-xs text-gray-400 uppercase">Withdrawal Fees</div>
+                  <div className="text-xs text-gray-400 uppercase">Withdrawal Fees (Net)</div>
                   <div className="text-2xl font-bold text-blue-400">{currencySymbol}{(platformFinancials?.netWithdrawalEarnings || 0).toFixed(2)}</div>
-                  <div className="text-xs text-gray-500">After bank fees</div>
+                  <div className="text-xs text-gray-500">
+                    Charged: {currencySymbol}{(platformFinancials?.totalWithdrawalFeesGross || 0).toFixed(2)}
+                  </div>
+                  <div className="text-xs text-red-400/60">
+                    Bank: -{currencySymbol}{(platformFinancials?.totalBankWithdrawalFees || 0).toFixed(2)}
+                  </div>
                 </div>
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
                   <div className="text-xs text-gray-400 uppercase">Unclaimed Pools</div>
@@ -925,6 +979,86 @@ export default function FinancialDashboard() {
             </CardContent>
           </Card>
 
+          {/* Fee Breakdown Detail Table */}
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white text-lg flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-yellow-400" />
+                💵 Fee Breakdown Detail
+              </CardTitle>
+              <CardDescription>Complete breakdown of all fees charged vs paid to processors</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Fee Type</th>
+                      <th className="text-right py-3 px-4 text-gray-400 font-medium">We Charged Users</th>
+                      <th className="text-right py-3 px-4 text-gray-400 font-medium">Stripe/Bank Takes</th>
+                      <th className="text-right py-3 px-4 text-emerald-400 font-medium">WE KEEP (Net)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-gray-800 hover:bg-gray-800/50">
+                      <td className="py-3 px-4 text-white font-medium">📥 Deposit Fees</td>
+                      <td className="py-3 px-4 text-right text-green-400">{currencySymbol}{(platformFinancials?.totalDepositFeesGross || 0).toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right text-red-400">-{currencySymbol}{(platformFinancials?.totalBankDepositFees || 0).toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right text-emerald-400 font-bold">{currencySymbol}{(platformFinancials?.netDepositEarnings || 0).toFixed(2)}</td>
+                    </tr>
+                    <tr className="border-b border-gray-800 hover:bg-gray-800/50">
+                      <td className="py-3 px-4 text-white font-medium">📤 Withdrawal Fees</td>
+                      <td className="py-3 px-4 text-right text-green-400">{currencySymbol}{(platformFinancials?.totalWithdrawalFeesGross || 0).toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right text-red-400">-{currencySymbol}{(platformFinancials?.totalBankWithdrawalFees || 0).toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right text-emerald-400 font-bold">{currencySymbol}{(platformFinancials?.netWithdrawalEarnings || 0).toFixed(2)}</td>
+                    </tr>
+                    <tr className="border-b border-gray-800 hover:bg-gray-800/50">
+                      <td className="py-3 px-4 text-white font-medium">🏆 Competition Fees</td>
+                      <td className="py-3 px-4 text-right text-green-400">{currencySymbol}{(platformFinancials?.totalPlatformFees || 0).toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right text-gray-500">-{currencySymbol}0.00</td>
+                      <td className="py-3 px-4 text-right text-emerald-400 font-bold">{currencySymbol}{(platformFinancials?.totalPlatformFees || 0).toFixed(2)}</td>
+                    </tr>
+                    <tr className="border-b border-gray-800 hover:bg-gray-800/50">
+                      <td className="py-3 px-4 text-white font-medium">⚔️ Challenge Fees</td>
+                      <td className="py-3 px-4 text-right text-green-400">{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right text-gray-500">-{currencySymbol}0.00</td>
+                      <td className="py-3 px-4 text-right text-emerald-400 font-bold">{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</td>
+                    </tr>
+                    <tr className="border-b border-gray-800 hover:bg-gray-800/50">
+                      <td className="py-3 px-4 text-white font-medium">🛒 Marketplace Sales</td>
+                      <td className="py-3 px-4 text-right text-green-400">{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right text-gray-500">-{currencySymbol}0.00</td>
+                      <td className="py-3 px-4 text-right text-emerald-400 font-bold">{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</td>
+                    </tr>
+                    <tr className="border-b border-gray-800 hover:bg-gray-800/50">
+                      <td className="py-3 px-4 text-white font-medium">🎰 Unclaimed Pools</td>
+                      <td className="py-3 px-4 text-right text-green-400">{currencySymbol}{((platformFinancials?.totalUnclaimedPools || 0) / conversionRate).toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right text-gray-500">-{currencySymbol}0.00</td>
+                      <td className="py-3 px-4 text-right text-emerald-400 font-bold">{currencySymbol}{((platformFinancials?.totalUnclaimedPools || 0) / conversionRate).toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-800/50 font-bold">
+                      <td className="py-4 px-4 text-white">TOTALS</td>
+                      <td className="py-4 px-4 text-right text-green-400">
+                        {currencySymbol}{(platformFinancials?.totalGrossEarnings || 0).toFixed(2)}
+                      </td>
+                      <td className="py-4 px-4 text-right text-red-400">
+                        -{currencySymbol}{(platformFinancials?.totalBankFees || 0).toFixed(2)}
+                      </td>
+                      <td className="py-4 px-4 text-right text-emerald-400 text-lg">
+                        {currencySymbol}{(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-blue-300">
+                💡 <strong>Understanding Fees:</strong> "We Charged Users" is what we invoice. "Stripe/Bank Takes" is what payment processors deduct. "WE KEEP" is our actual net earnings.
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Recent Transactions */}
           <Card className="bg-gray-900 border-gray-700">
             <CardHeader>
@@ -953,9 +1087,17 @@ export default function FinancialDashboard() {
                           {tx.status}
                         </Badge>
                       </div>
-                      {tx.description && (
+                      {/* Enhanced description for withdrawals showing fees */}
+                      {tx.transactionType === 'withdrawal' && tx.metadata?.netAmountEUR !== undefined ? (
+                        <p className="text-sm text-gray-400 mt-1 truncate max-w-md">
+                          {tx.description}
+                          <span className="text-cyan-400 ml-2">
+                            (Net: €{tx.metadata.netAmountEUR?.toFixed(2)}, Fee: €{tx.metadata.platformFee?.toFixed(2) || '0.00'})
+                          </span>
+                        </p>
+                      ) : tx.description ? (
                         <p className="text-sm text-gray-400 mt-1 truncate max-w-md">{tx.description}</p>
-                      )}
+                      ) : null}
                     </div>
                     <div className="text-right">
                       <div className={`font-semibold ${tx.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -1146,7 +1288,9 @@ export default function FinancialDashboard() {
                   Pending User Withdrawals ({pendingWithdrawals.length})
                 </CardTitle>
                 <CardDescription>
-                  Total: {currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)}
+                  Total Gross: {currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)} | 
+                  Total Net to Users: {currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.netAmountEUR || 0), 0).toFixed(2)} | 
+                  Total Platform Fees: {currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.platformFee || 0), 0).toFixed(2)}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1154,8 +1298,10 @@ export default function FinancialDashboard() {
                   <TableHeader>
                     <TableRow className="border-gray-700">
                       <TableHead className="text-gray-400">User</TableHead>
-                      <TableHead className="text-gray-400">Amount</TableHead>
-                      <TableHead className="text-gray-400">EUR Value</TableHead>
+                      <TableHead className="text-gray-400">Amount Requested</TableHead>
+                      <TableHead className="text-gray-400">Platform Fee</TableHead>
+                      <TableHead className="text-gray-400">Net to User</TableHead>
+                      <TableHead className="text-gray-400">Status</TableHead>
                       <TableHead className="text-gray-400">Requested</TableHead>
                       <TableHead className="text-gray-400">Action</TableHead>
                     </TableRow>
@@ -1169,11 +1315,24 @@ export default function FinancialDashboard() {
                             <div className="text-xs text-gray-400">{withdrawal.userEmail}</div>
                           </div>
                         </TableCell>
-                        <TableCell className="font-semibold text-white">
-                          {creditSymbol} {Math.abs(withdrawal.amount).toLocaleString()}
+                        <TableCell>
+                          <div className="font-semibold text-white">
+                            {creditSymbol} {Math.abs(withdrawal.amount).toLocaleString()}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {currencySymbol}{(withdrawal.amountEUR || 0).toFixed(2)}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-green-400">
-                          {currencySymbol}{creditsToEUR(Math.abs(withdrawal.amount))}
+                        <TableCell className="text-red-400 text-sm">
+                          {currencySymbol}{(withdrawal.platformFee || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-green-400 font-semibold">
+                          {currencySymbol}{(withdrawal.netAmountEUR || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`${getStatusColor(withdrawal.status)} text-white text-xs`}>
+                            {withdrawal.status}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-gray-400 text-sm">
                           {new Date(withdrawal.createdAt).toLocaleDateString()}
@@ -1726,14 +1885,18 @@ export default function FinancialDashboard() {
                         <div>Spent</div>
                         <div className="text-xs font-normal">(Comp / Chall)</div>
                       </TableHead>
-                      <TableHead className="text-gray-400">Net</TableHead>
+                      <TableHead className="text-gray-400">
+                        <div>Net</div>
+                        <div className="text-xs font-normal">(Won - Spent)</div>
+                      </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                     {filteredWallets.slice(0, 50).map((wallet) => {
                       const totalWon = (wallet.totalWonFromCompetitions || 0) + (wallet.totalWonFromChallenges || 0);
                       const totalSpent = (wallet.totalSpentOnCompetitions || 0) + (wallet.totalSpentOnChallenges || 0);
-                  const netPosition = wallet.creditBalance - wallet.totalDeposited;
+                      // Net from competitions/challenges only (Won - Spent)
+                      const netPosition = totalWon - totalSpent;
                   return (
                     <TableRow key={wallet.userId} className="border-gray-700">
                           <TableCell>
@@ -1920,8 +2083,16 @@ export default function FinancialDashboard() {
                                 {tx.status}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-gray-400 text-sm max-w-xs truncate">
-                              {tx.description || '-'}
+                            <TableCell className="text-gray-400 text-sm max-w-xs">
+                              <div className="truncate">
+                                {tx.description || '-'}
+                              </div>
+                              {/* Show fee details for withdrawals */}
+                              {tx.transactionType === 'withdrawal' && tx.metadata?.netAmountEUR !== undefined && (
+                                <div className="text-xs text-cyan-400 mt-0.5">
+                                  Net: €{tx.metadata.netAmountEUR?.toFixed(2)} | Fee: €{tx.metadata.platformFee?.toFixed(2) || '0.00'}
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell 
                               className="font-mono text-xs text-gray-500 cursor-pointer hover:text-gray-300"
@@ -2180,6 +2351,11 @@ export default function FinancialDashboard() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* RECONCILIATION TAB */}
+        <TabsContent value="reconciliation" className="space-y-6">
+          <ReconciliationSection />
         </TabsContent>
       </Tabs>
 
@@ -2479,8 +2655,38 @@ export default function FinancialDashboard() {
                 </div>
               )}
 
+              {/* Withdrawal Fee Breakdown */}
+              {selectedTransaction.transactionType === 'withdrawal' && selectedTransaction.metadata && (
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <DollarSign className="h-4 w-4 text-blue-400" />
+                    <span className="text-white font-medium">Withdrawal Fee Breakdown</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Withdrawal Amount:</span>
+                      <span className="text-white">{currencySymbol}{(selectedTransaction.metadata.amountEUR || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Platform Fee:</span>
+                      <span className="text-red-400">-{currencySymbol}{(selectedTransaction.metadata.platformFee || 0).toFixed(2)}</span>
+                    </div>
+                    {selectedTransaction.metadata.bankFee !== undefined && selectedTransaction.metadata.bankFee > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Bank Fee:</span>
+                        <span className="text-red-400">-{currencySymbol}{selectedTransaction.metadata.bankFee.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-medium border-t border-blue-500/30 pt-2 mt-2">
+                      <span className="text-blue-300">User Receives:</span>
+                      <span className="text-green-400 text-lg">{currencySymbol}{(selectedTransaction.metadata.netAmountEUR || 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Metadata */}
-              {selectedTransaction.metadata && Object.keys(selectedTransaction.metadata).length > 0 && (
+              {selectedTransaction.metadata && Object.keys(selectedTransaction.metadata).length > 0 && selectedTransaction.transactionType !== 'withdrawal' && (
                 <div className="bg-gray-800 rounded-lg p-4">
                   <div className="text-xs text-gray-500 mb-2">Additional Details</div>
                   <div className="space-y-2">

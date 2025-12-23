@@ -1,0 +1,740 @@
+import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
+import { auth } from '@/lib/better-auth/auth';
+import { headers } from 'next/headers';
+import { connectToDatabase } from '@/database/mongoose';
+import WithdrawalSettings from '@/database/models/withdrawal-settings.model';
+import WithdrawalRequest from '@/database/models/withdrawal-request.model';
+import CreditWallet from '@/database/models/trading/credit-wallet.model';
+import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
+import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
+import Challenge from '@/database/models/trading/challenge.model';
+import AppSettings from '@/database/models/app-settings.model';
+import UserBankAccount from '@/database/models/user-bank-account.model';
+
+/**
+ * GET /api/wallet/withdraw
+ * Get withdrawal eligibility and settings for current user
+ */
+export async function GET() {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    await connectToDatabase();
+
+    const [withdrawalSettings, creditSettings, wallet, appSettings] = await Promise.all([
+      WithdrawalSettings.getSingleton(),
+      CreditConversionSettings.getSingleton(),
+      CreditWallet.findOne({ userId: session.user.id }),
+      AppSettings.findById('global-app-settings'),
+    ]);
+
+    if (!wallet) {
+      return NextResponse.json({
+        success: true,
+        eligible: false,
+        reason: 'No wallet found',
+        settings: null,
+      });
+    }
+
+    const isSandbox = appSettings?.simulatorModeEnabled ?? true;
+
+    // Check eligibility
+    const eligibility = await checkWithdrawalEligibility(
+      session.user.id,
+      wallet,
+      withdrawalSettings,
+      creditSettings,
+      isSandbox
+    );
+
+    // Calculate fees
+    const feePercentage = withdrawalSettings.useCustomFees
+      ? withdrawalSettings.platformFeePercentage
+      : creditSettings.platformWithdrawalFeePercentage;
+    const feeFixed = withdrawalSettings.useCustomFees
+      ? withdrawalSettings.platformFeeFixed
+      : 0;
+
+    // Get user's last deposit for original payment method
+    const lastDeposit = await WalletTransaction.findOne({
+      userId: session.user.id,
+      transactionType: 'deposit',
+      status: 'completed',
+    }).sort({ createdAt: -1 });
+
+    // Get user's bank accounts for withdrawals
+    const bankAccounts = await UserBankAccount.getUserAccounts(session.user.id);
+    const defaultBankAccount = bankAccounts.find(a => a.isDefault) || bankAccounts[0];
+    const hasBankAccount = bankAccounts.length > 0;
+
+    // Get conversion rate
+    const conversionRate = creditSettings.eurToCreditsRate || 100;
+    const balanceEUR = wallet.creditBalance / conversionRate;
+
+    // Build available withdrawal methods
+    const availableWithdrawalMethods: Array<{
+      id: string;
+      type: 'original_method' | 'bank_account';
+      label: string;
+      details: string;
+      cardBrand?: string;
+      cardLast4?: string;
+      bankName?: string;
+      ibanLast4?: string;
+      country?: string;
+      isDefault?: boolean;
+    }> = [];
+
+    // Add original payment method if available
+    if (lastDeposit?.paymentMethod) {
+      const cardLast4 = lastDeposit.metadata?.cardLast4 || lastDeposit.metadata?.last4;
+      const cardBrand = lastDeposit.metadata?.cardBrand || lastDeposit.metadata?.brand || lastDeposit.paymentMethod;
+      availableWithdrawalMethods.push({
+        id: 'original_method',
+        type: 'original_method',
+        label: `Original Payment Method`,
+        details: cardLast4 ? `${cardBrand} •••• ${cardLast4}` : cardBrand,
+        cardBrand,
+        cardLast4,
+      });
+    }
+
+    // Add bank accounts
+    for (const bankAccount of bankAccounts) {
+      availableWithdrawalMethods.push({
+        id: bankAccount._id.toString(),
+        type: 'bank_account',
+        label: bankAccount.nickname || `Bank Account ****${bankAccount.ibanLast4}`,
+        details: bankAccount.bankName 
+          ? `${bankAccount.bankName} (****${bankAccount.ibanLast4})`
+          : `****${bankAccount.ibanLast4}`,
+        bankName: bankAccount.bankName,
+        ibanLast4: bankAccount.ibanLast4,
+        country: bankAccount.country,
+        isDefault: bankAccount.isDefault,
+      });
+    }
+
+    // Update warning if no methods available
+    if (availableWithdrawalMethods.length === 0 && eligibility.eligible) {
+      eligibility.warnings = eligibility.warnings || [];
+      eligibility.warnings.push('No withdrawal method available. Please add a bank account or make a deposit first.');
+    }
+
+    return NextResponse.json({
+      success: true,
+      eligible: eligibility.eligible,
+      reason: eligibility.reason,
+      warnings: eligibility.warnings,
+      wallet: {
+        balance: wallet.creditBalance,
+        balanceEUR: balanceEUR,
+        totalDeposited: wallet.totalDeposited,
+        totalWithdrawn: wallet.totalWithdrawn,
+        kycVerified: wallet.kycVerified,
+        withdrawalEnabled: wallet.withdrawalEnabled,
+      },
+      settings: {
+        minimumWithdrawal: withdrawalSettings.minimumWithdrawal,
+        maximumWithdrawal: withdrawalSettings.maximumWithdrawal,
+        dailyLimit: withdrawalSettings.dailyWithdrawalLimit,
+        monthlyLimit: withdrawalSettings.monthlyWithdrawalLimit,
+        feePercentage,
+        feeFixed,
+        processingTimeHours: withdrawalSettings.processingTimeHours,
+        allowedMethods: withdrawalSettings.allowedPayoutMethods,
+        preferredMethod: withdrawalSettings.preferredPayoutMethod,
+        requireKYC: withdrawalSettings.requireKYC,
+        conversionRate: conversionRate,
+      },
+      isSandbox,
+      originalPaymentMethod: lastDeposit?.paymentMethod || null,
+      // Available withdrawal methods for dropdown
+      availableWithdrawalMethods,
+      hasWithdrawalMethod: availableWithdrawalMethods.length > 0,
+      // Legacy bank account info
+      hasBankAccount,
+      bankAccount: defaultBankAccount ? {
+        id: defaultBankAccount._id,
+        nickname: defaultBankAccount.nickname,
+        bankName: defaultBankAccount.bankName,
+        ibanLast4: defaultBankAccount.ibanLast4,
+        country: defaultBankAccount.country,
+        isVerified: defaultBankAccount.isVerified,
+      } : null,
+      bankAccountCount: bankAccounts.length,
+    });
+  } catch (error) {
+    console.error('Error getting withdrawal info:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to get withdrawal information' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/wallet/withdraw
+ * Create a new withdrawal request
+ */
+export async function POST(request: NextRequest) {
+  const mongoSession = await mongoose.startSession();
+  mongoSession.startTransaction();
+
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { amountEUR, withdrawalMethodId, userNote } = body;
+
+    if (!amountEUR || amountEUR <= 0) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid withdrawal amount' },
+        { status: 400 }
+      );
+    }
+
+    if (!withdrawalMethodId) {
+      return NextResponse.json(
+        { success: false, error: 'Please select a withdrawal method' },
+        { status: 400 }
+      );
+    }
+
+    await connectToDatabase();
+
+    const [withdrawalSettings, creditSettings, wallet, appSettings] = await Promise.all([
+      WithdrawalSettings.getSingleton(),
+      CreditConversionSettings.getSingleton(),
+      CreditWallet.findOne({ userId: session.user.id }).session(mongoSession),
+      AppSettings.findById('global-app-settings'),
+    ]);
+
+    if (!wallet) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        { success: false, error: 'Wallet not found' },
+        { status: 404 }
+      );
+    }
+
+    const isSandbox = appSettings?.simulatorModeEnabled ?? true;
+
+    // Determine withdrawal method (original method or bank account)
+    let bankAccount = null;
+    let originalPaymentDetails = null;
+    let payoutMethodType = 'bank_transfer';
+
+    if (withdrawalMethodId === 'original_method') {
+      // Using original payment method (card)
+      const lastDeposit = await WalletTransaction.findOne({
+        userId: session.user.id,
+        transactionType: 'deposit',
+        status: 'completed',
+      }).sort({ createdAt: -1 }).session(mongoSession);
+
+      if (!lastDeposit) {
+        await mongoSession.abortTransaction();
+        return NextResponse.json(
+          { success: false, error: 'No original payment method found. Please make a deposit first or add a bank account.' },
+          { status: 400 }
+        );
+      }
+
+      payoutMethodType = 'original_method';
+      originalPaymentDetails = {
+        paymentIntentId: lastDeposit.metadata?.paymentIntentId,
+        paymentMethod: lastDeposit.paymentMethod,
+        cardBrand: lastDeposit.metadata?.cardBrand || lastDeposit.metadata?.brand,
+        cardLast4: lastDeposit.metadata?.cardLast4 || lastDeposit.metadata?.last4,
+        cardExpMonth: lastDeposit.metadata?.cardExpMonth,
+        cardExpYear: lastDeposit.metadata?.cardExpYear,
+        cardCountry: lastDeposit.metadata?.cardCountry,
+      };
+    } else {
+      // Using bank account
+      bankAccount = await UserBankAccount.findOne({
+        _id: withdrawalMethodId,
+        userId: session.user.id,
+        isActive: true,
+      }).session(mongoSession);
+
+      if (!bankAccount) {
+        await mongoSession.abortTransaction();
+        return NextResponse.json(
+          { success: false, error: 'Selected bank account not found' },
+          { status: 400 }
+        );
+      }
+      payoutMethodType = 'bank_transfer';
+    }
+
+    // Check eligibility
+    const eligibility = await checkWithdrawalEligibility(
+      session.user.id,
+      wallet,
+      withdrawalSettings,
+      creditSettings,
+      isSandbox
+    );
+
+    if (!eligibility.eligible) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        { success: false, error: eligibility.reason },
+        { status: 400 }
+      );
+    }
+
+    // Validate amount
+    if (amountEUR < withdrawalSettings.minimumWithdrawal) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        { success: false, error: `Minimum withdrawal is €${withdrawalSettings.minimumWithdrawal}` },
+        { status: 400 }
+      );
+    }
+
+    if (amountEUR > withdrawalSettings.maximumWithdrawal) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        { success: false, error: `Maximum withdrawal is €${withdrawalSettings.maximumWithdrawal}` },
+        { status: 400 }
+      );
+    }
+
+    // Convert EUR to credits
+    const exchangeRate = creditSettings.eurToCreditsRate;
+    const amountCredits = amountEUR * exchangeRate;
+
+    if (amountCredits > wallet.creditBalance) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        { success: false, error: 'Insufficient balance' },
+        { status: 400 }
+      );
+    }
+
+    // Check daily limit
+    const dailyTotal = await WithdrawalRequest.getDailyTotal(session.user.id);
+    if (withdrawalSettings.dailyWithdrawalLimit > 0 && 
+        dailyTotal + amountEUR > withdrawalSettings.dailyWithdrawalLimit) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        { success: false, error: `Would exceed daily limit of €${withdrawalSettings.dailyWithdrawalLimit}` },
+        { status: 400 }
+      );
+    }
+
+    // Check monthly limit
+    const monthlyTotal = await WithdrawalRequest.getMonthlyTotal(session.user.id);
+    if (withdrawalSettings.monthlyWithdrawalLimit > 0 && 
+        monthlyTotal + amountEUR > withdrawalSettings.monthlyWithdrawalLimit) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        { success: false, error: `Would exceed monthly limit of €${withdrawalSettings.monthlyWithdrawalLimit}` },
+        { status: 400 }
+      );
+    }
+
+    // Calculate fees
+    const feePercentage = withdrawalSettings.useCustomFees
+      ? withdrawalSettings.platformFeePercentage
+      : creditSettings.platformWithdrawalFeePercentage;
+    const feeFixed = withdrawalSettings.useCustomFees
+      ? withdrawalSettings.platformFeeFixed
+      : 0;
+
+    const platformFee = (amountEUR * feePercentage / 100) + feeFixed;
+    const platformFeeCredits = platformFee * exchangeRate;
+    const netAmountEUR = amountEUR - platformFee;
+
+    // Deduct credits from wallet
+    const balanceBefore = wallet.creditBalance;
+    wallet.creditBalance -= amountCredits;
+    await wallet.save({ session: mongoSession });
+
+    // Build withdrawal request data based on selected method
+    const withdrawalRequestData: any = {
+      userId: session.user.id,
+      userEmail: session.user.email,
+      userName: session.user.name,
+      amountCredits,
+      amountEUR,
+      exchangeRate,
+      platformFee,
+      platformFeeCredits,
+      bankFee: 0, // Will be calculated when processing
+      netAmountEUR,
+      status: 'pending',
+      payoutMethod: payoutMethodType,
+      walletBalanceBefore: balanceBefore,
+      walletBalanceAfter: wallet.creditBalance,
+      isSandbox,
+      kycVerified: wallet.kycVerified,
+      userNote,
+      requestedAt: new Date(),
+      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+      userAgent: request.headers.get('user-agent'),
+    };
+
+    // Add method-specific details
+    if (payoutMethodType === 'original_method' && originalPaymentDetails) {
+      // Original payment method (card refund)
+      withdrawalRequestData.originalPaymentId = originalPaymentDetails.paymentIntentId;
+      withdrawalRequestData.originalPaymentMethod = originalPaymentDetails.paymentMethod;
+      withdrawalRequestData.originalCardDetails = {
+        brand: originalPaymentDetails.cardBrand,
+        last4: originalPaymentDetails.cardLast4,
+        expMonth: originalPaymentDetails.cardExpMonth,
+        expYear: originalPaymentDetails.cardExpYear,
+        country: originalPaymentDetails.cardCountry,
+      };
+    } else if (bankAccount) {
+      // Bank transfer
+      withdrawalRequestData.bankDetails = {
+        accountHolderName: bankAccount.accountHolderName,
+        iban: bankAccount.ibanLast4 ? `****${bankAccount.ibanLast4}` : undefined,
+        fullIban: bankAccount.iban, // Store full IBAN for processing
+        bankName: bankAccount.bankName,
+        swiftBic: bankAccount.swiftBic,
+        country: bankAccount.country,
+      };
+      withdrawalRequestData.bankAccountId = bankAccount._id;
+    }
+
+    // Create withdrawal request
+    const withdrawalRequest = await WithdrawalRequest.create(
+      [withdrawalRequestData],
+      { session: mongoSession }
+    );
+
+    // Record wallet transaction
+    await WalletTransaction.create(
+      [{
+        userId: session.user.id,
+        transactionType: 'withdrawal',
+        amount: -amountCredits,
+        balanceBefore,
+        balanceAfter: wallet.creditBalance,
+        currency: 'EUR',
+        exchangeRate,
+        status: 'pending',
+        description: `Withdrawal request for €${amountEUR.toFixed(2)}`,
+        metadata: {
+          withdrawalRequestId: withdrawalRequest[0]._id,
+          netAmountEUR,
+          platformFee,
+        },
+      }],
+      { session: mongoSession }
+    );
+
+    // Check for auto-approval and immediate processing
+    let autoApproved = false;
+    let immediatelyProcessed = false;
+    let processResult: { success: boolean; payoutId?: string; status?: string; error?: string } | null = null;
+
+    if (isSandbox && withdrawalSettings.sandboxAutoApprove) {
+      // Auto-approve sandbox withdrawals
+      withdrawalRequest[0].status = 'approved';
+      withdrawalRequest[0].isAutoApproved = true;
+      withdrawalRequest[0].autoApprovalReason = 'Sandbox mode auto-approval';
+      withdrawalRequest[0].processedAt = new Date();
+      await withdrawalRequest[0].save({ session: mongoSession });
+      autoApproved = true;
+    } else if (
+      withdrawalSettings.processingMode === 'automatic' &&
+      withdrawalSettings.autoApproveEnabled &&
+      amountEUR <= withdrawalSettings.autoApproveMaxAmount
+    ) {
+      // Check auto-approval criteria for production
+      const accountCreatedAt = new Date(session.user.createdAt || Date.now());
+      const accountAge = Math.floor((Date.now() - accountCreatedAt.getTime()) / (1000 * 60 * 60 * 24));
+      
+      const previousWithdrawals = await WithdrawalRequest.countDocuments({
+        userId: session.user.id,
+        status: 'completed',
+      });
+
+      const meetsKYC = !withdrawalSettings.autoApproveRequireKYC || wallet.kycVerified;
+      const meetsAge = accountAge >= withdrawalSettings.autoApproveMinAccountAge;
+      const meetsHistory = previousWithdrawals >= withdrawalSettings.autoApproveMinSuccessfulWithdrawals;
+
+      if (meetsKYC && meetsAge && meetsHistory) {
+        withdrawalRequest[0].status = 'approved';
+        withdrawalRequest[0].isAutoApproved = true;
+        withdrawalRequest[0].autoApprovalReason = `Met auto-approval criteria: Amount ≤ €${withdrawalSettings.autoApproveMaxAmount}, Account age ${accountAge} days, Previous withdrawals: ${previousWithdrawals}`;
+        withdrawalRequest[0].processedAt = new Date();
+        await withdrawalRequest[0].save({ session: mongoSession });
+        autoApproved = true;
+      }
+    }
+
+    await mongoSession.commitTransaction();
+
+    // If auto-approved, immediately process the withdrawal (outside the transaction)
+    if (autoApproved) {
+      try {
+        const { processWithdrawal } = await import('@/lib/services/withdrawal.service');
+        processResult = await processWithdrawal(
+          withdrawalRequest[0]._id.toString(),
+          'system',
+          'auto-processor'
+        );
+        
+        if (processResult.success) {
+          immediatelyProcessed = true;
+          // Refresh the withdrawal status
+          const updatedWithdrawal = await WithdrawalRequest.findById(withdrawalRequest[0]._id);
+          if (updatedWithdrawal) {
+            withdrawalRequest[0] = updatedWithdrawal;
+          }
+        }
+      } catch (processError) {
+        console.error('Auto-processing failed:', processError);
+        // Don't fail the request - withdrawal is still approved, will be processed by worker
+      }
+    }
+
+    const finalStatus = withdrawalRequest[0].status;
+    let message = 'Withdrawal request submitted successfully. It will be reviewed shortly.';
+    
+    if (autoApproved && immediatelyProcessed && finalStatus === 'completed') {
+      message = '🎉 Withdrawal processed successfully! Funds are on the way.';
+    } else if (autoApproved && immediatelyProcessed && finalStatus === 'processing') {
+      message = 'Withdrawal approved and being processed! You will be notified when complete.';
+    } else if (autoApproved) {
+      message = 'Withdrawal request approved! Processing will begin shortly.';
+    }
+
+    return NextResponse.json({
+      success: true,
+      message,
+      withdrawalRequest: {
+        id: withdrawalRequest[0]._id,
+        status: finalStatus,
+        amountEUR,
+        netAmountEUR,
+        platformFee,
+        estimatedProcessingHours: withdrawalSettings.processingTimeHours,
+        isAutoApproved: autoApproved,
+        immediatelyProcessed,
+        payoutId: processResult?.payoutId,
+      },
+    });
+  } catch (error) {
+    await mongoSession.abortTransaction();
+    console.error('Error creating withdrawal:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to create withdrawal request' },
+      { status: 500 }
+    );
+  } finally {
+    mongoSession.endSession();
+  }
+}
+
+/**
+ * Check if user is eligible for withdrawal
+ */
+async function checkWithdrawalEligibility(
+  userId: string,
+  wallet: any,
+  settings: any,
+  creditSettings: any,
+  isSandbox: boolean
+): Promise<{ eligible: boolean; reason: string; warnings: string[] }> {
+  const warnings: string[] = [];
+  
+  // Get the actual conversion rate from credit settings
+  const conversionRate = creditSettings?.eurToCreditsRate || 100;
+
+  // Check if sandbox withdrawals are enabled
+  if (isSandbox && !settings.sandboxEnabled) {
+    return {
+      eligible: false,
+      reason: 'Withdrawals are disabled in sandbox mode',
+      warnings,
+    };
+  }
+
+  // Check if wallet is active
+  if (!wallet.isActive) {
+    return {
+      eligible: false,
+      reason: 'Your wallet is inactive. Please contact support.',
+      warnings,
+    };
+  }
+  
+  // Note: wallet.withdrawalEnabled is no longer checked here
+  // Admin withdrawal settings now control eligibility globally
+
+  // Check minimum balance using actual conversion rate
+  const minCreditsRequired = settings.minimumWithdrawal * conversionRate;
+  if (wallet.creditBalance < minCreditsRequired) {
+    const userBalanceEUR = (wallet.creditBalance / conversionRate).toFixed(2);
+    return {
+      eligible: false,
+      reason: `Minimum withdrawal amount is €${settings.minimumWithdrawal}. Your balance is €${userBalanceEUR}`,
+      warnings,
+    };
+  }
+
+  // Check KYC requirement
+  if (settings.requireKYC && !wallet.kycVerified) {
+    return {
+      eligible: false,
+      reason: 'KYC verification required before withdrawal. Please complete identity verification.',
+      warnings,
+    };
+  }
+
+  // Check deposit requirement
+  if (settings.minimumDepositRequired && wallet.totalDeposited === 0) {
+    return {
+      eligible: false,
+      reason: 'You must make at least one deposit before withdrawing',
+      warnings,
+    };
+  }
+
+  // Check withdrawal frequency limits
+  const todayCount = await WithdrawalRequest.countDocuments({
+    userId,
+    status: { $in: ['pending', 'approved', 'processing', 'completed'] },
+    requestedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+  });
+
+  if (todayCount >= settings.maxWithdrawalsPerDay) {
+    return {
+      eligible: false,
+      reason: `Maximum ${settings.maxWithdrawalsPerDay} withdrawal requests per day`,
+      warnings,
+    };
+  }
+
+  // Check monthly limit
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  
+  const monthCount = await WithdrawalRequest.countDocuments({
+    userId,
+    status: { $in: ['pending', 'approved', 'processing', 'completed'] },
+    requestedAt: { $gte: startOfMonth },
+  });
+
+  if (monthCount >= settings.maxWithdrawalsPerMonth) {
+    return {
+      eligible: false,
+      reason: `Maximum ${settings.maxWithdrawalsPerMonth} withdrawal requests per month`,
+      warnings,
+    };
+  }
+
+  // Check cooldown
+  if (settings.cooldownHours > 0) {
+    const lastWithdrawal = await WithdrawalRequest.findOne({
+      userId,
+      status: { $in: ['pending', 'approved', 'processing', 'completed'] },
+    }).sort({ requestedAt: -1 });
+
+    if (lastWithdrawal) {
+      const cooldownEnd = new Date(lastWithdrawal.requestedAt);
+      cooldownEnd.setHours(cooldownEnd.getHours() + settings.cooldownHours);
+      
+      if (cooldownEnd > new Date()) {
+        const hoursLeft = Math.ceil((cooldownEnd.getTime() - Date.now()) / (1000 * 60 * 60));
+        return {
+          eligible: false,
+          reason: `Please wait ${hoursLeft} more hour(s) before your next withdrawal`,
+          warnings,
+        };
+      }
+    }
+  }
+
+  // Check hold period after deposit
+  if (settings.holdPeriodAfterDeposit > 0) {
+    const lastDeposit = await WalletTransaction.findOne({
+      userId,
+      transactionType: 'deposit',
+      status: 'completed',
+    }).sort({ createdAt: -1 });
+
+    if (lastDeposit) {
+      const holdEnd = new Date(lastDeposit.createdAt);
+      holdEnd.setHours(holdEnd.getHours() + settings.holdPeriodAfterDeposit);
+      
+      if (holdEnd > new Date()) {
+        const hoursLeft = Math.ceil((holdEnd.getTime() - Date.now()) / (1000 * 60 * 60));
+        return {
+          eligible: false,
+          reason: `Please wait ${hoursLeft} more hour(s) after your last deposit`,
+          warnings,
+        };
+      }
+    }
+  }
+
+  // Check active competitions/challenges
+  if (!settings.allowWithdrawalDuringActiveCompetitions) {
+    const activeCompetitions = await CompetitionParticipant.countDocuments({
+      clerkUserId: userId,
+      status: 'active',
+    });
+
+    if (activeCompetitions > 0) {
+      warnings.push('You have active competition positions. Partial balance may be locked.');
+    }
+  }
+
+  if (settings.blockWithdrawalOnActiveChallenges) {
+    const activeChallenges = await Challenge.countDocuments({
+      $or: [{ challengerId: userId }, { challengedId: userId }],
+      status: { $in: ['pending', 'accepted', 'in_progress'] },
+    });
+
+    if (activeChallenges > 0) {
+      return {
+        eligible: false,
+        reason: 'You have active challenges. Complete or cancel them before withdrawing.',
+        warnings,
+      };
+    }
+  }
+
+  // Check pending withdrawals
+  const pendingWithdrawals = await WithdrawalRequest.countDocuments({
+    userId,
+    status: { $in: ['pending', 'approved', 'processing'] },
+  });
+
+  if (pendingWithdrawals > 0) {
+    warnings.push(`You have ${pendingWithdrawals} pending withdrawal request(s)`);
+  }
+
+  return {
+    eligible: true,
+    reason: 'Eligible for withdrawal',
+    warnings,
+  };
+}
+

@@ -47,6 +47,7 @@ import {
   Cog,
   LayoutDashboard,
   Activity,
+  ArrowUpFromLine,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -77,6 +78,8 @@ import RedisSettingsSection from '@/components/admin/RedisSettingsSection';
 import DevSettingsSection from '@/components/admin/DevSettingsSection';
 import TradingHistorySection from '@/components/admin/TradingHistorySection';
 import PerformanceSimulatorSection from '@/components/admin/PerformanceSimulatorSection';
+import WithdrawalSettingsSection from '@/components/admin/WithdrawalSettingsSection';
+import PendingWithdrawalsSection from '@/components/admin/PendingWithdrawalsSection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -206,6 +209,20 @@ const menuGroups: MenuGroup[] = [
         icon: <CreditCard className="h-5 w-5" />,
         color: 'text-yellow-400',
         bgColor: 'bg-yellow-500/10 hover:bg-yellow-500/20',
+      },
+      {
+        id: 'withdrawals',
+        label: 'Withdrawal Settings',
+        icon: <Wallet className="h-5 w-5" />,
+        color: 'text-teal-400',
+        bgColor: 'bg-teal-500/10 hover:bg-teal-500/20',
+      },
+      {
+        id: 'pending-withdrawals',
+        label: 'Pending Withdrawals',
+        icon: <ArrowUpFromLine className="h-5 w-5" />,
+        color: 'text-cyan-400',
+        bgColor: 'bg-cyan-500/10 hover:bg-cyan-500/20',
       },
     ],
   },
@@ -380,6 +397,10 @@ export default function AdminDashboard({
         return <CompetitionAnalytics />;
       case 'payments':
         return <PendingPaymentsSection />;
+      case 'withdrawals':
+        return <WithdrawalSettingsSection />;
+      case 'pending-withdrawals':
+        return <PendingWithdrawalsSection />;
       case 'fraud':
         return <FraudMonitoringSection />;
       case 'badges':

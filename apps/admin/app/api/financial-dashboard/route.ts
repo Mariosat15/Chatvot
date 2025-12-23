@@ -3,6 +3,7 @@ import { jwtVerify } from 'jose';
 import { connectToDatabase } from '@/database/mongoose';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import WithdrawalRequest from '@/database/models/withdrawal-request.model';
 import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
 import { PlatformFinancialsService } from '@/lib/services/platform-financials.service';
 import { getUsersByIds } from '@/lib/utils/user-lookup';
@@ -45,12 +46,11 @@ export async function GET(request: NextRequest) {
     const userIds = wallets.map(w => w.userId);
     const usersMap = await getUsersByIds(userIds);
 
-    // Get pending withdrawals
-    const pendingWithdrawals = await WalletTransaction.find({
-      transactionType: 'withdrawal',
-      status: 'pending',
+    // Get pending withdrawals from WithdrawalRequest (source of truth)
+    const pendingWithdrawalRequests = await WithdrawalRequest.find({
+      status: { $in: ['pending', 'approved', 'processing'] },
     })
-      .sort({ createdAt: -1 })
+      .sort({ requestedAt: -1 })
       .lean();
 
     // Get conversion settings
@@ -80,7 +80,12 @@ export async function GET(request: NextRequest) {
       .limit(50)
       .lean();
 
-    const txUserIds = [...new Set(recentTransactions.map(t => t.userId).filter(id => id !== 'platform'))];
+    // Collect all user IDs from transactions and withdrawal requests
+    const withdrawalUserIds = pendingWithdrawalRequests.map(w => w.userId);
+    const txUserIds = [...new Set([
+      ...recentTransactions.map(t => t.userId).filter(id => id !== 'platform'),
+      ...withdrawalUserIds,
+    ])];
     const txUsersMap = await getUsersByIds(txUserIds);
 
     // Calculate totals from wallets (including both competitions and challenges)
@@ -95,8 +100,9 @@ export async function GET(request: NextRequest) {
     // Calculate liability metrics
     const conversionRate = conversionSettings.eurToCreditsRate;
     const totalLiabilityEUR = totalCreditsInCirculation / conversionRate;
-    const pendingWithdrawalsTotal = pendingWithdrawals.reduce((sum, w) => sum + Math.abs(w.amount), 0);
-    const pendingWithdrawalsEUR = pendingWithdrawalsTotal / conversionRate;
+    // Use WithdrawalRequest for accurate pending amounts (in EUR)
+    const pendingWithdrawalsEUR = pendingWithdrawalRequests.reduce((sum, w) => sum + (w.amountEUR || 0), 0);
+    const pendingWithdrawalsTotal = pendingWithdrawalsEUR * conversionRate; // Convert back to credits for display
 
     return NextResponse.json({
       success: true,
@@ -116,16 +122,27 @@ export async function GET(request: NextRequest) {
             totalSpentOnChallenges: w.totalSpentOnChallenges || 0,
           };
         }),
-        pendingWithdrawals: pendingWithdrawals.map((t) => {
-          const userInfo = txUsersMap.get(t.userId);
+        pendingWithdrawals: pendingWithdrawalRequests.map((w) => {
+          const userInfo = txUsersMap.get(w.userId);
           return {
-            _id: t._id,
-            userId: t.userId,
-            userName: userInfo?.name || 'Unknown',
-            userEmail: userInfo?.email || 'Unknown',
-            amount: t.amount,
-            createdAt: t.createdAt,
-            metadata: t.metadata,
+            _id: w._id,
+            userId: w.userId,
+            userName: w.userName || userInfo?.name || 'Unknown',
+            userEmail: w.userEmail || userInfo?.email || 'Unknown',
+            amount: -(w.amountCredits || 0), // Negative for display consistency
+            amountEUR: w.amountEUR || 0,
+            status: w.status,
+            createdAt: w.requestedAt,
+            // Fee details
+            platformFee: w.platformFee || 0,
+            bankFee: w.bankFee || 0,
+            netAmountEUR: w.netAmountEUR || 0,
+            metadata: {
+              netAmountEUR: w.netAmountEUR,
+              platformFee: w.platformFee,
+              bankFee: w.bankFee,
+              amountEUR: w.amountEUR,
+            },
           };
         }),
         platformStats: {
@@ -159,10 +176,36 @@ export async function GET(request: NextRequest) {
           platformNetCredits: platformFinancialStats.platformNetCredits,
           platformNetEUR: platformFinancialStats.platformNetEUR,
         },
-        recentTransactions: recentTransactions.slice(0, 20).map((t) => {
+        recentTransactions: await Promise.all(recentTransactions.slice(0, 20).map(async (t) => {
           const userInfo = t.userId === 'platform' 
             ? { name: 'Platform', email: 'system' }
             : txUsersMap.get(t.userId);
+          
+          // For withdrawals, get actual status and fee details from WithdrawalRequest (source of truth)
+          let actualStatus = t.status;
+          let enrichedMetadata = { ...t.metadata };
+          
+          if (t.transactionType === 'withdrawal' && t.metadata?.withdrawalRequestId) {
+            const withdrawalReq = await WithdrawalRequest.findById(t.metadata.withdrawalRequestId).lean();
+            if (withdrawalReq) {
+              // Map withdrawal request status to wallet transaction status
+              if (withdrawalReq.status === 'completed') actualStatus = 'completed';
+              else if (withdrawalReq.status === 'rejected' || withdrawalReq.status === 'failed') actualStatus = 'failed';
+              else if (withdrawalReq.status === 'cancelled') actualStatus = 'cancelled';
+              else actualStatus = 'pending'; // pending, approved, processing all show as pending
+              
+              // Enrich metadata with fee details
+              enrichedMetadata = {
+                ...enrichedMetadata,
+                amountEUR: withdrawalReq.amountEUR,
+                platformFee: withdrawalReq.platformFee,
+                bankFee: withdrawalReq.bankFee,
+                netAmountEUR: withdrawalReq.netAmountEUR,
+                withdrawalStatus: withdrawalReq.status,
+              };
+            }
+          }
+          
           return {
             _id: t._id,
             userId: t.userId,
@@ -170,14 +213,14 @@ export async function GET(request: NextRequest) {
             userEmail: userInfo?.email || 'Unknown',
             transactionType: t.transactionType,
             amount: t.amount,
-            status: t.status,
+            status: actualStatus,
             createdAt: t.createdAt,
             description: t.description,
             competitionId: t.competitionId,
             paymentMethod: t.paymentMethod,
-            metadata: t.metadata,
+            metadata: enrichedMetadata,
           };
-        }),
+        })),
         conversionRate: conversionSettings.eurToCreditsRate,
       },
     });

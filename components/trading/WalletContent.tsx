@@ -1,10 +1,13 @@
 'use client';
 
-import { Wallet, TrendingUp, TrendingDown, DollarSign, History, ArrowDownCircle, ArrowUpCircle, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Wallet, TrendingUp, TrendingDown, DollarSign, History, ArrowDownCircle, ArrowUpCircle, Zap, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DepositModal from '@/components/trading/DepositModal';
 import WithdrawalModal from '@/components/trading/WithdrawalModal';
 import TransactionHistory from '@/components/trading/TransactionHistory';
+import BankAccountsSection from '@/components/wallet/BankAccountsSection';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 
 interface WalletContentProps {
@@ -23,12 +26,64 @@ interface WalletContentProps {
 }
 
 export default function WalletContent({ stats, transactions }: WalletContentProps) {
-  const { formatCredits, settings, creditsToEUR } = useAppSettings();
+  const { settings, creditsToEUR } = useAppSettings();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [paymentStatus, setPaymentStatus] = useState<'success' | 'error' | null>(null);
+
+  // Handle payment return from Stripe/Paddle
+  useEffect(() => {
+    const payment = searchParams.get('payment');
+    const paddleSuccess = searchParams.get('paddle_status');
+    const error = searchParams.get('error');
+
+    if (payment === 'success' || paddleSuccess === 'completed') {
+      setPaymentStatus('success');
+      // Clear URL params after showing message
+      setTimeout(() => {
+        router.replace('/wallet', { scroll: false });
+      }, 5000);
+    } else if (error || payment === 'failed' || paddleSuccess === 'failed') {
+      setPaymentStatus('error');
+      setTimeout(() => {
+        router.replace('/wallet', { scroll: false });
+      }, 5000);
+    }
+  }, [searchParams, router]);
 
   if (!settings) return null;
 
   return (
     <div className="flex min-h-screen flex-col gap-8 p-4 md:p-8">
+      {/* Payment Status Banner */}
+      {paymentStatus === 'success' && (
+        <div className="animate-in fade-in slide-in-from-top-4 rounded-xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 p-6 flex items-center gap-4">
+          <div className="rounded-full bg-green-500/20 p-3">
+            <CheckCircle2 className="h-8 w-8 text-green-500" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-green-400">Payment Successful!</h3>
+            <p className="text-sm text-gray-300 mt-1">
+              Your {settings.credits.name} have been added to your wallet. They may take a few moments to appear.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {paymentStatus === 'error' && (
+        <div className="animate-in fade-in slide-in-from-top-4 rounded-xl bg-gradient-to-r from-red-500/20 to-rose-500/20 border border-red-500/30 p-6 flex items-center gap-4">
+          <div className="rounded-full bg-red-500/20 p-3">
+            <XCircle className="h-8 w-8 text-red-500" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-red-400">Payment Failed</h3>
+            <p className="text-sm text-gray-300 mt-1">
+              There was an issue processing your payment. Please try again or contact support.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -87,21 +142,13 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
               <Button
                 variant="outline"
                 className="flex-1 border-gray-600 bg-gray-800/50 hover:bg-gray-800 text-gray-100 h-14 text-lg hover:scale-105 transition-all"
-                disabled={!stats.withdrawalEnabled || stats.currentBalance < 10}
+                disabled={stats.currentBalance < 1}
               >
                 <ArrowUpCircle className="mr-2 h-6 w-6" />
                 Withdraw
               </Button>
             </WithdrawalModal>
           </div>
-
-          {!stats.kycVerified && (
-            <div className="mt-4 rounded-lg bg-orange-500/10 border border-orange-500/20 p-3">
-              <p className="text-xs text-orange-400">
-                ⚠️ KYC verification required for withdrawals. Contact support to verify your account.
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -208,6 +255,9 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
           </div>
         </div>
       </div>
+
+      {/* Bank Accounts for Withdrawals */}
+      <BankAccountsSection />
 
       {/* Transaction History */}
       <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">

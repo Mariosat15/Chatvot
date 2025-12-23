@@ -79,7 +79,7 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
     withdrawalEnabled: {
       type: Boolean,
       required: true,
-      default: false,
+      default: true, // Enable by default - admin settings control actual eligibility
     },
   },
   {

@@ -42,6 +42,7 @@ import { runChallengeFinalizeCheck } from './jobs/challenge-finalize.job';
 import { runTradeQueueProcessor } from './jobs/trade-queue.job';
 import { runPriceCacheUpdate } from './jobs/price-cache.job';
 import { runBadgeEvaluation } from './jobs/evaluate-badges.job';
+import { defineWithdrawalProcessJob, scheduleWithdrawalJobs } from './jobs/withdrawal-process.job';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -220,6 +221,9 @@ agenda.define('evaluate-badges', async () => {
   }
 });
 
+// Define withdrawal processing jobs
+defineWithdrawalProcessJob(agenda);
+
 // ============================================
 // GRACEFUL SHUTDOWN
 // ============================================
@@ -272,6 +276,9 @@ async function startWorker(): Promise<void> {
     await agenda.every('1 minute', 'trade-queue');  // BACKUP sweep - real-time happens in main app
     await agenda.every('1 minute', 'price-cache');
     await agenda.every('1 hour', 'evaluate-badges');
+    
+    // Schedule withdrawal processing jobs
+    await scheduleWithdrawalJobs(agenda);
 
     console.log('\n📅 Scheduled Jobs:');
     console.log('   • margin-check: every 5 minutes');
@@ -280,6 +287,9 @@ async function startWorker(): Promise<void> {
     console.log('   • trade-queue: every 1 minute (backup TP/SL sweep & limit orders)');
     console.log('   • price-cache: every 1 minute');
     console.log('   • evaluate-badges: every 1 hour');
+    console.log('   • check-pending-withdrawals: every 1 hour (status summary)');
+    console.log('   • check-stuck-withdrawals: every 6 hours');
+    console.log('   • check-old-pending-withdrawals: every 12 hours');
     console.log('\n⚡ TP/SL Note: Real-time triggers happen in main app on price updates!');
     console.log('   Worker trade-queue is a BACKUP sweep to catch any missed closures.');
     console.log('\n🚀 Worker is running! Press Ctrl+C to stop.\n');
