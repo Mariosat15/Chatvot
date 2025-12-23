@@ -362,7 +362,7 @@ export default function CompetitionsListSection() {
 
               {/* Right: Actions */}
               <div className="flex flex-col gap-2">
-                <Link href={`/admin/competitions/view/${competition._id}`}>
+                <Link href={`/competitions/view/${competition._id}`}>
                   <Button
                     size="sm"
                     variant="outline"
@@ -373,7 +373,7 @@ export default function CompetitionsListSection() {
                   </Button>
                 </Link>
                 
-                <Link href={`/admin/competitions/edit/${competition._id}`}>
+                <Link href={`/competitions/edit/${competition._id}`}>
                   <Button
                     size="sm"
                     variant="outline"
