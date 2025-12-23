@@ -108,12 +108,31 @@ PADDLE_VENDOR_ID=...
 PADDLE_API_KEY=...
 ```
 
+
+Ctrl + O  →  Save
+Enter     →  Confirm
+Ctrl + X  →  Exit
+
 ### 4. Install Dependencies
 
 ```bash
 npm install
 cd apps/admin && npm install && cd ../..
 ```
+cd apps/admin
+npm install
+cd ../..
+
+cd api-server
+npm install
+cd ..
+
+I Recommend Option 1 id issue with files
+mv Chatvot/* .
+mv Chatvot/.* . 2>/dev/null
+rm -rf Chatvot
+ls
+
 
 ### 5. Build All Apps
 
@@ -170,6 +189,21 @@ sudo systemctl reload nginx
 # Start all apps with PM2
 pm2 start ecosystem.config.js
 
+if │ 3  │ chartvolt-api       │ default     │ 1.0.0   │ fork    │ 0        │ 0      │ 30   │ errored   │ 0%       │ 0b       │ root     │ disabled 
+-------------
+then Generate secret put it in .env
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 
+sed -i "s/BETTER_AUTH_SECRET=.*/BETTER_AUTH_SECRET=$(openssl rand -hex 32)/" .env
+Verify it changed:
+grep BETTER_AUTH_SECRET .env
+
+Reload and restart:
+export $(grep -v '^#' .env | xargs)
+pm2 delete chartvolt-api 2>/dev/null
+pm2 start api-server/dist/index.js --name chartvolt-api
+pm2 save
+pm2 status
+
 # Save PM2 configuration
 pm2 save
 
@@ -188,9 +222,29 @@ sudo certbot --nginx -d chartvolt.com -d www.chartvolt.com -d admin.chartvolt.co
 sudo certbot renew --dry-run
 ```
 
+----------MongoDB Atlas IP Whitelist Issue!-------
+Go to MongoDB Atlas
+Select your cluster (Cluster0)
+SECURITY section → Database & Network Access
+Click on "Database & Network Access" - that's where you add the IP whitelist!
+Select the "Network Access" tab (or "IP Access List")
+Click "+ Add IP Address"
+Enter: 148.230.124.57 (your VPS IP)
+Click Confirm
 ## Management Commands
 
 ### PM2 Commands
+
+admin not log in -------------
+Quick Fix - Create Symlink:
+ln -sf /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
+Then restart:
+pm2 restart chartvolt-admin
+
+Or Copy the .env:
+cp /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
+pm2 restart chartvolt-admin
+
 
 ```bash
 # View all apps status
