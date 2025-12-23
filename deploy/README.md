@@ -245,11 +245,20 @@ Or Copy the .env:
 cp /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
 pm2 restart chartvolt-admin
 -------
-this is to update the server with latest git
+this is to update the server with latest git for admin
 cd /var/www/chartvolt
 git pull origin main
 npm run build:admin
 pm2 restart chartvolt-admin
+
+
+----------------------this is to update the server with latest git for worker
+
+cd /var/www/chartvolt 
+git pull origin main
+npm run worker:build
+pm2 restart chartvolt-worker
+pm2 logs chartvolt-worker --lines 50
 
 ```bash
 # View all apps status

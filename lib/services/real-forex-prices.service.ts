@@ -344,6 +344,43 @@ export async function fetchRealForexPrices(symbols: ForexSymbol[]): Promise<Map<
     }
   }
 
+  // STEP 2.5: For still missing symbols, check MongoDB PriceCache
+  // This is the fallback for worker processes that don't have WebSocket/Redis
+  // The web app writes prices to MongoDB, worker reads them here
+  const stillMissingAfterRedis = symbols.filter(s => !pricesMap.has(s));
+  if (stillMissingAfterRedis.length > 0) {
+    try {
+      const { connectToDatabase } = await import('@/database/mongoose');
+      const PriceCache = (await import('@/database/models/price-cache.model')).default;
+      
+      await connectToDatabase();
+      const mongoPrices = await PriceCache.getAllPrices();
+      
+      for (const symbol of stillMissingAfterRedis) {
+        const cached = mongoPrices.get(symbol);
+        if (cached) {
+          const quote: PriceQuote = {
+            symbol,
+            bid: cached.bid,
+            ask: cached.ask,
+            mid: (cached.bid + cached.ask) / 2,
+            spread: cached.spread,
+            timestamp: cached.timestamp,
+          };
+          pricesMap.set(symbol, quote);
+          lastKnownPrices.set(symbol, quote);
+        }
+      }
+      
+      if (mongoPrices.size > 0) {
+        console.log(`📦 [MongoDB Cache] Read ${mongoPrices.size} prices from cache`);
+      }
+    } catch (mongoError) {
+      // MongoDB fallback failed, continue to API
+      console.warn('⚠️ MongoDB price cache read failed:', mongoError);
+    }
+  }
+
   // STEP 3: For still missing symbols, fetch from API (blocking for first load only)
   const stillMissing = symbols.filter(s => !pricesMap.has(s));
   if (stillMissing.length > 0) {
