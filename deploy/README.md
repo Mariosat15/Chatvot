@@ -2,28 +2,37 @@
 
 Complete guide for deploying Chartvolt to a Hostinger VPS.
 
+## 🌐 Production Details
+
+| Item | Value |
+|------|-------|
+| **Domain** | chartvolt.com |
+| **Admin Domain** | admin.chartvolt.com |
+| **VPS IP** | 148.230.124.57 |
+| **Provider** | Hostinger |
+
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    HOSTINGER VPS                                │
+│                HOSTINGER VPS (148.230.124.57)                   │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │  NGINX (Reverse Proxy)                                   │  │
 │  │  - chartvolt.com → User App (3000)                      │  │
+│  │  - chartvolt.com/api/auth/* → API Server (4000)         │  │
 │  │  - admin.chartvolt.com → Admin App (3001)               │  │
 │  │  - SSL/TLS termination                                   │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                           │                                     │
-│         ┌─────────────────┼─────────────────┐                  │
-│         │                 │                 │                  │
-│  ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐          │
-│  │  USER APP   │   │  ADMIN APP  │   │   WORKER    │          │
-│  │  Port 3000  │   │  Port 3001  │   │  (No port)  │          │
-│  │  PM2        │   │  PM2        │   │  PM2        │          │
-│  └──────┬──────┘   └──────┬──────┘   └──────┬──────┘          │
-│         │                 │                 │                  │
-│         └─────────────────┼─────────────────┘                  │
+│    ┌──────────────────────┼──────────────────────┐             │
+│    │          │           │           │          │             │
+│  ┌─▼────┐  ┌──▼───┐  ┌────▼────┐  ┌───▼────┐                  │
+│  │ USER │  │ADMIN │  │   API   │  │ WORKER │                  │
+│  │ APP  │  │ APP  │  │ SERVER  │  │        │                  │
+│  │:3000 │  │:3001 │  │ :4000   │  │(no port│                  │
+│  └──┬───┘  └──┬───┘  └────┬────┘  └───┬────┘                  │
+│     └─────────┴───────────┴───────────┘                        │
 │                           │                                     │
 │                    ┌──────▼──────┐                              │
 │                    │   MongoDB   │                              │
@@ -35,7 +44,7 @@ Complete guide for deploying Chartvolt to a Hostinger VPS.
 ## Prerequisites
 
 - Hostinger VPS (4GB RAM minimum recommended)
-- Domain name configured with DNS pointing to VPS IP
+- Domain name configured with DNS pointing to VPS IP (148.230.124.57)
 - MongoDB Atlas account (or self-hosted MongoDB)
 
 ## Quick Start
@@ -44,10 +53,10 @@ Complete guide for deploying Chartvolt to a Hostinger VPS.
 
 ```bash
 # Connect to your VPS
-ssh root@your-server-ip
+ssh root@148.230.124.57
 
 # Download and run setup script
-curl -O https://raw.githubusercontent.com/your-repo/chartvolt/main/deploy/setup-server.sh
+curl -O https://raw.githubusercontent.com/Mariosat15/Chatvot/main/deploy/setup-server.sh
 chmod +x setup-server.sh
 sudo ./setup-server.sh
 ```
@@ -75,16 +84,28 @@ Required environment variables:
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/chartvolt
 
 # Authentication
-BETTER_AUTH_SECRET=your-secret-key
+BETTER_AUTH_SECRET=your-secret-key-min-32-chars
 BETTER_AUTH_URL=https://chartvolt.com
 
+# App URLs
+NEXT_PUBLIC_APP_URL=https://chartvolt.com
+ADMIN_URL=https://admin.chartvolt.com
+
 # Admin
-ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_EMAIL=admin@chartvolt.com
 ADMIN_PASSWORD=your-secure-password
+
+# API Server
+API_PORT=4000
 
 # Stripe (optional)
 STRIPE_SECRET_KEY=sk_...
 STRIPE_PUBLISHABLE_KEY=pk_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Paddle (optional)
+PADDLE_VENDOR_ID=...
+PADDLE_API_KEY=...
 ```
 
 ### 4. Install Dependencies
@@ -102,21 +123,37 @@ npm run build:all
 
 ### 6. Configure NGINX
 
+> ⚠️ **IMPORTANT: Rate Limiting Must Be Added Manually**
+> 
+> Nginx requires rate limiting zones to be defined in the main config file BEFORE using them.
+
 ```bash
 # STEP 1: Add rate limiting to main nginx.conf
 sudo nano /etc/nginx/nginx.conf
+```
 
-# Add these lines inside the http {} block:
-# limit_req_zone $binary_remote_addr zone=admin_limit:10m rate=1r/s;
-# limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
-# limit_req_status 429;
+**Add these lines inside the `http {}` block (REQUIRED):**
+```nginx
+http {
+    # ... existing settings ...
+    
+    # Rate limiting zones (ADD THIS - REQUIRED!)
+    limit_req_zone $binary_remote_addr zone=admin_limit:10m rate=1r/s;
+    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+    limit_req_status 429;
+    
+    # ... rest of config ...
+}
+```
 
+```bash
 # STEP 2: Copy site config
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
 
-# STEP 3: Edit domain names
-sudo nano /etc/nginx/sites-available/chartvolt
-# Replace chartvolt.com with your actual domain
+# STEP 3: The config already has chartvolt.com - verify it's correct
+sudo cat /etc/nginx/sites-available/chartvolt | grep server_name
+# Should show: server_name chartvolt.com www.chartvolt.com;
+# And: server_name admin.chartvolt.com;
 
 # STEP 4: Enable site and disable default
 sudo ln -s /etc/nginx/sites-available/chartvolt /etc/nginx/sites-enabled/
@@ -143,10 +180,12 @@ pm2 status
 ### 8. SSL Certificate (Let's Encrypt)
 
 ```bash
-# After DNS is propagated
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com -d admin.yourdomain.com
+# After DNS is propagated (chartvolt.com → 148.230.124.57)
+sudo certbot --nginx -d chartvolt.com -d www.chartvolt.com -d admin.chartvolt.com
 
 # Auto-renewal is configured automatically
+# Test renewal with:
+sudo certbot renew --dry-run
 ```
 
 ## Management Commands
@@ -207,14 +246,18 @@ tail -f /var/log/nginx/chartvolt-error.log
 ### Check App Health
 
 ```bash
-# User app
+# User app (local)
 curl http://localhost:3000/health
 
-# Admin app
+# Admin app (local)
 curl http://localhost:3001/health
 
-# External (after domain setup)
-curl https://yourdomain.com/health
+# API server (local)
+curl http://localhost:4000/api/health
+
+# External (after SSL setup)
+curl https://chartvolt.com/health
+curl https://admin.chartvolt.com/health
 ```
 
 ### Resource Usage

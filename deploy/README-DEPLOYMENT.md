@@ -2,6 +2,15 @@
 
 Complete guide for deploying Chartvolt to production servers.
 
+## 🌐 Production Details
+
+| Item | Value |
+|------|-------|
+| **Domain** | chartvolt.com |
+| **Admin Domain** | admin.chartvolt.com |
+| **VPS IP** | 148.230.124.57 |
+| **Provider** | Hostinger |
+
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
@@ -15,10 +24,10 @@ Complete guide for deploying Chartvolt to production servers.
 
 ## Architecture Overview
 
-### Single VPS Setup
+### Single VPS Setup (148.230.124.57)
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      YOUR VPS                                │
+│              HOSTINGER VPS (148.230.124.57)                 │
 │                                                              │
 │   ┌─────────────────────────────────────────────────────┐   │
 │   │  PM2 Process Manager                                │   │
@@ -30,9 +39,9 @@ Complete guide for deploying Chartvolt to production servers.
 │                                                              │
 │   ┌─────────────────────────────────────────────────────┐   │
 │   │  Nginx Reverse Proxy                                │   │
-│   │  ├── yourdomain.com → Port 3000 (UI + most API)    │   │
-│   │  ├── yourdomain.com/api/auth/* → Port 4000 (bcrypt)│   │
-│   │  └── admin.yourdomain.com → Port 3001              │   │
+│   │  ├── chartvolt.com → Port 3000 (UI + most API)     │   │
+│   │  ├── chartvolt.com/api/auth/* → Port 4000 (bcrypt) │   │
+│   │  └── admin.chartvolt.com → Port 3001               │   │
 │   └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
                             │
@@ -69,26 +78,28 @@ Complete guide for deploying Chartvolt to production servers.
 
 ### Step 1: Prepare Your VPS
 
-1. **Get a VPS from Hostinger** (or similar provider)
+1. **VPS Details**
+   - Provider: Hostinger
+   - IP: 148.230.124.57
    - Recommended: KVM 2 or KVM 4 (4GB+ RAM, 2+ CPU cores)
    - OS: Ubuntu 22.04 LTS
 
 2. **SSH into your server**
    ```bash
-   ssh root@YOUR_VPS_IP
+   ssh root@148.230.124.57
    ```
 
 3. **Run the setup script**
    ```bash
    # Download and run setup script
-   curl -fsSL https://raw.githubusercontent.com/YOUR_REPO/main/deploy/setup-server.sh | sudo bash
+   curl -fsSL https://raw.githubusercontent.com/Mariosat15/Chatvot/main/deploy/setup-server.sh | sudo bash
    ```
 
    Or manually:
    ```bash
    # Clone repo first, then run setup
    cd /var/www
-   git clone https://github.com/YOUR_USERNAME/chartvolt.git
+   git clone https://github.com/Mariosat15/Chatvot.git chartvolt
    cd chartvolt
    chmod +x deploy/setup-server.sh
    sudo ./deploy/setup-server.sh
@@ -108,15 +119,24 @@ Complete guide for deploying Chartvolt to production servers.
    MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/chartvolt
 
    # Auth
-   BETTER_AUTH_SECRET=your-secret-key
-   BETTER_AUTH_URL=https://yourdomain.com
+   BETTER_AUTH_SECRET=your-secret-key-min-32-chars
+   BETTER_AUTH_URL=https://chartvolt.com
 
-   # App
-   NEXT_PUBLIC_APP_URL=https://yourdomain.com
-   ADMIN_URL=https://admin.yourdomain.com
+   # App URLs
+   NEXT_PUBLIC_APP_URL=https://chartvolt.com
+   ADMIN_URL=https://admin.chartvolt.com
 
    # API Server
    API_PORT=4000
+
+   # Admin Credentials
+   ADMIN_EMAIL=admin@chartvolt.com
+   ADMIN_PASSWORD=your-secure-password
+
+   # Payment Providers (optional)
+   STRIPE_SECRET_KEY=sk_...
+   STRIPE_PUBLISHABLE_KEY=pk_...
+   STRIPE_WEBHOOK_SECRET=whsec_...
 
    # Optional: OpenAI for AI features
    OPENAI_API_KEY=sk-...
@@ -137,21 +157,39 @@ npm run build:all
 
 ### Step 4: Configure Nginx
 
+> ⚠️ **IMPORTANT: Rate Limiting Must Be Added Manually**
+> 
+> Nginx requires rate limiting zones to be defined in the main config file BEFORE using them.
+> Without this step, nginx will fail to start!
+
 ```bash
 # STEP 1: Add rate limiting to main nginx.conf
 sudo nano /etc/nginx/nginx.conf
+```
 
-# Add these lines inside the http {} block (before any server blocks):
-# limit_req_zone $binary_remote_addr zone=admin_limit:10m rate=1r/s;
-# limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
-# limit_req_status 429;
+**Add these lines inside the `http {}` block (REQUIRED!):**
+```nginx
+http {
+    # ... existing settings ...
+    
+    # Rate limiting zones (ADD THIS - REQUIRED!)
+    limit_req_zone $binary_remote_addr zone=admin_limit:10m rate=1r/s;
+    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+    limit_req_status 429;
+    
+    # ... rest of config ...
+}
+```
 
+```bash
 # STEP 2: Copy site config
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
 
-# STEP 3: Edit domain names in the config
-sudo nano /etc/nginx/sites-available/chartvolt
-# Replace chartvolt.com with your domain
+# STEP 3: Verify domain names (already set to chartvolt.com)
+sudo cat /etc/nginx/sites-available/chartvolt | grep server_name
+# Should show:
+#   server_name chartvolt.com www.chartvolt.com;
+#   server_name admin.chartvolt.com;
 
 # STEP 4: Enable the site
 sudo ln -sf /etc/nginx/sites-available/chartvolt /etc/nginx/sites-enabled/
@@ -197,16 +235,21 @@ curl http://localhost:4000/api/health
 
 ## SSL Setup
 
-After your DNS is configured (domain points to VPS IP):
+After your DNS is configured (chartvolt.com → 148.230.124.57):
 
 ```bash
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com -d admin.yourdomain.com
+sudo certbot --nginx -d chartvolt.com -d www.chartvolt.com -d admin.chartvolt.com
 ```
 
 Certbot will automatically:
 - Obtain SSL certificates
 - Configure Nginx for HTTPS
 - Set up auto-renewal
+
+**Test auto-renewal:**
+```bash
+sudo certbot renew --dry-run
+```
 
 ---
 
@@ -217,11 +260,12 @@ Certbot will automatically:
 From your local machine:
 ```bash
 # SSH into server and deploy
-ssh root@YOUR_VPS_IP 'cd /var/www/chartvolt && ./deploy/deploy.sh'
+ssh root@148.230.124.57 'cd /var/www/chartvolt && ./deploy/deploy.sh'
 ```
 
 Or from the server:
 ```bash
+ssh root@148.230.124.57
 cd /var/www/chartvolt
 ./deploy/deploy.sh
 ```

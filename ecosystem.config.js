@@ -117,8 +117,8 @@ module.exports = {
   deploy: {
     production: {
       // SSH connection
-      user: 'your-username',
-      host: 'your-hostinger-ip',
+      user: 'root',
+      host: '148.230.124.57',
       ref: 'origin/main',
       repo: 'git@github.com:Mariosat15/Chatvot.git',
       path: '/var/www/chartvolt',
