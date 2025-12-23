@@ -46,12 +46,17 @@ export async function POST(request: NextRequest) {
     const price = entryPrice || (symbol.includes('EUR/USD') ? 1.0850 + (Math.random() * 0.01 - 0.005) : 100 + Math.random() * 10);
     const marginUsed = (quantity * price * 100000) / leverage; // Standard forex lot size
     const orderId = new Types.ObjectId().toString();
+    
+    // Use valid ObjectIds for competitionId and participantId
+    // This prevents CastError when TP/SL system tries to update participants
+    const simCompetitionId = competitionId || new Types.ObjectId().toString();
+    const simParticipantId = new Types.ObjectId().toString();
 
     // Create position
     const position = new TradingPosition({
       userId,
-      competitionId: competitionId || 'simulator-sandbox',
-      participantId: `sim-participant-${userId}`,
+      competitionId: simCompetitionId,
+      participantId: simParticipantId,
       symbol: symbol.toUpperCase(),
       side,
       quantity,

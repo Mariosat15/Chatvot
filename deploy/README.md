@@ -133,7 +133,7 @@ mv Chatvot/.* . 2>/dev/null
 rm -rf Chatvot
 ls
 
-
+get pull git pull origin main
 ### 5. Build All Apps
 
 ```bash
