@@ -50,7 +50,7 @@ import { getAdminSession } from '@/lib/admin/auth';
  * - All marketplace user purchases (keeps items, removes user purchases)
  * - All withdrawal requests
  * - All user bank accounts
- * - All auth sessions (Better Auth 'account' collection)
+ * - All auth sessions (Better Auth 'session' collection - keeps login credentials)
  * - All orphan credit wallets (where user no longer exists)
  * - All reconciliation logs (audit history)
  * 
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     console.log('🚨🚨🚨 STARTING FULL DATA RESET 🚨🚨🚨');
 
     // Get collections directly via mongoose (for collections without explicit models)
-    const accountCollection = mongoose.connection.collection('account');
+    const sessionCollection = mongoose.connection.collection('session'); // Auth sessions (NOT account - that has credentials!)
     const userCollection = mongoose.connection.collection('user');
     const alertsCollection = mongoose.connection.collection('alerts');
     const botExecutionsCollection = mongoose.connection.collection('botexecutions');
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
       marketplacePurchases: await UserPurchase.countDocuments(),
       withdrawalRequests: await WithdrawalRequest.countDocuments(),
       userBankAccounts: await UserBankAccount.countDocuments(),
-      authSessions: await accountCollection.countDocuments(),
+      authSessions: await sessionCollection.countDocuments(),
       alerts: await alertsCollection.countDocuments(),
       botExecutions: await botExecutionsCollection.countDocuments(),
       reconciliationLogs: await ReconciliationLog.countDocuments(),
@@ -223,8 +223,8 @@ export async function POST(request: Request) {
     await UserBankAccount.deleteMany({});
     console.log('✅ Deleted all user bank accounts');
 
-    // Delete all auth sessions (Better Auth 'account' collection)
-    const authSessionsDeleted = await accountCollection.deleteMany({});
+    // Delete all auth sessions (Better Auth 'session' collection - NOT 'account' which has credentials!)
+    const authSessionsDeleted = await sessionCollection.deleteMany({});
     console.log(`✅ Deleted ${authSessionsDeleted.deletedCount} auth sessions`);
 
     // Delete alerts collection data (price alerts, system alerts)
@@ -301,7 +301,7 @@ export async function POST(request: Request) {
       marketplacePurchases: await UserPurchase.countDocuments(),
       withdrawalRequests: await WithdrawalRequest.countDocuments(),
       userBankAccounts: await UserBankAccount.countDocuments(),
-      authSessions: await accountCollection.countDocuments(),
+      authSessions: await sessionCollection.countDocuments(),
       alerts: await alertsCollection.countDocuments(),
       botExecutions: await botExecutionsCollection.countDocuments(),
       reconciliationLogs: await ReconciliationLog.countDocuments(),
