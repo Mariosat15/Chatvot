@@ -9,13 +9,14 @@ import WalletTransaction from '@/database/models/trading/wallet-transaction.mode
 /**
  * POST /api/simulator/competitions/join-batch
  * Batch join multiple users to a competition (MUCH faster than individual joins)
- * Only for simulator mode in development
+ * Available in development OR with simulator mode header (for production simulation tests)
  */
 export async function POST(request: NextRequest) {
   const isSimulatorMode = request.headers.get('X-Simulator-Mode') === 'true';
   const isDev = process.env.NODE_ENV === 'development';
 
-  if (!isSimulatorMode || !isDev) {
+  // Allow in development OR with simulator mode header
+  if (!isSimulatorMode && !isDev) {
     return NextResponse.json(
       { success: false, error: 'Only available in simulator mode' },
       { status: 403 }

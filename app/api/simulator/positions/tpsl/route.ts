@@ -12,7 +12,8 @@ export async function POST(request: NextRequest) {
   const simulatorUserId = request.headers.get('X-Simulator-User-Id');
   const isDev = process.env.NODE_ENV === 'development';
 
-  if ((!isSimulatorMode && !simulatorUserId) || !isDev) {
+  // Allow in development OR with simulator mode header (for production simulation tests)
+  if (!isSimulatorMode && !simulatorUserId && !isDev) {
     return NextResponse.json(
       { success: false, error: 'Simulator mode not enabled' },
       { status: 403 }

@@ -86,7 +86,8 @@ export async function POST(request: NextRequest) {
     // Check for simulator mode
     const isSimulatorMode = request.headers.get('X-Simulator-Mode') === 'true';
     const simulatorUserId = request.headers.get('X-Simulator-User-Id');
-    const isDev = process.env.NODE_ENV === 'development';
+    // Allow simulator mode in development OR with explicit simulator headers in production
+    const allowSimulatorMode = isSimulatorMode || simulatorUserId;
     
     let challengerId: string;
     let challengerName: string;
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
       return errorResponse('challengedId is required', 400);
     }
     
-    if ((isSimulatorMode || simulatorUserId) && isDev) {
+    if (allowSimulatorMode) {
       // Simulator mode - accept challengerId from header or body
       const simUserId = simulatorUserId || body.challengerId;
       if (!simUserId) {
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Skip most validation in simulator mode
-    const isInSimulatorMode = (isSimulatorMode || simulatorUserId) && isDev;
+    const isInSimulatorMode = allowSimulatorMode;
 
     // ⏰ CHECK MARKET STATUS - Challenges require open market
     // Skip check in simulator mode for testing

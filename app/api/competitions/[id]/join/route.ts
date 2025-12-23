@@ -22,13 +22,14 @@ export async function POST(
     // Check for simulator mode first
     const isSimulatorMode = request.headers.get('X-Simulator-Mode') === 'true';
     const simulatorUserId = request.headers.get('X-Simulator-User-Id');
-    const isDev = process.env.NODE_ENV === 'development';
+    // Allow simulator mode in development OR with explicit simulator headers in production
+    const allowSimulatorMode = isSimulatorMode || simulatorUserId;
     
     let userId: string;
     let userEmail: string;
     let userName: string;
     
-    if ((isSimulatorMode || simulatorUserId) && isDev) {
+    if (allowSimulatorMode) {
       // In simulator mode, accept userId from header or body
       let bodyUserId: string | undefined;
       try {

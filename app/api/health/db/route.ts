@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import mongoose from 'mongoose';
 
@@ -7,10 +7,30 @@ import mongoose from 'mongoose';
  * Health check endpoint for database connectivity
  * Used by the Performance Simulator for stress testing
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   const start = Date.now();
+  const isSimulatorMode = request.headers.get('X-Simulator-Mode') === 'true';
   
   try {
+    // For simulator mode, use a lighter check if connection is already established
+    if (isSimulatorMode && mongoose.connection.readyState === 1) {
+      // Connection already open - just verify it's responsive
+      const db = mongoose.connection.db;
+      if (db) {
+        // Quick ping without reconnection overhead
+        await db.command({ ping: 1 });
+        const duration = Date.now() - start;
+        return NextResponse.json({
+          status: 'healthy',
+          database: 'connected',
+          responseTime: duration,
+          timestamp: new Date().toISOString(),
+          mode: 'fast',
+        });
+      }
+    }
+    
+    // Normal mode - full connection check
     await connectToDatabase();
     
     // Simple ping to database
@@ -29,9 +49,11 @@ export async function GET() {
       database: 'connected',
       responseTime: duration,
       timestamp: new Date().toISOString(),
+      mode: 'full',
     });
   } catch (error) {
     const duration = Date.now() - start;
+    console.error('Health check failed:', error);
     
     return NextResponse.json(
       {
