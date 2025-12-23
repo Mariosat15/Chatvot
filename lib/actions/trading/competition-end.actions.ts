@@ -107,9 +107,18 @@ export async function finalizeCompetition(competitionId: string) {
     // OPTIMIZATION: Fetch all prices at once (instead of one by one in loop!)
     // This reduces price fetch from 15+ seconds to <1 second
     const uniqueSymbols = [...new Set(openPositions.map(p => p.symbol))] as ForexSymbol[];
-    console.log(`Fetching prices for ${uniqueSymbols.length} unique symbols...`);
+    console.log(`Fetching prices for ${uniqueSymbols.length} unique symbols: ${uniqueSymbols.join(', ')}`);
     const pricesMap = await fetchRealForexPrices(uniqueSymbols);
     console.log(`Got ${pricesMap.size} prices in single batch`);
+    
+    // Log which prices we have
+    if (pricesMap.size > 0) {
+      for (const [symbol, price] of pricesMap.entries()) {
+        console.log(`  ✅ ${symbol}: bid=${price.bid}, ask=${price.ask}`);
+      }
+    } else {
+      console.error(`  ❌ WARNING: No prices available! This will prevent position closing.`);
+    }
 
     for (const position of openPositions) {
       try {

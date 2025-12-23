@@ -33,6 +33,19 @@ export async function runCompetitionEndCheck(): Promise<CompetitionEndResult> {
 
     // Find all active competitions that should have ended
     const now = new Date();
+    
+    // Debug: Check what competitions exist
+    const allActiveCompetitions = await Competition.find({ status: 'active' }).select('_id name status endTime');
+    if (allActiveCompetitions.length > 0) {
+      console.log(`   📊 Found ${allActiveCompetitions.length} active competition(s):`);
+      allActiveCompetitions.forEach(c => {
+        const endTime = new Date(c.endTime);
+        const hasEnded = endTime <= now;
+        const timeRemaining = hasEnded ? 'ENDED' : `${Math.round((endTime.getTime() - now.getTime()) / 1000)}s remaining`;
+        console.log(`      - ${c.name}: endTime=${endTime.toISOString()}, ${timeRemaining}`);
+      });
+    }
+    
     const expiredCompetitions = await Competition.find({
       status: 'active',
       endTime: { $lte: now },

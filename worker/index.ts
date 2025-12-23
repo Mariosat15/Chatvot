@@ -104,13 +104,15 @@ agenda.define('competition-end', async () => {
     const result = await runCompetitionEndCheck();
     const duration = Date.now() - startTime;
     
+    // Always log completion with result
+    console.log(`🏆 [COMPETITION END] Completed in ${duration}ms`);
+    console.log(`   Checked: ${result.checkedCompetitions} expired competitions`);
+    
     if (result.checkedCompetitions > 0) {
-      console.log(`🏆 [COMPETITION END] Completed in ${duration}ms`);
-      console.log(`   Checked: ${result.checkedCompetitions} competitions`);
       console.log(`   Ended: ${result.endedCompetitions}`);
       
       if (result.failedCompetitions.length > 0) {
-        console.log(`   Failed: ${result.failedCompetitions.length}`);
+        console.log(`   ❌ Failed: ${result.failedCompetitions.length}`);
         result.failedCompetitions.forEach(e => console.log(`     - ${e}`));
       }
     }
