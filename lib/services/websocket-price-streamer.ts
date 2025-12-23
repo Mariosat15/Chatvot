@@ -824,15 +824,33 @@ export function resetWebSocket(): void {
  * Checks multiple signals to reliably detect Worker context
  */
 function isWorkerProcess(): boolean {
-  // Check 1: Environment variable (set via cross-env in npm script)
-  if (process.env.IS_WORKER === 'true') return true;
+  // Check 1: Environment variable (set via PM2 or cross-env)
+  // PM2 sets this in ecosystem.config.js: IS_WORKER: 'true'
+  const isWorkerEnv = process.env.IS_WORKER === 'true';
+  if (isWorkerEnv) {
+    console.log('✅ [WEBSOCKET] IS_WORKER=true detected from environment');
+    return true;
+  }
   
-  // Check 2: Process arguments contain "worker"
+  // Check 2: Process arguments contain "worker" or "dist/worker"
   const args = process.argv.join(' ').toLowerCase();
-  if (args.includes('worker/index') || args.includes('worker\\index')) return true;
+  if (args.includes('worker/index') || args.includes('worker\\index') || 
+      args.includes('dist/worker') || args.includes('dist\\worker')) {
+    console.log('✅ [WEBSOCKET] Worker detected from process.argv:', args.substring(0, 100));
+    return true;
+  }
   
   // Check 3: npm_lifecycle_event (if running via npm run worker)
-  if (process.env.npm_lifecycle_event === 'worker') return true;
+  if (process.env.npm_lifecycle_event === 'worker') {
+    console.log('✅ [WEBSOCKET] Worker detected from npm_lifecycle_event');
+    return true;
+  }
+  
+  // Debug: Log what we found (only on first check)
+  if (!hasLoggedInit) {
+    console.log('ℹ️ [WEBSOCKET] Worker detection: IS_WORKER=' + process.env.IS_WORKER + 
+                ', argv=' + args.substring(0, 80));
+  }
   
   return false;
 }
