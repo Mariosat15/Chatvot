@@ -244,7 +244,12 @@ pm2 restart chartvolt-admin
 Or Copy the .env:
 cp /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
 pm2 restart chartvolt-admin
-
+-------
+this is to update the server with latest git
+cd /var/www/chartvolt
+git pull origin main
+npm run build:admin
+pm2 restart chartvolt-admin
 
 ```bash
 # View all apps status
