@@ -587,7 +587,8 @@ const TEST_CASES: TestCase[] = [
 
       ctx.log('info', `Executing ${totalTrades} trades`);
 
-      const symbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD'];
+      // Use correct format with slashes to match FOREX_PAIRS and price cache
+      const symbols = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD'];
       let tradeCount = 0;
 
       for (const user of ctx.testUsers) {

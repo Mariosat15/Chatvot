@@ -42,6 +42,25 @@ export interface PriceQuote {
 }
 
 /**
+ * Normalize symbol format to standard format with slash (e.g., EURUSD -> EUR/USD)
+ * This ensures symbols from different sources are consistent
+ */
+export function normalizeSymbol(symbol: string): ForexSymbol {
+  // If already has slash, return as-is
+  if (symbol.includes('/')) {
+    return symbol as ForexSymbol;
+  }
+  
+  // Convert EURUSD to EUR/USD format
+  if (symbol.length === 6) {
+    return `${symbol.slice(0, 3)}/${symbol.slice(3)}` as ForexSymbol;
+  }
+  
+  // Return as-is for other formats
+  return symbol as ForexSymbol;
+}
+
+/**
  * Normalize a price quote - ensures mid and spread are ALWAYS calculated from bid/ask
  * This prevents mid from lagging behind bid/ask updates
  */
@@ -261,7 +280,11 @@ const API_FETCH_COOLDOWN = 2000; // Only fetch from API every 2 seconds max
  * 
  * Strategy: Return cached prices IMMEDIATELY, fetch updates in background
  */
-export async function fetchRealForexPrices(symbols: ForexSymbol[]): Promise<Map<ForexSymbol, PriceQuote>> {
+export async function fetchRealForexPrices(inputSymbols: ForexSymbol[]): Promise<Map<ForexSymbol, PriceQuote>> {
+  // Normalize all symbols to standard format (EUR/USD not EURUSD)
+  // This ensures consistency regardless of input format
+  const symbols = inputSymbols.map(normalizeSymbol);
+  
   const pricesMap = new Map<ForexSymbol, PriceQuote>();
   const symbolsNeedingFetch: ForexSymbol[] = [];
   const now = Date.now();
