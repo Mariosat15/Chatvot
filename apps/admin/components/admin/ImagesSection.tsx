@@ -67,12 +67,14 @@ export default function ImagesSection() {
       const response = await fetch('/api/hero-settings');
       if (response.ok) {
         const data = await response.json();
+        // API returns { settings: {...} } so access the nested object
+        const settings = data.settings || data;
         setAuthSettings({
-          authPageTestimonialText: data.authPageTestimonialText || '',
-          authPageTestimonialAuthor: data.authPageTestimonialAuthor || '',
-          authPageTestimonialRole: data.authPageTestimonialRole || '',
-          authPageTestimonialRating: data.authPageTestimonialRating || 5,
-          authPageDashboardImage: data.authPageDashboardImage || '',
+          authPageTestimonialText: settings.authPageTestimonialText || '',
+          authPageTestimonialAuthor: settings.authPageTestimonialAuthor || '',
+          authPageTestimonialRole: settings.authPageTestimonialRole || '',
+          authPageTestimonialRating: settings.authPageTestimonialRating || 5,
+          authPageDashboardImage: settings.authPageDashboardImage || '',
         });
       }
     } catch (error) {
