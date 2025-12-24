@@ -17,7 +17,7 @@ interface ImageSettings {
 }
 
 interface AuthPageSettings {
-  authPageTestimonialQuote: string;
+  authPageTestimonialText: string;
   authPageTestimonialAuthor: string;
   authPageTestimonialRole: string;
   authPageTestimonialRating: number;
@@ -32,7 +32,7 @@ export default function ImagesSection() {
     dashboardPreview: '',
   });
   const [authSettings, setAuthSettings] = useState<AuthPageSettings>({
-    authPageTestimonialQuote: '',
+    authPageTestimonialText: '',
     authPageTestimonialAuthor: '',
     authPageTestimonialRole: '',
     authPageTestimonialRating: 5,
@@ -68,7 +68,7 @@ export default function ImagesSection() {
       if (response.ok) {
         const data = await response.json();
         setAuthSettings({
-          authPageTestimonialQuote: data.authPageTestimonialQuote || '',
+          authPageTestimonialText: data.authPageTestimonialText || '',
           authPageTestimonialAuthor: data.authPageTestimonialAuthor || '',
           authPageTestimonialRole: data.authPageTestimonialRole || '',
           authPageTestimonialRating: data.authPageTestimonialRating || 5,
@@ -423,8 +423,8 @@ export default function ImagesSection() {
               Testimonial Quote
             </Label>
             <Textarea
-              value={authSettings.authPageTestimonialQuote}
-              onChange={(e) => setAuthSettings(prev => ({ ...prev, authPageTestimonialQuote: e.target.value }))}
+              value={authSettings.authPageTestimonialText}
+              onChange={(e) => setAuthSettings(prev => ({ ...prev, authPageTestimonialText: e.target.value }))}
               className="bg-gray-900 border-gray-700 text-white min-h-[100px]"
               placeholder="Chatvolt turned my watchlist into a winning list..."
             />
