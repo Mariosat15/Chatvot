@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import AdminBankAccount from '@/database/models/admin-bank-account.model';
-import { getAdminSession } from '@/lib/admin-auth';
+import { getAdminSession } from '@/lib/admin/auth';
 
 /**
  * GET /api/admin-bank-accounts
