@@ -776,12 +776,16 @@ export const checkStopLossTakeProfit = async (competitionId: string) => {
   }
 };
 
-// Close position automatically (SL/TP/Liquidation)
+// Close position automatically (SL/TP/Liquidation) with retry logic for WriteConflict
 export async function closePositionAutomatic(
   positionId: string,
   exitPrice: number,
-  closeReason: 'stop_loss' | 'take_profit' | 'margin_call'
-) {
+  closeReason: 'stop_loss' | 'take_profit' | 'margin_call',
+  retryCount = 0
+): Promise<void> {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 100; // 100ms, 200ms, 400ms (exponential backoff)
+
   const mongoSession = await mongoose.startSession();
   mongoSession.startTransaction();
 
@@ -789,7 +793,8 @@ export async function closePositionAutomatic(
     const position = await TradingPosition.findById(positionId).session(mongoSession);
     if (!position || position.status !== 'open') {
       await mongoSession.abortTransaction();
-      return;
+      await mongoSession.endSession();
+      return; // Position already closed or doesn't exist - this is fine
     }
 
     const realizedPnl = calculateUnrealizedPnL(
@@ -954,6 +959,7 @@ export async function closePositionAutomatic(
     }
 
     await mongoSession.commitTransaction();
+    await mongoSession.endSession(); // End session after successful commit
     
     // Send notifications based on close reason
     try {
@@ -1008,9 +1014,28 @@ export async function closePositionAutomatic(
     }
   } catch (error) {
     await mongoSession.abortTransaction();
+    await mongoSession.endSession();
+    
+    // Handle WriteConflict with retry
+    const isWriteConflict = error instanceof Error && 
+      (error.message.includes('WriteConflict') || 
+       error.message.includes('Write conflict') ||
+       (error as { code?: number }).code === 112);
+    
+    if (isWriteConflict && retryCount < MAX_RETRIES) {
+      const delay = RETRY_DELAY_MS * Math.pow(2, retryCount); // Exponential backoff
+      console.log(`⚠️ [TP/SL] WriteConflict on position ${positionId}, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return closePositionAutomatic(positionId, exitPrice, closeReason, retryCount + 1);
+    }
+    
+    // If it's a WriteConflict after all retries, the position was likely closed by another process
+    if (isWriteConflict) {
+      console.log(`ℹ️ [TP/SL] Position ${positionId} likely already closed by another process (WriteConflict after ${MAX_RETRIES} retries)`);
+      return; // Don't throw - position is handled
+    }
+    
     throw error;
-  } finally {
-    mongoSession.endSession();
   }
 }
 
