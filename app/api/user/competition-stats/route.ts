@@ -249,15 +249,38 @@ export async function GET(req: NextRequest) {
         userId,
       }).lean();
 
+      console.log('🔍 DEBUG - Competition Stats Query:');
+      console.log('  competitionId:', competitionId);
+      console.log('  userId:', userId);
+      console.log('  participation found:', !!participation);
+      console.log('  participation._id:', participation?._id?.toString());
+
       if (participation) {
         const competition = await Competition.findById(competitionId).lean();
         
         // Get all positions for this competition
         // Note: participantId is stored as string in DB, so convert ObjectId to string
+        const participantIdStr = participation._id.toString();
+        console.log('  Querying positions with participantId:', participantIdStr);
+        
         const positions = await TradingPosition.find({
           competitionId,
-          participantId: participation._id.toString(),
+          participantId: participantIdStr,
         }).sort({ openedAt: 1 }).lean();
+        
+        console.log('  Positions found:', positions.length);
+        
+        // Also try querying just by competitionId and userId to see if positions exist
+        const altPositions = await TradingPosition.find({
+          competitionId,
+          userId,
+        }).lean();
+        console.log('  Alt query (by userId) found:', altPositions.length);
+        if (altPositions.length > 0) {
+          console.log('  First position participantId:', altPositions[0].participantId);
+          console.log('  Expected participantId:', participantIdStr);
+          console.log('  Match:', altPositions[0].participantId === participantIdStr);
+        }
 
         // Calculate live stats
         const openPositions = positions.filter(p => p.status === 'open');
