@@ -1007,7 +1007,7 @@ export default function PendingWithdrawalsSection() {
 
       {/* Detail Dialog */}
       <Dialog open={detailDialog.open} onOpenChange={(open) => !open && setDetailDialog({ open: false, withdrawal: null })}>
-        <DialogContent className="bg-gray-800 border-gray-700 max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-gray-800 border-gray-700 max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">Withdrawal Details</DialogTitle>
           </DialogHeader>
@@ -1026,23 +1026,27 @@ export default function PendingWithdrawalsSection() {
                 </div>
                 
                 {/* Enhanced User Information */}
-                <div className="col-span-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                  <p className="text-xs text-blue-400 font-semibold mb-2 flex items-center gap-1">
+                <div className="col-span-2 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                  <p className="text-xs text-blue-400 font-semibold mb-3 flex items-center gap-1">
                     <User className="h-3 w-3" />
                     User Information
                   </p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <p className="text-xs text-gray-500">Full Name</p>
-                      <p className="text-white font-medium">{detailDialog.withdrawal.userName || 'Not provided'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Email</p>
-                      <p className="text-white">{detailDialog.withdrawal.userEmail}</p>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-gray-500">Full Name</p>
+                        <p className="text-white font-medium">{detailDialog.withdrawal.userName || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Email</p>
+                        <p className="text-white break-all">{detailDialog.withdrawal.userEmail}</p>
+                      </div>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">User ID</p>
-                      <p className="text-white font-mono text-xs">{detailDialog.withdrawal.userId}</p>
+                      <p className="text-white font-mono text-sm bg-gray-900/50 px-2 py-1 rounded select-all break-all">
+                        {detailDialog.withdrawal.userId}
+                      </p>
                     </div>
                   </div>
                 </div>
