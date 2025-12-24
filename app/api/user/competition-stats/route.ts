@@ -7,6 +7,7 @@ import ChallengeParticipant from '@/database/models/trading/challenge-participan
 import Competition from '@/database/models/trading/competition.model';
 import Challenge from '@/database/models/trading/challenge.model';
 import TradingPosition from '@/database/models/trading/trading-position.model';
+import TradeHistory from '@/database/models/trading/trade-history.model';
 
 export const dynamic = 'force-dynamic';
 
@@ -306,20 +307,31 @@ export async function GET(req: NextRequest) {
 
         // Calculate live stats
         const openPositions = positions.filter(p => p.status === 'open');
-        const closedPositions = positions.filter(p => p.status === 'closed');
         
-        // Note: When a position is closed, unrealizedPnl becomes the final realized PnL
+        // Get actual P&L from TradeHistory (where realizedPnl is stored for closed trades)
+        const tradeHistory = await TradeHistory.find({
+          competitionId,
+          participantId: participantIdStr,
+        }).sort({ closedAt: 1 }).lean();
+        
+        console.log('  TradeHistory records found:', tradeHistory.length);
+        if (tradeHistory.length > 0) {
+          console.log('  Sample trade realizedPnl:', tradeHistory[0].realizedPnl);
+        }
+        
+        // Unrealized P&L from open positions
         const unrealizedPnL = openPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0);
-        const realizedPnL = closedPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0);
+        // Realized P&L from trade history
+        const realizedPnL = tradeHistory.reduce((sum, t) => sum + (t.realizedPnl || 0), 0);
         
-        // Build equity curve from closed positions
+        // Build equity curve from trade history
         let runningEquity = competition?.startingCapital || 10000;
         equityCurve.push({ time: new Date(competition?.startTime || Date.now()).toISOString(), equity: runningEquity });
         
-        for (const pos of closedPositions) {
-          runningEquity += pos.unrealizedPnl || 0;
+        for (const trade of tradeHistory) {
+          runningEquity += trade.realizedPnl || 0;
           equityCurve.push({
-            time: pos.closedAt?.toISOString() || new Date().toISOString(),
+            time: trade.closedAt?.toISOString() || new Date().toISOString(),
             equity: runningEquity,
           });
         }
@@ -336,21 +348,21 @@ export async function GET(req: NextRequest) {
         const today = new Date();
         today.setUTCHours(0, 0, 0, 0);
         
-        const todayTrades = closedPositions.filter(p => 
-          p.closedAt && new Date(p.closedAt) >= today
+        const todayTrades = tradeHistory.filter(t => 
+          t.closedAt && new Date(t.closedAt) >= today
         );
-        const todayPnL = todayTrades.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0);
-        const todayWins = todayTrades.filter(p => (p.unrealizedPnl || 0) > 0).length;
+        const todayPnL = todayTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0);
+        const todayWins = todayTrades.filter(t => (t.realizedPnl || 0) > 0).length;
 
-        // Calculate winning streak
+        // Calculate winning streak from trade history
         let winStreak = 0;
         let loseStreak = 0;
         let currentStreak = 0;
         let isWinStreak = true;
 
-        for (let i = closedPositions.length - 1; i >= 0; i--) {
-          const pnl = closedPositions[i].unrealizedPnl || 0;
-          if (i === closedPositions.length - 1) {
+        for (let i = tradeHistory.length - 1; i >= 0; i--) {
+          const pnl = tradeHistory[i].realizedPnl || 0;
+          if (i === tradeHistory.length - 1) {
             isWinStreak = pnl > 0;
             currentStreak = 1;
           } else {
@@ -365,14 +377,14 @@ export async function GET(req: NextRequest) {
         if (isWinStreak) winStreak = currentStreak;
         else loseStreak = currentStreak;
 
-        // Calculate average trade stats
-        const winningPositions = closedPositions.filter(p => (p.unrealizedPnl || 0) > 0);
-        const losingPositions = closedPositions.filter(p => (p.unrealizedPnl || 0) < 0);
-        const avgWinAmount = winningPositions.length > 0 
-          ? winningPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0) / winningPositions.length 
+        // Calculate average trade stats from TradeHistory
+        const winningTrades = tradeHistory.filter(t => (t.realizedPnl || 0) > 0);
+        const losingTrades = tradeHistory.filter(t => (t.realizedPnl || 0) < 0);
+        const avgWinAmount = winningTrades.length > 0 
+          ? winningTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0) / winningTrades.length 
           : 0;
-        const avgLossAmount = losingPositions.length > 0 
-          ? Math.abs(losingPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0)) / losingPositions.length 
+        const avgLossAmount = losingTrades.length > 0 
+          ? Math.abs(losingTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0)) / losingTrades.length 
           : 0;
         const profitFactor = avgLossAmount > 0 ? avgWinAmount / avgLossAmount : avgWinAmount > 0 ? Infinity : 0;
 
@@ -408,20 +420,15 @@ export async function GET(req: NextRequest) {
           loseStreak,
           currentStreak,
           isOnWinStreak: isWinStreak,
-          // Advanced stats
+          // Advanced stats from TradeHistory
           avgWin: avgWinAmount,
           avgLoss: avgLossAmount,
           profitFactor: profitFactor === Infinity ? 999 : profitFactor,
-          largestWin: Math.max(...closedPositions.map(p => p.unrealizedPnl || 0), 0),
-          largestLoss: Math.min(...closedPositions.map(p => p.unrealizedPnl || 0), 0),
-          // Holding times
-          avgHoldingTime: closedPositions.length > 0 
-            ? closedPositions.reduce((sum, p) => {
-                if (p.openedAt && p.closedAt) {
-                  return sum + (new Date(p.closedAt).getTime() - new Date(p.openedAt).getTime());
-                }
-                return sum;
-              }, 0) / closedPositions.length / 1000 / 60 // in minutes
+          largestWin: tradeHistory.length > 0 ? Math.max(...tradeHistory.map(t => t.realizedPnl || 0), 0) : 0,
+          largestLoss: tradeHistory.length > 0 ? Math.min(...tradeHistory.map(t => t.realizedPnl || 0), 0) : 0,
+          // Holding times from TradeHistory
+          avgHoldingTime: tradeHistory.length > 0 
+            ? tradeHistory.reduce((sum, t) => sum + (t.holdingTimeSeconds || 0), 0) / tradeHistory.length / 60 // in minutes
             : 0,
         };
 
