@@ -80,10 +80,13 @@ export interface IWithdrawalRequest extends Document {
   // Company Bank Used (for tracking which bank processed the withdrawal)
   companyBankUsed?: {
     bankId?: string;               // Admin bank account ID
-    accountName?: string;          // Account name
+    accountName?: string;          // Account name/nickname
+    accountHolderName?: string;    // Account holder name
     bankName?: string;             // Bank name
     iban?: string;                 // IBAN (masked)
     accountNumber?: string;        // Account number (masked)
+    country?: string;              // Bank country
+    currency?: string;             // Currency
   };
   
   // Auto-approval
@@ -241,13 +244,16 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
     processedAt: Date,
     completedAt: Date,
     
-    // Company Bank Used
+    // Company Bank Used (which company bank account processed this withdrawal)
     companyBankUsed: {
       bankId: String,
       accountName: String,
+      accountHolderName: String,
       bankName: String,
       iban: String,
       accountNumber: String,
+      country: String,
+      currency: String,
     },
     
     // Auto-approval

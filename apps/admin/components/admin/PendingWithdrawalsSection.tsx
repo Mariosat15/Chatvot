@@ -290,9 +290,15 @@ export default function PendingWithdrawalsSection() {
     setActionLoading(true);
     try {
       // Get selected bank details for completed withdrawals
+      console.log('🔍 Action:', actionDialog.action);
+      console.log('🔍 Selected Bank ID:', selectedBankId);
+      console.log('🔍 Admin Bank Accounts:', adminBankAccounts);
+      
       const selectedBank = actionDialog.action === 'completed' && selectedBankId
         ? adminBankAccounts.find(b => b._id === selectedBankId)
         : null;
+      
+      console.log('🔍 Selected Bank:', selectedBank);
 
       const response = await fetch(`/api/withdrawals/${actionDialog.withdrawal._id}`, {
         method: 'PUT',
@@ -904,11 +910,11 @@ export default function PendingWithdrawalsSection() {
             {/* Bank selection for completed withdrawals */}
             {actionDialog.action === 'completed' && adminBankAccounts.length > 0 && (
               <div>
-                <Label className="text-gray-300">Company Bank Account Used</Label>
-                <p className="text-xs text-gray-500 mb-2">Select which company bank account processed this withdrawal</p>
+                <Label className="text-gray-300">Company Bank Account Used <span className="text-red-400">*</span></Label>
+                <p className="text-xs text-gray-500 mb-2">Select which company bank account processed this withdrawal (required)</p>
                 <Select value={selectedBankId} onValueChange={setSelectedBankId}>
-                  <SelectTrigger className="bg-gray-700 border-gray-600">
-                    <SelectValue placeholder="Select bank account..." />
+                  <SelectTrigger className={`bg-gray-700 border-gray-600 ${!selectedBankId ? 'border-red-500/50' : ''}`}>
+                    <SelectValue placeholder="⚠️ Select bank account..." />
                   </SelectTrigger>
                   <SelectContent>
                     {adminBankAccounts.map((bank) => (
@@ -967,7 +973,11 @@ export default function PendingWithdrawalsSection() {
             </Button>
             <Button
               onClick={handleAction}
-              disabled={actionLoading || ((actionDialog.action === 'rejected' || actionDialog.action === 'failed') && !actionReason)}
+              disabled={
+                actionLoading || 
+                ((actionDialog.action === 'rejected' || actionDialog.action === 'failed') && !actionReason) ||
+                (actionDialog.action === 'completed' && adminBankAccounts.length > 0 && !selectedBankId)
+              }
               className={
                 actionDialog.action === 'approved' || actionDialog.action === 'completed'
                   ? 'bg-emerald-600 hover:bg-emerald-700'
