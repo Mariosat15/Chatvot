@@ -140,6 +140,7 @@ get pull git pull origin main
 npm run build:all
 pm2 restart all
 pm2 logs --lines 30
+pm2 logs chartvolt-admin --lines 50
 ```
 
 ### 6. Configure NGINX

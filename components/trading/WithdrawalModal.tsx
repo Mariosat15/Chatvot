@@ -310,7 +310,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             <div className="rounded-lg bg-gray-800 border border-gray-700 p-4">
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 text-sm">Available Balance</span>
-                <span className="text-yellow-400 font-bold text-lg">
+                <span className="text-yellow-400 font-bold text-lg" suppressHydrationWarning>
                   {withdrawalInfo.wallet.balance.toLocaleString()} Credits
                 </span>
               </div>
@@ -493,7 +493,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
 
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>Credits Deducted:</span>
-                    <span>{withdrawal.creditsRequired.toLocaleString()} Credits</span>
+                    <span suppressHydrationWarning>{withdrawal.creditsRequired.toLocaleString()} Credits</span>
                   </div>
                 </div>
               </div>

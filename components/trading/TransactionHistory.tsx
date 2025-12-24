@@ -237,7 +237,7 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
             <p className="text-xs text-gray-500 truncate">{transaction.description}</p>
           )}
           <div className="flex items-center gap-2 mt-1">
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-600" suppressHydrationWarning>
               {new Date(transaction.createdAt).toLocaleString('en-US', {
                 month: 'short',
                 day: 'numeric',

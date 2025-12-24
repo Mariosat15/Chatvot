@@ -217,8 +217,6 @@ export async function PUT(
           withdrawal.adminNote = (withdrawal.adminNote || '') + (withdrawal.adminNote ? '\n' : '') + adminNote;
         }
         
-        console.log('📥 Received companyBankUsed:', JSON.stringify(companyBankUsed, null, 2));
-        
         // Save company bank used for this withdrawal
         if (companyBankUsed && companyBankUsed.bankId) {
           // Store the bank details - IBAN should come pre-masked from frontend or mask it here
@@ -243,7 +241,6 @@ export async function PUT(
             currency: companyBankUsed.currency,
           };
           
-          console.log('💾 Saving companyBankUsed to withdrawal:', JSON.stringify(bankDataToSave, null, 2));
           withdrawal.companyBankUsed = bankDataToSave;
           
           // Update admin bank account statistics
@@ -331,10 +328,6 @@ export async function PUT(
     }
 
     await withdrawal.save({ session });
-    
-    // Log the saved withdrawal to verify companyBankUsed was persisted
-    console.log('✅ Withdrawal saved. companyBankUsed:', JSON.stringify(withdrawal.companyBankUsed, null, 2));
-    
     await session.commitTransaction();
 
     // Log action to audit log (after successful commit)
@@ -413,17 +406,10 @@ export async function PUT(
       // Don't fail the request if audit logging fails
     }
 
-    // Fetch the updated withdrawal to verify data was saved
-    const updatedWithdrawal = await WithdrawalRequest.findById(id).lean();
-    console.log('📤 Returning withdrawal with companyBankUsed:', JSON.stringify(updatedWithdrawal?.companyBankUsed, null, 2));
-    
     return NextResponse.json({
       success: true,
       message: `Withdrawal ${action} successfully`,
-      withdrawal: updatedWithdrawal,
-      debug: {
-        companyBankUsedSaved: updatedWithdrawal?.companyBankUsed || null,
-      }
+      withdrawal,
     });
   } catch (error) {
     await session.abortTransaction();

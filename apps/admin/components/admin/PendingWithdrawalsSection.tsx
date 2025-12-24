@@ -290,15 +290,9 @@ export default function PendingWithdrawalsSection() {
     setActionLoading(true);
     try {
       // Get selected bank details for completed withdrawals
-      console.log('🔍 Action:', actionDialog.action);
-      console.log('🔍 Selected Bank ID:', selectedBankId);
-      console.log('🔍 Admin Bank Accounts:', adminBankAccounts);
-      
       const selectedBank = actionDialog.action === 'completed' && selectedBankId
         ? adminBankAccounts.find(b => b._id === selectedBankId)
         : null;
-      
-      console.log('🔍 Selected Bank:', selectedBank);
 
       const response = await fetch(`/api/withdrawals/${actionDialog.withdrawal._id}`, {
         method: 'PUT',
@@ -322,9 +316,6 @@ export default function PendingWithdrawalsSection() {
       });
 
       const data = await response.json();
-      console.log('📤 Server response:', data);
-      console.log('📤 companyBankUsed saved:', data.debug?.companyBankUsedSaved);
-      
       if (!response.ok) {
         toast.error(data.error || 'Action failed');
         return;

@@ -512,7 +512,7 @@ export default function ProfileSettingsSection() {
           <h2 className="text-2xl font-bold text-white">Change Password</h2>
         </div>
 
-        <div className="space-y-4 max-w-md">
+        <form onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }} className="space-y-4 max-w-md">
           {/* Current Password */}
           <div className="space-y-2">
             <Label htmlFor="currentPassword" className="text-gray-300">Current Password</Label>
@@ -524,6 +524,7 @@ export default function ProfileSettingsSection() {
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Enter current password"
                 className="bg-dark-800 border-dark-600 text-white pr-10"
+                autoComplete="current-password"
               />
               <button
                 type="button"
@@ -546,6 +547,7 @@ export default function ProfileSettingsSection() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Enter new password (min. 8 characters)"
                 className="bg-dark-800 border-dark-600 text-white pr-10"
+                autoComplete="new-password"
               />
               <button
                 type="button"
@@ -571,6 +573,7 @@ export default function ProfileSettingsSection() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
                 className="bg-dark-800 border-dark-600 text-white pr-10"
+                autoComplete="new-password"
               />
               <button
                 type="button"
@@ -591,7 +594,7 @@ export default function ProfileSettingsSection() {
           {/* Change Password Button */}
           <div className="pt-2">
             <Button
-              onClick={handleChangePassword}
+              type="submit"
               disabled={savingPassword || !isPasswordFormValid()}
               className={`px-6 py-2 font-semibold ${
                 isPasswordFormValid()
@@ -612,7 +615,7 @@ export default function ProfileSettingsSection() {
               )}
             </Button>
           </div>
-        </div>
+        </form>
       </div>
 
       {/* Account Information */}
