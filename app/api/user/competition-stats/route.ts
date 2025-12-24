@@ -282,6 +282,28 @@ export async function GET(req: NextRequest) {
           console.log('  Match:', altPositions[0].participantId === participantIdStr);
         }
 
+        // DEBUG: Check position statuses and PnL values
+        const openCount = positions.filter(p => p.status === 'open').length;
+        const closedCount = positions.filter(p => p.status === 'closed').length;
+        console.log('  Open positions:', openCount);
+        console.log('  Closed positions:', closedCount);
+        
+        if (positions.length > 0) {
+          console.log('  Sample position fields:', Object.keys(positions[0]));
+          console.log('  First position status:', positions[0].status);
+          console.log('  First position unrealizedPnl:', positions[0].unrealizedPnl);
+          
+          // Show all closed positions PnL
+          const closedOnes = positions.filter(p => p.status === 'closed');
+          if (closedOnes.length > 0) {
+            console.log('  Closed positions PnL values:', closedOnes.map(p => ({
+              symbol: p.symbol,
+              pnl: p.unrealizedPnl,
+              side: p.side
+            })));
+          }
+        }
+
         // Calculate live stats
         const openPositions = positions.filter(p => p.status === 'open');
         const closedPositions = positions.filter(p => p.status === 'closed');
