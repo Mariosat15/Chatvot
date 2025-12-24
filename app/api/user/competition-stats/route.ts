@@ -262,15 +262,16 @@ export async function GET(req: NextRequest) {
         const openPositions = positions.filter(p => p.status === 'open');
         const closedPositions = positions.filter(p => p.status === 'closed');
         
-        const unrealizedPnL = openPositions.reduce((sum, p) => sum + (p.unrealizedPnL || 0), 0);
-        const realizedPnL = closedPositions.reduce((sum, p) => sum + (p.realizedPnL || 0), 0);
+        // Note: When a position is closed, unrealizedPnl becomes the final realized PnL
+        const unrealizedPnL = openPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0);
+        const realizedPnL = closedPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0);
         
         // Build equity curve from closed positions
         let runningEquity = competition?.startingCapital || 10000;
         equityCurve.push({ time: new Date(competition?.startTime || Date.now()).toISOString(), equity: runningEquity });
         
         for (const pos of closedPositions) {
-          runningEquity += pos.realizedPnL || 0;
+          runningEquity += pos.unrealizedPnl || 0;
           equityCurve.push({
             time: pos.closedAt?.toISOString() || new Date().toISOString(),
             equity: runningEquity,
@@ -292,8 +293,8 @@ export async function GET(req: NextRequest) {
         const todayTrades = closedPositions.filter(p => 
           p.closedAt && new Date(p.closedAt) >= today
         );
-        const todayPnL = todayTrades.reduce((sum, p) => sum + (p.realizedPnL || 0), 0);
-        const todayWins = todayTrades.filter(p => (p.realizedPnL || 0) > 0).length;
+        const todayPnL = todayTrades.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0);
+        const todayWins = todayTrades.filter(p => (p.unrealizedPnl || 0) > 0).length;
 
         // Calculate winning streak
         let winStreak = 0;
@@ -302,7 +303,7 @@ export async function GET(req: NextRequest) {
         let isWinStreak = true;
 
         for (let i = closedPositions.length - 1; i >= 0; i--) {
-          const pnl = closedPositions[i].realizedPnL || 0;
+          const pnl = closedPositions[i].unrealizedPnl || 0;
           if (i === closedPositions.length - 1) {
             isWinStreak = pnl > 0;
             currentStreak = 1;
@@ -319,13 +320,13 @@ export async function GET(req: NextRequest) {
         else loseStreak = currentStreak;
 
         // Calculate average trade stats
-        const avgWin = closedPositions.filter(p => (p.realizedPnL || 0) > 0);
-        const avgLoss = closedPositions.filter(p => (p.realizedPnL || 0) < 0);
-        const avgWinAmount = avgWin.length > 0 
-          ? avgWin.reduce((sum, p) => sum + (p.realizedPnL || 0), 0) / avgWin.length 
+        const winningPositions = closedPositions.filter(p => (p.unrealizedPnl || 0) > 0);
+        const losingPositions = closedPositions.filter(p => (p.unrealizedPnl || 0) < 0);
+        const avgWinAmount = winningPositions.length > 0 
+          ? winningPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0) / winningPositions.length 
           : 0;
-        const avgLossAmount = avgLoss.length > 0 
-          ? Math.abs(avgLoss.reduce((sum, p) => sum + (p.realizedPnL || 0), 0)) / avgLoss.length 
+        const avgLossAmount = losingPositions.length > 0 
+          ? Math.abs(losingPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0)) / losingPositions.length 
           : 0;
         const profitFactor = avgLossAmount > 0 ? avgWinAmount / avgLossAmount : avgWinAmount > 0 ? Infinity : 0;
 
@@ -365,8 +366,8 @@ export async function GET(req: NextRequest) {
           avgWin: avgWinAmount,
           avgLoss: avgLossAmount,
           profitFactor: profitFactor === Infinity ? 999 : profitFactor,
-          largestWin: Math.max(...closedPositions.map(p => p.realizedPnL || 0), 0),
-          largestLoss: Math.min(...closedPositions.map(p => p.realizedPnL || 0), 0),
+          largestWin: Math.max(...closedPositions.map(p => p.unrealizedPnl || 0), 0),
+          largestLoss: Math.min(...closedPositions.map(p => p.unrealizedPnl || 0), 0),
           // Holding times
           avgHoldingTime: closedPositions.length > 0 
             ? closedPositions.reduce((sum, p) => {
@@ -421,14 +422,14 @@ export async function GET(req: NextRequest) {
         const openPositions = positions.filter(p => p.status === 'open');
         const closedPositions = positions.filter(p => p.status === 'closed');
         
-        const unrealizedPnL = openPositions.reduce((sum, p) => sum + (p.unrealizedPnL || 0), 0);
+        const unrealizedPnL = openPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0);
         
         // Build equity curve
         let runningEquity = participation.startingCapital || 10000;
         challengeEquityCurve.push({ time: new Date(challenge?.startTime || Date.now()).toISOString(), equity: runningEquity });
         
         for (const pos of closedPositions) {
-          runningEquity += pos.realizedPnL || 0;
+          runningEquity += pos.unrealizedPnl || 0;
           challengeEquityCurve.push({
             time: pos.closedAt?.toISOString() || new Date().toISOString(),
             equity: runningEquity,
