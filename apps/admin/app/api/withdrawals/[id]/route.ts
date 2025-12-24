@@ -413,10 +413,17 @@ export async function PUT(
       // Don't fail the request if audit logging fails
     }
 
+    // Fetch the updated withdrawal to verify data was saved
+    const updatedWithdrawal = await WithdrawalRequest.findById(id).lean();
+    console.log('📤 Returning withdrawal with companyBankUsed:', JSON.stringify(updatedWithdrawal?.companyBankUsed, null, 2));
+    
     return NextResponse.json({
       success: true,
       message: `Withdrawal ${action} successfully`,
-      withdrawal,
+      withdrawal: updatedWithdrawal,
+      debug: {
+        companyBankUsedSaved: updatedWithdrawal?.companyBankUsed || null,
+      }
     });
   } catch (error) {
     await session.abortTransaction();

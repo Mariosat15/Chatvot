@@ -322,6 +322,9 @@ export default function PendingWithdrawalsSection() {
       });
 
       const data = await response.json();
+      console.log('📤 Server response:', data);
+      console.log('📤 companyBankUsed saved:', data.debug?.companyBankUsedSaved);
+      
       if (!response.ok) {
         toast.error(data.error || 'Action failed');
         return;

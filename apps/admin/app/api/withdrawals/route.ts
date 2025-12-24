@@ -95,7 +95,10 @@ export async function GET(request: NextRequest) {
     const companyBankId = searchParams.get('companyBankId');
     if (companyBankId && companyBankId !== 'all') {
       query['companyBankUsed.bankId'] = companyBankId;
+      console.log('🔍 Filtering by companyBankUsed.bankId:', companyBankId);
     }
+
+    console.log('📊 Final query:', JSON.stringify(query, null, 2));
 
     // Get total count
     const total = await WithdrawalRequest.countDocuments(query);
@@ -184,6 +187,9 @@ export async function GET(request: NextRequest) {
           }
         }
 
+        // Ensure companyBankUsed is included
+        console.log(`📦 Withdrawal ${w._id} companyBankUsed:`, w.companyBankUsed);
+        
         return {
           ...w,
           // Include original card details - now always fetched from deposit if not stored
@@ -191,6 +197,8 @@ export async function GET(request: NextRequest) {
           originalPaymentId,
           originalPaymentMethod,
           userBankDetails,
+          // Explicitly include companyBankUsed
+          companyBankUsed: w.companyBankUsed || null,
         };
       })
     );
