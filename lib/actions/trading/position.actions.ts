@@ -457,7 +457,8 @@ export const closePosition = async (
         const isWinner = realizedPnl > 0;
         const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
         const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
-        const totalTrades = participant.totalTrades + 1; // INCREMENT total trades!
+        // Note: totalTrades was already incremented when position was opened
+        const totalTrades = participant.totalTrades;
         const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
 
         // Update averages
@@ -473,7 +474,7 @@ export const closePosition = async (
           {
             $inc: {
               currentOpenPositions: -1,
-              totalTrades: 1, // INCREMENT total trades!
+              // totalTrades already counted on position open
               winningTrades: isWinner ? 1 : 0,
               losingTrades: isWinner ? 0 : 1,
             },
@@ -912,7 +913,8 @@ export async function closePositionAutomatic(
       const isWinner = realizedPnl > 0;
       const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
       const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
-      const totalTrades = participant.totalTrades + 1; // INCREMENT total trades!
+      // Note: totalTrades was already incremented when position was opened
+      const totalTrades = participant.totalTrades;
       const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
 
       const averageWin =
@@ -930,7 +932,7 @@ export async function closePositionAutomatic(
         {
           $inc: {
             currentOpenPositions: -1,
-            totalTrades: 1, // INCREMENT total trades!
+            // totalTrades already counted on position open
             winningTrades: isWinner ? 1 : 0,
             losingTrades: isWinner ? 0 : 1,
             marginCallWarnings: closeReason === 'margin_call' ? 1 : 0,
