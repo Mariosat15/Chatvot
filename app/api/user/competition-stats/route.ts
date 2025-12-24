@@ -32,12 +32,12 @@ export async function GET(req: NextRequest) {
 
     // Get all user's competition participations
     const allCompetitionParticipations = await CompetitionParticipant.find({ userId })
-      .populate('competitionId', 'name status prizePool entryFeeCredits startTime endTime')
+      .populate('competitionId', 'name status prizePool entryFee startTime endTime startingCapital')
       .lean();
 
     // Get all user's challenge participations
     const allChallengeParticipations = await ChallengeParticipant.find({ userId })
-      .populate('challengeId', 'name status prizePool stakeAmount startTime endTime')
+      .populate('challengeId', 'name status prizePool entryFee startTime endTime startingCapital')
       .lean();
 
     // Calculate all-time stats (combining competitions + challenges)
@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
       allTimeStats.totalTrades += participation.totalTrades || 0;
       allTimeStats.winningTrades += participation.winningTrades || 0;
       allTimeStats.losingTrades += participation.losingTrades || 0;
-      allTimeStats.totalEntryFees += comp.entryFeeCredits || 0;
+      allTimeStats.totalEntryFees += comp.entryFee || 0;
 
       // Track best/biggest stats
       if (participation.pnl > allTimeStats.biggestWin) {
@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
       allTimeStats.totalTrades += participation.totalTrades || 0;
       allTimeStats.winningTrades += participation.winningTrades || 0;
       allTimeStats.losingTrades += participation.losingTrades || 0;
-      allTimeStats.totalEntryFees += challenge.stakeAmount || 0;
+      allTimeStats.totalEntryFees += challenge.entryFee || 0;
 
       // Track best/biggest stats
       if (participation.pnl > allTimeStats.biggestWin) {
@@ -253,9 +253,10 @@ export async function GET(req: NextRequest) {
         const competition = await Competition.findById(competitionId).lean();
         
         // Get all positions for this competition
+        // Note: participantId is stored as string in DB, so convert ObjectId to string
         const positions = await TradingPosition.find({
           competitionId,
-          participantId: participation._id,
+          participantId: participation._id.toString(),
         }).sort({ openedAt: 1 }).lean();
 
         // Calculate live stats
@@ -414,9 +415,10 @@ export async function GET(req: NextRequest) {
         }).lean();
         
         // Get all positions for this challenge
+        // Note: participantId is stored as string in DB, so convert ObjectId to string
         const positions = await TradingPosition.find({
           challengeId,
-          participantId: participation._id,
+          participantId: participation._id.toString(),
         }).sort({ openedAt: 1 }).lean();
 
         const openPositions = positions.filter(p => p.status === 'open');
