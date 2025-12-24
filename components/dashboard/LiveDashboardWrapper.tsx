@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, memo } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import DashboardStats from './DashboardStats';
 import GlobalRiskMetrics from './GlobalRiskMetrics';
 import CompetitionsTable from './CompetitionsTable';
@@ -36,15 +36,22 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [timeSinceUpdate, setTimeSinceUpdate] = useState(0);
-  const [isMounted, setIsMounted] = useState(false);
+  
+  // Use refs for stable values that don't cause re-renders
+  const isRefreshingRef = useRef(false);
+  const isMountedRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
-  // Auto-refresh function
-  const refreshData = useCallback(async (skipMountedCheck = false) => {
-    // Don't refresh immediately after mount - use server data
-    if (!skipMountedCheck && !isMounted) return;
-    if (isRefreshing) return; // Prevent duplicate requests
+  // Auto-refresh function - stable, no dependencies that change
+  const refreshData = async () => {
+    // Prevent any refresh during initial mount period
+    if (!isMountedRef.current) return;
+    // Prevent duplicate requests using ref (synchronous check)
+    if (isRefreshingRef.current) return;
     
+    isRefreshingRef.current = true;
     setIsRefreshing(true);
+    
     try {
       const response = await fetch('/api/dashboard/live-stats?t=' + Date.now(), {
         method: 'GET',
@@ -63,19 +70,26 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
     } catch {
       // Silently handle refresh errors
     } finally {
+      isRefreshingRef.current = false;
       setIsRefreshing(false);
     }
-  }, [isMounted, isRefreshing]);
+  };
 
-  // Mark component as mounted after initial render
+  // Mark component as mounted after initial render - runs ONCE
   useEffect(() => {
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+    
     // Delay the mounted state to ensure hydration is complete
+    // This prevents any refresh calls during the first 2 seconds
     const timer = setTimeout(() => {
-      setIsMounted(true);
-    }, 1000);
+      isMountedRef.current = true;
+    }, 2000);
+    
     return () => clearTimeout(timer);
   }, []);
 
+  // Update time counter
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeSinceUpdate(Math.floor((Date.now() - lastUpdate) / 1000));
@@ -84,38 +98,45 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
     return () => clearInterval(timer);
   }, [lastUpdate]);
 
-  // Auto-refresh with visibility awareness - only after mounted
+  // Auto-refresh with visibility awareness - runs ONCE, uses refs
   useEffect(() => {
-    if (!isMounted) return;
-
-    const handleRefresh = () => {
-      // Skip if tab is hidden
-      if (document.hidden) return;
-      refreshData(true);
-    };
-
-    const interval = setInterval(handleRefresh, PERFORMANCE_INTERVALS.DASHBOARD_REFRESH);
+    // Set up interval for auto-refresh
+    const interval = setInterval(() => {
+      // Skip if tab is hidden or not mounted yet
+      if (document.hidden || !isMountedRef.current) return;
+      refreshData();
+    }, PERFORMANCE_INTERVALS.DASHBOARD_REFRESH);
     
-    // Refresh when tab becomes visible (only if it was previously hidden)
+    // Track if tab was previously hidden
     let wasHidden = document.hidden;
+    
     const handleVisibilityChange = () => {
-      if (wasHidden && !document.hidden) {
-        // Tab became visible after being hidden - refresh
-        refreshData(true);
+      // Only refresh if tab was hidden and is now visible AND we're mounted
+      if (wasHidden && !document.hidden && isMountedRef.current) {
+        refreshData();
       }
       wasHidden = document.hidden;
     };
+    
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isMounted, refreshData]);
+  }, []); // Empty deps - runs once, uses refs for all checks
 
-  // Manual refresh handler
+  // Manual refresh handler - bypasses mounted check
   const handleManualRefresh = () => {
-    refreshData(true); // Skip mounted check for manual refresh
+    if (isRefreshingRef.current) return;
+    // For manual refresh, temporarily allow it even if not "mounted"
+    const wasMounted = isMountedRef.current;
+    isMountedRef.current = true;
+    refreshData();
+    if (!wasMounted) {
+      // Restore if it wasn't mounted (edge case)
+      setTimeout(() => { isMountedRef.current = wasMounted; }, 100);
+    }
   };
 
   return (
