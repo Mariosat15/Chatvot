@@ -422,9 +422,39 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     : 0;
   
   // Calculate overview stats
-  const allParticipations = [...competitionParticipations, ...challengeParticipations] as any[];
+  // ONLY count capital from ACTIVE competitions/challenges for "Live Balance"
+  const activeCompetitionIdsSet = new Set(
+    allCompetitions
+      .filter((c: any) => c.status === 'active')
+      .map((c: any) => c._id.toString())
+  );
   
+  const activeChallengeIdsSet = new Set(
+    allChallenges
+      .filter((c: any) => c.status === 'active')
+      .map((c: any) => c._id.toString())
+  );
+  
+  // Filter to only active participations for capital calculation
+  const activeCompParticipations = (competitionParticipations as any[]).filter(
+    (p: any) => activeCompetitionIdsSet.has(p.competitionId?.toString())
+  );
+  const activeChallengeParticipations = (challengeParticipations as any[]).filter(
+    (p: any) => activeChallengeIdsSet.has(p.challengeId?.toString())
+  );
+  
+  // For total stats, use all participations
+  const allParticipations = [...competitionParticipations, ...challengeParticipations] as any[];
+  // For live capital, use only active participations
+  const activeParticipations = [...activeCompParticipations, ...activeChallengeParticipations];
+  
+  // Live capital = only from active contests
   let totalCapital = 0;
+  for (const p of activeParticipations) {
+    totalCapital += p.currentCapital || 0;
+  }
+  
+  // All-time stats = from all participations
   let totalPnL = 0;
   let unrealizedPnL = 0;
   let realizedPnL = 0;
@@ -438,7 +468,6 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   let totalPrizesWon = 0;
   
   for (const p of allParticipations) {
-    totalCapital += p.currentCapital || 0;
     totalPnL += p.pnl || 0;
     unrealizedPnL += p.unrealizedPnl || 0;
     realizedPnL += p.realizedPnl || 0;
