@@ -64,8 +64,9 @@ export async function POST(request: NextRequest) {
     const filePath = path.join(uploadDir, filename);
     await writeFile(filePath, buffer);
 
-    // Return public path
-    const publicPath = `/assets/images/${filename}`;
+    // Return API-served path (works in production without rebuild)
+    // Use API route for dynamic serving, with timestamp for cache-busting
+    const publicPath = `/api/assets/images/${filename}?t=${timestamp}`;
 
     return NextResponse.json({
       success: true,

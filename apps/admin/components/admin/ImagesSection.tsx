@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Save, Upload, RefreshCw, Image as ImageIconLucide, Info, Palette } from 'lucide-react';
+import { Save, Upload, RefreshCw, Image as ImageIconLucide, Info, Palette, Star, Users, Quote } from 'lucide-react';
 import Image from 'next/image';
 
 interface ImageSettings {
@@ -13,6 +16,14 @@ interface ImageSettings {
   dashboardPreview: string;
 }
 
+interface AuthPageSettings {
+  authPageTestimonialQuote: string;
+  authPageTestimonialAuthor: string;
+  authPageTestimonialRole: string;
+  authPageTestimonialRating: number;
+  authPageDashboardImage: string;
+}
+
 export default function ImagesSection() {
   const [images, setImages] = useState<ImageSettings>({
     appLogo: '',
@@ -20,12 +31,20 @@ export default function ImagesSection() {
     profileImage: '',
     dashboardPreview: '',
   });
+  const [authSettings, setAuthSettings] = useState<AuthPageSettings>({
+    authPageTestimonialQuote: '',
+    authPageTestimonialAuthor: '',
+    authPageTestimonialRole: '',
+    authPageTestimonialRating: 5,
+    authPageDashboardImage: '',
+  });
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
 
   useEffect(() => {
     fetchImages();
+    fetchAuthSettings();
   }, []);
 
   const fetchImages = async () => {
@@ -40,6 +59,24 @@ export default function ImagesSection() {
       toast.error('Failed to load images');
     } finally {
       setIsFetching(false);
+    }
+  };
+
+  const fetchAuthSettings = async () => {
+    try {
+      const response = await fetch('/api/hero-settings');
+      if (response.ok) {
+        const data = await response.json();
+        setAuthSettings({
+          authPageTestimonialQuote: data.authPageTestimonialQuote || '',
+          authPageTestimonialAuthor: data.authPageTestimonialAuthor || '',
+          authPageTestimonialRole: data.authPageTestimonialRole || '',
+          authPageTestimonialRating: data.authPageTestimonialRating || 5,
+          authPageDashboardImage: data.authPageDashboardImage || '',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load auth settings:', error);
     }
   };
 
@@ -99,6 +136,68 @@ export default function ImagesSection() {
       if (response.ok) {
         toast.success('Images configuration saved');
         toast.info('Changes will be visible after page refresh');
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Save failed');
+      }
+    } catch (error) {
+      toast.error('An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAuthImageUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setUploading((prev) => ({ ...prev, authPageDashboardImage: true }));
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('field', 'authPageDashboardImage');
+
+      const response = await fetch('/api/images/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setAuthSettings((prev) => ({ ...prev, authPageDashboardImage: data.path }));
+        toast.success('Auth page image uploaded successfully');
+      } else {
+        toast.error(data.error || 'Upload failed');
+      }
+    } catch (error) {
+      toast.error('An error occurred during upload');
+    } finally {
+      setUploading((prev) => ({ ...prev, authPageDashboardImage: false }));
+    }
+  };
+
+  const handleSaveAuthSettings = async () => {
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/hero-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(authSettings),
+      });
+
+      if (response.ok) {
+        toast.success('Auth page settings saved');
+        toast.info('Changes will be visible on login/signup pages');
       } else {
         const data = await response.json();
         toast.error(data.error || 'Save failed');
@@ -294,7 +393,181 @@ export default function ImagesSection() {
           {isLoading ? 'Saving Changes...' : 'Save Image Configuration'}
         </Button>
       </div>
+
+      {/* Auth Page Branding Section */}
+      <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-2xl overflow-hidden shadow-xl">
+        <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 p-6">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-white rounded-xl blur-lg opacity-50"></div>
+              <div className="relative h-14 w-14 bg-white rounded-xl flex items-center justify-center shadow-xl">
+                <Users className="h-7 w-7 text-indigo-600" />
+              </div>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                Auth Page Branding
+              </h2>
+              <p className="text-indigo-100 mt-1">
+                Customize the login & signup page testimonial and image
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-8 space-y-6">
+          {/* Testimonial Quote */}
+          <div className="space-y-2">
+            <Label className="text-gray-300 flex items-center gap-2">
+              <Quote className="h-4 w-4 text-indigo-400" />
+              Testimonial Quote
+            </Label>
+            <Textarea
+              value={authSettings.authPageTestimonialQuote}
+              onChange={(e) => setAuthSettings(prev => ({ ...prev, authPageTestimonialQuote: e.target.value }))}
+              className="bg-gray-900 border-gray-700 text-white min-h-[100px]"
+              placeholder="Chatvolt turned my watchlist into a winning list..."
+            />
+          </div>
+
+          {/* Author & Role */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-gray-300">Author Name</Label>
+              <Input
+                value={authSettings.authPageTestimonialAuthor}
+                onChange={(e) => setAuthSettings(prev => ({ ...prev, authPageTestimonialAuthor: e.target.value }))}
+                className="bg-gray-900 border-gray-700 text-white"
+                placeholder="- Ethan R."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-gray-300">Author Role</Label>
+              <Input
+                value={authSettings.authPageTestimonialRole}
+                onChange={(e) => setAuthSettings(prev => ({ ...prev, authPageTestimonialRole: e.target.value }))}
+                className="bg-gray-900 border-gray-700 text-white"
+                placeholder="Retail Investor"
+              />
+            </div>
+          </div>
+
+          {/* Star Rating */}
+          <div className="space-y-2">
+            <Label className="text-gray-300 flex items-center gap-2">
+              <Star className="h-4 w-4 text-yellow-400" />
+              Star Rating (1-5)
+            </Label>
+            <div className="flex items-center gap-3">
+              <Input
+                type="number"
+                value={authSettings.authPageTestimonialRating}
+                onChange={(e) => setAuthSettings(prev => ({ ...prev, authPageTestimonialRating: Math.min(5, Math.max(1, parseInt(e.target.value) || 1)) }))}
+                className="bg-gray-900 border-gray-700 text-white w-24"
+                min={1}
+                max={5}
+              />
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`h-5 w-5 ${star <= authSettings.authPageTestimonialRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Auth Page Dashboard Image */}
+          <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+            <div className="flex items-start gap-6">
+              {/* Preview */}
+              <div className="flex-shrink-0">
+                {authSettings.authPageDashboardImage ? (
+                  <div className="relative h-32 w-48 bg-gray-900 border-2 border-gray-700 rounded-xl overflow-hidden shadow-lg">
+                    <Image
+                      src={authSettings.authPageDashboardImage}
+                      alt="Auth Page Dashboard"
+                      fill
+                      className="object-contain p-2"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div className="h-32 w-48 bg-gray-900 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center">
+                    <ImageIconLucide className="h-12 w-12 text-gray-600" />
+                  </div>
+                )}
+              </div>
+
+              {/* Info & Upload */}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold text-gray-100">Auth Page Dashboard Image</h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  The dashboard preview shown on the right side of login/signup pages
+                </p>
+                <p className="text-xs text-indigo-400 mt-2 flex items-center gap-1">
+                  <ImageIconLucide className="h-3 w-3" />
+                  Recommended: 1440x1150px, PNG or JPEG
+                </p>
+
+                <div className="mt-4">
+                  <input
+                    type="file"
+                    id="upload-authPageDashboardImage"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleAuthImageUpload(file);
+                    }}
+                  />
+                  <label htmlFor="upload-authPageDashboardImage">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={uploading.authPageDashboardImage}
+                      className="cursor-pointer border-indigo-500 text-indigo-400 hover:bg-indigo-500 hover:text-white"
+                      asChild
+                    >
+                      <span>
+                        {uploading.authPageDashboardImage ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload New
+                          </>
+                        )}
+                      </span>
+                    </Button>
+                  </label>
+                </div>
+
+                {authSettings.authPageDashboardImage && (
+                  <p className="text-xs text-gray-600 mt-3 font-mono truncate">
+                    {authSettings.authPageDashboardImage}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Save Auth Settings Button */}
+          <Button
+            onClick={handleSaveAuthSettings}
+            disabled={isLoading}
+            className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-bold h-14 text-lg shadow-lg shadow-indigo-500/50"
+          >
+            <Save className="h-5 w-5 mr-2" />
+            {isLoading ? 'Saving...' : 'Save Auth Page Settings'}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
-
