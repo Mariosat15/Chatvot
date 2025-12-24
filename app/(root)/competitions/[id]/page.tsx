@@ -7,6 +7,7 @@ import Link from 'next/link';
 import CompetitionLeaderboard from '@/components/trading/CompetitionLeaderboard';
 import CompetitionEntryButton from '@/components/trading/CompetitionEntryButton';
 import CompetitionStatusWrapper from '@/components/trading/CompetitionStatusWrapper';
+import CompetitionDashboard from '@/components/trading/CompetitionDashboard';
 import CompetitionStatusMonitor from '@/components/trading/CompetitionStatusMonitor';
 import UTCClock from '@/components/trading/UTCClock';
 import LiveCountdown from '@/components/trading/LiveCountdown';
@@ -166,24 +167,27 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* User's Participant Card (Dynamic - handles status changes) */}
-            <CompetitionStatusWrapper
-              competitionId={id}
-              startTime={new Date(competition.startTime).toISOString()}
-              endTime={new Date(competition.endTime).toISOString()}
-              initialStatus={isCompleted ? 'completed' : isActive ? 'active' : 'upcoming'}
-              isUserIn={isUserIn}
-              userParticipant={userParticipant ? {
-                _id: userParticipant._id.toString(),
-                currentCapital: userParticipant.currentCapital,
-                pnl: userParticipant.pnl,
-                pnlPercentage: userParticipant.pnlPercentage,
-                totalTrades: userParticipant.totalTrades,
-                currentRank: userParticipant.currentRank,
-                winningTrades: userParticipant.winningTrades,
-                losingTrades: userParticipant.losingTrades,
-              } : null}
-            />
+            {/* User's Comprehensive Dashboard */}
+            {isUserIn && userParticipant && (
+              <CompetitionDashboard
+                competitionId={id}
+                initialParticipant={{
+                  _id: userParticipant._id.toString(),
+                  currentCapital: userParticipant.currentCapital,
+                  pnl: userParticipant.pnl,
+                  pnlPercentage: userParticipant.pnlPercentage,
+                  totalTrades: userParticipant.totalTrades,
+                  currentRank: userParticipant.currentRank,
+                  winningTrades: userParticipant.winningTrades,
+                  losingTrades: userParticipant.losingTrades,
+                }}
+                competitionStatus={isCompleted ? 'completed' : isActive ? 'active' : 'upcoming'}
+                startTime={new Date(competition.startTime).toISOString()}
+                endTime={new Date(competition.endTime).toISOString()}
+                startingCapital={competition.startingCapital || competition.startingTradingPoints || 10000}
+                totalParticipants={competition.currentParticipants}
+              />
+            )}
 
             {/* Competition Rules */}
             {competition.rules && (
