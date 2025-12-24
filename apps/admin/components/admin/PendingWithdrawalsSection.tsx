@@ -406,8 +406,14 @@ export default function PendingWithdrawalsSection() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <p className="text-gray-500 text-xs">User</p>
-              <p className="text-white font-medium truncate">
+              <p className="text-white font-medium truncate" title={withdrawal.userName}>
+                {withdrawal.userName || 'Unknown'}
+              </p>
+              <p className="text-xs text-gray-400 truncate" title={withdrawal.userEmail}>
                 {withdrawal.userEmail}
+              </p>
+              <p className="text-[10px] text-gray-500 font-mono truncate" title={withdrawal.userId}>
+                ID: {withdrawal.userId.slice(0, 12)}...
               </p>
             </div>
             <div>
@@ -436,6 +442,18 @@ export default function PendingWithdrawalsSection() {
                   withdrawal.payoutMethod?.replace(/_/g, ' ')
                 )}
               </p>
+              {/* Show bank hint for bank transfers */}
+              {withdrawal.payoutMethod === 'bank_transfer' && withdrawal.userBankDetails && (
+                <p className="text-[10px] text-teal-400/70 truncate" title={withdrawal.userBankDetails.iban}>
+                  IBAN: ...{withdrawal.userBankDetails.ibanLast4 || withdrawal.userBankDetails.iban?.slice(-4)}
+                </p>
+              )}
+              {/* Show card hint for original method */}
+              {withdrawal.payoutMethod === 'original_method' && withdrawal.originalCardDetails?.last4 && (
+                <p className="text-[10px] text-blue-400/70">
+                  Card: ****{withdrawal.originalCardDetails.last4}
+                </p>
+              )}
             </div>
             <div>
               <p className="text-gray-500 text-xs">Requested</p>
@@ -997,7 +1015,7 @@ export default function PendingWithdrawalsSection() {
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">ID</p>
+                  <p className="text-xs text-gray-500">Withdrawal ID</p>
                   <p className="text-white font-mono text-sm">{detailDialog.withdrawal._id}</p>
                 </div>
                 <div>
@@ -1006,10 +1024,27 @@ export default function PendingWithdrawalsSection() {
                     {detailDialog.withdrawal.status.toUpperCase()}
                   </Badge>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">User</p>
-                  <p className="text-white">{detailDialog.withdrawal.userEmail}</p>
-                  <p className="text-xs text-gray-500">{detailDialog.withdrawal.userId}</p>
+                
+                {/* Enhanced User Information */}
+                <div className="col-span-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                  <p className="text-xs text-blue-400 font-semibold mb-2 flex items-center gap-1">
+                    <User className="h-3 w-3" />
+                    User Information
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-xs text-gray-500">Full Name</p>
+                      <p className="text-white font-medium">{detailDialog.withdrawal.userName || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Email</p>
+                      <p className="text-white">{detailDialog.withdrawal.userEmail}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">User ID</p>
+                      <p className="text-white font-mono text-xs">{detailDialog.withdrawal.userId}</p>
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Amount</p>

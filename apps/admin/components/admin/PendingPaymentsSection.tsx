@@ -348,11 +348,14 @@ export default function PendingPaymentsSection() {
             </div>
           )}
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-100 truncate">
+            <p className="text-sm font-semibold text-gray-100 truncate" title={payment.user?.name || 'Unknown User'}>
               {payment.user?.name || 'Unknown User'}
             </p>
-            <p className="text-xs text-gray-400 truncate">
+            <p className="text-xs text-gray-400 truncate" title={payment.user?.email || 'No email'}>
               {payment.user?.email || 'No email'}
+            </p>
+            <p className="text-[10px] text-gray-500 font-mono truncate" title={payment.userId}>
+              ID: {payment.userId?.slice(0, 12)}...
             </p>
           </div>
         </div>
@@ -860,9 +863,9 @@ export default function PendingPaymentsSection() {
                 </div>
               </div>
 
-              {/* User Info */}
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+              {/* User Info - Enhanced */}
+              <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/30">
+                <h4 className="text-sm font-medium text-blue-400 mb-3 flex items-center gap-2">
                   <User className="h-4 w-4" />
                   User Information
                 </h4>
@@ -871,23 +874,34 @@ export default function PendingPaymentsSection() {
                     <img
                       src={detailDialog.payment.user.image}
                       alt={detailDialog.payment.user.name || 'User'}
-                      className="w-12 h-12 rounded-full"
+                      className="w-14 h-14 rounded-full border-2 border-blue-500/30"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
-                      <User className="h-6 w-6 text-blue-400" />
+                    <div className="w-14 h-14 rounded-full bg-blue-500/20 border-2 border-blue-500/30 flex items-center justify-center">
+                      <User className="h-7 w-7 text-blue-400" />
                     </div>
                   )}
-                  <div>
-                    <p className="font-semibold text-white">
-                      {detailDialog.payment.user?.name || 'Unknown User'}
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      {detailDialog.payment.user?.email || 'No email available'}
-                    </p>
-                    <p className="text-xs text-gray-500 font-mono mt-1">
-                      ID: {detailDialog.payment.userId}
-                    </p>
+                  <div className="flex-1">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-gray-500">Full Name</p>
+                        <p className="font-semibold text-white">
+                          {detailDialog.payment.user?.name || 'Unknown User'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Email</p>
+                        <p className="text-sm text-gray-300">
+                          {detailDialog.payment.user?.email || 'No email available'}
+                        </p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-500">User ID</p>
+                        <p className="text-xs text-gray-400 font-mono bg-gray-800/50 px-2 py-1 rounded inline-block">
+                          {detailDialog.payment.userId}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
