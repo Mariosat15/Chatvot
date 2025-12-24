@@ -12,6 +12,7 @@ import {
 import type { ComprehensiveDashboardData } from '@/lib/actions/comprehensive-dashboard.actions';
 import WinPotentialCard from './WinPotentialCard';
 import type { RankingMethod } from '@/lib/services/ranking-config.service';
+import { useAppSettings } from '@/contexts/AppSettingsContext';
 
 interface ModernDashboardProps {
   data: ComprehensiveDashboardData;
@@ -20,6 +21,7 @@ interface ModernDashboardProps {
 export default function ModernDashboard({ data }: ModernDashboardProps) {
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { settings, formatCredits } = useAppSettings();
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -136,7 +138,13 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
         <StatCard icon={Flame} label="Win Streak" value={data.streaks.currentWinStreak} color="orange" />
         <StatCard icon={ArrowUpRight} label="Avg Win" value={formatCurrency(data.overview.averageWin)} color="green" small />
         <StatCard icon={ArrowDownRight} label="Avg Loss" value={formatCurrency(data.overview.averageLoss)} color="red" small />
-        <StatCard icon={Award} label="Prizes Won" value={formatCurrency(data.overview.totalPrizesWon)} color="yellow" small />
+        <StatCard 
+          icon={Award} 
+          label="Prizes Won" 
+          value={`${settings?.credits.symbol || '⚡'} ${data.overview.totalPrizesWon.toLocaleString()}`} 
+          color="yellow" 
+          small 
+        />
         <StatCard icon={Calendar} label="Days Traded" value={data.streaks.tradingDaysThisMonth} color="blue" />
       </section>
 
