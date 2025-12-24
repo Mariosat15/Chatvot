@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
+import { useAppSettings } from '@/contexts/AppSettingsContext';
 
 interface CompetitionDashboardProps {
   competitionId: string;
@@ -108,12 +109,14 @@ export default function CompetitionDashboard({
   startingCapital,
   totalParticipants,
 }: CompetitionDashboardProps) {
+  const { settings } = useAppSettings();
   const [allTimeStats, setAllTimeStats] = useState<AllTimeStats | null>(null);
   const [currentStats, setCurrentStats] = useState<CurrentStats | null>(null);
   const [equityCurve, setEquityCurve] = useState<EquityPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState('live');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const isActive = competitionStatus === 'active';
   const isCompleted = competitionStatus === 'completed';
@@ -254,19 +257,14 @@ export default function CompetitionDashboard({
               </div>
             </div>
             
-            {/* Quick Actions */}
+            {/* Status Badge Only - Trade button is elsewhere on the page */}
             <div className="flex items-center gap-2">
-              {isActive && (
-                <Link href={`/competitions/${competitionId}/trade`}>
-                  <Button className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold shadow-lg shadow-green-500/25">
-                    <Play className="h-4 w-4 mr-2" />
-                    Trade Now
-                  </Button>
-                </Link>
-              )}
               {isCompleted && (
                 <Link href={`/competitions/${competitionId}/results`}>
-                  <Button className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-semibold">
+                  <Button 
+                    className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-semibold
+                      active:scale-95 transition-all duration-150 shadow-lg hover:shadow-purple-500/25"
+                  >
                     <BarChart3 className="h-4 w-4 mr-2" />
                     View Results
                   </Button>
@@ -294,21 +292,30 @@ export default function CompetitionDashboard({
             <TabsList className="bg-slate-800/50 p-1 rounded-xl">
               <TabsTrigger 
                 value="live" 
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-cyan-500 data-[state=active]:text-white rounded-lg px-4"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-cyan-500 
+                  data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-blue-500/25
+                  rounded-lg px-4 transition-all duration-200 active:scale-95
+                  hover:bg-slate-700/50 data-[state=inactive]:text-slate-400"
               >
                 <Activity className="h-4 w-4 mr-2" />
                 Live Stats
               </TabsTrigger>
               <TabsTrigger 
                 value="performance" 
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white rounded-lg px-4"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 
+                  data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/25
+                  rounded-lg px-4 transition-all duration-200 active:scale-95
+                  hover:bg-slate-700/50 data-[state=inactive]:text-slate-400"
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
                 Performance
               </TabsTrigger>
               <TabsTrigger 
                 value="alltime" 
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white rounded-lg px-4"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 
+                  data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-amber-500/25
+                  rounded-lg px-4 transition-all duration-200 active:scale-95
+                  hover:bg-slate-700/50 data-[state=inactive]:text-slate-400"
               >
                 <Trophy className="h-4 w-4 mr-2" />
                 All-Time
@@ -442,19 +449,19 @@ export default function CompetitionDashboard({
             {/* Secondary Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Total Trades */}
-              <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+              <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-slate-600/50 transition-all duration-200 hover:bg-slate-800/70">
                 <p className="text-xs text-slate-400 mb-1">Total Trades</p>
                 <p className="text-lg font-bold text-white">{stats.totalTrades || 0}</p>
               </div>
               
               {/* Open Positions */}
-              <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+              <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-cyan-500/30 transition-all duration-200 hover:bg-slate-800/70">
                 <p className="text-xs text-slate-400 mb-1">Open Positions</p>
                 <p className="text-lg font-bold text-cyan-400">{currentStats?.openPositionsCount || 0}</p>
               </div>
               
               {/* Unrealized P&L */}
-              <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+              <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-slate-600/50 transition-all duration-200 hover:bg-slate-800/70">
                 <p className="text-xs text-slate-400 mb-1">Unrealized P&L</p>
                 <p className={`text-lg font-bold ${(currentStats?.unrealizedPnL || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {(currentStats?.unrealizedPnL || 0) >= 0 ? '+' : ''}${(currentStats?.unrealizedPnL || 0).toFixed(2)}
@@ -462,7 +469,7 @@ export default function CompetitionDashboard({
               </div>
               
               {/* Today's P&L */}
-              <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+              <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-slate-600/50 transition-all duration-200 hover:bg-slate-800/70">
                 <p className="text-xs text-slate-400 mb-1">Today&apos;s P&L</p>
                 <p className={`text-lg font-bold ${(currentStats?.todayPnL || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {(currentStats?.todayPnL || 0) >= 0 ? '+' : ''}${(currentStats?.todayPnL || 0).toFixed(2)}
@@ -482,42 +489,42 @@ export default function CompetitionDashboard({
                 </h3>
                 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-green-500/30 transition-all duration-200 hover:bg-slate-800/70">
                     <p className="text-xs text-slate-400 mb-1">Avg Win</p>
                     <p className="text-lg font-bold text-green-400">
                       +${(currentStats?.avgWin || 0).toFixed(2)}
                     </p>
                   </div>
                   
-                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-red-500/30 transition-all duration-200 hover:bg-slate-800/70">
                     <p className="text-xs text-slate-400 mb-1">Avg Loss</p>
                     <p className="text-lg font-bold text-red-400">
-                      -${(currentStats?.avgLoss || 0).toFixed(2)}
+                      -${Math.abs(currentStats?.avgLoss || 0).toFixed(2)}
                     </p>
                   </div>
                   
-                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-green-500/30 transition-all duration-200 hover:bg-slate-800/70">
                     <p className="text-xs text-slate-400 mb-1">Largest Win</p>
                     <p className="text-lg font-bold text-green-400">
                       +${(currentStats?.largestWin || 0).toFixed(2)}
                     </p>
                   </div>
                   
-                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-red-500/30 transition-all duration-200 hover:bg-slate-800/70">
                     <p className="text-xs text-slate-400 mb-1">Largest Loss</p>
                     <p className="text-lg font-bold text-red-400">
-                      ${(currentStats?.largestLoss || 0).toFixed(2)}
+                      -${Math.abs(currentStats?.largestLoss || 0).toFixed(2)}
                     </p>
                   </div>
                   
-                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-slate-600/50 transition-all duration-200 hover:bg-slate-800/70">
                     <p className="text-xs text-slate-400 mb-1">Profit Factor</p>
-                    <p className={`text-lg font-bold ${(currentStats?.profitFactor || 0) >= 1 ? 'text-green-400' : 'text-red-400'}`}>
+                    <p className={`text-lg font-bold ${(currentStats?.profitFactor || 0) >= 1 ? 'text-green-400' : (currentStats?.profitFactor || 0) === 0 ? 'text-slate-400' : 'text-red-400'}`}>
                       {(currentStats?.profitFactor || 0).toFixed(2)}
                     </p>
                   </div>
                   
-                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-slate-600/50 transition-all duration-200 hover:bg-slate-800/70">
                     <p className="text-xs text-slate-400 mb-1">Avg Hold Time</p>
                     <p className="text-lg font-bold text-white">
                       {(currentStats?.avgHoldingTime || 0).toFixed(0)}m
@@ -625,27 +632,27 @@ export default function CompetitionDashboard({
                   
                   <div className="p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/30">
                     <div className="flex items-center gap-2 mb-2">
-                      <Award className="h-4 w-4 text-purple-400" />
+                      <Medal className="h-4 w-4 text-purple-400" />
                       <p className="text-xs text-slate-400">Best Rank</p>
                     </div>
                     <p className="text-2xl font-bold text-white">
-                      #{allTimeStats.bestRank || '—'}
+                      {allTimeStats.bestRank ? `#${allTimeStats.bestRank}` : 'N/A'}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      Avg: #{allTimeStats.averageRank?.toFixed(1) || '—'}
+                      Avg: {allTimeStats.averageRank && allTimeStats.averageRank > 0 ? `#${allTimeStats.averageRank.toFixed(1)}` : 'N/A'}
                     </p>
                   </div>
                   
                   <div className="p-4 rounded-xl bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border border-cyan-500/30">
                     <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="h-4 w-4 text-cyan-400" />
+                      <Award className="h-4 w-4 text-cyan-400" />
                       <p className="text-xs text-slate-400">Prizes Won</p>
                     </div>
-                    <p className="text-2xl font-bold text-white">
-                      ${allTimeStats.totalPrizesWon?.toFixed(0) || '0'}
+                    <p className="text-2xl font-bold text-yellow-400">
+                      {settings?.credits.symbol || '⚡'} {allTimeStats.totalPrizesWon?.toLocaleString() || '0'}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      Net: ${allTimeStats.netProfit?.toFixed(0) || '0'}
+                      Net: {settings?.credits.symbol || '⚡'} {allTimeStats.netProfit?.toLocaleString() || '0'}
                     </p>
                   </div>
                 </div>
@@ -689,70 +696,82 @@ export default function CompetitionDashboard({
 
                 {/* Career Trading Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-slate-600/50 transition-colors">
                     <p className="text-xs text-slate-400 mb-1">Total Contests</p>
                     <p className="text-lg font-bold text-white">{allTimeStats.totalContests || 0}</p>
                   </div>
-                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-slate-600/50 transition-colors">
                     <p className="text-xs text-slate-400 mb-1">Entry Fees Paid</p>
-                    <p className="text-lg font-bold text-amber-400">${(allTimeStats.totalEntryFees || 0).toFixed(0)}</p>
+                    <p className="text-lg font-bold text-amber-400">
+                      {settings?.credits.symbol || '⚡'} {(allTimeStats.totalEntryFees || 0).toLocaleString()}
+                    </p>
                   </div>
-                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-slate-600/50 transition-colors">
                     <p className="text-xs text-slate-400 mb-1">Biggest Win</p>
-                    <p className="text-lg font-bold text-green-400">+${(allTimeStats.biggestWin || 0).toFixed(2)}</p>
+                    <p className="text-lg font-bold text-green-400">
+                      +${(allTimeStats.biggestWin || 0).toFixed(2)}
+                    </p>
                   </div>
-                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-slate-600/50 transition-colors">
                     <p className="text-xs text-slate-400 mb-1">Biggest Loss</p>
-                    <p className="text-lg font-bold text-red-400">${(allTimeStats.biggestLoss || 0).toFixed(2)}</p>
+                    <p className="text-lg font-bold text-red-400">
+                      {(allTimeStats.biggestLoss || 0) < 0 ? '' : '-'}${Math.abs(allTimeStats.biggestLoss || 0).toFixed(2)}
+                    </p>
                   </div>
                 </div>
 
                 {/* P&L History Mini Chart */}
-                {allTimeStats.pnlHistory && allTimeStats.pnlHistory.length > 1 && (
-                  <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/30">
-                    <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4 text-amber-400" />
-                      Contest History
-                    </h3>
-                    <div className="flex items-end gap-1 h-20">
-                      {allTimeStats.pnlHistory.slice(-12).map((item, index) => {
-                        const maxPnl = Math.max(...allTimeStats.pnlHistory.map(h => Math.abs(h.pnl)));
-                        const height = maxPnl > 0 ? (Math.abs(item.pnl) / maxPnl) * 100 : 0;
-                        const isChallenge = item.type === 'challenge';
-                        return (
-                          <div 
-                            key={index}
-                            className="flex-1 flex flex-col justify-end"
-                            title={`${item.name} (${item.type}): ${item.pnl >= 0 ? '+' : ''}$${item.pnl.toFixed(2)}`}
-                          >
+                <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/30">
+                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-amber-400" />
+                    Contest History
+                  </h3>
+                  {allTimeStats.pnlHistory && allTimeStats.pnlHistory.length > 0 ? (
+                    <>
+                      <div className="flex items-end gap-1 h-20">
+                        {allTimeStats.pnlHistory.slice(-12).map((item, index) => {
+                          const maxPnl = Math.max(...allTimeStats.pnlHistory.map(h => Math.abs(h.pnl)), 1);
+                          const height = maxPnl > 0 ? (Math.abs(item.pnl) / maxPnl) * 100 : 5;
+                          const isChallenge = item.type === 'challenge';
+                          return (
                             <div 
-                              className={`rounded-t transition-all hover:opacity-80 ${
-                                item.pnl >= 0 
-                                  ? isChallenge ? 'bg-orange-500' : 'bg-green-500' 
-                                  : 'bg-red-500'
-                              }`}
-                              style={{ height: `${Math.max(height, 5)}%` }}
-                            />
-                          </div>
-                        );
-                      })}
+                              key={index}
+                              className="flex-1 flex flex-col justify-end cursor-pointer group"
+                              title={`${item.name} (${item.type}): ${item.pnl >= 0 ? '+' : ''}$${item.pnl.toFixed(2)}`}
+                            >
+                              <div 
+                                className={`rounded-t transition-all duration-200 group-hover:opacity-80 group-hover:scale-y-105 origin-bottom ${
+                                  item.pnl >= 0 
+                                    ? isChallenge ? 'bg-orange-500' : 'bg-green-500' 
+                                    : 'bg-red-500'
+                                }`}
+                                style={{ height: `${Math.max(height, 8)}%`, minHeight: '4px' }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex items-center justify-center gap-4 mt-3 text-xs text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                          Competition Win
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                          Challenge Win
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                          Loss
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-20 text-slate-500 text-sm">
+                      <p>Complete contests to see your history chart</p>
                     </div>
-                    <div className="flex items-center justify-center gap-4 mt-3 text-xs text-slate-500">
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                        Competition Win
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                        Challenge Win
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                        Loss
-                      </span>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             ) : (
               <div className="text-center py-8">
