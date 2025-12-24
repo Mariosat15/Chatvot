@@ -10,6 +10,8 @@ import {
   Swords, LineChart, PieChart, Timer, Sparkles, Shield, Eye
 } from 'lucide-react';
 import type { ComprehensiveDashboardData } from '@/lib/actions/comprehensive-dashboard.actions';
+import WinPotentialCard from './WinPotentialCard';
+import type { RankingMethod } from '@/lib/services/ranking-config.service';
 
 interface ModernDashboardProps {
   data: ComprehensiveDashboardData;
@@ -137,6 +139,48 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
         <StatCard icon={Award} label="Prizes Won" value={formatCurrency(data.overview.totalPrizesWon)} color="yellow" small />
         <StatCard icon={Calendar} label="Days Traded" value={data.streaks.tradingDaysThisMonth} color="blue" />
       </section>
+
+      {/* Win Potential by Competition - Shows ranking method for each competition */}
+      {data.competitions.active.length > 0 && (
+        <section className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50 rounded-2xl overflow-hidden">
+          <div className="p-5 border-b border-gray-700/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg">
+                  <Trophy className="h-5 w-5 text-yellow-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Win Potential by Competition</h3>
+                  <p className="text-xs text-gray-400">
+                    Each competition has its own ranking method - shown on each card
+                  </p>
+                </div>
+              </div>
+              <Link href="/competitions" className="text-sm text-yellow-400 hover:text-yellow-300 flex items-center gap-1">
+                All Competitions <ChevronRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+          <div className="p-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {data.competitions.active.map((comp) => (
+                <WinPotentialCard
+                  key={comp.id}
+                  competition={{
+                    _id: comp.id,
+                    name: comp.name,
+                    rankingMethod: comp.rankingMethod as RankingMethod,
+                    prizeDistribution: comp.prizeDistribution,
+                    minimumTrades: comp.minimumTrades,
+                  }}
+                  userParticipation={comp.userParticipation}
+                  allParticipants={comp.allParticipants}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -118,6 +118,40 @@ interface CompetitionData {
   winRate: number;
   openPositions: number;
   prizeWon?: number;
+  // For Win Potential Card
+  rankingMethod: string;
+  prizeDistribution: { rank: number; percentage: number }[];
+  minimumTrades: number;
+  userParticipation: {
+    userId: string;
+    currentCapital: number;
+    startingCapital: number;
+    pnl: number;
+    pnlPercentage: number;
+    totalTrades: number;
+    winningTrades: number;
+    losingTrades: number;
+    winRate: number;
+    averageWin: number;
+    averageLoss: number;
+    currentRank: number;
+    status: string;
+  };
+  allParticipants: Array<{
+    userId: string;
+    currentCapital: number;
+    startingCapital: number;
+    pnl: number;
+    pnlPercentage: number;
+    totalTrades: number;
+    winningTrades: number;
+    losingTrades: number;
+    winRate: number;
+    averageWin: number;
+    averageLoss: number;
+    currentRank: number;
+    status: string;
+  }>;
 }
 
 interface ChallengeData {
@@ -212,9 +246,48 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   let totalRankSum = 0;
   let rankedCount = 0;
   
+  // Pre-fetch all participants for active competitions (needed for Win Potential card)
+  const activeCompetitionIds = allCompetitions
+    .filter((c: any) => c.status === 'active')
+    .map((c: any) => c._id);
+  
+  const allActiveParticipants = await CompetitionParticipant.find({
+    competitionId: { $in: activeCompetitionIds }
+  }).lean();
+  
+  // Group participants by competition
+  const participantsByCompetition = new Map<string, any[]>();
+  for (const p of allActiveParticipants as any[]) {
+    const compId = p.competitionId?.toString();
+    if (!participantsByCompetition.has(compId)) {
+      participantsByCompetition.set(compId, []);
+    }
+    participantsByCompetition.get(compId)!.push(p);
+  }
+  
   for (const participation of competitionParticipations as any[]) {
     const competition = competitionsMap.get(participation.competitionId?.toString());
     if (!competition) continue;
+    
+    // Get all participants for this competition (for win potential calculation)
+    const competitionParticipants = participantsByCompetition.get(competition._id.toString()) || [];
+    
+    // Map participants to the format needed by WinPotentialCard
+    const mappedParticipants = competitionParticipants.map((p: any) => ({
+      userId: p.userId?.toString() || '',
+      currentCapital: p.currentCapital || 0,
+      startingCapital: p.startingCapital || competition.startingCapital || 10000,
+      pnl: p.pnl || 0,
+      pnlPercentage: p.pnlPercentage || 0,
+      totalTrades: p.totalTrades || 0,
+      winningTrades: p.winningTrades || 0,
+      losingTrades: p.losingTrades || 0,
+      winRate: p.totalTrades > 0 ? ((p.winningTrades || 0) / p.totalTrades) * 100 : 0,
+      averageWin: p.averageWin || 0,
+      averageLoss: p.averageLoss || 0,
+      currentRank: p.currentRank || 0,
+      status: p.status || 'active',
+    }));
     
     const compData: CompetitionData = {
       id: competition._id.toString(),
@@ -234,6 +307,26 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       winRate: participation.winRate || 0,
       openPositions: participation.currentOpenPositions || 0,
       prizeWon: participation.prizeWon,
+      // Win Potential Card data
+      rankingMethod: competition.rules?.rankingMethod || 'pnl',
+      prizeDistribution: competition.prizeDistribution || [],
+      minimumTrades: competition.rules?.minimumTrades || 0,
+      userParticipation: {
+        userId: userId,
+        currentCapital: participation.currentCapital || 0,
+        startingCapital: participation.startingCapital || competition.startingCapital || 10000,
+        pnl: participation.pnl || 0,
+        pnlPercentage: participation.pnlPercentage || 0,
+        totalTrades: participation.totalTrades || 0,
+        winningTrades: participation.winningTrades || 0,
+        losingTrades: participation.losingTrades || 0,
+        winRate: participation.totalTrades > 0 ? ((participation.winningTrades || 0) / participation.totalTrades) * 100 : 0,
+        averageWin: participation.averageWin || 0,
+        averageLoss: participation.averageLoss || 0,
+        currentRank: participation.currentRank || 0,
+        status: participation.status || 'active',
+      },
+      allParticipants: mappedParticipants,
     };
     
     if (competition.status === 'active') {
