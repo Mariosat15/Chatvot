@@ -139,6 +139,7 @@ get pull git pull origin main
 ```bash
 npm run build:all
 pm2 restart all
+pm2 logs --lines 30
 ```
 
 ### 6. Configure NGINX

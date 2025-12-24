@@ -90,6 +90,12 @@ export async function GET(request: NextRequest) {
         { userName: { $regex: search, $options: 'i' } },
       ];
     }
+    
+    // Filter by company bank used
+    const companyBankId = searchParams.get('companyBankId');
+    if (companyBankId && companyBankId !== 'all') {
+      query['companyBankUsed.bankId'] = companyBankId;
+    }
 
     // Get total count
     const total = await WithdrawalRequest.countDocuments(query);

@@ -219,12 +219,26 @@ export async function PUT(
         
         // Save company bank used for this withdrawal
         if (companyBankUsed) {
+          // Store the bank details - IBAN should come pre-masked from frontend or mask it here
+          const maskIban = (iban: string | undefined) => {
+            if (!iban) return undefined;
+            // If already masked, don't re-mask
+            if (iban.startsWith('****')) return iban;
+            // Show last 4 chars
+            return `****${iban.slice(-4)}`;
+          };
+          
           withdrawal.companyBankUsed = {
             bankId: companyBankUsed.bankId,
             accountName: companyBankUsed.accountName,
+            accountHolderName: companyBankUsed.accountHolderName,
             bankName: companyBankUsed.bankName,
-            iban: companyBankUsed.iban ? `****${companyBankUsed.iban.slice(-4)}` : undefined,
-            accountNumber: companyBankUsed.accountNumber ? `****${companyBankUsed.accountNumber.slice(-4)}` : undefined,
+            iban: maskIban(companyBankUsed.iban),
+            accountNumber: companyBankUsed.accountNumber ? 
+              (companyBankUsed.accountNumber.startsWith('****') ? companyBankUsed.accountNumber : `****${companyBankUsed.accountNumber.slice(-4)}`) 
+              : undefined,
+            country: companyBankUsed.country,
+            currency: companyBankUsed.currency,
           };
           
           // Update admin bank account statistics

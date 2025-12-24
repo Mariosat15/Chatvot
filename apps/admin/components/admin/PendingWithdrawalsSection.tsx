@@ -146,6 +146,7 @@ export default function PendingWithdrawalsSection() {
   const [historyDateTo, setHistoryDateTo] = useState('');
   const [historyMinAmount, setHistoryMinAmount] = useState('');
   const [historyMaxAmount, setHistoryMaxAmount] = useState('');
+  const [historyCompanyBankFilter, setHistoryCompanyBankFilter] = useState('all');
   const [historyPage, setHistoryPage] = useState(1);
   const [historyTotalPages, setHistoryTotalPages] = useState(1);
   const [historyTotal, setHistoryTotal] = useState(0);
@@ -181,7 +182,7 @@ export default function PendingWithdrawalsSection() {
     if (activeTab === 'history') {
       fetchHistoryWithdrawals();
     }
-  }, [activeTab, historyStatusFilter, historyDateFrom, historyDateTo, historyMinAmount, historyMaxAmount, historyPage, sandboxFilter]);
+  }, [activeTab, historyStatusFilter, historyDateFrom, historyDateTo, historyMinAmount, historyMaxAmount, historyCompanyBankFilter, historyPage, sandboxFilter]);
   
   const fetchAdminBankAccounts = async () => {
     try {
@@ -264,6 +265,9 @@ export default function PendingWithdrawalsSection() {
       if (searchQuery) {
         params.set('search', searchQuery);
       }
+      if (historyCompanyBankFilter && historyCompanyBankFilter !== 'all') {
+        params.set('companyBankId', historyCompanyBankFilter);
+      }
 
       const response = await fetch(`/api/withdrawals?${params}`);
       if (!response.ok) throw new Error('Failed to fetch');
@@ -297,14 +301,14 @@ export default function PendingWithdrawalsSection() {
           action: actionDialog.action,
           reason: actionReason,
           adminNote: actionNote,
-          // Include company bank details when completing
+          // Include company bank details when completing (send full details, backend will mask)
           companyBankUsed: selectedBank ? {
             bankId: selectedBank._id,
             accountName: selectedBank.accountName,
             accountHolderName: selectedBank.accountHolderName,
             bankName: selectedBank.bankName,
-            iban: selectedBank.iban ? `****${selectedBank.iban.slice(-4)}` : undefined,
-            accountNumber: selectedBank.accountNumber ? `****${selectedBank.accountNumber.slice(-4)}` : undefined,
+            iban: selectedBank.iban,
+            accountNumber: selectedBank.accountNumber,
             country: selectedBank.country,
             currency: selectedBank.currency,
           } : undefined,
@@ -365,6 +369,7 @@ export default function PendingWithdrawalsSection() {
     setHistoryDateTo('');
     setHistoryMinAmount('');
     setHistoryMaxAmount('');
+    setHistoryCompanyBankFilter('all');
     setSearchQuery('');
     setHistoryPage(1);
   };
@@ -745,8 +750,8 @@ export default function PendingWithdrawalsSection() {
               </div>
             </div>
             
-            {/* Second row: Amount filters and actions */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+            {/* Second row: Amount filters, company bank, and actions */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
               <div>
                 <Label className="text-gray-400 text-xs">Min Amount (€)</Label>
                 <Input
@@ -766,6 +771,27 @@ export default function PendingWithdrawalsSection() {
                   onChange={(e) => { setHistoryMaxAmount(e.target.value); setHistoryPage(1); }}
                   className="mt-1 bg-gray-700 border-gray-600"
                 />
+              </div>
+              {/* Company Bank Filter */}
+              <div>
+                <Label className="text-gray-400 text-xs">Processed By Bank</Label>
+                <Select value={historyCompanyBankFilter} onValueChange={(v) => { setHistoryCompanyBankFilter(v); setHistoryPage(1); }}>
+                  <SelectTrigger className="mt-1 bg-gray-700 border-gray-600">
+                    <SelectValue placeholder="All Banks" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Banks</SelectItem>
+                    {adminBankAccounts.map((bank) => (
+                      <SelectItem key={bank._id} value={bank._id}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-3 w-3" />
+                          <span>{bank.accountName}</span>
+                          {bank.isDefault && <span className="text-emerald-400 text-xs">★</span>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex items-end">
                 <Button
@@ -1121,20 +1147,9 @@ export default function PendingWithdrawalsSection() {
                 )}
               </div>
 
-              {/* Payment Method Details Section */}
-              {/* Determine if this should show card or bank based on payoutMethod */}
-              {(() => {
-                const isCardWithdrawal = 
-                  detailDialog.withdrawal.payoutMethod === 'original_method' ||
-                  detailDialog.withdrawal.payoutMethod?.includes('card') ||
-                  detailDialog.withdrawal.payoutMethod?.includes('refund');
-                const hasBankDetails = !!detailDialog.withdrawal.userBankDetails;
-                const hasCardDetails = !!detailDialog.withdrawal.originalCardDetails;
-                
-                // Show card section if explicitly original_method, OR if no bank but has card
-                return (isCardWithdrawal || (!hasBankDetails && hasCardDetails));
-              })() ? (
-                // Original Payment Method (Card Refund)
+              {/* Payment Method Details Section - Show ONLY the method user selected */}
+              {detailDialog.withdrawal.payoutMethod === 'original_method' ? (
+                // Card Refund - User chose to refund to original payment method
                 <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
                   <h4 className="text-blue-300 font-semibold mb-3 flex items-center gap-2">
                     💳 Original Payment Method (Card Refund)
@@ -1205,8 +1220,8 @@ export default function PendingWithdrawalsSection() {
                     </div>
                   )}
                 </div>
-              ) : detailDialog.withdrawal.userBankDetails ? (
-                // Bank Transfer
+              ) : detailDialog.withdrawal.payoutMethod === 'bank_transfer' && detailDialog.withdrawal.userBankDetails ? (
+                // Bank Transfer - User chose bank transfer with their bank details
                 <div className="mt-6 p-4 bg-teal-500/10 border border-teal-500/30 rounded-xl">
                   <h4 className="text-teal-300 font-semibold mb-3 flex items-center gap-2">
                     🏦 User Bank Details for Transfer
@@ -1269,36 +1284,16 @@ export default function PendingWithdrawalsSection() {
                   )}
                 </div>
               ) : detailDialog.withdrawal.status !== 'completed' && detailDialog.withdrawal.status !== 'rejected' && (
-                <div className="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
-                  <p className="text-red-300 text-sm flex items-center gap-2">
-                    ⚠️ No payment method on file for this withdrawal
+                // No payment method details available
+                <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                  <p className="text-amber-300 text-sm flex items-center gap-2">
+                    ⚠️ Payment method details unavailable
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    Contact the user to verify their withdrawal method details before processing.
+                    Method: {detailDialog.withdrawal.payoutMethod?.replace(/_/g, ' ') || 'Unknown'}
+                    <br />
+                    Contact the user to verify their withdrawal details before processing.
                   </p>
-                </div>
-              )}
-
-              {/* Original Deposit Card Info - Always show if available (for reference) */}
-              {detailDialog.withdrawal.payoutMethod !== 'original_method' && detailDialog.withdrawal.originalCardDetails && (
-                <div className="mt-4 p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
-                  <h5 className="text-gray-400 text-xs font-semibold mb-2 flex items-center gap-1">
-                    💳 Original Deposit Card (Reference)
-                  </h5>
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="text-white capitalize">{detailDialog.withdrawal.originalCardDetails.brand || 'Card'}</span>
-                    <span className="text-blue-300 font-mono">•••• {detailDialog.withdrawal.originalCardDetails.last4 || '****'}</span>
-                    {detailDialog.withdrawal.originalCardDetails.expMonth && detailDialog.withdrawal.originalCardDetails.expYear && (
-                      <span className="text-gray-500 text-xs">
-                        Exp: {String(detailDialog.withdrawal.originalCardDetails.expMonth).padStart(2, '0')}/{detailDialog.withdrawal.originalCardDetails.expYear}
-                      </span>
-                    )}
-                  </div>
-                  {detailDialog.withdrawal.originalPaymentId && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Payment ID: <span className="font-mono text-gray-400 select-all">{detailDialog.withdrawal.originalPaymentId}</span>
-                    </p>
-                  )}
                 </div>
               )}
             </div>
