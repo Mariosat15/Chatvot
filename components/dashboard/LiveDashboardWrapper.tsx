@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import DashboardStats from './DashboardStats';
 import GlobalRiskMetrics from './GlobalRiskMetrics';
 import CompetitionsTable from './CompetitionsTable';
@@ -9,134 +10,52 @@ import OpenPositions from './OpenPositions';
 import DailyPnLChart from './DailyPnLChart';
 import Link from 'next/link';
 import { Trophy, TrendingUp, RefreshCw } from 'lucide-react';
-import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
-interface LiveDashboardWrapperProps {
-  initialData: {
-    activeCompetitions: any[];
-    overallStats: {
-      totalCapital: number;
-      totalPnL: number;
-      totalPositions: number;
-      totalTrades: number;
-      totalWinningTrades: number;
-      totalLosingTrades: number;
-      overallWinRate: number;
-      profitFactor: number;
-      activeCompetitionsCount: number;
-    };
-    globalCharts?: {
-      dailyPnL: any[];
-    };
+interface DashboardData {
+  activeCompetitions: any[];
+  overallStats: {
+    totalCapital: number;
+    totalPnL: number;
+    totalPositions: number;
+    totalTrades: number;
+    totalWinningTrades: number;
+    totalLosingTrades: number;
+    overallWinRate: number;
+    profitFactor: number;
+    activeCompetitionsCount: number;
+  };
+  globalCharts?: {
+    dailyPnL: any[];
   };
 }
 
+interface LiveDashboardWrapperProps {
+  initialData: DashboardData;
+}
+
+/**
+ * Dashboard Wrapper Component
+ * 
+ * Design principles:
+ * - Uses ONLY server-rendered data (no client-side fetching)
+ * - No auto-refresh (user controls when to refresh)
+ * - Refresh = page reload (ensures consistent data from server)
+ * - Simple, predictable, no layout shifts
+ */
 export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapperProps) {
-  const [dashboardData, setDashboardData] = useState(initialData);
+  const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(Date.now());
-  const [timeSinceUpdate, setTimeSinceUpdate] = useState(0);
-  
-  // Use refs for stable values that don't cause re-renders
-  const isRefreshingRef = useRef(false);
-  const isMountedRef = useRef(false);
-  const hasInitializedRef = useRef(false);
 
-  // Auto-refresh function - stable, no dependencies that change
-  const refreshData = async () => {
-    // Prevent any refresh during initial mount period
-    if (!isMountedRef.current) return;
-    // Prevent duplicate requests using ref (synchronous check)
-    if (isRefreshingRef.current) return;
-    
-    isRefreshingRef.current = true;
+  // Use server data directly - no client-side state mutations
+  const dashboardData = initialData;
+
+  // Refresh handler - reloads the page to get fresh server data
+  const handleRefresh = () => {
     setIsRefreshing(true);
-    
-    try {
-      const response = await fetch('/api/dashboard/live-stats?t=' + Date.now(), {
-        method: 'GET',
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-        },
-      });
-      
-      if (response.ok) {
-        const newData = await response.json();
-        setDashboardData(newData);
-        setLastUpdate(Date.now());
-      }
-    } catch {
-      // Silently handle refresh errors
-    } finally {
-      isRefreshingRef.current = false;
-      setIsRefreshing(false);
-    }
-  };
-
-  // Mark component as mounted after initial render - runs ONCE
-  useEffect(() => {
-    if (hasInitializedRef.current) return;
-    hasInitializedRef.current = true;
-    
-    // Delay the mounted state to ensure hydration is complete
-    // This prevents any refresh calls during the first 2 seconds
-    const timer = setTimeout(() => {
-      isMountedRef.current = true;
-    }, 2000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Update time counter
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeSinceUpdate(Math.floor((Date.now() - lastUpdate) / 1000));
-    }, PERFORMANCE_INTERVALS.COUNTDOWN_UPDATE);
-
-    return () => clearInterval(timer);
-  }, [lastUpdate]);
-
-  // Auto-refresh with visibility awareness - runs ONCE, uses refs
-  useEffect(() => {
-    // Set up interval for auto-refresh
-    const interval = setInterval(() => {
-      // Skip if tab is hidden or not mounted yet
-      if (document.hidden || !isMountedRef.current) return;
-      refreshData();
-    }, PERFORMANCE_INTERVALS.DASHBOARD_REFRESH);
-    
-    // Track if tab was previously hidden
-    let wasHidden = document.hidden;
-    
-    const handleVisibilityChange = () => {
-      // Only refresh if tab was hidden and is now visible AND we're mounted
-      if (wasHidden && !document.hidden && isMountedRef.current) {
-        refreshData();
-      }
-      wasHidden = document.hidden;
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []); // Empty deps - runs once, uses refs for all checks
-
-  // Manual refresh handler - bypasses mounted check
-  const handleManualRefresh = () => {
-    if (isRefreshingRef.current) return;
-    // For manual refresh, temporarily allow it even if not "mounted"
-    const wasMounted = isMountedRef.current;
-    isMountedRef.current = true;
-    refreshData();
-    if (!wasMounted) {
-      // Restore if it wasn't mounted (edge case)
-      setTimeout(() => { isMountedRef.current = wasMounted; }, 100);
-    }
+    // Use router.refresh() to re-fetch server data without full page reload
+    router.refresh();
+    // Reset refreshing state after a short delay
+    setTimeout(() => setIsRefreshing(false), 1000);
   };
 
   return (
@@ -147,26 +66,25 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
           <h1 className="text-3xl font-bold text-gray-100 flex items-center gap-3">
             <Trophy className="h-8 w-8 text-yellow-500" />
             Competition Dashboard
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-            </span>
           </h1>
-          <div className="flex items-center gap-3 mt-2">
-            <p className="text-gray-400">Track your performance and compete in real-time</p>
-            <button
-              onClick={handleManualRefresh}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 text-xs text-gray-500 hover:text-yellow-500 transition-colors"
-              title="Refresh data"
-            >
-              <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>
-                {isRefreshing ? 'Refreshing...' : `Updated ${timeSinceUpdate}s ago`}
-              </span>
-            </button>
-          </div>
+          <p className="text-gray-400 mt-2">Track your performance and compete in real-time</p>
         </div>
+        
+        {/* Refresh Button */}
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className={`
+            flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all
+            ${isRefreshing 
+              ? 'bg-gray-700 text-gray-400 cursor-not-allowed' 
+              : 'bg-yellow-500 hover:bg-yellow-600 text-gray-900'
+            }
+          `}
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+        </button>
       </div>
 
       {/* Overall Stats */}
@@ -246,4 +164,3 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
     </>
   );
 }
-
