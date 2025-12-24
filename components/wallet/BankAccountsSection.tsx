@@ -529,6 +529,9 @@ export default function BankAccountsSection() {
               <p className="text-gray-400 mb-4">
                 Add a bank account to receive withdrawals
               </p>
+              <p className="text-gray-500 text-sm mb-4">
+                <span className="text-blue-400">Note:</span> If you don&apos;t add a bank account, withdrawals will be refunded to your original payment method (the card or account you used to purchase credits).
+              </p>
               <Button onClick={() => setAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Your First Bank Account
@@ -657,9 +660,10 @@ export default function BankAccountsSection() {
               <div className="text-sm text-blue-300">
                 <p className="font-medium">How Withdrawals Work</p>
                 <p className="text-blue-200/80 mt-1">
-                  When you request a withdrawal, funds are transferred to your bank account via SEPA
-                  transfer. Processing typically takes 1-3 business days. Your bank account will be
-                  verified after the first successful withdrawal.
+                  When you request a withdrawal, you can choose to receive funds via bank transfer (SEPA) 
+                  or refund to your original payment method. If you haven&apos;t added a bank account, 
+                  withdrawals will automatically go back to the card or account you used to purchase credits. 
+                  Bank transfers typically take 1-3 business days.
                 </p>
               </div>
             </div>
