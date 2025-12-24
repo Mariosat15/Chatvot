@@ -288,6 +288,7 @@ export default function ProfileSettingsSection() {
                       width={128}
                       height={128}
                       className="w-full h-full object-cover"
+                      unoptimized
                     />
                   ) : (
                     <span className="text-4xl font-bold text-gray-400">

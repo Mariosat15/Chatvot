@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
 
-    // Generate public URL
-    const profileImageUrl = `/uploads/profiles/${fileName}`;
+    // Generate public URL with cache-busting timestamp
+    const profileImageUrl = `/uploads/profiles/${fileName}?t=${Date.now()}`;
 
     // Update user in database
     const mongoose = await connectToDatabase();

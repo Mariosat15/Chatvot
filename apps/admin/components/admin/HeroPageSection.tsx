@@ -658,6 +658,10 @@ export default function HeroPageSection() {
             <FileText className="h-4 w-4 mr-2" />
             Footer
           </TabsTrigger>
+          <TabsTrigger value="authpage" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
+            <Users className="h-4 w-4 mr-2" />
+            Auth Page
+          </TabsTrigger>
           <TabsTrigger value="enterprise" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
             <Building2 className="h-4 w-4 mr-2" />
             Enterprise
@@ -1627,6 +1631,154 @@ export default function HeroPageSection() {
               <p className="text-xs text-gray-500 mt-2">
                 This default disclaimer cannot be removed but can be extended with your custom disclaimer above.
               </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Auth Page Tab (Login/Signup) */}
+        <TabsContent value="authpage" className="space-y-6">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Users className="h-5 w-5 text-green-400" />
+                Login/Signup Page Settings
+              </CardTitle>
+              <CardDescription>
+                Customize the testimonial and dashboard preview shown on the authentication pages
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Testimonial Text */}
+              <div>
+                <Label className="text-gray-400">Testimonial Quote</Label>
+                <Textarea
+                  value={(settings as any).authPageTestimonialText || ''}
+                  onChange={(e) => updateSettings('authPageTestimonialText', e.target.value)}
+                  className="bg-gray-900 border-gray-600 text-white mt-1"
+                  rows={3}
+                  placeholder="chatvolt turned my watchlist into a winning list..."
+                />
+                <p className="text-xs text-gray-500 mt-1">The quote shown on the right side of the login/signup page</p>
+              </div>
+
+              {/* Author Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-gray-400">Author Name</Label>
+                  <Input
+                    value={(settings as any).authPageTestimonialAuthor || ''}
+                    onChange={(e) => updateSettings('authPageTestimonialAuthor', e.target.value)}
+                    className="bg-gray-900 border-gray-600 text-white mt-1"
+                    placeholder="Ethan R."
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-400">Author Role/Title</Label>
+                  <Input
+                    value={(settings as any).authPageTestimonialRole || ''}
+                    onChange={(e) => updateSettings('authPageTestimonialRole', e.target.value)}
+                    className="bg-gray-900 border-gray-600 text-white mt-1"
+                    placeholder="Retail Investor"
+                  />
+                </div>
+              </div>
+
+              {/* Rating */}
+              <div>
+                <Label className="text-gray-400">Star Rating (1-5)</Label>
+                <Select
+                  value={String((settings as any).authPageTestimonialRating || 5)}
+                  onValueChange={(v) => updateSettings('authPageTestimonialRating', parseInt(v))}
+                >
+                  <SelectTrigger className="bg-gray-900 border-gray-600 text-white mt-1 w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-600">
+                    <SelectItem value="5">5 Stars ★★★★★</SelectItem>
+                    <SelectItem value="4">4 Stars ★★★★☆</SelectItem>
+                    <SelectItem value="3">3 Stars ★★★☆☆</SelectItem>
+                    <SelectItem value="2">2 Stars ★★☆☆☆</SelectItem>
+                    <SelectItem value="1">1 Star ★☆☆☆☆</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Dashboard Preview Image */}
+              <div>
+                <Label className="text-gray-400">Dashboard Preview Image</Label>
+                <div className="mt-2 space-y-3">
+                  {(settings as any).authPageDashboardImage && (
+                    <div className="relative h-48 w-full bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+                      <Image
+                        src={(settings as any).authPageDashboardImage}
+                        alt="Dashboard Preview"
+                        fill
+                        className="object-contain p-2"
+                        unoptimized
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <Input
+                      value={(settings as any).authPageDashboardImage || ''}
+                      onChange={(e) => updateSettings('authPageDashboardImage', e.target.value)}
+                      className="bg-gray-900 border-gray-600 text-white flex-1"
+                      placeholder="/assets/images/dashboard.png"
+                    />
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const url = await uploadImage(file, 'authPageDashboardImage');
+                            if (url) {
+                              updateSettings('authPageDashboardImage', url);
+                            }
+                          }
+                        }}
+                      />
+                      <Button type="button" variant="outline" className="border-gray-600" asChild>
+                        <span>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload
+                        </span>
+                      </Button>
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    This image appears on the right side of the login/signup page. Recommended size: 1440x1150px
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Preview */}
+          <Card className="bg-gradient-to-r from-green-900/50 to-emerald-900/50 border-green-500/30">
+            <CardContent className="py-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Preview Auth Pages</h3>
+                  <p className="text-gray-400 text-sm">See how your changes look on the login and signup pages</p>
+                </div>
+                <div className="flex gap-2">
+                  <a href="/sign-in" target="_blank" rel="noopener noreferrer">
+                    <Button className="bg-green-500 hover:bg-green-400 text-white">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Sign In
+                    </Button>
+                  </a>
+                  <a href="/sign-up" target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" className="border-green-500 text-green-400 hover:bg-green-500/20">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Sign Up
+                    </Button>
+                  </a>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

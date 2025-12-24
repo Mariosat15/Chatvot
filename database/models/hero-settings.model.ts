@@ -440,6 +440,13 @@ export interface IHeroSettings extends Document {
     footer: boolean;
   };
   
+  // Auth Page (Login/Signup) Settings
+  authPageTestimonialText: string;
+  authPageTestimonialAuthor: string;
+  authPageTestimonialRole: string;
+  authPageTestimonialRating: number;
+  authPageDashboardImage: string;
+  
   // Advanced
   customCSS: string;
   customJS: string;
@@ -957,6 +964,13 @@ const HeroSettingsSchema = new Schema<IHeroSettings>({
     contact: { type: Boolean, default: true },
     footer: { type: Boolean, default: true },
   },
+  
+  // Auth Page (Login/Signup) Settings
+  authPageTestimonialText: { type: String, default: 'chatvolt turned my watchlist into a winning list. The alerts are spot-on, and I feel more confident making moves in the market' },
+  authPageTestimonialAuthor: { type: String, default: 'Ethan R.' },
+  authPageTestimonialRole: { type: String, default: 'Retail Investor' },
+  authPageTestimonialRating: { type: Number, default: 5, min: 1, max: 5 },
+  authPageDashboardImage: { type: String, default: '/assets/images/dashboard.png' },
   
   // Advanced
   customCSS: { type: String, default: '' },

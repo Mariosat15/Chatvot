@@ -44,8 +44,9 @@ export async function POST(request: NextRequest) {
     // Get file extension
     const fileExtension = file.name.split('.').pop() || 'png';
     
-    // Generate filename based on field
-    const filename = `${field}.${fileExtension}`;
+    // Generate filename based on field with timestamp for cache-busting
+    const timestamp = Date.now();
+    const filename = `${field}-${timestamp}.${fileExtension}`;
     
     // Create upload directory if it doesn't exist
     const uploadDir = path.join(process.cwd(), 'public', 'assets', 'images');

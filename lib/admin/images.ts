@@ -2,6 +2,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import { WhiteLabel } from '@/database/models/whitelabel.model';
 
 // Cache for image paths (optional, for performance)
+// Note: Cache is disabled in development for instant updates
 let imageCache: {
   appLogo: string;
   emailLogo: string;
@@ -10,7 +11,8 @@ let imageCache: {
 } | null = null;
 
 let cacheTime: number = 0;
-const CACHE_DURATION = 60 * 1000; // 1 minute
+// Short cache duration - images should update within 5 seconds
+const CACHE_DURATION = process.env.NODE_ENV === 'production' ? 5 * 1000 : 0; // 5 seconds in prod, no cache in dev
 
 export async function getWhiteLabelImages() {
   // Return cached if available and fresh
