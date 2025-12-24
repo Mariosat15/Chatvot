@@ -28,6 +28,11 @@ import {
   Ban,
   PlayCircle,
   Eye,
+  History,
+  Filter,
+  Download,
+  Building2,
+  CreditCard,
 } from 'lucide-react';
 
 interface WithdrawalRequest {
@@ -78,9 +83,12 @@ interface WithdrawalRequest {
   companyBankUsed?: {
     bankId?: string;
     accountName?: string;
+    accountHolderName?: string;
     bankName?: string;
     iban?: string;
     accountNumber?: string;
+    country?: string;
+    currency?: string;
   } | null;
 }
 
@@ -118,7 +126,10 @@ interface AdminBankAccount {
   isDefault: boolean;
 }
 
+type TabType = 'pending' | 'history';
+
 export default function PendingWithdrawalsSection() {
+  const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [stats, setStats] = useState<WithdrawalStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,6 +139,18 @@ export default function PendingWithdrawalsSection() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  
+  // History tab filters
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
+  const [historyMinAmount, setHistoryMinAmount] = useState('');
+  const [historyMaxAmount, setHistoryMaxAmount] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyWithdrawals, setHistoryWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   
   // Admin bank accounts for withdrawal processing
   const [adminBankAccounts, setAdminBankAccounts] = useState<AdminBankAccount[]>([]);
@@ -153,6 +176,12 @@ export default function PendingWithdrawalsSection() {
     fetchWithdrawals();
     fetchAdminBankAccounts();
   }, [statusFilter, sandboxFilter, page]);
+  
+  useEffect(() => {
+    if (activeTab === 'history') {
+      fetchHistoryWithdrawals();
+    }
+  }, [activeTab, historyStatusFilter, historyDateFrom, historyDateTo, historyMinAmount, historyMaxAmount, historyPage, sandboxFilter]);
   
   const fetchAdminBankAccounts = async () => {
     try {
@@ -198,6 +227,58 @@ export default function PendingWithdrawalsSection() {
       setLoading(false);
     }
   };
+  
+  const fetchHistoryWithdrawals = async () => {
+    setHistoryLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: historyPage.toString(),
+        limit: '20',
+        historyMode: 'true', // Signal we want history (completed/rejected/etc)
+      });
+      
+      // Status filter for history
+      if (historyStatusFilter !== 'all') {
+        params.set('status', historyStatusFilter);
+      } else {
+        // Default to history statuses
+        params.set('status', 'completed,rejected,cancelled,failed');
+      }
+      
+      if (sandboxFilter !== 'all') {
+        params.set('sandbox', sandboxFilter);
+      }
+      
+      if (historyDateFrom) {
+        params.set('dateFrom', historyDateFrom);
+      }
+      if (historyDateTo) {
+        params.set('dateTo', historyDateTo);
+      }
+      if (historyMinAmount) {
+        params.set('minAmount', historyMinAmount);
+      }
+      if (historyMaxAmount) {
+        params.set('maxAmount', historyMaxAmount);
+      }
+      if (searchQuery) {
+        params.set('search', searchQuery);
+      }
+
+      const response = await fetch(`/api/withdrawals?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      
+      const data = await response.json();
+      setHistoryWithdrawals(data.withdrawals);
+      setHistoryTotalPages(data.pagination.pages);
+      setHistoryTotal(data.pagination.total);
+    } catch (error) {
+      toast.error('Failed to load withdrawal history');
+      console.error(error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   const handleAction = async () => {
     if (!actionDialog.withdrawal) return;
@@ -220,9 +301,12 @@ export default function PendingWithdrawalsSection() {
           companyBankUsed: selectedBank ? {
             bankId: selectedBank._id,
             accountName: selectedBank.accountName,
+            accountHolderName: selectedBank.accountHolderName,
             bankName: selectedBank.bankName,
-            iban: selectedBank.iban,
-            accountNumber: selectedBank.accountNumber,
+            iban: selectedBank.iban ? `****${selectedBank.iban.slice(-4)}` : undefined,
+            accountNumber: selectedBank.accountNumber ? `****${selectedBank.accountNumber.slice(-4)}` : undefined,
+            country: selectedBank.country,
+            currency: selectedBank.currency,
           } : undefined,
         }),
       });
@@ -238,6 +322,9 @@ export default function PendingWithdrawalsSection() {
       setActionReason('');
       setActionNote('');
       fetchWithdrawals();
+      if (activeTab === 'history') {
+        fetchHistoryWithdrawals();
+      }
     } catch (error) {
       toast.error('Failed to process action');
       console.error(error);
@@ -259,10 +346,190 @@ export default function PendingWithdrawalsSection() {
           w.userId.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : withdrawals;
+    
+  const filteredHistoryWithdrawals = searchQuery
+    ? historyWithdrawals.filter(
+        (w) =>
+          w.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          w.userId.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : historyWithdrawals;
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleString();
   };
+  
+  const resetHistoryFilters = () => {
+    setHistoryStatusFilter('all');
+    setHistoryDateFrom('');
+    setHistoryDateTo('');
+    setHistoryMinAmount('');
+    setHistoryMaxAmount('');
+    setSearchQuery('');
+    setHistoryPage(1);
+  };
+
+  // Render withdrawal row (shared between tabs)
+  const renderWithdrawalRow = (withdrawal: WithdrawalRequest, showActions: boolean = true) => (
+    <div
+      key={withdrawal._id}
+      className="bg-gray-700/30 rounded-xl p-4 hover:bg-gray-700/50 transition-colors"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
+            <Badge className={STATUS_COLORS[withdrawal.status]}>
+              {withdrawal.status.toUpperCase()}
+            </Badge>
+            {withdrawal.isSandbox && (
+              <Badge className="bg-purple-500/20 text-purple-300">
+                SANDBOX
+              </Badge>
+            )}
+            {withdrawal.kycVerified && (
+              <Badge className="bg-green-500/20 text-green-300">
+                KYC ✓
+              </Badge>
+            )}
+            {withdrawal.companyBankUsed && (
+              <Badge className="bg-cyan-500/20 text-cyan-300 text-xs">
+                <Building2 className="h-3 w-3 mr-1" />
+                {withdrawal.companyBankUsed.accountName || withdrawal.companyBankUsed.bankName}
+              </Badge>
+            )}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+            <div>
+              <p className="text-gray-500 text-xs">User</p>
+              <p className="text-white font-medium truncate">
+                {withdrawal.userEmail}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs">Amount</p>
+              <p className="text-emerald-400 font-bold">
+                €{withdrawal.amountEUR.toFixed(2)}
+              </p>
+              <p className="text-xs text-gray-500">
+                Net: €{withdrawal.netAmountEUR.toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs">Method</p>
+              <p className="text-white flex items-center gap-1">
+                {withdrawal.payoutMethod === 'original_method' ? (
+                  <>
+                    <CreditCard className="h-3 w-3 text-blue-400" />
+                    <span>Card Refund</span>
+                  </>
+                ) : withdrawal.payoutMethod === 'bank_transfer' ? (
+                  <>
+                    <Building2 className="h-3 w-3 text-teal-400" />
+                    <span>Bank Transfer</span>
+                  </>
+                ) : (
+                  withdrawal.payoutMethod?.replace(/_/g, ' ')
+                )}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs">Requested</p>
+              <p className="text-white">
+                {formatDate(withdrawal.requestedAt)}
+              </p>
+            </div>
+            {withdrawal.completedAt && (
+              <div>
+                <p className="text-gray-500 text-xs">Completed</p>
+                <p className="text-white">
+                  {formatDate(withdrawal.completedAt)}
+                </p>
+              </div>
+            )}
+          </div>
+          {withdrawal.rejectionReason && (
+            <p className="text-sm text-red-400 mt-2">
+              Reason: {withdrawal.rejectionReason}
+            </p>
+          )}
+          {withdrawal.failureReason && (
+            <p className="text-sm text-orange-400 mt-2">
+              Failed: {withdrawal.failureReason}
+            </p>
+          )}
+          {withdrawal.processedByEmail && (
+            <p className="text-xs text-gray-500 mt-1">
+              Processed by: {withdrawal.processedByEmail}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDetailDialog({ open: true, withdrawal })}
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            Details
+          </Button>
+          {showActions && (
+            <>
+              {withdrawal.status === 'pending' && (
+                <>
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    onClick={() => openActionDialog(withdrawal, 'approved')}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => openActionDialog(withdrawal, 'rejected')}
+                  >
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Reject
+                  </Button>
+                </>
+              )}
+              {withdrawal.status === 'approved' && (
+                <Button
+                  size="sm"
+                  className="bg-purple-600 hover:bg-purple-700"
+                  onClick={() => openActionDialog(withdrawal, 'processing')}
+                >
+                  <PlayCircle className="h-4 w-4 mr-1" />
+                  Process
+                </Button>
+              )}
+              {withdrawal.status === 'processing' && (
+                <>
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    onClick={() => openActionDialog(withdrawal, 'completed')}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Complete
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => openActionDialog(withdrawal, 'failed')}
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    Failed
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -279,26 +546,62 @@ export default function PendingWithdrawalsSection() {
               </div>
               <div>
                 <h2 className="text-3xl font-bold text-white flex items-center gap-2">
-                  💸 Withdrawal Requests
+                  💸 Withdrawal Management
                 </h2>
                 <p className="text-teal-100 mt-1">
-                  Review and process user withdrawal requests
+                  Review, process, and track user withdrawal requests
                 </p>
               </div>
             </div>
             <Button
-              onClick={fetchWithdrawals}
-              disabled={loading}
+              onClick={() => {
+                fetchWithdrawals();
+                if (activeTab === 'history') fetchHistoryWithdrawals();
+              }}
+              disabled={loading || historyLoading}
               className="bg-white/20 hover:bg-white/30 text-white"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 mr-2 ${(loading || historyLoading) ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
         </div>
 
-        {/* Stats */}
-        {stats && (
+        {/* Tabs */}
+        <div className="px-6 pt-4 border-b border-gray-700">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`px-4 py-2 rounded-t-lg font-medium transition-all flex items-center gap-2 ${
+                activeTab === 'pending'
+                  ? 'bg-gray-700 text-white border-b-2 border-teal-500'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              <Clock className="h-4 w-4" />
+              Pending Requests
+              {stats && stats.pending.count + stats.approved.count + stats.processing.count > 0 && (
+                <Badge className="bg-amber-500/20 text-amber-300 text-xs">
+                  {stats.pending.count + stats.approved.count + stats.processing.count}
+                </Badge>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`px-4 py-2 rounded-t-lg font-medium transition-all flex items-center gap-2 ${
+                activeTab === 'history'
+                  ? 'bg-gray-700 text-white border-b-2 border-teal-500'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              <History className="h-4 w-4" />
+              Withdrawal History
+            </button>
+          </div>
+        </div>
+
+        {/* Stats (only show for pending tab) */}
+        {activeTab === 'pending' && stats && (
           <div className="p-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             {Object.entries(stats).map(([status, data]) => (
               <div
@@ -323,68 +626,206 @@ export default function PendingWithdrawalsSection() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="flex-1 min-w-[200px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search by email or user ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-gray-800 border-gray-700"
-            />
+      {activeTab === 'pending' ? (
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex-1 min-w-[200px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by email or user ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-gray-800 border-gray-700"
+              />
+            </div>
           </div>
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+            <SelectTrigger className="w-40 bg-gray-800 border-gray-700">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="processing">Processing</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sandboxFilter} onValueChange={(v) => { setSandboxFilter(v); setPage(1); }}>
+            <SelectTrigger className="w-40 bg-gray-800 border-gray-700">
+              <SelectValue placeholder="Mode" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Modes</SelectItem>
+              <SelectItem value="false">Production</SelectItem>
+              <SelectItem value="true">Sandbox</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-40 bg-gray-800 border-gray-700">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="processing">Processing</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={sandboxFilter} onValueChange={(v) => { setSandboxFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-40 bg-gray-800 border-gray-700">
-            <SelectValue placeholder="Mode" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Modes</SelectItem>
-            <SelectItem value="false">Production</SelectItem>
-            <SelectItem value="true">Sandbox</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      ) : (
+        /* History Tab Filters */
+        <Card className="bg-gray-800/50 border-gray-700">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-white text-lg flex items-center gap-2">
+              <Filter className="h-5 w-5 text-teal-400" />
+              Filter History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+              {/* Search */}
+              <div className="lg:col-span-2">
+                <Label className="text-gray-400 text-xs">Search User</Label>
+                <div className="relative mt-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Email or user ID..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 bg-gray-700 border-gray-600"
+                  />
+                </div>
+              </div>
+              
+              {/* Status Filter */}
+              <div>
+                <Label className="text-gray-400 text-xs">Status</Label>
+                <Select value={historyStatusFilter} onValueChange={(v) => { setHistoryStatusFilter(v); setHistoryPage(1); }}>
+                  <SelectTrigger className="mt-1 bg-gray-700 border-gray-600">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All History</SelectItem>
+                    <SelectItem value="completed">✅ Completed</SelectItem>
+                    <SelectItem value="rejected">❌ Rejected</SelectItem>
+                    <SelectItem value="cancelled">🚫 Cancelled</SelectItem>
+                    <SelectItem value="failed">⚠️ Failed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Mode Filter */}
+              <div>
+                <Label className="text-gray-400 text-xs">Mode</Label>
+                <Select value={sandboxFilter} onValueChange={(v) => { setSandboxFilter(v); setHistoryPage(1); }}>
+                  <SelectTrigger className="mt-1 bg-gray-700 border-gray-600">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Modes</SelectItem>
+                    <SelectItem value="false">Production</SelectItem>
+                    <SelectItem value="true">Sandbox</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Date From */}
+              <div>
+                <Label className="text-gray-400 text-xs">From Date</Label>
+                <Input
+                  type="date"
+                  value={historyDateFrom}
+                  onChange={(e) => { setHistoryDateFrom(e.target.value); setHistoryPage(1); }}
+                  className="mt-1 bg-gray-700 border-gray-600"
+                />
+              </div>
+              
+              {/* Date To */}
+              <div>
+                <Label className="text-gray-400 text-xs">To Date</Label>
+                <Input
+                  type="date"
+                  value={historyDateTo}
+                  onChange={(e) => { setHistoryDateTo(e.target.value); setHistoryPage(1); }}
+                  className="mt-1 bg-gray-700 border-gray-600"
+                />
+              </div>
+            </div>
+            
+            {/* Second row: Amount filters and actions */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+              <div>
+                <Label className="text-gray-400 text-xs">Min Amount (€)</Label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={historyMinAmount}
+                  onChange={(e) => { setHistoryMinAmount(e.target.value); setHistoryPage(1); }}
+                  className="mt-1 bg-gray-700 border-gray-600"
+                />
+              </div>
+              <div>
+                <Label className="text-gray-400 text-xs">Max Amount (€)</Label>
+                <Input
+                  type="number"
+                  placeholder="No limit"
+                  value={historyMaxAmount}
+                  onChange={(e) => { setHistoryMaxAmount(e.target.value); setHistoryPage(1); }}
+                  className="mt-1 bg-gray-700 border-gray-600"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  onClick={resetHistoryFilters}
+                  className="w-full"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Reset Filters
+                </Button>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  onClick={fetchHistoryWithdrawals}
+                  className="w-full bg-teal-600 hover:bg-teal-700"
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  Apply Filters
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Withdrawals List */}
       <Card className="bg-gray-800/50 border-gray-700">
         <CardHeader>
           <CardTitle className="text-white flex items-center justify-between">
-            <span>Withdrawal Requests ({total})</span>
-            {totalPages > 1 && (
+            <span>
+              {activeTab === 'pending' 
+                ? `Withdrawal Requests (${total})` 
+                : `Withdrawal History (${historyTotal})`
+              }
+            </span>
+            {/* Pagination */}
+            {(activeTab === 'pending' ? totalPages : historyTotalPages) > 1 && (
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
+                  onClick={() => activeTab === 'pending' 
+                    ? setPage((p) => Math.max(1, p - 1))
+                    : setHistoryPage((p) => Math.max(1, p - 1))
+                  }
+                  disabled={activeTab === 'pending' ? page === 1 : historyPage === 1}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="text-sm text-gray-400">
-                  Page {page} of {totalPages}
+                  Page {activeTab === 'pending' ? page : historyPage} of {activeTab === 'pending' ? totalPages : historyTotalPages}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
+                  onClick={() => activeTab === 'pending'
+                    ? setPage((p) => Math.min(totalPages, p + 1))
+                    : setHistoryPage((p) => Math.min(historyTotalPages, p + 1))
+                  }
+                  disabled={activeTab === 'pending' ? page === totalPages : historyPage === historyTotalPages}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -393,141 +834,22 @@ export default function PendingWithdrawalsSection() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {(activeTab === 'pending' ? loading : historyLoading) ? (
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="h-8 w-8 text-teal-400 animate-spin" />
             </div>
-          ) : filteredWithdrawals.length === 0 ? (
+          ) : (activeTab === 'pending' ? filteredWithdrawals : filteredHistoryWithdrawals).length === 0 ? (
             <div className="text-center py-12 text-gray-500">
-              No withdrawal requests found
+              {activeTab === 'pending' 
+                ? 'No withdrawal requests found' 
+                : 'No withdrawal history matching filters'
+              }
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredWithdrawals.map((withdrawal) => (
-                <div
-                  key={withdrawal._id}
-                  className="bg-gray-700/30 rounded-xl p-4 hover:bg-gray-700/50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Badge className={STATUS_COLORS[withdrawal.status]}>
-                          {withdrawal.status.toUpperCase()}
-                        </Badge>
-                        {withdrawal.isSandbox && (
-                          <Badge className="bg-purple-500/20 text-purple-300">
-                            SANDBOX
-                          </Badge>
-                        )}
-                        {withdrawal.kycVerified && (
-                          <Badge className="bg-green-500/20 text-green-300">
-                            KYC ✓
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-500 text-xs">User</p>
-                          <p className="text-white font-medium truncate">
-                            {withdrawal.userEmail}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500 text-xs">Amount</p>
-                          <p className="text-emerald-400 font-bold">
-                            €{withdrawal.amountEUR.toFixed(2)}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Net: €{withdrawal.netAmountEUR.toFixed(2)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500 text-xs">Method</p>
-                          <p className="text-white">
-                            {withdrawal.payoutMethod.replace(/_/g, ' ')}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500 text-xs">Requested</p>
-                          <p className="text-white">
-                            {formatDate(withdrawal.requestedAt)}
-                          </p>
-                        </div>
-                      </div>
-                      {withdrawal.rejectionReason && (
-                        <p className="text-sm text-red-400 mt-2">
-                          Reason: {withdrawal.rejectionReason}
-                        </p>
-                      )}
-                      {withdrawal.failureReason && (
-                        <p className="text-sm text-orange-400 mt-2">
-                          Failed: {withdrawal.failureReason}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setDetailDialog({ open: true, withdrawal })}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Details
-                      </Button>
-                      {withdrawal.status === 'pending' && (
-                        <>
-                          <Button
-                            size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                            onClick={() => openActionDialog(withdrawal, 'approved')}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => openActionDialog(withdrawal, 'rejected')}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Reject
-                          </Button>
-                        </>
-                      )}
-                      {withdrawal.status === 'approved' && (
-                        <Button
-                          size="sm"
-                          className="bg-purple-600 hover:bg-purple-700"
-                          onClick={() => openActionDialog(withdrawal, 'processing')}
-                        >
-                          <PlayCircle className="h-4 w-4 mr-1" />
-                          Process
-                        </Button>
-                      )}
-                      {withdrawal.status === 'processing' && (
-                        <>
-                          <Button
-                            size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                            onClick={() => openActionDialog(withdrawal, 'completed')}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Complete
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => openActionDialog(withdrawal, 'failed')}
-                          >
-                            <AlertTriangle className="h-4 w-4 mr-1" />
-                            Failed
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+              {(activeTab === 'pending' ? filteredWithdrawals : filteredHistoryWithdrawals).map((withdrawal) => 
+                renderWithdrawalRow(withdrawal, activeTab === 'pending')
+              )}
             </div>
           )}
         </CardContent>
@@ -637,7 +959,7 @@ export default function PendingWithdrawalsSection() {
 
       {/* Detail Dialog */}
       <Dialog open={detailDialog.open} onOpenChange={(open) => !open && setDetailDialog({ open: false, withdrawal: null })}>
-        <DialogContent className="bg-gray-800 border-gray-700 max-w-2xl">
+        <DialogContent className="bg-gray-800 border-gray-700 max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">Withdrawal Details</DialogTitle>
           </DialogHeader>
@@ -718,33 +1040,61 @@ export default function PendingWithdrawalsSection() {
                     <p className="text-white font-mono text-sm">{detailDialog.withdrawal.payoutId}</p>
                   </div>
                 )}
+                
+                {/* Company Bank Used Section - Enhanced */}
                 {detailDialog.withdrawal.companyBankUsed && (
-                  <div className="col-span-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                    <p className="text-xs text-emerald-400 font-semibold mb-2">🏦 Company Bank Used</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-gray-500 text-xs">Account</p>
-                        <p className="text-white">{detailDialog.withdrawal.companyBankUsed.accountName}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-xs">Bank</p>
-                        <p className="text-white">{detailDialog.withdrawal.companyBankUsed.bankName}</p>
-                      </div>
+                  <div className="col-span-2 p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-xl">
+                    <p className="text-xs text-cyan-400 font-semibold mb-3 flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      Company Bank Account Used for Payout
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      {detailDialog.withdrawal.companyBankUsed.accountName && (
+                        <div>
+                          <p className="text-gray-500 text-xs">Account Name</p>
+                          <p className="text-white font-medium">{detailDialog.withdrawal.companyBankUsed.accountName}</p>
+                        </div>
+                      )}
+                      {detailDialog.withdrawal.companyBankUsed.accountHolderName && (
+                        <div>
+                          <p className="text-gray-500 text-xs">Account Holder</p>
+                          <p className="text-white">{detailDialog.withdrawal.companyBankUsed.accountHolderName}</p>
+                        </div>
+                      )}
+                      {detailDialog.withdrawal.companyBankUsed.bankName && (
+                        <div>
+                          <p className="text-gray-500 text-xs">Bank</p>
+                          <p className="text-white">{detailDialog.withdrawal.companyBankUsed.bankName}</p>
+                        </div>
+                      )}
+                      {detailDialog.withdrawal.companyBankUsed.country && (
+                        <div>
+                          <p className="text-gray-500 text-xs">Country</p>
+                          <p className="text-white uppercase">{detailDialog.withdrawal.companyBankUsed.country}</p>
+                        </div>
+                      )}
                       {detailDialog.withdrawal.companyBankUsed.iban && (
                         <div>
                           <p className="text-gray-500 text-xs">IBAN</p>
-                          <p className="text-white font-mono">{detailDialog.withdrawal.companyBankUsed.iban}</p>
+                          <p className="text-cyan-300 font-mono">{detailDialog.withdrawal.companyBankUsed.iban}</p>
                         </div>
                       )}
                       {detailDialog.withdrawal.companyBankUsed.accountNumber && (
                         <div>
                           <p className="text-gray-500 text-xs">Account #</p>
-                          <p className="text-white font-mono">{detailDialog.withdrawal.companyBankUsed.accountNumber}</p>
+                          <p className="text-cyan-300 font-mono">{detailDialog.withdrawal.companyBankUsed.accountNumber}</p>
+                        </div>
+                      )}
+                      {detailDialog.withdrawal.companyBankUsed.currency && (
+                        <div>
+                          <p className="text-gray-500 text-xs">Currency</p>
+                          <p className="text-white uppercase">{detailDialog.withdrawal.companyBankUsed.currency}</p>
                         </div>
                       )}
                     </div>
                   </div>
                 )}
+                
                 {detailDialog.withdrawal.rejectionReason && (
                   <div className="col-span-2">
                     <p className="text-xs text-gray-500">Rejection Reason</p>
@@ -840,24 +1190,26 @@ export default function PendingWithdrawalsSection() {
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
-                    <p className="text-xs text-gray-400">
-                      📋 <strong>To process this withdrawal:</strong>
-                    </p>
-                    <ol className="text-xs text-gray-400 mt-1 space-y-1">
-                      <li>1. Log into your payment provider dashboard (Stripe, etc.)</li>
-                      <li>2. Find the original payment: <span className="font-mono text-blue-300 select-all">{detailDialog.withdrawal.originalPaymentId || 'Search by user email'}</span></li>
-                      <li>3. Issue a refund of €{detailDialog.withdrawal.netAmountEUR.toFixed(2)} to the card</li>
-                      <li>4. Use reference: <span className="font-mono text-blue-300 select-all">WD-{detailDialog.withdrawal._id.slice(-12).toUpperCase()}</span></li>
-                      <li>5. Mark this withdrawal as &quot;Completed&quot;</li>
-                    </ol>
-                  </div>
+                  {detailDialog.withdrawal.status !== 'completed' && (
+                    <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
+                      <p className="text-xs text-gray-400">
+                        📋 <strong>To process this withdrawal:</strong>
+                      </p>
+                      <ol className="text-xs text-gray-400 mt-1 space-y-1">
+                        <li>1. Log into your payment provider dashboard (Stripe, etc.)</li>
+                        <li>2. Find the original payment: <span className="font-mono text-blue-300 select-all">{detailDialog.withdrawal.originalPaymentId || 'Search by user email'}</span></li>
+                        <li>3. Issue a refund of €{detailDialog.withdrawal.netAmountEUR.toFixed(2)} to the card</li>
+                        <li>4. Use reference: <span className="font-mono text-blue-300 select-all">WD-{detailDialog.withdrawal._id.slice(-12).toUpperCase()}</span></li>
+                        <li>5. Mark this withdrawal as &quot;Completed&quot;</li>
+                      </ol>
+                    </div>
+                  )}
                 </div>
               ) : detailDialog.withdrawal.userBankDetails ? (
                 // Bank Transfer
                 <div className="mt-6 p-4 bg-teal-500/10 border border-teal-500/30 rounded-xl">
                   <h4 className="text-teal-300 font-semibold mb-3 flex items-center gap-2">
-                    🏦 Bank Details for Transfer
+                    🏦 User Bank Details for Transfer
                     {detailDialog.withdrawal.userBankDetails.nickname && (
                       <span className="text-xs text-gray-400 font-normal">
                         ({detailDialog.withdrawal.userBankDetails.nickname})
@@ -902,17 +1254,19 @@ export default function PendingWithdrawalsSection() {
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
-                    <p className="text-xs text-gray-400">
-                      📋 <strong>To process this withdrawal:</strong>
-                    </p>
-                    <ol className="text-xs text-gray-400 mt-1 space-y-1">
-                      <li>1. Log into your company bank account</li>
-                      <li>2. Transfer €{detailDialog.withdrawal.netAmountEUR.toFixed(2)} to the IBAN above</li>
-                      <li>3. Use reference: <span className="font-mono text-teal-300 select-all">WD-{detailDialog.withdrawal._id.slice(-12).toUpperCase()}</span></li>
-                      <li>4. Mark this withdrawal as &quot;Completed&quot;</li>
-                    </ol>
-                  </div>
+                  {detailDialog.withdrawal.status !== 'completed' && (
+                    <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
+                      <p className="text-xs text-gray-400">
+                        📋 <strong>To process this withdrawal:</strong>
+                      </p>
+                      <ol className="text-xs text-gray-400 mt-1 space-y-1">
+                        <li>1. Log into your company bank account</li>
+                        <li>2. Transfer €{detailDialog.withdrawal.netAmountEUR.toFixed(2)} to the IBAN above</li>
+                        <li>3. Use reference: <span className="font-mono text-teal-300 select-all">WD-{detailDialog.withdrawal._id.slice(-12).toUpperCase()}</span></li>
+                        <li>4. Mark this withdrawal as &quot;Completed&quot;</li>
+                      </ol>
+                    </div>
+                  )}
                 </div>
               ) : detailDialog.withdrawal.status !== 'completed' && detailDialog.withdrawal.status !== 'rejected' && (
                 <div className="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
@@ -954,4 +1308,3 @@ export default function PendingWithdrawalsSection() {
     </div>
   );
 }
-

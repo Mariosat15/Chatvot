@@ -29,19 +29,66 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
     const skip = (page - 1) * limit;
+    
+    // New filters for history tab
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    const minAmount = searchParams.get('minAmount');
+    const maxAmount = searchParams.get('maxAmount');
+    const search = searchParams.get('search');
 
     await connectToDatabase();
 
     // Build query
     const query: any = {};
+    
+    // Handle comma-separated status values (e.g., "completed,rejected,cancelled,failed")
     if (status && status !== 'all') {
-      query.status = status;
+      if (status.includes(',')) {
+        query.status = { $in: status.split(',') };
+      } else {
+        query.status = status;
+      }
     }
     if (userId) {
       query.userId = userId;
     }
-    if (isSandbox !== null && isSandbox !== undefined) {
+    if (isSandbox !== null && isSandbox !== undefined && isSandbox !== 'all') {
       query.isSandbox = isSandbox === 'true';
+    }
+    
+    // Date range filters
+    if (dateFrom || dateTo) {
+      query.requestedAt = {};
+      if (dateFrom) {
+        query.requestedAt.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        // End of day for dateTo
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        query.requestedAt.$lte = endDate;
+      }
+    }
+    
+    // Amount range filters
+    if (minAmount || maxAmount) {
+      query.amountEUR = {};
+      if (minAmount) {
+        query.amountEUR.$gte = parseFloat(minAmount);
+      }
+      if (maxAmount) {
+        query.amountEUR.$lte = parseFloat(maxAmount);
+      }
+    }
+    
+    // Search by email or userId
+    if (search) {
+      query.$or = [
+        { userEmail: { $regex: search, $options: 'i' } },
+        { userId: { $regex: search, $options: 'i' } },
+        { userName: { $regex: search, $options: 'i' } },
+      ];
     }
 
     // Get total count
