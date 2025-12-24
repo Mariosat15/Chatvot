@@ -31,9 +31,18 @@ interface CompetitionDashboardProps {
 }
 
 interface AllTimeStats {
+  // Competitions
   totalCompetitions: number;
   activeCompetitions: number;
   completedCompetitions: number;
+  // Challenges
+  totalChallenges: number;
+  activeChallenges: number;
+  completedChallenges: number;
+  challengeWins: number;
+  challengeLosses: number;
+  // Combined
+  totalContests: number;
   totalPnL: number;
   totalTrades: number;
   winningTrades: number;
@@ -44,11 +53,11 @@ interface AllTimeStats {
   totalEntryFees: number;
   netProfit: number;
   winRate: number;
-  averagePnLPerCompetition: number;
+  averagePnLPerContest: number;
   biggestWin: number;
   biggestLoss: number;
-  rankHistory: { date: string; rank: number; competition: string }[];
-  pnlHistory: { date: string; pnl: number; competition: string }[];
+  rankHistory: { date: string; rank: number; name: string; type: string }[];
+  pnlHistory: { date: string; pnl: number; name: string; type: string }[];
 }
 
 interface CurrentStats {
@@ -588,7 +597,7 @@ export default function CompetitionDashboard({
           <TabsContent value="alltime" className="p-6 space-y-6 mt-0">
             {allTimeStats ? (
               <>
-                {/* Career Overview */}
+                {/* Career Overview - Competitions & Challenges */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/30">
                     <div className="flex items-center gap-2 mb-2">
@@ -601,6 +610,19 @@ export default function CompetitionDashboard({
                     </p>
                   </div>
                   
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-orange-500/10 to-orange-500/5 border border-orange-500/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="h-4 w-4 text-orange-400" />
+                      <p className="text-xs text-slate-400">1v1 Challenges</p>
+                    </div>
+                    <p className="text-2xl font-bold text-white">{allTimeStats.totalChallenges || 0}</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      <span className="text-green-400">{allTimeStats.challengeWins || 0}W</span>
+                      {' / '}
+                      <span className="text-red-400">{allTimeStats.challengeLosses || 0}L</span>
+                    </p>
+                  </div>
+                  
                   <div className="p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/30">
                     <div className="flex items-center gap-2 mb-2">
                       <Award className="h-4 w-4 text-purple-400" />
@@ -610,24 +632,7 @@ export default function CompetitionDashboard({
                       #{allTimeStats.bestRank || '—'}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      Avg: #{allTimeStats.averageRank.toFixed(1)}
-                    </p>
-                  </div>
-                  
-                  <div className={`p-4 rounded-xl border ${
-                    allTimeStats.totalPnL >= 0 
-                      ? 'bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/30'
-                      : 'bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/30'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className={`h-4 w-4 ${allTimeStats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`} />
-                      <p className="text-xs text-slate-400">Total P&L</p>
-                    </div>
-                    <p className={`text-2xl font-bold ${allTimeStats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {allTimeStats.totalPnL >= 0 ? '+' : ''}${allTimeStats.totalPnL.toFixed(2)}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Avg: ${allTimeStats.averagePnLPerCompetition.toFixed(2)}/comp
+                      Avg: #{allTimeStats.averageRank?.toFixed(1) || '—'}
                     </p>
                   </div>
                   
@@ -637,54 +642,94 @@ export default function CompetitionDashboard({
                       <p className="text-xs text-slate-400">Prizes Won</p>
                     </div>
                     <p className="text-2xl font-bold text-white">
-                      ${allTimeStats.totalPrizesWon.toFixed(0)}
+                      ${allTimeStats.totalPrizesWon?.toFixed(0) || '0'}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      Net: ${allTimeStats.netProfit.toFixed(0)}
+                      Net: ${allTimeStats.netProfit?.toFixed(0) || '0'}
                     </p>
+                  </div>
+                </div>
+
+                {/* P&L Summary */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className={`p-4 rounded-xl border ${
+                    (allTimeStats.totalPnL || 0) >= 0 
+                      ? 'bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/30'
+                      : 'bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/30'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className={`h-4 w-4 ${(allTimeStats.totalPnL || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`} />
+                      <p className="text-xs text-slate-400">Total Career P&L</p>
+                    </div>
+                    <p className={`text-3xl font-bold ${(allTimeStats.totalPnL || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {(allTimeStats.totalPnL || 0) >= 0 ? '+' : ''}${(allTimeStats.totalPnL || 0).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Avg: ${(allTimeStats.averagePnLPerContest || 0).toFixed(2)} per contest
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="h-4 w-4 text-blue-400" />
+                      <p className="text-xs text-slate-400">Trading Performance</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div>
+                        <p className="text-2xl font-bold text-white">{allTimeStats.totalTrades || 0}</p>
+                        <p className="text-xs text-slate-500">Total Trades</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-white">{(allTimeStats.winRate || 0).toFixed(1)}%</p>
+                        <p className="text-xs text-slate-500">Win Rate</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {/* Career Trading Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
-                    <p className="text-xs text-slate-400 mb-1">Total Trades</p>
-                    <p className="text-lg font-bold text-white">{allTimeStats.totalTrades}</p>
+                    <p className="text-xs text-slate-400 mb-1">Total Contests</p>
+                    <p className="text-lg font-bold text-white">{allTimeStats.totalContests || 0}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
-                    <p className="text-xs text-slate-400 mb-1">Career Win Rate</p>
-                    <p className="text-lg font-bold text-white">{allTimeStats.winRate.toFixed(1)}%</p>
+                    <p className="text-xs text-slate-400 mb-1">Entry Fees Paid</p>
+                    <p className="text-lg font-bold text-amber-400">${(allTimeStats.totalEntryFees || 0).toFixed(0)}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
                     <p className="text-xs text-slate-400 mb-1">Biggest Win</p>
-                    <p className="text-lg font-bold text-green-400">+${allTimeStats.biggestWin.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-green-400">+${(allTimeStats.biggestWin || 0).toFixed(2)}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
                     <p className="text-xs text-slate-400 mb-1">Biggest Loss</p>
-                    <p className="text-lg font-bold text-red-400">${allTimeStats.biggestLoss.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-red-400">${(allTimeStats.biggestLoss || 0).toFixed(2)}</p>
                   </div>
                 </div>
 
                 {/* P&L History Mini Chart */}
-                {allTimeStats.pnlHistory.length > 1 && (
+                {allTimeStats.pnlHistory && allTimeStats.pnlHistory.length > 1 && (
                   <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/30">
                     <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                       <BarChart3 className="h-4 w-4 text-amber-400" />
-                      Competition History
+                      Contest History
                     </h3>
                     <div className="flex items-end gap-1 h-20">
                       {allTimeStats.pnlHistory.slice(-12).map((item, index) => {
                         const maxPnl = Math.max(...allTimeStats.pnlHistory.map(h => Math.abs(h.pnl)));
                         const height = maxPnl > 0 ? (Math.abs(item.pnl) / maxPnl) * 100 : 0;
+                        const isChallenge = item.type === 'challenge';
                         return (
                           <div 
                             key={index}
                             className="flex-1 flex flex-col justify-end"
-                            title={`${item.competition}: ${item.pnl >= 0 ? '+' : ''}$${item.pnl.toFixed(2)}`}
+                            title={`${item.name} (${item.type}): ${item.pnl >= 0 ? '+' : ''}$${item.pnl.toFixed(2)}`}
                           >
                             <div 
                               className={`rounded-t transition-all hover:opacity-80 ${
-                                item.pnl >= 0 ? 'bg-green-500' : 'bg-red-500'
+                                item.pnl >= 0 
+                                  ? isChallenge ? 'bg-orange-500' : 'bg-green-500' 
+                                  : 'bg-red-500'
                               }`}
                               style={{ height: `${Math.max(height, 5)}%` }}
                             />
@@ -692,14 +737,27 @@ export default function CompetitionDashboard({
                         );
                       })}
                     </div>
-                    <p className="text-xs text-slate-500 mt-2 text-center">Last {Math.min(allTimeStats.pnlHistory.length, 12)} competitions</p>
+                    <div className="flex items-center justify-center gap-4 mt-3 text-xs text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                        Competition Win
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                        Challenge Win
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                        Loss
+                      </span>
+                    </div>
                   </div>
                 )}
               </>
             ) : (
               <div className="text-center py-8">
                 <Trophy className="h-12 w-12 text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400">Complete more competitions to see your all-time stats!</p>
+                <p className="text-slate-400">Complete competitions or challenges to see your all-time stats!</p>
               </div>
             )}
           </TabsContent>
