@@ -36,9 +36,12 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [timeSinceUpdate, setTimeSinceUpdate] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Auto-refresh function
-  const refreshData = async () => {
+  const refreshData = useCallback(async (skipMountedCheck = false) => {
+    // Don't refresh immediately after mount - use server data
+    if (!skipMountedCheck && !isMounted) return;
     if (isRefreshing) return; // Prevent duplicate requests
     
     setIsRefreshing(true);
@@ -62,10 +65,16 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [isMounted, isRefreshing]);
 
-  // Device fingerprinting happens globally via FingerprintProvider
-  // No need to track here
+  // Mark component as mounted after initial render
+  useEffect(() => {
+    // Delay the mounted state to ensure hydration is complete
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -75,21 +84,26 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
     return () => clearInterval(timer);
   }, [lastUpdate]);
 
-  // Auto-refresh with visibility awareness - optimized to 15 seconds
+  // Auto-refresh with visibility awareness - only after mounted
   useEffect(() => {
+    if (!isMounted) return;
+
     const handleRefresh = () => {
       // Skip if tab is hidden
       if (document.hidden) return;
-      refreshData();
+      refreshData(true);
     };
 
     const interval = setInterval(handleRefresh, PERFORMANCE_INTERVALS.DASHBOARD_REFRESH);
     
-    // Refresh when tab becomes visible
+    // Refresh when tab becomes visible (only if it was previously hidden)
+    let wasHidden = document.hidden;
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        refreshData();
+      if (wasHidden && !document.hidden) {
+        // Tab became visible after being hidden - refresh
+        refreshData(true);
       }
+      wasHidden = document.hidden;
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
@@ -97,11 +111,11 @@ export default function LiveDashboardWrapper({ initialData }: LiveDashboardWrapp
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []); // Empty dependency array - only set up once
+  }, [isMounted, refreshData]);
 
   // Manual refresh handler
   const handleManualRefresh = () => {
-    refreshData();
+    refreshData(true); // Skip mounted check for manual refresh
   };
 
   return (
