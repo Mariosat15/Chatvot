@@ -250,8 +250,8 @@ async function startServer() {
     bcryptPool.initialize();
     console.log(`✅ Worker pool ready (${bcryptPool.getStats().poolSize} workers)`);
 
-    // Start server
-    app.listen(PORT, () => {
+    // Start server and store reference for graceful shutdown
+    httpServer = app.listen(PORT, () => {
       console.log(`\n🚀 API Server running on port ${PORT}`);
       console.log(`   Health: http://localhost:${PORT}/api/health`);
       console.log('\n📋 Routes (bcrypt offloading):');
@@ -267,11 +267,27 @@ async function startServer() {
   }
 }
 
+// HTTP server reference for graceful shutdown
+let httpServer: ReturnType<typeof app.listen> | null = null;
+
 // Graceful shutdown
 async function shutdown(signal: string) {
   console.log(`\n🛑 Received ${signal}, shutting down...`);
   
   try {
+    // Stop accepting new connections first
+    if (httpServer) {
+      console.log('🔌 Closing HTTP server...');
+      await new Promise<void>((resolve, reject) => {
+        httpServer!.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      console.log('✅ HTTP server closed');
+    }
+    
+    // Then shutdown worker pool
     await bcryptPool.shutdown();
     console.log('✅ Server shut down gracefully');
     process.exit(0);

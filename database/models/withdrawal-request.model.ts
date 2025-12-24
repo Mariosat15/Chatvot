@@ -77,6 +77,15 @@ export interface IWithdrawalRequest extends Document {
   processedAt?: Date;              // When processing started
   completedAt?: Date;              // When payout completed
   
+  // Company Bank Used (for tracking which bank processed the withdrawal)
+  companyBankUsed?: {
+    bankId?: string;               // Admin bank account ID
+    accountName?: string;          // Account name
+    bankName?: string;             // Bank name
+    iban?: string;                 // IBAN (masked)
+    accountNumber?: string;        // Account number (masked)
+  };
+  
   // Auto-approval
   isAutoApproved: boolean;         // Was this auto-approved?
   autoApprovalReason?: string;     // Why it qualified for auto-approval
@@ -231,6 +240,15 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
     processedByEmail: String,
     processedAt: Date,
     completedAt: Date,
+    
+    // Company Bank Used
+    companyBankUsed: {
+      bankId: String,
+      accountName: String,
+      bankName: String,
+      iban: String,
+      accountNumber: String,
+    },
     
     // Auto-approval
     isAutoApproved: {

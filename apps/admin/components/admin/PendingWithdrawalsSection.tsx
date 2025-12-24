@@ -74,6 +74,14 @@ interface WithdrawalRequest {
     currency?: string;
     ibanLast4?: string;
   } | null;
+  // Company bank that processed this withdrawal
+  companyBankUsed?: {
+    bankId?: string;
+    accountName?: string;
+    bankName?: string;
+    iban?: string;
+    accountNumber?: string;
+  } | null;
 }
 
 interface WithdrawalStats {
@@ -96,6 +104,20 @@ const STATUS_COLORS: Record<string, string> = {
   failed: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
 };
 
+// Admin bank account interface
+interface AdminBankAccount {
+  _id: string;
+  accountName: string;
+  accountHolderName: string;
+  bankName: string;
+  country: string;
+  currency: string;
+  iban?: string;
+  accountNumber?: string;
+  swiftBic?: string;
+  isDefault: boolean;
+}
+
 export default function PendingWithdrawalsSection() {
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [stats, setStats] = useState<WithdrawalStats | null>(null);
@@ -106,6 +128,10 @@ export default function PendingWithdrawalsSection() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  
+  // Admin bank accounts for withdrawal processing
+  const [adminBankAccounts, setAdminBankAccounts] = useState<AdminBankAccount[]>([]);
+  const [selectedBankId, setSelectedBankId] = useState<string>('');
   
   // Action dialog state
   const [actionDialog, setActionDialog] = useState<{
@@ -125,7 +151,25 @@ export default function PendingWithdrawalsSection() {
 
   useEffect(() => {
     fetchWithdrawals();
+    fetchAdminBankAccounts();
   }, [statusFilter, sandboxFilter, page]);
+  
+  const fetchAdminBankAccounts = async () => {
+    try {
+      const response = await fetch('/api/admin-bank-accounts');
+      if (response.ok) {
+        const data = await response.json();
+        setAdminBankAccounts(data.accounts || []);
+        // Set default bank as selected
+        const defaultBank = data.accounts?.find((b: AdminBankAccount) => b.isDefault);
+        if (defaultBank) {
+          setSelectedBankId(defaultBank._id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching admin bank accounts:', error);
+    }
+  };
 
   const fetchWithdrawals = async () => {
     setLoading(true);
@@ -160,6 +204,11 @@ export default function PendingWithdrawalsSection() {
 
     setActionLoading(true);
     try {
+      // Get selected bank details for completed withdrawals
+      const selectedBank = actionDialog.action === 'completed' && selectedBankId
+        ? adminBankAccounts.find(b => b._id === selectedBankId)
+        : null;
+
       const response = await fetch(`/api/withdrawals/${actionDialog.withdrawal._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -167,6 +216,14 @@ export default function PendingWithdrawalsSection() {
           action: actionDialog.action,
           reason: actionReason,
           adminNote: actionNote,
+          // Include company bank details when completing
+          companyBankUsed: selectedBank ? {
+            bankId: selectedBank._id,
+            accountName: selectedBank.accountName,
+            bankName: selectedBank.bankName,
+            iban: selectedBank.iban,
+            accountNumber: selectedBank.accountNumber,
+          } : undefined,
         }),
       });
 
@@ -496,6 +553,42 @@ export default function PendingWithdrawalsSection() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Bank selection for completed withdrawals */}
+            {actionDialog.action === 'completed' && adminBankAccounts.length > 0 && (
+              <div>
+                <Label className="text-gray-300">Company Bank Account Used</Label>
+                <p className="text-xs text-gray-500 mb-2">Select which company bank account processed this withdrawal</p>
+                <Select value={selectedBankId} onValueChange={setSelectedBankId}>
+                  <SelectTrigger className="bg-gray-700 border-gray-600">
+                    <SelectValue placeholder="Select bank account..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {adminBankAccounts.map((bank) => (
+                      <SelectItem key={bank._id} value={bank._id}>
+                        <div className="flex items-center gap-2">
+                          <span>{bank.accountName}</span>
+                          <span className="text-gray-400 text-xs">({bank.bankName})</span>
+                          {bank.isDefault && (
+                            <span className="text-emerald-400 text-xs">★ Default</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {actionDialog.action === 'completed' && adminBankAccounts.length === 0 && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <p className="text-amber-300 text-sm flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  No company bank accounts configured
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Add bank accounts in Settings → Company Details to track which bank processed withdrawals.
+                </p>
+              </div>
+            )}
             {(actionDialog.action === 'rejected' || actionDialog.action === 'failed') && (
               <div>
                 <Label className="text-gray-300">Reason (required)</Label>
@@ -623,6 +716,33 @@ export default function PendingWithdrawalsSection() {
                   <div className="col-span-2">
                     <p className="text-xs text-gray-500">Payout ID</p>
                     <p className="text-white font-mono text-sm">{detailDialog.withdrawal.payoutId}</p>
+                  </div>
+                )}
+                {detailDialog.withdrawal.companyBankUsed && (
+                  <div className="col-span-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                    <p className="text-xs text-emerald-400 font-semibold mb-2">🏦 Company Bank Used</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-gray-500 text-xs">Account</p>
+                        <p className="text-white">{detailDialog.withdrawal.companyBankUsed.accountName}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Bank</p>
+                        <p className="text-white">{detailDialog.withdrawal.companyBankUsed.bankName}</p>
+                      </div>
+                      {detailDialog.withdrawal.companyBankUsed.iban && (
+                        <div>
+                          <p className="text-gray-500 text-xs">IBAN</p>
+                          <p className="text-white font-mono">{detailDialog.withdrawal.companyBankUsed.iban}</p>
+                        </div>
+                      )}
+                      {detailDialog.withdrawal.companyBankUsed.accountNumber && (
+                        <div>
+                          <p className="text-gray-500 text-xs">Account #</p>
+                          <p className="text-white font-mono">{detailDialog.withdrawal.companyBankUsed.accountNumber}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
                 {detailDialog.withdrawal.rejectionReason && (

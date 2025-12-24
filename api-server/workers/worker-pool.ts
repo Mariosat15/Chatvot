@@ -44,7 +44,8 @@ class BcryptWorkerPool {
    * Initialize the worker pool
    */
   public initialize(): void {
-    if (this.initialized) return;
+    // Don't initialize if already initialized or if shutting down
+    if (this.initialized || this.isShuttingDown) return;
     
     console.log(`🔧 Initializing bcrypt worker pool with ${this.poolSize} workers...`);
 
@@ -176,12 +177,23 @@ class BcryptWorkerPool {
    * Execute a task on the worker pool
    */
   private async executeTask<T>(type: string, data: any): Promise<T> {
+    // Reject immediately if shutting down
+    if (this.isShuttingDown) {
+      return Promise.reject(new Error('Worker pool is shutting down'));
+    }
+    
     // Lazy initialization
     if (!this.initialized) {
       this.initialize();
     }
 
     return new Promise<T>((resolve, reject) => {
+      // Double-check shutdown state inside promise (race condition guard)
+      if (this.isShuttingDown) {
+        reject(new Error('Worker pool is shutting down'));
+        return;
+      }
+      
       const id = `${Date.now()}-${++this.taskIdCounter}`;
       const task: PendingTask = { id, resolve, reject };
 

@@ -87,7 +87,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { action, reason, bankTransferRef, adminNote } = body;
+    const { action, reason, bankTransferRef, adminNote, companyBankUsed } = body;
 
     await connectToDatabase();
 
@@ -212,6 +212,39 @@ export async function PUT(
         withdrawal.payoutStatus = 'completed';
         if (bankTransferRef) {
           withdrawal.adminNote = (withdrawal.adminNote || '') + `\nBank ref: ${bankTransferRef}`;
+        }
+        if (adminNote) {
+          withdrawal.adminNote = (withdrawal.adminNote || '') + (withdrawal.adminNote ? '\n' : '') + adminNote;
+        }
+        
+        // Save company bank used for this withdrawal
+        if (companyBankUsed) {
+          withdrawal.companyBankUsed = {
+            bankId: companyBankUsed.bankId,
+            accountName: companyBankUsed.accountName,
+            bankName: companyBankUsed.bankName,
+            iban: companyBankUsed.iban ? `****${companyBankUsed.iban.slice(-4)}` : undefined,
+            accountNumber: companyBankUsed.accountNumber ? `****${companyBankUsed.accountNumber.slice(-4)}` : undefined,
+          };
+          
+          // Update admin bank account statistics
+          try {
+            const AdminBankAccount = (await import('@/database/models/admin-bank-account.model')).default;
+            await AdminBankAccount.findByIdAndUpdate(
+              companyBankUsed.bankId,
+              {
+                $inc: { 
+                  totalWithdrawals: 1, 
+                  totalAmount: withdrawal.netAmountEUR 
+                },
+                $set: { lastUsedAt: new Date() },
+              },
+              { session }
+            );
+          } catch (bankUpdateError) {
+            console.error('Failed to update admin bank stats:', bankUpdateError);
+            // Don't fail the withdrawal for this
+          }
         }
 
         // Update wallet's total withdrawn
