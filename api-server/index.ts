@@ -187,10 +187,25 @@ function validateAuthSecret(): void {
   let secret = process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET;
   const isProduction = process.env.NODE_ENV === 'production';
   
-  // Check for insecure placeholder values
-  const insecurePatterns = ['your-', 'change', 'secret', 'password', 'test', 'example', 'placeholder'];
-  const lowerSecret = secret?.toLowerCase() || '';
-  const isInsecure = !secret || secret.length < 32 || insecurePatterns.some(p => lowerSecret.includes(p));
+  // Check for common placeholder VALUES (exact matches or very short secrets)
+  // Don't use substring matching - a 64-char hex could accidentally contain "test" or "secret"
+  const commonPlaceholders = [
+    'your-secret-key', 'your-auth-secret', 'change-me', 'changeme', 
+    'secret', 'password', 'test', 'example', 'placeholder',
+    'xxx', 'abc123', '123456', 'default', 'supersecret'
+  ];
+  const lowerSecret = secret?.toLowerCase().trim() || '';
+  
+  // Secret is insecure if:
+  // 1. Missing or too short (< 32 chars)
+  // 2. EXACTLY matches a common placeholder
+  // 3. Starts with obvious placeholder prefixes for short secrets
+  const isTooShort = !secret || secret.length < 32;
+  const isExactPlaceholder = commonPlaceholders.includes(lowerSecret);
+  const hasPlaceholderPrefix = secret && secret.length < 40 && 
+    (lowerSecret.startsWith('your-') || lowerSecret.startsWith('change'));
+  
+  const isInsecure = isTooShort || isExactPlaceholder || hasPlaceholderPrefix;
   
   if (!secret || isInsecure) {
     if (isProduction) {

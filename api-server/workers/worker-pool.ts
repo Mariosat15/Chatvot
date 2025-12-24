@@ -60,16 +60,20 @@ class BcryptWorkerPool {
    * Create a new worker
    */
   private createWorker(): void {
-    // Use compiled JS in production, TS in development
-    const workerPath = process.env.NODE_ENV === 'production'
+    // Detect if running from compiled dist/ folder (same method as index.ts)
+    // This works regardless of NODE_ENV setting
+    const isCompiledBuild = __dirname.includes('dist');
+    
+    // Use compiled JS in dist/, TS in source
+    const workerPath = isCompiledBuild
       ? path.join(__dirname, 'bcrypt.worker.js')
       : path.join(__dirname, 'bcrypt.worker.ts');
 
     const worker = new Worker(workerPath, {
-      // Use ts-node/register for TypeScript in development
-      execArgv: process.env.NODE_ENV !== 'production' 
-        ? ['--require', 'tsx/cjs']
-        : undefined,
+      // Use tsx for TypeScript in development (non-compiled)
+      execArgv: isCompiledBuild 
+        ? undefined
+        : ['--require', 'tsx/cjs'],
     });
 
     const workerInfo: WorkerInfo = { worker, busy: false, currentTaskId: null };
@@ -113,28 +117,39 @@ class BcryptWorkerPool {
         this.workers.splice(index, 1);
         if (!this.isShuttingDown) {
           this.createWorker();
+          // Process any queued tasks with the new worker
+          this.processQueue();
         }
       }
     });
 
     worker.on('exit', (code) => {
-      if (code !== 0 && !this.isShuttingDown) {
+      // Skip cleanup only during intentional shutdown
+      if (this.isShuttingDown) return;
+      
+      // Handle any exit (code 0 or non-zero) during normal operation
+      if (code !== 0) {
         console.warn(`⚠️ Worker exited with code ${code}, recreating...`);
-        
-        // Reject the orphaned task if there was one
-        if (workerInfo.currentTaskId) {
-          const orphanedTask = this.pendingTasks.get(workerInfo.currentTaskId);
-          if (orphanedTask) {
-            this.pendingTasks.delete(workerInfo.currentTaskId);
-            orphanedTask.reject(new Error(`Worker exited unexpectedly with code ${code}`));
-          }
+      } else {
+        console.info(`ℹ️ Worker exited normally (code 0), recreating...`);
+      }
+      
+      // Reject the orphaned task if there was one
+      if (workerInfo.currentTaskId) {
+        const orphanedTask = this.pendingTasks.get(workerInfo.currentTaskId);
+        if (orphanedTask) {
+          this.pendingTasks.delete(workerInfo.currentTaskId);
+          orphanedTask.reject(new Error(`Worker exited unexpectedly with code ${code}`));
         }
-        
-        const index = this.workers.indexOf(workerInfo);
-        if (index !== -1) {
-          this.workers.splice(index, 1);
-          this.createWorker();
-        }
+      }
+      
+      // Remove zombie workerInfo and recreate
+      const index = this.workers.indexOf(workerInfo);
+      if (index !== -1) {
+        this.workers.splice(index, 1);
+        this.createWorker();
+        // Process any queued tasks with the new worker
+        this.processQueue();
       }
     });
 
@@ -222,10 +237,26 @@ class BcryptWorkerPool {
     
     console.log('🛑 Shutting down worker pool...');
     
+    const shutdownError = new Error('Worker pool is shutting down');
+    
+    // Reject all pending tasks (in-flight operations)
+    for (const [taskId, task] of this.pendingTasks) {
+      console.log(`   Rejecting pending task: ${taskId}`);
+      task.reject(shutdownError);
+    }
+    
+    // Reject all queued tasks (waiting operations)
+    for (const { task } of this.taskQueue) {
+      console.log(`   Rejecting queued task: ${task.id}`);
+      task.reject(shutdownError);
+    }
+    
+    // Terminate all workers
     await Promise.all(
       this.workers.map(({ worker }) => worker.terminate())
     );
 
+    // Clear all collections
     this.workers = [];
     this.taskQueue = [];
     this.pendingTasks.clear();

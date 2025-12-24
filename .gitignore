@@ -50,3 +50,6 @@ apps/*/.next/
 
 # Worker
 worker/dist/
+
+# API Server (compiled files)
+api-server/dist/
