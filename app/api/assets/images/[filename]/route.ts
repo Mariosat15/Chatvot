@@ -19,9 +19,12 @@ export async function GET(
     const sanitizedFilename = path.basename(filename);
     
     // Try multiple possible locations for the file
+    // Include admin app's public folder since that's where admin uploads go
     const possiblePaths = [
       path.join(process.cwd(), 'public', 'assets', 'images', sanitizedFilename),
+      path.join(process.cwd(), 'apps', 'admin', 'public', 'assets', 'images', sanitizedFilename),
       path.join('/var/www/chartvolt', 'public', 'assets', 'images', sanitizedFilename),
+      path.join('/var/www/chartvolt', 'apps', 'admin', 'public', 'assets', 'images', sanitizedFilename),
     ];
     
     let filePath: string | null = null;

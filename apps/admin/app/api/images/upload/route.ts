@@ -49,7 +49,17 @@ export async function POST(request: NextRequest) {
     const filename = `${field}-${timestamp}.${fileExtension}`;
     
     // Create upload directory if it doesn't exist
-    const uploadDir = path.join(process.cwd(), 'public', 'assets', 'images');
+    // In monorepo, admin app is in apps/admin, so we need to go up to the root
+    // and save to the main app's public folder for the web app to serve
+    const possibleUploadDirs = [
+      // Production: /var/www/chartvolt/public/assets/images
+      path.join(process.cwd(), '..', '..', 'public', 'assets', 'images'),
+      // Fallback: current app's public folder
+      path.join(process.cwd(), 'public', 'assets', 'images'),
+    ];
+    
+    // Use the first directory, creating it if needed
+    const uploadDir = possibleUploadDirs[0];
     try {
       await mkdir(uploadDir, { recursive: true });
     } catch {
