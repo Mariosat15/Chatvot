@@ -15,6 +15,7 @@ import mongoose from 'mongoose';
 import FraudAlert from '../database/models/fraud/fraud-alert.model';
 import FraudSettings from '../database/models/fraud/fraud-settings.model';
 import UserRestriction from '../database/models/user-restriction.model';
+import SuspicionScore from '../database/models/fraud/suspicion-score.model';
 
 async function applyDuplicateKYCSuspensions() {
   console.log('\n🔐 Applying suspensions to existing duplicate KYC alerts...\n');
@@ -64,6 +65,7 @@ async function applyDuplicateKYCSuspensions() {
 
     let totalUsersSuspended = 0;
     let totalUsersAlreadySuspended = 0;
+    let totalScoresUpdated = 0;
 
     for (const alert of duplicateAlerts) {
       console.log(`\n🚨 Processing Alert: ${alert._id}`);
@@ -71,8 +73,44 @@ async function applyDuplicateKYCSuspensions() {
       console.log(`   Involved users: ${alert.suspiciousUserIds?.length || 0}`);
 
       const involvedUserIds = alert.suspiciousUserIds || [];
+      const evidenceText = `Duplicate KYC document detected with ${involvedUserIds.length - 1} other account(s). Applied by migration.`;
 
       for (const userId of involvedUserIds) {
+        // Update suspicion score
+        try {
+          let suspicionScore = await SuspicionScore.findOne({ 
+            userId: new mongoose.Types.ObjectId(userId) 
+          });
+          
+          if (!suspicionScore) {
+            suspicionScore = new SuspicionScore({
+              userId: new mongoose.Types.ObjectId(userId),
+              totalScore: 0,
+              riskLevel: 'low',
+            });
+          }
+          
+          // Add KYC duplicate percentage (50%)
+          suspicionScore.addPercentage('kycDuplicate', 50, evidenceText);
+          
+          // Add linked accounts
+          for (const otherId of involvedUserIds) {
+            if (otherId !== userId) {
+              suspicionScore.addLinkedAccount(
+                new mongoose.Types.ObjectId(otherId),
+                'kyc_duplicate',
+                0.95
+              );
+            }
+          }
+          
+          await suspicionScore.save();
+          console.log(`   📊 Updated score for ${userId}: ${suspicionScore.totalScore}% (${suspicionScore.riskLevel})`);
+          totalScoresUpdated++;
+        } catch (scoreError) {
+          console.log(`   ⚠️  Failed to update score for ${userId}: ${scoreError}`);
+        }
+
         // Check if user already has an active KYC fraud restriction
         const existingRestriction = await UserRestriction.findOne({
           userId,
@@ -110,6 +148,7 @@ async function applyDuplicateKYCSuspensions() {
     console.log('\n' + '='.repeat(50));
     console.log('📊 Summary:');
     console.log(`   Total alerts processed: ${duplicateAlerts.length}`);
+    console.log(`   Fraud scores updated: ${totalScoresUpdated}`);
     console.log(`   Users newly suspended: ${totalUsersSuspended}`);
     console.log(`   Users already suspended: ${totalUsersAlreadySuspended}`);
     console.log('='.repeat(50));

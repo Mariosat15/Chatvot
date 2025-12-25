@@ -1,9 +1,11 @@
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import KYCSession from '@/database/models/kyc-session.model';
 import FraudAlert from '@/database/models/fraud/fraud-alert.model';
 import FraudSettings from '@/database/models/fraud/fraud-settings.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import UserRestriction from '@/database/models/user-restriction.model';
+import SuspicionScore from '@/database/models/fraud/suspicion-score.model';
 import { connectToDatabase } from '@/database/mongoose';
 
 interface DocumentInfo {
@@ -239,6 +241,47 @@ export async function checkForDuplicateKYC(
     result.alertId = alert._id.toString();
     
     console.log(`🚨 [KYC Fraud] Created duplicate KYC alert for user ${userId}. Alert ID: ${alert._id}`);
+    
+    // Update suspicion scores for ALL involved users
+    const kycDuplicatePercentage = 50; // Max 50% contribution for KYC duplication
+    const evidenceText = `Duplicate KYC document detected with ${allInvolvedUserIds.length - 1} other account(s). ` +
+      `Match type: ${result.duplicateAccounts[0]?.matchType || 'unknown'}`;
+    
+    for (const involvedUserId of allInvolvedUserIds) {
+      try {
+        // Find or create suspicion score
+        let suspicionScore = await SuspicionScore.findOne({ 
+          userId: new mongoose.Types.ObjectId(involvedUserId) 
+        });
+        
+        if (!suspicionScore) {
+          suspicionScore = new SuspicionScore({
+            userId: new mongoose.Types.ObjectId(involvedUserId),
+            totalScore: 0,
+            riskLevel: 'low',
+          });
+        }
+        
+        // Add KYC duplicate percentage
+        suspicionScore.addPercentage('kycDuplicate', kycDuplicatePercentage, evidenceText);
+        
+        // Add linked accounts
+        for (const otherId of allInvolvedUserIds) {
+          if (otherId !== involvedUserId) {
+            suspicionScore.addLinkedAccount(
+              new mongoose.Types.ObjectId(otherId),
+              'kyc_duplicate',
+              0.95 // High confidence for KYC match
+            );
+          }
+        }
+        
+        await suspicionScore.save();
+        console.log(`  📊 Updated suspicion score for user ${involvedUserId}: ${suspicionScore.totalScore}% (${suspicionScore.riskLevel})`);
+      } catch (scoreError) {
+        console.error(`  ❌ Failed to update suspicion score for ${involvedUserId}:`, scoreError);
+      }
+    }
     
     // Check if auto-suspend is enabled
     const fraudSettings = await FraudSettings.findOne().lean();
