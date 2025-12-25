@@ -119,6 +119,9 @@ export async function GET() {
         status: latestSession.status,
         createdAt: latestSession.createdAt,
         completedAt: latestSession.completedAt,
+        dataRetentionExpiresAt: latestSession.dataRetentionExpiresAt || 
+          // Calculate for existing sessions without this field (2 years from creation)
+          new Date(new Date(latestSession.createdAt).setFullYear(new Date(latestSession.createdAt).getFullYear() + 2)),
       } : null,
       
       messages: {

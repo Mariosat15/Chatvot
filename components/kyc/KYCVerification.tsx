@@ -36,6 +36,7 @@ interface KYCStatus {
     status: string;
     createdAt: string;
     completedAt?: string;
+    dataRetentionExpiresAt?: string;
   };
   messages: {
     required: string;
@@ -301,6 +302,37 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
             </div>
           </div>
         </div>
+
+        {/* Data Retention Info - Show when verified */}
+        {userStatus.status === 'approved' && status.latestSession?.dataRetentionExpiresAt && (
+          <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-blue-400">Important: Re-verification Notice</p>
+                <div className="text-sm text-gray-400 space-y-1">
+                  <p>
+                    <span className="text-gray-300">Document Valid Until:</span>{' '}
+                    {userStatus.expiresAt 
+                      ? new Date(userStatus.expiresAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                      : 'N/A'}
+                  </p>
+                  <p>
+                    <span className="text-gray-300">Verification Records Expire:</span>{' '}
+                    {new Date(status.latestSession.dataRetentionExpiresAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Our verification provider retains your identity verification records for 2 years. 
+                  After <strong className="text-gray-400">
+                    {new Date(status.latestSession.dataRetentionExpiresAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </strong>, you will need to re-verify your identity to continue using withdrawal features.
+                  We'll notify you before this date.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Action Section */}
         {userStatus.status !== 'approved' && (

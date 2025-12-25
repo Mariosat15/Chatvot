@@ -58,6 +58,9 @@ export interface IKYCSession extends Document {
   fraudCheckResult?: 'pass' | 'fail' | 'review';
   fraudCheckDetails?: string[];
   
+  // Data Retention (Veriff deletes session data after this date)
+  dataRetentionExpiresAt?: Date;
+  
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -136,6 +139,7 @@ const KYCSessionSchema = new Schema<IKYCSession>(
       enum: ['pass', 'fail', 'review'],
     },
     fraudCheckDetails: [String],
+    dataRetentionExpiresAt: Date,
     submittedAt: Date,
     completedAt: Date,
   },

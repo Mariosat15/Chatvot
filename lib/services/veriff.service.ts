@@ -160,6 +160,10 @@ class VeriffService {
 
     const data: VeriffSessionResponse = await response.json();
 
+    // Calculate data retention expiry (Veriff retains data for 2 years)
+    const dataRetentionExpiresAt = new Date();
+    dataRetentionExpiresAt.setFullYear(dataRetentionExpiresAt.getFullYear() + 2);
+    
     // Save session to database
     const session = await KYCSession.create({
       userId,
@@ -168,6 +172,7 @@ class VeriffService {
       veriffSessionId: data.verification.id,
       veriffSessionUrl: data.verification.url,
       status: 'created',
+      dataRetentionExpiresAt,
     });
 
     // Update wallet status to pending (don't count attempt yet - only count on rejection)
