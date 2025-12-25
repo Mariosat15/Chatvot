@@ -80,6 +80,8 @@ import TradingHistorySection from '@/components/admin/TradingHistorySection';
 import PerformanceSimulatorSection from '@/components/admin/PerformanceSimulatorSection';
 import WithdrawalSettingsSection from '@/components/admin/WithdrawalSettingsSection';
 import PendingWithdrawalsSection from '@/components/admin/PendingWithdrawalsSection';
+import KYCSettingsSection from '@/components/admin/KYCSettingsSection';
+import KYCHistorySection from '@/components/admin/KYCHistorySection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -233,6 +235,20 @@ const menuGroups: MenuGroup[] = [
     icon: <ShieldAlert className="h-4 w-4" />,
     color: 'text-red-400',
     items: [
+      {
+        id: 'kyc-settings',
+        label: 'KYC Settings',
+        icon: <Shield className="h-5 w-5" />,
+        color: 'text-green-400',
+        bgColor: 'bg-green-500/10 hover:bg-green-500/20',
+      },
+      {
+        id: 'kyc-history',
+        label: 'KYC History',
+        icon: <History className="h-5 w-5" />,
+        color: 'text-green-400',
+        bgColor: 'bg-green-500/10 hover:bg-green-500/20',
+      },
       {
         id: 'fraud',
         label: 'Fraud Detection',
@@ -401,6 +417,10 @@ export default function AdminDashboard({
         return <WithdrawalSettingsSection />;
       case 'pending-withdrawals':
         return <PendingWithdrawalsSection />;
+      case 'kyc-settings':
+        return <KYCSettingsSection />;
+      case 'kyc-history':
+        return <KYCHistorySection />;
       case 'fraud':
         return <FraudMonitoringSection />;
       case 'badges':

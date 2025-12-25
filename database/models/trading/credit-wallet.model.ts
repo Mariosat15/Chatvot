@@ -11,7 +11,15 @@ export interface ICreditWallet extends Document {
   totalSpentOnChallenges: number; // Total spent on 1v1 challenges
   totalWonFromChallenges: number; // Total winnings from 1v1 challenges
   isActive: boolean; // Wallet status
+  
+  // KYC Fields
   kycVerified: boolean; // KYC verification status (required for withdrawals)
+  kycStatus: 'none' | 'pending' | 'approved' | 'declined' | 'expired';
+  kycVerifiedAt?: Date;
+  kycExpiresAt?: Date;
+  kycAttempts: number;
+  lastKYCSessionId?: string;
+  
   withdrawalEnabled: boolean; // Can user withdraw?
   createdAt: Date;
   updatedAt: Date;
@@ -75,6 +83,24 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
       type: Boolean,
       required: true,
       default: false,
+    },
+    kycStatus: {
+      type: String,
+      enum: ['none', 'pending', 'approved', 'declined', 'expired'],
+      default: 'none',
+    },
+    kycVerifiedAt: {
+      type: Date,
+    },
+    kycExpiresAt: {
+      type: Date,
+    },
+    kycAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lastKYCSessionId: {
+      type: String,
     },
     withdrawalEnabled: {
       type: Boolean,

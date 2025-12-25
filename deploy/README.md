@@ -137,6 +137,7 @@ get pull git pull origin main
 ### 5. Build All Apps
 
 ```bash
+pm2 flush
 git pull origin main
 npm run build:all
 pm2 restart all

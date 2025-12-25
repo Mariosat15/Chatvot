@@ -1,0 +1,67 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { connectToDatabase } from '@/database/mongoose';
+import UserRestriction from '@/database/models/user-restriction.model';
+import AuditLog from '@/database/models/audit-log.model';
+import UserNote from '@/database/models/user-notes.model';
+import { getAdminSession } from '@/lib/admin/auth';
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ userId: string; restrictionId: string }> }
+) {
+  try {
+    const session = await getAdminSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { userId, restrictionId } = await params;
+    await connectToDatabase();
+
+    const restriction = await UserRestriction.findByIdAndUpdate(
+      restrictionId,
+      {
+        isActive: false,
+        unrestrictedAt: new Date(),
+        unrestrictedBy: session.id,
+      },
+      { new: true }
+    );
+
+    if (!restriction) {
+      return NextResponse.json({ error: 'Restriction not found' }, { status: 404 });
+    }
+
+    // Auto-add a note about lifting the restriction
+    await UserNote.create({
+      userId,
+      adminId: session.id,
+      adminName: session.name || session.email || 'Admin',
+      content: `Restriction removed. Original reason: ${restriction.reason}${
+        restriction.customReason ? ` - ${restriction.customReason}` : ''
+      }`,
+      category: 'general',
+      priority: 'medium',
+    });
+
+    // Create audit log
+    await AuditLog.create({
+      adminId: session.id,
+      adminName: session.name || session.email,
+      action: 'restriction_removed',
+      targetType: 'user',
+      targetId: userId,
+      details: {
+        restrictionId,
+        originalType: restriction.restrictionType,
+        originalReason: restriction.reason,
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error removing restriction:', error);
+    return NextResponse.json({ error: 'Failed to remove restriction' }, { status: 500 });
+  }
+}
+

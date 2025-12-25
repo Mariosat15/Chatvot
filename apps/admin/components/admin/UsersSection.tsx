@@ -18,9 +18,11 @@ import {
   AlertTriangle,
   FileText,
   Send,
-  Eye
+  Eye,
+  UserCog,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import UserDetailDialog from './UserDetailDialog';
 import {
   Dialog,
   DialogContent,
@@ -103,6 +105,10 @@ export default function UsersSection() {
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // User detail dialog state
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [detailUser, setDetailUser] = useState<UserData | null>(null);
 
   // Invoice dialog state
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -631,6 +637,19 @@ export default function UsersSection() {
                       )}
                     </div>
                     
+                    {/* View Details Button */}
+                    <Button
+                      onClick={() => {
+                        setDetailUser(user);
+                        setDetailDialogOpen(true);
+                      }}
+                      variant="outline"
+                      className="w-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border-purple-500/30 hover:border-purple-500/50 transition-all gap-1"
+                    >
+                      <UserCog className="h-4 w-4" />
+                      Details
+                    </Button>
+                    
                     {/* Invoices Button - Bottom (only for non-admin roles) */}
                     {user.role !== 'admin' && (
                       <Button
@@ -1148,6 +1167,18 @@ export default function UsersSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* User Detail Dialog */}
+      {detailUser && (
+        <UserDetailDialog
+          open={detailDialogOpen}
+          onOpenChange={setDetailDialogOpen}
+          userId={detailUser.id}
+          userName={detailUser.name}
+          userEmail={detailUser.email}
+          onRefresh={fetchUsers}
+        />
+      )}
     </div>
   );
 }

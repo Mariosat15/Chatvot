@@ -9,6 +9,8 @@ export type RestrictionReason =
   | 'suspicious_activity'
   | 'admin_decision'
   | 'automated_fraud_detection'
+  | 'kyc_failed'
+  | 'kyc_fraud'
   | 'other';
 
 export interface IUserRestriction extends Document {
@@ -62,6 +64,8 @@ const UserRestrictionSchema = new Schema<IUserRestriction>({
       'suspicious_activity',
       'admin_decision',
       'automated_fraud_detection',
+      'kyc_failed',
+      'kyc_fraud',
       'other'
     ]
   },
