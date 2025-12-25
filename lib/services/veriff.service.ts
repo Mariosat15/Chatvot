@@ -109,7 +109,7 @@ class VeriffService {
 
     const payload = {
       verification: {
-        callback: `${process.env.NEXT_PUBLIC_APP_URL}/api/kyc/callback`,
+        callback: `${process.env.NEXT_PUBLIC_APP_URL}/api/kyc/webhook`,
         person: {
           firstName: userData.firstName || undefined,
           lastName: userData.lastName || undefined,
