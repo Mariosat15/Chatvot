@@ -45,17 +45,22 @@ export async function DELETE(
     });
 
     // Create audit log
-    await AuditLog.create({
-      adminId: session.id,
-      adminName: session.name || session.email,
+    await AuditLog.logAction({
+      userId: session.id,
+      userName: session.name || 'Admin',
+      userEmail: session.email || 'admin@system',
+      userRole: 'admin',
       action: 'restriction_removed',
+      actionCategory: 'user_management',
+      description: `Removed restriction from user ${userId}. Original reason: ${restriction.reason}`,
       targetType: 'user',
       targetId: userId,
-      details: {
+      metadata: {
         restrictionId,
         originalType: restriction.restrictionType,
         originalReason: restriction.reason,
       },
+      status: 'success',
     });
 
     return NextResponse.json({ success: true });

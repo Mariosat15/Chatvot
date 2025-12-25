@@ -91,18 +91,23 @@ export async function POST(
     });
 
     // Create audit log
-    await AuditLog.create({
-      adminId: session.id,
-      adminName: session.name || session.email,
+    await AuditLog.logAction({
+      userId: session.id,
+      userName: session.name || 'Admin',
+      userEmail: session.email || 'admin@system',
+      userRole: 'admin',
       action: isBanned ? 'user_banned' : 'user_suspended',
+      actionCategory: 'user_management',
+      description: `${isBanned ? 'Banned' : 'Suspended'} user ${userId}. Reason: ${body.reason}`,
       targetType: 'user',
       targetId: userId,
-      details: {
+      metadata: {
         restrictionType: body.restrictionType,
         reason: body.reason,
         customReason: body.customReason,
         expiresAt: body.expiresAt,
       },
+      status: 'success',
     });
 
     return NextResponse.json({ restriction });

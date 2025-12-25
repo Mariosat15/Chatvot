@@ -87,18 +87,23 @@ export async function PUT(
 
     // Create audit log
     const AuditLog = (await import('@/database/models/audit-log.model')).default;
-    await AuditLog.create({
-      adminId: session.id,
-      adminName: session.name || session.email,
+    await AuditLog.logAction({
+      userId: session.id,
+      userName: session.name || 'Admin',
+      userEmail: session.email || 'admin@system',
+      userRole: 'admin',
       action: 'kyc_status_update',
+      actionCategory: 'security',
+      description: `Updated KYC status for user ${userId} to ${body.kycStatus || 'updated'}`,
       targetType: 'user',
       targetId: userId,
-      details: {
+      metadata: {
         previousStatus: wallet.kycStatus,
         newStatus: body.kycStatus,
         kycVerified: body.kycVerified,
         resetAttempts: body.resetAttempts,
       },
+      status: 'success',
     });
 
     return NextResponse.json({
