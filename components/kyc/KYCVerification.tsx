@@ -93,28 +93,51 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
   const [status, setStatus] = useState<KYCStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [checking, setChecking] = useState(false);
 
-  const fetchStatus = async () => {
+  const fetchStatus = async (showToast = false) => {
+    if (showToast) setChecking(true);
     try {
-      const response = await fetch('/api/kyc/status');
+      const response = await fetch('/api/kyc/status', { cache: 'no-store' });
       const data = await response.json();
       if (data.enabled !== undefined) {
+        const oldStatus = status?.userStatus?.status;
         setStatus(data);
+        
+        // Show toast if status changed or if manually checking
+        if (showToast) {
+          if (data.userStatus.status !== oldStatus && data.userStatus.status !== 'pending') {
+            if (data.userStatus.status === 'approved') {
+              toast.success('🎉 Your identity has been verified!');
+              onVerificationComplete?.();
+            } else if (data.userStatus.status === 'declined') {
+              toast.error('Your verification was declined. You may retry.');
+            } else if (data.userStatus.status === 'expired') {
+              toast.warning('Your verification session expired. Please try again.');
+            }
+          } else if (data.userStatus.status === 'pending') {
+            toast.info('Still processing... Please check again in a few minutes.');
+          } else {
+            toast.success('Status refreshed');
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching KYC status:', error);
+      if (showToast) toast.error('Failed to check status');
     } finally {
       setLoading(false);
+      setChecking(false);
     }
   };
 
   useEffect(() => {
-    fetchStatus();
+    fetchStatus(false);
     
     // Poll for status updates while pending
     const interval = setInterval(() => {
       if (status?.userStatus?.status === 'pending') {
-        fetchStatus();
+        fetchStatus(false);
       }
     }, 10000);
 
@@ -138,7 +161,7 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
         toast.success('Verification started! Complete the process in the new window.');
         
         // Start polling for updates
-        fetchStatus();
+        fetchStatus(false);
       } else {
         toast.error(data.error || 'Failed to start verification');
       }
@@ -330,11 +353,12 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
               <>
                 <Button
                   variant="outline"
-                  onClick={fetchStatus}
+                  onClick={() => fetchStatus(true)}
+                  disabled={checking}
                   className="w-full"
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Check Verification Status
+                  <RefreshCw className={`h-4 w-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
+                  {checking ? 'Checking...' : 'Check Verification Status'}
                 </Button>
                 {status.latestSession && isSessionStale(status.latestSession.createdAt) && (
                   <p className="text-xs text-orange-400 text-center mt-2">
