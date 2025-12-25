@@ -344,11 +344,48 @@ export default function UserDetailDialog({
         const data = await response.json();
         setKycStatus(data.kycStatus);
         toast.success('KYC status updated');
+        onRefresh?.();
       }
     } catch (error) {
       console.error('Error updating KYC status:', error);
       toast.error('Failed to update KYC status');
     }
+  };
+
+  const handleResetKYC = async () => {
+    if (!confirm('Are you sure you want to reset this user\'s KYC status? They will need to verify again.')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/users/${userId}/kyc`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          kycVerified: false, 
+          kycStatus: 'none',
+          resetAttempts: true,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setKycStatus(data.kycStatus);
+        toast.success('KYC status reset successfully. User can now verify again.');
+        onRefresh?.();
+      }
+    } catch (error) {
+      console.error('Error resetting KYC:', error);
+      toast.error('Failed to reset KYC status');
+    }
+  };
+
+  const handleBanForKYC = async () => {
+    setRestrictionType('banned');
+    setRestrictionReason('kyc_fraud');
+    setCustomReason('Banned due to KYC verification issues');
+    setActiveTab('restrictions');
+    setShowRestrictionForm(true);
   };
 
   const activeRestrictions = restrictions.filter((r) => r.isActive);
@@ -488,7 +525,7 @@ export default function UserDetailDialog({
                         </Badge>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       {kycStatus?.status !== 'approved' && (
                         <Button
                           size="sm"
@@ -511,6 +548,24 @@ export default function UserDetailDialog({
                           Decline
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-orange-400 hover:text-orange-300"
+                        onClick={handleResetKYC}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Reset KYC
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-500 hover:text-red-400 border-red-500/50"
+                        onClick={handleBanForKYC}
+                      >
+                        <Ban className="h-4 w-4 mr-1" />
+                        Ban for KYC
+                      </Button>
                     </div>
                   </div>
                   {kycStatus?.verifiedAt && (
