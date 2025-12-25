@@ -45,6 +45,12 @@ interface KYCStatus {
   };
 }
 
+// Helper to check if session is stale (older than 30 minutes)
+const isSessionStale = (createdAt: string): boolean => {
+  const thirtyMinutes = 30 * 60 * 1000;
+  return Date.now() - new Date(createdAt).getTime() > thirtyMinutes;
+};
+
 const STATUS_CONFIG = {
   none: { 
     color: 'bg-gray-500', 
@@ -177,16 +183,25 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
             </Badge>
           </div>
         </div>
-        {(userStatus.status === 'none' || userStatus.status === 'declined' || userStatus.status === 'expired') && (
-          <Button
-            size="sm"
-            onClick={startVerification}
-            disabled={starting || userStatus.attempts >= status.userStatus.maxAttempts}
-          >
-            {starting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Shield className="h-4 w-4 mr-2" />}
-            {userStatus.status === 'none' ? 'Verify Now' : 'Try Again'}
-          </Button>
-        )}
+        {(() => {
+          const canRetry = userStatus.status === 'none' || 
+                           userStatus.status === 'declined' || 
+                           userStatus.status === 'expired' ||
+                           (userStatus.status === 'pending' && status.latestSession && isSessionStale(status.latestSession.createdAt));
+          
+          if (!canRetry) return null;
+          
+          return (
+            <Button
+              size="sm"
+              onClick={startVerification}
+              disabled={starting || userStatus.attempts >= status.userStatus.maxAttempts}
+            >
+              {starting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Shield className="h-4 w-4 mr-2" />}
+              {userStatus.status === 'none' ? 'Verify Now' : 'Try Again'}
+            </Button>
+          );
+        })()}
       </div>
     );
   }
@@ -258,33 +273,42 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
               </div>
             )}
 
-            {/* Start Verification Button */}
-            {(userStatus.status === 'none' || userStatus.status === 'declined' || userStatus.status === 'expired') && (
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={startVerification}
-                disabled={starting || userStatus.attempts >= userStatus.maxAttempts}
-              >
-                {starting ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    Starting Verification...
-                  </>
-                ) : userStatus.attempts >= userStatus.maxAttempts ? (
-                  <>
-                    <XCircle className="h-5 w-5 mr-2" />
-                    Max Attempts Reached
-                  </>
-                ) : (
-                  <>
-                    <Shield className="h-5 w-5 mr-2" />
-                    {userStatus.status === 'none' ? 'Start Verification' : 'Retry Verification'}
-                    <ExternalLink className="h-4 w-4 ml-2" />
-                  </>
-                )}
-              </Button>
-            )}
+            {/* Start Verification Button - show for none/declined/expired OR stale pending sessions */}
+            {(() => {
+              const canRetry = userStatus.status === 'none' || 
+                               userStatus.status === 'declined' || 
+                               userStatus.status === 'expired' ||
+                               (userStatus.status === 'pending' && status.latestSession && isSessionStale(status.latestSession.createdAt));
+              
+              if (!canRetry) return null;
+              
+              return (
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={startVerification}
+                  disabled={starting || userStatus.attempts >= userStatus.maxAttempts}
+                >
+                  {starting ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      Starting Verification...
+                    </>
+                  ) : userStatus.attempts >= userStatus.maxAttempts ? (
+                    <>
+                      <XCircle className="h-5 w-5 mr-2" />
+                      Max Attempts Reached
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="h-5 w-5 mr-2" />
+                      {userStatus.status === 'none' ? 'Start Verification' : 'Retry Verification'}
+                      <ExternalLink className="h-4 w-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              );
+            })()}
 
             {/* Max attempts reached */}
             {userStatus.attempts >= userStatus.maxAttempts && (
@@ -303,14 +327,21 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
 
             {/* Pending state - refresh button */}
             {userStatus.status === 'pending' && (
-              <Button
-                variant="outline"
-                onClick={fetchStatus}
-                className="w-full"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Check Verification Status
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={fetchStatus}
+                  className="w-full"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Check Verification Status
+                </Button>
+                {status.latestSession && isSessionStale(status.latestSession.createdAt) && (
+                  <p className="text-xs text-orange-400 text-center mt-2">
+                    Your previous verification session has expired. You can retry above.
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}
