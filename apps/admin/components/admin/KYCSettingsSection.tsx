@@ -210,7 +210,9 @@ export default function KYCSettingsSection() {
 
   const copyWebhookUrl = () => {
     const url = typeof window !== 'undefined' 
-      ? `${window.location.origin.replace(':3001', ':3000')}/api/kyc/webhook`
+      ? `${window.location.origin
+          .replace(':3001', ':3000')
+          .replace('admin.', '')}/api/kyc/webhook`
       : '/api/kyc/webhook';
     navigator.clipboard.writeText(url);
     setCopiedWebhook(true);
@@ -460,7 +462,9 @@ export default function KYCSettingsSection() {
                         </div>
                         <code className="block p-2 bg-gray-800 rounded text-xs text-green-400 break-all">
                           {typeof window !== 'undefined' 
-                            ? `${window.location.origin.replace(':3001', ':3000')}/api/kyc/webhook`
+                            ? `${window.location.origin
+                                .replace(':3001', ':3000')
+                                .replace('admin.', '')}/api/kyc/webhook`
                             : '/api/kyc/webhook'}
                         </code>
                       </div>
