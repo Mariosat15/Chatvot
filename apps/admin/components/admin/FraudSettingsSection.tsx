@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Settings, Save, RefreshCw, Shield, Eye, AlertTriangle } from 'lucide-react';
+import { Settings, Save, RefreshCw, Shield, Eye, AlertTriangle, UserX, Fingerprint } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FraudSettings {
@@ -34,6 +34,15 @@ interface FraudSettings {
   // Auto-Actions
   autoSuspendEnabled: boolean;
   autoSuspendThreshold: number;
+  
+  // Duplicate KYC Detection
+  duplicateKYCAutoSuspend: boolean;
+  duplicateKYCSuspendMessage: string;
+  duplicateKYCAllowWithdrawals: boolean;
+  duplicateKYCBlockDeposits: boolean;
+  duplicateKYCBlockTrading: boolean;
+  duplicateKYCBlockCompetitions: boolean;
+  duplicateKYCBlockChallenges: boolean;
   
   // Rate Limiting
   maxSignupsPerHour: number;
@@ -437,6 +446,129 @@ export default function FraudSettingsSection() {
                 className="bg-gray-900 border-gray-700 text-gray-100"
               />
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Duplicate KYC Detection */}
+      <Card className="bg-gray-800 border-gray-700 border-orange-500/30">
+        <CardHeader>
+          <CardTitle className="text-gray-100 flex items-center gap-2">
+            <Fingerprint className="h-5 w-5 text-orange-500" />
+            Duplicate KYC Detection
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Automatically handle users who attempt to verify with the same identity document
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+            <div>
+              <Label className="text-gray-300 font-medium">Auto-Suspend on Duplicate KYC</Label>
+              <p className="text-sm text-gray-500">
+                Automatically suspend all accounts using the same identity document
+              </p>
+            </div>
+            <Switch
+              checked={settings.duplicateKYCAutoSuspend}
+              onCheckedChange={(checked) => updateSetting('duplicateKYCAutoSuspend', checked)}
+            />
+          </div>
+
+          {settings.duplicateKYCAutoSuspend && (
+            <>
+              {/* Suspension Message */}
+              <div>
+                <Label className="text-gray-300">Suspension Message</Label>
+                <p className="text-sm text-gray-500 mb-2">
+                  Message shown to suspended users (advise them to contact support)
+                </p>
+                <textarea
+                  value={settings.duplicateKYCSuspendMessage || ''}
+                  onChange={(e) => updateSetting('duplicateKYCSuspendMessage', e.target.value)}
+                  className="w-full bg-gray-900 border-gray-700 text-gray-100 rounded-md p-3 min-h-[80px]"
+                  placeholder="Your account has been suspended due to a security concern..."
+                />
+              </div>
+
+              {/* What actions to block */}
+              <div>
+                <Label className="text-gray-300 mb-3 block">Actions to Block</Label>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                    <div>
+                      <Label className="text-gray-300 text-sm">Block Deposits</Label>
+                      <p className="text-xs text-gray-500">Prevent new deposits</p>
+                    </div>
+                    <Switch
+                      checked={settings.duplicateKYCBlockDeposits}
+                      onCheckedChange={(checked) => updateSetting('duplicateKYCBlockDeposits', checked)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                    <div>
+                      <Label className="text-gray-300 text-sm">Block Trading</Label>
+                      <p className="text-xs text-gray-500">Prevent trading</p>
+                    </div>
+                    <Switch
+                      checked={settings.duplicateKYCBlockTrading}
+                      onCheckedChange={(checked) => updateSetting('duplicateKYCBlockTrading', checked)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                    <div>
+                      <Label className="text-gray-300 text-sm">Block Competitions</Label>
+                      <p className="text-xs text-gray-500">Prevent competition entry</p>
+                    </div>
+                    <Switch
+                      checked={settings.duplicateKYCBlockCompetitions}
+                      onCheckedChange={(checked) => updateSetting('duplicateKYCBlockCompetitions', checked)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                    <div>
+                      <Label className="text-gray-300 text-sm">Block Challenges</Label>
+                      <p className="text-xs text-gray-500">Prevent challenge entry</p>
+                    </div>
+                    <Switch
+                      checked={settings.duplicateKYCBlockChallenges}
+                      onCheckedChange={(checked) => updateSetting('duplicateKYCBlockChallenges', checked)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-green-500/10 border border-green-500/30 rounded-lg col-span-2 lg:col-span-1">
+                    <div>
+                      <Label className="text-green-400 text-sm">Allow Withdrawals</Label>
+                      <p className="text-xs text-gray-500">Let users withdraw funds</p>
+                    </div>
+                    <Switch
+                      checked={settings.duplicateKYCAllowWithdrawals}
+                      onCheckedChange={(checked) => updateSetting('duplicateKYCAllowWithdrawals', checked)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Info box */}
+              <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <UserX className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-gray-300">
+                    <p className="font-medium text-blue-400 mb-1">How it works:</p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-400">
+                      <li>When a user completes KYC, we check if the same document was used before</li>
+                      <li>If duplicate found, a <strong className="text-orange-400">critical fraud alert</strong> is created</li>
+                      <li>All accounts using that document are automatically suspended</li>
+                      <li>Withdrawals remain enabled so users can retrieve their funds</li>
+                      <li>Users see the suspension message and are directed to contact support</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
