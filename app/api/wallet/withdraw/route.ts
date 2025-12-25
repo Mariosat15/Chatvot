@@ -12,6 +12,7 @@ import CompetitionParticipant from '@/database/models/trading/competition-partic
 import Challenge from '@/database/models/trading/challenge.model';
 import AppSettings from '@/database/models/app-settings.model';
 import UserBankAccount from '@/database/models/user-bank-account.model';
+import KYCSettings from '@/database/models/kyc-settings.model';
 
 /**
  * GET /api/wallet/withdraw
@@ -29,11 +30,12 @@ export async function GET() {
 
     await connectToDatabase();
 
-    const [withdrawalSettings, creditSettings, wallet, appSettings] = await Promise.all([
+    const [withdrawalSettings, creditSettings, wallet, appSettings, kycSettings] = await Promise.all([
       WithdrawalSettings.getSingleton(),
       CreditConversionSettings.getSingleton(),
       CreditWallet.findOne({ userId: session.user.id }),
       AppSettings.findById('global-app-settings'),
+      KYCSettings.findOne(),
     ]);
 
     if (!wallet) {
@@ -46,6 +48,9 @@ export async function GET() {
     }
 
     const isSandbox = appSettings?.simulatorModeEnabled ?? true;
+    
+    // Determine if KYC is required - check KYC settings first, fallback to withdrawal settings
+    const kycRequiredForWithdrawal = (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) || withdrawalSettings.requireKYC;
 
     // Check eligibility
     const eligibility = await checkWithdrawalEligibility(
@@ -53,7 +58,8 @@ export async function GET() {
       wallet,
       withdrawalSettings,
       creditSettings,
-      isSandbox
+      isSandbox,
+      kycRequiredForWithdrawal
     );
 
     // Calculate fees
@@ -153,7 +159,7 @@ export async function GET() {
         processingTimeHours: withdrawalSettings.processingTimeHours,
         allowedMethods: withdrawalSettings.allowedPayoutMethods,
         preferredMethod: withdrawalSettings.preferredPayoutMethod,
-        requireKYC: withdrawalSettings.requireKYC,
+        requireKYC: kycRequiredForWithdrawal,
         conversionRate: conversionRate,
       },
       isSandbox,
@@ -218,11 +224,12 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
-    const [withdrawalSettings, creditSettings, wallet, appSettings] = await Promise.all([
+    const [withdrawalSettings, creditSettings, wallet, appSettings, kycSettings] = await Promise.all([
       WithdrawalSettings.getSingleton(),
       CreditConversionSettings.getSingleton(),
       CreditWallet.findOne({ userId: session.user.id }).session(mongoSession),
       AppSettings.findById('global-app-settings'),
+      KYCSettings.findOne(),
     ]);
 
     if (!wallet) {
@@ -234,6 +241,7 @@ export async function POST(request: NextRequest) {
     }
 
     const isSandbox = appSettings?.simulatorModeEnabled ?? true;
+    const kycRequiredForWithdrawal = (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) || withdrawalSettings.requireKYC;
 
     // Determine withdrawal method (original method or bank account)
     let bankAccount = null;
@@ -290,7 +298,8 @@ export async function POST(request: NextRequest) {
       wallet,
       withdrawalSettings,
       creditSettings,
-      isSandbox
+      isSandbox,
+      kycRequiredForWithdrawal
     );
 
     if (!eligibility.eligible) {
@@ -558,7 +567,8 @@ async function checkWithdrawalEligibility(
   wallet: any,
   settings: any,
   creditSettings: any,
-  isSandbox: boolean
+  isSandbox: boolean,
+  kycRequired: boolean = false
 ): Promise<{ eligible: boolean; reason: string; warnings: string[] }> {
   const warnings: string[] = [];
   
@@ -597,8 +607,8 @@ async function checkWithdrawalEligibility(
     };
   }
 
-  // Check KYC requirement
-  if (settings.requireKYC && !wallet.kycVerified) {
+  // Check KYC requirement (uses combined KYC settings from both models)
+  if (kycRequired && !wallet.kycVerified) {
     return {
       eligible: false,
       reason: 'KYC verification required before withdrawal. Please complete identity verification.',
