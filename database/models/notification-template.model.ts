@@ -71,6 +71,12 @@ export type NotificationType =
   | 'email_changed'
   | 'account_suspended'
   | 'account_restored'
+  // KYC
+  | 'kyc_started'
+  | 'kyc_approved'
+  | 'kyc_declined'
+  | 'kyc_expired'
+  | 'kyc_required'
   // Custom (for admin-created templates)
   | 'custom';
 
@@ -1021,6 +1027,98 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       isDefault: true,
       isCustom: false,
       channels: { inApp: true, email: true, push: false },
+    },
+
+    // ========== KYC ==========
+    {
+      templateId: 'kyc_started',
+      name: 'KYC Verification Started',
+      description: 'Sent when user initiates KYC verification',
+      category: 'security',
+      type: 'kyc_started',
+      title: '🔐 Verification Started',
+      message: 'Your identity verification has been initiated. Please complete the process to unlock all features.',
+      icon: '🔐',
+      priority: 'normal',
+      color: '#3B82F6',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+      actionUrl: '/profile?tab=verification',
+      actionText: 'Check Status',
+    },
+    {
+      templateId: 'kyc_approved',
+      name: 'KYC Approved',
+      description: 'Sent when KYC verification is approved',
+      category: 'security',
+      type: 'kyc_approved',
+      title: '✅ Identity Verified!',
+      message: 'Congratulations! Your identity has been successfully verified. You now have full access to all platform features including withdrawals.',
+      icon: '✅',
+      priority: 'high',
+      color: '#10B981',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: '/wallet',
+      actionText: 'View Wallet',
+    },
+    {
+      templateId: 'kyc_declined',
+      name: 'KYC Declined',
+      description: 'Sent when KYC verification is declined',
+      category: 'security',
+      type: 'kyc_declined',
+      title: '❌ Verification Declined',
+      message: 'Your identity verification was not successful. Reason: {{reason}}. You may retry the verification process.',
+      icon: '❌',
+      priority: 'high',
+      color: '#EF4444',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: '/profile?tab=verification',
+      actionText: 'Retry Verification',
+    },
+    {
+      templateId: 'kyc_expired',
+      name: 'KYC Expired',
+      description: 'Sent when KYC session expires or is abandoned',
+      category: 'security',
+      type: 'kyc_expired',
+      title: '⏰ Verification Expired',
+      message: 'Your identity verification session has expired. Please start a new verification to continue.',
+      icon: '⏰',
+      priority: 'normal',
+      color: '#F59E0B',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+      actionUrl: '/profile?tab=verification',
+      actionText: 'Start Verification',
+    },
+    {
+      templateId: 'kyc_required',
+      name: 'KYC Required',
+      description: 'Sent when user tries to withdraw without KYC',
+      category: 'security',
+      type: 'kyc_required',
+      title: '🔒 Verification Required',
+      message: 'To withdraw funds, you must first verify your identity. This helps keep the platform secure for everyone.',
+      icon: '🔒',
+      priority: 'high',
+      color: '#F59E0B',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+      actionUrl: '/profile?tab=verification',
+      actionText: 'Verify Now',
     },
   ];
 }

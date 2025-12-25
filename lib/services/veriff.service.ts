@@ -3,6 +3,12 @@ import KYCSettings from '@/database/models/kyc-settings.model';
 import KYCSession from '@/database/models/kyc-session.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import { connectToDatabase } from '@/database/mongoose';
+import {
+  sendKYCStartedNotification,
+  sendKYCApprovedNotification,
+  sendKYCDeclinedNotification,
+  sendKYCExpiredNotification,
+} from '@/lib/services/notification.service';
 
 interface VeriffSessionResponse {
   status: string;
@@ -175,6 +181,9 @@ class VeriffService {
       }
     );
 
+    // Send notification that KYC verification started
+    await sendKYCStartedNotification(userId);
+
     return {
       sessionId: data.verification.id,
       sessionUrl: data.verification.url,
@@ -244,7 +253,7 @@ class VeriffService {
       } : undefined,
     });
 
-    // Update user wallet
+    // Update user wallet and send notifications
     const wallet = await CreditWallet.findOne({ userId });
     if (wallet) {
       if (status === 'approved') {
@@ -258,11 +267,17 @@ class VeriffService {
           kycVerifiedAt: new Date(),
           kycExpiresAt: expiresAt,
         });
+
+        // Send approval notification
+        await sendKYCApprovedNotification(userId);
       } else if (status === 'declined') {
         await CreditWallet.findByIdAndUpdate(wallet._id, {
           kycVerified: false,
           kycStatus: 'declined',
         });
+
+        // Send declined notification
+        await sendKYCDeclinedNotification(userId, verification.reason);
 
         // Auto-suspend if configured
         if (settings.autoSuspendOnFail) {
@@ -279,6 +294,13 @@ class VeriffService {
             restrictedBy: 'system',
           });
         }
+      } else if (status === 'expired') {
+        await CreditWallet.findByIdAndUpdate(wallet._id, {
+          kycStatus: 'expired',
+        });
+
+        // Send expired notification
+        await sendKYCExpiredNotification(userId);
       } else {
         await CreditWallet.findByIdAndUpdate(wallet._id, {
           kycStatus: status === 'resubmission_requested' ? 'none' : status,
