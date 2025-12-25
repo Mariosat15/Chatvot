@@ -86,17 +86,23 @@ export async function POST(req: NextRequest) {
     }
 
     // Create audit log
-    await AuditLog.create({
-      adminId: session.id,
-      adminName: session.name || session.email,
+    await AuditLog.logAction({
+      userId: session.id,
+      userName: session.name || 'Admin',
+      userEmail: session.email || 'admin@system',
+      userRole: 'admin',
       action: 'kyc_provider_configured',
+      actionCategory: 'security',
+      description: `Configured Veriff KYC provider credentials`,
       targetType: 'settings',
       targetId: 'veriff',
-      details: {
+      targetName: 'Veriff KYC Provider',
+      metadata: {
         provider: 'veriff',
         environment: baseUrl?.includes('test') ? 'sandbox' : 'production',
         apiKeyPrefix: apiKey.slice(0, 8),
       },
+      status: 'success',
     });
 
     return NextResponse.json({ 
