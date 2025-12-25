@@ -43,6 +43,7 @@ import { runTradeQueueProcessor } from './jobs/trade-queue.job';
 import { runPriceCacheUpdate } from './jobs/price-cache.job';
 import { runBadgeEvaluation } from './jobs/evaluate-badges.job';
 import { defineWithdrawalProcessJob, scheduleWithdrawalJobs } from './jobs/withdrawal-process.job';
+import { runKYCExpiryCheck } from './jobs/kyc-expiry-check.job';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -223,6 +224,36 @@ agenda.define('evaluate-badges', async () => {
   }
 });
 
+/**
+ * KYC Expiry Check Job
+ * Runs daily to check for expiring KYC verifications and send reminders
+ */
+agenda.define('kyc-expiry-check', async () => {
+  const startTime = Date.now();
+  console.log('\n🔐 [KYC EXPIRY CHECK] Starting...');
+  
+  try {
+    const result = await runKYCExpiryCheck();
+    const duration = Date.now() - startTime;
+    
+    console.log(`🔐 [KYC EXPIRY CHECK] Completed in ${duration}ms`);
+    console.log(`   Users checked: ${result.checkedUsers}`);
+    console.log(`   Expiring in 30 days: ${result.expiringSoon30Days}`);
+    console.log(`   Expiring in 7 days: ${result.expiringSoon7Days}`);
+    console.log(`   Expiring in 1 day: ${result.expiringSoon1Day}`);
+    console.log(`   Expired (reset): ${result.expired}`);
+    console.log(`   Data retention expiring: ${result.dataRetentionExpiring}`);
+    console.log(`   Notifications sent: ${result.notificationsSent}`);
+    
+    if (result.errors.length > 0) {
+      console.log(`   Errors: ${result.errors.length}`);
+      result.errors.forEach(e => console.log(`     - ${e}`));
+    }
+  } catch (error) {
+    console.error(`🔐 [KYC EXPIRY CHECK] Failed:`, error);
+  }
+});
+
 // Define withdrawal processing jobs
 defineWithdrawalProcessJob(agenda);
 
@@ -278,6 +309,7 @@ async function startWorker(): Promise<void> {
     await agenda.every('1 minute', 'trade-queue');  // BACKUP sweep - real-time happens in main app
     await agenda.every('1 minute', 'price-cache');
     await agenda.every('1 hour', 'evaluate-badges');
+    await agenda.every('1 day', 'kyc-expiry-check');  // Daily KYC expiry check
     
     // Schedule withdrawal processing jobs
     await scheduleWithdrawalJobs(agenda);
@@ -289,6 +321,7 @@ async function startWorker(): Promise<void> {
     console.log('   • trade-queue: every 1 minute (backup TP/SL sweep & limit orders)');
     console.log('   • price-cache: every 1 minute');
     console.log('   • evaluate-badges: every 1 hour');
+    console.log('   • kyc-expiry-check: every 1 day (expiry reminders & auto-reset)');
     console.log('   • check-pending-withdrawals: every 1 hour (status summary)');
     console.log('   • check-stuck-withdrawals: every 6 hours');
     console.log('   • check-old-pending-withdrawals: every 12 hours');
