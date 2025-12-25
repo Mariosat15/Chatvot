@@ -95,10 +95,21 @@ class VeriffService {
     });
 
     if (existingSession) {
-      return {
-        sessionId: existingSession.veriffSessionId,
-        sessionUrl: existingSession.veriffSessionUrl,
-      };
+      // Check if session is old (over 30 minutes) - mark as expired and allow new session
+      const sessionAge = Date.now() - new Date(existingSession.createdAt).getTime();
+      const thirtyMinutes = 30 * 60 * 1000;
+      
+      if (sessionAge > thirtyMinutes) {
+        // Mark old session as expired
+        await KYCSession.findByIdAndUpdate(existingSession._id, { status: 'expired' });
+        // Continue to create new session
+      } else {
+        // Return existing active session
+        return {
+          sessionId: existingSession.veriffSessionId,
+          sessionUrl: existingSession.veriffSessionUrl,
+        };
+      }
     }
 
     // Check max attempts

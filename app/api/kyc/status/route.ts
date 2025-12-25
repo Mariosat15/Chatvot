@@ -34,10 +34,11 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Check if KYC is expired
+    // Determine the actual KYC status
     let kycStatus = wallet?.kycStatus || 'none';
     let kycVerified = wallet?.kycVerified || false;
 
+    // Check if KYC is expired by date
     if (kycVerified && wallet?.kycExpiresAt && new Date() > wallet.kycExpiresAt) {
       kycStatus = 'expired';
       kycVerified = false;
@@ -46,6 +47,54 @@ export async function GET() {
         kycVerified: false,
         kycStatus: 'expired',
       });
+    }
+    
+    // Sync status from latest session if wallet status is out of sync
+    // This handles cases where webhook didn't update the wallet properly
+    if (latestSession) {
+      const sessionStatus = latestSession.status;
+      
+      // If session is approved but wallet isn't verified, sync it
+      if (sessionStatus === 'approved' && !kycVerified) {
+        kycVerified = true;
+        kycStatus = 'approved';
+        // Update wallet
+        if (wallet) {
+          await CreditWallet.findByIdAndUpdate(wallet._id, {
+            kycVerified: true,
+            kycStatus: 'approved',
+            kycVerifiedAt: latestSession.completedAt || new Date(),
+          });
+        }
+      }
+      
+      // If session is declined/expired/abandoned but wallet shows pending, sync it
+      if (['declined', 'expired', 'abandoned', 'resubmission_requested'].includes(sessionStatus) && kycStatus === 'pending') {
+        kycStatus = sessionStatus === 'resubmission_requested' ? 'declined' : sessionStatus;
+        // Update wallet
+        if (wallet) {
+          await CreditWallet.findByIdAndUpdate(wallet._id, {
+            kycStatus: kycStatus,
+          });
+        }
+      }
+      
+      // Check if session has been pending too long (over 1 hour) - likely abandoned
+      if (sessionStatus === 'created' || sessionStatus === 'started') {
+        const sessionAge = Date.now() - new Date(latestSession.createdAt).getTime();
+        const oneHour = 60 * 60 * 1000;
+        
+        if (sessionAge > oneHour) {
+          // Mark as expired so user can retry
+          await KYCSession.findByIdAndUpdate(latestSession._id, { status: 'expired' });
+          if (kycStatus === 'pending') {
+            kycStatus = 'expired';
+            if (wallet) {
+              await CreditWallet.findByIdAndUpdate(wallet._id, { kycStatus: 'expired' });
+            }
+          }
+        }
+      }
     }
 
     return NextResponse.json({
