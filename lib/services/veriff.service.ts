@@ -170,11 +170,10 @@ class VeriffService {
       status: 'created',
     });
 
-    // Update wallet KYC attempts
+    // Update wallet status to pending (don't count attempt yet - only count on rejection)
     await CreditWallet.findOneAndUpdate(
       { userId },
       {
-        $inc: { kycAttempts: 1 },
         $set: {
           kycStatus: 'pending',
           lastKYCSessionId: session._id.toString(),
@@ -258,9 +257,19 @@ class VeriffService {
     const wallet = await CreditWallet.findOne({ userId });
     if (wallet) {
       if (status === 'approved') {
-        // Calculate expiry date
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + settings.verificationValidDays);
+        // Determine expiry date:
+        // 1. Use document validUntil from Veriff if available
+        // 2. Fall back to our settings (verificationValidDays from verification date)
+        let expiresAt: Date;
+        
+        if (verification.document?.validUntil) {
+          // Use the document's actual expiry date from Veriff
+          expiresAt = new Date(verification.document.validUntil);
+        } else {
+          // Fall back to our configured validity period
+          expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + settings.verificationValidDays);
+        }
 
         await CreditWallet.findByIdAndUpdate(wallet._id, {
           kycVerified: true,
@@ -304,9 +313,11 @@ class VeriffService {
           // Don't fail the verification if fraud check fails
         }
       } else if (status === 'declined') {
+        // Increment attempt count only on rejection (not on session start)
         await CreditWallet.findByIdAndUpdate(wallet._id, {
           kycVerified: false,
           kycStatus: 'declined',
+          $inc: { kycAttempts: 1 },
         });
 
         // Send declined notification

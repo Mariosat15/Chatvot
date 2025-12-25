@@ -34,7 +34,7 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Determine the actual KYC status
+    // Determine the actual KYC status - wallet status is the source of truth
     let kycStatus = wallet?.kycStatus || 'none';
     let kycVerified = wallet?.kycVerified || false;
 
@@ -49,9 +49,9 @@ export async function GET() {
       });
     }
     
-    // Sync status from latest session if wallet status is out of sync
-    // This handles cases where webhook didn't update the wallet properly
-    if (latestSession) {
+    // IMPORTANT: If wallet status is 'none' (e.g., admin reset), respect that
+    // Only sync from session if wallet status indicates it hasn't been manually reset
+    if (kycStatus !== 'none' && latestSession) {
       const sessionStatus = latestSession.status;
       
       // If session is approved but wallet isn't verified, sync it
@@ -89,9 +89,9 @@ export async function GET() {
           // Mark as abandoned so user can retry
           await KYCSession.findByIdAndUpdate(latestSession._id, { status: 'abandoned' });
           if (kycStatus === 'pending') {
-            kycStatus = 'expired'; // Show as expired to user so they can retry
+            kycStatus = 'none'; // Show as none so user can retry (not expired, which suggests they tried)
             if (wallet) {
-              await CreditWallet.findByIdAndUpdate(wallet._id, { kycStatus: 'expired' });
+              await CreditWallet.findByIdAndUpdate(wallet._id, { kycStatus: 'none' });
             }
           }
         }
