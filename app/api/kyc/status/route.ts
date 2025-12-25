@@ -79,16 +79,17 @@ export async function GET() {
         }
       }
       
-      // Check if session has been pending too long (over 1 hour) - likely abandoned
+      // Check if session has been pending too long (over 5 minutes) - likely abandoned/interrupted
+      // This allows users to quickly retry if they closed the verification window
       if (sessionStatus === 'created' || sessionStatus === 'started') {
         const sessionAge = Date.now() - new Date(latestSession.createdAt).getTime();
-        const oneHour = 60 * 60 * 1000;
+        const fiveMinutes = 5 * 60 * 1000;
         
-        if (sessionAge > oneHour) {
-          // Mark as expired so user can retry
-          await KYCSession.findByIdAndUpdate(latestSession._id, { status: 'expired' });
+        if (sessionAge > fiveMinutes) {
+          // Mark as abandoned so user can retry
+          await KYCSession.findByIdAndUpdate(latestSession._id, { status: 'abandoned' });
           if (kycStatus === 'pending') {
-            kycStatus = 'expired';
+            kycStatus = 'expired'; // Show as expired to user so they can retry
             if (wallet) {
               await CreditWallet.findByIdAndUpdate(wallet._id, { kycStatus: 'expired' });
             }

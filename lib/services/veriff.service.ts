@@ -95,16 +95,17 @@ class VeriffService {
     });
 
     if (existingSession) {
-      // Check if session is old (over 30 minutes) - mark as expired and allow new session
+      // Check if session is old (over 5 minutes) - mark as expired and allow new session
+      // This allows quick retry if user interrupted/closed the verification window
       const sessionAge = Date.now() - new Date(existingSession.createdAt).getTime();
-      const thirtyMinutes = 30 * 60 * 1000;
+      const fiveMinutes = 5 * 60 * 1000;
       
-      if (sessionAge > thirtyMinutes) {
+      if (sessionAge > fiveMinutes) {
         // Mark old session as expired
-        await KYCSession.findByIdAndUpdate(existingSession._id, { status: 'expired' });
+        await KYCSession.findByIdAndUpdate(existingSession._id, { status: 'abandoned' });
         // Continue to create new session
       } else {
-        // Return existing active session
+        // Return existing active session (still within 5 min window)
         return {
           sessionId: existingSession.veriffSessionId,
           sessionUrl: existingSession.veriffSessionUrl,

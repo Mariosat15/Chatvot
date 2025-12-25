@@ -25,7 +25,7 @@ interface KYCStatus {
   requiredAmount: number;
   userStatus: {
     verified: boolean;
-    status: 'none' | 'pending' | 'approved' | 'declined' | 'expired';
+    status: 'none' | 'pending' | 'approved' | 'declined' | 'expired' | 'abandoned';
     verifiedAt?: string;
     expiresAt?: string;
     attempts: number;
@@ -45,10 +45,10 @@ interface KYCStatus {
   };
 }
 
-// Helper to check if session is stale (older than 30 minutes)
+// Helper to check if session is stale (older than 5 minutes - allows quick retry if interrupted)
 const isSessionStale = (createdAt: string): boolean => {
-  const thirtyMinutes = 30 * 60 * 1000;
-  return Date.now() - new Date(createdAt).getTime() > thirtyMinutes;
+  const fiveMinutes = 5 * 60 * 1000;
+  return Date.now() - new Date(createdAt).getTime() > fiveMinutes;
 };
 
 const STATUS_CONFIG = {
@@ -81,6 +81,12 @@ const STATUS_CONFIG = {
     icon: AlertTriangle, 
     label: 'Expired',
     textColor: 'text-orange-400' 
+  },
+  abandoned: { 
+    color: 'bg-gray-500', 
+    icon: XCircle, 
+    label: 'Interrupted',
+    textColor: 'text-gray-400' 
   },
 };
 
@@ -210,6 +216,7 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
           const canRetry = userStatus.status === 'none' || 
                            userStatus.status === 'declined' || 
                            userStatus.status === 'expired' ||
+                           userStatus.status === 'abandoned' ||
                            (userStatus.status === 'pending' && status.latestSession && isSessionStale(status.latestSession.createdAt));
           
           if (!canRetry) return null;
@@ -296,11 +303,12 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
               </div>
             )}
 
-            {/* Start Verification Button - show for none/declined/expired OR stale pending sessions */}
+            {/* Start Verification Button - show for none/declined/expired/abandoned OR stale pending sessions */}
             {(() => {
               const canRetry = userStatus.status === 'none' || 
                                userStatus.status === 'declined' || 
                                userStatus.status === 'expired' ||
+                               userStatus.status === 'abandoned' ||
                                (userStatus.status === 'pending' && status.latestSession && isSessionStale(status.latestSession.createdAt));
               
               if (!canRetry) return null;
