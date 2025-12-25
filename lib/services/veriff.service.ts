@@ -9,6 +9,7 @@ import {
   sendKYCDeclinedNotification,
   sendKYCExpiredNotification,
 } from '@/lib/services/notification.service';
+import { checkForDuplicateKYC } from '@/lib/services/kyc-fraud-detection.service';
 
 interface VeriffSessionResponse {
   status: string;
@@ -270,6 +271,38 @@ class VeriffService {
 
         // Send approval notification
         await sendKYCApprovedNotification(userId);
+
+        // Check for duplicate KYC (fraud detection)
+        try {
+          const duplicateResult = await checkForDuplicateKYC(
+            userId,
+            session._id.toString(),
+            {
+              documentNumber: verification.document?.number,
+              documentType: verification.document?.type,
+              documentCountry: verification.document?.country,
+              idNumber: verification.person?.idNumber,
+              firstName: verification.person?.firstName,
+              lastName: verification.person?.lastName,
+              dateOfBirth: verification.person?.dateOfBirth,
+            }
+          );
+
+          if (duplicateResult.isDuplicate) {
+            console.log(`🚨 [KYC Fraud] Duplicate document detected for user ${userId}!`);
+            console.log(`   Matched with accounts: ${duplicateResult.duplicateAccounts.map(d => d.userId).join(', ')}`);
+            
+            // Optionally suspend the account if duplicate found
+            // This is commented out by default - admin should review manually
+            // await CreditWallet.findByIdAndUpdate(wallet._id, {
+            //   kycVerified: false,
+            //   kycStatus: 'flagged',
+            // });
+          }
+        } catch (error) {
+          console.error('Error checking for duplicate KYC:', error);
+          // Don't fail the verification if fraud check fails
+        }
       } else if (status === 'declined') {
         await CreditWallet.findByIdAndUpdate(wallet._id, {
           kycVerified: false,

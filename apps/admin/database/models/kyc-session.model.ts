@@ -38,6 +38,10 @@ export interface IKYCSession extends Document {
     validUntil?: string;
   };
   
+  // Document Fingerprint for duplicate detection
+  documentFingerprint?: string;  // Hash of document number + country + type
+  faceFingerprint?: string;      // Veriff face similarity hash if available
+  
   // Address Data (from Veriff)
   addressData?: {
     fullAddress?: string;
@@ -108,6 +112,14 @@ const KYCSessionSchema = new Schema<IKYCSession>(
       country: String,
       validFrom: String,
       validUntil: String,
+    },
+    documentFingerprint: {
+      type: String,
+      index: true,
+    },
+    faceFingerprint: {
+      type: String,
+      index: true,
     },
     addressData: {
       fullAddress: String,

@@ -9,7 +9,8 @@ export type FraudAlertType =
   | 'coordinated_entry'     // Accounts created/entered at same time
   | 'suspicious_behavior'   // Other suspicious patterns
   | 'vpn_usage'             // VPN/Proxy detected
-  | 'high_risk_device';     // Device with high risk score
+  | 'high_risk_device'      // Device with high risk score
+  | 'duplicate_kyc';        // Same ID document used across multiple accounts
 
 export type AlertStatus = 'pending' | 'investigating' | 'resolved' | 'dismissed';
 export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
@@ -65,7 +66,8 @@ const FraudAlertSchema = new Schema<IFraudAlert>({
       'coordinated_entry',
       'suspicious_behavior',
       'vpn_usage',
-      'high_risk_device'
+      'high_risk_device',
+      'duplicate_kyc'
     ]
   },
   severity: { 
