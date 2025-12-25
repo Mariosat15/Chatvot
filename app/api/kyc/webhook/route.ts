@@ -57,8 +57,29 @@ async function handleSessionEvent(payload: any) {
   console.log(`📝 [KYC Webhook] Updated session ${verification.id} status to: ${newStatus}`);
 }
 
-// Veriff sends GET requests to verify webhook URL
-export async function GET() {
-  return NextResponse.json({ status: 'ok' });
+// Handle GET requests - either Veriff testing webhook or user redirect after verification
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const isVeriffTest = req.headers.get('user-agent')?.includes('Veriff') || 
+                       req.headers.get('x-auth-client');
+  
+  // If it's Veriff testing the webhook endpoint, return JSON
+  if (isVeriffTest) {
+    return NextResponse.json({ status: 'ok' });
+  }
+  
+  // If it's a user browser redirect after verification, redirect to profile
+  const sessionId = searchParams.get('session_id');
+  const redirectUrl = new URL('/profile', req.url);
+  redirectUrl.searchParams.set('tab', 'verification');
+  
+  if (sessionId) {
+    redirectUrl.searchParams.set('sessionId', sessionId);
+  }
+  
+  // Add a flag to trigger status refresh on the profile page
+  redirectUrl.searchParams.set('checkStatus', 'true');
+  
+  return NextResponse.redirect(redirectUrl.toString());
 }
 

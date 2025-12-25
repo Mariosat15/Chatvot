@@ -138,7 +138,19 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
   };
 
   useEffect(() => {
-    fetchStatus(false);
+    // Check if redirected from Veriff (checkStatus param in URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const shouldCheckStatus = urlParams.get('checkStatus') === 'true';
+    
+    fetchStatus(shouldCheckStatus); // Show toast if redirected from Veriff
+    
+    // Clear the URL params after checking (to prevent showing toast on refresh)
+    if (shouldCheckStatus) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('checkStatus');
+      newUrl.searchParams.delete('sessionId');
+      window.history.replaceState({}, '', newUrl.toString());
+    }
     
     // Poll for status updates while pending
     const interval = setInterval(() => {
