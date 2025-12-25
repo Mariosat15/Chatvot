@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
+import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
 import TradingPosition from '@/database/models/trading/trading-position.model';
 import TradeHistory from '@/database/models/trading/trade-history.model';
 import TradingOrder from '@/database/models/trading/trading-order.model';
@@ -24,6 +25,16 @@ import { PlatformTransaction } from '@/database/models/platform-financials.model
 // Withdrawal models
 import WithdrawalRequest from '@/database/models/withdrawal-request.model';
 import UserBankAccount from '@/database/models/user-bank-account.model';
+// KYC
+import KYCSession from '@/database/models/kyc-session.model';
+// Other user-related models
+import Notification from '@/database/models/notification.model';
+import { UserPurchase } from '@/database/models/marketplace/user-purchase.model';
+import UserNote from '@/database/models/user-notes.model';
+import PositionEvent from '@/database/models/position-event.model';
+import UserNotificationPreferences from '@/database/models/user-notification-preferences.model';
+import UserPresence from '@/database/models/user-presence.model';
+import AuditLog from '@/database/models/audit-log.model';
 import { ObjectId } from 'mongodb';
 import { getAdminSession } from '@/lib/admin/auth';
 import { auditLogService } from '@/lib/services/audit-log.service';
@@ -32,16 +43,25 @@ import { auditLogService } from '@/lib/services/audit-log.service';
  * DELETE /api/admin/users/delete
  * Delete user and ALL their data from the database
  * 
- * This deletes from:
- * - better-auth collections: user, session, account
- * - Trading: wallet, transactions, participants, positions, orders, trade history
+ * This deletes EVERYTHING related to the user - like they never existed:
+ * - Better Auth collections: user, session, account
+ * - Trading: wallet, transactions, competition participants, challenge participants,
+ *            positions, orders, trade history
  * - Progression: badges, levels
  * - Fraud: device fingerprints, restrictions, suspicion scores, alerts, 
  *          payment fingerprints, behavioral similarity, trading profiles, fraud history
+ * - KYC: All KYC sessions for this user
  * - Invoices
  * - Platform transactions (user-specific)
  * - Withdrawal requests
  * - User bank accounts
+ * - Notifications (user's notifications)
+ * - Marketplace purchases
+ * - User notes (admin notes about this user)
+ * - Position events
+ * - Notification preferences
+ * - User presence data
+ * - Audit logs related to this user
  */
 export async function DELETE(request: Request) {
   try {
@@ -126,6 +146,11 @@ export async function DELETE(request: Request) {
     deletionResults.competitionParticipants = participantsResult.deletedCount;
     console.log(`✅ Deleted ${deletionResults.competitionParticipants} competition participants`);
 
+    // Delete challenge participants
+    const challengeParticipantsResult = await ChallengeParticipant.deleteMany({ userId });
+    deletionResults.challengeParticipants = challengeParticipantsResult.deletedCount;
+    console.log(`✅ Deleted ${deletionResults.challengeParticipants} challenge participants`);
+
     // Delete trading positions
     const positionsResult = await TradingPosition.deleteMany({ userId });
     deletionResults.tradingPositions = positionsResult.deletedCount;
@@ -207,7 +232,16 @@ export async function DELETE(request: Request) {
     console.log(`✅ Deleted ${deletionResults.fraudHistory} fraud history records`);
 
     // ============================================
-    // 5. DELETE INVOICES
+    // 5. DELETE KYC DATA
+    // ============================================
+
+    // Delete KYC sessions
+    const kycResult = await KYCSession.deleteMany({ userId });
+    deletionResults.kycSessions = kycResult.deletedCount;
+    console.log(`✅ Deleted ${deletionResults.kycSessions} KYC sessions`);
+
+    // ============================================
+    // 6. DELETE INVOICES
     // ============================================
 
     // Delete invoices (try with both string and ObjectId)
@@ -228,7 +262,7 @@ export async function DELETE(request: Request) {
     }
 
     // ============================================
-    // 6. DELETE PLATFORM TRANSACTIONS (user-specific)
+    // 7. DELETE PLATFORM TRANSACTIONS (user-specific)
     // ============================================
 
     try {
@@ -241,7 +275,7 @@ export async function DELETE(request: Request) {
     }
 
     // ============================================
-    // 7. DELETE WITHDRAWAL DATA
+    // 8. DELETE WITHDRAWAL DATA
     // ============================================
 
     // Delete withdrawal requests
@@ -262,6 +296,101 @@ export async function DELETE(request: Request) {
     } catch (e) {
       console.log(`⚠️ No user bank accounts to delete`);
       deletionResults.userBankAccounts = 0;
+    }
+
+    // ============================================
+    // 9. DELETE NOTIFICATIONS AND PREFERENCES
+    // ============================================
+
+    // Delete user's notifications
+    try {
+      const notificationResult = await Notification.deleteMany({ userId });
+      deletionResults.notifications = notificationResult.deletedCount;
+      console.log(`✅ Deleted ${deletionResults.notifications} notifications`);
+    } catch (e) {
+      console.log(`⚠️ No notifications to delete`);
+      deletionResults.notifications = 0;
+    }
+
+    // Delete user notification preferences
+    try {
+      const notifPrefResult = await UserNotificationPreferences.deleteMany({ userId });
+      deletionResults.notificationPreferences = notifPrefResult.deletedCount;
+      console.log(`✅ Deleted ${deletionResults.notificationPreferences} notification preferences`);
+    } catch (e) {
+      console.log(`⚠️ No notification preferences to delete`);
+      deletionResults.notificationPreferences = 0;
+    }
+
+    // ============================================
+    // 10. DELETE MARKETPLACE PURCHASES
+    // ============================================
+
+    try {
+      const purchaseResult = await UserPurchase.deleteMany({ userId });
+      deletionResults.marketplacePurchases = purchaseResult.deletedCount;
+      console.log(`✅ Deleted ${deletionResults.marketplacePurchases} marketplace purchases`);
+    } catch (e) {
+      console.log(`⚠️ No marketplace purchases to delete`);
+      deletionResults.marketplacePurchases = 0;
+    }
+
+    // ============================================
+    // 11. DELETE USER NOTES (Admin notes about user)
+    // ============================================
+
+    try {
+      const notesResult = await UserNote.deleteMany({ userId });
+      deletionResults.userNotes = notesResult.deletedCount;
+      console.log(`✅ Deleted ${deletionResults.userNotes} user notes`);
+    } catch (e) {
+      console.log(`⚠️ No user notes to delete`);
+      deletionResults.userNotes = 0;
+    }
+
+    // ============================================
+    // 12. DELETE POSITION EVENTS
+    // ============================================
+
+    try {
+      const posEventsResult = await PositionEvent.deleteMany({ userId });
+      deletionResults.positionEvents = posEventsResult.deletedCount;
+      console.log(`✅ Deleted ${deletionResults.positionEvents} position events`);
+    } catch (e) {
+      console.log(`⚠️ No position events to delete`);
+      deletionResults.positionEvents = 0;
+    }
+
+    // ============================================
+    // 13. DELETE USER PRESENCE
+    // ============================================
+
+    try {
+      const presenceResult = await UserPresence.deleteMany({ userId });
+      deletionResults.userPresence = presenceResult.deletedCount;
+      console.log(`✅ Deleted ${deletionResults.userPresence} user presence records`);
+    } catch (e) {
+      console.log(`⚠️ No user presence to delete`);
+      deletionResults.userPresence = 0;
+    }
+
+    // ============================================
+    // 14. DELETE AUDIT LOGS ABOUT THIS USER
+    // ============================================
+
+    // Delete audit logs where this user was the target (preserve logs about admin actions)
+    try {
+      const auditResult = await AuditLog.deleteMany({ 
+        $or: [
+          { userId }, // Logs created by this user
+          { targetUserId: userId }, // Logs where this user was the target
+        ]
+      });
+      deletionResults.auditLogs = auditResult.deletedCount;
+      console.log(`✅ Deleted ${deletionResults.auditLogs} audit logs`);
+    } catch (e) {
+      console.log(`⚠️ No audit logs to delete`);
+      deletionResults.auditLogs = 0;
     }
 
     console.log('');

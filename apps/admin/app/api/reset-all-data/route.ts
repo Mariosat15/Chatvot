@@ -16,6 +16,10 @@ import UserRestriction from '@/database/models/user-restriction.model';
 import DeviceFingerprint from '@/database/models/fraud/device-fingerprint.model';
 import FraudAlert from '@/database/models/fraud/fraud-alert.model';
 import { FraudHistory } from '@/database/models/fraud/fraud-history.model';
+import SuspicionScore from '@/database/models/fraud/suspicion-score.model';
+import PaymentFingerprint from '@/database/models/fraud/payment-fingerprint.model';
+import BehavioralSimilarity from '@/database/models/fraud/behavioral-similarity.model';
+import TradingBehaviorProfile from '@/database/models/fraud/trading-behavior-profile.model';
 import { PlatformTransaction, PlatformBalanceSnapshot } from '@/database/models/platform-financials.model';
 import VATPayment from '@/database/models/vat-payment.model';
 import Invoice from '@/database/models/invoice.model';
@@ -27,6 +31,11 @@ import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.
 import WithdrawalRequest from '@/database/models/withdrawal-request.model';
 import UserBankAccount from '@/database/models/user-bank-account.model';
 import ReconciliationLog from '@/database/models/reconciliation-log.model';
+import KYCSession from '@/database/models/kyc-session.model';
+import UserNote from '@/database/models/user-notes.model';
+import PositionEvent from '@/database/models/position-event.model';
+import UserNotificationPreferences from '@/database/models/user-notification-preferences.model';
+import UserPresence from '@/database/models/user-presence.model';
 import { resetBadgeAndXPConfigs } from '@/lib/services/badge-config-seed.service';
 import { auditLogService } from '@/lib/services/audit-log.service';
 import { getAdminSession } from '@/lib/admin/auth';
@@ -42,6 +51,8 @@ import { getAdminSession } from '@/lib/admin/auth';
  * - All wallet transactions (keeps wallets, resets balance)
  * - All user badges and XP progress
  * - All fraud alerts, device fingerprints, and fraud history
+ * - All suspicion scores, payment fingerprints, behavioral similarity
+ * - All trading behavior profiles
  * - All user restrictions
  * - All platform financial data (fees, unclaimed pools, earnings, etc.)
  * - All invoices
@@ -53,6 +64,11 @@ import { getAdminSession } from '@/lib/admin/auth';
  * - All auth sessions (Better Auth 'session' collection - keeps login credentials)
  * - All orphan credit wallets (where user no longer exists)
  * - All reconciliation logs (audit history)
+ * - All KYC sessions and resets KYC status on all wallets
+ * - All user notes (admin notes about users)
+ * - All position events
+ * - All user notification preferences
+ * - All user presence data
  * 
  * ✅ PRESERVES (will NOT delete):
  * - User accounts (the actual users in 'user' collection)
@@ -62,12 +78,14 @@ import { getAdminSession } from '@/lib/admin/auth';
  * - Marketplace items created by admin (only resets purchase counts)
  * - Dashboard layouts and preferences
  * - All settings collections (appsettings, challengesettings, etc.)
+ * - KYC settings configuration (provider settings stay, session data deleted)
  * 
  * ✅ RESETS TO DEFAULTS:
  * - Badge configurations
  * - XP and level progression settings
  * - Notification templates (reseeds defaults, preserves custom)
  * - Marketplace item purchase counts
+ * - KYC verification status on all wallets (reset to 'none')
  * 
  * POST /api/admin/reset-all-data
  */
@@ -124,6 +142,10 @@ export async function POST(request: Request) {
       deviceFingerprints: await DeviceFingerprint.countDocuments(),
       userRestrictions: await UserRestriction.countDocuments(),
       fraudHistory: await FraudHistory.countDocuments(),
+      suspicionScores: await SuspicionScore.countDocuments(),
+      paymentFingerprints: await PaymentFingerprint.countDocuments(),
+      behavioralSimilarity: await BehavioralSimilarity.countDocuments(),
+      tradingBehaviorProfiles: await TradingBehaviorProfile.countDocuments(),
       platformTransactions: await PlatformTransaction.countDocuments(),
       platformSnapshots: await PlatformBalanceSnapshot.countDocuments(),
       vatPayments: await VATPayment.countDocuments(),
@@ -137,6 +159,11 @@ export async function POST(request: Request) {
       alerts: await alertsCollection.countDocuments(),
       botExecutions: await botExecutionsCollection.countDocuments(),
       reconciliationLogs: await ReconciliationLog.countDocuments(),
+      kycSessions: await KYCSession.countDocuments(),
+      userNotes: await UserNote.countDocuments(),
+      positionEvents: await PositionEvent.countDocuments(),
+      notificationPreferences: await UserNotificationPreferences.countDocuments(),
+      userPresence: await UserPresence.countDocuments(),
     };
 
     console.log('📊 Before deletion:', before);
@@ -187,6 +214,22 @@ export async function POST(request: Request) {
     // Delete fraud history
     await FraudHistory.deleteMany({});
     console.log('✅ Deleted all fraud history');
+
+    // Delete suspicion scores
+    await SuspicionScore.deleteMany({});
+    console.log('✅ Deleted all suspicion scores');
+
+    // Delete payment fingerprints
+    await PaymentFingerprint.deleteMany({});
+    console.log('✅ Deleted all payment fingerprints');
+
+    // Delete behavioral similarity
+    await BehavioralSimilarity.deleteMany({});
+    console.log('✅ Deleted all behavioral similarity records');
+
+    // Delete trading behavior profiles
+    await TradingBehaviorProfile.deleteMany({});
+    console.log('✅ Deleted all trading behavior profiles');
 
     // Delete platform financial data (fees, unclaimed pools, etc.)
     await PlatformTransaction.deleteMany({});
@@ -239,6 +282,26 @@ export async function POST(request: Request) {
     await ReconciliationLog.deleteMany({});
     console.log('✅ Deleted all reconciliation logs');
 
+    // Delete ALL KYC sessions
+    await KYCSession.deleteMany({});
+    console.log('✅ Deleted all KYC sessions');
+
+    // Delete all user notes
+    await UserNote.deleteMany({});
+    console.log('✅ Deleted all user notes');
+
+    // Delete all position events
+    await PositionEvent.deleteMany({});
+    console.log('✅ Deleted all position events');
+
+    // Delete all user notification preferences
+    await UserNotificationPreferences.deleteMany({});
+    console.log('✅ Deleted all user notification preferences');
+
+    // Delete all user presence data
+    await UserPresence.deleteMany({});
+    console.log('✅ Deleted all user presence data');
+
     // Delete orphan credit wallets (where user no longer exists)
     if (orphanWalletIds.length > 0) {
       const orphanDeleteResult = await CreditWallet.deleteMany({ _id: { $in: orphanWalletIds } });
@@ -265,10 +328,19 @@ export async function POST(request: Request) {
           totalWonFromCompetitions: 0,        // Reset competition winnings (Volt Won)
           totalSpentOnChallenges: 0,          // Reset challenge spending
           totalWonFromChallenges: 0,          // Reset challenge winnings
+          // Reset KYC status fields
+          kycVerified: false,
+          kycStatus: 'none',
+          kycAttempts: 0,
+        },
+        $unset: {
+          kycVerifiedAt: '',
+          kycExpiresAt: '',
+          lastKYCSessionId: '',
         },
       }
     );
-    console.log(`✅ Reset ${walletResetResult.modifiedCount} wallet balances to 0 (including balances, competition/challenge winnings)`);
+    console.log(`✅ Reset ${walletResetResult.modifiedCount} wallet balances to 0 (including balances, competition/challenge winnings, KYC status)`);
 
     // Reset badge and XP configurations to defaults
     await resetBadgeAndXPConfigs();
@@ -292,6 +364,10 @@ export async function POST(request: Request) {
       deviceFingerprints: await DeviceFingerprint.countDocuments(),
       userRestrictions: await UserRestriction.countDocuments(),
       fraudHistory: await FraudHistory.countDocuments(),
+      suspicionScores: await SuspicionScore.countDocuments(),
+      paymentFingerprints: await PaymentFingerprint.countDocuments(),
+      behavioralSimilarity: await BehavioralSimilarity.countDocuments(),
+      tradingBehaviorProfiles: await TradingBehaviorProfile.countDocuments(),
       platformTransactions: await PlatformTransaction.countDocuments(),
       platformSnapshots: await PlatformBalanceSnapshot.countDocuments(),
       vatPayments: await VATPayment.countDocuments(),
@@ -305,6 +381,11 @@ export async function POST(request: Request) {
       alerts: await alertsCollection.countDocuments(),
       botExecutions: await botExecutionsCollection.countDocuments(),
       reconciliationLogs: await ReconciliationLog.countDocuments(),
+      kycSessions: await KYCSession.countDocuments(),
+      userNotes: await UserNote.countDocuments(),
+      positionEvents: await PositionEvent.countDocuments(),
+      notificationPreferences: await UserNotificationPreferences.countDocuments(),
+      userPresence: await UserPresence.countDocuments(),
     };
 
     console.log('📊 After deletion:', after);
@@ -349,6 +430,10 @@ export async function POST(request: Request) {
         deviceFingerprints: before.deviceFingerprints,
         userRestrictions: before.userRestrictions,
         fraudHistory: before.fraudHistory,
+        suspicionScores: before.suspicionScores,
+        paymentFingerprints: before.paymentFingerprints,
+        behavioralSimilarity: before.behavioralSimilarity,
+        tradingBehaviorProfiles: before.tradingBehaviorProfiles,
         platformTransactions: before.platformTransactions,
         platformSnapshots: before.platformSnapshots,
         vatPayments: before.vatPayments,
@@ -361,6 +446,11 @@ export async function POST(request: Request) {
         alerts: before.alerts,
         botExecutions: before.botExecutions,
         reconciliationLogs: before.reconciliationLogs,
+        kycSessions: before.kycSessions,
+        userNotes: before.userNotes,
+        positionEvents: before.positionEvents,
+        notificationPreferences: before.notificationPreferences,
+        userPresence: before.userPresence,
       },
       walletsReset: walletResetResult.modifiedCount,
     });
