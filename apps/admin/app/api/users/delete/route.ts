@@ -194,20 +194,72 @@ export async function DELETE(request: Request) {
     deletionResults.userRestrictions = restrictionResult.deletedCount;
     console.log(`✅ Deleted ${deletionResults.userRestrictions} user restrictions`);
 
-    // Delete suspicion scores
+    // Delete suspicion scores for the deleted user
     const suspicionResult = await SuspicionScore.deleteMany({ userId });
     deletionResults.suspicionScores = suspicionResult.deletedCount;
     console.log(`✅ Deleted ${deletionResults.suspicionScores} suspicion scores`);
 
-    // Delete fraud alerts where user is involved
+    // Handle fraud alerts - need to clean up properly for multi-user alerts
+    // Step 1: Find duplicate_kyc alerts that involve this user AND other users
+    const multiUserAlerts = await FraudAlert.find({
+      alertType: 'duplicate_kyc',
+      suspiciousUserIds: userId,
+      $expr: { $gt: [{ $size: '$suspiciousUserIds' }, 1] } // More than 1 user
+    });
+
+    // Step 2: For each multi-user alert, remove deleted user and clean up other users' scores
+    let alertsUpdated = 0;
+    for (const alert of multiUserAlerts) {
+      const otherUserIds = alert.suspiciousUserIds.filter((id: string) => id !== userId);
+      
+      if (otherUserIds.length === 1) {
+        // Only one user left - no longer a duplicate, delete the alert
+        await FraudAlert.deleteOne({ _id: alert._id });
+        
+        // Clear the kycDuplicate score from the remaining user
+        const remainingUserId = otherUserIds[0];
+        await SuspicionScore.updateOne(
+          { userId: remainingUserId },
+          {
+            $set: { 'scoreBreakdown.kycDuplicate': { percentage: 0, evidence: [], lastUpdated: new Date() } },
+          }
+        );
+        // Recalculate total score
+        const remainingScore = await SuspicionScore.findOne({ userId: remainingUserId });
+        if (remainingScore) {
+          await remainingScore.recalculateTotal();
+        }
+        console.log(`✅ Cleared kycDuplicate score for remaining user ${remainingUserId}`);
+      } else {
+        // Multiple users still remain - just remove deleted user from the list
+        await FraudAlert.updateOne(
+          { _id: alert._id },
+          { $pull: { suspiciousUserIds: userId } }
+        );
+      }
+      alertsUpdated++;
+    }
+    if (alertsUpdated > 0) {
+      console.log(`✅ Updated ${alertsUpdated} multi-user fraud alerts`);
+    }
+
+    // Step 3: Delete any remaining alerts where this user is the only one involved
     const alertResult = await FraudAlert.deleteMany({ 
       $or: [
         { suspiciousUserIds: userId },
+        { primaryUserId: userId },
         { 'metadata.userId': userId }
       ]
     });
-    deletionResults.fraudAlerts = alertResult.deletedCount;
-    console.log(`✅ Deleted ${deletionResults.fraudAlerts} fraud alerts`);
+    deletionResults.fraudAlerts = alertResult.deletedCount + alertsUpdated;
+    console.log(`✅ Deleted ${alertResult.deletedCount} fraud alerts`);
+
+    // Step 4: Remove deleted user from linked accounts in other users' suspicion scores
+    await SuspicionScore.updateMany(
+      { 'linkedAccounts.userId': userId },
+      { $pull: { linkedAccounts: { userId: userId } } }
+    );
+    console.log(`✅ Removed deleted user from linked accounts in other suspicion scores`);
 
     // Delete payment fingerprints
     const paymentFpResult = await PaymentFingerprint.deleteMany({ userId });
