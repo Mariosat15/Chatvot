@@ -26,6 +26,15 @@ export interface IFraudSettings extends Document {
   autoSuspendEnabled: boolean;
   autoSuspendThreshold: number; // Default: 90 - Auto-suspend if risk > this
   
+  // Duplicate KYC Detection
+  duplicateKYCAutoSuspend: boolean; // Auto-suspend users when duplicate KYC detected
+  duplicateKYCSuspendMessage: string; // Message shown to suspended users
+  duplicateKYCAllowWithdrawals: boolean; // Allow withdrawals even when suspended
+  duplicateKYCBlockDeposits: boolean; // Block deposits
+  duplicateKYCBlockTrading: boolean; // Block trading
+  duplicateKYCBlockCompetitions: boolean; // Block competition entry
+  duplicateKYCBlockChallenges: boolean; // Block challenge entry
+  
   // Rate Limiting
   maxSignupsPerHour: number; // Max accounts from same fingerprint per hour
   maxEntriesPerHour: number; // Max competition entries per hour
@@ -65,6 +74,18 @@ const FraudSettingsSchema = new Schema<IFraudSettings>({
   autoSuspendEnabled: { type: Boolean, default: false },
   autoSuspendThreshold: { type: Number, default: 90, min: 0, max: 100 },
   
+  // Duplicate KYC Detection
+  duplicateKYCAutoSuspend: { type: Boolean, default: true },
+  duplicateKYCSuspendMessage: { 
+    type: String, 
+    default: 'Your account has been suspended due to a security concern with your identity verification. Please contact support for assistance.'
+  },
+  duplicateKYCAllowWithdrawals: { type: Boolean, default: true },
+  duplicateKYCBlockDeposits: { type: Boolean, default: true },
+  duplicateKYCBlockTrading: { type: Boolean, default: true },
+  duplicateKYCBlockCompetitions: { type: Boolean, default: true },
+  duplicateKYCBlockChallenges: { type: Boolean, default: true },
+  
   // Rate Limiting
   maxSignupsPerHour: { type: Number, default: 10, min: 1 },
   maxEntriesPerHour: { type: Number, default: 50, min: 1 },
@@ -101,6 +122,14 @@ export const DEFAULT_FRAUD_SETTINGS: Partial<IFraudSettings> = {
   alertThreshold: 40,
   autoSuspendEnabled: false,
   autoSuspendThreshold: 90,
+  // Duplicate KYC defaults
+  duplicateKYCAutoSuspend: true,
+  duplicateKYCSuspendMessage: 'Your account has been suspended due to a security concern with your identity verification. Please contact support for assistance.',
+  duplicateKYCAllowWithdrawals: true,
+  duplicateKYCBlockDeposits: true,
+  duplicateKYCBlockTrading: true,
+  duplicateKYCBlockCompetitions: true,
+  duplicateKYCBlockChallenges: true,
   maxSignupsPerHour: 10,
   maxEntriesPerHour: 50,
   whitelistedIPs: [],

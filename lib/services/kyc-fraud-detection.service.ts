@@ -1,7 +1,9 @@
 import crypto from 'crypto';
 import KYCSession from '@/database/models/kyc-session.model';
 import FraudAlert from '@/database/models/fraud/fraud-alert.model';
+import FraudSettings from '@/database/models/fraud/fraud-settings.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
+import UserRestriction from '@/database/models/user-restriction.model';
 import { connectToDatabase } from '@/database/mongoose';
 
 interface DocumentInfo {
@@ -26,6 +28,8 @@ interface DuplicateCheckResult {
   }[];
   alertCreated: boolean;
   alertId?: string;
+  usersSuspended: string[];
+  suspensionMessage?: string;
 }
 
 /**
@@ -81,6 +85,7 @@ export async function checkForDuplicateKYC(
     isDuplicate: false,
     duplicateAccounts: [],
     alertCreated: false,
+    usersSuspended: [],
   };
   
   // Generate fingerprints
@@ -234,6 +239,49 @@ export async function checkForDuplicateKYC(
     result.alertId = alert._id.toString();
     
     console.log(`🚨 [KYC Fraud] Created duplicate KYC alert for user ${userId}. Alert ID: ${alert._id}`);
+    
+    // Check if auto-suspend is enabled
+    const fraudSettings = await FraudSettings.findOne().lean();
+    
+    if (fraudSettings?.duplicateKYCAutoSuspend) {
+      console.log(`🔒 [KYC Fraud] Auto-suspend enabled, suspending all involved users...`);
+      
+      result.suspensionMessage = fraudSettings.duplicateKYCSuspendMessage;
+      
+      // Suspend all involved users
+      for (const involvedUserId of allInvolvedUserIds) {
+        // Check if user already has an active restriction for this
+        const existingRestriction = await UserRestriction.findOne({
+          userId: involvedUserId,
+          reason: 'kyc_fraud',
+          isActive: true,
+        });
+        
+        if (!existingRestriction) {
+          await UserRestriction.create({
+            userId: involvedUserId,
+            restrictionType: 'suspended',
+            reason: 'kyc_fraud',
+            customReason: `Duplicate KYC detected. Same identity document used across multiple accounts. Alert ID: ${alert._id}`,
+            canTrade: !fraudSettings.duplicateKYCBlockTrading,
+            canEnterCompetitions: !fraudSettings.duplicateKYCBlockCompetitions,
+            canDeposit: !fraudSettings.duplicateKYCBlockDeposits,
+            canWithdraw: fraudSettings.duplicateKYCAllowWithdrawals,
+            restrictedBy: 'system',
+            relatedFraudAlertId: alert._id.toString(),
+            relatedUserIds: allInvolvedUserIds.filter(id => id !== involvedUserId),
+            isActive: true,
+          });
+          
+          result.usersSuspended.push(involvedUserId);
+          console.log(`  ✅ Suspended user: ${involvedUserId}`);
+        } else {
+          console.log(`  ⏭️ User ${involvedUserId} already has active KYC fraud restriction`);
+        }
+      }
+      
+      console.log(`🔒 [KYC Fraud] Suspended ${result.usersSuspended.length} users`);
+    }
   }
   
   return result;
