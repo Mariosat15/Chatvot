@@ -150,7 +150,7 @@ const KYCSessionSchema = new Schema<IKYCSession>(
 
 // Indexes
 KYCSessionSchema.index({ userId: 1, status: 1 });
-KYCSessionSchema.index({ veriffSessionId: 1 });
+// Note: veriffSessionId index is created by 'unique: true' on the field
 KYCSessionSchema.index({ status: 1, createdAt: -1 });
 
 const KYCSession = models?.KYCSession || model<IKYCSession>('KYCSession', KYCSessionSchema);
