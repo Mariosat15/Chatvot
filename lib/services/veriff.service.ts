@@ -144,6 +144,8 @@ class VeriffService {
     // Save session to database
     const session = await KYCSession.create({
       userId,
+      userEmail: userData.email,
+      userName: [userData.firstName, userData.lastName].filter(Boolean).join(' ') || undefined,
       veriffSessionId: data.verification.id,
       veriffSessionUrl: data.verification.url,
       status: 'created',

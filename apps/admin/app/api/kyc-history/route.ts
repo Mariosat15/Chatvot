@@ -56,18 +56,24 @@ export async function GET(req: NextRequest) {
     ]);
 
     // Get user details for each session
-    const User = (await import('@/database/models/trading/credit-wallet.model')).default;
+    // User info is now stored directly in the session, but fallback to lookup for older sessions
+    const mongoose = (await import('mongoose')).default;
+    const db = mongoose.connection.db;
+    
     const sessionsWithUsers = await Promise.all(
-      sessions.map(async (session) => {
-        // Try to get user info from Better Auth users collection
-        const mongoose = (await import('mongoose')).default;
-        const db = mongoose.connection.db;
+      sessions.map(async (session: any) => {
+        // Use stored user info if available
+        if (session.userEmail && session.userName) {
+          return session;
+        }
+        
+        // Fallback: Try to get user info from Better Auth users collection
         const user = await db?.collection('user').findOne({ id: session.userId });
         
         return {
           ...session,
-          userEmail: user?.email || 'Unknown',
-          userName: user?.name || 'Unknown',
+          userEmail: session.userEmail || user?.email || 'Unknown',
+          userName: session.userName || user?.name || 'Unknown',
         };
       })
     );

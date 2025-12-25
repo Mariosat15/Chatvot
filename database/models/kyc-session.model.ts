@@ -2,6 +2,8 @@ import { Schema, model, models, Document } from 'mongoose';
 
 export interface IKYCSession extends Document {
   userId: string;
+  userEmail?: string;
+  userName?: string;
   
   // Veriff Session Data
   veriffSessionId: string;
@@ -65,6 +67,12 @@ const KYCSessionSchema = new Schema<IKYCSession>(
       type: String,
       required: true,
       index: true,
+    },
+    userEmail: {
+      type: String,
+    },
+    userName: {
+      type: String,
     },
     veriffSessionId: {
       type: String,
