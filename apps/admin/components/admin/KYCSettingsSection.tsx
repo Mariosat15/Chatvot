@@ -24,6 +24,9 @@ import {
   Loader2,
   Copy,
   Check,
+  Search,
+  Users,
+  Fingerprint,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -92,6 +95,21 @@ export default function KYCSettingsSection() {
   const [tempApiSecret, setTempApiSecret] = useState('');
   const [tempBaseUrl, setTempBaseUrl] = useState('https://stationapi.veriff.com');
   const [savingProvider, setSavingProvider] = useState(false);
+  
+  // Scan duplicates state
+  const [scanning, setScanning] = useState(false);
+  const [scanResults, setScanResults] = useState<{
+    success: boolean;
+    message: string;
+    stats: {
+      sessionsScanned: number;
+      duplicateGroupsFound: number;
+      alertsCreated: number;
+      scoresUpdated: number;
+      usersSuspended: number;
+    };
+    duplicates: any[];
+  } | null>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -109,6 +127,35 @@ export default function KYCSettingsSection() {
       toast.error('Failed to load KYC settings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleScanDuplicates = async () => {
+    setScanning(true);
+    setScanResults(null);
+    
+    try {
+      const response = await fetch('/api/kyc-settings/scan-duplicates', {
+        method: 'POST',
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setScanResults(data);
+        if (data.stats.duplicateGroupsFound > 0) {
+          toast.warning(`Found ${data.stats.duplicateGroupsFound} duplicate group(s)!`);
+        } else {
+          toast.success('No duplicates found. All KYC sessions are unique.');
+        }
+      } else {
+        toast.error(data.error || 'Failed to scan for duplicates');
+      }
+    } catch (error) {
+      console.error('Error scanning for duplicates:', error);
+      toast.error('Failed to scan for duplicates');
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -328,6 +375,10 @@ export default function KYCSettingsSection() {
           <TabsTrigger value="messages">
             <MessageSquare className="h-4 w-4 mr-2" />
             Messages
+          </TabsTrigger>
+          <TabsTrigger value="tools">
+            <Search className="h-4 w-4 mr-2" />
+            Tools
           </TabsTrigger>
         </TabsList>
 
@@ -757,6 +808,139 @@ export default function KYCSettingsSection() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tools Tab */}
+        <TabsContent value="tools">
+          <div className="space-y-4">
+            {/* Scan for Duplicate KYC */}
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Fingerprint className="h-5 w-5 text-orange-500" />
+                  Scan for Duplicate KYC
+                </CardTitle>
+                <CardDescription>
+                  Scan all approved KYC sessions in the database for duplicates
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-orange-400 mt-0.5" />
+                    <div className="text-sm text-gray-300">
+                      <p className="font-medium text-orange-400 mb-1">What this does:</p>
+                      <ul className="list-disc list-inside space-y-1 text-gray-400">
+                        <li>Scans all approved KYC sessions for duplicate documents</li>
+                        <li>Creates fraud alerts for any duplicates found</li>
+                        <li>Updates fraud scores for involved users (+50%)</li>
+                        <li>Applies suspensions if auto-suspend is enabled</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleScanDuplicates}
+                  disabled={scanning}
+                  className="w-full bg-orange-600 hover:bg-orange-700"
+                >
+                  {scanning ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Scanning KYC Sessions...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Scan for Duplicates
+                    </>
+                  )}
+                </Button>
+
+                {/* Scan Results */}
+                {scanResults && (
+                  <div className={`p-4 rounded-lg border ${
+                    scanResults.stats.duplicateGroupsFound > 0 
+                      ? 'bg-red-500/10 border-red-500/30'
+                      : 'bg-green-500/10 border-green-500/30'
+                  }`}>
+                    <div className="flex items-start gap-3">
+                      {scanResults.stats.duplicateGroupsFound > 0 ? (
+                        <AlertTriangle className="h-5 w-5 text-red-400 mt-0.5" />
+                      ) : (
+                        <CheckCircle className="h-5 w-5 text-green-400 mt-0.5" />
+                      )}
+                      <div className="flex-1">
+                        <p className={`font-medium ${
+                          scanResults.stats.duplicateGroupsFound > 0 ? 'text-red-400' : 'text-green-400'
+                        }`}>
+                          {scanResults.message}
+                        </p>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
+                          <div className="bg-gray-800/50 p-2 rounded">
+                            <p className="text-xs text-gray-500">Sessions Scanned</p>
+                            <p className="text-lg font-bold text-white">{scanResults.stats.sessionsScanned}</p>
+                          </div>
+                          <div className="bg-gray-800/50 p-2 rounded">
+                            <p className="text-xs text-gray-500">Duplicates Found</p>
+                            <p className={`text-lg font-bold ${
+                              scanResults.stats.duplicateGroupsFound > 0 ? 'text-red-400' : 'text-green-400'
+                            }`}>
+                              {scanResults.stats.duplicateGroupsFound}
+                            </p>
+                          </div>
+                          <div className="bg-gray-800/50 p-2 rounded">
+                            <p className="text-xs text-gray-500">Alerts Created</p>
+                            <p className="text-lg font-bold text-orange-400">{scanResults.stats.alertsCreated}</p>
+                          </div>
+                          <div className="bg-gray-800/50 p-2 rounded">
+                            <p className="text-xs text-gray-500">Scores Updated</p>
+                            <p className="text-lg font-bold text-blue-400">{scanResults.stats.scoresUpdated}</p>
+                          </div>
+                          <div className="bg-gray-800/50 p-2 rounded">
+                            <p className="text-xs text-gray-500">Users Suspended</p>
+                            <p className="text-lg font-bold text-purple-400">{scanResults.stats.usersSuspended}</p>
+                          </div>
+                        </div>
+
+                        {/* Duplicate Details */}
+                        {scanResults.duplicates && scanResults.duplicates.length > 0 && (
+                          <div className="mt-4 space-y-2">
+                            <p className="text-sm font-medium text-gray-300">Duplicate Groups:</p>
+                            {scanResults.duplicates.map((dup, index) => (
+                              <div key={index} className="p-3 bg-gray-800/70 rounded border border-gray-700">
+                                <div className="flex items-center justify-between mb-2">
+                                  <Badge variant="outline" className="text-orange-400 border-orange-400">
+                                    {dup.matchType.replace('_', ' ')}
+                                  </Badge>
+                                  {dup.alertExisted ? (
+                                    <Badge variant="secondary" className="bg-gray-700">Alert already existed</Badge>
+                                  ) : (
+                                    <Badge variant="secondary" className="bg-red-500/20 text-red-400">New alert created</Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-gray-400">
+                                  <Users className="h-4 w-4" />
+                                  <span>{dup.userIds.length} accounts involved</span>
+                                </div>
+                                {dup.documentInfo && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    Document: {dup.documentInfo.type} from {dup.documentInfo.country} ({dup.documentInfo.numberMasked})
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 
