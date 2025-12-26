@@ -17,19 +17,21 @@ import {
   calculatePnLPercentage,
   ForexSymbol,
 } from '@/lib/services/pnl-calculator.service';
-import { getRealPrice, fetchRealForexPrices, isForexMarketOpen, getMarketStatus, getPriceFromCacheOnly } from '@/lib/services/real-forex-prices.service';
+import { getRealPrice, fetchRealForexPrices, getMarketStatus, getPriceFromCacheOnly } from '@/lib/services/real-forex-prices.service';
+import { isMarketOpen } from '@/lib/services/market-hours.service';
 import { getMarginStatus } from '@/lib/services/risk-manager.service';
 import PriceLog from '@/database/models/trading/price-log.model';
 
 /**
  * Check if market is open and throw error if closed
- * Used for all user-initiated trading actions
+ * Uses admin-configured market hours and holidays
  */
 async function ensureMarketOpen(): Promise<void> {
-  const isOpen = await isForexMarketOpen();
-  if (!isOpen) {
-    const status = getMarketStatus();
-    throw new Error(`Market is currently closed. ${status}. Trading is not available until market opens.`);
+  const marketStatus = await isMarketOpen('forex');
+  if (!marketStatus.isOpen) {
+    const reason = marketStatus.reason || getMarketStatus();
+    const holidayInfo = marketStatus.isHoliday ? ` (Holiday: ${marketStatus.holidayName})` : '';
+    throw new Error(`Market is currently closed${holidayInfo}. ${reason}. Trading is not available until market opens.`);
   }
 }
 
