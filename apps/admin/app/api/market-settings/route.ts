@@ -30,7 +30,7 @@ export async function GET() {
   }
 }
 
-// PUT - Update market settings
+// PUT - Update ALL market settings at once (mode, schedules, holidays, blocking rules)
 export async function PUT(request: Request) {
   try {
     const session = await getAdminSession();
@@ -47,22 +47,79 @@ export async function PUT(request: Request) {
       settings = new MarketSettings();
     }
 
-    // Update fields
-    if (body.mode !== undefined) settings.mode = body.mode;
+    // Track changes for audit log
+    const changes: string[] = [];
+    const oldMode = settings.mode;
+
+    // Update mode
+    if (body.mode !== undefined && body.mode !== settings.mode) {
+      settings.mode = body.mode;
+      changes.push(`mode: ${oldMode} → ${body.mode}`);
+    }
+    
+    // Update automatic settings
     if (body.automaticSettings !== undefined) {
       settings.automaticSettings = { ...settings.automaticSettings, ...body.automaticSettings };
     }
+    
+    // Update asset schedules (full replacement for each provided schedule)
     if (body.assetSchedules !== undefined) {
-      settings.assetSchedules = { ...settings.assetSchedules, ...body.assetSchedules };
+      for (const [asset, schedule] of Object.entries(body.assetSchedules)) {
+        if (schedule && typeof schedule === 'object') {
+          (settings.assetSchedules as Record<string, unknown>)[asset] = schedule;
+        }
+      }
+      settings.markModified('assetSchedules');
     }
-    if (body.blockTradingOnHolidays !== undefined) settings.blockTradingOnHolidays = body.blockTradingOnHolidays;
-    if (body.blockCompetitionsOnHolidays !== undefined) settings.blockCompetitionsOnHolidays = body.blockCompetitionsOnHolidays;
-    if (body.blockChallengesOnHolidays !== undefined) settings.blockChallengesOnHolidays = body.blockChallengesOnHolidays;
-    if (body.showHolidayWarning !== undefined) settings.showHolidayWarning = body.showHolidayWarning;
+    
+    // Update holidays (full replacement - clean up temp IDs)
+    if (body.holidays !== undefined) {
+      const oldCount = settings.holidays?.length || 0;
+      // Clean temporary IDs and prepare holidays for save
+      settings.holidays = body.holidays.map((h: { _id?: string; name: string; date: string; affectedAssets: string[]; isRecurring: boolean }) => ({
+        name: h.name,
+        date: h.date,
+        affectedAssets: h.affectedAssets,
+        isRecurring: h.isRecurring,
+        // Keep existing _id if it's a real MongoDB ID, otherwise MongoDB will generate one
+        ...(h._id && !h._id.startsWith('temp_') ? { _id: h._id } : {}),
+      }));
+      settings.markModified('holidays');
+      const newCount = settings.holidays.length;
+      if (newCount !== oldCount) {
+        changes.push(`holidays: ${oldCount} → ${newCount}`);
+      }
+    }
+    
+    // Update blocking rules
+    if (body.blockTradingOnHolidays !== undefined) {
+      if (body.blockTradingOnHolidays !== settings.blockTradingOnHolidays) {
+        changes.push(`blockTrading: ${settings.blockTradingOnHolidays} → ${body.blockTradingOnHolidays}`);
+      }
+      settings.blockTradingOnHolidays = body.blockTradingOnHolidays;
+    }
+    if (body.blockCompetitionsOnHolidays !== undefined) {
+      if (body.blockCompetitionsOnHolidays !== settings.blockCompetitionsOnHolidays) {
+        changes.push(`blockCompetitions: ${settings.blockCompetitionsOnHolidays} → ${body.blockCompetitionsOnHolidays}`);
+      }
+      settings.blockCompetitionsOnHolidays = body.blockCompetitionsOnHolidays;
+    }
+    if (body.blockChallengesOnHolidays !== undefined) {
+      if (body.blockChallengesOnHolidays !== settings.blockChallengesOnHolidays) {
+        changes.push(`blockChallenges: ${settings.blockChallengesOnHolidays} → ${body.blockChallengesOnHolidays}`);
+      }
+      settings.blockChallengesOnHolidays = body.blockChallengesOnHolidays;
+    }
+    if (body.showHolidayWarning !== undefined) {
+      settings.showHolidayWarning = body.showHolidayWarning;
+    }
 
     await settings.save();
 
-    // Log action
+    // Reload to get proper IDs for new holidays
+    settings = await MarketSettings.findOne();
+
+    // Log action with detailed changes
     await AuditLog.logAction({
       userId: session.id,
       userName: session.name || 'Admin',
@@ -70,10 +127,26 @@ export async function PUT(request: Request) {
       userRole: 'admin',
       action: 'market_settings_updated',
       actionCategory: 'settings',
-      description: `Updated market settings (mode: ${settings.mode})`,
+      description: changes.length > 0 
+        ? `Updated market settings: ${changes.join(', ')}`
+        : `Updated market settings (mode: ${settings?.mode})`,
       targetType: 'settings',
       targetId: 'market',
       status: 'success',
+      metadata: {
+        mode: settings?.mode,
+        holidayCount: settings?.holidays?.length || 0,
+        blockTrading: settings?.blockTradingOnHolidays,
+        blockCompetitions: settings?.blockCompetitionsOnHolidays,
+        blockChallenges: settings?.blockChallengesOnHolidays,
+      },
+    });
+
+    console.log('[Market Settings] Saved successfully:', {
+      mode: settings?.mode,
+      holidays: settings?.holidays?.length || 0,
+      blockCompetitions: settings?.blockCompetitionsOnHolidays,
+      blockChallenges: settings?.blockChallengesOnHolidays,
     });
 
     return NextResponse.json(settings);

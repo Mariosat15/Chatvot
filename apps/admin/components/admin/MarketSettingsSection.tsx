@@ -115,8 +115,10 @@ const DEFAULT_DAY_SCHEDULE: DaySchedule = {
 
 export default function MarketSettingsSection() {
   const [settings, setSettings] = useState<MarketSettings | null>(null);
+  const [originalSettings, setOriginalSettings] = useState<MarketSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
   const [addHolidayOpen, setAddHolidayOpen] = useState(false);
   const [newHoliday, setNewHoliday] = useState<Partial<MarketHoliday>>({
     name: '',
@@ -129,12 +131,21 @@ export default function MarketSettingsSection() {
     fetchSettings();
   }, []);
 
+  // Track changes
+  useEffect(() => {
+    if (settings && originalSettings) {
+      const changed = JSON.stringify(settings) !== JSON.stringify(originalSettings);
+      setHasChanges(changed);
+    }
+  }, [settings, originalSettings]);
+
   const fetchSettings = async () => {
     try {
       const response = await fetch('/api/market-settings');
       if (response.ok) {
         const data = await response.json();
         setSettings(data);
+        setOriginalSettings(JSON.parse(JSON.stringify(data))); // Deep copy
       }
     } catch (error) {
       console.error('Error fetching market settings:', error);
@@ -144,21 +155,34 @@ export default function MarketSettingsSection() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSaveAll = async () => {
     if (!settings) return;
     
     setSaving(true);
     try {
+      // Save ALL settings at once (mode, schedules, holidays, blocking rules)
       const response = await fetch('/api/market-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({
+          ...settings,
+          // Include holidays in the save
+          holidays: settings.holidays,
+        }),
       });
 
       if (response.ok) {
-        toast.success('Market settings saved');
+        const updatedSettings = await response.json();
+        setSettings(updatedSettings);
+        setOriginalSettings(JSON.parse(JSON.stringify(updatedSettings)));
+        setHasChanges(false);
+        toast.success('✅ All market settings saved and applied immediately!', {
+          description: 'Changes are now active for all users.',
+          duration: 4000,
+        });
       } else {
-        toast.error('Failed to save settings');
+        const error = await response.json();
+        toast.error(error.error || 'Failed to save settings');
       }
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -168,55 +192,48 @@ export default function MarketSettingsSection() {
     }
   };
 
-  const handleAddHoliday = async () => {
+  const handleAddHoliday = () => {
     if (!newHoliday.name || !newHoliday.date) {
       toast.error('Please enter holiday name and date');
       return;
     }
 
-    try {
-      const response = await fetch('/api/market-settings/holidays', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newHoliday),
-      });
+    if (!settings) return;
 
-      if (response.ok) {
-        const { holiday } = await response.json();
-        setSettings(prev => prev ? {
-          ...prev,
-          holidays: [...prev.holidays, holiday],
-        } : null);
-        setNewHoliday({ name: '', date: '', affectedAssets: ['forex'], isRecurring: false });
-        setAddHolidayOpen(false);
-        toast.success('Holiday added');
-      } else {
-        toast.error('Failed to add holiday');
-      }
-    } catch (error) {
-      console.error('Error adding holiday:', error);
-      toast.error('Failed to add holiday');
-    }
+    // Add holiday to local state (will be saved when user clicks "Save All Settings")
+    const holiday: MarketHoliday = {
+      _id: `temp_${Date.now()}`, // Temporary ID for local tracking
+      name: newHoliday.name,
+      date: newHoliday.date,
+      affectedAssets: newHoliday.affectedAssets || ['forex'],
+      isRecurring: newHoliday.isRecurring || false,
+    };
+
+    setSettings({
+      ...settings,
+      holidays: [...settings.holidays, holiday],
+    });
+
+    setNewHoliday({ name: '', date: '', affectedAssets: ['forex'], isRecurring: false });
+    setAddHolidayOpen(false);
+    toast.info('Holiday added. Click "Save All Settings" to apply.');
   };
 
-  const handleDeleteHoliday = async (holidayId: string) => {
-    try {
-      const response = await fetch(`/api/market-settings/holidays?id=${holidayId}`, {
-        method: 'DELETE',
-      });
+  const handleDeleteHoliday = (holidayId: string) => {
+    if (!settings) return;
 
-      if (response.ok) {
-        setSettings(prev => prev ? {
-          ...prev,
-          holidays: prev.holidays.filter(h => h._id !== holidayId),
-        } : null);
-        toast.success('Holiday removed');
-      } else {
-        toast.error('Failed to remove holiday');
-      }
-    } catch (error) {
-      console.error('Error removing holiday:', error);
-      toast.error('Failed to remove holiday');
+    setSettings({
+      ...settings,
+      holidays: settings.holidays.filter(h => h._id !== holidayId),
+    });
+    toast.info('Holiday removed. Click "Save All Settings" to apply.');
+  };
+
+  const handleDiscardChanges = () => {
+    if (originalSettings) {
+      setSettings(JSON.parse(JSON.stringify(originalSettings)));
+      setHasChanges(false);
+      toast.info('Changes discarded');
     }
   };
 
@@ -261,8 +278,8 @@ export default function MarketSettingsSection() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header with Save Button */}
+      <div className="flex items-center justify-between sticky top-0 bg-gray-900/95 backdrop-blur-sm z-10 py-4 -mx-4 px-4 border-b border-gray-700">
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-green-500" />
@@ -272,15 +289,49 @@ export default function MarketSettingsSection() {
             Configure market hours and holidays for competitions and challenges
           </p>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="bg-green-600 hover:bg-green-700">
-          {saving ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4 mr-2" />
+        <div className="flex items-center gap-3">
+          {hasChanges && (
+            <>
+              <Badge variant="outline" className="text-yellow-400 border-yellow-400 animate-pulse">
+                Unsaved Changes
+              </Badge>
+              <Button 
+                variant="outline" 
+                onClick={handleDiscardChanges}
+                className="border-gray-600 hover:bg-gray-700"
+              >
+                Discard
+              </Button>
+            </>
           )}
-          Save Settings
-        </Button>
+          <Button 
+            onClick={handleSaveAll} 
+            disabled={saving || !hasChanges} 
+            className={`${hasChanges ? 'bg-green-600 hover:bg-green-700 animate-pulse' : 'bg-green-600/50'}`}
+            size="lg"
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Save All Settings
+          </Button>
+        </div>
       </div>
+
+      {/* Important Note */}
+      {hasChanges && (
+        <div className="p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-lg flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-yellow-400 font-medium">You have unsaved changes</p>
+            <p className="text-sm text-gray-300 mt-1">
+              Click "Save All Settings" to apply your changes. Settings will take effect immediately for all users.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Mode Selection */}
       <Card className="bg-gray-800/50 border-gray-700">
@@ -319,7 +370,7 @@ export default function MarketSettingsSection() {
                 )}
               </div>
               <p className="text-sm text-gray-400">
-                Real-time market status from Massive.com API with automatic holiday detection
+                Real-time market status from Massive.com API. Your custom holidays will still be respected.
               </p>
             </div>
 
@@ -347,7 +398,7 @@ export default function MarketSettingsSection() {
                 )}
               </div>
               <p className="text-sm text-gray-400">
-                Define custom trading hours and holidays for each asset class
+                Define custom trading hours for each day and asset class. Full control over market hours.
               </p>
             </div>
           </div>
@@ -393,6 +444,17 @@ export default function MarketSettingsSection() {
               </div>
             </div>
           )}
+
+          {/* Manual Mode Note */}
+          {settings.mode === 'manual' && (
+            <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start gap-2">
+              <Info className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-gray-300">
+                In Manual mode, market hours are determined by your custom schedule below. 
+                Days marked as "disabled" will block competitions, challenges, and trading.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -404,7 +466,7 @@ export default function MarketSettingsSection() {
           </TabsTrigger>
           <TabsTrigger value="holidays">
             <Calendar className="h-4 w-4 mr-2" />
-            Holidays
+            Holidays ({settings.holidays.length})
           </TabsTrigger>
           <TabsTrigger value="blocking">
             <AlertTriangle className="h-4 w-4 mr-2" />
@@ -415,6 +477,15 @@ export default function MarketSettingsSection() {
         {/* Trading Schedules Tab */}
         <TabsContent value="schedules">
           <div className="space-y-4">
+            {settings.mode === 'automatic' && (
+              <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-start gap-2 mb-4">
+                <Info className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-gray-300">
+                  You're in <strong>Automatic</strong> mode. These schedules will only be used as fallback if the Massive.com API fails.
+                  Switch to <strong>Manual</strong> mode to use these schedules directly.
+                </p>
+              </div>
+            )}
             {ASSET_CLASSES.map((asset) => (
               <Card key={asset.id} className="bg-gray-800/50 border-gray-700">
                 <CardHeader className="pb-3">
@@ -478,8 +549,8 @@ export default function MarketSettingsSection() {
                             </>
                           )}
                           {!schedule.enabled && (
-                            <div className="h-14 flex items-center justify-center text-xs text-gray-500">
-                              Closed
+                            <div className="h-14 flex items-center justify-center text-xs text-red-400 font-medium">
+                              CLOSED
                             </div>
                           )}
                         </div>
@@ -504,7 +575,7 @@ export default function MarketSettingsSection() {
                     Market Holidays
                   </CardTitle>
                   <CardDescription>
-                    Define holidays when markets are closed
+                    Define holidays when markets are closed (applied in both Automatic and Manual modes)
                   </CardDescription>
                 </div>
                 <Button onClick={() => setAddHolidayOpen(true)} className="bg-blue-600 hover:bg-blue-700">
@@ -525,16 +596,25 @@ export default function MarketSettingsSection() {
                   {settings.holidays.map((holiday) => (
                     <div
                       key={holiday._id}
-                      className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg"
+                      className={`flex items-center justify-between p-3 rounded-lg ${
+                        holiday._id?.startsWith('temp_') 
+                          ? 'bg-yellow-500/10 border border-yellow-500/30' 
+                          : 'bg-gray-900/50'
+                      }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
                           <Calendar className="h-5 w-5 text-red-400" />
                         </div>
                         <div>
-                          <p className="font-medium text-white">{holiday.name}</p>
+                          <p className="font-medium text-white">
+                            {holiday.name}
+                            {holiday._id?.startsWith('temp_') && (
+                              <Badge className="ml-2 text-xs bg-yellow-500/20 text-yellow-400">New</Badge>
+                            )}
+                          </p>
                           <div className="flex items-center gap-2 text-xs text-gray-400">
-                            <span>{new Date(holiday.date).toLocaleDateString()}</span>
+                            <span>{new Date(holiday.date + 'T00:00:00').toLocaleDateString()}</span>
                             {holiday.isRecurring && (
                               <Badge variant="outline" className="text-xs">Recurring</Badge>
                             )}
@@ -586,16 +666,25 @@ export default function MarketSettingsSection() {
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-orange-500" />
-                Holiday Blocking Rules
+                Blocking Rules
               </CardTitle>
               <CardDescription>
-                Configure what actions to block during holidays
+                Configure what actions to block when market is closed (holidays or outside trading hours)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg flex items-start gap-2 mb-4">
+                <AlertTriangle className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-gray-300">
+                  These rules apply when the market is closed - either due to holidays, weekends, or 
+                  disabled days in your schedule. Enable these to prevent users from joining competitions 
+                  or challenges during market closures.
+                </p>
+              </div>
+
               <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
                 <div>
-                  <Label className="text-white">Block Trading on Holidays</Label>
+                  <Label className="text-white">Block Trading on Market Close</Label>
                   <p className="text-xs text-gray-400">Prevent users from opening/closing positions</p>
                 </div>
                 <Switch
@@ -606,8 +695,8 @@ export default function MarketSettingsSection() {
 
               <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
                 <div>
-                  <Label className="text-white">Block Competition Entry on Holidays</Label>
-                  <p className="text-xs text-gray-400">Prevent joining competitions when market is closed</p>
+                  <Label className="text-white">Block Competition Entry on Market Close</Label>
+                  <p className="text-xs text-gray-400">Prevent users from joining competitions</p>
                 </div>
                 <Switch
                   checked={settings.blockCompetitionsOnHolidays}
@@ -617,8 +706,8 @@ export default function MarketSettingsSection() {
 
               <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
                 <div>
-                  <Label className="text-white">Block Challenge Entry on Holidays</Label>
-                  <p className="text-xs text-gray-400">Prevent joining 1v1 challenges when market is closed</p>
+                  <Label className="text-white">Block Challenge Entry on Market Close</Label>
+                  <p className="text-xs text-gray-400">Prevent users from creating/accepting 1v1 challenges</p>
                 </div>
                 <Switch
                   checked={settings.blockChallengesOnHolidays}
@@ -628,8 +717,8 @@ export default function MarketSettingsSection() {
 
               <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
                 <div>
-                  <Label className="text-white">Show Holiday Warning</Label>
-                  <p className="text-xs text-gray-400">Display warning banner when market is closed</p>
+                  <Label className="text-white">Show Holiday Warning Banner</Label>
+                  <p className="text-xs text-gray-400">Display warning to users when market is closed</p>
                 </div>
                 <Switch
                   checked={settings.showHolidayWarning}
@@ -640,6 +729,25 @@ export default function MarketSettingsSection() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Floating Save Button (when scrolled) */}
+      {hasChanges && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button 
+            onClick={handleSaveAll} 
+            disabled={saving}
+            size="lg"
+            className="bg-green-600 hover:bg-green-700 shadow-xl shadow-green-500/30 animate-bounce"
+          >
+            {saving ? (
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-5 w-5 mr-2" />
+            )}
+            Save All Settings
+          </Button>
+        </div>
+      )}
 
       {/* Add Holiday Dialog */}
       <Dialog open={addHolidayOpen} onOpenChange={setAddHolidayOpen}>
@@ -718,4 +826,3 @@ export default function MarketSettingsSection() {
     </div>
   );
 }
-

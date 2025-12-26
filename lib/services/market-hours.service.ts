@@ -5,9 +5,9 @@ import { getMarketStatusFromAPI, isForexMarketOpen as isForexMarketOpenAPI } fro
 type AssetClass = 'forex' | 'crypto' | 'stocks' | 'indices' | 'commodities';
 type DayOfWeek = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
 
-// Cache for settings
+// Cache for settings - short duration for fast updates
 let settingsCache: { settings: IMarketSettings; timestamp: number } | null = null;
-const SETTINGS_CACHE_DURATION = 60 * 1000; // 1 minute
+const SETTINGS_CACHE_DURATION = 10 * 1000; // 10 seconds for quick updates
 
 /**
  * Get market settings from database (with caching)
