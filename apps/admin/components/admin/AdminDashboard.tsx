@@ -48,6 +48,7 @@ import {
   LayoutDashboard,
   Activity,
   ArrowUpFromLine,
+  Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -82,6 +83,7 @@ import WithdrawalSettingsSection from '@/components/admin/WithdrawalSettingsSect
 import PendingWithdrawalsSection from '@/components/admin/PendingWithdrawalsSection';
 import KYCSettingsSection from '@/components/admin/KYCSettingsSection';
 import KYCHistorySection from '@/components/admin/KYCHistorySection';
+import MarketSettingsSection from '@/components/admin/MarketSettingsSection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -165,6 +167,13 @@ const menuGroups: MenuGroup[] = [
         icon: <BarChart3 className="h-5 w-5" />,
         color: 'text-blue-400',
         bgColor: 'bg-blue-500/10 hover:bg-blue-500/20',
+      },
+      {
+        id: 'market',
+        label: 'Market Hours',
+        icon: <Calendar className="h-5 w-5" />,
+        color: 'text-green-400',
+        bgColor: 'bg-green-500/10 hover:bg-green-500/20',
       },
     ],
   },
@@ -411,6 +420,8 @@ export default function AdminDashboard({
         return <FinancialDashboard />;
       case 'analytics':
         return <CompetitionAnalytics />;
+      case 'market':
+        return <MarketSettingsSection />;
       case 'payments':
         return <PendingPaymentsSection />;
       case 'withdrawals':
