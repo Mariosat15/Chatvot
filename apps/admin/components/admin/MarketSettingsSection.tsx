@@ -5,17 +5,23 @@ import {
   Clock,
   Calendar,
   Save,
-  RefreshCw,
   Plus,
   Trash2,
   Settings,
   Zap,
   AlertTriangle,
   CheckCircle,
-  Globe,
   TrendingUp,
   Loader2,
   Info,
+  ChevronDown,
+  ChevronRight,
+  Shield,
+  Ban,
+  Activity,
+  Globe,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +29,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -38,6 +43,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
@@ -90,21 +100,21 @@ interface MarketSettings {
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 const DAY_LABELS: Record<string, string> = {
-  monday: 'Monday',
-  tuesday: 'Tuesday',
-  wednesday: 'Wednesday',
-  thursday: 'Thursday',
-  friday: 'Friday',
-  saturday: 'Saturday',
-  sunday: 'Sunday',
+  monday: 'Mon',
+  tuesday: 'Tue',
+  wednesday: 'Wed',
+  thursday: 'Thu',
+  friday: 'Fri',
+  saturday: 'Sat',
+  sunday: 'Sun',
 };
 
 const ASSET_CLASSES = [
-  { id: 'forex', label: 'Forex', icon: '💱' },
-  { id: 'crypto', label: 'Crypto', icon: '₿' },
-  { id: 'stocks', label: 'Stocks', icon: '📈' },
-  { id: 'indices', label: 'Indices', icon: '📊' },
-  { id: 'commodities', label: 'Commodities', icon: '🛢️' },
+  { id: 'forex', label: 'Forex', icon: '💱', color: 'from-emerald-500 to-teal-600', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/30' },
+  { id: 'crypto', label: 'Crypto', icon: '₿', color: 'from-orange-500 to-amber-600', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/30' },
+  { id: 'stocks', label: 'Stocks', icon: '📈', color: 'from-blue-500 to-indigo-600', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30' },
+  { id: 'indices', label: 'Indices', icon: '📊', color: 'from-purple-500 to-violet-600', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30' },
+  { id: 'commodities', label: 'Commodities', icon: '🛢️', color: 'from-yellow-500 to-orange-600', bgColor: 'bg-yellow-500/10', borderColor: 'border-yellow-500/30' },
 ];
 
 const DEFAULT_DAY_SCHEDULE: DaySchedule = {
@@ -120,6 +130,8 @@ export default function MarketSettingsSection() {
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [addHolidayOpen, setAddHolidayOpen] = useState(false);
+  const [expandedAssets, setExpandedAssets] = useState<string[]>(['forex']);
+  const [activeSection, setActiveSection] = useState<'schedules' | 'holidays' | 'blocking'>('schedules');
   const [newHoliday, setNewHoliday] = useState<Partial<MarketHoliday>>({
     name: '',
     date: '',
@@ -131,7 +143,6 @@ export default function MarketSettingsSection() {
     fetchSettings();
   }, []);
 
-  // Track changes
   useEffect(() => {
     if (settings && originalSettings) {
       const changed = JSON.stringify(settings) !== JSON.stringify(originalSettings);
@@ -145,7 +156,7 @@ export default function MarketSettingsSection() {
       if (response.ok) {
         const data = await response.json();
         setSettings(data);
-        setOriginalSettings(JSON.parse(JSON.stringify(data))); // Deep copy
+        setOriginalSettings(JSON.parse(JSON.stringify(data)));
       }
     } catch (error) {
       console.error('Error fetching market settings:', error);
@@ -160,15 +171,10 @@ export default function MarketSettingsSection() {
     
     setSaving(true);
     try {
-      // Save ALL settings at once (mode, schedules, holidays, blocking rules)
       const response = await fetch('/api/market-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...settings,
-          // Include holidays in the save
-          holidays: settings.holidays,
-        }),
+        body: JSON.stringify(settings),
       });
 
       if (response.ok) {
@@ -176,9 +182,9 @@ export default function MarketSettingsSection() {
         setSettings(updatedSettings);
         setOriginalSettings(JSON.parse(JSON.stringify(updatedSettings)));
         setHasChanges(false);
-        toast.success('✅ All market settings saved and applied immediately!', {
-          description: 'Changes are now active for all users.',
-          duration: 4000,
+        toast.success('✅ Market settings saved!', {
+          description: 'Changes are now active.',
+          duration: 3000,
         });
       } else {
         const error = await response.json();
@@ -200,9 +206,8 @@ export default function MarketSettingsSection() {
 
     if (!settings) return;
 
-    // Add holiday to local state (will be saved when user clicks "Save All Settings")
     const holiday: MarketHoliday = {
-      _id: `temp_${Date.now()}`, // Temporary ID for local tracking
+      _id: `temp_${Date.now()}`,
       name: newHoliday.name,
       date: newHoliday.date,
       affectedAssets: newHoliday.affectedAssets || ['forex'],
@@ -216,25 +221,23 @@ export default function MarketSettingsSection() {
 
     setNewHoliday({ name: '', date: '', affectedAssets: ['forex'], isRecurring: false });
     setAddHolidayOpen(false);
-    toast.info('Holiday added. Click "Save All Settings" to apply.');
+    toast.info('Holiday added - click Save to apply');
   };
 
   const handleDeleteHoliday = (holidayId: string) => {
     if (!settings) return;
-
     setSettings({
       ...settings,
       holidays: settings.holidays.filter(h => h._id !== holidayId),
     });
-    toast.info('Holiday removed. Click "Save All Settings" to apply.');
   };
 
-  const handleDiscardChanges = () => {
-    if (originalSettings) {
-      setSettings(JSON.parse(JSON.stringify(originalSettings)));
-      setHasChanges(false);
-      toast.info('Changes discarded');
-    }
+  const toggleAssetExpanded = (assetId: string) => {
+    setExpandedAssets(prev => 
+      prev.includes(assetId) 
+        ? prev.filter(id => id !== assetId)
+        : [...prev, assetId]
+    );
   };
 
   const updateDaySchedule = (
@@ -260,159 +263,147 @@ export default function MarketSettingsSection() {
     });
   };
 
+  const getEnabledDaysCount = (schedule: AssetClassSchedule) => {
+    return DAYS.filter(day => schedule[day]?.enabled).length;
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-emerald-500 mx-auto mb-4" />
+          <p className="text-gray-400">Loading market settings...</p>
+        </div>
       </div>
     );
   }
 
   if (!settings) {
     return (
-      <div className="text-center py-8 text-gray-400">
-        Failed to load market settings
+      <div className="text-center py-16 text-gray-400">
+        <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-400" />
+        <p>Failed to load market settings</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header with Save Button */}
-      <div className="flex items-center justify-between sticky top-0 bg-gray-900/95 backdrop-blur-sm z-10 py-4 -mx-4 px-4 border-b border-gray-700">
-        <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <TrendingUp className="h-6 w-6 text-green-500" />
-            Market Settings
-          </h2>
-          <p className="text-gray-400 mt-1">
-            Configure market hours and holidays for competitions and challenges
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {hasChanges && (
-            <>
-              <Badge variant="outline" className="text-yellow-400 border-yellow-400 animate-pulse">
+    <div className="space-y-6 pb-24">
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800/80 via-gray-900/90 to-gray-950 border border-gray-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/[0.02]" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+        
+        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+              <TrendingUp className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Market Settings</h1>
+              <p className="text-gray-400 text-sm">Configure trading hours, holidays & blocking rules</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {hasChanges && (
+              <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 animate-pulse px-3 py-1">
+                <span className="w-2 h-2 rounded-full bg-amber-400 mr-2 animate-ping" />
                 Unsaved Changes
               </Badge>
-              <Button 
-                variant="outline" 
-                onClick={handleDiscardChanges}
-                className="border-gray-600 hover:bg-gray-700"
-              >
-                Discard
-              </Button>
-            </>
-          )}
-          <Button 
-            onClick={handleSaveAll} 
-            disabled={saving || !hasChanges} 
-            className={`${hasChanges ? 'bg-green-600 hover:bg-green-700 animate-pulse' : 'bg-green-600/50'}`}
-            size="lg"
-          >
-            {saving ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
             )}
-            Save All Settings
-          </Button>
+            <Button 
+              onClick={handleSaveAll} 
+              disabled={saving || !hasChanges}
+              className={`${
+                hasChanges 
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/25' 
+                  : 'bg-gray-700 text-gray-400'
+              } font-semibold px-6`}
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save Settings
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* Important Note */}
-      {hasChanges && (
-        <div className="p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-lg flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-yellow-400 font-medium">You have unsaved changes</p>
-            <p className="text-sm text-gray-300 mt-1">
-              Click "Save All Settings" to apply your changes. Settings will take effect immediately for all users.
+        {/* Quick Stats */}
+        <div className="relative grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-3 border border-gray-700/50">
+            <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
+              <Settings className="h-3.5 w-3.5" />
+              Mode
+            </div>
+            <p className="text-white font-semibold capitalize">{settings.mode}</p>
+          </div>
+          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-3 border border-gray-700/50">
+            <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
+              <Calendar className="h-3.5 w-3.5" />
+              Holidays
+            </div>
+            <p className="text-white font-semibold">{settings.holidays.length}</p>
+          </div>
+          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-3 border border-gray-700/50">
+            <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
+              <Shield className="h-3.5 w-3.5" />
+              Blocking
+            </div>
+            <p className="text-white font-semibold">
+              {[settings.blockTradingOnHolidays, settings.blockCompetitionsOnHolidays, settings.blockChallengesOnHolidays].filter(Boolean).length}/3
+            </p>
+          </div>
+          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-3 border border-gray-700/50">
+            <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
+              <Activity className="h-3.5 w-3.5" />
+              Active Assets
+            </div>
+            <p className="text-white font-semibold">
+              {ASSET_CLASSES.filter(a => settings.assetSchedules[a.id as keyof typeof settings.assetSchedules]?.enabled).length}/5
             </p>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Mode Selection */}
-      <Card className="bg-gray-800/50 border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Market Hours Mode
-          </CardTitle>
-          <CardDescription>
-            Choose how market hours are determined
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Automatic Mode */}
-            <div
-              className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                settings.mode === 'automatic'
-                  ? 'border-green-500 bg-green-500/10'
-                  : 'border-gray-700 hover:border-gray-600'
-              }`}
-              onClick={() => setSettings({ ...settings, mode: 'automatic' })}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                  settings.mode === 'automatic' ? 'bg-green-500' : 'bg-gray-700'
-                }`}>
-                  <Zap className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-white">Automatic</h4>
-                  <p className="text-xs text-gray-400">Use Massive.com API</p>
-                </div>
-                {settings.mode === 'automatic' && (
-                  <CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
-                )}
-              </div>
-              <p className="text-sm text-gray-400">
-                Real-time market status from Massive.com API. Your custom holidays will still be respected.
-              </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <button
+          onClick={() => setSettings({ ...settings, mode: 'automatic' })}
+          className={`relative overflow-hidden rounded-xl p-5 text-left transition-all duration-300 ${
+            settings.mode === 'automatic'
+              ? 'bg-gradient-to-br from-emerald-500/20 to-teal-600/10 border-2 border-emerald-500 shadow-lg shadow-emerald-500/10'
+              : 'bg-gray-800/50 border border-gray-700/50 hover:border-gray-600'
+          }`}
+        >
+          {settings.mode === 'automatic' && (
+            <div className="absolute top-3 right-3">
+              <CheckCircle className="h-5 w-5 text-emerald-400" />
             </div>
-
-            {/* Manual Mode */}
-            <div
-              className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                settings.mode === 'manual'
-                  ? 'border-blue-500 bg-blue-500/10'
-                  : 'border-gray-700 hover:border-gray-600'
-              }`}
-              onClick={() => setSettings({ ...settings, mode: 'manual' })}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                  settings.mode === 'manual' ? 'bg-blue-500' : 'bg-gray-700'
-                }`}>
-                  <Clock className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-white">Manual</h4>
-                  <p className="text-xs text-gray-400">Custom schedules</p>
-                </div>
-                {settings.mode === 'manual' && (
-                  <CheckCircle className="h-5 w-5 text-blue-500 ml-auto" />
-                )}
-              </div>
-              <p className="text-sm text-gray-400">
-                Define custom trading hours for each day and asset class. Full control over market hours.
-              </p>
+          )}
+          <div className="flex items-center gap-3 mb-3">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              settings.mode === 'automatic' 
+                ? 'bg-gradient-to-br from-emerald-500 to-teal-600' 
+                : 'bg-gray-700'
+            }`}>
+              <Zap className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-lg">Automatic Mode</h3>
+              <p className="text-xs text-gray-400">Real-time API data</p>
             </div>
           </div>
-
-          {/* Automatic Mode Settings */}
+          <p className="text-sm text-gray-400">
+            Uses Massive.com API for live market status. Your custom holidays will still apply.
+          </p>
+          
           {settings.mode === 'automatic' && (
-            <div className="mt-4 p-4 bg-gray-900/50 rounded-lg space-y-4">
-              <h4 className="text-sm font-medium text-white">Automatic Mode Settings</h4>
-              
+            <div className="mt-4 pt-4 border-t border-gray-700/50 space-y-3">
               <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-white">Fallback to Manual Settings</Label>
-                  <p className="text-xs text-gray-400">If API fails, use manual schedules</p>
-                </div>
+                <span className="text-sm text-gray-400">API Fallback</span>
                 <Switch
                   checked={settings.automaticSettings.fallbackToManual}
                   onCheckedChange={(checked) => setSettings({
@@ -421,9 +412,8 @@ export default function MarketSettingsSection() {
                   })}
                 />
               </div>
-
-              <div className="flex items-center gap-4">
-                <Label className="text-white">Cache Duration</Label>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-400">Cache</span>
                 <Select
                   value={String(settings.automaticSettings.cacheMinutes)}
                   onValueChange={(val) => setSettings({
@@ -431,331 +421,436 @@ export default function MarketSettingsSection() {
                     automaticSettings: { ...settings.automaticSettings, cacheMinutes: parseInt(val) }
                   })}
                 >
-                  <SelectTrigger className="w-32 bg-gray-800 border-gray-600">
+                  <SelectTrigger className="w-24 h-8 bg-gray-800 border-gray-600 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">1 minute</SelectItem>
-                    <SelectItem value="5">5 minutes</SelectItem>
-                    <SelectItem value="15">15 minutes</SelectItem>
-                    <SelectItem value="30">30 minutes</SelectItem>
+                    <SelectItem value="1">1 min</SelectItem>
+                    <SelectItem value="5">5 min</SelectItem>
+                    <SelectItem value="15">15 min</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           )}
+        </button>
 
-          {/* Manual Mode Note */}
+        <button
+          onClick={() => setSettings({ ...settings, mode: 'manual' })}
+          className={`relative overflow-hidden rounded-xl p-5 text-left transition-all duration-300 ${
+            settings.mode === 'manual'
+              ? 'bg-gradient-to-br from-blue-500/20 to-indigo-600/10 border-2 border-blue-500 shadow-lg shadow-blue-500/10'
+              : 'bg-gray-800/50 border border-gray-700/50 hover:border-gray-600'
+          }`}
+        >
           {settings.mode === 'manual' && (
-            <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start gap-2">
-              <Info className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+            <div className="absolute top-3 right-3">
+              <CheckCircle className="h-5 w-5 text-blue-400" />
+            </div>
+          )}
+          <div className="flex items-center gap-3 mb-3">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              settings.mode === 'manual' 
+                ? 'bg-gradient-to-br from-blue-500 to-indigo-600' 
+                : 'bg-gray-700'
+            }`}>
+              <Clock className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-lg">Manual Mode</h3>
+              <p className="text-xs text-gray-400">Custom schedules</p>
+            </div>
+          </div>
+          <p className="text-sm text-gray-400">
+            Full control over trading hours. Define custom schedules for each day and asset class.
+          </p>
+        </button>
+      </div>
+
+      {/* Section Navigation */}
+      <div className="flex gap-2 p-1 bg-gray-800/50 rounded-xl border border-gray-700/50">
+        {[
+          { id: 'schedules', label: 'Trading Schedules', icon: Clock },
+          { id: 'holidays', label: 'Holidays', icon: Calendar, count: settings.holidays.length },
+          { id: 'blocking', label: 'Blocking Rules', icon: Shield },
+        ].map((section) => (
+          <button
+            key={section.id}
+            onClick={() => setActiveSection(section.id as typeof activeSection)}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-all ${
+              activeSection === section.id
+                ? 'bg-gradient-to-r from-gray-700 to-gray-800 text-white shadow-lg'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+            }`}
+          >
+            <section.icon className="h-4 w-4" />
+            <span className="hidden sm:inline">{section.label}</span>
+            {section.count !== undefined && section.count > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                {section.count}
+              </Badge>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Trading Schedules Section */}
+      {activeSection === 'schedules' && (
+        <div className="space-y-3">
+          {settings.mode === 'automatic' && (
+            <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+              <Info className="h-5 w-5 text-emerald-400 flex-shrink-0" />
               <p className="text-sm text-gray-300">
-                In Manual mode, market hours are determined by your custom schedule below. 
-                Days marked as "disabled" will block competitions, challenges, and trading.
+                <span className="text-emerald-400 font-medium">Automatic mode active.</span> These schedules are used as fallback when API is unavailable.
               </p>
             </div>
           )}
-        </CardContent>
-      </Card>
 
-      <Tabs defaultValue="schedules" className="space-y-4">
-        <TabsList className="bg-gray-800/50 border border-gray-700">
-          <TabsTrigger value="schedules">
-            <Clock className="h-4 w-4 mr-2" />
-            Trading Schedules
-          </TabsTrigger>
-          <TabsTrigger value="holidays">
-            <Calendar className="h-4 w-4 mr-2" />
-            Holidays ({settings.holidays.length})
-          </TabsTrigger>
-          <TabsTrigger value="blocking">
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Blocking Rules
-          </TabsTrigger>
-        </TabsList>
+          {ASSET_CLASSES.map((asset) => {
+            const schedule = settings.assetSchedules[asset.id as keyof typeof settings.assetSchedules];
+            const isExpanded = expandedAssets.includes(asset.id);
+            const enabledDays = getEnabledDaysCount(schedule);
 
-        {/* Trading Schedules Tab */}
-        <TabsContent value="schedules">
-          <div className="space-y-4">
-            {settings.mode === 'automatic' && (
-              <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-start gap-2 mb-4">
-                <Info className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-300">
-                  You're in <strong>Automatic</strong> mode. These schedules will only be used as fallback if the Massive.com API fails.
-                  Switch to <strong>Manual</strong> mode to use these schedules directly.
-                </p>
-              </div>
-            )}
-            {ASSET_CLASSES.map((asset) => (
-              <Card key={asset.id} className="bg-gray-800/50 border-gray-700">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-white flex items-center gap-2">
-                      <span className="text-xl">{asset.icon}</span>
-                      {asset.label}
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-gray-400 text-sm">Enabled</Label>
-                      <Switch
-                        checked={settings.assetSchedules[asset.id as keyof typeof settings.assetSchedules]?.enabled ?? true}
-                        onCheckedChange={(checked) => setSettings({
-                          ...settings,
-                          assetSchedules: {
-                            ...settings.assetSchedules,
-                            [asset.id]: {
-                              ...settings.assetSchedules[asset.id as keyof typeof settings.assetSchedules],
-                              enabled: checked,
-                            },
-                          },
-                        })}
-                      />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-7 gap-2">
-                    {DAYS.map((day) => {
-                      const schedule = settings.assetSchedules[asset.id as keyof typeof settings.assetSchedules]?.[day] || DEFAULT_DAY_SCHEDULE;
-                      return (
-                        <div key={day} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs text-gray-400">{DAY_LABELS[day].slice(0, 3)}</Label>
-                            <Switch
-                              checked={schedule.enabled}
-                              onCheckedChange={(checked) => 
-                                updateDaySchedule(asset.id as keyof typeof settings.assetSchedules, day, 'enabled', checked)
-                              }
-                              className="scale-75"
-                            />
-                          </div>
-                          {schedule.enabled && (
-                            <>
-                              <Input
-                                type="time"
-                                value={schedule.openTime}
-                                onChange={(e) => 
-                                  updateDaySchedule(asset.id as keyof typeof settings.assetSchedules, day, 'openTime', e.target.value)
-                                }
-                                className="h-7 text-xs bg-gray-900 border-gray-600"
-                              />
-                              <Input
-                                type="time"
-                                value={schedule.closeTime}
-                                onChange={(e) => 
-                                  updateDaySchedule(asset.id as keyof typeof settings.assetSchedules, day, 'closeTime', e.target.value)
-                                }
-                                className="h-7 text-xs bg-gray-900 border-gray-600"
-                              />
-                            </>
-                          )}
-                          {!schedule.enabled && (
-                            <div className="h-14 flex items-center justify-center text-xs text-red-400 font-medium">
-                              CLOSED
-                            </div>
-                          )}
+            return (
+              <Collapsible key={asset.id} open={isExpanded} onOpenChange={() => toggleAssetExpanded(asset.id)}>
+                <div className={`rounded-xl border overflow-hidden transition-all ${
+                  schedule?.enabled 
+                    ? `${asset.bgColor} ${asset.borderColor}` 
+                    : 'bg-gray-800/30 border-gray-700/50 opacity-60'
+                }`}>
+                  <CollapsibleTrigger asChild>
+                    <button className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${asset.color} flex items-center justify-center text-2xl shadow-lg`}>
+                          {asset.icon}
                         </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">All times are in UTC</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* Holidays Tab */}
-        <TabsContent value="holidays">
-          <Card className="bg-gray-800/50 border-gray-700">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Market Holidays
-                  </CardTitle>
-                  <CardDescription>
-                    Define holidays when markets are closed (applied in both Automatic and Manual modes)
-                  </CardDescription>
-                </div>
-                <Button onClick={() => setAddHolidayOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Holiday
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {settings.holidays.length === 0 ? (
-                <div className="text-center py-8 text-gray-400">
-                  <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No holidays configured</p>
-                  <p className="text-sm">Add holidays to block trading during market closures</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {settings.holidays.map((holiday) => (
-                    <div
-                      key={holiday._id}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        holiday._id?.startsWith('temp_') 
-                          ? 'bg-yellow-500/10 border border-yellow-500/30' 
-                          : 'bg-gray-900/50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-                          <Calendar className="h-5 w-5 text-red-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-white">
-                            {holiday.name}
-                            {holiday._id?.startsWith('temp_') && (
-                              <Badge className="ml-2 text-xs bg-yellow-500/20 text-yellow-400">New</Badge>
-                            )}
+                        <div className="text-left">
+                          <h3 className="font-bold text-white text-lg">{asset.label}</h3>
+                          <p className="text-sm text-gray-400">
+                            {schedule?.enabled ? `${enabledDays} days active` : 'Disabled'}
                           </p>
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
-                            <span>{new Date(holiday.date + 'T00:00:00').toLocaleDateString()}</span>
-                            {holiday.isRecurring && (
-                              <Badge variant="outline" className="text-xs">Recurring</Badge>
-                            )}
-                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex gap-1">
-                          {holiday.affectedAssets.map((asset) => (
-                            <Badge key={asset} variant="secondary" className="text-xs">
-                              {asset}
-                            </Badge>
+                      
+                      <div className="flex items-center gap-4">
+                        <div className="flex gap-1 mr-2">
+                          {DAYS.map((day) => (
+                            <div
+                              key={day}
+                              className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold ${
+                                schedule?.[day]?.enabled
+                                  ? 'bg-emerald-500/30 text-emerald-400'
+                                  : 'bg-gray-700/50 text-gray-500'
+                              }`}
+                            >
+                              {DAY_LABELS[day][0]}
+                            </div>
                           ))}
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => holiday._id && handleDeleteHoliday(holiday._id)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        
+                        <Switch
+                          checked={schedule?.enabled ?? true}
+                          onCheckedChange={(checked) => {
+                            setSettings({
+                              ...settings,
+                              assetSchedules: {
+                                ...settings.assetSchedules,
+                                [asset.id]: { ...schedule, enabled: checked },
+                              },
+                            });
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        
+                        {isExpanded ? (
+                          <ChevronDown className="h-5 w-5 text-gray-400" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5 text-gray-400" />
+                        )}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    </button>
+                  </CollapsibleTrigger>
 
-              {/* Common Holidays Quick Add */}
-              <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Info className="h-4 w-4 text-blue-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-blue-400 font-medium">Common Forex Holidays</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Forex markets typically close on: Christmas Day (Dec 25), New Year's Day (Jan 1), 
-                      Good Friday, Easter Monday. Add these as recurring holidays.
-                    </p>
+                  <CollapsibleContent>
+                    <div className="px-4 pb-4 pt-2 border-t border-gray-700/30">
+                      <div className="grid grid-cols-7 gap-2">
+                        {DAYS.map((day) => {
+                          const daySchedule = schedule?.[day] || DEFAULT_DAY_SCHEDULE;
+                          const isWeekend = day === 'saturday' || day === 'sunday';
+                          
+                          return (
+                            <div 
+                              key={day} 
+                              className={`rounded-lg p-3 ${
+                                daySchedule.enabled 
+                                  ? 'bg-gray-800/50' 
+                                  : 'bg-gray-900/30'
+                              } ${isWeekend ? 'ring-1 ring-orange-500/20' : ''}`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className={`text-xs font-bold ${
+                                  daySchedule.enabled ? 'text-white' : 'text-gray-500'
+                                }`}>
+                                  {DAY_LABELS[day]}
+                                </span>
+                                <Switch
+                                  checked={daySchedule.enabled}
+                                  onCheckedChange={(checked) => 
+                                    updateDaySchedule(asset.id as keyof typeof settings.assetSchedules, day, 'enabled', checked)
+                                  }
+                                  className="scale-75"
+                                />
+                              </div>
+                              
+                              {daySchedule.enabled ? (
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-1">
+                                    <Sun className="h-3 w-3 text-amber-400" />
+                                    <Input
+                                      type="time"
+                                      value={daySchedule.openTime}
+                                      onChange={(e) => 
+                                        updateDaySchedule(asset.id as keyof typeof settings.assetSchedules, day, 'openTime', e.target.value)
+                                      }
+                                      className="h-7 text-xs bg-gray-900/50 border-gray-700 px-2"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Moon className="h-3 w-3 text-blue-400" />
+                                    <Input
+                                      type="time"
+                                      value={daySchedule.closeTime}
+                                      onChange={(e) => 
+                                        updateDaySchedule(asset.id as keyof typeof settings.assetSchedules, day, 'closeTime', e.target.value)
+                                      }
+                                      className="h-7 text-xs bg-gray-900/50 border-gray-700 px-2"
+                                    />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="h-[60px] flex items-center justify-center">
+                                  <div className="flex items-center gap-1 text-red-400/70">
+                                    <Ban className="h-4 w-4" />
+                                    <span className="text-xs font-medium">Closed</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-3 text-center">All times in UTC</p>
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Holidays Section */}
+      {activeSection === 'holidays' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-white">Market Holidays</h3>
+              <p className="text-sm text-gray-400">Define days when markets are closed</p>
+            </div>
+            <Button onClick={() => setAddHolidayOpen(true)} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Holiday
+            </Button>
+          </div>
+
+          {settings.holidays.length === 0 ? (
+            <div className="text-center py-16 bg-gray-800/30 rounded-xl border border-dashed border-gray-700">
+              <Calendar className="h-16 w-16 mx-auto mb-4 text-gray-600" />
+              <h3 className="text-lg font-semibold text-gray-400 mb-2">No Holidays Configured</h3>
+              <p className="text-sm text-gray-500 mb-4">Add holidays to block trading during market closures</p>
+              <Button onClick={() => setAddHolidayOpen(true)} variant="outline" className="border-gray-600">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Holiday
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {settings.holidays.map((holiday) => (
+                <div
+                  key={holiday._id}
+                  className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                    holiday._id?.startsWith('temp_')
+                      ? 'bg-amber-500/10 border-amber-500/30'
+                      : 'bg-gray-800/50 border-gray-700/50 hover:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg shadow-red-500/20">
+                      <Calendar className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold text-white">{holiday.name}</h4>
+                        {holiday._id?.startsWith('temp_') && (
+                          <Badge className="bg-amber-500/20 text-amber-400 text-xs">New</Badge>
+                        )}
+                        {holiday.isRecurring && (
+                          <Badge variant="outline" className="text-xs border-gray-600">Yearly</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-400">
+                        {new Date(holiday.date + 'T00:00:00').toLocaleDateString('en-US', { 
+                          weekday: 'short', 
+                          month: 'short', 
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-1">
+                      {holiday.affectedAssets.map((asset) => (
+                        <Badge key={asset} variant="secondary" className="text-xs capitalize">
+                          {asset}
+                        </Badge>
+                      ))}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => holiday._id && handleDeleteHoliday(holiday._id)}
+                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              ))}
+            </div>
+          )}
 
-        {/* Blocking Rules Tab */}
-        <TabsContent value="blocking">
-          <Card className="bg-gray-800/50 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-orange-500" />
-                Blocking Rules
-              </CardTitle>
-              <CardDescription>
-                Configure what actions to block when market is closed (holidays or outside trading hours)
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg flex items-start gap-2 mb-4">
-                <AlertTriangle className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-300">
-                  These rules apply when the market is closed - either due to holidays, weekends, or 
-                  disabled days in your schedule. Enable these to prevent users from joining competitions 
-                  or challenges during market closures.
+          {/* Quick Add Info */}
+          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm text-blue-400 font-medium mb-1">Common Forex Holidays</p>
+                <p className="text-xs text-gray-400">
+                  Christmas (Dec 25), New Year's (Jan 1), Good Friday, Easter Monday. 
+                  Mark as "Yearly" for recurring holidays.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
-                <div>
-                  <Label className="text-white">Block Trading on Market Close</Label>
-                  <p className="text-xs text-gray-400">Prevent users from opening/closing positions</p>
+      {/* Blocking Rules Section */}
+      {activeSection === 'blocking' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm text-orange-400 font-medium mb-1">About Blocking Rules</p>
+                <p className="text-xs text-gray-400">
+                  These rules apply when the market is closed - holidays, weekends, or disabled days. 
+                  Enable to prevent users from joining competitions/challenges during closures.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            {[
+              {
+                id: 'blockTradingOnHolidays',
+                label: 'Block Trading',
+                description: 'Prevent opening/closing positions',
+                icon: TrendingUp,
+                color: 'from-red-500 to-rose-600',
+              },
+              {
+                id: 'blockCompetitionsOnHolidays',
+                label: 'Block Competition Entry',
+                description: 'Prevent joining competitions',
+                icon: Globe,
+                color: 'from-orange-500 to-amber-600',
+              },
+              {
+                id: 'blockChallengesOnHolidays',
+                label: 'Block Challenge Entry',
+                description: 'Prevent creating/accepting 1v1 challenges',
+                icon: Shield,
+                color: 'from-purple-500 to-violet-600',
+              },
+              {
+                id: 'showHolidayWarning',
+                label: 'Show Warning Banner',
+                description: 'Display notice to users when market is closed',
+                icon: AlertTriangle,
+                color: 'from-yellow-500 to-amber-600',
+              },
+            ].map((rule) => (
+              <div
+                key={rule.id}
+                className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                  settings[rule.id as keyof MarketSettings]
+                    ? 'bg-gray-800/50 border-gray-600'
+                    : 'bg-gray-800/30 border-gray-700/50'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${rule.color} flex items-center justify-center shadow-lg ${
+                    settings[rule.id as keyof MarketSettings] ? 'opacity-100' : 'opacity-40'
+                  }`}>
+                    <rule.icon className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white">{rule.label}</h4>
+                    <p className="text-sm text-gray-400">{rule.description}</p>
+                  </div>
                 </div>
                 <Switch
-                  checked={settings.blockTradingOnHolidays}
-                  onCheckedChange={(checked) => setSettings({ ...settings, blockTradingOnHolidays: checked })}
+                  checked={settings[rule.id as keyof MarketSettings] as boolean}
+                  onCheckedChange={(checked) => setSettings({ ...settings, [rule.id]: checked })}
                 />
               </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-              <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
-                <div>
-                  <Label className="text-white">Block Competition Entry on Market Close</Label>
-                  <p className="text-xs text-gray-400">Prevent users from joining competitions</p>
-                </div>
-                <Switch
-                  checked={settings.blockCompetitionsOnHolidays}
-                  onCheckedChange={(checked) => setSettings({ ...settings, blockCompetitionsOnHolidays: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
-                <div>
-                  <Label className="text-white">Block Challenge Entry on Market Close</Label>
-                  <p className="text-xs text-gray-400">Prevent users from creating/accepting 1v1 challenges</p>
-                </div>
-                <Switch
-                  checked={settings.blockChallengesOnHolidays}
-                  onCheckedChange={(checked) => setSettings({ ...settings, blockChallengesOnHolidays: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
-                <div>
-                  <Label className="text-white">Show Holiday Warning Banner</Label>
-                  <p className="text-xs text-gray-400">Display warning to users when market is closed</p>
-                </div>
-                <Switch
-                  checked={settings.showHolidayWarning}
-                  onCheckedChange={(checked) => setSettings({ ...settings, showHolidayWarning: checked })}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Floating Save Button (when scrolled) */}
+      {/* Floating Save Button */}
       {hasChanges && (
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="fixed bottom-6 right-6 z-50 animate-bounce">
           <Button 
             onClick={handleSaveAll} 
             disabled={saving}
             size="lg"
-            className="bg-green-600 hover:bg-green-700 shadow-xl shadow-green-500/30 animate-bounce"
+            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-2xl shadow-emerald-500/30 font-bold px-8"
           >
             {saving ? (
               <Loader2 className="h-5 w-5 mr-2 animate-spin" />
             ) : (
               <Save className="h-5 w-5 mr-2" />
             )}
-            Save All Settings
+            Save Settings
           </Button>
         </div>
       )}
 
       {/* Add Holiday Dialog */}
       <Dialog open={addHolidayOpen} onOpenChange={setAddHolidayOpen}>
-        <DialogContent className="bg-gray-800 border-gray-700">
+        <DialogContent className="bg-gray-900 border-gray-700 max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Add Market Holiday
+            <DialogTitle className="text-white flex items-center gap-2 text-xl">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
+                <Calendar className="h-5 w-5 text-white" />
+              </div>
+              Add Holiday
             </DialogTitle>
           </DialogHeader>
 
@@ -766,7 +861,7 @@ export default function MarketSettingsSection() {
                 value={newHoliday.name}
                 onChange={(e) => setNewHoliday({ ...newHoliday, name: e.target.value })}
                 placeholder="e.g., Christmas Day"
-                className="bg-gray-900 border-gray-600"
+                className="bg-gray-800 border-gray-700 focus:border-emerald-500"
               />
             </div>
 
@@ -776,15 +871,22 @@ export default function MarketSettingsSection() {
                 type="date"
                 value={newHoliday.date}
                 onChange={(e) => setNewHoliday({ ...newHoliday, date: e.target.value })}
-                className="bg-gray-900 border-gray-600"
+                className="bg-gray-800 border-gray-700 focus:border-emerald-500"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-white">Affected Asset Classes</Label>
-              <div className="flex flex-wrap gap-2">
+              <Label className="text-white">Affected Markets</Label>
+              <div className="grid grid-cols-3 gap-2">
                 {ASSET_CLASSES.map((asset) => (
-                  <label key={asset.id} className="flex items-center gap-2">
+                  <label 
+                    key={asset.id} 
+                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
+                      newHoliday.affectedAssets?.includes(asset.id)
+                        ? `${asset.bgColor} ${asset.borderColor} border`
+                        : 'bg-gray-800/50 border border-gray-700 hover:border-gray-600'
+                    }`}
+                  >
                     <Checkbox
                       checked={newHoliday.affectedAssets?.includes(asset.id)}
                       onCheckedChange={(checked) => {
@@ -796,27 +898,32 @@ export default function MarketSettingsSection() {
                             : assets.filter(a => a !== asset.id),
                         });
                       }}
+                      className="hidden"
                     />
-                    <span className="text-sm text-gray-300">{asset.icon} {asset.label}</span>
+                    <span className="text-lg">{asset.icon}</span>
+                    <span className="text-xs text-gray-300">{asset.label}</span>
                   </label>
                 ))}
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <label className="flex items-center gap-3 p-3 rounded-lg bg-gray-800/50 cursor-pointer">
               <Checkbox
                 checked={newHoliday.isRecurring}
                 onCheckedChange={(checked) => setNewHoliday({ ...newHoliday, isRecurring: !!checked })}
               />
-              <Label className="text-gray-300">Recurring yearly</Label>
-            </div>
+              <div>
+                <span className="text-white font-medium">Recurring Yearly</span>
+                <p className="text-xs text-gray-400">Repeats every year on the same date</p>
+              </div>
+            </label>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAddHolidayOpen(false)}>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAddHolidayOpen(false)} className="border-gray-700">
               Cancel
             </Button>
-            <Button onClick={handleAddHoliday} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleAddHoliday} className="bg-gradient-to-r from-emerald-500 to-teal-600">
               <Plus className="h-4 w-4 mr-2" />
               Add Holiday
             </Button>
