@@ -29,6 +29,7 @@ interface SuspicionScoreData {
     mirrorTrading: ScoreBreakdown;
     timezoneLanguage: ScoreBreakdown;
     deviceSwitching: ScoreBreakdown;
+    kycDuplicate: ScoreBreakdown;
   };
   linkedAccounts: Array<{
     userId: string;
@@ -85,6 +86,7 @@ export default function SuspicionScoreCard({ score }: Props) {
   };
 
   const detectionMethods = [
+    { key: 'kycDuplicate', label: 'Duplicate KYC', maxPercentage: 50, icon: '🪪' },
     { key: 'deviceMatch', label: 'Device Match', maxPercentage: 40, icon: '📱' },
     { key: 'ipBrowserMatch', label: 'IP + Browser', maxPercentage: 35, icon: '🌐' },
     { key: 'mirrorTrading', label: 'Mirror Trading', maxPercentage: 35, icon: '🪞' },
