@@ -5,11 +5,9 @@ import {
   Bot, 
   TrendingUp, 
   Zap, 
-  Star, 
   Settings,
   Power,
   PowerOff,
-  ChevronRight,
   ShoppingBag,
   Clock,
   Activity,
@@ -17,7 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';

@@ -47,7 +47,7 @@ export async function GET(
         'Content-Type': 'text/html; charset=utf-8',
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching invoice HTML:', error);
     return NextResponse.json({ error: 'Failed to fetch invoice' }, { status: 500 });
   }

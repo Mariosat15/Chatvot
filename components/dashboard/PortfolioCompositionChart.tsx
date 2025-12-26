@@ -1,6 +1,6 @@
 'use client';
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { PieChart as PieChartIcon } from 'lucide-react';
 
 interface PortfolioCompositionChartProps {
@@ -92,7 +92,7 @@ export default function PortfolioCompositionChart({ positions }: PortfolioCompos
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                 outerRadius={80}
                 innerRadius={50}
                 fill="#8884d8"

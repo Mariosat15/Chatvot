@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    const wallet = await CreditWallet.findOne({ userId: session.user.id }).lean();
+    const wallet = await CreditWallet.findOne({ userId: session.user.id }).lean() as any;
     
     return NextResponse.json({
       balance: wallet?.creditBalance ?? 0,

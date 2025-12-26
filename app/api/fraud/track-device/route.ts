@@ -81,7 +81,7 @@ export async function POST(request: Request) {
                      'unknown';
 
     // Detect VPN/Proxy (if enabled)
-    let ipDetection = {
+    let ipDetection: any = {
       isVPN: false,
       isProxy: false,
       isTor: false,
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
 
     // Check if this fingerprint already exists FOR THIS USER FIRST
     // This ensures each user updates their OWN fingerprint, not a linked one
-    let existingFingerprint = await DeviceFingerprint.findOne({
+    const existingFingerprint = await DeviceFingerprint.findOne({
       fingerprintId: fingerprintData.fingerprintId,
       userId: userId
     });
@@ -821,9 +821,16 @@ export async function POST(request: Request) {
       });
     }
   } catch (error) {
-    console.error('Error tracking device fingerprint:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('❌ Error tracking device fingerprint:', errorMessage);
+    console.error('Stack:', errorStack);
     return NextResponse.json(
-      { success: false, message: 'Failed to track device' },
+      { 
+        success: false, 
+        message: 'Failed to track device',
+        error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { status: 500 }
     );
   }

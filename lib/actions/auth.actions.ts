@@ -1,10 +1,11 @@
 'use server';
 
 import {auth} from "@/lib/better-auth/auth";
-import {inngest} from "@/lib/inngest/client";
 import {headers} from "next/headers";
 import {connectToDatabase} from "@/database/mongoose";
 import { ObjectId } from 'mongodb';
+import { sendWelcomeEmail } from "@/lib/nodemailer";
+import EmailTemplate from "@/database/models/email-template.model";
 
 export const signUpWithEmail = async ({ email, password, fullName, country, address, city, postalCode }: SignUpFormData) => {
     try {
@@ -29,6 +30,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, addr
                 console.log(`📝 Sign-up: Updating user ${userId} with profile data...`);
                 
                 // Build query to find user by multiple ID formats
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const queries: any[] = [{ id: userId }];
                 if (ObjectId.isValid(userId)) {
                     queries.push({ _id: new ObjectId(userId) });
@@ -62,10 +64,20 @@ export const signUpWithEmail = async ({ email, password, fullName, country, addr
                 }
             }
 
-            await inngest.send({
-                name: 'app/user.created',
-                data: { email, name: fullName, country }
-            })
+            // Send welcome email directly (replaces Inngest)
+            try {
+                const template = await EmailTemplate.findOne({ templateType: 'welcome' });
+                if (template?.isActive !== false) {
+                    const introText = template?.introText || 'Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.';
+                    await sendWelcomeEmail({ email, name: fullName, intro: introText });
+                    console.log(`✅ Welcome email sent to ${email}`);
+                } else {
+                    console.log('📧 Welcome email is disabled in settings, skipping...');
+                }
+            } catch (emailError) {
+                console.error('⚠️ Failed to send welcome email:', emailError);
+                // Don't fail registration if email fails
+            }
         }
 
         return { success: true, data: response }

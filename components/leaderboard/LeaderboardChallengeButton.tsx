@@ -4,11 +4,18 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Swords, Circle, Loader2 } from 'lucide-react';
 import ChallengeCreateDialog from '@/components/challenges/ChallengeCreateDialog';
+import VsScreen, { VsOpponent } from '@/components/challenges/VsScreen';
 
 interface LeaderboardChallengeButtonProps {
   userId: string;
   username: string;
   isCurrentUser: boolean;
+  // Stats from leaderboard data
+  winRate?: number;
+  totalTrades?: number;
+  challengesEntered?: number;
+  level?: number;
+  profileImage?: string;
 }
 
 interface OnlineUser {
@@ -46,10 +53,19 @@ export default function LeaderboardChallengeButton({
   userId,
   username,
   isCurrentUser,
+  winRate = 0,
+  totalTrades = 0,
+  challengesEntered = 0,
+  level = 3,
+  profileImage,
 }: LeaderboardChallengeButtonProps) {
   const [onlineStatus, setOnlineStatus] = useState<OnlineUser | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showVsScreen, setShowVsScreen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [currentUserName, setCurrentUserName] = useState<string>('You');
+  const [currentUserImage, setCurrentUserImage] = useState<string | undefined>();
+  const [opponentStats, setOpponentStats] = useState<VsOpponent | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const updateStatusFromCache = useCallback(() => {
@@ -102,6 +118,50 @@ export default function LeaderboardChallengeButton({
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [fetchOnlineStatus]);
 
+  // Fetch current user name and image on mount
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await fetch('/api/user/profile');
+        const data = await res.json();
+        const user = data.user || data;
+        if (user?.name) {
+          setCurrentUserName(user.name);
+        }
+        if (user?.profileImage) {
+          setCurrentUserImage(user.profileImage);
+        }
+      } catch {
+        // Ignore - use default "You"
+      }
+    };
+    fetchCurrentUser();
+  }, []);
+
+  // Handle challenge button click - show VS screen first
+  const handleChallengeClick = () => {
+    // Use stats passed from leaderboard (no need to fetch)
+    setOpponentStats({
+      username,
+      profileImage,
+      level,
+      winRate,
+      totalTrades,
+      challengesEntered,
+    });
+    
+    setShowVsScreen(true);
+  };
+
+  const handleVsChallenge = () => {
+    setShowVsScreen(false);
+    setDialogOpen(true);
+  };
+
+  const handleVsClose = () => {
+    setShowVsScreen(false);
+  };
+
   // Current user sees their own row but no challenge button
   if (isCurrentUser) {
     return (
@@ -139,12 +199,24 @@ export default function LeaderboardChallengeButton({
       {canChallenge && (
         <Button
           size="sm"
-          onClick={() => setDialogOpen(true)}
+          onClick={handleChallengeClick}
           className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-xs px-2 py-1 h-7"
         >
           <Swords className="h-3 w-3 mr-1" />
           Challenge
         </Button>
+      )}
+
+      {/* VS Screen */}
+      {opponentStats && (
+        <VsScreen
+          show={showVsScreen}
+          player1Name={currentUserName}
+          player1Image={currentUserImage}
+          opponent={opponentStats}
+          onChallenge={handleVsChallenge}
+          onClose={handleVsClose}
+        />
       )}
 
       {/* Challenge Dialog */}

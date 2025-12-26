@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Swords, Target, Trophy, User, RefreshCw } from 'lucide-react';
 import { 
@@ -12,6 +12,7 @@ import {
   getMyStatLabel,
   getRankingLabel
 } from '@/lib/utils/ranking-utils';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface ChallengeInfoHeaderProps {
   challengeId: string;
@@ -66,7 +67,9 @@ export function ChallengeInfoHeader({
         const participants = data.participants;
         
         // Find opponent and me
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const oppData = participants.find((p: any) => p.userId === opponentId);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const myData = participants.find((p: any) => p.userId !== opponentId);
         
         if (myData) {
@@ -138,11 +141,24 @@ export function ChallengeInfoHeader({
     return () => clearInterval(interval);
   }, [endTime]);
 
-  // Poll for live data every 3 seconds
+  // Poll for live data - optimized interval with visibility awareness
   useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchLiveData(); // Refresh when tab becomes visible
+      }
+    };
+
     fetchLiveData();
-    const interval = setInterval(fetchLiveData, 3000);
-    return () => clearInterval(interval);
+    intervalId = setInterval(fetchLiveData, PERFORMANCE_INTERVALS.CHALLENGE_LIVE_DATA);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchLiveData]);
 
   // Determine who's winning based on the ranking method

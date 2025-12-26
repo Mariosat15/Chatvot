@@ -4,6 +4,7 @@ import { Trophy, TrendingUp, TrendingDown, Target, Activity, AlertTriangle, Shie
 import { formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionsTableProps {
   competitions: any[];
 }

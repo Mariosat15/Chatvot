@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Trophy, Award, Settings, Bell, ShoppingBag } from 'lucide-react';
+import { Trophy, Award, Settings, Bell, ShoppingBag, Shield } from 'lucide-react';
 
 interface ProfileTabsProps {
   overviewContent: React.ReactNode;
@@ -10,17 +10,20 @@ interface ProfileTabsProps {
   settingsContent?: React.ReactNode;
   notificationsContent?: React.ReactNode;
   arsenalContent?: React.ReactNode;
+  verificationContent?: React.ReactNode;
 }
 
-export default function ProfileTabs({ overviewContent, badgesContent, settingsContent, notificationsContent, arsenalContent }: ProfileTabsProps) {
+export default function ProfileTabs({ overviewContent, badgesContent, settingsContent, notificationsContent, arsenalContent, verificationContent }: ProfileTabsProps) {
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'overview' | 'badges' | 'settings' | 'notifications' | 'arsenal'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'badges' | 'settings' | 'notifications' | 'arsenal' | 'verification'>('overview');
   
   // Handle tab from URL query param
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab === 'arsenal') {
       setActiveTab('arsenal');
+    } else if (tab === 'verification') {
+      setActiveTab('verification');
     }
   }, [searchParams]);
 
@@ -74,6 +77,19 @@ export default function ProfileTabs({ overviewContent, badgesContent, settingsCo
             Trading Arsenal
           </button>
         )}
+        {verificationContent && (
+          <button
+            onClick={() => setActiveTab('verification')}
+            className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'verification'
+                ? 'text-green-400 border-b-2 border-green-400'
+                : 'text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            <Shield className="h-5 w-5" />
+            Verification
+          </button>
+        )}
         {settingsContent && (
           <button
             onClick={() => setActiveTab('settings')}
@@ -95,6 +111,7 @@ export default function ProfileTabs({ overviewContent, badgesContent, settingsCo
         {activeTab === 'badges' && badgesContent}
         {activeTab === 'notifications' && (notificationsContent || <div className="text-gray-400">Loading notifications...</div>)}
         {activeTab === 'arsenal' && arsenalContent}
+        {activeTab === 'verification' && verificationContent}
         {activeTab === 'settings' && settingsContent}
       </div>
     </div>

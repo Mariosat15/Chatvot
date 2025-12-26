@@ -3,10 +3,12 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface ChallengeStatusMonitorProps {
   challengeId: string;
   initialStatus: string;
+  userId: string; // Current user's ID to check if they won
 }
 
 /**
@@ -15,7 +17,8 @@ interface ChallengeStatusMonitorProps {
  */
 export default function ChallengeStatusMonitor({ 
   challengeId, 
-  initialStatus 
+  initialStatus,
+  userId,
 }: ChallengeStatusMonitorProps) {
   const router = useRouter();
   const hasRedirectedRef = useRef(false);
@@ -100,18 +103,33 @@ export default function ChallengeStatusMonitor({
               clearInterval(pollIntervalRef.current);
             }
 
-            // Check if user won
+            // Check if CURRENT user won (compare winnerId to userId prop)
             const winnerId = data.challenge?.winnerId;
-            const isWinner = winnerId && data.participants?.some(
-              (p: any) => p.userId === winnerId && p.isWinner
-            );
+            const isTie = data.challenge?.isTie;
+            const isWinner = winnerId && winnerId === userId;
+            const isLoser = winnerId && winnerId !== userId && !isTie;
 
-            toast.success(isWinner ? '🏆 You Won!' : '⚔️ Challenge Ended', {
-              description: isWinner 
-                ? 'Congratulations! You won the challenge!' 
-                : 'The challenge has ended. View the results.',
-              duration: 5000,
-            });
+            if (isTie) {
+              toast.info('🤝 Challenge Ended - Tie!', {
+                description: 'The challenge ended in a tie. View the results.',
+                duration: 5000,
+              });
+            } else if (isWinner) {
+              toast.success('🏆 You Won!', {
+                description: 'Congratulations! You won the challenge!',
+                duration: 5000,
+              });
+            } else if (isLoser) {
+              toast.error('😔 Challenge Ended', {
+                description: 'You lost this challenge. Better luck next time!',
+                duration: 5000,
+              });
+            } else {
+              toast('⚔️ Challenge Ended', {
+                description: 'The challenge has ended. View the results.',
+                duration: 5000,
+              });
+            }
 
             setTimeout(() => {
               router.push(`/challenges/${challengeId}`);
@@ -127,8 +145,8 @@ export default function ChallengeStatusMonitor({
     // Initial check after 3 seconds
     const timeoutId = setTimeout(checkChallengeStatus, 3000);
 
-    // Poll every 5 seconds
-    pollIntervalRef.current = setInterval(checkChallengeStatus, 5000);
+    // Poll at optimized interval (10 seconds instead of 5)
+    pollIntervalRef.current = setInterval(checkChallengeStatus, PERFORMANCE_INTERVALS.CHALLENGE_STATUS);
 
     return () => {
       clearTimeout(timeoutId);
@@ -136,7 +154,7 @@ export default function ChallengeStatusMonitor({
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [challengeId, initialStatus, router]);
+  }, [challengeId, initialStatus, router, userId]);
 
   return null;
 }

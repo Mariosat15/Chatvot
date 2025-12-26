@@ -1,4 +1,4 @@
-import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, ArrowLeft, Target, Shield, AlertTriangle, Zap, Info, Percent, BarChart3, Skull, Bell, Eye } from 'lucide-react';
+import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, ArrowLeft, Target, Shield, AlertTriangle, Zap, Info, Percent, BarChart3, Skull, Bell } from 'lucide-react';
 import { getCompetitionById, getCompetitionLeaderboard, isUserInCompetition, getUserParticipant } from '@/lib/actions/trading/competition.actions';
 import { getWalletBalance } from '@/lib/actions/trading/wallet.actions';
 import { getTradingRiskSettings } from '@/lib/actions/trading/risk-settings.actions';
@@ -7,12 +7,15 @@ import Link from 'next/link';
 import CompetitionLeaderboard from '@/components/trading/CompetitionLeaderboard';
 import CompetitionEntryButton from '@/components/trading/CompetitionEntryButton';
 import CompetitionStatusWrapper from '@/components/trading/CompetitionStatusWrapper';
+import CompetitionDashboard from '@/components/trading/CompetitionDashboard';
 import CompetitionStatusMonitor from '@/components/trading/CompetitionStatusMonitor';
 import UTCClock from '@/components/trading/UTCClock';
 import LiveCountdown from '@/components/trading/LiveCountdown';
 import InlineCountdown from '@/components/trading/InlineCountdown';
 import { notFound } from 'next/navigation';
 import { unstable_noStore as noStore } from 'next/cache';
+import { auth } from '@/lib/better-auth/auth';
+import { headers } from 'next/headers';
 
 interface CompetitionDetailsPageProps {
   params: Promise<{ id: string }>;
@@ -23,6 +26,10 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
   noStore();
   
   const { id } = await params;
+
+  // Get session for user identification
+  const session = await auth.api.getSession({ headers: await headers() });
+  const userId = session?.user?.id || '';
 
   try {
     // Get competition data
@@ -48,7 +55,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
       return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
     };
 
-    const getTimeRemaining = () => {
+    const _getTimeRemaining = () => {
       const now = new Date();
       const end = new Date(competition.endTime);
       const diff = end.getTime() - now.getTime();
@@ -70,7 +77,8 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
         {/* Auto-refresh when competition status changes */}
         <CompetitionStatusMonitor 
           competitionId={id} 
-          initialStatus={competition.status} 
+          initialStatus={competition.status}
+          userId={userId}
         />
         
         {/* Header with Back Button and UTC Clock */}
@@ -159,24 +167,27 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* User's Participant Card (Dynamic - handles status changes) */}
-            <CompetitionStatusWrapper
-              competitionId={id}
-              startTime={new Date(competition.startTime).toISOString()}
-              endTime={new Date(competition.endTime).toISOString()}
-              initialStatus={isCompleted ? 'completed' : isActive ? 'active' : 'upcoming'}
-              isUserIn={isUserIn}
-              userParticipant={userParticipant ? {
-                _id: userParticipant._id.toString(),
-                currentCapital: userParticipant.currentCapital,
-                pnl: userParticipant.pnl,
-                pnlPercentage: userParticipant.pnlPercentage,
-                totalTrades: userParticipant.totalTrades,
-                currentRank: userParticipant.currentRank,
-                winningTrades: userParticipant.winningTrades,
-                losingTrades: userParticipant.losingTrades,
-              } : null}
-            />
+            {/* User's Comprehensive Dashboard */}
+            {isUserIn && userParticipant && (
+              <CompetitionDashboard
+                competitionId={id}
+                initialParticipant={{
+                  _id: userParticipant._id.toString(),
+                  currentCapital: userParticipant.currentCapital,
+                  pnl: userParticipant.pnl,
+                  pnlPercentage: userParticipant.pnlPercentage,
+                  totalTrades: userParticipant.totalTrades,
+                  currentRank: userParticipant.currentRank,
+                  winningTrades: userParticipant.winningTrades,
+                  losingTrades: userParticipant.losingTrades,
+                }}
+                competitionStatus={isCompleted ? 'completed' : isActive ? 'active' : 'upcoming'}
+                startTime={new Date(competition.startTime).toISOString()}
+                endTime={new Date(competition.endTime).toISOString()}
+                startingCapital={competition.startingCapital || competition.startingTradingPoints || 10000}
+                totalParticipants={competition.currentParticipants}
+              />
+            )}
 
             {/* Competition Rules */}
             {competition.rules && (
@@ -590,7 +601,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                   <p className="text-xs text-yellow-400 flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                     <span>
-                      <strong>Important:</strong> If you hit any risk limit, you won't be able to open new positions until your account recovers or the next trading day (for daily limits).
+                      <strong>Important:</strong> If you hit any risk limit, you won&apos;t be able to open new positions until your account recovers or the next trading day (for daily limits).
                     </span>
                   </p>
                 </div>
@@ -770,7 +781,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                 
                 let unclaimedPercentage = 0;
                 if (currentParticipants < prizePositions) {
-                  competition.prizeDistribution.forEach((prize: any, index: number) => {
+                  competition.prizeDistribution.forEach((prize: { percentage: number }, index: number) => {
                     if (index >= currentParticipants) {
                       unclaimedPercentage += prize.percentage;
                     }
@@ -822,7 +833,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
 
                     {/* Prize Distribution List */}
                     <div className="space-y-2">
-                      {competition.prizeDistribution.map((prize: any, index: number) => {
+                      {competition.prizeDistribution.map((prize: { percentage: number; rank?: number }, index: number) => {
                         const isFilled = index < currentParticipants;
                         const basePercentage = prize.percentage;
                         
@@ -856,7 +867,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                                 {index === 2 && <Trophy className={`h-5 w-5 ${isFilled ? 'text-orange-600' : 'text-gray-600'}`} />}
                                 {index > 2 && <Trophy className="h-5 w-5 text-gray-600" />}
                                 <span className={`text-sm font-bold ${isFilled ? 'text-gray-300' : 'text-gray-500'}`}>
-                                  Rank #{prize.rank}
+                                  Rank #{prize.rank ?? (index + 1)}
                                 </span>
                                 <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                                   isFilled ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-700 text-gray-500'

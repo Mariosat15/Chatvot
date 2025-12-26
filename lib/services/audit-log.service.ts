@@ -20,9 +20,9 @@ interface LogActionParams {
   targetType?: TargetType;
   targetId?: string;
   targetName?: string;
-  metadata?: Record<string, any>;
-  previousValue?: any;
-  newValue?: any;
+  metadata?: Record<string, unknown>;
+  previousValue?: unknown;
+  newValue?: unknown;
   status?: 'success' | 'failed' | 'pending';
   errorMessage?: string;
 }
@@ -275,7 +275,7 @@ export const auditLogService = {
 
   // ==================== SETTINGS ====================
 
-  async logSettingsUpdated(admin: AdminInfo, settingName: string, previousValue?: any, newValue?: any): Promise<void> {
+  async logSettingsUpdated(admin: AdminInfo, settingName: string, previousValue?: unknown, newValue?: unknown): Promise<void> {
     await this.log({
       admin,
       action: 'settings_updated',

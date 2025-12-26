@@ -140,7 +140,7 @@ export default function XPProgressBar({
         <div className="text-center p-6 rounded-xl bg-gradient-to-r from-yellow-600/20 to-orange-600/20 border-2 border-yellow-500/50">
           <div className="text-4xl mb-3">🎉</div>
           <h3 className="text-2xl font-bold text-yellow-400 mb-2">Maximum Level Reached!</h3>
-          <p className="text-sm text-gray-300">You've achieved the highest trading title!</p>
+          <p className="text-sm text-gray-300">You&apos;ve achieved the highest trading title!</p>
         </div>
       )}
 

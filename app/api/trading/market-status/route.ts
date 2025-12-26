@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const status = await getMarketStatusFromAPI();
     return NextResponse.json(status);
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Error fetching market status:', error);
     
     // Return fallback status
@@ -17,7 +17,7 @@ export async function GET() {
       isOpen: false,
       status: 'unknown',
       serverTime: new Date().toISOString(),
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }

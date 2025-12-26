@@ -8,6 +8,7 @@ import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { isEUCountry } from '@/lib/utils/country-vat';
 import { ObjectId } from 'mongodb';
+import { isPaddleConfigured, getPaddleConfig } from '@/lib/paddle/config';
 
 /**
  * Helper to find user by various ID formats
@@ -95,23 +96,51 @@ export async function GET() {
     
     console.log(`💳 Payment config - VAT enabled by admin: ${vatEnabled}, User country: ${userCountry}, Is EU: ${isEUCountry(userCountry)}, VAT applicable: ${vatApplicable}`);
 
-    // Return only public/publishable keys (not secret keys) + processing fee from centralized settings
+    // Check Paddle availability
+    let paddleAvailable = false;
+    let paddleConfig: any = null;
+    try {
+      paddleAvailable = await isPaddleConfigured();
+      if (paddleAvailable) {
+        paddleConfig = await getPaddleConfig();
+      }
+    } catch (e) {
+      // Paddle not configured
+    }
+
+    // Return available payment providers
     return NextResponse.json({
       configured: true,
+      // Primary provider (Stripe for backwards compatibility)
       provider: 'stripe',
-      publishableKey: stripeConfig.publishable_key || stripeConfig.public_key || '',
+      publishableKey: (stripeConfig as any).publishable_key || (stripeConfig as any).public_key || '',
       testMode: stripeConfig.testMode || false,
       processingFee: platformDepositFee, // From centralized Fee Settings
       // VAT info
       vatEnabled: vatApplicable, // True only if admin enabled AND user is EU
       vatPercentage: vatApplicable ? vatPercentage : 0,
       userCountry,
+      // Available payment providers
+      providers: {
+        stripe: {
+          available: true,
+          publishableKey: (stripeConfig as any).publishable_key || (stripeConfig as any).public_key || '',
+          testMode: stripeConfig.testMode || false,
+        },
+        paddle: {
+          available: paddleAvailable,
+          clientToken: paddleConfig?.publicKey || null,
+          environment: paddleConfig?.environment || 'sandbox',
+          vendorId: paddleConfig?.vendorId || null,
+        },
+      },
     });
   } catch (error) {
     console.error('Error fetching payment config:', error);
     return NextResponse.json({
       configured: false,
       provider: null,
+      providers: {},
     });
   }
 }

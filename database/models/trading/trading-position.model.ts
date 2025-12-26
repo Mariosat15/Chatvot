@@ -49,6 +49,12 @@ export interface ITradingPosition extends Document {
   lastPriceUpdate: Date; // When price was last updated
   priceUpdateCount: number; // How many times updated
   
+  // Flexible metadata for extra info (e.g., simulator mode)
+  metadata?: {
+    simulatorMode?: boolean;
+    [key: string]: unknown;
+  };
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -184,6 +190,11 @@ const TradingPositionSchema = new Schema<ITradingPosition>(
       default: 0,
       min: 0,
     },
+    // Flexible metadata for extra info (e.g., simulator mode)
+    metadata: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
   },
   {
     timestamps: true,
@@ -196,6 +207,10 @@ TradingPositionSchema.index({ userId: 1, status: 1 });
 TradingPositionSchema.index({ symbol: 1, status: 1 });
 TradingPositionSchema.index({ participantId: 1, status: 1 });
 TradingPositionSchema.index({ competitionId: 1, userId: 1, status: 1 });
+// PERFORMANCE: Additional indexes for common operations
+TradingPositionSchema.index({ userId: 1, competitionId: 1, openedAt: -1 }); // User's positions in competition
+TradingPositionSchema.index({ status: 1, lastPriceUpdate: 1 }); // For price update jobs
+TradingPositionSchema.index({ competitionId: 1, symbol: 1, status: 1 }); // Symbol-based queries in competition
 
 // Virtual for is profitable
 TradingPositionSchema.virtual('isProfitable').get(function () {

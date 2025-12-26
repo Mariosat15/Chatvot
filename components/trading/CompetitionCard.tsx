@@ -1,6 +1,6 @@
 'use client';
 
-import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, CheckCircle, Shield, Zap, Target, Flame, Star, Crown, Sparkles, Timer, ChevronRight, Award, Swords, Gamepad2 } from 'lucide-react';
+import { Trophy, Users, Clock, Calendar, CheckCircle, Zap, Target, Flame, Crown, Sparkles, Timer, ChevronRight, Swords, Gamepad2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
@@ -9,7 +9,9 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionCardProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
   userBalance: number;
   isCompleted?: boolean;

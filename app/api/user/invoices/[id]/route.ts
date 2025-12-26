@@ -40,7 +40,7 @@ export async function GET(
       invoice,
       html,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching invoice:', error);
     
     return NextResponse.json(

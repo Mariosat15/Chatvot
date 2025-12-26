@@ -123,7 +123,7 @@ export async function POST(request: Request) {
 
     const score = await SuspicionScoringService.updateScore(userId, {
       method,
-      points,
+      percentage: points, // Use points as percentage
       evidence
     });
 

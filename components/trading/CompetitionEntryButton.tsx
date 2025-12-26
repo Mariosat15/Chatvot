@@ -8,7 +8,9 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionEntryButtonProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
   userBalance: number;
   isUserIn: boolean;
@@ -69,7 +71,7 @@ export default function CompetitionEntryButton({
           <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
             <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-green-400">You're in this competition!</p>
+              <p className="text-sm font-medium text-green-400">You&apos;re in this competition!</p>
               <p className="text-xs text-gray-400 mt-1">
                 {isActive ? 'Start trading now' : 'Competition will start soon'}
               </p>
@@ -78,7 +80,7 @@ export default function CompetitionEntryButton({
 
           {isActive ? (
             <Link href={`/competitions/${competition._id}/trade`}>
-              <Button className="w-full bg-blue-500 hover:bg-blue-600">
+              <Button className="w-full bg-blue-500 hover:bg-blue-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-blue-500/25">
                 <Trophy className="mr-2 h-4 w-4" />
                 Start Trading
               </Button>
@@ -120,7 +122,10 @@ export default function CompetitionEntryButton({
           <Button
             onClick={handleEnter}
             disabled={!canEnter || entering}
-            className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold 
+              disabled:opacity-50 disabled:cursor-not-allowed
+              cursor-pointer active:scale-95 transition-all duration-150
+              shadow-lg hover:shadow-yellow-500/25"
           >
             {entering ? (
               <>
@@ -153,7 +158,7 @@ export default function CompetitionEntryButton({
                 <Link href="/wallet">
                   <Button
                     variant="link"
-                    className="h-auto p-0 text-xs text-red-400 underline mt-1"
+                    className="h-auto p-0 text-xs text-red-400 underline mt-1 cursor-pointer hover:text-red-300 active:scale-95 transition-all"
                   >
                     Go to Wallet
                   </Button>

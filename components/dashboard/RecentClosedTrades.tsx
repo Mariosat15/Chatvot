@@ -3,6 +3,7 @@
 import { TrendingUp, TrendingDown, Clock } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface RecentClosedTradesProps {
   trades: any[];
   competitionName: string;

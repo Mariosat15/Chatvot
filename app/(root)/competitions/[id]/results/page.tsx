@@ -17,7 +17,6 @@ import {
   Target, 
   Clock,
   DollarSign,
-  Percent,
   Activity,
   Award,
   Calendar,
@@ -50,6 +49,7 @@ const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string
     redirect(`/competitions/${competitionId}`);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const participant = participantDoc as any;
 
   // Get trade history
@@ -57,23 +57,33 @@ const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string
   const tradeHistory = tradeHistoryResult.success ? tradeHistoryResult.trades : [];
 
   // Calculate stats
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const winningTrades = tradeHistory.filter((t: any) => t.realizedPnl > 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const losingTrades = tradeHistory.filter((t: any) => t.realizedPnl < 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalPnl = tradeHistory.reduce((sum: number, t: any) => sum + (t.realizedPnl || 0), 0);
   const winRate = tradeHistory.length > 0 ? (winningTrades.length / tradeHistory.length) * 100 : 0;
   const avgWin = winningTrades.length > 0 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ? winningTrades.reduce((sum: number, t: any) => sum + t.realizedPnl, 0) / winningTrades.length 
     : 0;
   const avgLoss = losingTrades.length > 0 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ? Math.abs(losingTrades.reduce((sum: number, t: any) => sum + t.realizedPnl, 0)) / losingTrades.length 
     : 0;
   const profitFactor = avgLoss > 0 ? avgWin / avgLoss : avgWin > 0 ? Infinity : 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const largestWin = Math.max(...winningTrades.map((t: any) => t.realizedPnl), 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const largestLoss = Math.min(...losingTrades.map((t: any) => t.realizedPnl), 0);
 
   // Check if user won a prize
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prizeWon = competition.finalLeaderboard?.find((l: any) => l.userId === session.user.id)?.prizeAmount || 0;
-  const finalRank = participant.currentRank || competition.finalLeaderboard?.findIndex((l: any) => l.userId === session.user.id) + 1 || '—';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const leaderboardIndex = competition.finalLeaderboard?.findIndex((l: any) => l.userId === session.user.id) ?? -1;
+  const finalRank = participant.currentRank || (leaderboardIndex >= 0 ? leaderboardIndex + 1 : null) || '—';
 
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleString('en-US', {
@@ -285,6 +295,7 @@ const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700/50">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {tradeHistory.slice(0, 50).map((trade: any) => {
                   const duration = trade.holdingTimeSeconds 
                     ? trade.holdingTimeSeconds < 60 

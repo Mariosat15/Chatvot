@@ -8,6 +8,8 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
+  profileImage?: string;
+  bio?: string;
   country?: string;
   address?: string;
   city?: string;
@@ -19,6 +21,7 @@ export interface UserProfile {
 /**
  * Helper to find user by various ID formats
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function findUserById(db: any, userId: string) {
   // Try by 'id' field first (better-auth uses this)
   let user = await db.collection('user').findOne({ id: userId });
@@ -44,6 +47,7 @@ async function findUserById(db: any, userId: string) {
  * Helper to build query filter for user
  */
 function buildUserQuery(userId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const queries: any[] = [{ id: userId }];
   
   if (ObjectId.isValid(userId)) {
@@ -97,6 +101,8 @@ export async function GET() {
       id: user.id || user._id?.toString(),
       name: user.name || '',
       email: user.email || '',
+      profileImage: user.profileImage || '',
+      bio: user.bio || '',
       country: user.country || '',
       address: user.address || '',
       city: user.city || '',
@@ -105,7 +111,7 @@ export async function GET() {
       updatedAt: user.updatedAt,
     };
 
-    return NextResponse.json(profile);
+    return NextResponse.json({ user: profile });
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
@@ -125,7 +131,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, country, address, city, postalCode } = body;
+    const { name, profileImage, bio, country, address, city, postalCode } = body;
 
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
@@ -135,11 +141,14 @@ export async function PUT(req: NextRequest) {
     }
 
     // Build update object (only update provided fields)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateFields: Record<string, any> = {
       updatedAt: new Date(),
     };
 
     if (name !== undefined) updateFields.name = name.trim();
+    if (profileImage !== undefined) updateFields.profileImage = profileImage;
+    if (bio !== undefined) updateFields.bio = bio.trim();
     if (country !== undefined) updateFields.country = country;
     if (address !== undefined) updateFields.address = address.trim();
     if (city !== undefined) updateFields.city = city.trim();
@@ -170,6 +179,8 @@ export async function PUT(req: NextRequest) {
       id: result.id || result._id?.toString(),
       name: result.name || '',
       email: result.email || '',
+      profileImage: result.profileImage || '',
+      bio: result.bio || '',
       country: result.country || '',
       address: result.address || '',
       city: result.city || '',
@@ -178,7 +189,7 @@ export async function PUT(req: NextRequest) {
       updatedAt: result.updatedAt,
     };
 
-    return NextResponse.json(updatedProfile);
+    return NextResponse.json({ user: updatedProfile });
   } catch (error) {
     console.error('Error updating user profile:', error);
     return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });

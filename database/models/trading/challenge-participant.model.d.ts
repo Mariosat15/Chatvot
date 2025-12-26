@@ -1,0 +1,41 @@
+import { Document } from 'mongoose';
+export interface IChallengeParticipant extends Document {
+    challengeId: string;
+    userId: string;
+    username: string;
+    email: string;
+    role: 'challenger' | 'challenged';
+    startingCapital: number;
+    currentCapital: number;
+    availableCapital: number;
+    usedMargin: number;
+    pnl: number;
+    pnlPercentage: number;
+    realizedPnl: number;
+    unrealizedPnl: number;
+    totalTrades: number;
+    winningTrades: number;
+    losingTrades: number;
+    winRate: number;
+    averageWin: number;
+    averageLoss: number;
+    largestWin: number;
+    largestLoss: number;
+    currentOpenPositions: number;
+    maxDrawdown: number;
+    maxDrawdownPercentage: number;
+    status: 'active' | 'liquidated' | 'completed' | 'disqualified';
+    liquidationReason?: string;
+    disqualificationReason?: string;
+    marginCallWarnings: number;
+    lastMarginCallAt?: Date;
+    isWinner: boolean;
+    prizeReceived: number;
+    joinedAt: Date;
+    lastTradeAt?: Date;
+    createdAt: Date;
+    updatedAt: Date;
+}
+declare const ChallengeParticipant: import("mongoose").Model<any, {}, {}, {}, any, any>;
+export default ChallengeParticipant;
+//# sourceMappingURL=challenge-participant.model.d.ts.map

@@ -1,9 +1,10 @@
 'use client';
 
-import { Trophy, TrendingUp, Target, Award, DollarSign, Coins, Activity, BarChart3, Zap, Swords } from 'lucide-react';
+import { Trophy, TrendingUp, Target, Award, Activity, BarChart3, Zap, Swords } from 'lucide-react';
 import Link from 'next/link';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface ProfileContentProps {
   session: any;
   competitionStats: any;

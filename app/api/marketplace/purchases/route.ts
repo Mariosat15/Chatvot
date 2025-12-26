@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     const enabled = searchParams.get('enabled');
     
     // Build query
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = { userId: session.user.id };
     
     if (enabled === 'true') {
@@ -46,12 +47,13 @@ export async function GET(request: NextRequest) {
     
     // Filter by category if specified
     if (category) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       purchases = purchases.filter((p: any) => p.itemId?.category === category);
     }
     
-    console.log(`📦 Found ${purchases.length} purchases for user ${session.user.id}`);
     
     // Transform for response - ensure IDs are strings
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const items = purchases.map((purchase: any) => ({
       purchaseId: purchase._id?.toString() || purchase._id,
       itemId: purchase.itemId?._id?.toString() || purchase.itemId?._id,
@@ -69,16 +71,14 @@ export async function GET(request: NextRequest) {
       userRating: purchase.userRating,
     }));
     
-    console.log(`📦 Returning ${items.length} items:`, items.map((i: any) => i.item?.name || 'no item'));
-    
     return NextResponse.json({
       success: true,
       purchases: items,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching purchases:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -136,10 +136,10 @@ export async function PUT(request: NextRequest) {
       success: true,
       purchase,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error updating purchase:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

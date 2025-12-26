@@ -1,20 +1,22 @@
 'use client';
 
-import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Coins, Zap, FileText, Download, ExternalLink, Swords } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Zap, FileText, Swords } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
 
 interface Transaction {
   _id: string;
-  transactionType: 'deposit' | 'withdrawal' | 'withdrawal_fee' | 'competition_entry' | 'competition_win' | 'competition_refund' | 'platform_fee' | 'admin_adjustment' | 'challenge_entry' | 'challenge_win' | 'challenge_refund';
+  transactionType: 'deposit' | 'withdrawal' | 'withdrawal_fee' | 'competition_entry' | 'competition_win' | 'competition_refund' | 'platform_fee' | 'admin_adjustment' | 'challenge_entry' | 'challenge_win' | 'challenge_refund' | 'marketplace_purchase';
   amount: number;
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
   description: string;
   createdAt: string;
   paymentMethod?: string;
   exchangeRate?: number;
+  paymentId?: string;
+  failureReason?: string;
+  metadata?: Record<string, any>;
 }
 
 interface TransactionHistoryProps {
@@ -138,6 +140,37 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
   };
 
   const getStatusBadge = () => {
+    // For withdrawals, show more detailed status
+    if (transaction.transactionType === 'withdrawal') {
+      switch (transaction.status) {
+        case 'completed':
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+              ✓ Sent to Bank
+            </span>
+          );
+        case 'pending':
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+              Processing
+            </span>
+          );
+        case 'failed':
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20" title={transaction.failureReason}>
+              Rejected
+            </span>
+          );
+        case 'cancelled':
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20">
+              Cancelled
+            </span>
+          );
+      }
+    }
+
+    // Default status badges for other transaction types
     switch (transaction.status) {
       case 'completed':
         return (
@@ -190,9 +223,21 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
             </p>
             {getStatusBadge()}
           </div>
-          <p className="text-xs text-gray-500 truncate">{transaction.description}</p>
+          {/* Enhanced description for withdrawals showing fees */}
+          {transaction.transactionType === 'withdrawal' && transaction.metadata ? (
+            <p className="text-xs text-gray-500 truncate">
+              {creditsAmount.toFixed(settings?.credits.decimals || 0)} {settings?.credits.name || 'credits'} 
+              {transaction.metadata.netAmountEUR && transaction.metadata.platformFee ? (
+                <span className="text-gray-400">
+                  {' '}(You receive: €{transaction.metadata.netAmountEUR.toFixed(2)}, Fee: €{transaction.metadata.platformFee.toFixed(2)})
+                </span>
+              ) : null}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500 truncate">{transaction.description}</p>
+          )}
           <div className="flex items-center gap-2 mt-1">
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-600" suppressHydrationWarning>
               {new Date(transaction.createdAt).toLocaleString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -206,6 +251,13 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
               <>
                 <span className="text-gray-700">•</span>
                 <p className="text-xs text-gray-600 capitalize">{transaction.paymentMethod}</p>
+              </>
+            )}
+            {/* Show bank transfer for withdrawals */}
+            {transaction.transactionType === 'withdrawal' && (
+              <>
+                <span className="text-gray-700">•</span>
+                <p className="text-xs text-gray-600">Bank Transfer</p>
               </>
             )}
           </div>

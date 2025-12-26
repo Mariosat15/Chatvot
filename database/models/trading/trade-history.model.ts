@@ -245,6 +245,10 @@ TradeHistorySchema.index({ participantId: 1, closedAt: -1 });
 TradeHistorySchema.index({ symbol: 1, closedAt: -1 });
 TradeHistorySchema.index({ competitionId: 1, isWinner: 1 });
 TradeHistorySchema.index({ userId: 1, isWinner: 1 });
+// PERFORMANCE: Additional indexes for analytics and reporting
+TradeHistorySchema.index({ userId: 1, competitionId: 1, closedAt: -1 }); // User's trades in competition
+TradeHistorySchema.index({ competitionId: 1, realizedPnl: -1 }); // Top trades leaderboard
+TradeHistorySchema.index({ closeReason: 1, closedAt: -1 }); // Analyzing close reasons
 
 // Virtual for trade duration (human readable)
 TradeHistorySchema.virtual('holdingTimeDuration').get(function () {

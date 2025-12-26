@@ -50,6 +50,7 @@ export interface ISuspicionScore extends Document {
     mirrorTrading: IScoreBreakdown;
     timezoneLanguage: IScoreBreakdown;
     deviceSwitching: IScoreBreakdown;
+    kycDuplicate: IScoreBreakdown;
   };
   
   linkedAccounts: ILinkedAccount[];
@@ -206,6 +207,10 @@ const SuspicionScoreSchema = new Schema<ISuspicionScore>({
     deviceSwitching: {
       type: ScoreBreakdownSchema,
       default: () => ({ percentage: 0, evidence: '' })
+    },
+    kycDuplicate: {
+      type: ScoreBreakdownSchema,
+      default: () => ({ percentage: 0, evidence: '' })
     }
   },
   
@@ -254,7 +259,8 @@ SuspicionScoreSchema.methods.addPercentage = function(
       tradingSimilarity: 30,
       mirrorTrading: 35,
       timezoneLanguage: 10,
-      deviceSwitching: 15
+      deviceSwitching: 15,
+      kycDuplicate: 50  // KYC duplication is a serious indicator
     };
     
     const maxPercentage = maxPercentagePerMethod[method] || 50;
@@ -267,6 +273,7 @@ SuspicionScoreSchema.methods.addPercentage = function(
     
     // Recalculate total score
     this.totalScore = Math.min(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       Object.values(this.scoreBreakdown).reduce((sum: number, item: any) => {
         return sum + (item?.percentage || 0);
       }, 0),

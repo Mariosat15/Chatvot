@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Trophy, Users, Clock, TrendingUp, Zap, LayoutGrid, List, Filter, Search, X, ChevronDown, Target, Award, Flame, Crown, Sparkles, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import { Trophy, Clock, TrendingUp, Zap, LayoutGrid, List, Filter, Search, X, ChevronDown, Target, Flame, Crown, Sparkles, SlidersHorizontal } from 'lucide-react';
 import CompetitionCard from '@/components/trading/CompetitionCard';
 import WalletBalanceDisplay from '@/components/trading/WalletBalanceDisplay';
 import UTCClock from '@/components/trading/UTCClock';
@@ -100,8 +100,8 @@ export default function CompetitionsPageContent({
   const userInCompetitions = useMemo(() => new Set(userInCompetitionIdsState), [userInCompetitionIdsState]);
   
   // Auto-refresh state (always enabled - no toggle needed)
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [_isRefreshing, setIsRefreshing] = useState(false);
+  const [_lastRefresh, setLastRefresh] = useState<Date>(new Date());
   
   // Load saved preferences on mount
   const [isHydrated, setIsHydrated] = useState(false);
@@ -207,7 +207,7 @@ export default function CompetitionsPageContent({
   }, [competitions]);
 
   // Apply filters to competitions
-  const applyFilters = (comps: Competition[]) => {
+  const applyFilters = useCallback((comps: Competition[]) => {
     let result = [...comps];
 
     // Search filter
@@ -248,20 +248,20 @@ export default function CompetitionsPageContent({
     });
 
     return result;
-  };
+  }, [searchQuery, rankingFilter, assetFilter, sortBy]);
 
   // Separate upcoming competitions (always shown first)
   const upcomingCompetitions = useMemo(() => {
     if (!statusFilter.includes('upcoming')) return [];
     return applyFilters(competitions.filter(c => c.status === 'upcoming'));
-  }, [competitions, searchQuery, rankingFilter, assetFilter, sortBy, statusFilter]);
+  }, [competitions, applyFilters, statusFilter]);
 
   // Other filtered competitions (active, completed, cancelled)
   const otherCompetitions = useMemo(() => {
     const otherStatuses = statusFilter.filter(s => s !== 'upcoming');
     if (otherStatuses.length === 0) return [];
     return applyFilters(competitions.filter(c => otherStatuses.includes(c.status)));
-  }, [competitions, searchQuery, statusFilter, rankingFilter, assetFilter, sortBy]);
+  }, [competitions, applyFilters, statusFilter]);
 
   // Total count for display
   const totalFilteredCount = upcomingCompetitions.length + otherCompetitions.length;
@@ -461,7 +461,7 @@ export default function CompetitionsPageContent({
               <DropdownMenuContent className="bg-gray-800 border-gray-700">
                 <DropdownMenuLabel className="text-gray-400">Competition Type</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-gray-700" />
-                {availableRankingMethods.map((method) => (
+                {availableRankingMethods.filter((m): m is string => !!m).map((method) => (
                   <DropdownMenuCheckboxItem
                     key={method}
                     checked={rankingFilter.includes(method)}
@@ -474,7 +474,7 @@ export default function CompetitionsPageContent({
                     }}
                     className="text-gray-300"
                   >
-                    {RANKING_LABELS[method] || method}
+                    {RANKING_LABELS[method as keyof typeof RANKING_LABELS] || method}
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuContent>
@@ -539,7 +539,7 @@ export default function CompetitionsPageContent({
                 <DropdownMenuCheckboxItem
                   key={option.value}
                   checked={sortBy === option.value}
-                  onCheckedChange={() => setSortBy(option.value as any)}
+                  onCheckedChange={() => setSortBy(option.value as 'prize' | 'start' | 'participants' | 'entry')}
                   className="text-gray-300"
                 >
                   {option.label}

@@ -39,11 +39,12 @@ export async function POST(req: NextRequest) {
       console.log(`✅ Password changed for user: ${session.user.email}`);
 
       return NextResponse.json({ success: true, message: 'Password changed successfully' });
-    } catch (authError: any) {
+    } catch (authError) {
       console.error('Password change error:', authError);
       
       // Handle specific error cases
-      if (authError.message?.includes('incorrect') || authError.message?.includes('invalid')) {
+      const errorMessage = authError instanceof Error ? authError.message : '';
+      if (errorMessage.includes('incorrect') || errorMessage.includes('invalid')) {
         return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 });
       }
       

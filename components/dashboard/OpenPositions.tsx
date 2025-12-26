@@ -3,6 +3,7 @@
 import { Activity, TrendingUp, TrendingDown } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface OpenPositionsProps {
   positions: any[];
   competitionName: string;

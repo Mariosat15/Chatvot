@@ -1,6 +1,6 @@
 'use client';
 
-import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from 'recharts';
+import { AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Calendar, TrendingUp, TrendingDown } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { TrendingUp, TrendingDown, DollarSign, Shield, Zap, Target } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Zap, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getMarginStatus } from '@/lib/services/risk-manager.service';
 import { MarginStatusIndicator } from './MarginStatusIndicator';
@@ -479,7 +479,7 @@ export function AccountInfoPanel({
             <p className="text-center text-xs text-purple-200 font-semibold">
               {usedMargin > 0 ? (
                 <>
-                  💡 You're using <span className="text-white font-bold">${Math.floor(usedMargin)}</span> for open trades.
+                  💡 You&apos;re using <span className="text-white font-bold">${Math.floor(usedMargin)}</span> for open trades.
                   {marginStatus.status === 'liquidation' && (
                     <span className="block mt-1 text-red-300">
                       ⚠️ All positions will close automatically!

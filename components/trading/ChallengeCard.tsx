@@ -1,12 +1,14 @@
 'use client';
 
-import { Trophy, Users, Clock, Zap, Target, Timer, ChevronRight, Swords, Crown, Shield, CheckCircle, Sparkles } from 'lucide-react';
+import { Trophy, Users, Clock, Zap, Target, Timer, ChevronRight, Swords, Crown, CheckCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface ChallengeCardProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   challenge: any;
   userId: string;
   viewMode?: 'card' | 'list';

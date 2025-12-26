@@ -19,6 +19,7 @@ export const getCompetitions = async (filters?: {
   try {
     await connectToDatabase();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
     if (filters?.status) {
       query.status = filters.status;
@@ -115,6 +116,24 @@ export const getCompetitionById = async (competitionId: string) => {
           console.error('Error cancelling active competition:', cancelError);
         }
       }
+      
+      // AUTO-FINALIZE: If competition is active but end time has passed, finalize it immediately
+      // This provides instant finalization when user accesses the page - no waiting for worker
+      const endTime = new Date(competition.endTime);
+      if (endTime <= now) {
+        console.log(`🏁 AUTO-FINALIZING "${competition.name}" on access - end time passed`);
+        
+        try {
+          const { finalizeCompetition } = await import('@/lib/actions/trading/competition-end.actions');
+          await finalizeCompetition(competitionId);
+          
+          // Refresh the competition data
+          competition = await Competition.findById(competitionId).lean() as any;
+          console.log(`✅ Competition "${competition.name}" auto-finalized successfully`);
+        } catch (finalizeError) {
+          console.error('Error auto-finalizing competition:', finalizeError);
+        }
+      }
     }
 
     return JSON.parse(JSON.stringify({ ...competition, participantCount }));
@@ -190,7 +209,7 @@ export const createCompetition = async (competitionData: {
     }
 
     // Generate slug from name with auto-increment for duplicates
-    let baseSlug = competitionData.name
+    const baseSlug = competitionData.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
@@ -568,6 +587,7 @@ export const getCompetitionLeaderboard = async (competitionId: string, limit: nu
     const { getTitleByXP } = await import('@/lib/constants/levels');
 
     // Prepare participant data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const participantData = participants.map((p: any) => ({
       userId: p.userId,
       username: p.username || 'Anonymous',
@@ -647,6 +667,7 @@ export const getUserCompetitions = async (status?: 'active' | 'completed') => {
 
     await connectToDatabase();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = { userId: session.user.id };
     if (status) {
       query.status = status;
@@ -665,6 +686,7 @@ export const getUserCompetitions = async (status?: 'active' | 'completed') => {
     // Merge data
     const userCompetitions = participants.map((participant) => {
       const competition = competitions.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (c: any) => c._id.toString() === participant.competitionId
       );
       return {

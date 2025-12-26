@@ -3,10 +3,12 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface CompetitionStatusMonitorProps {
   competitionId: string;
   initialStatus: string;
+  userId: string; // Current user's ID to check their ranking
 }
 
 /**
@@ -15,7 +17,8 @@ interface CompetitionStatusMonitorProps {
  */
 export default function CompetitionStatusMonitor({ 
   competitionId, 
-  initialStatus 
+  initialStatus,
+  userId,
 }: CompetitionStatusMonitorProps) {
   const router = useRouter();
   const hasRedirectedRef = useRef(false);
@@ -30,7 +33,7 @@ export default function CompetitionStatusMonitor({
 
     const checkCompetitionStatus = async () => {
       try {
-        const response = await fetch(`/api/competitions/${competitionId}/status`);
+        const response = await fetch(`/api/competitions/${competitionId}/status?userId=${userId}`);
         if (!response.ok) {
           // Fail silently if API doesn't exist
           if (response.status === 404) {
@@ -85,11 +88,48 @@ export default function CompetitionStatusMonitor({
               clearInterval(pollIntervalRef.current);
             }
 
-            // Show notification
-            toast.success('🏆 Competition has ended!', {
-              description: 'View the final results and rankings',
-              duration: 5000,
-            });
+            // Show personalized notification based on user's ranking
+            const userRank = data.userRank;
+            const totalParticipants = data.totalParticipants || 0;
+            const prizeWon = data.prizeWon || 0;
+
+            if (userRank === 1) {
+              toast.success('🏆 You Won!', {
+                description: prizeWon > 0 
+                  ? `Congratulations! You finished 1st and won ${prizeWon} credits!`
+                  : 'Congratulations! You finished in 1st place!',
+                duration: 6000,
+              });
+            } else if (userRank === 2) {
+              toast.success('🥈 2nd Place!', {
+                description: prizeWon > 0 
+                  ? `Great job! You finished 2nd and won ${prizeWon} credits!`
+                  : 'Great job! You finished in 2nd place!',
+                duration: 6000,
+              });
+            } else if (userRank === 3) {
+              toast.success('🥉 3rd Place!', {
+                description: prizeWon > 0 
+                  ? `Well done! You finished 3rd and won ${prizeWon} credits!`
+                  : 'Well done! You finished in 3rd place!',
+                duration: 6000,
+              });
+            } else if (userRank && userRank <= 10) {
+              toast.info(`📊 Competition Ended - ${userRank}th Place`, {
+                description: `You finished ${userRank}/${totalParticipants}. View the full results.`,
+                duration: 5000,
+              });
+            } else if (userRank) {
+              toast('⚔️ Competition Ended', {
+                description: `You finished ${userRank}/${totalParticipants}. Better luck next time!`,
+                duration: 5000,
+              });
+            } else {
+              toast('⚔️ Competition Ended', {
+                description: 'View the final results and rankings.',
+                duration: 5000,
+              });
+            }
 
             // Redirect after a brief delay to allow toast to show
             setTimeout(() => {
@@ -103,11 +143,11 @@ export default function CompetitionStatusMonitor({
       }
     };
 
-    // Initial check after 3 seconds (faster than before)
+    // Initial check after 3 seconds
     const timeoutId = setTimeout(checkCompetitionStatus, 3000);
 
-    // Poll every 5 seconds (faster to catch cancellations)
-    pollIntervalRef.current = setInterval(checkCompetitionStatus, 5000);
+    // Poll at optimized interval (10 seconds instead of 5)
+    pollIntervalRef.current = setInterval(checkCompetitionStatus, PERFORMANCE_INTERVALS.COMPETITION_STATUS);
 
     // Cleanup
     return () => {
@@ -116,7 +156,7 @@ export default function CompetitionStatusMonitor({
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [competitionId, initialStatus, router]);
+  }, [competitionId, initialStatus, router, userId]);
 
   // This component doesn't render anything
   return null;

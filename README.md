@@ -1,6 +1,6 @@
 <div align="center">
   <br />
-  <img src="public/readme/hero.webp" alt="Chartvolt Banner">
+  
   <br />
 
   <div>
