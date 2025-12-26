@@ -7,6 +7,7 @@ import ChallengeParticipant from '@/database/models/trading/challenge-participan
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import mongoose from 'mongoose';
+import { canJoinChallenge } from '@/lib/services/market-hours.service';
 
 // POST - Accept a challenge
 export async function POST(
@@ -24,6 +25,16 @@ export async function POST(
 
     const { id } = await params;
     await connectToDatabase();
+
+    // Check if market is open for challenges
+    const marketCheck = await canJoinChallenge();
+    if (!marketCheck.canJoin) {
+      await dbSession.abortTransaction();
+      return NextResponse.json(
+        { error: marketCheck.reason || 'Cannot accept challenge: Market is currently closed.' },
+        { status: 400 }
+      );
+    }
 
     const challenge = await Challenge.findById(id).session(dbSession);
 

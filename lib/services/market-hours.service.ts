@@ -107,15 +107,23 @@ export async function isMarketOpen(assetClass: AssetClass = 'forex'): Promise<{
   
   // Fallback if no settings
   if (!settings) {
-    console.warn('No market settings found, using API fallback');
+    console.warn('[Market Hours] No market settings found, using API fallback');
     const apiOpen = await isForexMarketOpenAPI();
     return { isOpen: apiOpen };
   }
+
+  console.log('[Market Hours] isMarketOpen check:', {
+    assetClass,
+    mode: settings.mode,
+    blockTradingOnHolidays: settings.blockTradingOnHolidays,
+    holidaysCount: settings.holidays?.length || 0,
+  });
 
   // Check holidays first (applies to both modes)
   if (settings.blockTradingOnHolidays) {
     const holiday = getTodayHoliday(settings.holidays, assetClass);
     if (holiday) {
+      console.log('[Market Hours] Holiday blocking market:', holiday.name);
       return {
         isOpen: false,
         reason: `Market closed for ${holiday.name}`,
@@ -127,16 +135,19 @@ export async function isMarketOpen(assetClass: AssetClass = 'forex'): Promise<{
 
   // Automatic mode - use Massive.com API
   if (settings.mode === 'automatic') {
+    console.log('[Market Hours] Using AUTOMATIC mode (Massive.com API)');
     try {
       const status = await getMarketStatusFromAPI();
+      console.log('[Market Hours] API response:', status);
       return {
         isOpen: status.isOpen,
         reason: status.isOpen ? undefined : 'Market is currently closed',
       };
     } catch (error) {
+      console.error('[Market Hours] API failed:', error);
       // If API fails and fallback is enabled, use manual settings
       if (settings.automaticSettings.fallbackToManual) {
-        console.log('API failed, falling back to manual settings');
+        console.log('[Market Hours] Falling back to manual settings');
         return checkManualSchedule(settings, assetClass);
       }
       
@@ -149,6 +160,7 @@ export async function isMarketOpen(assetClass: AssetClass = 'forex'): Promise<{
   }
 
   // Manual mode - use configured schedules
+  console.log('[Market Hours] Using MANUAL mode');
   return checkManualSchedule(settings, assetClass);
 }
 
@@ -163,6 +175,7 @@ function checkManualSchedule(settings: IMarketSettings, assetClass: AssetClass):
   
   // Check if asset class is enabled
   if (!schedule || !schedule.enabled) {
+    console.log(`[Market Hours] ${assetClass} trading is disabled in settings`);
     return {
       isOpen: false,
       reason: `${assetClass} trading is disabled`,
@@ -174,8 +187,18 @@ function checkManualSchedule(settings: IMarketSettings, assetClass: AssetClass):
   const currentTime = getCurrentTimeUTC();
   const daySchedule = schedule[currentDay];
 
+  console.log('[Market Hours] Manual schedule check:', {
+    assetClass,
+    currentDay,
+    currentTime,
+    dayEnabled: daySchedule?.enabled,
+    openTime: daySchedule?.openTime,
+    closeTime: daySchedule?.closeTime,
+  });
+
   // Check if trading is enabled for this day
   if (!daySchedule || !daySchedule.enabled) {
+    console.log(`[Market Hours] ${currentDay} is disabled for ${assetClass}`);
     return {
       isOpen: false,
       reason: `Market is closed on ${currentDay}`,
@@ -184,12 +207,14 @@ function checkManualSchedule(settings: IMarketSettings, assetClass: AssetClass):
 
   // Check if within trading hours
   if (!isWithinTimeRange(currentTime, daySchedule.openTime, daySchedule.closeTime)) {
+    console.log(`[Market Hours] Outside trading hours for ${currentDay}`);
     return {
       isOpen: false,
       reason: `Market is closed. Trading hours: ${daySchedule.openTime} - ${daySchedule.closeTime} UTC`,
     };
   }
 
+  console.log('[Market Hours] Market is OPEN');
   return { isOpen: true };
 }
 
@@ -231,24 +256,39 @@ export async function canJoinCompetition(): Promise<{
   const settings = await getMarketSettings();
   
   if (!settings) {
+    console.log('[Market Hours] No settings found, allowing competition join');
     return { canJoin: true };
   }
 
-  if (settings.blockCompetitionsOnHolidays) {
-    const holiday = getTodayHoliday(settings.holidays, 'forex');
-    if (holiday) {
-      return {
-        canJoin: false,
-        reason: `Competition entry blocked due to market holiday: ${holiday.name}`,
-      };
-    }
+  console.log('[Market Hours] Checking competition join:', {
+    mode: settings.mode,
+    blockCompetitionsOnHolidays: settings.blockCompetitionsOnHolidays,
+  });
+
+  // Check if blocking is enabled
+  if (!settings.blockCompetitionsOnHolidays) {
+    console.log('[Market Hours] Competition blocking is disabled, allowing');
+    return { canJoin: true };
   }
 
-  const marketStatus = await isMarketOpen('forex');
-  if (!marketStatus.isOpen && settings.blockCompetitionsOnHolidays) {
+  // Check for holidays first
+  const holiday = getTodayHoliday(settings.holidays, 'forex');
+  if (holiday) {
+    console.log('[Market Hours] Holiday detected:', holiday.name);
     return {
       canJoin: false,
-      reason: marketStatus.reason || 'Market is closed',
+      reason: `Competition entry blocked due to market holiday: ${holiday.name}`,
+    };
+  }
+
+  // Check market status (respects mode: automatic vs manual)
+  const marketStatus = await isMarketOpen('forex');
+  console.log('[Market Hours] Market status:', marketStatus);
+  
+  if (!marketStatus.isOpen) {
+    return {
+      canJoin: false,
+      reason: marketStatus.reason || 'Market is closed. Competition entry is not available.',
     };
   }
 
@@ -265,24 +305,39 @@ export async function canJoinChallenge(): Promise<{
   const settings = await getMarketSettings();
   
   if (!settings) {
+    console.log('[Market Hours] No settings found, allowing challenge');
     return { canJoin: true };
   }
 
-  if (settings.blockChallengesOnHolidays) {
-    const holiday = getTodayHoliday(settings.holidays, 'forex');
-    if (holiday) {
-      return {
-        canJoin: false,
-        reason: `Challenge entry blocked due to market holiday: ${holiday.name}`,
-      };
-    }
+  console.log('[Market Hours] Checking challenge:', {
+    mode: settings.mode,
+    blockChallengesOnHolidays: settings.blockChallengesOnHolidays,
+  });
+
+  // Check if blocking is enabled
+  if (!settings.blockChallengesOnHolidays) {
+    console.log('[Market Hours] Challenge blocking is disabled, allowing');
+    return { canJoin: true };
   }
 
-  const marketStatus = await isMarketOpen('forex');
-  if (!marketStatus.isOpen && settings.blockChallengesOnHolidays) {
+  // Check for holidays first
+  const holiday = getTodayHoliday(settings.holidays, 'forex');
+  if (holiday) {
+    console.log('[Market Hours] Holiday detected:', holiday.name);
     return {
       canJoin: false,
-      reason: marketStatus.reason || 'Market is closed',
+      reason: `Challenge blocked due to market holiday: ${holiday.name}`,
+    };
+  }
+
+  // Check market status (respects mode: automatic vs manual)
+  const marketStatus = await isMarketOpen('forex');
+  console.log('[Market Hours] Market status:', marketStatus);
+  
+  if (!marketStatus.isOpen) {
+    return {
+      canJoin: false,
+      reason: marketStatus.reason || 'Market is closed. Challenges are not available.',
     };
   }
 

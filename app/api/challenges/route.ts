@@ -10,6 +10,7 @@ import TradingRiskSettings from '@/database/models/trading-risk-settings.model';
 import { getUserById } from '@/lib/utils/user-lookup';
 import { nanoid } from 'nanoid';
 import { trackTiming, errorResponse } from '@/lib/utils/api-utils';
+import { canJoinChallenge } from '@/lib/services/market-hours.service';
 
 // Request timeout for this route (5 seconds)
 const REQUEST_TIMEOUT_MS = 5000;
@@ -150,28 +151,37 @@ export async function POST(request: NextRequest) {
     // Skip check in simulator mode for testing
     if (!isInSimulatorMode) {
       try {
-        const { isForexMarketOpen } = await import('@/lib/services/real-forex-prices.service');
-        const marketOpen = await isForexMarketOpen();
-        
-        if (!marketOpen) {
+        const marketCheck = await canJoinChallenge();
+        if (!marketCheck.canJoin) {
           return errorResponse(
-            'Cannot create challenge: Forex market is currently closed. Challenges can only be created during market hours (Sunday 10pm - Friday 10pm UTC).',
+            marketCheck.reason || 'Cannot create challenge: Market is currently closed.',
             400
           );
         }
       } catch (marketError) {
-        console.warn('⚠️ Market status check failed, using fallback:', marketError);
-        // Fallback: time-based check
-        const now = new Date();
-        const utcDay = now.getUTCDay();
-        const utcHour = now.getUTCHours();
-        const isClosed = utcDay === 6 || (utcDay === 0 && utcHour < 22) || (utcDay === 5 && utcHour >= 22);
-        
-        if (isClosed) {
-          return errorResponse(
-            'Cannot create challenge: Forex market is currently closed (Weekend). Challenges can only be created during market hours.',
-            400
-          );
+        console.warn('⚠️ Market hours check failed, using fallback:', marketError);
+        // Fallback: time-based check (existing logic)
+        try {
+          const { isForexMarketOpen } = await import('@/lib/services/real-forex-prices.service');
+          const marketOpen = await isForexMarketOpen();
+          if (!marketOpen) {
+            return errorResponse(
+              'Cannot create challenge: Forex market is currently closed.',
+              400
+            );
+          }
+        } catch {
+          // Ultimate fallback: weekend check
+          const now = new Date();
+          const utcDay = now.getUTCDay();
+          const utcHour = now.getUTCHours();
+          const isClosed = utcDay === 6 || (utcDay === 0 && utcHour < 22) || (utcDay === 5 && utcHour >= 22);
+          if (isClosed) {
+            return errorResponse(
+              'Cannot create challenge: Forex market is currently closed (Weekend).',
+              400
+            );
+          }
         }
       }
     }

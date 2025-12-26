@@ -7,6 +7,7 @@ import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
+import { canJoinCompetition } from '@/lib/services/market-hours.service';
 
 /**
  * POST /api/competitions/[id]/join
@@ -64,6 +65,17 @@ export async function POST(
     }
 
     await connectToDatabase();
+
+    // Check if market is open (skip for simulator mode)
+    if (!allowSimulatorMode) {
+      const marketCheck = await canJoinCompetition();
+      if (!marketCheck.canJoin) {
+        return NextResponse.json(
+          { success: false, error: marketCheck.reason || 'Market is closed. Cannot join competitions at this time.' },
+          { status: 400 }
+        );
+      }
+    }
 
     // Start MongoDB transaction for atomic operations
     const mongoSession = await mongoose.startSession();
