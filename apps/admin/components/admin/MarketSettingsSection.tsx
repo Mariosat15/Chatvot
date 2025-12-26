@@ -123,6 +123,15 @@ const DEFAULT_DAY_SCHEDULE: DaySchedule = {
   closeTime: '23:59',
 };
 
+interface AutomaticHoliday {
+  id: string;
+  name: string;
+  date: string;
+  exchange: string;
+  status: string;
+  daysUntil: number;
+}
+
 export default function MarketSettingsSection() {
   const [settings, setSettings] = useState<MarketSettings | null>(null);
   const [originalSettings, setOriginalSettings] = useState<MarketSettings | null>(null);
@@ -132,6 +141,8 @@ export default function MarketSettingsSection() {
   const [addHolidayOpen, setAddHolidayOpen] = useState(false);
   const [expandedAssets, setExpandedAssets] = useState<string[]>(['forex']);
   const [activeSection, setActiveSection] = useState<'schedules' | 'holidays' | 'blocking'>('schedules');
+  const [automaticHolidays, setAutomaticHolidays] = useState<AutomaticHoliday[]>([]);
+  const [loadingAutoHolidays, setLoadingAutoHolidays] = useState(false);
   const [newHoliday, setNewHoliday] = useState<Partial<MarketHoliday>>({
     name: '',
     date: '',
@@ -141,6 +152,7 @@ export default function MarketSettingsSection() {
 
   useEffect(() => {
     fetchSettings();
+    fetchAutomaticHolidays();
   }, []);
 
   useEffect(() => {
@@ -163,6 +175,21 @@ export default function MarketSettingsSection() {
       toast.error('Failed to load market settings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAutomaticHolidays = async () => {
+    setLoadingAutoHolidays(true);
+    try {
+      const response = await fetch('/api/market-settings/automatic-holidays');
+      if (response.ok) {
+        const data = await response.json();
+        setAutomaticHolidays(data.holidays || []);
+      }
+    } catch (error) {
+      console.error('Error fetching automatic holidays:', error);
+    } finally {
+      setLoadingAutoHolidays(false);
     }
   };
 
@@ -651,95 +678,210 @@ export default function MarketSettingsSection() {
 
       {/* Holidays Section */}
       {activeSection === 'holidays' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-white">Market Holidays</h3>
-              <p className="text-sm text-gray-400">Define days when markets are closed</p>
-            </div>
-            <Button onClick={() => setAddHolidayOpen(true)} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Holiday
-            </Button>
-          </div>
-
-          {settings.holidays.length === 0 ? (
-            <div className="text-center py-16 bg-gray-800/30 rounded-xl border border-dashed border-gray-700">
-              <Calendar className="h-16 w-16 mx-auto mb-4 text-gray-600" />
-              <h3 className="text-lg font-semibold text-gray-400 mb-2">No Holidays Configured</h3>
-              <p className="text-sm text-gray-500 mb-4">Add holidays to block trading during market closures</p>
-              <Button onClick={() => setAddHolidayOpen(true)} variant="outline" className="border-gray-600">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Holiday
-              </Button>
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              {settings.holidays.map((holiday) => (
-                <div
-                  key={holiday._id}
-                  className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
-                    holiday._id?.startsWith('temp_')
-                      ? 'bg-amber-500/10 border-amber-500/30'
-                      : 'bg-gray-800/50 border-gray-700/50 hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg shadow-red-500/20">
-                      <Calendar className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold text-white">{holiday.name}</h4>
-                        {holiday._id?.startsWith('temp_') && (
-                          <Badge className="bg-amber-500/20 text-amber-400 text-xs">New</Badge>
-                        )}
-                        {holiday.isRecurring && (
-                          <Badge variant="outline" className="text-xs border-gray-600">Yearly</Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-400">
-                        {new Date(holiday.date + 'T00:00:00').toLocaleDateString('en-US', { 
-                          weekday: 'short', 
-                          month: 'short', 
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
-                      </p>
-                    </div>
+        <div className="space-y-6">
+          {/* Automatic Holidays from API - Show when in automatic mode */}
+          {settings.mode === 'automatic' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                    <Zap className="h-5 w-5 text-white" />
                   </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-1">
-                      {holiday.affectedAssets.map((asset) => (
-                        <Badge key={asset} variant="secondary" className="text-xs capitalize">
-                          {asset}
-                        </Badge>
-                      ))}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => holiday._id && handleDeleteHoliday(holiday._id)}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Automatic Holidays</h3>
+                    <p className="text-sm text-gray-400">Detected from Massive.com API</p>
                   </div>
                 </div>
-              ))}
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={fetchAutomaticHolidays}
+                  disabled={loadingAutoHolidays}
+                  className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                >
+                  {loadingAutoHolidays ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Globe className="h-4 w-4 mr-2" />
+                      Refresh
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {loadingAutoHolidays ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                </div>
+              ) : automaticHolidays.length === 0 ? (
+                <div className="p-6 bg-gray-800/30 rounded-xl border border-dashed border-gray-700 text-center">
+                  <Globe className="h-10 w-10 mx-auto mb-3 text-gray-600" />
+                  <p className="text-gray-400 text-sm">No upcoming holidays detected from API</p>
+                  <p className="text-gray-500 text-xs mt-1">This may mean all markets are operating normally</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {automaticHolidays.slice(0, 9).map((holiday) => (
+                    <div
+                      key={holiday.id}
+                      className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-600/5 border border-emerald-500/20 p-4"
+                    >
+                      <div className="absolute top-2 right-2">
+                        <Badge className="bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5">
+                          API
+                        </Badge>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                          <Calendar className="h-5 w-5 text-emerald-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-white text-sm truncate">{holiday.name}</h4>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {new Date(holiday.date + 'T00:00:00').toLocaleDateString('en-US', { 
+                              weekday: 'short', 
+                              month: 'short', 
+                              day: 'numeric'
+                            })}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="outline" className="text-[10px] border-gray-600 px-1.5">
+                              {holiday.exchange}
+                            </Badge>
+                            {holiday.daysUntil === 0 ? (
+                              <Badge className="bg-red-500/20 text-red-400 text-[10px] px-1.5">Today</Badge>
+                            ) : holiday.daysUntil === 1 ? (
+                              <Badge className="bg-orange-500/20 text-orange-400 text-[10px] px-1.5">Tomorrow</Badge>
+                            ) : (
+                              <span className="text-[10px] text-gray-500">in {holiday.daysUntil} days</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {automaticHolidays.length > 9 && (
+                <p className="text-xs text-center text-gray-500">
+                  And {automaticHolidays.length - 9} more upcoming holidays...
+                </p>
+              )}
             </div>
           )}
 
-          {/* Quick Add Info */}
+          {/* Manual/Custom Holidays */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">
+                    {settings.mode === 'automatic' ? 'Custom Holidays' : 'Market Holidays'}
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    {settings.mode === 'automatic' 
+                      ? 'Additional holidays you define (added to automatic detection)'
+                      : 'Define days when markets are closed'}
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => setAddHolidayOpen(true)} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Holiday
+              </Button>
+            </div>
+
+            {settings.holidays.length === 0 ? (
+              <div className="text-center py-12 bg-gray-800/30 rounded-xl border border-dashed border-gray-700">
+                <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-600" />
+                <h3 className="text-base font-semibold text-gray-400 mb-1">No Custom Holidays</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  {settings.mode === 'automatic' 
+                    ? 'API holidays will still apply. Add custom holidays if needed.'
+                    : 'Add holidays to block trading during market closures'}
+                </p>
+                <Button onClick={() => setAddHolidayOpen(true)} variant="outline" className="border-gray-600">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Holiday
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {settings.holidays.map((holiday) => (
+                  <div
+                    key={holiday._id}
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                      holiday._id?.startsWith('temp_')
+                        ? 'bg-amber-500/10 border-amber-500/30'
+                        : 'bg-gray-800/50 border-gray-700/50 hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                        <Calendar className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-white">{holiday.name}</h4>
+                          {holiday._id?.startsWith('temp_') && (
+                            <Badge className="bg-amber-500/20 text-amber-400 text-xs">New</Badge>
+                          )}
+                          <Badge className="bg-blue-500/20 text-blue-400 text-xs">Custom</Badge>
+                          {holiday.isRecurring && (
+                            <Badge variant="outline" className="text-xs border-gray-600">Yearly</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-400">
+                          {new Date(holiday.date + 'T00:00:00').toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            month: 'short', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1">
+                        {holiday.affectedAssets.map((asset) => (
+                          <Badge key={asset} variant="secondary" className="text-xs capitalize">
+                            {asset}
+                          </Badge>
+                        ))}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => holiday._id && handleDeleteHoliday(holiday._id)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Info Box */}
           <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
             <div className="flex items-start gap-3">
               <Info className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-sm text-blue-400 font-medium mb-1">Common Forex Holidays</p>
+                <p className="text-sm text-blue-400 font-medium mb-1">
+                  {settings.mode === 'automatic' ? 'How Holidays Work' : 'Common Forex Holidays'}
+                </p>
                 <p className="text-xs text-gray-400">
-                  Christmas (Dec 25), New Year's (Jan 1), Good Friday, Easter Monday. 
-                  Mark as "Yearly" for recurring holidays.
+                  {settings.mode === 'automatic' 
+                    ? 'In automatic mode, API-detected holidays and your custom holidays are combined. Both will block trading when the relevant blocking rules are enabled.'
+                    : 'Christmas (Dec 25), New Year\'s (Jan 1), Good Friday, Easter Monday. Mark as "Yearly" for recurring holidays.'}
                 </p>
               </div>
             </div>

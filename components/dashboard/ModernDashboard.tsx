@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { ComprehensiveDashboardData } from '@/lib/actions/comprehensive-dashboard.actions';
 import WinPotentialCard from './WinPotentialCard';
+import MarketHolidaysCard from './MarketHolidaysCard';
 import type { RankingMethod } from '@/lib/services/ranking-config.service';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 
@@ -442,6 +443,9 @@ export default function ModernDashboard({ data }: ModernDashboardProps) {
           />
         </div>
       </section>
+
+      {/* Market Holidays */}
+      <MarketHolidaysCard />
     </div>
   );
 }
