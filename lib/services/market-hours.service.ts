@@ -64,13 +64,19 @@ function isWithinTimeRange(currentTime: string, openTime: string, closeTime: str
 
 /**
  * Check if today is a holiday for the given asset class
+ * In manual mode, only custom holidays are checked (template holidays ignored)
  */
-function isTodayHoliday(holidays: IMarketHoliday[], assetClass: AssetClass): boolean {
+function isTodayHoliday(holidays: IMarketHoliday[], assetClass: AssetClass, mode: 'automatic' | 'manual' = 'automatic'): boolean {
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
   const todayMonthDay = todayStr.slice(5); // MM-DD for recurring check
 
   for (const holiday of holidays) {
+    // In manual mode, skip template holidays - only use custom holidays
+    if (mode === 'manual' && (holiday as { isTemplate?: boolean }).isTemplate) {
+      continue;
+    }
+
     // Check if this holiday affects this asset class
     if (!holiday.affectedAssets.includes(assetClass)) {
       continue;
@@ -119,9 +125,9 @@ export async function isMarketOpen(assetClass: AssetClass = 'forex'): Promise<{
     holidaysCount: settings.holidays?.length || 0,
   });
 
-  // Check holidays first (applies to both modes)
+  // Check holidays first (applies to both modes, but respects mode for template vs custom)
   if (settings.blockTradingOnHolidays) {
-    const holiday = getTodayHoliday(settings.holidays, assetClass);
+    const holiday = getTodayHoliday(settings.holidays, assetClass, settings.mode);
     if (holiday) {
       console.log('[Market Hours] Holiday blocking market:', holiday.name);
       return {
@@ -220,13 +226,19 @@ function checkManualSchedule(settings: IMarketSettings, assetClass: AssetClass):
 
 /**
  * Get today's holiday if any
+ * In manual mode, only returns custom holidays (template holidays ignored)
  */
-function getTodayHoliday(holidays: IMarketHoliday[], assetClass: AssetClass): IMarketHoliday | null {
+function getTodayHoliday(holidays: IMarketHoliday[], assetClass: AssetClass, mode: 'automatic' | 'manual' = 'automatic'): IMarketHoliday | null {
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
   const todayMonthDay = todayStr.slice(5);
 
   for (const holiday of holidays) {
+    // In manual mode, skip template holidays - only use custom holidays
+    if (mode === 'manual' && (holiday as { isTemplate?: boolean }).isTemplate) {
+      continue;
+    }
+
     if (!holiday.affectedAssets.includes(assetClass)) {
       continue;
     }
@@ -271,8 +283,8 @@ export async function canJoinCompetition(): Promise<{
     return { canJoin: true };
   }
 
-  // Check for holidays first
-  const holiday = getTodayHoliday(settings.holidays, 'forex');
+  // Check for holidays first (respects mode for template vs custom)
+  const holiday = getTodayHoliday(settings.holidays, 'forex', settings.mode);
   if (holiday) {
     console.log('[Market Hours] Holiday detected:', holiday.name);
     return {
@@ -320,8 +332,8 @@ export async function canJoinChallenge(): Promise<{
     return { canJoin: true };
   }
 
-  // Check for holidays first
-  const holiday = getTodayHoliday(settings.holidays, 'forex');
+  // Check for holidays first (respects mode for template vs custom)
+  const holiday = getTodayHoliday(settings.holidays, 'forex', settings.mode);
   if (holiday) {
     console.log('[Market Hours] Holiday detected:', holiday.name);
     return {
@@ -393,7 +405,8 @@ export async function shouldShowHolidayWarning(): Promise<{
     return { show: false };
   }
 
-  const holiday = getTodayHoliday(settings.holidays, 'forex');
+  // Respects mode for template vs custom holidays
+  const holiday = getTodayHoliday(settings.holidays, 'forex', settings.mode);
   return {
     show: !!holiday,
     holiday: holiday || undefined,

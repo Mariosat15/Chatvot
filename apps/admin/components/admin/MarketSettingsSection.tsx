@@ -74,6 +74,7 @@ interface MarketHoliday {
   date: string;
   affectedAssets: string[];
   isRecurring: boolean;
+  isTemplate?: boolean;
   createdAt?: string;
 }
 
@@ -192,6 +193,54 @@ export default function MarketSettingsSection() {
       setLoadingAutoHolidays(false);
     }
   };
+
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+
+  const handlePopulateTemplate = async () => {
+    setLoadingTemplate(true);
+    try {
+      const response = await fetch('/api/market-settings/template-holidays', {
+        method: 'POST',
+      });
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(`✅ Added ${result.templateCount} template holidays!`);
+        fetchSettings(); // Refresh settings to get new holidays
+      } else {
+        toast.error('Failed to populate template');
+      }
+    } catch (error) {
+      console.error('Error populating template:', error);
+      toast.error('Failed to populate template');
+    } finally {
+      setLoadingTemplate(false);
+    }
+  };
+
+  const handleClearTemplate = async () => {
+    setLoadingTemplate(true);
+    try {
+      const response = await fetch('/api/market-settings/template-holidays', {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(result.message);
+        fetchSettings(); // Refresh settings
+      } else {
+        toast.error('Failed to clear template');
+      }
+    } catch (error) {
+      console.error('Error clearing template:', error);
+      toast.error('Failed to clear template');
+    } finally {
+      setLoadingTemplate(false);
+    }
+  };
+
+  // Separate template and custom holidays
+  const templateHolidays = settings?.holidays.filter(h => h.isTemplate) || [];
+  const customHolidays = settings?.holidays.filter(h => !h.isTemplate) || [];
 
   const handleSaveAll = async () => {
     if (!settings) return;
@@ -679,7 +728,28 @@ export default function MarketSettingsSection() {
       {/* Holidays Section */}
       {activeSection === 'holidays' && (
         <div className="space-y-6">
-          {/* Automatic Holidays from API - Show when in automatic mode */}
+          {/* Mode Explanation */}
+          <div className={`p-4 rounded-xl border ${
+            settings.mode === 'automatic' 
+              ? 'bg-emerald-500/10 border-emerald-500/20' 
+              : 'bg-blue-500/10 border-blue-500/20'
+          }`}>
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 mt-0.5 flex-shrink-0 text-gray-400" />
+              <div>
+                <p className="text-sm text-white font-medium mb-1">
+                  {settings.mode === 'automatic' ? '🟢 Automatic Mode' : '🔵 Manual Mode'}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {settings.mode === 'automatic' 
+                    ? 'Both template holidays AND custom holidays will be respected. Template holidays are standard market holidays. You can remove any template holiday you don\'t want.'
+                    : 'Only your custom holidays will be used. Template holidays are ignored in manual mode.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Template Holidays Section - Only shown in Automatic mode */}
           {settings.mode === 'automatic' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -688,91 +758,119 @@ export default function MarketSettingsSection() {
                     <Zap className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">Automatic Holidays</h3>
-                    <p className="text-sm text-gray-400">Detected from Massive.com API</p>
+                    <h3 className="text-lg font-bold text-white">Template Holidays</h3>
+                    <p className="text-sm text-gray-400">
+                      Standard market holidays ({templateHolidays.length} configured)
+                    </p>
                   </div>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={fetchAutomaticHolidays}
-                  disabled={loadingAutoHolidays}
-                  className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                >
-                  {loadingAutoHolidays ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="flex gap-2">
+                  {templateHolidays.length === 0 ? (
+                    <Button 
+                      onClick={handlePopulateTemplate}
+                      disabled={loadingTemplate}
+                      className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+                    >
+                      {loadingTemplate ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-2" />
+                      )}
+                      Load Template
+                    </Button>
                   ) : (
-                    <>
-                      <Globe className="h-4 w-4 mr-2" />
-                      Refresh
-                    </>
+                    <Button 
+                      variant="outline"
+                      onClick={handleClearTemplate}
+                      disabled={loadingTemplate}
+                      className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                    >
+                      {loadingTemplate ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-2" />
+                      )}
+                      Clear Template
+                    </Button>
                   )}
-                </Button>
+                </div>
               </div>
 
-              {loadingAutoHolidays ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-                </div>
-              ) : automaticHolidays.length === 0 ? (
-                <div className="p-6 bg-gray-800/30 rounded-xl border border-dashed border-gray-700 text-center">
-                  <Globe className="h-10 w-10 mx-auto mb-3 text-gray-600" />
-                  <p className="text-gray-400 text-sm">No upcoming holidays detected from API</p>
-                  <p className="text-gray-500 text-xs mt-1">This may mean all markets are operating normally</p>
+              {templateHolidays.length === 0 ? (
+                <div className="p-6 bg-gray-800/30 rounded-xl border border-dashed border-emerald-500/30 text-center">
+                  <Zap className="h-10 w-10 mx-auto mb-3 text-emerald-500/50" />
+                  <p className="text-gray-400 text-sm">No template holidays loaded</p>
+                  <p className="text-gray-500 text-xs mt-1">Click "Load Template" to add standard market holidays</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {automaticHolidays.slice(0, 9).map((holiday) => (
-                    <div
-                      key={holiday.id}
-                      className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-600/5 border border-emerald-500/20 p-4"
-                    >
-                      <div className="absolute top-2 right-2">
-                        <Badge className="bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5">
-                          API
-                        </Badge>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                          <Calendar className="h-5 w-5 text-emerald-400" />
+                  {templateHolidays.slice(0, 12).map((holiday) => {
+                    const holidayDate = new Date(holiday.date + 'T00:00:00');
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const daysUntil = Math.ceil((holidayDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    return (
+                      <div
+                        key={holiday._id}
+                        className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-600/5 border border-emerald-500/20 p-4 group"
+                      >
+                        <div className="absolute top-2 right-2 flex gap-1">
+                          <Badge className="bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5">
+                            Template
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => holiday._id && handleDeleteHoliday(holiday._id)}
+                            className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-white text-sm truncate">{holiday.name}</h4>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {new Date(holiday.date + 'T00:00:00').toLocaleDateString('en-US', { 
-                              weekday: 'short', 
-                              month: 'short', 
-                              day: 'numeric'
-                            })}
-                          </p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="outline" className="text-[10px] border-gray-600 px-1.5">
-                              {holiday.exchange}
-                            </Badge>
-                            {holiday.daysUntil === 0 ? (
-                              <Badge className="bg-red-500/20 text-red-400 text-[10px] px-1.5">Today</Badge>
-                            ) : holiday.daysUntil === 1 ? (
-                              <Badge className="bg-orange-500/20 text-orange-400 text-[10px] px-1.5">Tomorrow</Badge>
-                            ) : (
-                              <span className="text-[10px] text-gray-500">in {holiday.daysUntil} days</span>
-                            )}
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                            <Calendar className="h-5 w-5 text-emerald-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-semibold text-white text-sm truncate pr-16">{holiday.name}</h4>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {holidayDate.toLocaleDateString('en-US', { 
+                                weekday: 'short', 
+                                month: 'short', 
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </p>
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              {daysUntil === 0 ? (
+                                <Badge className="bg-red-500/20 text-red-400 text-[10px] px-1.5">Today</Badge>
+                              ) : daysUntil === 1 ? (
+                                <Badge className="bg-orange-500/20 text-orange-400 text-[10px] px-1.5">Tomorrow</Badge>
+                              ) : daysUntil > 0 ? (
+                                <span className="text-[10px] text-gray-500">in {daysUntil} days</span>
+                              ) : null}
+                              {holiday.isRecurring && (
+                                <Badge variant="outline" className="text-[10px] border-gray-600 px-1.5">Yearly</Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
-              {automaticHolidays.length > 9 && (
+              {templateHolidays.length > 12 && (
                 <p className="text-xs text-center text-gray-500">
-                  And {automaticHolidays.length - 9} more upcoming holidays...
+                  And {templateHolidays.length - 12} more template holidays...
                 </p>
               )}
             </div>
           )}
 
-          {/* Manual/Custom Holidays */}
+          {/* Custom Holidays */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -780,30 +878,26 @@ export default function MarketSettingsSection() {
                   <Calendar className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">
-                    {settings.mode === 'automatic' ? 'Custom Holidays' : 'Market Holidays'}
-                  </h3>
+                  <h3 className="text-lg font-bold text-white">Custom Holidays</h3>
                   <p className="text-sm text-gray-400">
-                    {settings.mode === 'automatic' 
-                      ? 'Additional holidays you define (added to automatic detection)'
-                      : 'Define days when markets are closed'}
+                    Your manually added holidays ({customHolidays.length} configured)
                   </p>
                 </div>
               </div>
               <Button onClick={() => setAddHolidayOpen(true)} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Holiday
+                Add Custom
               </Button>
             </div>
 
-            {settings.holidays.length === 0 ? (
+            {customHolidays.length === 0 ? (
               <div className="text-center py-12 bg-gray-800/30 rounded-xl border border-dashed border-gray-700">
                 <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-600" />
                 <h3 className="text-base font-semibold text-gray-400 mb-1">No Custom Holidays</h3>
                 <p className="text-sm text-gray-500 mb-4">
                   {settings.mode === 'automatic' 
-                    ? 'API holidays will still apply. Add custom holidays if needed.'
-                    : 'Add holidays to block trading during market closures'}
+                    ? 'Template holidays will still apply. Add custom holidays for additional closures.'
+                    : 'Add holidays to block trading during market closures.'}
                 </p>
                 <Button onClick={() => setAddHolidayOpen(true)} variant="outline" className="border-gray-600">
                   <Plus className="h-4 w-4 mr-2" />
@@ -812,7 +906,7 @@ export default function MarketSettingsSection() {
               </div>
             ) : (
               <div className="grid gap-3">
-                {settings.holidays.map((holiday) => (
+                {customHolidays.map((holiday) => (
                   <div
                     key={holiday._id}
                     className={`flex items-center justify-between p-4 rounded-xl border transition-all ${

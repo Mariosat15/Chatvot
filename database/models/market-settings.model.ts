@@ -5,6 +5,7 @@ export interface IMarketHoliday {
   date: string; // YYYY-MM-DD format
   affectedAssets: ('forex' | 'crypto' | 'stocks' | 'indices' | 'commodities')[];
   isRecurring: boolean; // If true, repeats yearly
+  isTemplate: boolean; // If true, this is a standard holiday from template (used in automatic mode)
   createdAt?: Date;
 }
 
@@ -85,6 +86,7 @@ const MarketHolidaySchema = new Schema({
     default: ['forex']
   }],
   isRecurring: { type: Boolean, default: false },
+  isTemplate: { type: Boolean, default: false }, // Template holidays are used in automatic mode
   createdAt: { type: Date, default: Date.now },
 }, { _id: true });
 
