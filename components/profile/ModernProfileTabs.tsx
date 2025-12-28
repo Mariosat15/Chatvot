@@ -62,8 +62,8 @@ const TABS: Tab[] = [
     id: 'settings', 
     label: 'Settings', 
     icon: <Settings className="w-4 h-4" />,
-    color: 'text-slate-400',
-    gradient: 'from-slate-500/20 to-slate-600/10'
+    color: 'text-gray-400',
+    gradient: 'from-gray-500/20 to-gray-600/10'
   },
 ];
 
@@ -157,7 +157,7 @@ export default function ModernProfileTabs({
         {canScrollLeft && (
           <button
             onClick={() => scroll('left')}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-slate-900/90 backdrop-blur rounded-full flex items-center justify-center text-slate-400 hover:text-white transition-colors shadow-lg border border-slate-700"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-gray-900/90 backdrop-blur rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors shadow-lg border border-gray-700"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -165,7 +165,7 @@ export default function ModernProfileTabs({
         {canScrollRight && (
           <button
             onClick={() => scroll('right')}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-slate-900/90 backdrop-blur rounded-full flex items-center justify-center text-slate-400 hover:text-white transition-colors shadow-lg border border-slate-700"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-gray-900/90 backdrop-blur rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors shadow-lg border border-gray-700"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -175,7 +175,7 @@ export default function ModernProfileTabs({
         <div
           ref={tabsContainerRef}
           onScroll={checkScroll}
-          className="flex items-center gap-2 overflow-x-auto scrollbar-hide scroll-smooth px-1 py-1 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/50"
+          className="flex items-center gap-2 overflow-x-auto scrollbar-hide scroll-smooth px-1 py-1 bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700/50"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {TABS.map((tab) => {
@@ -189,7 +189,7 @@ export default function ModernProfileTabs({
                   transition-all duration-200 whitespace-nowrap min-w-fit
                   ${isActive 
                     ? `bg-gradient-to-r ${tab.gradient} ${tab.color} shadow-lg` 
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
                   }
                 `}
               >

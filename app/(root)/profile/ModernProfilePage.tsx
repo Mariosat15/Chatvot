@@ -84,7 +84,7 @@ export default function ModernProfilePage({
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950">
+    <div className="min-h-screen bg-gradient-to-b from-dark-800 via-dark-900 to-dark-900">
       {/* Header Section */}
       <ProfileHeader
         session={session}

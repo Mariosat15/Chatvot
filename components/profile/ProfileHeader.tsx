@@ -64,7 +64,7 @@ export default function ProfileHeader({
   return (
     <div className="relative overflow-hidden">
       {/* Background Pattern */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900">
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
@@ -96,7 +96,7 @@ export default function ProfileHeader({
                 />
                 
                 {/* Avatar */}
-                <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden ring-4 ring-slate-800 bg-gradient-to-br from-slate-700 to-slate-800">
+                <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden ring-4 ring-gray-800 bg-gradient-to-br from-gray-700 to-gray-800">
                   {profileImage && hasCustomImage ? (
                     <img
                       src={profileImage}
@@ -120,7 +120,7 @@ export default function ProfileHeader({
 
                 {/* Level Badge */}
                 <div 
-                  className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold shadow-lg border-2 border-slate-800"
+                  className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold shadow-lg border-2 border-gray-800"
                   style={{ backgroundColor: levelData.currentColor }}
                 >
                   <span className="text-white drop-shadow">{levelData.currentIcon}</span>
@@ -128,7 +128,7 @@ export default function ProfileHeader({
 
                 {/* Verified Badge */}
                 {isKYCVerified && (
-                  <div className="absolute -top-1 -right-1 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center shadow-lg border-2 border-slate-800">
+                  <div className="absolute -top-1 -right-1 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center shadow-lg border-2 border-gray-800">
                     <Verified className="w-4 h-4 text-white" />
                   </div>
                 )}
@@ -157,10 +157,10 @@ export default function ProfileHeader({
                 </div>
               </div>
 
-              <p className="text-slate-400 mb-4 text-sm sm:text-base">{session.user.email}</p>
+              <p className="text-gray-400 mb-4 text-sm sm:text-base">{session.user.email}</p>
 
               {/* Meta Info */}
-              <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
+              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4" />
                   <span>Member since {memberSince}</span>
@@ -178,8 +178,8 @@ export default function ProfileHeader({
 
             {/* Quick Balance Card */}
             <div className="lg:text-right">
-              <div className="inline-flex flex-col items-start lg:items-end bg-slate-800/50 backdrop-blur rounded-2xl p-4 border border-slate-700/50">
-                <span className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Balance</span>
+              <div className="inline-flex flex-col items-start lg:items-end bg-gray-800/50 backdrop-blur rounded-2xl p-4 border border-gray-700/50">
+                <span className="text-xs text-gray-400 mb-1 uppercase tracking-wider">Balance</span>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-bold text-white tabular-nums">
                     {(walletData?.currentBalance || 0).toLocaleString(undefined, { 
@@ -196,7 +196,7 @@ export default function ProfileHeader({
           {/* Quick Stats Toggle */}
           <button 
             onClick={() => setShowQuickStats(!showQuickStats)}
-            className="mt-6 flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm"
+            className="mt-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
           >
             <span>Quick Stats</span>
             <ChevronDown className={`w-4 h-4 transition-transform ${showQuickStats ? 'rotate-180' : ''}`} />
@@ -249,10 +249,10 @@ function QuickStatCard({
   color: string;
 }) {
   return (
-    <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl px-4 py-3 border border-slate-700/30 hover:border-slate-600/50 transition-colors">
+    <div className="bg-gray-800/30 backdrop-blur-sm rounded-xl px-4 py-3 border border-gray-700/30 hover:border-gray-600/50 transition-colors">
       <div className={`flex items-center gap-2 ${color} mb-1`}>
         {icon}
-        <span className="text-xs text-slate-400">{label}</span>
+        <span className="text-xs text-gray-400">{label}</span>
       </div>
       <p className="text-lg font-bold text-white tabular-nums">{value}</p>
     </div>

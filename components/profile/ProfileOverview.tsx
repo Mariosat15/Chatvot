@@ -201,7 +201,7 @@ export default function ProfileOverview({
         </div>
 
         {/* Performance Grid */}
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 bg-slate-800/30 rounded-xl p-3">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 bg-gray-800/30 rounded-xl p-3">
           <MiniStat label="P&L" value={`${(competitionStats?.totalPnl || 0) >= 0 ? '+' : ''}${(competitionStats?.totalPnl || 0).toFixed(2)}`} color={(competitionStats?.totalPnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'} />
           <MiniStat label="Avg ROI" value={`${(competitionStats?.averageRoi || 0) >= 0 ? '+' : ''}${(competitionStats?.averageRoi || 0).toFixed(2)}%`} color={(competitionStats?.averageRoi || 0) >= 0 ? 'text-green-400' : 'text-red-400'} />
           <MiniStat label="Win Rate" value={`${(competitionStats?.overallWinRate || 0).toFixed(1)}%`} color="text-white" />
@@ -215,7 +215,7 @@ export default function ProfileOverview({
       {competitionStats?.recentCompetitions?.length > 0 && (
         <CollapsibleSection
           title="📅 Recent Competitions"
-          icon={<Clock className="w-5 h-5 text-slate-400" />}
+          icon={<Clock className="w-5 h-5 text-gray-400" />}
           isOpen={expandedSections.recentComps}
           onToggle={() => toggleSection('recentComps')}
           count={competitionStats.recentCompetitions.length}
@@ -285,7 +285,7 @@ export default function ProfileOverview({
       {challengeStats?.recentChallenges?.length > 0 && (
         <CollapsibleSection
           title="⚔️ Recent Challenges"
-          icon={<Clock className="w-5 h-5 text-slate-400" />}
+          icon={<Clock className="w-5 h-5 text-gray-400" />}
           isOpen={expandedSections.recentChallenges}
           onToggle={() => toggleSection('recentChallenges')}
           count={challengeStats.recentChallenges.length}
@@ -300,20 +300,20 @@ export default function ProfileOverview({
 
       {/* Empty State */}
       {!competitionStats?.recentCompetitions?.length && !challengeStats?.recentChallenges?.length && (
-        <div className="bg-slate-800/30 rounded-2xl p-8 text-center border border-slate-700/50">
-          <Trophy className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+        <div className="bg-gray-800/30 rounded-2xl p-8 text-center border border-gray-700/50">
+          <Trophy className="w-12 h-12 text-gray-600 mx-auto mb-3" />
           <h3 className="text-lg font-semibold text-white mb-2">No Activity Yet</h3>
-          <p className="text-slate-400 mb-4">Join competitions or challenge other traders to start building your record!</p>
+          <p className="text-gray-400 mb-4">Join competitions or challenge other traders to start building your record!</p>
           <div className="flex justify-center gap-3">
             <Link
               href="/competitions"
-              className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-slate-900 rounded-lg font-medium transition-colors"
+              className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-gray-900 rounded-lg font-medium transition-colors"
             >
               Browse Competitions
             </Link>
             <Link
               href="/challenges"
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
             >
               Find Challengers
             </Link>
@@ -358,7 +358,7 @@ function StatCard({
     <div className={`bg-gradient-to-br ${colorClasses[color]} rounded-xl p-4 border ${colorClasses[color].split(' ')[2]} hover:scale-[1.02] transition-transform`}>
       <div className={`flex items-center gap-2 ${iconColorClasses[color]} mb-2`}>
         {icon}
-        <span className="text-xs text-slate-400 uppercase tracking-wider">{label}</span>
+        <span className="text-xs text-gray-400 uppercase tracking-wider">{label}</span>
         {trend && (
           trend === 'up' ? 
             <TrendingUp className="w-3 h-3 text-green-400 ml-auto" /> : 
@@ -392,10 +392,10 @@ function WalletStatCard({
 }) {
   const variants: Record<string, string> = {
     primary: 'bg-gradient-to-br from-yellow-500/20 to-amber-500/10 border-yellow-500/30',
-    blue: 'bg-slate-800/50 border-blue-500/20 hover:border-blue-500/40',
-    green: 'bg-slate-800/50 border-green-500/20 hover:border-green-500/40',
-    orange: 'bg-slate-800/50 border-orange-500/20 hover:border-orange-500/40',
-    gray: 'bg-slate-800/50 border-slate-600/20 hover:border-slate-500/40',
+    blue: 'bg-gray-800/50 border-blue-500/20 hover:border-blue-500/40',
+    green: 'bg-gray-800/50 border-green-500/20 hover:border-green-500/40',
+    orange: 'bg-gray-800/50 border-orange-500/20 hover:border-orange-500/40',
+    gray: 'bg-gray-800/50 border-gray-600/20 hover:border-gray-500/40',
   };
 
   const textColors: Record<string, string> = {
@@ -403,12 +403,12 @@ function WalletStatCard({
     blue: 'text-blue-400',
     green: 'text-green-400',
     orange: 'text-orange-400',
-    gray: 'text-slate-400',
+    gray: 'text-gray-400',
   };
 
   return (
     <div className={`rounded-xl p-3 border ${variants[variant]} transition-all`}>
-      <p className="text-xs text-slate-400 mb-1">{label}</p>
+      <p className="text-xs text-gray-400 mb-1">{label}</p>
       <div className="flex items-baseline gap-1">
         <p className={`text-lg font-bold tabular-nums ${textColors[variant]}`}>
           {prefix}{value.toFixed(decimals)}
@@ -416,7 +416,7 @@ function WalletStatCard({
         <span className="text-sm text-yellow-500">{symbol}</span>
       </div>
       {euroEquivalent !== undefined && currencySymbol && (
-        <p className="text-xs text-slate-500 mt-0.5">≈ {currencySymbol}{euroEquivalent.toFixed(2)}</p>
+        <p className="text-xs text-gray-500 mt-0.5">≈ {currencySymbol}{euroEquivalent.toFixed(2)}</p>
       )}
     </div>
   );
@@ -426,7 +426,7 @@ function WalletStatCard({
 function MiniStat({ label, value, color }: { label: string; value: string | number; color: string }) {
   return (
     <div className="text-center">
-      <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+      <p className="text-xs text-gray-500 mb-0.5">{label}</p>
       <p className={`text-sm font-semibold tabular-nums ${color}`}>{value}</p>
     </div>
   );
@@ -454,13 +454,13 @@ function HighlightCard({
     <div className={`bg-gradient-to-br ${gradient} rounded-xl p-4 border ${border}`}>
       <div className="flex items-center gap-2 mb-2">
         {icon}
-        <span className="text-sm text-slate-300">{label}</span>
+        <span className="text-sm text-gray-300">{label}</span>
       </div>
       <div className="flex items-baseline gap-1">
         <p className="text-2xl font-bold text-white tabular-nums">{value}</p>
         {symbol && <span className="text-lg text-yellow-500">{symbol}</span>}
       </div>
-      {subtext && <p className="text-xs text-slate-400 mt-1">{subtext}</p>}
+      {subtext && <p className="text-xs text-gray-400 mt-1">{subtext}</p>}
     </div>
   );
 }
@@ -486,16 +486,16 @@ function CollapsibleSection({
   count?: number;
 }) {
   return (
-    <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 overflow-hidden">
+    <div className="bg-gray-800/30 rounded-2xl border border-gray-700/50 overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors"
+        className="w-full flex items-center justify-between p-4 hover:bg-gray-800/50 transition-colors"
       >
         <div className="flex items-center gap-3">
           {icon}
           <h2 className="text-lg font-semibold text-white">{title}</h2>
           {badge && (
-            <span className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">
+            <span className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full">
               {badge}
             </span>
           )}
@@ -508,9 +508,9 @@ function CollapsibleSection({
         <div className="flex items-center gap-3">
           {action && <div onClick={e => e.stopPropagation()}>{action}</div>}
           {isOpen ? (
-            <ChevronUp className="w-5 h-5 text-slate-400" />
+            <ChevronUp className="w-5 h-5 text-gray-400" />
           ) : (
-            <ChevronDown className="w-5 h-5 text-slate-400" />
+            <ChevronDown className="w-5 h-5 text-gray-400" />
           )}
         </div>
       </button>
@@ -542,7 +542,7 @@ function CompetitionRow({ comp, settings }: { comp: any; settings: any }) {
   return (
     <Link
       href={`/competitions/${comp.competitionId}`}
-      className="flex items-center gap-4 p-3 bg-slate-800/50 hover:bg-slate-800/70 rounded-xl border border-slate-700/50 hover:border-slate-600/50 transition-all group"
+      className="flex items-center gap-4 p-3 bg-gray-800/50 hover:bg-gray-800/70 rounded-xl border border-gray-700/50 hover:border-gray-600/50 transition-all group"
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
@@ -556,24 +556,24 @@ function CompetitionRow({ comp, settings }: { comp: any; settings: any }) {
             {comp.status === 'cancelled' && '✕ CANCELLED'}
           </span>
         </div>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-gray-400">
           {comp.totalTrades} trades · {comp.winRate.toFixed(1)}% win rate
         </p>
       </div>
       <div className="flex items-center gap-4 text-right text-sm">
         <div>
-          <p className="text-xs text-slate-500">Rank</p>
+          <p className="text-xs text-gray-500">Rank</p>
           <p className="font-semibold text-yellow-400">{comp.rank > 0 ? `#${comp.rank}` : '-'}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">P&L</p>
+          <p className="text-xs text-gray-500">P&L</p>
           <p className={`font-semibold tabular-nums ${comp.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {comp.pnl >= 0 ? '+' : ''}{comp.pnl.toFixed(2)}
           </p>
         </div>
         {comp.prizeAmount > 0 && (
           <div>
-            <p className="text-xs text-slate-500">Prize</p>
+            <p className="text-xs text-gray-500">Prize</p>
             <p className="font-semibold text-yellow-400 tabular-nums">
               {comp.prizeAmount.toFixed(settings.credits.decimals)} {settings.credits.symbol}
             </p>
@@ -589,7 +589,7 @@ function ChallengeRow({ challenge, settings }: { challenge: any; settings: any }
   return (
     <Link
       href={`/challenges/${challenge.challengeId}`}
-      className="flex items-center gap-4 p-3 bg-slate-800/50 hover:bg-slate-800/70 rounded-xl border border-slate-700/50 hover:border-orange-500/30 transition-all group"
+      className="flex items-center gap-4 p-3 bg-gray-800/50 hover:bg-gray-800/70 rounded-xl border border-gray-700/50 hover:border-orange-500/30 transition-all group"
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
@@ -611,15 +611,15 @@ function ChallengeRow({ challenge, settings }: { challenge: any; settings: any }
             </span>
           )}
         </div>
-        <p className="text-xs text-slate-400">{challenge.totalTrades} trades</p>
+        <p className="text-xs text-gray-400">{challenge.totalTrades} trades</p>
       </div>
       <div className="flex items-center gap-4 text-right text-sm">
         <div>
-          <p className="text-xs text-slate-500">Entry</p>
+          <p className="text-xs text-gray-500">Entry</p>
           <p className="font-semibold text-blue-400">{challenge.entryFee}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">P&L</p>
+          <p className="text-xs text-gray-500">P&L</p>
           <p className={`font-semibold tabular-nums ${challenge.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {challenge.pnl >= 0 ? '+' : ''}{challenge.pnl.toFixed(2)}
           </p>
