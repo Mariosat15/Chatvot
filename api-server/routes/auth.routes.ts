@@ -9,20 +9,33 @@
 import { Router, Request, Response } from 'express';
 import { hashPassword, comparePassword } from '../workers/worker-pool';
 import mongoose, { Document, Model } from 'mongoose';
+import crypto from 'crypto';
 
 const router = Router();
 
-// User interface for type safety
+// User interface for type safety - MUST match better-auth's user schema
 interface IUser extends Document {
+  id: string;           // better-auth's primary identifier (NOT MongoDB's _id)
   email: string;
   password: string;
   name?: string;
+  emailVerified: boolean;
+  image?: string;
+  role?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 // Cached model to avoid recreation
 let UserModel: Model<IUser> | null = null;
+
+/**
+ * Generate a unique ID compatible with better-auth
+ * Uses crypto.randomUUID() which produces standard UUID v4 format
+ */
+const generateUserId = (): string => {
+  return crypto.randomUUID();
+};
 
 // Get or create User model with proper typing
 const getUserModel = (): Model<IUser> => {
@@ -34,12 +47,16 @@ const getUserModel = (): Model<IUser> => {
     return UserModel;
   }
   
-  // Define minimal schema for auth operations
+  // Define schema matching better-auth's user structure
   // Use 'user' collection (singular) to match better-auth's collection name
   const userSchema = new mongoose.Schema<IUser>({
+    id: { type: String, required: true, unique: true }, // better-auth's ID field
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     name: { type: String },
+    emailVerified: { type: Boolean, default: false },
+    image: { type: String },
+    role: { type: String, default: 'trader' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   }, { collection: 'user' }); // Explicitly set collection name to match better-auth
@@ -79,11 +96,15 @@ router.post('/register', async (req: Request, res: Response) => {
     
     console.log(`🔐 Password hashed in ${hashDuration}ms (non-blocking)`);
 
-    // Create user
+    // Create user with better-auth compatible fields
+    const userId = generateUserId();
     const user = await User.create({
+      id: userId,  // better-auth's ID field
       email,
       password: hashedPassword,
       name: name || email.split('@')[0],
+      emailVerified: false,
+      role: 'trader',
     });
 
     const totalDuration = Date.now() - startTime;
@@ -92,7 +113,7 @@ router.post('/register', async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       user: {
-        id: user._id,
+        id: user.id,  // Return better-auth's id, not _id
         email: user.email,
         name: user.name,
       },
@@ -154,7 +175,7 @@ router.post('/login', async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       user: {
-        id: user._id,
+        id: user.id || user._id,  // Prefer better-auth's id, fallback to _id
         email: user.email,
         name: user.name,
       },
@@ -258,13 +279,17 @@ router.post('/register-batch', async (req: Request, res: Response) => {
           continue;
         }
 
+        const userId = generateUserId();
         const user = await User.create({
+          id: userId,  // better-auth's ID field
           email: userData.email,
           password: userData.hashedPassword,
           name: userData.name || userData.email.split('@')[0],
+          emailVerified: false,
+          role: 'trader',
         });
 
-        results.push({ success: true, email: userData.email, userId: user._id.toString() });
+        results.push({ success: true, email: userData.email, userId: user.id });
         successCount++;
       } catch (error) {
         results.push({ 
