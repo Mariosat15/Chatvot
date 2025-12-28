@@ -61,6 +61,9 @@ class BcryptWorkerPool {
    * Create a new worker
    */
   private createWorker(): void {
+    // Don't create workers during shutdown
+    if (this.isShuttingDown) return;
+    
     // Detect if running from compiled dist/ folder (same method as index.ts)
     // Use path.sep to check for exact 'dist' folder (not substring like 'distributed')
     const isCompiledBuild = __dirname.split(path.sep).includes('dist');
@@ -161,6 +164,8 @@ class BcryptWorkerPool {
    * Process queued tasks
    */
   private processQueue(): void {
+    // Don't process queue during shutdown
+    if (this.isShuttingDown) return;
     if (this.taskQueue.length === 0) return;
 
     const availableWorker = this.workers.find(w => !w.busy);
