@@ -60,27 +60,25 @@ export default function ModernProfilePage({
   // Create overview content with the new components
   const overviewContent = (
     <div className="space-y-6">
-      {/* XP Progress Bar */}
-      <div className="bg-slate-800/30 rounded-2xl p-4 border border-slate-700/50">
-        <XPProgressBar
-          currentXP={levelData.currentXP}
-          currentLevel={levelData.currentLevel}
-          currentTitle={levelData.currentTitle}
-          currentIcon={levelData.currentIcon}
-          currentDescription={levelData.currentDescription}
-          currentColor={levelData.currentColor}
-          totalBadgesEarned={levelData.totalBadgesEarned}
-          badgeXPValues={badgeXPValues}
-          titleLevels={titleLevels}
-        />
-      </div>
-
       {/* Stats Overview */}
       <ProfileOverview
         combinedStats={combinedStats}
         competitionStats={competitionStats}
         challengeStats={challengeStats}
         walletData={walletData}
+      />
+
+      {/* XP Progress Bar */}
+      <XPProgressBar
+        currentXP={levelData.currentXP}
+        currentLevel={levelData.currentLevel}
+        currentTitle={levelData.currentTitle}
+        currentIcon={levelData.currentIcon}
+        currentDescription={levelData.currentDescription}
+        currentColor={levelData.currentColor}
+        totalBadgesEarned={levelData.totalBadgesEarned}
+        badgeXPValues={badgeXPValues}
+        titleLevels={titleLevels}
       />
     </div>
   );
