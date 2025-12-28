@@ -328,6 +328,7 @@ export async function POST(request: Request) {
           totalWonFromCompetitions: 0,        // Reset competition winnings (Volt Won)
           totalSpentOnChallenges: 0,          // Reset challenge spending
           totalWonFromChallenges: 0,          // Reset challenge winnings
+          totalSpentOnMarketplace: 0,         // Reset marketplace spending
           // Reset KYC status fields
           kycVerified: false,
           kycStatus: 'none',

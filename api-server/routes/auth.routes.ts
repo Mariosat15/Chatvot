@@ -174,17 +174,50 @@ router.post('/login', async (req: Request, res: Response) => {
 });
 
 /**
- * Batch register users (for simulator)
+ * Batch register users (for simulator/internal use only)
  * Uses worker threads for parallel bcrypt hashing
+ * 
+ * SECURITY: This endpoint requires an internal API key to prevent abuse.
+ * Set INTERNAL_API_KEY in your .env file to enable this endpoint.
+ * Without the key, this endpoint is completely disabled.
  */
 router.post('/register-batch', async (req: Request, res: Response) => {
   const startTime = Date.now();
   
   try {
+    // SECURITY: Require internal API key to prevent abuse
+    const internalApiKey = process.env.INTERNAL_API_KEY;
+    const providedKey = req.headers['x-internal-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
+    
+    // If no internal API key is configured, disable this endpoint entirely
+    if (!internalApiKey) {
+      res.status(403).json({ 
+        error: 'Batch registration is disabled',
+        message: 'This endpoint requires INTERNAL_API_KEY to be configured'
+      });
+      return;
+    }
+    
+    // Verify the provided key matches
+    if (providedKey !== internalApiKey) {
+      console.warn(`⚠️ Unauthorized batch registration attempt from ${req.ip}`);
+      res.status(401).json({ 
+        error: 'Unauthorized',
+        message: 'Invalid or missing internal API key. Provide via X-Internal-API-Key header.'
+      });
+      return;
+    }
+
     const { users } = req.body;
 
     if (!users || !Array.isArray(users) || users.length === 0) {
       res.status(400).json({ error: 'Users array is required' });
+      return;
+    }
+    
+    // Limit batch size to prevent abuse (max 100 users per request)
+    if (users.length > 100) {
+      res.status(400).json({ error: 'Maximum 100 users per batch request' });
       return;
     }
 
@@ -272,8 +305,19 @@ router.post('/register-batch', async (req: Request, res: Response) => {
 
 /**
  * Benchmark endpoint - test bcrypt performance
+ * 
+ * SECURITY: Only enabled in development mode to prevent DoS attacks
  */
 router.get('/benchmark', async (req: Request, res: Response) => {
+  // Only allow in development mode
+  if (process.env.NODE_ENV === 'production') {
+    res.status(403).json({ 
+      error: 'Benchmark endpoint disabled in production',
+      message: 'This endpoint is only available in development mode'
+    });
+    return;
+  }
+
   const iterations = 5;
   const times: number[] = [];
 
