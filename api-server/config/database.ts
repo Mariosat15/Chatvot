@@ -37,15 +37,35 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
     console.log('📊 Database connection in progress, waiting...');
     // Wait for connection to complete
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Connection timeout')), 30000);
-      mongoose.connection.once('connected', () => {
+      let settled = false;
+      
+      const onConnected = () => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timeout);
+        mongoose.connection.off('error', onError);
         resolve();
-      });
-      mongoose.connection.once('error', (err) => {
+      };
+      
+      const onError = (err: Error) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timeout);
+        mongoose.connection.off('connected', onConnected);
         reject(err);
-      });
+      };
+      
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        // Clean up listeners to prevent memory leaks
+        mongoose.connection.off('connected', onConnected);
+        mongoose.connection.off('error', onError);
+        reject(new Error('Connection timeout'));
+      }, 30000);
+      
+      mongoose.connection.once('connected', onConnected);
+      mongoose.connection.once('error', onError);
     });
     return mongoose;
   }
@@ -111,15 +131,35 @@ export async function ensureDbReady(): Promise<void> {
   } else if (state === 2) {
     // Connecting - wait
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('DB connection timeout')), 15000);
-      mongoose.connection.once('connected', () => {
+      let settled = false;
+      
+      const onConnected = () => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timeout);
+        mongoose.connection.off('error', onError);
         resolve();
-      });
-      mongoose.connection.once('error', (err) => {
+      };
+      
+      const onError = (err: Error) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timeout);
+        mongoose.connection.off('connected', onConnected);
         reject(err);
-      });
+      };
+      
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        // Clean up listeners to prevent memory leaks
+        mongoose.connection.off('connected', onConnected);
+        mongoose.connection.off('error', onError);
+        reject(new Error('DB connection timeout'));
+      }, 15000);
+      
+      mongoose.connection.once('connected', onConnected);
+      mongoose.connection.once('error', onError);
     });
   }
 }
