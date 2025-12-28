@@ -454,10 +454,8 @@ export async function POST(request: NextRequest) {
       { session: mongoSession }
     );
 
-    // Check for auto-approval and immediate processing
+    // Check for auto-approval (sandbox mode only)
     let autoApproved = false;
-    let immediatelyProcessed = false;
-    let processResult: { success: boolean; payoutId?: string; status?: string; error?: string } | null = null;
 
     if (isSandbox && withdrawalSettings.sandboxAutoApprove) {
       // Auto-approve sandbox withdrawals
@@ -497,36 +495,18 @@ export async function POST(request: NextRequest) {
 
     await mongoSession.commitTransaction();
 
-    // If auto-approved, immediately process the withdrawal (outside the transaction)
-    if (autoApproved) {
-      try {
-        const { processWithdrawal } = await import('@/lib/services/withdrawal.service');
-        processResult = await processWithdrawal(
-          withdrawalRequest[0]._id.toString(),
-          'system',
-          'auto-processor'
-        );
-        
-        if (processResult.success) {
-          immediatelyProcessed = true;
-          // Refresh the withdrawal status
-          const updatedWithdrawal = await WithdrawalRequest.findById(withdrawalRequest[0]._id);
-          if (updatedWithdrawal) {
-            withdrawalRequest[0] = updatedWithdrawal;
-          }
-        }
-      } catch (processError) {
-        console.error('Auto-processing failed:', processError);
-        // Don't fail the request - withdrawal is still approved, will be processed by worker
-      }
-    }
-
+    // Note: Auto-approved withdrawals still need admin to complete the bank transfer
+    // The auto-approval just skips the initial review step in sandbox mode
+    // Admin must still mark as "completed" after actual bank transfer
+    
     const finalStatus = withdrawalRequest[0].status;
     let message = 'Withdrawal request submitted successfully. It will be reviewed shortly.';
     
-    if (autoApproved && immediatelyProcessed && finalStatus === 'completed') {
+    if (autoApproved && finalStatus === 'approved') {
+      message = '✅ Withdrawal auto-approved! Funds will be transferred to your bank account within 24-48 hours.';
+    } else if (autoApproved && finalStatus === 'completed') {
       message = '🎉 Withdrawal processed successfully! Funds are on the way.';
-    } else if (autoApproved && immediatelyProcessed && finalStatus === 'processing') {
+    } else if (finalStatus === 'processing') {
       message = 'Withdrawal approved and being processed! You will be notified when complete.';
     } else if (autoApproved) {
       message = 'Withdrawal request approved! Processing will begin shortly.';
@@ -543,8 +523,7 @@ export async function POST(request: NextRequest) {
         platformFee,
         estimatedProcessingHours: withdrawalSettings.processingTimeHours,
         isAutoApproved: autoApproved,
-        immediatelyProcessed,
-        payoutId: processResult?.payoutId,
+        payoutId: withdrawalRequest[0].payoutId || null,
       },
     });
   } catch (error) {
@@ -574,6 +553,21 @@ async function checkWithdrawalEligibility(
   
   // Get the actual conversion rate from credit settings
   const conversionRate = creditSettings?.eurToCreditsRate || 100;
+
+  // ============================================
+  // FIRST: Check user restrictions (banned/suspended)
+  // This must be checked before anything else!
+  // ============================================
+  const { canUserPerformAction } = await import('@/lib/services/user-restriction.service');
+  const restrictionCheck = await canUserPerformAction(userId, 'withdraw');
+  
+  if (!restrictionCheck.allowed) {
+    return {
+      eligible: false,
+      reason: restrictionCheck.reason || 'Your account is restricted from withdrawals. Please contact support.',
+      warnings,
+    };
+  }
 
   // Check if sandbox withdrawals are enabled
   if (isSandbox && !settings.sandboxEnabled) {
@@ -706,26 +700,42 @@ async function checkWithdrawalEligibility(
 
   // Check active competitions/challenges
   if (!settings.allowWithdrawalDuringActiveCompetitions) {
+    // Check using userId field (better-auth uses this)
     const activeCompetitions = await CompetitionParticipant.countDocuments({
-      clerkUserId: userId,
+      userId: userId,
       status: 'active',
     });
 
     if (activeCompetitions > 0) {
-      warnings.push('You have active competition positions. Partial balance may be locked.');
+      return {
+        eligible: false,
+        reason: `You have ${activeCompetitions} active competition(s). Complete them before withdrawing.`,
+        warnings,
+      };
     }
   }
 
   if (settings.blockWithdrawalOnActiveChallenges) {
-    const activeChallenges = await Challenge.countDocuments({
+    // Find active challenges where user is either challenger or challenged
+    // Status values: 'pending' = waiting for accept, 'accepted' = accepted but not started, 'active' = in progress
+    const activeChallenges = await Challenge.find({
       $or: [{ challengerId: userId }, { challengedId: userId }],
-      status: { $in: ['pending', 'accepted', 'in_progress'] },
-    });
+      status: { $in: ['pending', 'accepted', 'active'] },
+    }).select('_id status').lean();
 
-    if (activeChallenges > 0) {
+    if (activeChallenges.length > 0) {
+      const pendingCount = activeChallenges.filter(c => c.status === 'pending').length;
+      const activeCount = activeChallenges.filter(c => c.status === 'accepted' || c.status === 'active').length;
+      
+      let message = 'You have ';
+      const parts = [];
+      if (pendingCount > 0) parts.push(`${pendingCount} pending challenge(s)`);
+      if (activeCount > 0) parts.push(`${activeCount} active challenge(s)`);
+      message += parts.join(' and ') + '. Complete or cancel them before withdrawing.';
+      
       return {
         eligible: false,
-        reason: 'You have active challenges. Complete or cancel them before withdrawing.',
+        reason: message,
         warnings,
       };
     }
