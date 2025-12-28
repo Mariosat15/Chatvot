@@ -529,13 +529,27 @@ export async function finalizeCompetition(competitionId: string) {
       });
     }
 
-    // STEP 5: Update competition status
+    // STEP 5: Update competition and participant statuses
     console.log(`🎯 Updating competition status...`);
     competition.status = 'completed';
     competition.winnerId = leaderboard[0]?.userId;
     competition.winnerPnL = leaderboard[0]?.pnl;
     competition.finalLeaderboard = leaderboard;
     await competition.save({ session });
+
+    // CRITICAL: Update ALL participant statuses to 'completed' so they don't block withdrawals!
+    // Only update participants that are still 'active' (not liquidated/disqualified)
+    const participantUpdateResult = await CompetitionParticipant.updateMany(
+      {
+        competitionId: competition._id,
+        status: 'active', // Only update active participants
+      },
+      {
+        $set: { status: 'completed' },
+      },
+      { session }
+    );
+    console.log(`   ✅ Updated ${participantUpdateResult.modifiedCount} participant statuses to 'completed'`);
 
     await session.commitTransaction();
     // End session immediately after commit to prevent "abortTransaction after commitTransaction" error

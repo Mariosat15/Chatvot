@@ -700,18 +700,52 @@ async function checkWithdrawalEligibility(
 
   // Check active competitions/challenges
   if (!settings.allowWithdrawalDuringActiveCompetitions) {
-    // Check using userId field (better-auth uses this)
-    const activeCompetitions = await CompetitionParticipant.countDocuments({
+    // IMPROVED: Check for participants where BOTH the participant AND competition are still active
+    // This handles cases where competition ended but participant status wasn't updated
+    const Competition = (await import('@/database/models/trading/competition.model')).default;
+    
+    // Get all participant records for this user
+    const participantRecords = await CompetitionParticipant.find({
       userId: userId,
       status: 'active',
-    });
+    }).select('competitionId').lean();
 
-    if (activeCompetitions > 0) {
-      return {
-        eligible: false,
-        reason: `You have ${activeCompetitions} active competition(s). Complete them before withdrawing.`,
-        warnings,
-      };
+    if (participantRecords.length > 0) {
+      // Check if any of these competitions are actually still active
+      const competitionIds = participantRecords.map((p: any) => p.competitionId);
+      const activeCompetitionCount = await Competition.countDocuments({
+        _id: { $in: competitionIds },
+        status: 'active', // Only count if competition itself is still active
+      });
+
+      if (activeCompetitionCount > 0) {
+        return {
+          eligible: false,
+          reason: `You have ${activeCompetitionCount} active competition(s). Complete them before withdrawing.`,
+          warnings,
+        };
+      }
+
+      // If participant is 'active' but competition is NOT active, auto-fix the participant status
+      if (participantRecords.length > activeCompetitionCount) {
+        const staleCount = participantRecords.length - activeCompetitionCount;
+        console.log(`⚠️ Found ${staleCount} orphaned 'active' participant(s) - competition already ended. Auto-fixing...`);
+        
+        // Get competitions that are NOT active
+        const nonActiveCompetitions = await Competition.find({
+          _id: { $in: competitionIds },
+          status: { $ne: 'active' },
+        }).select('_id status').lean();
+
+        for (const comp of nonActiveCompetitions) {
+          const newStatus = (comp as any).status === 'cancelled' ? 'refunded' : 'completed';
+          await CompetitionParticipant.updateMany(
+            { userId, competitionId: (comp as any)._id, status: 'active' },
+            { $set: { status: newStatus } }
+          );
+          console.log(`   ✅ Fixed participant status to '${newStatus}' for competition ${(comp as any)._id}`);
+        }
+      }
     }
   }
 
