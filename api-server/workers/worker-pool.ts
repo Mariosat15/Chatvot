@@ -62,8 +62,8 @@ class BcryptWorkerPool {
    */
   private createWorker(): void {
     // Detect if running from compiled dist/ folder (same method as index.ts)
-    // This works regardless of NODE_ENV setting
-    const isCompiledBuild = __dirname.includes('dist');
+    // Use path.sep to check for exact 'dist' folder (not substring like 'distributed')
+    const isCompiledBuild = __dirname.split(path.sep).includes('dist');
     
     // Use compiled JS in dist/, TS in source
     const workerPath = isCompiledBuild

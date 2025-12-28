@@ -34,7 +34,8 @@ import dotenv from 'dotenv';
 // Load environment variables from root .env
 // When compiled: api-server/dist/index.js → ../../.env (project root)
 // When running ts directly: api-server/index.ts → ../.env (project root)
-const isCompiledBuild = __dirname.includes('dist');
+// Use path.sep to check for exact 'dist' folder (not substring like 'distributed')
+const isCompiledBuild = __dirname.split(path.sep).includes('dist');
 const ROOT_ENV_PATH = isCompiledBuild 
   ? path.resolve(__dirname, '../../.env')  // From dist/ folder
   : path.resolve(__dirname, '../.env');     // From api-server/ folder

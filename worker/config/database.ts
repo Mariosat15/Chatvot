@@ -11,7 +11,8 @@ import path from 'path';
 
 // Load environment variables from root .env file
 // Works for both dev (tsx) and production (compiled to dist/worker)
-const isCompiledBuild = __dirname.includes('dist');
+// Use path.sep to check for exact 'dist' folder (not substring like 'distributed')
+const isCompiledBuild = __dirname.split(path.sep).includes('dist');
 const envPath = isCompiledBuild 
   ? path.resolve(__dirname, '../../../.env')  // From dist/worker/config/
   : path.resolve(__dirname, '../../.env');     // From worker/config/
