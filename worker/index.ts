@@ -134,13 +134,20 @@ agenda.define('challenge-finalize', async () => {
     const result = await runChallengeFinalizeCheck();
     const duration = Date.now() - startTime;
     
-    if (result.checkedChallenges > 0) {
+    // Log if any work was done
+    if (result.checkedChallenges > 0 || result.expiredPendingChallenges > 0) {
       console.log(`⚔️ [CHALLENGE FINALIZE] Completed in ${duration}ms`);
-      console.log(`   Checked: ${result.checkedChallenges} challenges`);
-      console.log(`   Finalized: ${result.finalizedChallenges}`);
+      
+      if (result.expiredPendingChallenges > 0) {
+        console.log(`   ⏰ Expired pending: ${result.expiredPendingChallenges} (refunded ${result.refundedAmount} credits)`);
+      }
+      
+      if (result.checkedChallenges > 0) {
+        console.log(`   🏁 Finalized active: ${result.finalizedChallenges}/${result.checkedChallenges}`);
+      }
       
       if (result.failedChallenges.length > 0) {
-        console.log(`   Failed: ${result.failedChallenges.length}`);
+        console.log(`   ❌ Failed: ${result.failedChallenges.length}`);
         result.failedChallenges.forEach(e => console.log(`     - ${e}`));
       }
     }
