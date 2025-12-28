@@ -53,7 +53,7 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
       id: user.id || user._id?.toString() || userId,
       email: user.email || 'unknown',
       name: user.name || user.email || 'Unknown User',
-      profileImage: user.profileImage,
+      profileImage: user.profileImage || user.image,  // Check both profileImage and image (better-auth)
       bio: user.bio,
       role: user.role || 'trader',
       country: user.country,
@@ -129,7 +129,7 @@ export async function getAllUsers(): Promise<UserInfo[]> {
         id,
         email,
         name: user.name || email.split('@')[0] || 'Unknown User', // Name is for display only
-        profileImage: user.profileImage,
+        profileImage: user.profileImage || user.image,  // Check both profileImage and image (better-auth)
         bio: user.bio,
         role: 'trader',
         country: user.country,
@@ -193,6 +193,8 @@ export async function getUsersByIds(userIds: string[]): Promise<Map<string, User
           id: user.id || user._id?.toString() || originalId,
           email: user.email || 'unknown',
           name: user.name || user.email || 'Unknown User',
+          profileImage: user.profileImage || user.image,  // Check both profileImage and image (better-auth)
+          bio: user.bio,
           role: user.role || 'trader',
           country: user.country,
           address: user.address,

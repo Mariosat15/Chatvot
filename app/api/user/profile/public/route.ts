@@ -55,9 +55,12 @@ export async function GET(req: NextRequest) {
     }
 
     // Return only public fields
+    // Check both 'profileImage' (custom) and 'image' (better-auth default) fields
+    const userImage = user.profileImage || user.image || null;
+    
     return NextResponse.json({
       username: user.name || 'Trader',
-      profileImage: user.profileImage || null,
+      profileImage: userImage,
       bio: user.bio || null,
     });
   } catch (error) {

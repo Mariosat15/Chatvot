@@ -97,11 +97,14 @@ export async function GET() {
       allKeys: Object.keys(user),
     });
 
+    // Check both 'profileImage' (custom) and 'image' (better-auth default) fields
+    const userImage = user.profileImage || user.image || '';
+    
     const profile: UserProfile = {
       id: user.id || user._id?.toString(),
       name: user.name || '',
       email: user.email || '',
-      profileImage: user.profileImage || '',
+      profileImage: userImage,
       bio: user.bio || '',
       country: user.country || '',
       address: user.address || '',
@@ -175,11 +178,14 @@ export async function PUT(req: NextRequest) {
       postalCode: result.postalCode,
     });
 
+    // Check both 'profileImage' (custom) and 'image' (better-auth default) fields
+    const updatedUserImage = result.profileImage || result.image || '';
+    
     const updatedProfile: UserProfile = {
       id: result.id || result._id?.toString(),
       name: result.name || '',
       email: result.email || '',
-      profileImage: result.profileImage || '',
+      profileImage: updatedUserImage,
       bio: result.bio || '',
       country: result.country || '',
       address: result.address || '',
