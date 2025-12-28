@@ -721,23 +721,76 @@ async function checkWithdrawalEligibility(
     const activeChallenges = await Challenge.find({
       $or: [{ challengerId: userId }, { challengedId: userId }],
       status: { $in: ['pending', 'accepted', 'active'] },
-    }).select('_id status').lean();
+    }).select('_id status challengerId challengedId acceptDeadline createdAt').lean();
 
+    // Debug log to help identify stale challenges
     if (activeChallenges.length > 0) {
-      const pendingCount = activeChallenges.filter(c => c.status === 'pending').length;
-      const activeCount = activeChallenges.filter(c => c.status === 'accepted' || c.status === 'active').length;
+      console.log(`🔍 Found ${activeChallenges.length} blocking challenge(s) for user ${userId}:`);
+      activeChallenges.forEach((c: any, i: number) => {
+        console.log(`   Challenge ${i + 1}: id=${c._id}, status=${c.status}, challengerId=${c.challengerId}, challengedId=${c.challengedId}, acceptDeadline=${c.acceptDeadline}, createdAt=${c.createdAt}`);
+      });
       
-      let message = 'You have ';
-      const parts = [];
-      if (pendingCount > 0) parts.push(`${pendingCount} pending challenge(s)`);
-      if (activeCount > 0) parts.push(`${activeCount} active challenge(s)`);
-      message += parts.join(' and ') + '. Complete or cancel them before withdrawing.';
+      // Check if any pending challenges have expired accept deadlines
+      const now = new Date();
+      const expiredPending = activeChallenges.filter((c: any) => 
+        c.status === 'pending' && c.acceptDeadline && new Date(c.acceptDeadline) < now
+      );
       
-      return {
-        eligible: false,
-        reason: message,
-        warnings,
-      };
+      if (expiredPending.length > 0) {
+        console.log(`⚠️  Found ${expiredPending.length} expired pending challenge(s) - these should have been auto-expired!`);
+        // Auto-expire these stale challenges
+        for (const expiredChallenge of expiredPending) {
+          try {
+            await Challenge.updateOne(
+              { _id: expiredChallenge._id, status: 'pending' },
+              { $set: { status: 'expired', expiredAt: now } }
+            );
+            console.log(`   ✅ Auto-expired stale challenge ${expiredChallenge._id}`);
+          } catch (err) {
+            console.error(`   ❌ Failed to expire challenge ${expiredChallenge._id}:`, err);
+          }
+        }
+        
+        // Re-check after cleanup
+        const remainingChallenges = activeChallenges.filter((c: any) => 
+          !(c.status === 'pending' && c.acceptDeadline && new Date(c.acceptDeadline) < now)
+        );
+        
+        if (remainingChallenges.length === 0) {
+          console.log(`   ✅ All blocking challenges were expired - user can now withdraw`);
+          // Continue to next check instead of blocking
+        } else {
+          const pendingCount = remainingChallenges.filter((c: any) => c.status === 'pending').length;
+          const activeCount = remainingChallenges.filter((c: any) => c.status === 'accepted' || c.status === 'active').length;
+          
+          let message = 'You have ';
+          const parts = [];
+          if (pendingCount > 0) parts.push(`${pendingCount} pending challenge(s)`);
+          if (activeCount > 0) parts.push(`${activeCount} active challenge(s)`);
+          message += parts.join(' and ') + '. Complete or cancel them before withdrawing.';
+          
+          return {
+            eligible: false,
+            reason: message,
+            warnings,
+          };
+        }
+      } else {
+        const pendingCount = activeChallenges.filter((c: any) => c.status === 'pending').length;
+        const activeCount = activeChallenges.filter((c: any) => c.status === 'accepted' || c.status === 'active').length;
+        
+        let message = 'You have ';
+        const parts = [];
+        if (pendingCount > 0) parts.push(`${pendingCount} pending challenge(s)`);
+        if (activeCount > 0) parts.push(`${activeCount} active challenge(s)`);
+        message += parts.join(' and ') + '. Complete or cancel them before withdrawing.';
+        
+        return {
+          eligible: false,
+          reason: message,
+          warnings,
+        };
+      }
     }
   }
 
