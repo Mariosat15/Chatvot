@@ -10,6 +10,7 @@ import Competition from '@/database/models/trading/competition.model';
 import Challenge from '@/database/models/trading/challenge.model';
 import TradingPosition from '@/database/models/trading/trading-position.model';
 import TradeHistory from '@/database/models/trading/trade-history.model';
+import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import { getRealPrice } from '@/lib/services/real-forex-prices.service';
 import { ForexSymbol, calculateUnrealizedPnL } from '@/lib/services/pnl-calculator.service';
 
@@ -204,6 +205,14 @@ interface PositionData {
 
 /**
  * Get comprehensive dashboard data for the authenticated user
+ * 
+ * SOURCE OF TRUTH:
+ * - Financial stats (totalPrizesWon) → CreditWallet model (line ~472)
+ * - Trading metrics (trades, PnL, win rate) → CompetitionParticipant + ChallengeParticipant records
+ * - Live capital → Only from ACTIVE contest participations (not wallet balance)
+ * 
+ * IMPORTANT: totalPrizesWon MUST come from wallet to match profile page!
+ * See lib/services/unified-user-stats.service.ts for the canonical definition.
  */
 export async function getComprehensiveDashboardData(): Promise<ComprehensiveDashboardData> {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -219,12 +228,15 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     allCompetitions,
     allChallenges,
     allTrades,
+    wallet,
   ] = await Promise.all([
     CompetitionParticipant.find({ userId }).lean(),
     ChallengeParticipant.find({ userId }).lean(),
     Competition.find({}).lean(),
     Challenge.find({ $or: [{ challengerId: userId }, { challengedId: userId }] }).lean(),
     TradeHistory.find({ userId }).sort({ closedAt: -1 }).limit(100).lean(),
+    // Wallet is the SOURCE OF TRUTH for financial data (prizes won, etc.)
+    CreditWallet.findOne({ userId }).lean(),
   ]);
   
   // Process competitions
@@ -465,7 +477,11 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   let totalGrossLosses = 0;
   let largestWin = 0;
   let largestLoss = 0;
-  let totalPrizesWon = 0;
+  
+  // IMPORTANT: Use wallet as SOURCE OF TRUTH for prizes won (not participation records)
+  // This ensures consistency with the profile page which also uses wallet data
+  const walletData = wallet as any;
+  const totalPrizesWon = (walletData?.totalWonFromCompetitions || 0) + (walletData?.totalWonFromChallenges || 0);
   
   for (const p of allParticipations) {
     totalPnL += p.pnl || 0;
@@ -483,8 +499,6 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     }
     if (p.largestWin && p.largestWin > largestWin) largestWin = p.largestWin;
     if (p.largestLoss && p.largestLoss < largestLoss) largestLoss = p.largestLoss;
-    if (p.prizeWon) totalPrizesWon += p.prizeWon;
-    if (p.prizeReceived) totalPrizesWon += p.prizeReceived;
   }
   
   const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;

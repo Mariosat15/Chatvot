@@ -17,12 +17,16 @@ export async function GET(
     // Sanitize filename to prevent directory traversal
     const sanitizedFilename = path.basename(filename);
     
+    console.log(`📸 Serving profile image: ${sanitizedFilename}, cwd: ${process.cwd()}`);
+    
     // Try multiple possible locations for the file
     const possiblePaths = [
       path.join(process.cwd(), 'public', 'uploads', 'profiles', sanitizedFilename),
       path.join(process.cwd(), 'uploads', 'profiles', sanitizedFilename),
       path.join('/var/www/chartvolt', 'public', 'uploads', 'profiles', sanitizedFilename),
       path.join('/var/www/chartvolt', 'uploads', 'profiles', sanitizedFilename),
+      // Also try the .next directory in case running from there
+      path.join(process.cwd(), '..', 'public', 'uploads', 'profiles', sanitizedFilename),
     ];
     
     let filePath: string | null = null;
@@ -31,6 +35,7 @@ export async function GET(
       try {
         await access(possiblePath, constants.R_OK);
         filePath = possiblePath;
+        console.log(`✅ Found profile image at: ${possiblePath}`);
         break;
       } catch {
         // File doesn't exist at this path, try next
@@ -38,7 +43,8 @@ export async function GET(
     }
     
     if (!filePath) {
-      console.error(`Profile image not found: ${sanitizedFilename}`);
+      console.error(`❌ Profile image not found: ${sanitizedFilename}`);
+      console.error(`   Searched paths: ${possiblePaths.join(', ')}`);
       return NextResponse.json({ error: 'Image not found' }, { status: 404 });
     }
     

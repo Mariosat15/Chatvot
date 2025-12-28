@@ -61,7 +61,25 @@ export async function POST(req: NextRequest) {
     }
 
     // Create uploads directory if it doesn't exist
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'profiles');
+    // Try multiple possible locations for production compatibility
+    const possibleDirs = [
+      path.join(process.cwd(), 'public', 'uploads', 'profiles'),
+      path.join('/var/www/chartvolt', 'public', 'uploads', 'profiles'),
+    ];
+    
+    // Use the first directory that we can create successfully
+    let uploadsDir = possibleDirs[0];
+    for (const dir of possibleDirs) {
+      try {
+        await mkdir(dir, { recursive: true });
+        uploadsDir = dir;
+        break;
+      } catch (err) {
+        console.warn(`Could not create directory ${dir}:`, err);
+      }
+    }
+    
+    // Ensure the directory exists
     await mkdir(uploadsDir, { recursive: true });
 
     // Generate unique filename

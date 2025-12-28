@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useWhiteLabelImages } from '@/hooks/useWhiteLabelImages';
+import { useUserProfileImage } from '@/hooks/useUserProfileImage';
 import { signOut } from '@/lib/actions/auth.actions';
 import NotificationDropdown from '@/components/notifications/NotificationDropdown';
 import {
@@ -115,6 +116,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const pathname = usePathname();
   const router = useRouter();
   const { images } = useWhiteLabelImages();
+  const { profileImage: userProfileImage } = useUserProfileImage();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -240,7 +242,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full opacity-50 group-hover:opacity-75 blur transition-opacity" />
               <Avatar className="relative h-12 w-12 ring-2 ring-gray-900">
-                <AvatarImage src={images.profileImage} />
+                <AvatarImage src={userProfileImage} />
                 <AvatarFallback className="bg-gradient-to-br from-yellow-500 to-orange-500 text-gray-900 font-bold text-lg">
                   {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}
                 </AvatarFallback>
