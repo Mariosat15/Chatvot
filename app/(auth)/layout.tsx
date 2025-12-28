@@ -23,7 +23,8 @@ async function getAuthPageSettings() {
             testimonialText: settings?.authPageTestimonialText || 'chatvolt turned my watchlist into a winning list. The alerts are spot-on, and I feel more confident making moves in the market',
             testimonialAuthor: settings?.authPageTestimonialAuthor || 'Ethan R.',
             testimonialRole: settings?.authPageTestimonialRole || 'Retail Investor',
-            testimonialRating: settings?.authPageTestimonialRating || 5,
+            // Use ?? instead of || so that explicit 0 rating (to hide stars) is respected
+            testimonialRating: settings?.authPageTestimonialRating ?? 5,
             dashboardImage: settings?.authPageDashboardImage || '/assets/images/dashboard.png',
             logo: settings?.logo || '/assets/icons/logo.svg',
         };
