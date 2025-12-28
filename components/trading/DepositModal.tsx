@@ -262,7 +262,7 @@ export default function DepositModal({ children }: DepositModalProps) {
         {children}
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[500px] bg-gray-900 border-gray-700">
+      <DialogContent className="bg-gray-900 border-gray-700 max-sm:border-0" fullScreenMobile size="default">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-gray-100">
             <Zap className="h-5 w-5 text-yellow-500" />

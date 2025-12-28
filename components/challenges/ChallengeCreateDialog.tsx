@@ -192,7 +192,7 @@ export default function ChallengeCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-900 border-orange-500/50 max-w-md">
+      <DialogContent className="bg-gray-900 border-orange-500/50 max-sm:border-0" fullScreenMobile size="sm">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Swords className="h-5 w-5 text-orange-500" />

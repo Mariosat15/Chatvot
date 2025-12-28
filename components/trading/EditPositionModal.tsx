@@ -213,7 +213,7 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="bg-[#1e222d] border-[#2b2b43] max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-[#1e222d] border-[#2b2b43] max-sm:border-0" fullScreenMobile size="lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
             <Target className="h-5 w-5 text-blue-500" />

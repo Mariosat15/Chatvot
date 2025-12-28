@@ -16,6 +16,8 @@ interface LeaderboardChallengeButtonProps {
   challengesEntered?: number;
   level?: number;
   profileImage?: string;
+  // Mobile: compact display
+  compact?: boolean;
 }
 
 interface OnlineUser {
@@ -58,6 +60,7 @@ export default function LeaderboardChallengeButton({
   challengesEntered = 0,
   level = 3,
   profileImage,
+  compact = false,
 }: LeaderboardChallengeButtonProps) {
   const [onlineStatus, setOnlineStatus] = useState<OnlineUser | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -174,6 +177,54 @@ export default function LeaderboardChallengeButton({
 
   const isOnline = onlineStatus?.status === 'online';
   const canChallenge = isOnline && onlineStatus?.acceptingChallenges !== false;
+
+  // Compact mode for mobile
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1.5">
+        {/* Compact Online Status */}
+        {loading ? (
+          <Loader2 className="h-2 w-2 text-gray-500 animate-spin" />
+        ) : (
+          <Circle
+            className={`h-2 w-2 ${
+              isOnline ? 'text-green-500 fill-green-500' : 'text-gray-500 fill-gray-500'
+            }`}
+          />
+        )}
+        
+        {/* Compact Challenge Button */}
+        {canChallenge && (
+          <Button
+            size="sm"
+            onClick={handleChallengeClick}
+            className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-[10px] px-2 py-0.5 h-6"
+          >
+            <Swords className="h-3 w-3" />
+          </Button>
+        )}
+
+        {/* VS Screen */}
+        {opponentStats && (
+          <VsScreen
+            show={showVsScreen}
+            player1Name={currentUserName}
+            player1Image={currentUserImage}
+            opponent={opponentStats}
+            onChallenge={handleVsChallenge}
+            onClose={handleVsClose}
+          />
+        )}
+
+        {/* Challenge Dialog */}
+        <ChallengeCreateDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          challengedUser={dialogOpen ? { userId, username } : null}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2">

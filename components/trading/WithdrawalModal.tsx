@@ -213,7 +213,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
 
-      <DialogContent className="sm:max-w-[550px] bg-gray-900 border-gray-700 max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-gray-900 border-gray-700 max-sm:border-0" fullScreenMobile size="default">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-gray-100">
             <Coins className="h-5 w-5 text-yellow-500" />

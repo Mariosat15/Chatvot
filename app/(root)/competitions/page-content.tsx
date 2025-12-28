@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Trophy, Clock, TrendingUp, Zap, LayoutGrid, List, Filter, Search, X, ChevronDown, Target, Flame, Crown, Sparkles, SlidersHorizontal } from 'lucide-react';
+import { Trophy, Clock, TrendingUp, Zap, LayoutGrid, List, Filter, Search, X, ChevronDown, Target, Flame, Crown, Sparkles, SlidersHorizontal, RefreshCw } from 'lucide-react';
 import CompetitionCard from '@/components/trading/CompetitionCard';
 import WalletBalanceDisplay from '@/components/trading/WalletBalanceDisplay';
 import UTCClock from '@/components/trading/UTCClock';
@@ -100,8 +100,11 @@ export default function CompetitionsPageContent({
   const userInCompetitions = useMemo(() => new Set(userInCompetitionIdsState), [userInCompetitionIdsState]);
   
   // Auto-refresh state (always enabled - no toggle needed)
-  const [_isRefreshing, setIsRefreshing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [_lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  
+  // Mobile filter drawer state
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   
   // Load saved preferences on mount
   const [isHydrated, setIsHydrated] = useState(false);
@@ -292,106 +295,217 @@ export default function CompetitionsPageContent({
     profit_factor: '⚡ Profit Factor',
   };
 
+  const activeFiltersCount = (statusFilter.length !== 2 || !statusFilter.includes('active') || !statusFilter.includes('upcoming') ? 1 : 0) + 
+    (rankingFilter.length > 0 ? 1 : 0) + 
+    (assetFilter.length > 0 ? 1 : 0);
+
   return (
-    <div className="flex min-h-screen flex-col gap-6 p-4 md:p-8">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <div className="absolute inset-0 bg-yellow-500/30 rounded-full blur-xl animate-pulse"></div>
-            <div className="relative rounded-full bg-gradient-to-br from-yellow-500 to-amber-600 p-4 shadow-xl shadow-yellow-500/30">
-              <Trophy className="h-8 w-8 text-yellow-900" />
+    <div className="flex min-h-screen flex-col gap-4 sm:gap-6">
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col gap-4">
+        {/* Title Row */}
+        <div className="flex items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <div className="relative flex-shrink-0">
+              <div className="absolute inset-0 bg-yellow-500/30 rounded-full blur-xl animate-pulse"></div>
+              <div className="relative rounded-full bg-gradient-to-br from-yellow-500 to-amber-600 p-2.5 sm:p-4 shadow-xl shadow-yellow-500/30">
+                <Trophy className="h-5 w-5 sm:h-8 sm:w-8 text-yellow-900" />
+              </div>
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-gray-100 flex items-center gap-2 truncate">
+                <span className="truncate">Trading Arena</span>
+                <Sparkles className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-500 flex-shrink-0" />
+              </h1>
+              <p className="text-xs sm:text-sm text-gray-400 hidden sm:block">
+                Compete with traders worldwide • Win massive prizes
+              </p>
             </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-black text-gray-100 flex items-center gap-2">
-              Trading Arena
-              <Sparkles className="h-6 w-6 text-yellow-500" />
-            </h1>
-            <p className="text-sm text-gray-400">
-              Compete with traders worldwide • Win massive prizes
-            </p>
+
+          {/* Mobile: Refresh + Filter buttons */}
+          <div className="flex items-center gap-2 sm:hidden">
+            <button
+              onClick={() => refreshData(true)}
+              disabled={isRefreshing}
+              className="p-2 bg-gray-800 rounded-lg border border-gray-700"
+            >
+              <RefreshCw className={`h-4 w-4 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className="relative p-2 bg-gray-800 rounded-lg border border-gray-700"
+            >
+              <Filter className="h-4 w-4 text-gray-400" />
+              {activeFiltersCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 text-gray-900 text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        {/* Actions Row - Desktop */}
+        <div className="hidden sm:flex items-center gap-3 flex-wrap">
           <UTCClock />
           <WalletBalanceDisplay balance={userBalance} />
           <Link href="/wallet">
-            <Button className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-gray-900 font-bold h-[72px] px-6 rounded-xl shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40 hover:scale-105 transition-all">
-              <Zap className="mr-2 h-5 w-5" />
+            <Button className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-gray-900 font-bold h-auto py-2 px-4 rounded-xl shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40 hover:scale-105 transition-all">
+              <Zap className="mr-2 h-4 w-4" />
               Add Credits
             </Button>
           </Link>
-          
-          {/* Live Status Indicator */}
           <LiveStatusIndicator onRefresh={async () => refreshData(false)} />
         </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/20 via-blue-500/10 to-transparent border border-blue-500/30 p-6 group hover:border-blue-500/50 transition-colors">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl group-hover:scale-150 transition-transform"></div>
-          <div className="relative flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
-                <Flame className="h-3 w-3" />
-                Live Now
-              </p>
-              <p className="mt-2 text-4xl font-black text-gray-100">{activeCount}</p>
-              <p className="text-xs text-gray-500">Active competitions</p>
-            </div>
-            <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <TrendingUp className="h-7 w-7 text-blue-400" />
-            </div>
+        {/* Mobile: Balance + Add Credits */}
+        <div className="flex sm:hidden items-center gap-2">
+          <div className="flex-1">
+            <WalletBalanceDisplay balance={userBalance} />
           </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-600/20 via-yellow-500/10 to-transparent border border-yellow-500/30 p-6 group hover:border-yellow-500/50 transition-colors">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl group-hover:scale-150 transition-transform"></div>
-          <div className="relative flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                Starting Soon
-              </p>
-              <p className="mt-2 text-4xl font-black text-gray-100">{upcomingCount}</p>
-              <p className="text-xs text-gray-500">Reserve your spot</p>
-            </div>
-            <div className="w-14 h-14 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-              <Clock className="h-7 w-7 text-yellow-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-600/20 via-green-500/10 to-transparent border border-green-500/30 p-6 group hover:border-green-500/50 transition-colors">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full blur-3xl group-hover:scale-150 transition-transform"></div>
-          <div className="relative flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-green-400 uppercase tracking-wider flex items-center gap-1">
-                <Crown className="h-3 w-3" />
-                Prize Pool
-              </p>
-              <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400">
-                  {totalPrizePool.toFixed(0)}
-                </span>
-                <Zap className="h-5 w-5 text-green-400" />
-              </div>
-              <p className="text-xs text-gray-500">Available to win</p>
-            </div>
-            <div className="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center">
-              <Trophy className="h-7 w-7 text-green-400" />
-            </div>
-          </div>
+          <Link href="/wallet">
+            <Button size="sm" className="bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 font-bold rounded-lg shadow-lg">
+              <Zap className="h-4 w-4" />
+            </Button>
+          </Link>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between bg-gray-800/50 border border-gray-700/50 rounded-2xl p-4">
+      {/* Stats Cards - Mobile Optimized */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-600/20 via-blue-500/10 to-transparent border border-blue-500/30 p-3 sm:p-6 group hover:border-blue-500/50 transition-colors">
+          <div className="absolute top-0 right-0 w-16 sm:w-32 h-16 sm:h-32 bg-blue-500/10 rounded-full blur-2xl sm:blur-3xl group-hover:scale-150 transition-transform"></div>
+          <div className="relative">
+            <p className="text-[10px] sm:text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
+              <Flame className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <span className="hidden sm:inline">Live Now</span>
+              <span className="sm:hidden">Live</span>
+            </p>
+            <p className="mt-1 sm:mt-2 text-2xl sm:text-4xl font-black text-gray-100 tabular-nums">{activeCount}</p>
+            <p className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">Active competitions</p>
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-yellow-600/20 via-yellow-500/10 to-transparent border border-yellow-500/30 p-3 sm:p-6 group hover:border-yellow-500/50 transition-colors">
+          <div className="absolute top-0 right-0 w-16 sm:w-32 h-16 sm:h-32 bg-yellow-500/10 rounded-full blur-2xl sm:blur-3xl group-hover:scale-150 transition-transform"></div>
+          <div className="relative">
+            <p className="text-[10px] sm:text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1">
+              <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <span className="hidden sm:inline">Starting Soon</span>
+              <span className="sm:hidden">Soon</span>
+            </p>
+            <p className="mt-1 sm:mt-2 text-2xl sm:text-4xl font-black text-gray-100 tabular-nums">{upcomingCount}</p>
+            <p className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">Reserve your spot</p>
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-green-600/20 via-green-500/10 to-transparent border border-green-500/30 p-3 sm:p-6 group hover:border-green-500/50 transition-colors">
+          <div className="absolute top-0 right-0 w-16 sm:w-32 h-16 sm:h-32 bg-green-500/10 rounded-full blur-2xl sm:blur-3xl group-hover:scale-150 transition-transform"></div>
+          <div className="relative">
+            <p className="text-[10px] sm:text-xs font-bold text-green-400 uppercase tracking-wider flex items-center gap-1">
+              <Crown className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <span className="hidden sm:inline">Prize Pool</span>
+              <span className="sm:hidden">Prize</span>
+            </p>
+            <div className="mt-1 sm:mt-2 flex items-baseline gap-0.5 sm:gap-1">
+              <span className="text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400 tabular-nums">
+                {totalPrizePool.toFixed(0)}
+              </span>
+              <Zap className="h-3 w-3 sm:h-5 sm:w-5 text-green-400" />
+            </div>
+            <p className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">Available to win</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Filter Drawer */}
+      {showMobileFilters && (
+        <div className="sm:hidden bg-gray-800/90 backdrop-blur-xl border border-gray-700 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-gray-900/50 border-gray-700 text-gray-100 rounded-xl h-10"
+            />
+          </div>
+
+          {/* Quick Filters */}
+          <div className="flex flex-wrap gap-2">
+            {['active', 'upcoming', 'completed'].map((status) => (
+              <button
+                key={status}
+                onClick={() => {
+                  if (statusFilter.includes(status)) {
+                    setStatusFilter(statusFilter.filter(s => s !== status));
+                  } else {
+                    setStatusFilter([...statusFilter, status]);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  statusFilter.includes(status)
+                    ? 'bg-yellow-500 text-gray-900'
+                    : 'bg-gray-700 text-gray-300'
+                }`}
+              >
+                {status === 'active' && '🔴 Live'}
+                {status === 'upcoming' && '🟡 Soon'}
+                {status === 'completed' && '🟢 Done'}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">Sort:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="flex-1 bg-gray-900/50 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-300"
+            >
+              <option value="prize">🏆 Prize Pool</option>
+              <option value="start">⏰ Start Time</option>
+              <option value="participants">👥 Participants</option>
+              <option value="entry">💰 Entry Fee</option>
+            </select>
+          </div>
+
+          {/* View Toggle + Clear */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center bg-gray-900/50 rounded-lg border border-gray-700 p-1">
+              <button
+                onClick={() => setViewMode('card')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'card' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400'
+                }`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'list' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400'
+                }`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-gray-400">
+                <X className="h-4 w-4 mr-1" /> Clear
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Filter Bar */}
+      <div className="hidden sm:flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between bg-gray-800/50 border border-gray-700/50 rounded-2xl p-4">
         {/* Search */}
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 max-w-md w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search competitions..."
@@ -588,7 +702,7 @@ export default function CompetitionsPageContent({
 
       {/* Results Count */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-400">
+        <p className="text-xs sm:text-sm text-gray-400">
           Showing <span className="font-bold text-gray-200">{totalFilteredCount}</span> competitions
         </p>
       </div>
@@ -596,19 +710,19 @@ export default function CompetitionsPageContent({
       {/* Upcoming Competitions - Always First */}
       {upcomingCompetitions.length > 0 && (
         <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-500/20 to-amber-500/10 border border-yellow-500/30">
-              <Clock className="h-5 w-5 text-yellow-500" />
-              <h2 className="text-xl font-bold text-gray-100">Starting Soon</h2>
-              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+          <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-yellow-500/20 to-amber-500/10 border border-yellow-500/30">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
+              <h2 className="text-base sm:text-xl font-bold text-gray-100">Starting Soon</h2>
+              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[10px] sm:text-xs">
                 {upcomingCompetitions.length}
               </Badge>
             </div>
           </div>
 
           <div className={viewMode === 'card' 
-            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-            : 'flex flex-col gap-3'
+            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6'
+            : 'flex flex-col gap-2 sm:gap-3'
           }>
             {upcomingCompetitions.map((competition) => (
               <CompetitionCard
@@ -628,10 +742,10 @@ export default function CompetitionsPageContent({
       {otherCompetitions.length > 0 && (
         <section>
           {upcomingCompetitions.length > 0 && (
-            <div className="flex items-center gap-3 mb-4 mt-8">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500/20 to-cyan-500/10 border border-blue-500/30">
-                <TrendingUp className="h-5 w-5 text-blue-500" />
-                <h2 className="text-xl font-bold text-gray-100">
+            <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 mt-4 sm:mt-8">
+              <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-500/20 to-cyan-500/10 border border-blue-500/30">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+                <h2 className="text-base sm:text-xl font-bold text-gray-100">
                   {statusFilter.includes('active') && statusFilter.includes('completed') 
                     ? 'All Competitions' 
                     : statusFilter.includes('active') 
@@ -640,7 +754,7 @@ export default function CompetitionsPageContent({
                     ? 'Completed'
                     : 'Other Competitions'}
                 </h2>
-                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-[10px] sm:text-xs">
                   {otherCompetitions.length}
                 </Badge>
               </div>
@@ -648,8 +762,8 @@ export default function CompetitionsPageContent({
           )}
 
           <div className={viewMode === 'card' 
-            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-            : 'flex flex-col gap-3'
+            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6'
+            : 'flex flex-col gap-2 sm:gap-3'
           }>
             {otherCompetitions.map((competition) => (
               <CompetitionCard
@@ -667,14 +781,14 @@ export default function CompetitionsPageContent({
 
       {/* Empty State */}
       {totalFilteredCount === 0 && (
-        <div className="py-20 text-center">
-          <div className="mx-auto w-24 h-24 bg-gray-800/50 rounded-full flex items-center justify-center mb-6 border border-gray-700">
-            <Trophy className="h-12 w-12 text-gray-600" />
+        <div className="py-12 sm:py-20 text-center">
+          <div className="mx-auto w-16 h-16 sm:w-24 sm:h-24 bg-gray-800/50 rounded-full flex items-center justify-center mb-4 sm:mb-6 border border-gray-700">
+            <Trophy className="h-8 w-8 sm:h-12 sm:w-12 text-gray-600" />
           </div>
-          <h3 className="text-2xl font-bold text-gray-300 mb-2">
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-300 mb-2">
             No Competitions Found
           </h3>
-          <p className="text-gray-500 mb-6">
+          <p className="text-sm sm:text-base text-gray-500 mb-4 sm:mb-6 px-4">
             {hasActiveFilters 
               ? 'Try adjusting your filters to see more competitions'
               : 'Check back soon for new trading competitions!'}
@@ -689,4 +803,3 @@ export default function CompetitionsPageContent({
     </div>
   );
 }
-
