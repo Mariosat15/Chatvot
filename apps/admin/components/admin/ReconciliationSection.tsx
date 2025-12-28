@@ -71,6 +71,7 @@ interface UserReconciliationDetail {
     totalWonFromChallenges: number;
     totalSpentOnCompetitions: number;
     totalSpentOnChallenges: number;
+    totalSpentOnMarketplace: number;
   };
   calculated: {
     expectedBalance: number;
@@ -81,6 +82,7 @@ interface UserReconciliationDetail {
     challengeWinTotal: number;
     competitionSpentTotal: number;
     challengeSpentTotal: number;
+    marketplaceSpentTotal: number;
   };
   transactionBreakdown: {
     deposits: number;
@@ -89,6 +91,7 @@ interface UserReconciliationDetail {
     competitionWins: number;
     challengeJoins: number;
     challengeWins: number;
+    marketplacePurchases: number;
     adminAdjustments: number;
     refunds: number;
     other: number;
@@ -179,6 +182,31 @@ const ISSUE_TYPES: Record<string, { label: string; description: string; fixable:
   missing_platform_transaction: {
     label: 'Missing Platform Fee',
     description: 'Completed withdrawal has no fee record',
+    fixable: false,
+  },
+  marketplace_spent_mismatch: {
+    label: 'Marketplace Spent Mismatch',
+    description: 'Marketplace spent counter doesn\'t match purchases',
+    fixable: true,
+  },
+  competition_win_mismatch: {
+    label: 'Competition Win Mismatch',
+    description: 'Competition winnings counter is incorrect',
+    fixable: false,
+  },
+  challenge_win_mismatch: {
+    label: 'Challenge Win Mismatch',
+    description: 'Challenge winnings counter is incorrect',
+    fixable: false,
+  },
+  competition_spent_mismatch: {
+    label: 'Competition Spent Mismatch',
+    description: 'Competition spent counter is incorrect',
+    fixable: false,
+  },
+  challenge_spent_mismatch: {
+    label: 'Challenge Spent Mismatch',
+    description: 'Challenge spent counter is incorrect',
     fixable: false,
   },
 };
@@ -619,7 +647,7 @@ export default function ReconciliationSection() {
                               )}
                             </td>
                           </tr>
-                          <tr>
+                          <tr className="border-b border-gray-800">
                             <td className="py-2 px-3 text-gray-300">🎲 Challenge Spent</td>
                             <td className="py-2 px-3 text-right text-white font-mono">{user.wallet.totalSpentOnChallenges.toFixed(2)}</td>
                             <td className="py-2 px-3 text-right text-white font-mono">{user.calculated.challengeSpentTotal.toFixed(2)}</td>
@@ -628,6 +656,18 @@ export default function ReconciliationSection() {
                                 <span className="text-green-400">✓</span>
                               ) : (
                                 <span className="text-yellow-400">⚠ {(user.wallet.totalSpentOnChallenges - user.calculated.challengeSpentTotal).toFixed(2)}</span>
+                              )}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 px-3 text-gray-300">🛒 Marketplace Spent</td>
+                            <td className="py-2 px-3 text-right text-white font-mono">{(user.wallet.totalSpentOnMarketplace || 0).toFixed(2)}</td>
+                            <td className="py-2 px-3 text-right text-white font-mono">{(user.calculated.marketplaceSpentTotal || 0).toFixed(2)}</td>
+                            <td className="py-2 px-3 text-right">
+                              {Math.abs((user.wallet.totalSpentOnMarketplace || 0) - (user.calculated.marketplaceSpentTotal || 0)) < 0.01 ? (
+                                <span className="text-green-400">✓</span>
+                              ) : (
+                                <span className="text-yellow-400">⚠ {((user.wallet.totalSpentOnMarketplace || 0) - (user.calculated.marketplaceSpentTotal || 0)).toFixed(2)}</span>
                               )}
                             </td>
                           </tr>
@@ -672,6 +712,11 @@ export default function ReconciliationSection() {
                         {user.transactionBreakdown.challengeWins > 0 && (
                           <Badge variant="outline" className="text-xs border-cyan-500/50 text-cyan-400">
                             {user.transactionBreakdown.challengeWins} Challenge Wins
+                          </Badge>
+                        )}
+                        {(user.transactionBreakdown.marketplacePurchases || 0) > 0 && (
+                          <Badge variant="outline" className="text-xs border-pink-500/50 text-pink-400">
+                            {user.transactionBreakdown.marketplacePurchases} Marketplace Purchases
                           </Badge>
                         )}
                         {user.transactionBreakdown.adminAdjustments > 0 && (

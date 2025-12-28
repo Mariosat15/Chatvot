@@ -10,6 +10,7 @@ export interface ICreditWallet extends Document {
   totalWonFromCompetitions: number; // Total winnings from competitions
   totalSpentOnChallenges: number; // Total spent on 1v1 challenges
   totalWonFromChallenges: number; // Total winnings from 1v1 challenges
+  totalSpentOnMarketplace: number; // Total spent on marketplace purchases
   isActive: boolean; // Wallet status
   
   // KYC Fields
@@ -69,6 +70,12 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
       min: 0,
     },
     totalWonFromChallenges: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+    },
+    totalSpentOnMarketplace: {
       type: Number,
       required: true,
       default: 0,

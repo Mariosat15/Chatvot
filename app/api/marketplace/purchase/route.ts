@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
     if (!item.isFree && item.price > 0) {
       const balanceBefore = wallet.creditBalance;
       wallet.creditBalance -= item.price;
+      wallet.totalSpentOnMarketplace = (wallet.totalSpentOnMarketplace || 0) + item.price;
       await wallet.save({ session: mongoSession });
       
       // Create transaction record

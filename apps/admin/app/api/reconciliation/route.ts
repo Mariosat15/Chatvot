@@ -38,6 +38,7 @@ interface UserReconciliationDetail {
     totalWonFromChallenges: number;
     totalSpentOnCompetitions: number;
     totalSpentOnChallenges: number;
+    totalSpentOnMarketplace: number;
   };
   calculated: {
     expectedBalance: number;
@@ -48,6 +49,7 @@ interface UserReconciliationDetail {
     challengeWinTotal: number;
     competitionSpentTotal: number;
     challengeSpentTotal: number;
+    marketplaceSpentTotal: number;
   };
   transactionBreakdown: {
     deposits: number;
@@ -56,6 +58,7 @@ interface UserReconciliationDetail {
     competitionWins: number;
     challengeJoins: number;
     challengeWins: number;
+    marketplacePurchases: number;
     adminAdjustments: number;
     refunds: number;
     other: number;
@@ -359,6 +362,28 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case 'marketplace_spent_mismatch': {
+        const marketplaceTx = await WalletTransaction.find({
+          userId,
+          transactionType: 'marketplace_purchase',
+          status: 'completed',
+        }).session(session);
+
+        const correctTotal = marketplaceTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+
+        await CreditWallet.updateOne(
+          { userId },
+          { $set: { totalSpentOnMarketplace: Math.round(correctTotal * 100) / 100 } },
+          { session }
+        );
+
+        result = {
+          success: true,
+          message: `Marketplace spent corrected to ${Math.round(correctTotal * 100) / 100} credits`,
+        };
+        break;
+      }
+
       default:
         await session.abortTransaction();
         return NextResponse.json(
@@ -577,6 +602,7 @@ async function getDetailedUserReconciliation(
     totalWonFromChallenges: wallet?.totalWonFromChallenges || 0,
     totalSpentOnCompetitions: wallet?.totalSpentOnCompetitions || 0,
     totalSpentOnChallenges: wallet?.totalSpentOnChallenges || 0,
+    totalSpentOnMarketplace: (wallet as any)?.totalSpentOnMarketplace || 0,
   };
 
   // Get all completed transactions
@@ -592,6 +618,7 @@ async function getDetailedUserReconciliation(
   let challengeWinTotal = 0;
   let competitionSpentTotal = 0;
   let challengeSpentTotal = 0;
+  let marketplaceSpentTotal = 0;
 
   // Transaction breakdown by type
   const breakdown = {
@@ -601,6 +628,7 @@ async function getDetailedUserReconciliation(
     competitionWins: 0,
     challengeJoins: 0,
     challengeWins: 0,
+    marketplacePurchases: 0,
     adminAdjustments: 0,
     refunds: 0,
     other: 0,
@@ -640,6 +668,10 @@ async function getDetailedUserReconciliation(
         challengeWinTotal += Math.abs(amount);
         breakdown.challengeWins++;
         break;
+      case 'marketplace_purchase':
+        marketplaceSpentTotal += Math.abs(amount);
+        breakdown.marketplacePurchases++;
+        break;
       case 'refund':
       case 'challenge_refund':
         breakdown.refunds++;
@@ -663,14 +695,15 @@ async function getDetailedUserReconciliation(
   const withdrawalFromRequests = completedWithdrawals.reduce((sum, w) => sum + (w.amountCredits || 0), 0);
 
   // Calculate EXPECTED balance using the formula:
-  // Balance = Deposits - Withdrawals + Wins - Spends
+  // Balance = Deposits - Withdrawals + Wins - Spends - Marketplace
   const expectedBalance = 
     walletData.totalDeposited - 
     walletData.totalWithdrawn + 
     walletData.totalWonFromCompetitions + 
     walletData.totalWonFromChallenges - 
     walletData.totalSpentOnCompetitions - 
-    walletData.totalSpentOnChallenges;
+    walletData.totalSpentOnChallenges -
+    walletData.totalSpentOnMarketplace;
 
   // Check for issues - compare stored balance with expected balance (not just transaction sum)
   // This is more accurate because it accounts for all the wallet fields
@@ -796,6 +829,23 @@ async function getDetailedUserReconciliation(
     });
   }
 
+  // Check marketplace spent
+  const marketSpentDiff = Math.abs(walletData.totalSpentOnMarketplace - marketplaceSpentTotal);
+  if (marketSpentDiff > 0.01) {
+    issues.push({
+      type: 'marketplace_spent_mismatch',
+      severity: 'warning',
+      userId,
+      userEmail,
+      details: {
+        expected: Math.round(marketplaceSpentTotal * 100) / 100,
+        actual: walletData.totalSpentOnMarketplace,
+        difference: Math.round((walletData.totalSpentOnMarketplace - marketplaceSpentTotal) * 100) / 100,
+        description: `Marketplace spent mismatch: stored ${walletData.totalSpentOnMarketplace}, calculated ${Math.round(marketplaceSpentTotal * 100) / 100}`,
+      },
+    });
+  }
+
   return {
     userId,
     userEmail,
@@ -810,6 +860,7 @@ async function getDetailedUserReconciliation(
       challengeWinTotal: Math.round(challengeWinTotal * 100) / 100,
       competitionSpentTotal: Math.round(competitionSpentTotal * 100) / 100,
       challengeSpentTotal: Math.round(challengeSpentTotal * 100) / 100,
+      marketplaceSpentTotal: Math.round(marketplaceSpentTotal * 100) / 100,
     },
     transactionBreakdown: breakdown,
     issues,

@@ -62,12 +62,14 @@ export interface UserReconciliationResult {
     totalWonFromChallenges: number;
     totalSpentOnCompetitions: number;
     totalSpentOnChallenges: number;
+    totalSpentOnMarketplace: number;
   };
   calculated: {
     expectedBalance: number;
     balanceFromTransactions: number;
     depositTotal: number;
     withdrawalTotal: number;
+    marketplaceSpentTotal: number;
   };
   issues: ReconciliationIssue[];
   healthy: boolean;
@@ -399,6 +401,11 @@ export async function getUserReconciliation(userId: string): Promise<UserReconci
     .filter(tx => tx.transactionType === 'deposit')
     .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
   
+  // Calculate marketplace purchases from transactions
+  const marketplaceSpentTotal = transactions
+    .filter(tx => tx.transactionType === 'marketplace_purchase')
+    .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+  
   const completedWithdrawals = await WithdrawalRequest.find({
     userId,
     status: 'completed',
@@ -407,14 +414,15 @@ export async function getUserReconciliation(userId: string): Promise<UserReconci
 
   const { issues } = await verifyUserWallet(userId, wallet.userEmail || 'Unknown');
 
-  // Calculate expected balance
+  // Calculate expected balance (including marketplace purchases)
   const expectedBalance = 
     (wallet.totalDeposited || 0) - 
     (wallet.totalWithdrawn || 0) + 
     (wallet.totalWonFromCompetitions || 0) + 
     (wallet.totalWonFromChallenges || 0) - 
     (wallet.totalSpentOnCompetitions || 0) - 
-    (wallet.totalSpentOnChallenges || 0);
+    (wallet.totalSpentOnChallenges || 0) -
+    ((wallet as any).totalSpentOnMarketplace || 0);
 
   return {
     userId,
@@ -427,12 +435,14 @@ export async function getUserReconciliation(userId: string): Promise<UserReconci
       totalWonFromChallenges: wallet.totalWonFromChallenges || 0,
       totalSpentOnCompetitions: wallet.totalSpentOnCompetitions || 0,
       totalSpentOnChallenges: wallet.totalSpentOnChallenges || 0,
+      totalSpentOnMarketplace: (wallet as any).totalSpentOnMarketplace || 0,
     },
     calculated: {
       expectedBalance,
       balanceFromTransactions,
       depositTotal,
       withdrawalTotal,
+      marketplaceSpentTotal,
     },
     issues,
     healthy: issues.filter(i => i.severity === 'critical').length === 0,
