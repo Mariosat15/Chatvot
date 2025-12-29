@@ -380,22 +380,12 @@ export default function AdminDashboard({
   };
 
   const handleMenuClick = (item: MenuItem, childId?: string) => {
-    // Save scroll position before state change
-    const navElement = document.getElementById('admin-sidebar-nav');
-    const scrollPos = navElement?.scrollTop || 0;
-    
     if (item.children && !childId) {
       toggleMenu(item.id);
     } else {
       setActiveSection(childId || item.id);
       setMobileMenuOpen(false);
     }
-    
-    // Restore scroll position after state change
-    requestAnimationFrame(() => {
-      const nav = document.getElementById('admin-sidebar-nav');
-      if (nav) nav.scrollTop = scrollPos;
-    });
   };
 
   const isActive = (itemId: string, childId?: string) => {
@@ -495,7 +485,8 @@ export default function AdminDashboard({
     }
   };
 
-  const SidebarContent = () => (
+  // Render sidebar content as JSX variable (not a component) to prevent unmount/remount on state changes
+  const sidebarContent = (
     <>
       {/* Logo */}
       <div className={cn(
@@ -529,8 +520,8 @@ export default function AdminDashboard({
         </div>
       )}
 
-      {/* Navigation - key prevents scroll reset on re-render */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4 scrollbar-thin scrollbar-track-gray-800 scrollbar-thumb-gray-600" id="admin-sidebar-nav">
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4">
         {menuGroups.map((group) => (
           <div key={group.id}>
             {/* Group Header */}
@@ -548,6 +539,7 @@ export default function AdminDashboard({
               {group.items.map((item) => (
                 <div key={item.id}>
                   <button
+                    type="button"
                     onClick={() => handleMenuClick(item)}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group",
@@ -586,6 +578,7 @@ export default function AdminDashboard({
                     <div className="mt-1 ml-4 pl-4 border-l border-gray-700/50 space-y-1">
                       {item.children.map((child) => (
                         <button
+                          type="button"
                           key={child.id}
                           onClick={() => handleMenuClick(item, child.id)}
                           className={cn(
@@ -614,6 +607,7 @@ export default function AdminDashboard({
         sidebarCollapsed && "px-2"
       )}>
         <button
+          type="button"
           onClick={handleLogout}
           className={cn(
             "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-all duration-200",
@@ -642,10 +636,11 @@ export default function AdminDashboard({
         "hidden lg:flex flex-col fixed left-0 top-0 bottom-0 bg-gray-800/95 backdrop-blur-xl border-r border-gray-700/50 z-30 transition-all duration-300",
         sidebarCollapsed ? "w-20" : "w-64"
       )}>
-        <SidebarContent />
+        {sidebarContent}
         
         {/* Collapse Button */}
         <button
+          type="button"
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           className="absolute -right-3 top-20 h-6 w-6 bg-gray-700 hover:bg-gray-600 rounded-full flex items-center justify-center border border-gray-600 shadow-lg transition-colors"
         >
@@ -661,7 +656,7 @@ export default function AdminDashboard({
         "lg:hidden fixed left-0 top-0 bottom-0 w-72 bg-gray-800/98 backdrop-blur-xl border-r border-gray-700/50 z-50 transform transition-transform duration-300 flex flex-col",
         mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <SidebarContent />
+        {sidebarContent}
       </aside>
 
       {/* Main Content */}
