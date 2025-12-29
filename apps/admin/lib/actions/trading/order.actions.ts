@@ -227,11 +227,34 @@ export const placeOrder = async (params: {
 
     // Check contest is active
     if (contestData.status !== 'active') {
-      throw new Error(`${contestType === 'competition' ? 'Competition' : 'Challenge'} is not active`);
+      const contestName = contestType === 'competition' ? 'Competition' : 'Challenge';
+      if (contestData.status === 'completed') {
+        throw new Error(`${contestName} has ended. You can no longer place trades.`);
+      } else if (contestData.status === 'cancelled') {
+        throw new Error(`${contestName} was cancelled. Trading is not available.`);
+      } else if (contestData.status === 'upcoming') {
+        throw new Error(`${contestName} hasn't started yet. Please wait for it to begin.`);
+      }
+      throw new Error(`${contestName} is not active (Status: ${contestData.status})`);
     }
 
+    // Check participant status with specific error messages
     if (participant.status !== 'active') {
-      throw new Error('Your participation status is not active');
+      const contestName = contestType === 'competition' ? 'Competition' : 'Challenge';
+      
+      if (participant.status === 'liquidated') {
+        const reason = participant.liquidationReason || 'margin call';
+        throw new Error(`⛔ You have been DISQUALIFIED from this ${contestName.toLowerCase()} due to liquidation (${reason}). You can no longer trade.`);
+      } else if (participant.status === 'disqualified') {
+        const reason = participant.disqualificationReason || 'rule violation';
+        throw new Error(`⛔ You have been DISQUALIFIED from this ${contestName.toLowerCase()}. Reason: ${reason}. You can no longer trade.`);
+      } else if (participant.status === 'completed') {
+        throw new Error(`This ${contestName.toLowerCase()} has ended for you. You can no longer place trades.`);
+      } else if (participant.status === 'refunded') {
+        throw new Error(`Your entry fee was refunded. You are no longer participating in this ${contestName.toLowerCase()}.`);
+      }
+      
+      throw new Error(`Your participation status is "${participant.status}". You cannot trade in this ${contestName.toLowerCase()}.`);
     }
 
     // ✅ CHECK RISK LIMITS (Max Drawdown & Daily Loss) - Only for competitions with risk limits
