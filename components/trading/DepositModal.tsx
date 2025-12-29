@@ -178,7 +178,7 @@ export default function DepositModal({ children }: DepositModalProps) {
     setError('');
 
     const amountNum = parseFloat(amount);
-    const currencySymbol = settings?.currency.symbol || '€';
+    const currencySymbol = settings?.currency?.symbol || '€';
 
     if (isNaN(amountNum) || amountNum < minDeposit) {
       setError(`Minimum is ${currencySymbol}${minDeposit}`);
@@ -244,7 +244,7 @@ export default function DepositModal({ children }: DepositModalProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             amount: totalPayment,
-            currency: settings?.currency.code || 'EUR',
+            currency: settings?.currency?.code || 'EUR',
           }),
         });
 
@@ -264,7 +264,7 @@ export default function DepositModal({ children }: DepositModalProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             amount: amountNum,
-            currency: settings?.currency.code || 'EUR',
+            currency: settings?.currency?.code || 'EUR',
           }),
         });
 
@@ -376,10 +376,10 @@ export default function DepositModal({ children }: DepositModalProps) {
           <form onSubmit={handleAmountSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="amount" className="text-gray-300">
-                Amount ({settings?.currency.code || 'EUR'})
+                Amount ({settings?.currency?.code || 'EUR'})
               </Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{settings?.currency.symbol || '€'}</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{settings?.currency?.symbol || '€'}</span>
                 <Input
                   id="amount"
                   type="number"
@@ -393,7 +393,7 @@ export default function DepositModal({ children }: DepositModalProps) {
                   required
                 />
               </div>
-              <p className="text-xs text-gray-500">Minimum: {settings?.currency.symbol || '€'}{minDeposit} • Maximum: {settings?.currency.symbol || '€'}10,000</p>
+              <p className="text-xs text-gray-500">Minimum: {settings?.currency?.symbol || '€'}{minDeposit} • Maximum: {settings?.currency?.symbol || '€'}10,000</p>
             </div>
 
             {/* Conversion Preview */}
@@ -468,7 +468,7 @@ export default function DepositModal({ children }: DepositModalProps) {
                   onClick={() => setAmount(preset.toString())}
                   className="bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-100"
                 >
-                  {settings?.currency.symbol || '€'}{preset}
+                  {settings?.currency?.symbol || '€'}{preset}
                 </Button>
               ))}
             </div>
@@ -539,14 +539,14 @@ export default function DepositModal({ children }: DepositModalProps) {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">Total to Pay</span>
                 <span className="text-lg font-bold text-white">
-                  {settings?.currency.symbol || '€'}{calculateTotalPayment(parseFloat(amount)).toFixed(2)}
+                  {settings?.currency?.symbol || '€'}{calculateTotalPayment(parseFloat(amount)).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between items-center mt-2">
                 <span className="text-sm text-gray-400">You Receive</span>
                 <span className="text-yellow-400 font-bold flex items-center gap-1">
                   <Zap className="h-4 w-4" />
-                  {eurToCredits(parseFloat(amount)).toFixed(settings?.credits.decimals || 2)} {settings?.credits.symbol || 'Credits'}
+                  {eurToCredits(parseFloat(amount)).toFixed(settings?.credits?.decimals || 2)} {settings?.credits?.symbol || 'Credits'}
                 </span>
               </div>
             </div>
@@ -729,7 +729,7 @@ function PaymentForm({
         <div>
           <h3 className="text-xl font-semibold text-gray-100">Payment Successful!</h3>
           <p className="text-sm text-gray-400 mt-2">
-            {creditsReceived.toFixed(settings?.credits.decimals || 2)} {settings?.credits.symbol || 'Credits'} added to your wallet
+            {creditsReceived.toFixed(settings?.credits?.decimals || 2)} {settings?.credits?.symbol || 'Credits'} added to your wallet
           </p>
         </div>
       </div>
@@ -741,27 +741,27 @@ function PaymentForm({
       <div className="rounded-lg bg-gray-800/50 border border-gray-700 p-4 space-y-2">
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-400">Credits Value</span>
-          <span className="text-lg font-bold text-gray-100">{settings?.currency.symbol || '€'}{amount.toFixed(2)}</span>
+          <span className="text-lg font-bold text-gray-100">{settings?.currency?.symbol || '€'}{amount.toFixed(2)}</span>
         </div>
         
         {vatEnabled && vatAmount > 0 && (
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-500">VAT ({vatPercentage}%)</span>
-            <span className="text-orange-400">+{settings?.currency.symbol || '€'}{vatAmount.toFixed(2)}</span>
+            <span className="text-orange-400">+{settings?.currency?.symbol || '€'}{vatAmount.toFixed(2)}</span>
           </div>
         )}
         
         {platformFeePercentage > 0 && platformFeeAmount > 0 && (
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-500">Platform Fee ({platformFeePercentage}%)</span>
-            <span className="text-orange-400">+{settings?.currency.symbol || '€'}{platformFeeAmount.toFixed(2)}</span>
+            <span className="text-orange-400">+{settings?.currency?.symbol || '€'}{platformFeeAmount.toFixed(2)}</span>
           </div>
         )}
         
         {(vatEnabled || platformFeePercentage > 0) && (
           <div className="flex justify-between items-center pt-2 border-t border-gray-600">
             <span className="text-sm font-semibold text-gray-300">Total to Pay</span>
-            <span className="text-lg font-bold text-white">{settings?.currency.symbol || '€'}{totalAmount.toFixed(2)}</span>
+            <span className="text-lg font-bold text-white">{settings?.currency?.symbol || '€'}{totalAmount.toFixed(2)}</span>
           </div>
         )}
         
@@ -769,7 +769,7 @@ function PaymentForm({
           <span className="text-sm font-semibold text-gray-300">You Receive</span>
           <span className="text-yellow-400 font-bold flex items-center gap-1">
             <Zap className="h-4 w-4" />
-            {creditsReceived.toFixed(settings?.credits.decimals || 2)} {settings?.credits.symbol || 'Credits'}
+            {creditsReceived.toFixed(settings?.credits?.decimals || 2)} {settings?.credits?.symbol || 'Credits'}
           </span>
         </div>
       </div>
@@ -804,7 +804,7 @@ function PaymentForm({
               Processing...
             </>
           ) : (
-            `Pay ${settings?.currency.symbol || '€'}${totalAmount.toFixed(2)}`
+            `Pay ${settings?.currency?.symbol || '€'}${totalAmount.toFixed(2)}`
           )}
         </Button>
       </div>
@@ -853,7 +853,8 @@ function NuveiPaymentForm({
   const router = useRouter();
   const { settings, eurToCredits } = useAppSettings();
   const cardFieldRef = useRef<HTMLDivElement>(null);
-  const [scard, setScard] = useState<ReturnType<ReturnType<NonNullable<typeof window.SafeCharge>>['fields']>['create']> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [scard, setScard] = useState<any>(null);
   const [sfcInitialized, setSfcInitialized] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -862,7 +863,8 @@ function NuveiPaymentForm({
   const [cardHolderName, setCardHolderName] = useState('');
   const [cardFieldReady, setCardFieldReady] = useState(false);
 
-  const creditsReceived = eurToCredits(amount);
+  // Safe calculation with fallback
+  const creditsReceived = typeof amount === 'number' && !isNaN(amount) ? eurToCredits(amount) : 0;
 
   // Initialize Nuvei when SDK is loaded
   useEffect(() => {
@@ -1013,7 +1015,7 @@ function NuveiPaymentForm({
         <div>
           <h3 className="text-xl font-semibold text-gray-100">Payment Successful!</h3>
           <p className="text-sm text-gray-400 mt-2">
-            {creditsReceived.toFixed(settings?.credits.decimals || 2)} {settings?.credits.symbol || 'Credits'} added to your wallet
+            {(creditsReceived || 0).toFixed(settings?.credits?.decimals ?? 2)} {settings?.credits?.symbol || 'Credits'} added to your wallet
           </p>
         </div>
       </div>
@@ -1034,27 +1036,27 @@ function NuveiPaymentForm({
       <div className="rounded-lg bg-gray-800/50 border border-gray-700 p-4 space-y-2">
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-400">Credits Value</span>
-          <span className="text-lg font-bold text-gray-100">{settings?.currency.symbol || '€'}{amount.toFixed(2)}</span>
+          <span className="text-lg font-bold text-gray-100">{settings?.currency?.symbol || '€'}{amount.toFixed(2)}</span>
         </div>
         
         {vatEnabled && vatAmount > 0 && (
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-500">VAT ({vatPercentage}%)</span>
-            <span className="text-orange-400">+{settings?.currency.symbol || '€'}{vatAmount.toFixed(2)}</span>
+            <span className="text-orange-400">+{settings?.currency?.symbol || '€'}{vatAmount.toFixed(2)}</span>
           </div>
         )}
         
         {platformFeePercentage > 0 && platformFeeAmount > 0 && (
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-500">Platform Fee ({platformFeePercentage}%)</span>
-            <span className="text-orange-400">+{settings?.currency.symbol || '€'}{platformFeeAmount.toFixed(2)}</span>
+            <span className="text-orange-400">+{settings?.currency?.symbol || '€'}{platformFeeAmount.toFixed(2)}</span>
           </div>
         )}
         
         {(vatEnabled || platformFeePercentage > 0) && (
           <div className="flex justify-between items-center pt-2 border-t border-gray-600">
             <span className="text-sm font-semibold text-gray-300">Total to Pay</span>
-            <span className="text-lg font-bold text-white">{settings?.currency.symbol || '€'}{totalAmount.toFixed(2)}</span>
+            <span className="text-lg font-bold text-white">{settings?.currency?.symbol || '€'}{totalAmount.toFixed(2)}</span>
           </div>
         )}
         
@@ -1062,7 +1064,7 @@ function NuveiPaymentForm({
           <span className="text-sm font-semibold text-gray-300">You Receive</span>
           <span className="text-yellow-400 font-bold flex items-center gap-1">
             <Zap className="h-4 w-4" />
-            {creditsReceived.toFixed(settings?.credits.decimals || 2)} {settings?.credits.symbol || 'Credits'}
+            {creditsReceived.toFixed(settings?.credits?.decimals || 2)} {settings?.credits?.symbol || 'Credits'}
           </span>
         </div>
       </div>
@@ -1125,7 +1127,7 @@ function NuveiPaymentForm({
               Processing...
             </>
           ) : (
-            `Pay ${settings?.currency.symbol || '€'}${totalAmount.toFixed(2)}`
+            `Pay ${settings?.currency?.symbol || '€'}${totalAmount.toFixed(2)}`
           )}
         </Button>
       </div>
