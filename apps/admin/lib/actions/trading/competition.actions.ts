@@ -10,6 +10,7 @@ import Competition from '@/database/models/trading/competition.model';
 import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import TradingRiskSettings from '@/database/models/trading-risk-settings.model';
 import mongoose from 'mongoose';
 
 // Get all competitions with filters
@@ -290,6 +291,22 @@ export const createCompetition = async (competitionData: {
     const registrationDeadline = new Date(competitionData.startTime);
     registrationDeadline.setHours(registrationDeadline.getHours() - 1);
 
+    // Fetch current trading risk settings to save with competition
+    const riskSettings = await TradingRiskSettings.findById('trading-risk-settings');
+    const tradingRiskDefaults = {
+      maxLeverage: riskSettings?.maxLeverage || 100,
+      minLeverage: riskSettings?.minLeverage || 1,
+      defaultLeverage: riskSettings?.defaultLeverage || 10,
+      marginLiquidation: riskSettings?.marginLiquidation || 50,
+      marginCall: riskSettings?.marginCall || 100,
+      marginWarning: riskSettings?.marginWarning || 150,
+      marginSafe: riskSettings?.marginSafe || 200,
+      maxOpenPositions: riskSettings?.maxOpenPositions || 10,
+      maxPositionSize: riskSettings?.maxPositionSize || 100,
+    };
+    
+    console.log('📊 Using trading risk settings for competition:', tradingRiskDefaults);
+
     const competition = await Competition.create({
       name: competitionData.name,
       description: competitionData.description,
@@ -308,9 +325,9 @@ export const createCompetition = async (competitionData: {
       blockedSymbols: [],
       leverage: {
         enabled: true,
-        min: 1,
-        max: competitionData.leverageAllowed || 100,
-        default: competitionData.leverageAllowed || 100,
+        min: tradingRiskDefaults.minLeverage,
+        max: tradingRiskDefaults.maxLeverage,
+        default: tradingRiskDefaults.defaultLeverage,
       },
       competitionType: 'time_based',
       prizePool: 0,
@@ -327,10 +344,17 @@ export const createCompetition = async (competitionData: {
         enabled: false,
         minLevel: 1,
       },
-      maxPositionSize: 100,
-      maxOpenPositions: 10,
+      maxPositionSize: tradingRiskDefaults.maxPositionSize,
+      maxOpenPositions: tradingRiskDefaults.maxOpenPositions,
       allowShortSelling: true,
-      marginCallThreshold: 50,
+      // Save margin settings from risk settings
+      marginSettings: {
+        liquidation: tradingRiskDefaults.marginLiquidation,
+        call: tradingRiskDefaults.marginCall,
+        warning: tradingRiskDefaults.marginWarning,
+        safe: tradingRiskDefaults.marginSafe,
+      },
+      marginCallThreshold: tradingRiskDefaults.marginCall,
       riskLimits: competitionData.riskLimits || {
         maxDrawdownPercent: 50,
         dailyLossLimitPercent: 20,

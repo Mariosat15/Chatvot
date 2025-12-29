@@ -78,6 +78,14 @@ export interface ICompetition extends Document {
   allowShortSelling: boolean;
   marginCallThreshold: number; // % of capital before forced close
   
+  // Margin Settings (copied from trading risk settings at creation time)
+  marginSettings?: {
+    liquidation: number; // Stopout level %
+    call: number; // Margin call level %
+    warning: number; // Warning level %
+    safe: number; // Safe level %
+  };
+  
   // Risk Limits (per-competition)
   riskLimits: {
     maxDrawdownPercent: number; // Max drawdown from starting capital before trading blocked
@@ -315,6 +323,15 @@ const CompetitionSchema = new Schema<ICompetition>(
       default: 50, // 50% of starting capital
       min: 10,
       max: 90,
+    },
+    marginSettings: {
+      type: {
+        liquidation: { type: Number, default: 50 },
+        call: { type: Number, default: 100 },
+        warning: { type: Number, default: 150 },
+        safe: { type: Number, default: 200 },
+      },
+      required: false,
     },
     riskLimits: {
       maxDrawdownPercent: {
