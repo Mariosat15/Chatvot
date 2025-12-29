@@ -26,6 +26,7 @@ export interface DifficultyFactor {
 
 export interface DifficultyAnalysis {
   level: DifficultyLevel;
+  label: string; // Human-readable label (e.g., "Novice Trader")
   score: number; // 0-100
   emoji: string;
   color: string;
@@ -33,10 +34,12 @@ export interface DifficultyAnalysis {
   borderColor: string;
   recommendedLevels: string;
   factors: DifficultyFactor[];
+  tips: string[]; // Tips for this difficulty level
 }
 
 // Difficulty configuration matching trader levels
 const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
+  label: string;
   emoji: string;
   color: string;
   bgColor: string;
@@ -44,8 +47,10 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
   minScore: number;
   maxScore: number;
   recommendedLevels: string;
+  tips: string[];
 }> = {
   'Novice': {
+    label: 'Novice Trader',
     emoji: '🌱',
     color: 'text-green-400',
     bgColor: 'bg-green-500/10',
@@ -53,8 +58,10 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
     minScore: 0,
     maxScore: 10,
     recommendedLevels: 'Level 1-2',
+    tips: ['Great for beginners', 'Low risk environment', 'Learn the basics'],
   },
   'Apprentice': {
+    label: 'Apprentice Trader',
     emoji: '📚',
     color: 'text-green-300',
     bgColor: 'bg-green-500/10',
@@ -62,8 +69,10 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
     minScore: 11,
     maxScore: 20,
     recommendedLevels: 'Level 2-3',
+    tips: ['Build your skills', 'Moderate risk', 'Practice strategies'],
   },
   'Skilled': {
+    label: 'Skilled Trader',
     emoji: '⚔️',
     color: 'text-blue-400',
     bgColor: 'bg-blue-500/10',
@@ -71,8 +80,10 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
     minScore: 21,
     maxScore: 30,
     recommendedLevels: 'Level 3-4',
+    tips: ['Requires trading experience', 'Medium difficulty', 'Test your strategies'],
   },
   'Expert': {
+    label: 'Expert Trader',
     emoji: '🎯',
     color: 'text-blue-300',
     bgColor: 'bg-blue-500/10',
@@ -80,8 +91,10 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
     minScore: 31,
     maxScore: 40,
     recommendedLevels: 'Level 4-5',
+    tips: ['For experienced traders', 'Higher stakes', 'Strategy is key'],
   },
   'Elite': {
+    label: 'Elite Trader',
     emoji: '💎',
     color: 'text-yellow-400',
     bgColor: 'bg-yellow-500/10',
@@ -89,8 +102,10 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
     minScore: 41,
     maxScore: 50,
     recommendedLevels: 'Level 5-6',
+    tips: ['Challenging competition', 'High skill required', 'Manage risk carefully'],
   },
   'Master': {
+    label: 'Master Trader',
     emoji: '👑',
     color: 'text-yellow-300',
     bgColor: 'bg-yellow-500/10',
@@ -98,8 +113,10 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
     minScore: 51,
     maxScore: 60,
     recommendedLevels: 'Level 6-7',
+    tips: ['Professional level', 'Strong competition', 'Discipline is essential'],
   },
   'Grand Master': {
+    label: 'Grand Master',
     emoji: '🔥',
     color: 'text-orange-400',
     bgColor: 'bg-orange-500/10',
@@ -107,8 +124,10 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
     minScore: 61,
     maxScore: 70,
     recommendedLevels: 'Level 7-8',
+    tips: ['Very challenging', 'Expert risk management needed', 'Not for beginners'],
   },
   'Champion': {
+    label: 'Trading Champion',
     emoji: '⚡',
     color: 'text-orange-300',
     bgColor: 'bg-orange-500/10',
@@ -116,8 +135,10 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
     minScore: 71,
     maxScore: 80,
     recommendedLevels: 'Level 8-9',
+    tips: ['Elite competition', 'High pressure', 'Prove your skills'],
   },
   'Legend': {
+    label: 'Market Legend',
     emoji: '🌟',
     color: 'text-red-400',
     bgColor: 'bg-red-500/10',
@@ -125,8 +146,10 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
     minScore: 81,
     maxScore: 90,
     recommendedLevels: 'Level 9-10',
+    tips: ['Extreme difficulty', 'Only for the best', 'High risk, high reward'],
   },
   'Trading God': {
+    label: 'Trading God',
     emoji: '👑',
     color: 'text-red-500',
     bgColor: 'bg-red-500/10',
@@ -134,6 +157,7 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
     minScore: 91,
     maxScore: 100,
     recommendedLevels: 'Level 10 only',
+    tips: ['Ultimate challenge', 'Brutal conditions', 'Only legends survive'],
   },
 };
 
@@ -334,6 +358,7 @@ export function calculateCompetitionDifficulty(params: CompetitionParams): Diffi
 
   return {
     level,
+    label: config.label,
     score,
     emoji: config.emoji,
     color: config.color,
@@ -341,17 +366,21 @@ export function calculateCompetitionDifficulty(params: CompetitionParams): Diffi
     borderColor: config.borderColor,
     recommendedLevels: config.recommendedLevels,
     factors,
+    tips: config.tips,
   };
 }
 
 /**
  * Get all difficulty levels for legend/filter
  */
-export function getAllDifficultyLevels(): { value: DifficultyLevel; emoji: string; color: string; recommendedLevels: string }[] {
+export function getAllDifficultyLevels(): { value: DifficultyLevel; label: string; emoji: string; color: string; bgColor: string; borderColor: string; recommendedLevels: string }[] {
   return Object.entries(DIFFICULTY_CONFIG).map(([key, config]) => ({
     value: key as DifficultyLevel,
+    label: config.label,
     emoji: config.emoji,
     color: config.color,
+    bgColor: config.bgColor,
+    borderColor: config.borderColor,
     recommendedLevels: config.recommendedLevels,
   }));
 }

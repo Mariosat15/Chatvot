@@ -105,25 +105,28 @@ export function DifficultyBadge({
             <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
               <div 
                 className={`h-full transition-all duration-500 ${
-                  difficulty.level === 'beginner' ? 'bg-green-500' :
-                  difficulty.level === 'intermediate' ? 'bg-blue-500' :
-                  difficulty.level === 'advanced' ? 'bg-yellow-500' :
-                  difficulty.level === 'expert' ? 'bg-orange-500' :
+                  difficulty.score <= 20 ? 'bg-green-500' :
+                  difficulty.score <= 40 ? 'bg-blue-500' :
+                  difficulty.score <= 60 ? 'bg-yellow-500' :
+                  difficulty.score <= 80 ? 'bg-orange-500' :
                   'bg-red-500'
                 }`}
                 style={{ width: `${difficulty.score}%` }}
               />
             </div>
             
-            {/* Reasons */}
-            {difficulty.reasons.length > 0 && (
+            {/* Factors */}
+            {difficulty.factors && difficulty.factors.length > 0 && (
               <div className="space-y-1">
                 <span className="text-xs text-gray-400 uppercase font-medium">Why:</span>
                 <ul className="text-xs text-gray-300 space-y-0.5">
-                  {difficulty.reasons.slice(0, 4).map((reason, i) => (
+                  {difficulty.factors.slice(0, 4).map((factor, i) => (
                     <li key={i} className="flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full bg-gray-500" />
-                      {reason}
+                      <span className={`w-1 h-1 rounded-full ${
+                        factor.impact === 'high' ? 'bg-red-400' :
+                        factor.impact === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
+                      }`} />
+                      {factor.factor}
                     </li>
                   ))}
                 </ul>
@@ -131,7 +134,7 @@ export function DifficultyBadge({
             )}
 
             {/* Tips */}
-            {difficulty.tips.length > 0 && (
+            {difficulty.tips && difficulty.tips.length > 0 && (
               <div className="pt-2 border-t border-gray-700">
                 <span className="text-xs text-yellow-400 flex items-center gap-1">
                   <Info className="h-3 w-3" />
@@ -225,10 +228,10 @@ export function DifficultyDetails({ difficulty, expanded: initialExpanded = fals
             <div className="h-3 bg-gray-700/50 rounded-full overflow-hidden">
               <div 
                 className={`h-full transition-all duration-500 rounded-full ${
-                  difficulty.level === 'beginner' ? 'bg-gradient-to-r from-green-500 to-green-400' :
-                  difficulty.level === 'intermediate' ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
-                  difficulty.level === 'advanced' ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
-                  difficulty.level === 'expert' ? 'bg-gradient-to-r from-orange-500 to-orange-400' :
+                  difficulty.score <= 20 ? 'bg-gradient-to-r from-green-500 to-green-400' :
+                  difficulty.score <= 40 ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
+                  difficulty.score <= 60 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+                  difficulty.score <= 80 ? 'bg-gradient-to-r from-orange-500 to-orange-400' :
                   'bg-gradient-to-r from-red-500 to-red-400'
                 }`}
                 style={{ width: `${difficulty.score}%` }}
@@ -237,14 +240,17 @@ export function DifficultyDetails({ difficulty, expanded: initialExpanded = fals
           </div>
 
           {/* Factors */}
-          {difficulty.reasons.length > 0 && (
+          {difficulty.factors && difficulty.factors.length > 0 && (
             <div>
               <h4 className="text-sm font-medium text-gray-300 mb-2">Contributing Factors:</h4>
               <ul className="space-y-1">
-                {difficulty.reasons.map((reason, i) => (
+                {difficulty.factors.map((factor, i) => (
                   <li key={i} className="text-sm text-gray-400 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
-                    {reason}
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      factor.impact === 'high' ? 'bg-red-400' :
+                      factor.impact === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
+                    }`} />
+                    {factor.factor}
                   </li>
                 ))}
               </ul>
@@ -252,7 +258,7 @@ export function DifficultyDetails({ difficulty, expanded: initialExpanded = fals
           )}
 
           {/* Tips */}
-          {difficulty.tips.length > 0 && (
+          {difficulty.tips && difficulty.tips.length > 0 && (
             <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
               <h4 className="text-sm font-medium text-yellow-400 mb-1 flex items-center gap-1.5">
                 <Info className="h-4 w-4" />

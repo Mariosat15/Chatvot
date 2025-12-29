@@ -414,25 +414,30 @@ export default function CompetitionsPageContent({
   };
 
   const DIFFICULTY_LABELS: Record<DifficultyLevel, { label: string; emoji: string; color: string }> = {
-    beginner: { label: 'Beginner', emoji: '🌱', color: 'text-green-400' },
-    intermediate: { label: 'Intermediate', emoji: '📊', color: 'text-blue-400' },
-    advanced: { label: 'Advanced', emoji: '⚡', color: 'text-yellow-400' },
-    expert: { label: 'Expert', emoji: '🔥', color: 'text-orange-400' },
-    extreme: { label: 'Extreme', emoji: '💀', color: 'text-red-400' },
+    'Novice': { label: 'Novice Trader', emoji: '🌱', color: 'text-green-400' },
+    'Apprentice': { label: 'Apprentice', emoji: '📚', color: 'text-green-300' },
+    'Skilled': { label: 'Skilled Trader', emoji: '⚔️', color: 'text-blue-400' },
+    'Expert': { label: 'Expert Trader', emoji: '🎯', color: 'text-blue-300' },
+    'Elite': { label: 'Elite Trader', emoji: '💎', color: 'text-yellow-400' },
+    'Master': { label: 'Master Trader', emoji: '👑', color: 'text-yellow-300' },
+    'Grand Master': { label: 'Grand Master', emoji: '🔥', color: 'text-orange-400' },
+    'Champion': { label: 'Champion', emoji: '⚡', color: 'text-orange-300' },
+    'Legend': { label: 'Legend', emoji: '🌟', color: 'text-red-400' },
+    'Trading God': { label: 'Trading God', emoji: '👑', color: 'text-red-500' },
   };
 
   const LEVEL_LABELS: Record<number, string> = {
     0: '🌐 Open to All',
-    1: '🌱 Level 1+',
-    2: '📚 Level 2+',
-    3: '⚔️ Level 3+',
-    4: '🎯 Level 4+',
-    5: '💎 Level 5+',
-    6: '👑 Level 6+',
-    7: '🔥 Level 7+',
-    8: '⚡ Level 8+',
-    9: '🌟 Level 9+',
-    10: '👑 Level 10',
+    1: '🌱 Novice+',
+    2: '📚 Apprentice+',
+    3: '⚔️ Skilled+',
+    4: '🎯 Expert+',
+    5: '💎 Elite+',
+    6: '👑 Master+',
+    7: '🔥 Grand Master+',
+    8: '⚡ Champion+',
+    9: '🌟 Legend+',
+    10: '👑 Trading God',
   };
 
   const activeFiltersCount = (statusFilter.length !== 2 || !statusFilter.includes('active') || !statusFilter.includes('upcoming') ? 1 : 0) + 
@@ -619,11 +624,7 @@ export default function CompetitionsPageContent({
                   }}
                   className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-all ${
                     difficultyFilter.includes(level)
-                      ? level === 'beginner' ? 'bg-green-500 text-gray-900'
-                        : level === 'intermediate' ? 'bg-blue-500 text-white'
-                        : level === 'advanced' ? 'bg-yellow-500 text-gray-900'
-                        : level === 'expert' ? 'bg-orange-500 text-white'
-                        : 'bg-red-500 text-white'
+                      ? `${DIFFICULTY_LABELS[level].color.replace('text-', 'bg-').replace('-400', '-500').replace('-300', '-400')} ${level === 'Novice' || level === 'Apprentice' || level === 'Elite' || level === 'Master' ? 'text-gray-900' : 'text-white'}`
                       : 'bg-gray-700 text-gray-300'
                   }`}
                 >
