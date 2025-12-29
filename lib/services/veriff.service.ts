@@ -127,7 +127,8 @@ class VeriffService {
     }
 
     // Veriff requires HTTPS callback URLs - ensure we use HTTPS
-    let baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://chartvolt.com';
+    // Check multiple env var names for compatibility
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://chartvolt.com';
     
     // Force HTTPS - Veriff rejects HTTP URLs
     if (baseUrl.startsWith('http://')) {
