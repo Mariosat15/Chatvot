@@ -58,6 +58,14 @@ export interface IChallenge extends Document {
   allowShortSelling: boolean;
   marginCallThreshold: number;
   
+  // Margin Settings (copied from trading risk settings at creation time)
+  marginSettings?: {
+    liquidation: number; // Stopout level %
+    call: number; // Margin call level %
+    warning: number; // Warning level %
+    safe: number; // Safe level %
+  };
+  
   // Results
   winnerId?: string;
   winnerName?: string;
@@ -251,6 +259,15 @@ const ChallengeSchema = new Schema<IChallenge>(
       default: 50,
       min: 10,
       max: 90,
+    },
+    marginSettings: {
+      type: {
+        liquidation: { type: Number, default: 50 },
+        call: { type: Number, default: 100 },
+        warning: { type: Number, default: 150 },
+        safe: { type: Number, default: 200 },
+      },
+      required: false,
     },
     winnerId: String,
     winnerName: String,

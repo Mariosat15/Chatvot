@@ -312,6 +312,12 @@ export async function POST(request: NextRequest) {
     const slug = `challenge-${nanoid(10)}`;
 
     // Create the challenge - uses universal TradingRiskSettings for trading rules
+    console.log('📊 Using trading risk settings for challenge:', {
+      maxLeverage: tradingRiskSettings.maxLeverage,
+      marginLiquidation: tradingRiskSettings.marginLiquidation,
+      marginCall: tradingRiskSettings.marginCall,
+    });
+    
     const challenge = await Challenge.create({
       slug,
       challengerId,
@@ -347,7 +353,14 @@ export async function POST(request: NextRequest) {
       maxPositionSize: tradingRiskSettings.maxPositionSize,
       maxOpenPositions: tradingRiskSettings.maxOpenPositions,
       allowShortSelling: true, // Allow short selling by default
-      marginCallThreshold: 50, // Default 50% - same as competitions
+      marginCallThreshold: tradingRiskSettings.marginCall || 100,
+      // Save all margin settings from risk settings
+      marginSettings: {
+        liquidation: tradingRiskSettings.marginLiquidation || 50,
+        call: tradingRiskSettings.marginCall || 100,
+        warning: tradingRiskSettings.marginWarning || 150,
+        safe: tradingRiskSettings.marginSafe || 200,
+      },
     });
 
     // Send notification to challenged user (skip in simulator mode)
