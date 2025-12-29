@@ -228,7 +228,12 @@ class VeriffService {
     }
 
     const { verification } = payload;
-    const userId = verification.vendorData;
+    const userId = verification.vendorData as string;
+    
+    if (!userId) {
+      console.error('Veriff webhook missing vendorData (userId)');
+      return;
+    }
 
     // Find and update session
     const session = await KYCSession.findOne({
