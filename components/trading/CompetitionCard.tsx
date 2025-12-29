@@ -1,6 +1,6 @@
 'use client';
 
-import { Trophy, Users, Clock, Calendar, CheckCircle, Zap, Target, Flame, Crown, Sparkles, Timer, ChevronRight, Swords, Gamepad2 } from 'lucide-react';
+import { Trophy, Users, Clock, Calendar, CheckCircle, Zap, Target, Flame, Crown, Sparkles, Timer, ChevronRight, Swords, Gamepad2, Gauge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
@@ -10,6 +10,20 @@ import { toast } from 'sonner';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { DifficultyBadge } from '@/components/ui/difficulty-badge';
 import { calculateCompetitionDifficulty } from '@/lib/utils/competition-difficulty';
+
+// Level names mapping
+const LEVEL_NAMES: Record<number, { emoji: string; name: string }> = {
+  1: { emoji: '🌱', name: 'Novice Trader' },
+  2: { emoji: '📚', name: 'Apprentice Trader' },
+  3: { emoji: '⚔️', name: 'Skilled Trader' },
+  4: { emoji: '🎯', name: 'Expert Trader' },
+  5: { emoji: '💎', name: 'Elite Trader' },
+  6: { emoji: '👑', name: 'Master Trader' },
+  7: { emoji: '🔥', name: 'Grand Master' },
+  8: { emoji: '⚡', name: 'Trading Champion' },
+  9: { emoji: '🌟', name: 'Market Legend' },
+  10: { emoji: '👑', name: 'Trading God' },
+};
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionCardProps {
@@ -93,6 +107,9 @@ export default function CompetitionCard({
   const rankingInfo = RANKING_DESCRIPTIONS[rankingMethod] || RANKING_DESCRIPTIONS.pnl;
 
   // Calculate difficulty
+  // Get the actual max leverage from competition settings
+  const maxLeverage = competition.leverage?.max || competition.leverageAllowed || 100;
+
   const difficulty = useMemo(() => {
     // Check if competition has manual difficulty setting
     if (competition.difficulty?.mode === 'manual' && competition.difficulty?.manualLevel) {
@@ -111,7 +128,7 @@ export default function CompetitionCard({
       };
     }
     
-    // Auto-calculate difficulty
+    // Auto-calculate difficulty using the correct leverage field
     const start = new Date(competition.startTime);
     const end = new Date(competition.endTime);
     const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
@@ -119,7 +136,7 @@ export default function CompetitionCard({
     return calculateCompetitionDifficulty({
       entryFeeCredits: competition.entryFee || competition.entryFeeCredits || 0,
       startingCapital: competition.startingCapital || competition.startingTradingPoints || 10000,
-      leverageAllowed: competition.leverageAllowed || 100,
+      leverageAllowed: maxLeverage,
       maxParticipants: competition.maxParticipants,
       participantCount: competition.currentParticipants,
       durationHours,
@@ -127,7 +144,7 @@ export default function CompetitionCard({
       riskLimits: competition.riskLimits,
       levelRequirement: competition.levelRequirement,
     });
-  }, [competition]);
+  }, [competition, maxLeverage]);
 
   // Live countdown
   const getTimeUntilStart = () => {
@@ -326,7 +343,7 @@ export default function CompetitionCard({
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20">
                 <Zap className="h-3 w-3 text-orange-400" />
                 <span className="text-[10px] text-orange-300 font-medium">
-                  1:{competition.leverage?.max || competition.leverageAllowed || 100}
+                  1:{maxLeverage}
                 </span>
               </div>
 
@@ -571,7 +588,7 @@ export default function CompetitionCard({
               <div>
                 <p className="text-[10px] text-gray-500 uppercase">Leverage</p>
                 <p className="text-sm font-bold text-yellow-400">
-                  1:{competition.leverage?.max || competition.leverageAllowed || 100}
+                  1:{maxLeverage}
                 </p>
               </div>
             </div>
@@ -662,13 +679,78 @@ export default function CompetitionCard({
           </div>
         )}
 
+        {/* Difficulty Bar */}
+        <div className={`mb-4 p-3 rounded-xl border ${
+          difficulty.level === 'Beginner' ? 'bg-green-500/10 border-green-500/30'
+            : difficulty.level === 'Intermediate' ? 'bg-blue-500/10 border-blue-500/30'
+            : difficulty.level === 'Advanced' ? 'bg-yellow-500/10 border-yellow-500/30'
+            : difficulty.level === 'Expert' ? 'bg-orange-500/10 border-orange-500/30'
+            : 'bg-red-500/10 border-red-500/30'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Gauge className={`h-4 w-4 ${
+                difficulty.level === 'Beginner' ? 'text-green-400'
+                  : difficulty.level === 'Intermediate' ? 'text-blue-400'
+                  : difficulty.level === 'Advanced' ? 'text-yellow-400'
+                  : difficulty.level === 'Expert' ? 'text-orange-400'
+                  : 'text-red-400'
+              }`} />
+              <span className={`text-xs font-bold ${
+                difficulty.level === 'Beginner' ? 'text-green-400'
+                  : difficulty.level === 'Intermediate' ? 'text-blue-400'
+                  : difficulty.level === 'Advanced' ? 'text-yellow-400'
+                  : difficulty.level === 'Expert' ? 'text-orange-400'
+                  : 'text-red-400'
+              }`}>
+                {difficulty.level === 'Beginner' ? '🌱'
+                  : difficulty.level === 'Intermediate' ? '📊'
+                  : difficulty.level === 'Advanced' ? '⚡'
+                  : difficulty.level === 'Expert' ? '🔥'
+                  : '💀'} {difficulty.level}
+              </span>
+            </div>
+            <span className={`text-xs font-mono ${
+              difficulty.level === 'Beginner' ? 'text-green-400'
+                : difficulty.level === 'Intermediate' ? 'text-blue-400'
+                : difficulty.level === 'Advanced' ? 'text-yellow-400'
+                : difficulty.level === 'Expert' ? 'text-orange-400'
+                : 'text-red-400'
+            }`}>
+              {difficulty.score}/100
+            </span>
+          </div>
+          <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div 
+              className={`h-full transition-all duration-500 ${
+                difficulty.level === 'Beginner' ? 'bg-gradient-to-r from-green-600 to-green-400'
+                  : difficulty.level === 'Intermediate' ? 'bg-gradient-to-r from-blue-600 to-blue-400'
+                  : difficulty.level === 'Advanced' ? 'bg-gradient-to-r from-yellow-600 to-yellow-400'
+                  : difficulty.level === 'Expert' ? 'bg-gradient-to-r from-orange-600 to-orange-400'
+                  : 'bg-gradient-to-r from-red-600 to-red-400'
+              }`}
+              style={{ width: `${difficulty.score}%` }}
+            />
+          </div>
+        </div>
+
         {/* Level Requirement */}
         {competition.levelRequirement?.enabled && (
           <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-purple-500/10 via-violet-500/10 to-purple-500/10 border border-purple-500/30">
             <div className="flex items-center gap-2">
               <Crown className="h-4 w-4 text-purple-400" />
               <span className="text-xs text-purple-300">
-                Level {competition.levelRequirement.minLevel}+ Required
+                {(() => {
+                  const minLevel = competition.levelRequirement.minLevel || 1;
+                  const maxLevel = competition.levelRequirement.maxLevel;
+                  const minInfo = LEVEL_NAMES[minLevel] || { emoji: '🌱', name: 'Novice Trader' };
+                  
+                  if (maxLevel && maxLevel !== minLevel) {
+                    const maxInfo = LEVEL_NAMES[maxLevel] || { emoji: '👑', name: 'Trading God' };
+                    return `${minInfo.emoji} ${minInfo.name} to ${maxInfo.emoji} ${maxInfo.name}`;
+                  }
+                  return `${minInfo.emoji} ${minInfo.name} or higher`;
+                })()}
               </span>
             </div>
           </div>
