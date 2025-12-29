@@ -116,7 +116,7 @@ export default function DepositModal({ children }: DepositModalProps) {
     return amountEur + vat + platformFee;
   };
 
-  // Check payment configuration on mount
+  // Check payment configuration on mount and RESET all state when modal opens
   useEffect(() => {
     async function checkPaymentConfig() {
       try {
@@ -154,6 +154,20 @@ export default function DepositModal({ children }: DepositModalProps) {
     }
     
     if (open) {
+      // IMPORTANT: Reset ALL state when modal opens fresh
+      // This prevents stale state from previous transactions causing issues
+      setAmount('50');
+      setClientSecret('');
+      setError('');
+      setLoading(false);
+      setStep('amount');
+      // Reset Nuvei state completely
+      setNuveiSessionToken('');
+      setNuveiClientUniqueId('');
+      setNuveiUserEmail('');
+      setNuveiLoaded(false);
+      
+      // Now check payment config
       setCheckingConfig(true);
       checkPaymentConfig();
     }
@@ -652,14 +666,16 @@ export default function DepositModal({ children }: DepositModalProps) {
               }}
               strategy="afterInteractive"
             />
-            {!nuveiLoaded ? (
-              // Show loading while SDK loads
+            {!nuveiLoaded || !nuveiSessionToken ? (
+              // Show loading while SDK loads or session is being created
               <div className="py-12 text-center space-y-4">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto text-green-500" />
                 <p className="text-sm text-gray-400">Loading secure payment form...</p>
               </div>
             ) : (
               <NuveiPaymentForm
+                // KEY: Force remount when session token changes to get fresh state
+                key={`nuvei-form-${nuveiSessionToken}`}
                 sessionToken={nuveiSessionToken}
                 clientUniqueId={nuveiClientUniqueId}
                 merchantId={providers.nuvei.merchantId || ''}
@@ -971,6 +987,19 @@ function NuveiPaymentForm({
       setError('Failed to initialize payment form. Please try again.');
     }
   }, [sdkLoaded, merchantId, siteId, testMode, sfcInitialized]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clear the card field container when unmounting
+      if (cardFieldRef.current) {
+        cardFieldRef.current.innerHTML = '';
+      }
+      setScard(null);
+      setSfcInitialized(false);
+      setCardFieldReady(false);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
