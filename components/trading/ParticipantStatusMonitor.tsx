@@ -1,9 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
+import { useState } from 'react';
 import { Skull, Ban, X, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -16,29 +13,28 @@ interface ParticipantStatusMonitorProps {
 }
 
 /**
- * Monitors participant status and shows alerts when disqualified/liquidated
- * Also displays a persistent banner when the user is disqualified
+ * Displays a banner when the user is disqualified/liquidated
+ * 
+ * NOTE: This component does NOT poll the server for status changes.
+ * Instead, it relies on:
+ * 1. Server-rendered initial status (page refresh shows correct state)
+ * 2. Trading buttons being disabled server-side when disqualified
+ * 3. Notification service sending alerts when liquidation happens
+ * 
+ * This approach avoids heavy server load from thousands of users polling.
+ * If real-time updates are needed in the future, consider WebSockets or SSE.
  */
 export default function ParticipantStatusMonitor({ 
   competitionId, 
   initialParticipantStatus,
-  userId,
-  contestType = 'competition',
 }: ParticipantStatusMonitorProps) {
-  const router = useRouter();
-  const hasNotifiedRef = useRef(false);
-  const lastStatusRef = useRef(initialParticipantStatus);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const [currentStatus, setCurrentStatus] = useState(initialParticipantStatus);
-  const [showBanner, setShowBanner] = useState(
-    initialParticipantStatus === 'liquidated' || initialParticipantStatus === 'disqualified'
-  );
   const [isDismissed, setIsDismissed] = useState(false);
 
-  const isDisqualified = currentStatus === 'liquidated' || currentStatus === 'disqualified';
+  // Check if user is disqualified based on initial server-rendered status
+  const isDisqualified = initialParticipantStatus === 'liquidated' || initialParticipantStatus === 'disqualified';
 
-  const getDisqualificationInfo = useCallback(() => {
-    switch (currentStatus) {
+  const getDisqualificationInfo = () => {
+    switch (initialParticipantStatus) {
       case 'liquidated':
         return {
           title: '💀 Account Liquidated',
@@ -60,97 +56,10 @@ export default function ParticipantStatusMonitor({
       default:
         return null;
     }
-  }, [currentStatus]);
-
-  useEffect(() => {
-    // Set initial banner state if already disqualified
-    if (initialParticipantStatus === 'liquidated' || initialParticipantStatus === 'disqualified') {
-      setShowBanner(true);
-    }
-  }, [initialParticipantStatus]);
-
-  useEffect(() => {
-    // Only poll if the participant is still active
-    if (!['active'].includes(initialParticipantStatus)) {
-      return;
-    }
-
-    const checkParticipantStatus = async () => {
-      try {
-        const response = await fetch(
-          `/api/competitions/${competitionId}/participant-status?userId=${userId}`
-        );
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            return;
-          }
-          console.error('Failed to fetch participant status');
-          return;
-        }
-
-        const data = await response.json();
-        
-        // If status changed from active to disqualified/liquidated
-        if (data.status !== lastStatusRef.current && !hasNotifiedRef.current) {
-          const previousStatus = lastStatusRef.current;
-          lastStatusRef.current = data.status;
-          setCurrentStatus(data.status);
-
-          // Handle liquidation
-          if (data.status === 'liquidated' && previousStatus === 'active') {
-            hasNotifiedRef.current = true;
-            setShowBanner(true);
-            
-            toast.error('💀 You have been liquidated!', {
-              description: 'Your account was liquidated due to margin call. You are no longer eligible for prizes.',
-              duration: 10000,
-            });
-
-            // Refresh the page after a short delay to update the UI
-            setTimeout(() => {
-              router.refresh();
-            }, 2000);
-          }
-
-          // Handle disqualification
-          if (data.status === 'disqualified' && previousStatus === 'active') {
-            hasNotifiedRef.current = true;
-            setShowBanner(true);
-            
-            toast.error('🚫 You have been disqualified!', {
-              description: data.reason || 'You did not meet the competition requirements.',
-              duration: 10000,
-            });
-
-            // Refresh the page after a short delay to update the UI
-            setTimeout(() => {
-              router.refresh();
-            }, 2000);
-          }
-        }
-      } catch (error) {
-        // Fail silently
-        console.error('Error checking participant status:', error);
-      }
-    };
-
-    // Initial check after 2 seconds
-    const timeoutId = setTimeout(checkParticipantStatus, 2000);
-
-    // Poll at optimized interval (10 seconds)
-    pollIntervalRef.current = setInterval(checkParticipantStatus, PERFORMANCE_INTERVALS.COMPETITION_STATUS);
-
-    return () => {
-      clearTimeout(timeoutId);
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-    };
-  }, [competitionId, initialParticipantStatus, userId, router]);
+  };
 
   // Don't render banner if dismissed or not disqualified
-  if (!showBanner || isDismissed || !isDisqualified) {
+  if (isDismissed || !isDisqualified) {
     return null;
   }
 
@@ -204,4 +113,3 @@ export default function ParticipantStatusMonitor({
     </div>
   );
 }
-

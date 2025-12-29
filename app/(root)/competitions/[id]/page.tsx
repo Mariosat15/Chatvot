@@ -802,37 +802,6 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
               </div>
             </div>
 
-            {/* Trading Restrictions */}
-            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Shield className="h-5 w-5 text-blue-400" />
-                <h3 className="text-lg font-semibold text-gray-100">Trading Restrictions</h3>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
-                  <span className="text-sm text-gray-300">Short Selling (Sell Orders)</span>
-                  <span className={`px-3 py-1 rounded-lg text-sm font-bold ${
-                    competition.allowShortSelling ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                  }`}>
-                    {competition.allowShortSelling ? '✅ Allowed' : '❌ Not Allowed'}
-                  </span>
-                </div>
-
-                {competition.rules?.disqualifyOnLiquidation && (
-                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                    <p className="text-sm text-red-400 flex items-center gap-2">
-                      <Skull className="h-4 w-4" />
-                      <strong>Liquidation = Disqualification</strong>
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      If your account gets liquidated (margin drops to {riskSettings.marginLiquidation}%), you will be disqualified from this competition.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Prize Distribution */}
             <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-6">
               <div className="flex items-center justify-between mb-4">
