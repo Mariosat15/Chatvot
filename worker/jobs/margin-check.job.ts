@@ -159,6 +159,17 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
             }
           }
 
+          // CRITICAL: After ALL positions are liquidated, mark participant as 'liquidated'
+          // This is needed for disqualifyOnLiquidation rule to work correctly at competition end
+          await CompetitionParticipant.findByIdAndUpdate(participant._id, {
+            $set: {
+              status: 'liquidated',
+              liquidationReason: `Margin call at ${marginStatus.marginLevel.toFixed(2)}%`,
+              currentOpenPositions: 0,
+            },
+          });
+          console.log(`   📝 Participant ${participant.userId} marked as 'liquidated' for disqualification tracking`);
+
           // Send notification (fire and forget)
           try {
             const { notificationService } = await import('../../lib/services/notification.service');

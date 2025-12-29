@@ -134,10 +134,14 @@ export const executeLiquidation = async (
     // EXECUTE LIQUIDATION
     // Send liquidation notifications
     try {
-      const { notificationService } = await import('@/lib/services/notification.service');
+      const { sendNotification } = await import('@/lib/services/notification.service');
       for (const position of openPositions) {
         // Fire and forget - don't block liquidation
-        notificationService.notifyLiquidation(session.user.id, position.symbol).catch(() => {});
+        sendNotification({
+          userId: session.user.id,
+          type: 'liquidation',
+          metadata: { symbol: position.symbol },
+        }).catch(() => {});
       }
     } catch {
       // Notifications are non-critical
@@ -156,6 +160,19 @@ export const executeLiquidation = async (
       } catch {
         // Position close failed - continue with others
       }
+    }
+
+    // CRITICAL: After ALL positions are liquidated, mark participant as 'liquidated'
+    // This is needed for disqualifyOnLiquidation rule to work correctly at competition end
+    if (closedCount > 0) {
+      await CompetitionParticipant.findByIdAndUpdate(participant._id, {
+        $set: {
+          status: 'liquidated',
+          liquidationReason: `Margin call at ${marginStatus.marginLevel.toFixed(2)}%`,
+          currentOpenPositions: 0,
+        },
+      });
+      console.log(`📝 Participant ${session.user.id} marked as 'liquidated' for disqualification tracking`);
     }
 
     return {

@@ -1220,7 +1220,18 @@ export const checkMarginCalls = async (competitionId: string) => {
           await closePositionAutomatic(position._id.toString(), marketPrice, 'margin_call');
         }
 
+        // CRITICAL: After ALL positions are liquidated, mark participant as 'liquidated'
+        // This is needed for disqualifyOnLiquidation rule to work correctly at competition end
+        await CompetitionParticipant.findByIdAndUpdate(participant._id, {
+          $set: {
+            status: 'liquidated',
+            liquidationReason: `Margin call at ${marginStatus.marginLevel.toFixed(2)}%`,
+            currentOpenPositions: 0,
+          },
+        });
+
         console.log(`   ⚠️ ✅ Liquidated all ${openPositions.length} positions for: ${participant.username}`);
+        console.log(`   📝 Participant status set to 'liquidated' for disqualification tracking`);
       } else {
         console.log(`   ✅ No liquidation needed (Status: ${marginStatus.status})`);
       }
