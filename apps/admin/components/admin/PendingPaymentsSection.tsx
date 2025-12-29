@@ -378,11 +378,24 @@ export default function PendingPaymentsSection() {
           <span className="capitalize">{payment.status}</span>
         </Badge>
 
-        {/* Provider */}
-        <div className="text-center w-24">
+        {/* Provider & Transaction ID */}
+        <div className="text-center w-36">
           <p className="text-xs text-gray-400">Provider</p>
           <p className="text-sm font-medium text-gray-200 capitalize">
             {payment.provider || payment.metadata?.paymentProvider || payment.paymentMethod || 'Unknown'}
+          </p>
+          {(payment.providerTransactionId || payment.paymentIntentId) && (
+            <p className="text-[10px] text-gray-500 font-mono truncate" title={payment.providerTransactionId || payment.paymentIntentId}>
+              {(payment.providerTransactionId || payment.paymentIntentId)?.slice(0, 16)}...
+            </p>
+          )}
+        </div>
+
+        {/* Transaction ID */}
+        <div className="text-center w-28">
+          <p className="text-xs text-gray-400">Txn ID</p>
+          <p className="text-[10px] text-gray-300 font-mono truncate" title={payment._id}>
+            {payment._id?.slice(0, 12)}...
           </p>
         </div>
 
@@ -981,33 +994,78 @@ export default function PendingPaymentsSection() {
                   <Building2 className="h-4 w-4" />
                   Transaction References
                 </h4>
-                <div className="space-y-2 text-xs font-mono">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500">Transaction ID:</span>
-                    <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">{detailDialog.payment._id}</code>
+                <div className="space-y-3 text-xs">
+                  {/* Our Transaction ID - Always show */}
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-blue-400 font-medium">Our Transaction ID</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(detailDialog.payment._id);
+                          toast.success('Transaction ID copied!');
+                        }}
+                        className="text-blue-400 hover:text-blue-300 text-[10px] px-2 py-0.5 bg-blue-500/20 rounded"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <code className="text-gray-200 font-mono text-sm block break-all">
+                      {detailDialog.payment._id}
+                    </code>
                   </div>
-                  {detailDialog.payment.providerTransactionId && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500">Provider Transaction ID:</span>
-                      <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded truncate max-w-[300px]">
-                        {detailDialog.payment.providerTransactionId}
+                  
+                  {/* Provider Transaction ID */}
+                  {(detailDialog.payment.providerTransactionId || detailDialog.payment.metadata?.dmnTransactionId) && (
+                    <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-purple-400 font-medium capitalize">
+                          {detailDialog.payment.provider || detailDialog.payment.metadata?.paymentProvider || 'Provider'} Transaction ID
+                        </span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(detailDialog.payment.providerTransactionId || detailDialog.payment.metadata?.dmnTransactionId || '');
+                            toast.success('Provider Transaction ID copied!');
+                          }}
+                          className="text-purple-400 hover:text-purple-300 text-[10px] px-2 py-0.5 bg-purple-500/20 rounded"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <code className="text-gray-200 font-mono text-sm block break-all">
+                        {detailDialog.payment.providerTransactionId || detailDialog.payment.metadata?.dmnTransactionId}
                       </code>
                     </div>
                   )}
-                  {detailDialog.payment.paymentIntentId && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500">Payment Intent:</span>
-                      <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded truncate max-w-[300px]">
-                        {detailDialog.payment.paymentIntentId}
-                      </code>
-                    </div>
-                  )}
-                  {detailDialog.payment.paymentId && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500">Payment ID:</span>
-                      <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">{detailDialog.payment.paymentId}</code>
-                    </div>
-                  )}
+                  
+                  {/* Other IDs in a smaller format */}
+                  <div className="space-y-2 font-mono pt-2 border-t border-gray-700">
+                    {detailDialog.payment.paymentIntentId && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">Payment Intent:</span>
+                        <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded truncate max-w-[280px]" title={detailDialog.payment.paymentIntentId}>
+                          {detailDialog.payment.paymentIntentId}
+                        </code>
+                      </div>
+                    )}
+                    {detailDialog.payment.paymentId && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">Payment ID:</span>
+                        <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">{detailDialog.payment.paymentId}</code>
+                      </div>
+                    )}
+                    {detailDialog.payment.metadata?.orderId && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">Order ID:</span>
+                        <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">{detailDialog.payment.metadata.orderId}</code>
+                      </div>
+                    )}
+                    {detailDialog.payment.metadata?.clientUniqueId && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">Client Unique ID:</span>
+                        <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">{detailDialog.payment.metadata.clientUniqueId}</code>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
