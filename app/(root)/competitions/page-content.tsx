@@ -63,6 +63,7 @@ interface Competition {
     minLevel: number;
     maxLevel?: number;
   };
+  createdAt?: string;
 }
 
 interface CompetitionsPageContentProps {
@@ -81,7 +82,7 @@ interface SavedFilters {
   assetFilter: string[];
   difficultyFilter: DifficultyLevel[];
   levelFilter: number[];
-  sortBy: 'prize' | 'start' | 'participants' | 'entry' | 'difficulty';
+  sortBy: 'newest' | 'prize' | 'start' | 'participants' | 'entry' | 'difficulty';
 }
 
 // Load saved filters from localStorage
@@ -134,7 +135,7 @@ export default function CompetitionsPageContent({
   const [assetFilter, setAssetFilter] = useState<string[]>([]);
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyLevel[]>([]);
   const [levelFilter, setLevelFilter] = useState<number[]>([]);
-  const [sortBy, setSortBy] = useState<'prize' | 'start' | 'participants' | 'entry' | 'difficulty'>('prize');
+  const [sortBy, setSortBy] = useState<'newest' | 'prize' | 'start' | 'participants' | 'entry' | 'difficulty'>('newest');
   
   // Platform risk settings (for actual leverage)
   const [platformLeverage, setPlatformLeverage] = useState<number>(100);
@@ -336,9 +337,13 @@ export default function CompetitionsPageContent({
     // Sort
     result.sort((a, b) => {
       switch (sortBy) {
+        case 'newest':
+          // Sort by creation date (newest first)
+          return new Date(b.createdAt || b.startTime).getTime() - new Date(a.createdAt || a.startTime).getTime();
         case 'prize':
           return (b.prizePool || b.prizePoolCredits || 0) - (a.prizePool || a.prizePoolCredits || 0);
         case 'start':
+          // Sort by start time (soonest first for upcoming)
           return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
         case 'participants':
           return b.currentParticipants - a.currentParticipants;
@@ -656,8 +661,9 @@ export default function CompetitionsPageContent({
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
               className="flex-1 bg-gray-900/50 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-300"
             >
+              <option value="newest">🆕 Newest First</option>
+              <option value="start">⏰ Starting Soon</option>
               <option value="prize">🏆 Prize Pool</option>
-              <option value="start">⏰ Start Time</option>
               <option value="participants">👥 Participants</option>
               <option value="entry">💰 Entry Fee</option>
               <option value="difficulty">🌱 Difficulty</option>
@@ -906,8 +912,9 @@ export default function CompetitionsPageContent({
               <DropdownMenuLabel className="text-gray-400">Sort By</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-gray-700" />
               {[
+                { value: 'newest', label: '🆕 Newest First' },
+                { value: 'start', label: '⏰ Starting Soon' },
                 { value: 'prize', label: '🏆 Prize Pool (High to Low)' },
-                { value: 'start', label: '⏰ Start Time (Soonest)' },
                 { value: 'participants', label: '👥 Participants (Most)' },
                 { value: 'entry', label: '💰 Entry Fee (Lowest)' },
                 { value: 'difficulty', label: '🌱 Difficulty (Easiest First)' },
@@ -915,7 +922,7 @@ export default function CompetitionsPageContent({
                 <DropdownMenuCheckboxItem
                   key={option.value}
                   checked={sortBy === option.value}
-                  onCheckedChange={() => setSortBy(option.value as 'prize' | 'start' | 'participants' | 'entry' | 'difficulty')}
+                  onCheckedChange={() => setSortBy(option.value as 'newest' | 'prize' | 'start' | 'participants' | 'entry' | 'difficulty')}
                   className="text-gray-300"
                 >
                   {option.label}

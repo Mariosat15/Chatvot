@@ -14,6 +14,10 @@ import {
   Trophy,
   Target,
   Zap,
+  ChevronDown,
+  Clock,
+  DollarSign,
+  ArrowDownUp,
 } from 'lucide-react';
 import usePresence from '@/hooks/usePresence';
 import ChallengeCard from '@/components/trading/ChallengeCard';
@@ -49,6 +53,7 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
   const [responding, setResponding] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<'newest' | 'starting' | 'prize' | 'entry'>('newest');
 
   // Track presence
   usePresence('/challenges');
@@ -118,13 +123,34 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
     }
   };
 
-  const filteredChallenges = challenges.filter((c) => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'pending') return c.status === 'pending';
-    if (activeTab === 'active') return c.status === 'active';
-    if (activeTab === 'completed') return ['completed', 'declined', 'expired', 'cancelled'].includes(c.status);
-    return true;
-  });
+  const filteredChallenges = challenges
+    .filter((c) => {
+      if (activeTab === 'all') return true;
+      if (activeTab === 'pending') return c.status === 'pending';
+      if (activeTab === 'active') return c.status === 'active';
+      if (activeTab === 'completed') return ['completed', 'declined', 'expired', 'cancelled'].includes(c.status);
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          // Sort by creation date (newest first)
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'starting':
+          // Sort by start/accept deadline time (soonest first)
+          const aTime = a.startTime ? new Date(a.startTime).getTime() : new Date(a.acceptDeadline).getTime();
+          const bTime = b.startTime ? new Date(b.startTime).getTime() : new Date(b.acceptDeadline).getTime();
+          return aTime - bTime;
+        case 'prize':
+          // Sort by prize pool (highest first)
+          return (b.prizePool || 0) - (a.prizePool || 0);
+        case 'entry':
+          // Sort by entry fee (lowest first)
+          return (a.entryFee || 0) - (b.entryFee || 0);
+        default:
+          return 0;
+      }
+    });
 
   const pendingReceived = challenges.filter(
     (c) => c.status === 'pending' && c.challengedId === userId
@@ -175,6 +201,21 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
             >
               <RefreshCw className={`h-4 w-4 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
+            
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="appearance-none bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 pr-8 text-sm text-gray-300 cursor-pointer hover:border-gray-600 transition-colors"
+              >
+                <option value="newest">🆕 Newest</option>
+                <option value="starting">⏰ Starting Soon</option>
+                <option value="prize">🏆 Prize Pool</option>
+                <option value="entry">💰 Entry Fee</option>
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            </div>
             
             {/* View Mode Toggle */}
             <div className="flex rounded-lg bg-gray-800 p-1">
