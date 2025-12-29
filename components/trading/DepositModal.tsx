@@ -638,6 +638,7 @@ export default function DepositModal({ children }: DepositModalProps) {
                 platformFeeAmount={calculatePlatformFee(parseFloat(amount))}
                 platformFeePercentage={processingFee}
                 sdkLoaded={nuveiLoaded}
+                userEmail=""
                 onSuccess={() => {
                   setOpen(false);
                   resetModal();
@@ -831,6 +832,7 @@ function NuveiPaymentForm({
   platformFeeAmount,
   platformFeePercentage,
   sdkLoaded,
+  userEmail,
   onSuccess, 
   onCancel 
 }: { 
@@ -847,6 +849,7 @@ function NuveiPaymentForm({
   platformFeeAmount: number;
   platformFeePercentage: number;
   sdkLoaded: boolean;
+  userEmail: string;
   onSuccess: () => void; 
   onCancel: () => void 
 }) {
@@ -861,6 +864,7 @@ function NuveiPaymentForm({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [cardHolderName, setCardHolderName] = useState('');
+  const [email, setEmail] = useState(userEmail || '');
   const [cardFieldReady, setCardFieldReady] = useState(false);
 
   // Safe calculation with fallback
@@ -946,6 +950,11 @@ function NuveiPaymentForm({
       return;
     }
 
+    if (!email.trim() || !email.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -956,17 +965,28 @@ function NuveiPaymentForm({
         merchantSiteId: siteId,
       });
 
-      // Create payment
+      // Parse cardholder name into first/last name
+      const nameParts = cardHolderName.trim().split(' ');
+      const firstName = nameParts[0] || 'Customer';
+      const lastName = nameParts.slice(1).join(' ') || 'Customer';
+
+      // Create payment with required user details
       sfc.createPayment(
         {
           sessionToken,
           clientUniqueId,
           cardHolderName: cardHolderName.trim(),
           paymentOption: scard,
-          billingAddress: {
-            country: 'US', // Will be overwritten by user's country if available
+          userDetails: {
+            firstName,
+            lastName,
+            email: email.trim(),
           },
-        },
+          billingAddress: {
+            email: email.trim(),
+            country: 'US',
+          },
+        } as Parameters<typeof sfc.createPayment>[0],
         async (result) => {
           console.log('Nuvei payment result:', result);
 
@@ -1079,6 +1099,20 @@ function NuveiPaymentForm({
           onChange={(e) => setCardHolderName(e.target.value)}
           className="bg-gray-800 border-gray-700 text-gray-100"
           placeholder="John Smith"
+          required
+        />
+      </div>
+
+      {/* Email */}
+      <div className="space-y-2">
+        <Label htmlFor="email" className="text-gray-300">Email Address</Label>
+        <Input
+          id="email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="bg-gray-800 border-gray-700 text-gray-100"
+          placeholder="john@example.com"
           required
         />
       </div>
