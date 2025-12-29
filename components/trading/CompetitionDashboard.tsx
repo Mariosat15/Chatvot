@@ -361,21 +361,28 @@ export default function CompetitionDashboard({
                 {rankInfo.icon ? <rankInfo.icon className={`h-6 w-6 ${rankInfo.color}`} /> : <Trophy className={`h-6 w-6 ${rankInfo.color}`} />}
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <h2 className="text-xl font-bold text-white flex items-center gap-3 flex-wrap">
                   Your Competition Dashboard
                   {isActive && (
-                    <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs font-medium animate-pulse flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
-                      LIVE
+                    <span className="px-3 py-1 rounded-full bg-gradient-to-r from-green-500/30 to-emerald-500/30 text-green-400 text-xs font-bold animate-pulse flex items-center gap-1.5 border border-green-500/40 shadow-lg shadow-green-500/20">
+                      <span className="w-2 h-2 bg-green-400 rounded-full animate-ping"></span>
+                      <span className="w-2 h-2 bg-green-400 rounded-full absolute"></span>
+                      LIVE NOW
                     </span>
                   )}
                   {isCompleted && (
-                    <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-medium">
-                      FINAL
+                    <span className="px-3 py-1 rounded-full bg-gradient-to-r from-purple-500/30 to-violet-500/30 text-purple-400 text-xs font-bold border border-purple-500/40">
+                      🏁 FINAL
+                    </span>
+                  )}
+                  {isUpcoming && (
+                    <span className="px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500/30 via-orange-500/30 to-yellow-500/30 text-amber-300 text-sm font-bold flex items-center gap-2 border border-amber-500/50 shadow-lg shadow-amber-500/20 animate-pulse">
+                      <Clock className="h-4 w-4 text-amber-400" />
+                      <span className="bg-gradient-to-r from-amber-300 to-yellow-300 bg-clip-text text-transparent">Starting Soon</span>
                     </span>
                   )}
                 </h2>
-                <p className="text-sm text-slate-400 flex items-center gap-2">
+                <p className="text-sm text-slate-400 flex items-center gap-2 mt-1">
                   <span className={rankInfo.color}>{rankInfo.label}</span>
                   <span className="text-slate-600">•</span>
                   <span>Rank #{stats.currentRank || '—'} of {stats.totalParticipants || totalParticipants}</span>
@@ -383,7 +390,7 @@ export default function CompetitionDashboard({
               </div>
             </div>
             
-            {/* Status Badge Only - Trade button is elsewhere on the page */}
+            {/* Action Buttons */}
             <div className="flex items-center gap-2">
               {isCompleted && (
                 <Link href={`/competitions/${competitionId}/results`}>
@@ -395,12 +402,6 @@ export default function CompetitionDashboard({
                     View Results
                   </Button>
                 </Link>
-              )}
-              {isUpcoming && (
-                <div className="px-4 py-2 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-medium flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Starting Soon
-                </div>
               )}
             </div>
           </div>
