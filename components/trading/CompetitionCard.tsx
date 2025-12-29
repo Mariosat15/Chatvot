@@ -3,11 +3,13 @@
 import { Trophy, Users, Clock, Calendar, CheckCircle, Zap, Target, Flame, Crown, Sparkles, Timer, ChevronRight, Swords, Gamepad2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { enterCompetition } from '@/lib/actions/trading/competition.actions';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { DifficultyBadge } from '@/components/ui/difficulty-badge';
+import { calculateCompetitionDifficulty } from '@/lib/utils/competition-difficulty';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionCardProps {
@@ -89,6 +91,25 @@ export default function CompetitionCard({
   const rankingMethod = competition.rules?.rankingMethod || 'pnl';
   const theme = COMPETITION_THEMES[rankingMethod] || COMPETITION_THEMES.pnl;
   const rankingInfo = RANKING_DESCRIPTIONS[rankingMethod] || RANKING_DESCRIPTIONS.pnl;
+
+  // Calculate difficulty
+  const difficulty = useMemo(() => {
+    const start = new Date(competition.startTime);
+    const end = new Date(competition.endTime);
+    const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    
+    return calculateCompetitionDifficulty({
+      entryFeeCredits: competition.entryFee || competition.entryFeeCredits || 0,
+      startingCapital: competition.startingCapital || competition.startingTradingPoints || 10000,
+      leverageAllowed: competition.leverageAllowed || 100,
+      maxParticipants: competition.maxParticipants,
+      participantCount: competition.currentParticipants,
+      durationHours,
+      rules: competition.rules,
+      riskLimits: competition.riskLimits,
+      levelRequirement: competition.levelRequirement,
+    });
+  }, [competition]);
 
   // Live countdown
   const getTimeUntilStart = () => {
@@ -201,6 +222,7 @@ export default function CompetitionCard({
                   <span className={`w-2 h-2 rounded-full bg-gradient-to-r ${theme.gradient}`}></span>
                   {rankingInfo.name}
                 </span>
+                <DifficultyBadge difficulty={difficulty} size="sm" showTooltip={true} />
                 <span className="flex items-center gap-1">
                   <Users className="h-3 w-3" />
                   {competition.currentParticipants}/{competition.maxParticipants}
@@ -337,6 +359,12 @@ export default function CompetitionCard({
         <h3 className="text-xl font-black text-center text-gray-100 mb-2 group-hover:text-yellow-400 transition-colors">
           {competition.name}
         </h3>
+        
+        {/* Difficulty Badge */}
+        <div className="flex justify-center mb-3">
+          <DifficultyBadge difficulty={difficulty} size="md" showTooltip={true} />
+        </div>
+        
         <p className="text-sm text-gray-400 text-center mb-4">{competition.description}</p>
 
         {/* Prize Pool - Casino Style */}
