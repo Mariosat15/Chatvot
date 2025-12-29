@@ -15,7 +15,7 @@ import WalletTransaction from '@/database/models/trading/wallet-transaction.mode
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import { InvoiceService } from '@/lib/services/invoice.service';
 import InvoiceSettings from '@/database/models/invoice-settings.model';
-import { sendInvoiceEmail } from '@/lib/email/invoice-email';
+import { sendInvoiceEmail } from '@/lib/nodemailer';
 import { ObjectId } from 'mongodb';
 
 // Helper to get user from database
