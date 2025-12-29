@@ -405,26 +405,27 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
             {(() => {
               // Check if competition has manual difficulty
               const manualDifficulty = (competition as { difficulty?: { mode: 'auto' | 'manual'; manualLevel?: string } }).difficulty;
-              let difficultyData: { level: DifficultyLevel; score: number; factors: { factor: string; impact: string; score: number }[] };
+              let difficultyData: { level: DifficultyLevel; label: string; score: number; factors: { factor: string; impact: string; score: number }[] };
               
               if (manualDifficulty?.mode === 'manual' && manualDifficulty.manualLevel) {
-                // Use manual difficulty
-                const levelMap: Record<string, { level: DifficultyLevel; score: number }> = {
-                  'beginner': { level: 'Beginner', score: 20 },
-                  'intermediate': { level: 'Intermediate', score: 40 },
-                  'advanced': { level: 'Advanced', score: 60 },
-                  'expert': { level: 'Expert', score: 80 },
-                  'extreme': { level: 'Extreme', score: 95 },
+                // Use manual difficulty - map old names to new trader level names
+                const levelMap: Record<string, { level: DifficultyLevel; label: string; score: number }> = {
+                  'beginner': { level: 'Novice', label: 'Novice Trader', score: 10 },
+                  'intermediate': { level: 'Skilled', label: 'Skilled Trader', score: 25 },
+                  'advanced': { level: 'Elite', label: 'Elite Trader', score: 45 },
+                  'expert': { level: 'Grand Master', label: 'Grand Master', score: 65 },
+                  'extreme': { level: 'Trading God', label: 'Trading God', score: 95 },
                 };
-                const mapped = levelMap[manualDifficulty.manualLevel] || { level: 'Intermediate' as DifficultyLevel, score: 40 };
+                const mapped = levelMap[manualDifficulty.manualLevel] || { level: 'Skilled' as DifficultyLevel, label: 'Skilled Trader', score: 25 };
                 difficultyData = {
                   level: mapped.level,
+                  label: mapped.label,
                   score: mapped.score,
                   factors: [{ factor: 'Manually Set', impact: 'high', score: mapped.score }],
                 };
               } else {
                 // Calculate auto difficulty
-                difficultyData = calculateCompetitionDifficulty({
+                const calculated = calculateCompetitionDifficulty({
                   entryFee: competition.entryFee || competition.entryFeeCredits || 0,
                   startingCapital: competition.startingCapital || competition.startingTradingPoints || 10000,
                   maxLeverage: competition.leverage?.max || competition.leverageAllowed || 100,
@@ -433,30 +434,51 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                   riskLimits: competition.riskLimits,
                   levelRequirement: competition.levelRequirement,
                 });
+                difficultyData = {
+                  level: calculated.level,
+                  label: calculated.label,
+                  score: calculated.score,
+                  factors: calculated.factors,
+                };
               }
               
               const colorMap: Record<DifficultyLevel, { bg: string; border: string; text: string; barColor: string }> = {
-                'Beginner': { bg: 'from-green-500/20 to-emerald-500/10', border: 'border-green-500/40', text: 'text-green-400', barColor: 'bg-green-500' },
-                'Intermediate': { bg: 'from-blue-500/20 to-cyan-500/10', border: 'border-blue-500/40', text: 'text-blue-400', barColor: 'bg-blue-500' },
-                'Advanced': { bg: 'from-yellow-500/20 to-amber-500/10', border: 'border-yellow-500/40', text: 'text-yellow-400', barColor: 'bg-yellow-500' },
-                'Expert': { bg: 'from-orange-500/20 to-red-500/10', border: 'border-orange-500/40', text: 'text-orange-400', barColor: 'bg-orange-500' },
-                'Extreme': { bg: 'from-red-500/20 to-pink-500/10', border: 'border-red-500/40', text: 'text-red-400', barColor: 'bg-red-500' },
+                'Novice': { bg: 'from-green-500/20 to-emerald-500/10', border: 'border-green-500/40', text: 'text-green-400', barColor: 'bg-green-500' },
+                'Apprentice': { bg: 'from-green-500/20 to-teal-500/10', border: 'border-green-500/40', text: 'text-green-300', barColor: 'bg-green-400' },
+                'Skilled': { bg: 'from-blue-500/20 to-cyan-500/10', border: 'border-blue-500/40', text: 'text-blue-400', barColor: 'bg-blue-500' },
+                'Expert': { bg: 'from-blue-500/20 to-indigo-500/10', border: 'border-blue-500/40', text: 'text-blue-300', barColor: 'bg-blue-400' },
+                'Elite': { bg: 'from-yellow-500/20 to-amber-500/10', border: 'border-yellow-500/40', text: 'text-yellow-400', barColor: 'bg-yellow-500' },
+                'Master': { bg: 'from-yellow-500/20 to-orange-500/10', border: 'border-yellow-500/40', text: 'text-yellow-300', barColor: 'bg-yellow-400' },
+                'Grand Master': { bg: 'from-orange-500/20 to-red-500/10', border: 'border-orange-500/40', text: 'text-orange-400', barColor: 'bg-orange-500' },
+                'Champion': { bg: 'from-orange-500/20 to-pink-500/10', border: 'border-orange-500/40', text: 'text-orange-300', barColor: 'bg-orange-400' },
+                'Legend': { bg: 'from-red-500/20 to-pink-500/10', border: 'border-red-500/40', text: 'text-red-400', barColor: 'bg-red-500' },
+                'Trading God': { bg: 'from-red-500/20 to-purple-500/10', border: 'border-red-500/40', text: 'text-red-500', barColor: 'bg-red-600' },
               };
               
               const emojiMap: Record<DifficultyLevel, string> = {
-                'Beginner': '🌱',
-                'Intermediate': '📊',
-                'Advanced': '⚡',
-                'Expert': '🔥',
-                'Extreme': '💀',
+                'Novice': '🌱',
+                'Apprentice': '📚',
+                'Skilled': '⚔️',
+                'Expert': '🎯',
+                'Elite': '💎',
+                'Master': '👑',
+                'Grand Master': '🔥',
+                'Champion': '⚡',
+                'Legend': '🌟',
+                'Trading God': '👑',
               };
               
               const descriptionMap: Record<DifficultyLevel, string> = {
-                'Beginner': 'Perfect for new traders learning the basics. Low risk, forgiving conditions.',
-                'Intermediate': 'For traders with some experience. Moderate challenge with balanced risk.',
-                'Advanced': 'Challenging competition for skilled traders. Requires solid strategy.',
-                'Expert': 'High-stakes competition for experienced traders. Demanding conditions.',
-                'Extreme': 'Maximum challenge for elite traders only. Extreme risk and pressure.',
+                'Novice': 'Perfect for new traders learning the basics. Low risk, forgiving conditions.',
+                'Apprentice': 'Building your trading skills. Slightly more challenging with room to grow.',
+                'Skilled': 'For traders with experience. Moderate challenge with balanced risk.',
+                'Expert': 'Requires solid strategies. Higher stakes for experienced traders.',
+                'Elite': 'Challenging competition for skilled traders. Strong performance needed.',
+                'Master': 'Professional level competition. Discipline and strategy are essential.',
+                'Grand Master': 'Very challenging. Expert risk management required.',
+                'Champion': 'Elite competition with high pressure. Prove your trading skills.',
+                'Legend': 'Extreme difficulty for the best traders only. High risk, high reward.',
+                'Trading God': 'Ultimate challenge. Only legends survive these brutal conditions.',
               };
               
               const colors = colorMap[difficultyData.level];
@@ -478,8 +500,8 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                         </p>
                       </div>
                     </div>
-                    <div className={`px-4 py-2 rounded-xl font-black text-xl ${colors.barColor}/20 ${colors.text}`}>
-                      {difficultyData.level.toUpperCase()}
+                    <div className={`px-4 py-2 rounded-xl font-black text-lg ${colors.barColor}/20 ${colors.text}`}>
+                      {difficultyData.label}
                     </div>
                   </div>
                   
