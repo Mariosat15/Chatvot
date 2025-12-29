@@ -66,6 +66,12 @@ export interface ICompetition extends Document {
     maxLevel?: number; // Optional max level (for beginner-only competitions)
   };
   
+  // Difficulty Settings
+  difficulty?: {
+    mode: 'auto' | 'manual';
+    manualLevel?: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'extreme';
+  };
+  
   // Restrictions
   maxPositionSize: number; // Max % of capital per position
   maxOpenPositions: number; // Max simultaneous positions
@@ -271,6 +277,17 @@ const CompetitionSchema = new Schema<ICompetition>(
         type: Number,
         min: 1,
         max: 10,
+      },
+    },
+    difficulty: {
+      mode: {
+        type: String,
+        enum: ['auto', 'manual'],
+        default: 'auto',
+      },
+      manualLevel: {
+        type: String,
+        enum: ['beginner', 'intermediate', 'advanced', 'expert', 'extreme'],
       },
     },
     maxPositionSize: {

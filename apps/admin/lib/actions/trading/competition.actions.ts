@@ -162,6 +162,10 @@ export const createCompetition = async (competitionData: {
     equityCheckEnabled: boolean;
     equityDrawdownPercent: number;
   };
+  difficulty?: {
+    mode: 'auto' | 'manual';
+    manualLevel?: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'extreme';
+  };
 }) => {
   try {
     const admin = await getAdminSession();
@@ -333,6 +337,9 @@ export const createCompetition = async (competitionData: {
         equityDrawdownPercent: 30,
         equityCheckEnabled: false,
         enabled: false,
+      },
+      difficulty: competitionData.difficulty || {
+        mode: 'auto',
       },
       createdBy: admin.id,
     });

@@ -99,6 +99,15 @@ export default function CompetitionCreatorForm() {
     maxLevel: undefined as number | undefined,
   });
 
+  // Difficulty settings
+  const [difficultySettings, setDifficultySettings] = useState<{
+    mode: 'auto' | 'manual';
+    manualLevel?: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'extreme';
+  }>({
+    mode: 'auto',
+    manualLevel: undefined,
+  });
+
   // Market status state for validation
   const [marketStatus, setMarketStatus] = useState<{
     isOpen: boolean;
@@ -344,6 +353,7 @@ export default function CompetitionCreatorForm() {
           equityCheckEnabled: formData.equityCheckEnabled,
           equityDrawdownPercent: formData.equityDrawdownPercent,
         },
+        difficulty: difficultySettings,
       });
 
       setSuccess(true);
@@ -1643,6 +1653,153 @@ export default function CompetitionCreatorForm() {
           )}
         </div>
       </div>
+
+      {/* Difficulty Setting */}
+                <div className="p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl">
+                  <h3 className="text-lg font-semibold text-gray-100 mb-2 flex items-center gap-2">
+                    <span className="text-2xl">🎯</span>
+                    Difficulty Level
+                  </h3>
+                  <p className="text-sm text-gray-400 mb-6">
+                    Set how the difficulty level is displayed to participants
+                  </p>
+                  
+                  <div className="space-y-6">
+                    {/* Mode Selection */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setDifficultySettings({ mode: 'auto', manualLevel: undefined })}
+                        className={`p-4 rounded-xl border-2 transition-all ${
+                          difficultySettings.mode === 'auto'
+                            ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                            : 'bg-gray-800/50 border-gray-600 text-gray-400 hover:border-gray-500'
+                        }`}
+                      >
+                        <div className="text-2xl mb-2">🤖</div>
+                        <div className="font-semibold">Auto Calculate</div>
+                        <div className="text-xs mt-1 opacity-70">
+                          Based on competition settings
+                        </div>
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => setDifficultySettings({ mode: 'manual', manualLevel: 'intermediate' })}
+                        className={`p-4 rounded-xl border-2 transition-all ${
+                          difficultySettings.mode === 'manual'
+                            ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                            : 'bg-gray-800/50 border-gray-600 text-gray-400 hover:border-gray-500'
+                        }`}
+                      >
+                        <div className="text-2xl mb-2">✋</div>
+                        <div className="font-semibold">Manual Select</div>
+                        <div className="text-xs mt-1 opacity-70">
+                          Choose specific level
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Manual Level Selection */}
+                    {difficultySettings.mode === 'manual' && (
+                      <div className="space-y-3">
+                        <Label className="text-gray-200">Select Difficulty Level</Label>
+                        <div className="grid grid-cols-5 gap-2">
+                          {[
+                            { value: 'beginner', label: 'Beginner', emoji: '🌱', color: 'green' },
+                            { value: 'intermediate', label: 'Intermediate', emoji: '📊', color: 'blue' },
+                            { value: 'advanced', label: 'Advanced', emoji: '⚡', color: 'yellow' },
+                            { value: 'expert', label: 'Expert', emoji: '🔥', color: 'orange' },
+                            { value: 'extreme', label: 'Extreme', emoji: '💀', color: 'red' },
+                          ].map((level) => (
+                            <button
+                              key={level.value}
+                              type="button"
+                              onClick={() => setDifficultySettings({ 
+                                mode: 'manual', 
+                                manualLevel: level.value as typeof difficultySettings.manualLevel 
+                              })}
+                              className={`p-3 rounded-xl border-2 transition-all text-center ${
+                                difficultySettings.manualLevel === level.value
+                                  ? level.color === 'green' ? 'bg-green-500/20 border-green-500 text-green-300'
+                                    : level.color === 'blue' ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                                    : level.color === 'yellow' ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300'
+                                    : level.color === 'orange' ? 'bg-orange-500/20 border-orange-500 text-orange-300'
+                                    : 'bg-red-500/20 border-red-500 text-red-300'
+                                  : 'bg-gray-800/50 border-gray-600 text-gray-400 hover:border-gray-500'
+                              }`}
+                            >
+                              <div className="text-xl mb-1">{level.emoji}</div>
+                              <div className="text-xs font-medium">{level.label}</div>
+                            </button>
+                          ))}
+                        </div>
+                        
+                        {/* Selected Difficulty Preview */}
+                        {difficultySettings.manualLevel && (
+                          <div className={`p-4 rounded-xl border ${
+                            difficultySettings.manualLevel === 'beginner' ? 'bg-green-500/10 border-green-500/30'
+                              : difficultySettings.manualLevel === 'intermediate' ? 'bg-blue-500/10 border-blue-500/30'
+                              : difficultySettings.manualLevel === 'advanced' ? 'bg-yellow-500/10 border-yellow-500/30'
+                              : difficultySettings.manualLevel === 'expert' ? 'bg-orange-500/10 border-orange-500/30'
+                              : 'bg-red-500/10 border-red-500/30'
+                          }`}>
+                            <div className="flex items-center gap-3">
+                              <div className="text-3xl">
+                                {difficultySettings.manualLevel === 'beginner' ? '🌱'
+                                  : difficultySettings.manualLevel === 'intermediate' ? '📊'
+                                  : difficultySettings.manualLevel === 'advanced' ? '⚡'
+                                  : difficultySettings.manualLevel === 'expert' ? '🔥'
+                                  : '💀'}
+                              </div>
+                              <div>
+                                <div className={`font-bold capitalize ${
+                                  difficultySettings.manualLevel === 'beginner' ? 'text-green-400'
+                                    : difficultySettings.manualLevel === 'intermediate' ? 'text-blue-400'
+                                    : difficultySettings.manualLevel === 'advanced' ? 'text-yellow-400'
+                                    : difficultySettings.manualLevel === 'expert' ? 'text-orange-400'
+                                    : 'text-red-400'
+                                }`}>
+                                  {difficultySettings.manualLevel} Difficulty
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  {difficultySettings.manualLevel === 'beginner' && 'Perfect for new traders learning the basics'}
+                                  {difficultySettings.manualLevel === 'intermediate' && 'For traders with some experience'}
+                                  {difficultySettings.manualLevel === 'advanced' && 'Challenging competition for skilled traders'}
+                                  {difficultySettings.manualLevel === 'expert' && 'High-stakes competition for experienced traders'}
+                                  {difficultySettings.manualLevel === 'extreme' && 'Maximum challenge for elite traders only'}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Auto Calculation Info */}
+                    {difficultySettings.mode === 'auto' && (
+                      <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+                        <div className="flex items-start gap-3">
+                          <span className="text-xl">🤖</span>
+                          <div>
+                            <div className="font-medium text-purple-300 mb-1">Auto Difficulty Calculation</div>
+                            <div className="text-xs text-gray-400">
+                              Difficulty will be automatically calculated based on:
+                              <ul className="mt-2 space-y-1 list-disc list-inside text-gray-500">
+                                <li>Entry fee amount</li>
+                                <li>Starting capital</li>
+                                <li>Leverage limits</li>
+                                <li>Competition duration</li>
+                                <li>Risk management rules</li>
+                                <li>Level requirements</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}

@@ -1,4 +1,5 @@
-import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, ArrowLeft, Target, Shield, AlertTriangle, Zap, Info, Percent, BarChart3, Skull, Bell, Ban } from 'lucide-react';
+import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, ArrowLeft, Target, Shield, AlertTriangle, Zap, Info, Percent, BarChart3, Skull, Bell, Ban, Gauge } from 'lucide-react';
+import { calculateCompetitionDifficulty, DifficultyLevel } from '@/lib/utils/competition-difficulty';
 import { getCompetitionById, getCompetitionLeaderboard, isUserInCompetition, getUserParticipant } from '@/lib/actions/trading/competition.actions';
 import { getWalletBalance } from '@/lib/actions/trading/wallet.actions';
 import { getTradingRiskSettings } from '@/lib/actions/trading/risk-settings.actions';
@@ -400,6 +401,151 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
               </div>
             )}
 
+            {/* Difficulty Level Section */}
+            {(() => {
+              // Check if competition has manual difficulty
+              const manualDifficulty = (competition as { difficulty?: { mode: 'auto' | 'manual'; manualLevel?: string } }).difficulty;
+              let difficultyData: { level: DifficultyLevel; score: number; factors: { factor: string; impact: string; score: number }[] };
+              
+              if (manualDifficulty?.mode === 'manual' && manualDifficulty.manualLevel) {
+                // Use manual difficulty
+                const levelMap: Record<string, { level: DifficultyLevel; score: number }> = {
+                  'beginner': { level: 'Beginner', score: 20 },
+                  'intermediate': { level: 'Intermediate', score: 40 },
+                  'advanced': { level: 'Advanced', score: 60 },
+                  'expert': { level: 'Expert', score: 80 },
+                  'extreme': { level: 'Extreme', score: 95 },
+                };
+                const mapped = levelMap[manualDifficulty.manualLevel] || { level: 'Intermediate' as DifficultyLevel, score: 40 };
+                difficultyData = {
+                  level: mapped.level,
+                  score: mapped.score,
+                  factors: [{ factor: 'Manually Set', impact: 'high', score: mapped.score }],
+                };
+              } else {
+                // Calculate auto difficulty
+                difficultyData = calculateCompetitionDifficulty({
+                  entryFee: competition.entryFee || competition.entryFeeCredits || 0,
+                  startingCapital: competition.startingCapital || competition.startingTradingPoints || 10000,
+                  maxLeverage: competition.leverage?.max || competition.leverageAllowed || 100,
+                  duration: Math.round((new Date(competition.endTime).getTime() - new Date(competition.startTime).getTime()) / (1000 * 60)),
+                  rules: competition.rules,
+                  riskLimits: competition.riskLimits,
+                  levelRequirement: competition.levelRequirement,
+                });
+              }
+              
+              const colorMap: Record<DifficultyLevel, { bg: string; border: string; text: string; barColor: string }> = {
+                'Beginner': { bg: 'from-green-500/20 to-emerald-500/10', border: 'border-green-500/40', text: 'text-green-400', barColor: 'bg-green-500' },
+                'Intermediate': { bg: 'from-blue-500/20 to-cyan-500/10', border: 'border-blue-500/40', text: 'text-blue-400', barColor: 'bg-blue-500' },
+                'Advanced': { bg: 'from-yellow-500/20 to-amber-500/10', border: 'border-yellow-500/40', text: 'text-yellow-400', barColor: 'bg-yellow-500' },
+                'Expert': { bg: 'from-orange-500/20 to-red-500/10', border: 'border-orange-500/40', text: 'text-orange-400', barColor: 'bg-orange-500' },
+                'Extreme': { bg: 'from-red-500/20 to-pink-500/10', border: 'border-red-500/40', text: 'text-red-400', barColor: 'bg-red-500' },
+              };
+              
+              const emojiMap: Record<DifficultyLevel, string> = {
+                'Beginner': '🌱',
+                'Intermediate': '📊',
+                'Advanced': '⚡',
+                'Expert': '🔥',
+                'Extreme': '💀',
+              };
+              
+              const descriptionMap: Record<DifficultyLevel, string> = {
+                'Beginner': 'Perfect for new traders learning the basics. Low risk, forgiving conditions.',
+                'Intermediate': 'For traders with some experience. Moderate challenge with balanced risk.',
+                'Advanced': 'Challenging competition for skilled traders. Requires solid strategy.',
+                'Expert': 'High-stakes competition for experienced traders. Demanding conditions.',
+                'Extreme': 'Maximum challenge for elite traders only. Extreme risk and pressure.',
+              };
+              
+              const colors = colorMap[difficultyData.level];
+              
+              return (
+                <div className={`rounded-xl bg-gradient-to-br ${colors.bg} border-2 ${colors.border} p-6`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl ${colors.barColor}/20`}>
+                        <Gauge className={`h-6 w-6 ${colors.text}`} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                          Difficulty Level
+                          <span className={`text-2xl`}>{emojiMap[difficultyData.level]}</span>
+                        </h3>
+                        <p className="text-xs text-gray-400">
+                          {manualDifficulty?.mode === 'manual' ? 'Manually set by organizer' : 'Auto-calculated based on settings'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className={`px-4 py-2 rounded-xl font-black text-xl ${colors.barColor}/20 ${colors.text}`}>
+                      {difficultyData.level.toUpperCase()}
+                    </div>
+                  </div>
+                  
+                  {/* Difficulty Progress Bar */}
+                  <div className="mb-4">
+                    <div className="flex justify-between text-xs text-gray-400 mb-2">
+                      <span>Easier</span>
+                      <span className={`font-bold ${colors.text}`}>{difficultyData.score}/100</span>
+                      <span>Harder</span>
+                    </div>
+                    <div className="h-4 bg-gray-800 rounded-full overflow-hidden relative">
+                      {/* Level markers */}
+                      <div className="absolute inset-0 flex">
+                        <div className="flex-1 border-r border-gray-700"></div>
+                        <div className="flex-1 border-r border-gray-700"></div>
+                        <div className="flex-1 border-r border-gray-700"></div>
+                        <div className="flex-1 border-r border-gray-700"></div>
+                        <div className="flex-1"></div>
+                      </div>
+                      {/* Progress fill */}
+                      <div 
+                        className={`h-full ${colors.barColor} transition-all duration-1000 ease-out relative`}
+                        style={{ width: `${difficultyData.score}%` }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                      <span>🌱</span>
+                      <span>📊</span>
+                      <span>⚡</span>
+                      <span>🔥</span>
+                      <span>💀</span>
+                    </div>
+                  </div>
+                  
+                  {/* Description */}
+                  <div className={`p-4 rounded-xl bg-gray-900/50 border ${colors.border.replace('border-', 'border-').replace('/40', '/20')}`}>
+                    <p className="text-sm text-gray-300">
+                      {descriptionMap[difficultyData.level]}
+                    </p>
+                  </div>
+                  
+                  {/* Difficulty Factors */}
+                  {manualDifficulty?.mode !== 'manual' && difficultyData.factors.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-400 mb-2 font-semibold">Contributing Factors:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {difficultyData.factors.slice(0, 5).map((factor, idx) => (
+                          <span 
+                            key={idx}
+                            className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                              factor.impact === 'high' ? 'bg-red-500/20 text-red-400' :
+                              factor.impact === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-green-500/20 text-green-400'
+                            }`}
+                          >
+                            {factor.factor}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Leaderboard */}
             <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">

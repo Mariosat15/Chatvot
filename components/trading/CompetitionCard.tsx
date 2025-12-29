@@ -94,6 +94,24 @@ export default function CompetitionCard({
 
   // Calculate difficulty
   const difficulty = useMemo(() => {
+    // Check if competition has manual difficulty setting
+    if (competition.difficulty?.mode === 'manual' && competition.difficulty?.manualLevel) {
+      const levelMap: Record<string, { level: string; score: number }> = {
+        'beginner': { level: 'Beginner', score: 20 },
+        'intermediate': { level: 'Intermediate', score: 40 },
+        'advanced': { level: 'Advanced', score: 60 },
+        'expert': { level: 'Expert', score: 80 },
+        'extreme': { level: 'Extreme', score: 95 },
+      };
+      const mapped = levelMap[competition.difficulty.manualLevel] || { level: 'Intermediate', score: 40 };
+      return {
+        level: mapped.level as 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert' | 'Extreme',
+        score: mapped.score,
+        factors: [{ factor: 'Manually Set', impact: 'high' as const, score: mapped.score }],
+      };
+    }
+    
+    // Auto-calculate difficulty
     const start = new Date(competition.startTime);
     const end = new Date(competition.endTime);
     const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
