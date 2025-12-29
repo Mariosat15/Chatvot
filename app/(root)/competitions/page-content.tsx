@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Trophy, Clock, TrendingUp, Zap, LayoutGrid, List, Filter, Search, X, ChevronDown, Target, Flame, Crown, Sparkles, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import { Trophy, Clock, TrendingUp, Zap, LayoutGrid, List, Filter, Search, X, ChevronDown, Target, Flame, Crown, Sparkles, SlidersHorizontal, RefreshCw, Skull, Star } from 'lucide-react';
 import CompetitionCard from '@/components/trading/CompetitionCard';
 import WalletBalanceDisplay from '@/components/trading/WalletBalanceDisplay';
 import UTCClock from '@/components/trading/UTCClock';
@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { calculateCompetitionDifficulty, DifficultyLevel, getAllDifficultyLevels } from '@/lib/utils/competition-difficulty';
 
 // Auto-refresh interval (10 seconds for real-time updates)
 const AUTO_REFRESH_INTERVAL = 10000;
@@ -39,9 +40,17 @@ interface Competition {
   startTime: string;
   endTime: string;
   assetClasses: string[];
+  leverageAllowed?: number;
   rules?: {
     rankingMethod: string;
     minimumTrades?: number;
+    minimumWinRate?: number;
+    disqualifyOnLiquidation?: boolean;
+  };
+  riskLimits?: {
+    enabled?: boolean;
+    maxDrawdownPercent?: number;
+    dailyLossLimitPercent?: number;
   };
   levelRequirement?: {
     enabled: boolean;
@@ -64,7 +73,9 @@ interface SavedFilters {
   statusFilter: string[];
   rankingFilter: string[];
   assetFilter: string[];
-  sortBy: 'prize' | 'start' | 'participants' | 'entry';
+  difficultyFilter: DifficultyLevel[];
+  levelFilter: number[];
+  sortBy: 'prize' | 'start' | 'participants' | 'entry' | 'difficulty';
 }
 
 // Load saved filters from localStorage
@@ -115,7 +126,9 @@ export default function CompetitionsPageContent({
   const [statusFilter, setStatusFilter] = useState<string[]>(['active', 'upcoming']);
   const [rankingFilter, setRankingFilter] = useState<string[]>([]);
   const [assetFilter, setAssetFilter] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<'prize' | 'start' | 'participants' | 'entry'>('prize');
+  const [difficultyFilter, setDifficultyFilter] = useState<DifficultyLevel[]>([]);
+  const [levelFilter, setLevelFilter] = useState<number[]>([]);
+  const [sortBy, setSortBy] = useState<'prize' | 'start' | 'participants' | 'entry' | 'difficulty'>('prize');
 
   // Fetch fresh data
   const refreshData = useCallback(async (showSpinner = true) => {
@@ -152,6 +165,8 @@ export default function CompetitionsPageContent({
     if (saved.statusFilter) setStatusFilter(saved.statusFilter);
     if (saved.rankingFilter) setRankingFilter(saved.rankingFilter);
     if (saved.assetFilter) setAssetFilter(saved.assetFilter);
+    if (saved.difficultyFilter) setDifficultyFilter(saved.difficultyFilter);
+    if (saved.levelFilter) setLevelFilter(saved.levelFilter);
     if (saved.sortBy) setSortBy(saved.sortBy);
     setIsHydrated(true);
   }, []);
@@ -194,9 +209,11 @@ export default function CompetitionsPageContent({
       statusFilter,
       rankingFilter,
       assetFilter,
+      difficultyFilter,
+      levelFilter,
       sortBy,
     });
-  }, [viewMode, statusFilter, rankingFilter, assetFilter, sortBy, isHydrated]);
+  }, [viewMode, statusFilter, rankingFilter, assetFilter, difficultyFilter, levelFilter, sortBy, isHydrated]);
 
   // Available filters
   const availableRankingMethods = useMemo(() => {
@@ -207,6 +224,38 @@ export default function CompetitionsPageContent({
   const availableAssets = useMemo(() => {
     const assets = new Set(competitions.flatMap(c => c.assetClasses || []));
     return Array.from(assets);
+  }, [competitions]);
+
+  // Calculate difficulty for a competition
+  const getCompetitionDifficulty = useCallback((c: Competition) => {
+    const start = new Date(c.startTime);
+    const end = new Date(c.endTime);
+    const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    
+    return calculateCompetitionDifficulty({
+      entryFeeCredits: c.entryFee || c.entryFeeCredits || 0,
+      startingCapital: c.startingCapital || c.startingTradingPoints || 10000,
+      leverageAllowed: c.leverageAllowed || 100,
+      maxParticipants: c.maxParticipants,
+      participantCount: c.currentParticipants,
+      durationHours,
+      rules: c.rules,
+      riskLimits: c.riskLimits,
+      levelRequirement: c.levelRequirement,
+    });
+  }, []);
+
+  // Get available level requirements
+  const availableLevels = useMemo(() => {
+    const levels = new Set<number>();
+    competitions.forEach(c => {
+      if (c.levelRequirement?.enabled && c.levelRequirement.minLevel) {
+        levels.add(c.levelRequirement.minLevel);
+      }
+    });
+    // Add "Open to All" option (level 0 means no requirement)
+    levels.add(0);
+    return Array.from(levels).sort((a, b) => a - b);
   }, [competitions]);
 
   // Apply filters to competitions
@@ -234,6 +283,29 @@ export default function CompetitionsPageContent({
       );
     }
 
+    // Difficulty filter
+    if (difficultyFilter.length > 0) {
+      result = result.filter(c => {
+        const difficulty = getCompetitionDifficulty(c);
+        return difficultyFilter.includes(difficulty.level);
+      });
+    }
+
+    // Level requirement filter
+    if (levelFilter.length > 0) {
+      result = result.filter(c => {
+        // If 0 is selected, show competitions with no level requirement
+        if (levelFilter.includes(0) && (!c.levelRequirement?.enabled || !c.levelRequirement?.minLevel)) {
+          return true;
+        }
+        // Otherwise check if the competition's level requirement matches
+        if (c.levelRequirement?.enabled && c.levelRequirement?.minLevel) {
+          return levelFilter.includes(c.levelRequirement.minLevel);
+        }
+        return false;
+      });
+    }
+
     // Sort
     result.sort((a, b) => {
       switch (sortBy) {
@@ -245,13 +317,15 @@ export default function CompetitionsPageContent({
           return b.currentParticipants - a.currentParticipants;
         case 'entry':
           return (a.entryFee || a.entryFeeCredits || 0) - (b.entryFee || b.entryFeeCredits || 0);
+        case 'difficulty':
+          return getCompetitionDifficulty(a).score - getCompetitionDifficulty(b).score;
         default:
           return 0;
       }
     });
 
     return result;
-  }, [searchQuery, rankingFilter, assetFilter, sortBy]);
+  }, [searchQuery, rankingFilter, assetFilter, difficultyFilter, levelFilter, sortBy, getCompetitionDifficulty]);
 
   // Separate upcoming competitions (always shown first)
   const upcomingCompetitions = useMemo(() => {
@@ -281,9 +355,12 @@ export default function CompetitionsPageContent({
     setStatusFilter(['active', 'upcoming']);
     setRankingFilter([]);
     setAssetFilter([]);
+    setDifficultyFilter([]);
+    setLevelFilter([]);
   };
 
   const hasActiveFilters = searchQuery || rankingFilter.length > 0 || assetFilter.length > 0 || 
+    difficultyFilter.length > 0 || levelFilter.length > 0 ||
     statusFilter.length !== 2 || !statusFilter.includes('active') || !statusFilter.includes('upcoming');
 
   const RANKING_LABELS: Record<string, string> = {
@@ -295,9 +372,33 @@ export default function CompetitionsPageContent({
     profit_factor: '⚡ Profit Factor',
   };
 
+  const DIFFICULTY_LABELS: Record<DifficultyLevel, { label: string; emoji: string; color: string }> = {
+    beginner: { label: 'Beginner', emoji: '🌱', color: 'text-green-400' },
+    intermediate: { label: 'Intermediate', emoji: '📊', color: 'text-blue-400' },
+    advanced: { label: 'Advanced', emoji: '⚡', color: 'text-yellow-400' },
+    expert: { label: 'Expert', emoji: '🔥', color: 'text-orange-400' },
+    extreme: { label: 'Extreme', emoji: '💀', color: 'text-red-400' },
+  };
+
+  const LEVEL_LABELS: Record<number, string> = {
+    0: '🌐 Open to All',
+    1: '🌱 Level 1+',
+    2: '📚 Level 2+',
+    3: '⚔️ Level 3+',
+    4: '🎯 Level 4+',
+    5: '💎 Level 5+',
+    6: '👑 Level 6+',
+    7: '🔥 Level 7+',
+    8: '⚡ Level 8+',
+    9: '🌟 Level 9+',
+    10: '👑 Level 10',
+  };
+
   const activeFiltersCount = (statusFilter.length !== 2 || !statusFilter.includes('active') || !statusFilter.includes('upcoming') ? 1 : 0) + 
     (rankingFilter.length > 0 ? 1 : 0) + 
-    (assetFilter.length > 0 ? 1 : 0);
+    (assetFilter.length > 0 ? 1 : 0) +
+    (difficultyFilter.length > 0 ? 1 : 0) +
+    (levelFilter.length > 0 ? 1 : 0);
 
   return (
     <div className="flex min-h-screen flex-col gap-4 sm:gap-6">
@@ -433,30 +534,91 @@ export default function CompetitionsPageContent({
             />
           </div>
 
-          {/* Quick Filters */}
-          <div className="flex flex-wrap gap-2">
-            {['active', 'upcoming', 'completed'].map((status) => (
-              <button
-                key={status}
-                onClick={() => {
-                  if (statusFilter.includes(status)) {
-                    setStatusFilter(statusFilter.filter(s => s !== status));
-                  } else {
-                    setStatusFilter([...statusFilter, status]);
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  statusFilter.includes(status)
-                    ? 'bg-yellow-500 text-gray-900'
-                    : 'bg-gray-700 text-gray-300'
-                }`}
-              >
-                {status === 'active' && '🔴 Live'}
-                {status === 'upcoming' && '🟡 Soon'}
-                {status === 'completed' && '🟢 Done'}
-              </button>
-            ))}
+          {/* Status Quick Filters */}
+          <div>
+            <span className="text-xs text-gray-400 mb-1.5 block">Status</span>
+            <div className="flex flex-wrap gap-2">
+              {['active', 'upcoming', 'completed'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => {
+                    if (statusFilter.includes(status)) {
+                      setStatusFilter(statusFilter.filter(s => s !== status));
+                    } else {
+                      setStatusFilter([...statusFilter, status]);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    statusFilter.includes(status)
+                      ? 'bg-yellow-500 text-gray-900'
+                      : 'bg-gray-700 text-gray-300'
+                  }`}
+                >
+                  {status === 'active' && '🔴 Live'}
+                  {status === 'upcoming' && '🟡 Soon'}
+                  {status === 'completed' && '🟢 Done'}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Difficulty Quick Filters */}
+          <div>
+            <span className="text-xs text-gray-400 mb-1.5 block">Difficulty</span>
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.keys(DIFFICULTY_LABELS) as DifficultyLevel[]).map((level) => (
+                <button
+                  key={level}
+                  onClick={() => {
+                    if (difficultyFilter.includes(level)) {
+                      setDifficultyFilter(difficultyFilter.filter(d => d !== level));
+                    } else {
+                      setDifficultyFilter([...difficultyFilter, level]);
+                    }
+                  }}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-all ${
+                    difficultyFilter.includes(level)
+                      ? level === 'beginner' ? 'bg-green-500 text-gray-900'
+                        : level === 'intermediate' ? 'bg-blue-500 text-white'
+                        : level === 'advanced' ? 'bg-yellow-500 text-gray-900'
+                        : level === 'expert' ? 'bg-orange-500 text-white'
+                        : 'bg-red-500 text-white'
+                      : 'bg-gray-700 text-gray-300'
+                  }`}
+                >
+                  {DIFFICULTY_LABELS[level].emoji} {DIFFICULTY_LABELS[level].label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Level Quick Filters */}
+          {availableLevels.length > 1 && (
+            <div>
+              <span className="text-xs text-gray-400 mb-1.5 block">Trader Level</span>
+              <div className="flex flex-wrap gap-1.5">
+                {availableLevels.slice(0, 6).map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => {
+                      if (levelFilter.includes(level)) {
+                        setLevelFilter(levelFilter.filter(l => l !== level));
+                      } else {
+                        setLevelFilter([...levelFilter, level]);
+                      }
+                    }}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-all ${
+                      levelFilter.includes(level)
+                        ? 'bg-amber-500 text-gray-900'
+                        : 'bg-gray-700 text-gray-300'
+                    }`}
+                  >
+                    {LEVEL_LABELS[level] || `Lvl ${level}+`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Sort */}
           <div className="flex items-center gap-2">
@@ -470,6 +632,7 @@ export default function CompetitionsPageContent({
               <option value="start">⏰ Start Time</option>
               <option value="participants">👥 Participants</option>
               <option value="entry">💰 Entry Fee</option>
+              <option value="difficulty">🌱 Difficulty</option>
             </select>
           </div>
 
@@ -633,6 +796,76 @@ export default function CompetitionsPageContent({
             </DropdownMenu>
           )}
 
+          {/* Difficulty Filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="bg-gray-900/50 border-gray-700 text-gray-300 rounded-xl">
+                <Skull className="h-4 w-4 mr-2" />
+                Difficulty
+                {difficultyFilter.length > 0 && (
+                  <Badge className="ml-2 bg-red-500/20 text-red-400 text-[10px]">{difficultyFilter.length}</Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-gray-800 border-gray-700">
+              <DropdownMenuLabel className="text-gray-400">Difficulty Level</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-gray-700" />
+              {(Object.keys(DIFFICULTY_LABELS) as DifficultyLevel[]).map((level) => (
+                <DropdownMenuCheckboxItem
+                  key={level}
+                  checked={difficultyFilter.includes(level)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setDifficultyFilter([...difficultyFilter, level]);
+                    } else {
+                      setDifficultyFilter(difficultyFilter.filter(d => d !== level));
+                    }
+                  }}
+                  className="text-gray-300"
+                >
+                  <span className={DIFFICULTY_LABELS[level].color}>
+                    {DIFFICULTY_LABELS[level].emoji} {DIFFICULTY_LABELS[level].label}
+                  </span>
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Level Requirement Filter */}
+          {availableLevels.length > 1 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="bg-gray-900/50 border-gray-700 text-gray-300 rounded-xl">
+                  <Star className="h-4 w-4 mr-2" />
+                  Level
+                  {levelFilter.length > 0 && (
+                    <Badge className="ml-2 bg-amber-500/20 text-amber-400 text-[10px]">{levelFilter.length}</Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-gray-800 border-gray-700">
+                <DropdownMenuLabel className="text-gray-400">Trader Level Required</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-gray-700" />
+                {availableLevels.map((level) => (
+                  <DropdownMenuCheckboxItem
+                    key={level}
+                    checked={levelFilter.includes(level)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setLevelFilter([...levelFilter, level]);
+                      } else {
+                        setLevelFilter(levelFilter.filter(l => l !== level));
+                      }
+                    }}
+                    className="text-gray-300"
+                  >
+                    {LEVEL_LABELS[level] || `Level ${level}+`}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {/* Sort */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -649,11 +882,12 @@ export default function CompetitionsPageContent({
                 { value: 'start', label: '⏰ Start Time (Soonest)' },
                 { value: 'participants', label: '👥 Participants (Most)' },
                 { value: 'entry', label: '💰 Entry Fee (Lowest)' },
+                { value: 'difficulty', label: '🌱 Difficulty (Easiest First)' },
               ].map((option) => (
                 <DropdownMenuCheckboxItem
                   key={option.value}
                   checked={sortBy === option.value}
-                  onCheckedChange={() => setSortBy(option.value as 'prize' | 'start' | 'participants' | 'entry')}
+                  onCheckedChange={() => setSortBy(option.value as 'prize' | 'start' | 'participants' | 'entry' | 'difficulty')}
                   className="text-gray-300"
                 >
                   {option.label}
