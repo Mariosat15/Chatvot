@@ -126,9 +126,17 @@ class VeriffService {
       throw new Error('Maximum verification attempts exceeded. Please contact support.');
     }
 
+    // Veriff requires HTTPS callback URLs - ensure we use HTTPS
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    if (baseUrl.startsWith('http://')) {
+      baseUrl = baseUrl.replace('http://', 'https://');
+    }
+    // Ensure URL doesn't have trailing slash
+    baseUrl = baseUrl.replace(/\/$/, '');
+    
     const payload = {
       verification: {
-        callback: `${process.env.NEXT_PUBLIC_APP_URL}/api/kyc/webhook`,
+        callback: `${baseUrl}/api/kyc/webhook`,
         person: {
           firstName: userData.firstName || undefined,
           lastName: userData.lastName || undefined,
