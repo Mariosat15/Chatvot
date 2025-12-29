@@ -492,13 +492,13 @@ export default function CompetitionsPageContent({
         <div className="hidden sm:flex items-center gap-3 flex-wrap">
           <UTCClock />
           <WalletBalanceDisplay balance={userBalance} />
+          <LiveStatusIndicator onRefresh={async () => refreshData(false)} />
           <Link href="/wallet">
             <Button className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-gray-900 font-bold h-auto py-2 px-4 rounded-xl shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40 hover:scale-105 transition-all">
               <Zap className="mr-2 h-4 w-4" />
               Add Credits
             </Button>
           </Link>
-          <LiveStatusIndicator onRefresh={async () => refreshData(false)} />
         </div>
 
         {/* Mobile: Balance + Add Credits */}

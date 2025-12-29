@@ -326,7 +326,7 @@ export default function CompetitionCard({
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20">
                 <Zap className="h-3 w-3 text-orange-400" />
                 <span className="text-[10px] text-orange-300 font-medium">
-                  1:{competition.leverageAllowed || 100}
+                  1:{competition.leverage?.max || competition.leverageAllowed || 100}
                 </span>
               </div>
 
@@ -558,6 +558,65 @@ export default function CompetitionCard({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Leverage & Risk Info */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+            <div className="absolute top-0 right-0 w-8 h-8 bg-yellow-500/10 rounded-full blur-lg"></div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                <Zap className="h-4 w-4 text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-500 uppercase">Leverage</p>
+                <p className="text-sm font-bold text-yellow-400">
+                  1:{competition.leverage?.max || competition.leverageAllowed || 100}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {competition.rules?.minimumTrades && competition.rules.minimumTrades > 0 ? (
+            <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+              <div className="absolute top-0 right-0 w-8 h-8 bg-cyan-500/10 rounded-full blur-lg"></div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                  <Swords className="h-4 w-4 text-cyan-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Min Trades</p>
+                  <p className="text-sm font-bold text-cyan-400">{competition.rules.minimumTrades}</p>
+                </div>
+              </div>
+            </div>
+          ) : competition.rules?.disqualifyOnLiquidation ? (
+            <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+              <div className="absolute top-0 right-0 w-8 h-8 bg-red-500/10 rounded-full blur-lg"></div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                  <Flame className="h-4 w-4 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Liquidation</p>
+                  <p className="text-sm font-bold text-red-400">= DQ</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+              <div className="absolute top-0 right-0 w-8 h-8 bg-green-500/10 rounded-full blur-lg"></div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Status</p>
+                  <p className="text-sm font-bold text-green-400">Open</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Dates */}
