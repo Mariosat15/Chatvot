@@ -1100,9 +1100,20 @@ export default function FinancialDashboard() {
                       ) : null}
                     </div>
                     <div className="text-right">
-                      <div className={`font-semibold ${tx.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {tx.amount >= 0 ? '+' : ''}{tx.amount.toLocaleString()} {creditSymbol}
-                      </div>
+                      {(tx.status === 'failed' || tx.status === 'cancelled') ? (
+                        <>
+                          <div className="font-semibold text-gray-500 line-through">
+                            {tx.amount >= 0 ? '+' : ''}{tx.amount.toLocaleString()} {creditSymbol}
+                          </div>
+                          <div className="text-[10px] text-red-400">
+                            {tx.status === 'cancelled' ? 'Cancelled' : 'Declined'}
+                          </div>
+                        </>
+                      ) : (
+                        <div className={`font-semibold ${tx.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {tx.amount >= 0 ? '+' : ''}{tx.amount.toLocaleString()} {creditSymbol}
+                        </div>
+                      )}
                       <div className="text-xs text-gray-500">
                         {new Date(tx.createdAt).toLocaleString()}
                       </div>

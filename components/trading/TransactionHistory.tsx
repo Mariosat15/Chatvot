@@ -297,16 +297,36 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
         {/* Amount */}
         <div className="text-right">
           <div className="flex items-baseline gap-1.5 justify-end">
-            <p className={`text-lg font-bold tabular-nums ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-              {isPositive ? '+' : '-'}{creditsAmount.toFixed(settings.credits.decimals)}
-            </p>
-            <span className={`text-sm font-semibold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-              {settings.credits.symbol}
-            </span>
+            {/* Show amount differently for failed/cancelled transactions */}
+            {(transaction.status === 'failed' || transaction.status === 'cancelled') ? (
+              <>
+                <p className="text-lg font-bold tabular-nums text-gray-500 line-through">
+                  {isPositive ? '+' : '-'}{creditsAmount.toFixed(settings.credits.decimals)}
+                </p>
+                <span className="text-sm font-semibold text-gray-500 line-through">
+                  {settings.credits.symbol}
+                </span>
+              </>
+            ) : (
+              <>
+                <p className={`text-lg font-bold tabular-nums ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {isPositive ? '+' : '-'}{creditsAmount.toFixed(settings.credits.decimals)}
+                </p>
+                <span className={`text-sm font-semibold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {settings.credits.symbol}
+                </span>
+              </>
+            )}
           </div>
           {settings.credits.showEUREquivalent && (
-            <p className="text-xs text-gray-500 tabular-nums">
+            <p className={`text-xs tabular-nums ${(transaction.status === 'failed' || transaction.status === 'cancelled') ? 'text-gray-600 line-through' : 'text-gray-500'}`}>
               ≈ {isPositive ? '+' : '-'}{settings.currency.symbol}{eurAmount.toFixed(2)}
+            </p>
+          )}
+          {/* Show "Not charged" for failed/cancelled */}
+          {(transaction.status === 'failed' || transaction.status === 'cancelled') && (
+            <p className="text-[10px] text-gray-500 mt-0.5">
+              {transaction.status === 'cancelled' ? 'Cancelled' : 'Not processed'}
             </p>
           )}
         </div>

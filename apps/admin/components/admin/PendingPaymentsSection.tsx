@@ -385,12 +385,28 @@ export default function PendingPaymentsSection() {
 
         {/* Amount */}
         <div className="text-right">
-          <p className="text-lg font-bold text-yellow-400">
-            +{payment.amount.toFixed(2)} Credits
-          </p>
-          <p className="text-xs text-gray-500">
-            €{(payment.metadata?.totalCharged || payment.metadata?.eurAmount || payment.amount).toFixed(2)} charged
-          </p>
+          {(payment.status === 'failed' || payment.status === 'cancelled') ? (
+            <>
+              <p className="text-lg font-bold text-gray-500 line-through">
+                +{payment.amount.toFixed(2)} Credits
+              </p>
+              <p className="text-xs text-gray-600 line-through">
+                €{(payment.metadata?.totalCharged || payment.metadata?.eurAmount || payment.amount).toFixed(2)}
+              </p>
+              <p className="text-[10px] text-red-400 mt-0.5">
+                {payment.status === 'cancelled' ? 'Not charged' : 'Declined'}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-bold text-yellow-400">
+                +{payment.amount.toFixed(2)} Credits
+              </p>
+              <p className="text-xs text-gray-500">
+                €{(payment.metadata?.totalCharged || payment.metadata?.eurAmount || payment.amount).toFixed(2)} charged
+              </p>
+            </>
+          )}
         </div>
 
         {/* Status */}
