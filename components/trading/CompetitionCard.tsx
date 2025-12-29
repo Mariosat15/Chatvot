@@ -113,17 +113,19 @@ export default function CompetitionCard({
   const difficulty = useMemo(() => {
     // Check if competition has manual difficulty setting
     if (competition.difficulty?.mode === 'manual' && competition.difficulty?.manualLevel) {
-      const levelMap: Record<string, { level: string; score: number }> = {
-        'beginner': { level: 'Beginner', score: 20 },
-        'intermediate': { level: 'Intermediate', score: 40 },
-        'advanced': { level: 'Advanced', score: 60 },
-        'expert': { level: 'Expert', score: 80 },
-        'extreme': { level: 'Extreme', score: 95 },
+      // Map old manual levels to new trader-based levels
+      const levelMap: Record<string, { level: string; score: number; emoji: string }> = {
+        'beginner': { level: 'Novice', score: 10, emoji: '🌱' },
+        'intermediate': { level: 'Skilled', score: 30, emoji: '⚔️' },
+        'advanced': { level: 'Elite', score: 50, emoji: '💎' },
+        'expert': { level: 'Grand Master', score: 70, emoji: '🔥' },
+        'extreme': { level: 'Trading God', score: 95, emoji: '👑' },
       };
-      const mapped = levelMap[competition.difficulty.manualLevel] || { level: 'Intermediate', score: 40 };
+      const mapped = levelMap[competition.difficulty.manualLevel] || { level: 'Skilled', score: 30, emoji: '⚔️' };
       return {
-        level: mapped.level as 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert' | 'Extreme',
+        level: mapped.level,
         score: mapped.score,
+        emoji: mapped.emoji,
         factors: [{ factor: 'Manually Set', impact: 'high' as const, score: mapped.score }],
       };
     }
@@ -681,40 +683,36 @@ export default function CompetitionCard({
 
         {/* Difficulty Bar */}
         <div className={`mb-4 p-3 rounded-xl border ${
-          difficulty.level === 'Beginner' ? 'bg-green-500/10 border-green-500/30'
-            : difficulty.level === 'Intermediate' ? 'bg-blue-500/10 border-blue-500/30'
-            : difficulty.level === 'Advanced' ? 'bg-yellow-500/10 border-yellow-500/30'
-            : difficulty.level === 'Expert' ? 'bg-orange-500/10 border-orange-500/30'
+          difficulty.score <= 20 ? 'bg-green-500/10 border-green-500/30'
+            : difficulty.score <= 40 ? 'bg-blue-500/10 border-blue-500/30'
+            : difficulty.score <= 60 ? 'bg-yellow-500/10 border-yellow-500/30'
+            : difficulty.score <= 80 ? 'bg-orange-500/10 border-orange-500/30'
             : 'bg-red-500/10 border-red-500/30'
         }`}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Gauge className={`h-4 w-4 ${
-                difficulty.level === 'Beginner' ? 'text-green-400'
-                  : difficulty.level === 'Intermediate' ? 'text-blue-400'
-                  : difficulty.level === 'Advanced' ? 'text-yellow-400'
-                  : difficulty.level === 'Expert' ? 'text-orange-400'
+                difficulty.score <= 20 ? 'text-green-400'
+                  : difficulty.score <= 40 ? 'text-blue-400'
+                  : difficulty.score <= 60 ? 'text-yellow-400'
+                  : difficulty.score <= 80 ? 'text-orange-400'
                   : 'text-red-400'
               }`} />
               <span className={`text-xs font-bold ${
-                difficulty.level === 'Beginner' ? 'text-green-400'
-                  : difficulty.level === 'Intermediate' ? 'text-blue-400'
-                  : difficulty.level === 'Advanced' ? 'text-yellow-400'
-                  : difficulty.level === 'Expert' ? 'text-orange-400'
+                difficulty.score <= 20 ? 'text-green-400'
+                  : difficulty.score <= 40 ? 'text-blue-400'
+                  : difficulty.score <= 60 ? 'text-yellow-400'
+                  : difficulty.score <= 80 ? 'text-orange-400'
                   : 'text-red-400'
               }`}>
-                {difficulty.level === 'Beginner' ? '🌱'
-                  : difficulty.level === 'Intermediate' ? '📊'
-                  : difficulty.level === 'Advanced' ? '⚡'
-                  : difficulty.level === 'Expert' ? '🔥'
-                  : '💀'} {difficulty.level}
+                {difficulty.emoji || '🎯'} {difficulty.level}
               </span>
             </div>
             <span className={`text-xs font-mono ${
-              difficulty.level === 'Beginner' ? 'text-green-400'
-                : difficulty.level === 'Intermediate' ? 'text-blue-400'
-                : difficulty.level === 'Advanced' ? 'text-yellow-400'
-                : difficulty.level === 'Expert' ? 'text-orange-400'
+              difficulty.score <= 20 ? 'text-green-400'
+                : difficulty.score <= 40 ? 'text-blue-400'
+                : difficulty.score <= 60 ? 'text-yellow-400'
+                : difficulty.score <= 80 ? 'text-orange-400'
                 : 'text-red-400'
             }`}>
               {difficulty.score}/100
@@ -723,10 +721,10 @@ export default function CompetitionCard({
           <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
             <div 
               className={`h-full transition-all duration-500 ${
-                difficulty.level === 'Beginner' ? 'bg-gradient-to-r from-green-600 to-green-400'
-                  : difficulty.level === 'Intermediate' ? 'bg-gradient-to-r from-blue-600 to-blue-400'
-                  : difficulty.level === 'Advanced' ? 'bg-gradient-to-r from-yellow-600 to-yellow-400'
-                  : difficulty.level === 'Expert' ? 'bg-gradient-to-r from-orange-600 to-orange-400'
+                difficulty.score <= 20 ? 'bg-gradient-to-r from-green-600 to-green-400'
+                  : difficulty.score <= 40 ? 'bg-gradient-to-r from-blue-600 to-blue-400'
+                  : difficulty.score <= 60 ? 'bg-gradient-to-r from-yellow-600 to-yellow-400'
+                  : difficulty.score <= 80 ? 'bg-gradient-to-r from-orange-600 to-orange-400'
                   : 'bg-gradient-to-r from-red-600 to-red-400'
               }`}
               style={{ width: `${difficulty.score}%` }}

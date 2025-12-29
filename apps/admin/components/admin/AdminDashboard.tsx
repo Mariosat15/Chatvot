@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,7 @@ import {
   Activity,
   ArrowUpFromLine,
   Calendar,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -350,6 +351,15 @@ export default function AdminDashboard({
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['settings', 'dev-zone-menu']);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [serverTime, setServerTime] = useState(new Date());
+
+  // Live server clock
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setServerTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -670,6 +680,21 @@ export default function AdminDashboard({
 
             {/* Right */}
             <div className="flex items-center gap-3">
+              {/* Live Server Clock */}
+              <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30">
+                <Clock className="h-4 w-4 text-cyan-400" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-cyan-400/80 uppercase tracking-wider">Server UTC</span>
+                  <span className="font-mono text-lg font-bold text-cyan-300">
+                    {serverTime.getUTCHours().toString().padStart(2, '0')}
+                    <span className="animate-pulse">:</span>
+                    {serverTime.getUTCMinutes().toString().padStart(2, '0')}
+                    <span className="animate-pulse">:</span>
+                    {serverTime.getUTCSeconds().toString().padStart(2, '0')}
+                  </span>
+                </div>
+              </div>
+
               {/* Search (Desktop) */}
               <div className="hidden md:flex items-center bg-gray-800/50 rounded-lg px-3 py-2 border border-gray-700/50">
                 <Search className="h-4 w-4 text-gray-500 mr-2" />

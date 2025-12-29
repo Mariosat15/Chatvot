@@ -2,10 +2,21 @@
  * Competition Difficulty Calculator
  * 
  * Analyzes competition parameters to determine difficulty level
- * and provides visual indicators for users
+ * Uses trader level names for consistency with user progression system
  */
 
-export type DifficultyLevel = 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert' | 'Extreme';
+// Difficulty levels mapped to trader levels
+export type DifficultyLevel = 
+  | 'Novice'        // Level 1-2 equivalent
+  | 'Apprentice'    // Level 2-3 equivalent
+  | 'Skilled'       // Level 3-4 equivalent
+  | 'Expert'        // Level 4-5 equivalent
+  | 'Elite'         // Level 5-6 equivalent
+  | 'Master'        // Level 6-7 equivalent
+  | 'Grand Master'  // Level 7-8 equivalent
+  | 'Champion'      // Level 8-9 equivalent
+  | 'Legend'        // Level 9-10 equivalent
+  | 'Trading God';  // Level 10 equivalent
 
 export interface DifficultyFactor {
   factor: string;
@@ -16,14 +27,126 @@ export interface DifficultyFactor {
 export interface DifficultyAnalysis {
   level: DifficultyLevel;
   score: number; // 0-100
+  emoji: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  recommendedLevels: string;
   factors: DifficultyFactor[];
 }
 
+// Difficulty configuration matching trader levels
+const DIFFICULTY_CONFIG: Record<DifficultyLevel, {
+  emoji: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  minScore: number;
+  maxScore: number;
+  recommendedLevels: string;
+}> = {
+  'Novice': {
+    emoji: '🌱',
+    color: 'text-green-400',
+    bgColor: 'bg-green-500/10',
+    borderColor: 'border-green-500/30',
+    minScore: 0,
+    maxScore: 10,
+    recommendedLevels: 'Level 1-2',
+  },
+  'Apprentice': {
+    emoji: '📚',
+    color: 'text-green-300',
+    bgColor: 'bg-green-500/10',
+    borderColor: 'border-green-500/30',
+    minScore: 11,
+    maxScore: 20,
+    recommendedLevels: 'Level 2-3',
+  },
+  'Skilled': {
+    emoji: '⚔️',
+    color: 'text-blue-400',
+    bgColor: 'bg-blue-500/10',
+    borderColor: 'border-blue-500/30',
+    minScore: 21,
+    maxScore: 30,
+    recommendedLevels: 'Level 3-4',
+  },
+  'Expert': {
+    emoji: '🎯',
+    color: 'text-blue-300',
+    bgColor: 'bg-blue-500/10',
+    borderColor: 'border-blue-500/30',
+    minScore: 31,
+    maxScore: 40,
+    recommendedLevels: 'Level 4-5',
+  },
+  'Elite': {
+    emoji: '💎',
+    color: 'text-yellow-400',
+    bgColor: 'bg-yellow-500/10',
+    borderColor: 'border-yellow-500/30',
+    minScore: 41,
+    maxScore: 50,
+    recommendedLevels: 'Level 5-6',
+  },
+  'Master': {
+    emoji: '👑',
+    color: 'text-yellow-300',
+    bgColor: 'bg-yellow-500/10',
+    borderColor: 'border-yellow-500/30',
+    minScore: 51,
+    maxScore: 60,
+    recommendedLevels: 'Level 6-7',
+  },
+  'Grand Master': {
+    emoji: '🔥',
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-500/10',
+    borderColor: 'border-orange-500/30',
+    minScore: 61,
+    maxScore: 70,
+    recommendedLevels: 'Level 7-8',
+  },
+  'Champion': {
+    emoji: '⚡',
+    color: 'text-orange-300',
+    bgColor: 'bg-orange-500/10',
+    borderColor: 'border-orange-500/30',
+    minScore: 71,
+    maxScore: 80,
+    recommendedLevels: 'Level 8-9',
+  },
+  'Legend': {
+    emoji: '🌟',
+    color: 'text-red-400',
+    bgColor: 'bg-red-500/10',
+    borderColor: 'border-red-500/30',
+    minScore: 81,
+    maxScore: 90,
+    recommendedLevels: 'Level 9-10',
+  },
+  'Trading God': {
+    emoji: '👑',
+    color: 'text-red-500',
+    bgColor: 'bg-red-500/10',
+    borderColor: 'border-red-500/30',
+    minScore: 91,
+    maxScore: 100,
+    recommendedLevels: 'Level 10 only',
+  },
+};
+
 interface CompetitionParams {
   entryFee?: number;
+  entryFeeCredits?: number;
   startingCapital?: number;
+  leverageAllowed?: number;
   maxLeverage?: number;
   duration?: number; // in minutes
+  durationHours?: number;
+  maxParticipants?: number;
+  participantCount?: number;
   rules?: {
     minimumTrades?: number;
     minimumWinRate?: number;
@@ -52,17 +175,18 @@ export function calculateCompetitionDifficulty(params: CompetitionParams): Diffi
   const factors: DifficultyFactor[] = [];
 
   // 1. Entry Fee Analysis (0-15 points)
-  if (params.entryFee !== undefined) {
-    if (params.entryFee <= 5) {
+  const entryFee = params.entryFee || params.entryFeeCredits || 0;
+  if (entryFee > 0) {
+    if (entryFee <= 5) {
       score += 2;
       factors.push({ factor: 'Low entry fee', impact: 'low', score: 2 });
-    } else if (params.entryFee <= 20) {
+    } else if (entryFee <= 20) {
       score += 5;
       factors.push({ factor: 'Moderate entry fee', impact: 'low', score: 5 });
-    } else if (params.entryFee <= 50) {
+    } else if (entryFee <= 50) {
       score += 10;
       factors.push({ factor: 'Higher entry fee', impact: 'medium', score: 10 });
-    } else if (params.entryFee <= 100) {
+    } else if (entryFee <= 100) {
       score += 12;
       factors.push({ factor: 'Premium entry fee', impact: 'medium', score: 12 });
     } else {
@@ -72,79 +196,94 @@ export function calculateCompetitionDifficulty(params: CompetitionParams): Diffi
   }
 
   // 2. Starting Capital Analysis (0-10 points)
-  if (params.startingCapital) {
-    if (params.startingCapital <= 1000) {
-      score += 10;
-      factors.push({ factor: 'Limited capital', impact: 'high', score: 10 });
-    } else if (params.startingCapital <= 5000) {
-      score += 6;
-      factors.push({ factor: 'Moderate capital', impact: 'medium', score: 6 });
-    } else if (params.startingCapital <= 10000) {
-      score += 3;
-      factors.push({ factor: 'Comfortable capital', impact: 'low', score: 3 });
-    }
+  const capital = params.startingCapital || 10000;
+  if (capital <= 1000) {
+    score += 10;
+    factors.push({ factor: 'Limited capital', impact: 'high', score: 10 });
+  } else if (capital <= 5000) {
+    score += 6;
+    factors.push({ factor: 'Moderate capital', impact: 'medium', score: 6 });
+  } else if (capital <= 10000) {
+    score += 3;
+    factors.push({ factor: 'Comfortable capital', impact: 'low', score: 3 });
   }
 
   // 3. Leverage Analysis (0-15 points)
-  if (params.maxLeverage) {
-    if (params.maxLeverage <= 10) {
-      score += 2;
-      factors.push({ factor: 'Conservative leverage', impact: 'low', score: 2 });
-    } else if (params.maxLeverage <= 50) {
-      score += 5;
-      factors.push({ factor: 'Moderate leverage', impact: 'low', score: 5 });
-    } else if (params.maxLeverage <= 100) {
-      score += 8;
-      factors.push({ factor: 'Standard leverage', impact: 'medium', score: 8 });
-    } else if (params.maxLeverage <= 200) {
-      score += 12;
-      factors.push({ factor: 'High leverage', impact: 'medium', score: 12 });
-    } else {
-      score += 15;
-      factors.push({ factor: 'Extreme leverage', impact: 'high', score: 15 });
-    }
+  const leverage = params.maxLeverage || params.leverageAllowed || 100;
+  if (leverage <= 10) {
+    score += 2;
+    factors.push({ factor: 'Conservative leverage', impact: 'low', score: 2 });
+  } else if (leverage <= 50) {
+    score += 5;
+    factors.push({ factor: 'Moderate leverage', impact: 'low', score: 5 });
+  } else if (leverage <= 100) {
+    score += 8;
+    factors.push({ factor: 'Standard leverage', impact: 'medium', score: 8 });
+  } else if (leverage <= 200) {
+    score += 12;
+    factors.push({ factor: 'High leverage', impact: 'medium', score: 12 });
+  } else {
+    score += 15;
+    factors.push({ factor: 'Extreme leverage', impact: 'high', score: 15 });
   }
 
-  // 4. Duration Analysis (0-10 points)
-  if (params.duration) {
-    const hours = params.duration / 60;
-    if (hours <= 1) {
-      score += 10;
-      factors.push({ factor: 'Sprint format', impact: 'high', score: 10 });
-    } else if (hours <= 4) {
-      score += 8;
-      factors.push({ factor: 'Short duration', impact: 'medium', score: 8 });
-    } else if (hours <= 24) {
-      score += 5;
-      factors.push({ factor: 'Day-long', impact: 'medium', score: 5 });
-    } else if (hours <= 72) {
-      score += 3;
-      factors.push({ factor: 'Multi-day', impact: 'low', score: 3 });
-    }
+  // 4. Competition Size (0-10 points)
+  const participants = params.participantCount || params.maxParticipants || 10;
+  if (participants <= 5) {
+    score += 2;
+    factors.push({ factor: 'Small field', impact: 'low', score: 2 });
+  } else if (participants <= 20) {
+    score += 4;
+    factors.push({ factor: 'Medium field', impact: 'low', score: 4 });
+  } else if (participants <= 50) {
+    score += 7;
+    factors.push({ factor: 'Large field', impact: 'medium', score: 7 });
+  } else {
+    score += 10;
+    factors.push({ factor: 'Massive field', impact: 'high', score: 10 });
   }
 
-  // 5. Rules Complexity (0-15 points)
+  // 5. Duration Analysis (0-10 points)
+  const hours = params.durationHours || (params.duration ? params.duration / 60 : 24);
+  if (hours <= 1) {
+    score += 10;
+    factors.push({ factor: 'Sprint format', impact: 'high', score: 10 });
+  } else if (hours <= 4) {
+    score += 8;
+    factors.push({ factor: 'Short duration', impact: 'medium', score: 8 });
+  } else if (hours <= 24) {
+    score += 5;
+    factors.push({ factor: 'Day-long', impact: 'medium', score: 5 });
+  } else if (hours <= 72) {
+    score += 3;
+    factors.push({ factor: 'Multi-day', impact: 'low', score: 3 });
+  }
+
+  // 6. Rules Complexity (0-20 points)
   if (params.rules) {
     if (params.rules.minimumTrades && params.rules.minimumTrades >= 10) {
-      score += 5;
-      factors.push({ factor: `${params.rules.minimumTrades}+ trades required`, impact: 'medium', score: 5 });
+      score += 8;
+      factors.push({ factor: `${params.rules.minimumTrades}+ trades required`, impact: 'high', score: 8 });
     } else if (params.rules.minimumTrades && params.rules.minimumTrades >= 5) {
-      score += 3;
-      factors.push({ factor: `${params.rules.minimumTrades} trades required`, impact: 'low', score: 3 });
+      score += 4;
+      factors.push({ factor: `${params.rules.minimumTrades} trades required`, impact: 'medium', score: 4 });
+    } else if (params.rules.minimumTrades && params.rules.minimumTrades >= 1) {
+      score += 2;
+      factors.push({ factor: `${params.rules.minimumTrades} trade required`, impact: 'low', score: 2 });
     }
 
     if (params.rules.minimumWinRate) {
-      score += 5;
-      factors.push({ factor: `${params.rules.minimumWinRate}% win rate`, impact: 'medium', score: 5 });
+      score += 6;
+      factors.push({ factor: `${params.rules.minimumWinRate}% win rate`, impact: 'medium', score: 6 });
     }
 
     if (params.rules.disqualifyOnLiquidation) {
-      score += 5;
-      factors.push({ factor: 'Liquidation = DQ', impact: 'medium', score: 5 });
+      score += 6;
+      factors.push({ factor: 'Liquidation = DQ', impact: 'medium', score: 6 });
     }
   }
 
-  // 6. Risk Management Rules (0-10 points)
+  // 7. Risk Management Rules (0-10 points)
   if (params.riskLimits?.enabled) {
     if (params.riskLimits.maxDrawdownPercent && params.riskLimits.maxDrawdownPercent <= 30) {
       score += 5;
@@ -156,7 +295,7 @@ export function calculateCompetitionDifficulty(params: CompetitionParams): Diffi
 
     if (params.riskLimits.dailyLossLimitPercent && params.riskLimits.dailyLossLimitPercent <= 10) {
       score += 3;
-      factors.push({ factor: 'Tight daily loss limit', impact: 'medium', score: 3 });
+      factors.push({ factor: 'Tight daily loss', impact: 'medium', score: 3 });
     }
 
     if (params.riskLimits.equityCheckEnabled) {
@@ -165,37 +304,42 @@ export function calculateCompetitionDifficulty(params: CompetitionParams): Diffi
     }
   }
 
-  // 7. Level Requirements (0-10 points)
+  // 8. Level Requirements (0-10 points)
   if (params.levelRequirement?.enabled && params.levelRequirement.minLevel) {
-    if (params.levelRequirement.minLevel >= 5) {
+    if (params.levelRequirement.minLevel >= 8) {
       score += 10;
-      factors.push({ factor: `Level ${params.levelRequirement.minLevel}+ required`, impact: 'high', score: 10 });
+      factors.push({ factor: `Level ${params.levelRequirement.minLevel}+ only`, impact: 'high', score: 10 });
+    } else if (params.levelRequirement.minLevel >= 5) {
+      score += 6;
+      factors.push({ factor: `Level ${params.levelRequirement.minLevel}+ required`, impact: 'medium', score: 6 });
     } else if (params.levelRequirement.minLevel >= 3) {
-      score += 5;
-      factors.push({ factor: 'Intermediate level required', impact: 'medium', score: 5 });
+      score += 3;
+      factors.push({ factor: `Level ${params.levelRequirement.minLevel}+ required`, impact: 'low', score: 3 });
     }
   }
 
   // Cap score at 100
   score = Math.min(score, 100);
 
-  // Determine difficulty level
-  let level: DifficultyLevel = 'Beginner';
-  if (score <= 20) {
-    level = 'Beginner';
-  } else if (score <= 40) {
-    level = 'Intermediate';
-  } else if (score <= 60) {
-    level = 'Advanced';
-  } else if (score <= 80) {
-    level = 'Expert';
-  } else {
-    level = 'Extreme';
+  // Determine difficulty level based on score
+  let level: DifficultyLevel = 'Novice';
+  for (const [key, config] of Object.entries(DIFFICULTY_CONFIG)) {
+    if (score >= config.minScore && score <= config.maxScore) {
+      level = key as DifficultyLevel;
+      break;
+    }
   }
+
+  const config = DIFFICULTY_CONFIG[level];
 
   return {
     level,
     score,
+    emoji: config.emoji,
+    color: config.color,
+    bgColor: config.bgColor,
+    borderColor: config.borderColor,
+    recommendedLevels: config.recommendedLevels,
     factors,
   };
 }
@@ -203,7 +347,11 @@ export function calculateCompetitionDifficulty(params: CompetitionParams): Diffi
 /**
  * Get all difficulty levels for legend/filter
  */
-export function getAllDifficultyLevels(): DifficultyLevel[] {
-  return ['Beginner', 'Intermediate', 'Advanced', 'Expert', 'Extreme'];
+export function getAllDifficultyLevels(): { value: DifficultyLevel; emoji: string; color: string; recommendedLevels: string }[] {
+  return Object.entries(DIFFICULTY_CONFIG).map(([key, config]) => ({
+    value: key as DifficultyLevel,
+    emoji: config.emoji,
+    color: config.color,
+    recommendedLevels: config.recommendedLevels,
+  }));
 }
-
