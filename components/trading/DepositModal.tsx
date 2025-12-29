@@ -165,11 +165,13 @@ export default function DepositModal({ children }: DepositModalProps) {
       setError('');
       setLoading(false);
       setStep('amount');
-      // Reset Nuvei state completely
+      // Reset Nuvei state - but check if SDK is already loaded in browser
       setNuveiSessionToken('');
       setNuveiClientUniqueId('');
       setNuveiUserEmail('');
-      setNuveiLoaded(false);
+      // FIX: Check if Nuvei SDK is already loaded in the window object
+      // The Script onLoad only fires once, so if SDK is already loaded, set nuveiLoaded to true
+      setNuveiLoaded(typeof window !== 'undefined' && !!window.SafeCharge);
       
       // Now check payment config
       setCheckingConfig(true);
@@ -182,6 +184,17 @@ export default function DepositModal({ children }: DepositModalProps) {
   const [nuveiSessionToken, setNuveiSessionToken] = useState('');
   const [nuveiClientUniqueId, setNuveiClientUniqueId] = useState('');
   const [nuveiUserEmail, setNuveiUserEmail] = useState('');
+  
+  // FIX: Sync nuveiLoaded with actual SDK state whenever we enter payment step
+  useEffect(() => {
+    if (step === 'payment' && selectedProvider === 'nuvei' && !nuveiLoaded) {
+      // Check if SDK is already in window (from previous payment)
+      if (typeof window !== 'undefined' && window.SafeCharge) {
+        console.log('🔧 Syncing nuveiLoaded state - SDK already available');
+        setNuveiLoaded(true);
+      }
+    }
+  }, [step, selectedProvider, nuveiLoaded]);
 
   // Get available provider count
   const getAvailableProviders = () => {
@@ -388,11 +401,13 @@ export default function DepositModal({ children }: DepositModalProps) {
     setError('');
     setLoading(false);
     setStep('amount');
-    // Reset Nuvei state
+    // Reset Nuvei state - keep nuveiLoaded true if SDK already loaded
     setNuveiSessionToken('');
     setNuveiClientUniqueId('');
     setNuveiUserEmail('');
-    setNuveiLoaded(false);
+    // FIX: Don't reset nuveiLoaded to false if SDK is already in window
+    // The Script onLoad only fires once per page load
+    setNuveiLoaded(typeof window !== 'undefined' && !!window.SafeCharge);
     
     // SECURITY: Reset processing refs to allow new transactions
     isProcessingRef.current = false;
@@ -715,14 +730,23 @@ export default function DepositModal({ children }: DepositModalProps) {
                 console.log('Nuvei SDK loaded successfully');
                 setNuveiLoaded(true);
               }}
+              onReady={() => {
+                // FIX: onReady fires when script is already loaded (cached)
+                // This ensures nuveiLoaded is set even on subsequent modal opens
+                if (window.SafeCharge && !nuveiLoaded) {
+                  console.log('Nuvei SDK already ready (cached)');
+                  setNuveiLoaded(true);
+                }
+              }}
               onError={(e) => {
                 console.error('Failed to load Nuvei SDK:', e);
                 setError('Failed to load payment form. Please refresh and try again.');
               }}
               strategy="afterInteractive"
             />
-            {!nuveiLoaded || !nuveiSessionToken ? (
-              // Show loading while SDK loads or session is being created
+            {/* FIX: Also check window.SafeCharge directly in case onLoad/onReady don't fire */}
+            {(!nuveiLoaded && !window.SafeCharge) ? (
+              // Show loading while SDK loads
               <div className="py-12 text-center space-y-4">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto text-green-500" />
                 <p className="text-sm text-gray-400">Loading secure payment form...</p>

@@ -69,18 +69,43 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
     
     // SECURITY: Check for recent pending transactions to prevent duplicate orders
+    // Only block if there's a very recent pending transaction (last 5 seconds)
+    // This prevents rapid double-clicks while allowing legitimate retries
     const recentPending = await WalletTransaction.findOne({
       userId,
       status: 'pending',
       provider: 'nuvei',
-      createdAt: { $gte: new Date(Date.now() - 60000) }, // Last 60 seconds
+      createdAt: { $gte: new Date(Date.now() - 5000) }, // Last 5 seconds only
     });
     
     if (recentPending) {
+      console.log(`🛡️ Blocked duplicate order - recent pending: ${recentPending._id}`);
       return NextResponse.json(
-        { error: 'A payment is already in progress. Please wait or cancel the previous transaction.' },
+        { error: 'Please wait a moment before trying again.' },
         { status: 429 }
       );
+    }
+    
+    // Auto-cancel any OLD pending Nuvei transactions (older than 30 minutes)
+    // These are likely abandoned sessions
+    const oldPending = await WalletTransaction.updateMany(
+      {
+        userId,
+        status: 'pending',
+        provider: 'nuvei',
+        createdAt: { $lt: new Date(Date.now() - 30 * 60 * 1000) }, // Older than 30 minutes
+      },
+      {
+        $set: {
+          status: 'cancelled',
+          failureReason: 'Session expired',
+          processedAt: new Date(),
+        },
+      }
+    );
+    
+    if (oldPending.modifiedCount > 0) {
+      console.log(`🧹 Auto-cancelled ${oldPending.modifiedCount} old pending Nuvei transactions`);
     }
 
     // Ensure wallet exists
