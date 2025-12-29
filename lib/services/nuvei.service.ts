@@ -78,66 +78,98 @@ interface PaymentStatusResponse {
 
 class NuveiService {
   /**
-   * Get Nuvei credentials from database
+   * Get Nuvei credentials from database or environment variables
    */
   async getCredentials(): Promise<NuveiCredentials | null> {
-    await connectToDatabase();
-    
-    const provider = await PaymentProvider.findOne({ 
-      slug: 'nuvei',
-      isActive: true 
-    });
-    
-    console.log('💳 Nuvei provider lookup:', { 
-      found: !!provider, 
-      isActive: provider?.isActive,
-      slug: provider?.slug 
-    });
-    
-    if (!provider) {
-      console.error('Nuvei provider not found or not active');
-      return null;
+    // First try to get from database
+    try {
+      await connectToDatabase();
+      
+      const provider = await PaymentProvider.findOne({ 
+        slug: 'nuvei',
+        isActive: true 
+      });
+      
+      console.log('💳 Nuvei provider lookup:', { 
+        found: !!provider, 
+        isActive: provider?.isActive,
+        slug: provider?.slug 
+      });
+      
+      if (provider) {
+        const credentials: NuveiCredentials = {
+          merchantId: '',
+          siteId: '',
+          secretKey: '',
+          testMode: provider.testMode,
+        };
+        
+        for (const cred of provider.credentials) {
+          switch (cred.key) {
+            case 'merchant_id':
+              credentials.merchantId = cred.value;
+              break;
+            case 'site_id':
+              credentials.siteId = cred.value;
+              break;
+            case 'secret_key':
+              credentials.secretKey = cred.value;
+              break;
+            case 'success_url':
+              credentials.successUrl = cred.value;
+              break;
+            case 'pending_url':
+              credentials.pendingUrl = cred.value;
+              break;
+            case 'back_url':
+              credentials.backUrl = cred.value;
+              break;
+            case 'failure_url':
+              credentials.failureUrl = cred.value;
+              break;
+          }
+        }
+        
+        console.log('💳 Nuvei credentials from DB:', {
+          merchantId: credentials.merchantId ? '***' + credentials.merchantId.slice(-4) : 'MISSING',
+          siteId: credentials.siteId ? '***' + credentials.siteId.slice(-4) : 'MISSING',
+          secretKey: credentials.secretKey ? '[SET]' : 'MISSING',
+          testMode: credentials.testMode,
+        });
+        
+        if (credentials.merchantId && credentials.siteId && credentials.secretKey) {
+          return credentials;
+        }
+      }
+    } catch (error) {
+      console.error('💳 Error reading Nuvei from database:', error);
     }
     
-    const credentials: NuveiCredentials = {
-      merchantId: '',
-      siteId: '',
-      secretKey: '',
-      testMode: provider.testMode,
+    // Fallback to environment variables
+    const envCredentials: NuveiCredentials = {
+      merchantId: process.env.NUVEI_MERCHANT_ID || '',
+      siteId: process.env.NUVEI_SITE_ID || '',
+      secretKey: process.env.NUVEI_SECRET_KEY || '',
+      successUrl: process.env.NUVEI_SUCCESS_URL,
+      pendingUrl: process.env.NUVEI_PENDING_URL,
+      backUrl: process.env.NUVEI_BACK_URL,
+      failureUrl: process.env.NUVEI_FAILURE_URL,
+      testMode: process.env.NUVEI_TEST_MODE !== 'false',
     };
     
-    for (const cred of provider.credentials) {
-      switch (cred.key) {
-        case 'merchant_id':
-          credentials.merchantId = cred.value;
-          break;
-        case 'site_id':
-          credentials.siteId = cred.value;
-          break;
-        case 'secret_key':
-          credentials.secretKey = cred.value;
-          break;
-        case 'success_url':
-          credentials.successUrl = cred.value;
-          break;
-        case 'pending_url':
-          credentials.pendingUrl = cred.value;
-          break;
-        case 'back_url':
-          credentials.backUrl = cred.value;
-          break;
-        case 'failure_url':
-          credentials.failureUrl = cred.value;
-          break;
-      }
-    }
+    console.log('💳 Nuvei credentials from ENV:', {
+      merchantId: envCredentials.merchantId ? '***' + envCredentials.merchantId.slice(-4) : 'MISSING',
+      siteId: envCredentials.siteId ? '***' + envCredentials.siteId.slice(-4) : 'MISSING',
+      secretKey: envCredentials.secretKey ? '[SET]' : 'MISSING',
+      testMode: envCredentials.testMode,
+    });
     
-    if (!credentials.merchantId || !credentials.siteId || !credentials.secretKey) {
-      console.error('Nuvei credentials incomplete');
+    if (!envCredentials.merchantId || !envCredentials.siteId || !envCredentials.secretKey) {
+      console.error('💳 Nuvei credentials incomplete (neither DB nor ENV)');
       return null;
     }
     
-    return credentials;
+    return envCredentials;
   }
   
   /**
@@ -350,19 +382,26 @@ class NuveiService {
     testMode?: boolean;
     sdkUrl: string;
   }> {
-    const credentials = await this.getCredentials();
-    
-    if (!credentials) {
+    try {
+      const credentials = await this.getCredentials();
+      
+      if (!credentials) {
+        console.log('💳 Nuvei getClientConfig: No credentials found');
+        return { enabled: false, sdkUrl: NUVEI_SDK_URL };
+      }
+      
+      console.log('💳 Nuvei getClientConfig: Returning enabled config');
+      return {
+        enabled: true,
+        merchantId: credentials.merchantId,
+        siteId: credentials.siteId,
+        testMode: credentials.testMode,
+        sdkUrl: NUVEI_SDK_URL,
+      };
+    } catch (error) {
+      console.error('💳 Nuvei getClientConfig error:', error);
       return { enabled: false, sdkUrl: NUVEI_SDK_URL };
     }
-    
-    return {
-      enabled: true,
-      merchantId: credentials.merchantId,
-      siteId: credentials.siteId,
-      testMode: credentials.testMode,
-      sdkUrl: NUVEI_SDK_URL,
-    };
   }
 }
 
