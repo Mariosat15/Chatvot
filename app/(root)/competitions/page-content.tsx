@@ -41,6 +41,12 @@ interface Competition {
   endTime: string;
   assetClasses: string[];
   leverageAllowed?: number;
+  leverage?: {
+    enabled?: boolean;
+    min?: number;
+    max?: number;
+    default?: number;
+  };
   rules?: {
     rankingMethod: string;
     minimumTrades?: number;
@@ -235,7 +241,7 @@ export default function CompetitionsPageContent({
     return calculateCompetitionDifficulty({
       entryFeeCredits: c.entryFee || c.entryFeeCredits || 0,
       startingCapital: c.startingCapital || c.startingTradingPoints || 10000,
-      leverageAllowed: c.leverageAllowed || 100,
+      leverageAllowed: c.leverage?.max || c.leverageAllowed || 100,
       maxParticipants: c.maxParticipants,
       participantCount: c.currentParticipants,
       durationHours,
