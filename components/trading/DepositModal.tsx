@@ -107,17 +107,21 @@ export default function DepositModal({ children }: DepositModalProps) {
     return amountEur * (vatPercentage / 100);
   };
 
-  // Calculate platform fee on the EUR amount
+  // Calculate platform fee on (credits + VAT) as per business requirement
+  // Fee is charged on the total deposited amount INCLUDING VAT
   const calculatePlatformFee = (amountEur: number) => {
     if (processingFee <= 0) return 0;
-    return amountEur * (processingFee / 100);
+    const vat = calculateVAT(amountEur);
+    const subtotal = amountEur + vat; // Credits + VAT
+    return subtotal * (processingFee / 100);
   };
 
-  // Calculate total payment
+  // Calculate total payment: Credits + VAT + Platform Fee (on credits+VAT)
   const calculateTotalPayment = (amountEur: number) => {
     const vat = calculateVAT(amountEur);
-    const platformFee = calculatePlatformFee(amountEur);
-    return amountEur + vat + platformFee;
+    const subtotal = amountEur + vat;
+    const platformFee = subtotal * (processingFee / 100);
+    return subtotal + platformFee;
   };
 
   // Check payment configuration on mount and RESET all state when modal opens
