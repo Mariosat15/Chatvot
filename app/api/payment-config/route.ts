@@ -9,6 +9,7 @@ import { headers } from 'next/headers';
 import { isEUCountry } from '@/lib/utils/country-vat';
 import { ObjectId } from 'mongodb';
 import { isPaddleConfigured, getPaddleConfig } from '@/lib/paddle/config';
+import { nuveiService, NUVEI_SDK_URL } from '@/lib/services/nuvei.service';
 
 /**
  * Helper to find user by various ID formats
@@ -108,6 +109,14 @@ export async function GET() {
       // Paddle not configured
     }
 
+    // Check Nuvei availability
+    let nuveiConfig: any = null;
+    try {
+      nuveiConfig = await nuveiService.getClientConfig();
+    } catch (e) {
+      // Nuvei not configured
+    }
+
     // Return available payment providers
     return NextResponse.json({
       configured: true,
@@ -132,6 +141,13 @@ export async function GET() {
           clientToken: paddleConfig?.publicKey || null,
           environment: paddleConfig?.environment || 'sandbox',
           vendorId: paddleConfig?.vendorId || null,
+        },
+        nuvei: {
+          available: nuveiConfig?.enabled || false,
+          merchantId: nuveiConfig?.merchantId || null,
+          siteId: nuveiConfig?.siteId || null,
+          testMode: nuveiConfig?.testMode || true,
+          sdkUrl: nuveiConfig?.sdkUrl || NUVEI_SDK_URL,
         },
       },
     });

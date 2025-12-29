@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { Zap, Loader2, CheckCircle2, XCircle, ArrowRight, CreditCard, Globe } from 'lucide-react';
+import { Zap, Loader2, CheckCircle2, XCircle, ArrowRight, CreditCard, Globe, Gem } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+import Script from 'next/script';
 
 interface DepositModalProps {
   children: React.ReactNode;
@@ -27,9 +28,52 @@ interface PaymentProviders {
     environment: 'sandbox' | 'production';
     vendorId: string | null;
   };
+  nuvei: {
+    available: boolean;
+    merchantId: string | null;
+    siteId: string | null;
+    testMode: boolean;
+    sdkUrl: string;
+  };
 }
 
-type PaymentProvider = 'stripe' | 'paddle';
+type PaymentProvider = 'stripe' | 'paddle' | 'nuvei';
+
+// Declare SafeCharge global type
+declare global {
+  interface Window {
+    SafeCharge?: (config: {
+      env: string;
+      merchantId: string;
+      merchantSiteId: string;
+    }) => {
+      fields: (options?: { fonts?: Array<{ cssUrl: string }> }) => {
+        create: (type: string, options?: { style?: Record<string, unknown>; classes?: Record<string, string> }) => {
+          attach: (element: string | HTMLElement | null) => void;
+          on: (event: string, callback: (evt: unknown) => void) => void;
+        };
+      };
+      createPayment: (
+        options: {
+          sessionToken: string;
+          clientUniqueId?: string;
+          cardHolderName?: string;
+          paymentOption: unknown;
+          billingAddress?: {
+            email?: string;
+            country?: string;
+          };
+        },
+        callback: (result: {
+          result: string;
+          errCode: string;
+          errorDescription?: string;
+          transactionId?: string;
+        }) => void
+      ) => void;
+    };
+  }
+}
 
 export default function DepositModal({ children }: DepositModalProps) {
   const { settings, eurToCredits } = useAppSettings();
@@ -90,6 +134,8 @@ export default function DepositModal({ children }: DepositModalProps) {
             setSelectedProvider('stripe');
             const stripe = loadStripe(config.providers.stripe.publishableKey);
             setStripePromise(stripe);
+          } else if (config.providers.nuvei?.available) {
+            setSelectedProvider('nuvei');
           } else if (config.providers.paddle?.available) {
             setSelectedProvider('paddle');
           }
@@ -112,11 +158,17 @@ export default function DepositModal({ children }: DepositModalProps) {
     }
   }, [open]);
 
+  // Nuvei state
+  const [nuveiLoaded, setNuveiLoaded] = useState(false);
+  const [nuveiSessionToken, setNuveiSessionToken] = useState('');
+  const [nuveiClientUniqueId, setNuveiClientUniqueId] = useState('');
+
   // Get available provider count
   const getAvailableProviders = () => {
     if (!providers) return [];
     const available: PaymentProvider[] = [];
     if (providers.stripe?.available) available.push('stripe');
+    if (providers.nuvei?.available) available.push('nuvei');
     if (providers.paddle?.available) available.push('paddle');
     return available;
   };
@@ -185,6 +237,26 @@ export default function DepositModal({ children }: DepositModalProps) {
         const data = await response.json();
         setClientSecret(data.clientSecret);
         setStep('payment');
+      } else if (provider === 'nuvei') {
+        // Create Nuvei session
+        const response = await fetch('/api/nuvei/open-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            amount: totalPayment,
+            currency: settings?.currency.code || 'EUR',
+          }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to create Nuvei session');
+        }
+
+        const data = await response.json();
+        setNuveiSessionToken(data.sessionToken);
+        setNuveiClientUniqueId(data.clientUniqueId);
+        setStep('payment');
       } else if (provider === 'paddle') {
         // Create Paddle checkout
         const response = await fetch('/api/paddle/create-checkout', {
@@ -230,6 +302,8 @@ export default function DepositModal({ children }: DepositModalProps) {
     switch (provider) {
       case 'stripe':
         return <CreditCard className="h-5 w-5" />;
+      case 'nuvei':
+        return <Gem className="h-5 w-5" />;
       case 'paddle':
         return <Globe className="h-5 w-5" />;
     }
@@ -239,6 +313,8 @@ export default function DepositModal({ children }: DepositModalProps) {
     switch (provider) {
       case 'stripe':
         return 'Credit/Debit Card';
+      case 'nuvei':
+        return 'Nuvei Secure Payment';
       case 'paddle':
         return 'Paddle (Global)';
     }
@@ -248,6 +324,8 @@ export default function DepositModal({ children }: DepositModalProps) {
     switch (provider) {
       case 'stripe':
         return 'Pay securely with your card';
+      case 'nuvei':
+        return 'Fast & secure card payments';
       case 'paddle':
         return 'Multiple payment methods, taxes included';
     }
@@ -490,7 +568,7 @@ export default function DepositModal({ children }: DepositModalProps) {
               Back
             </Button>
           </div>
-        ) : step === 'payment' && clientSecret && stripePromise ? (
+        ) : step === 'payment' && clientSecret && stripePromise && selectedProvider === 'stripe' ? (
           // Step 3: Stripe Payment Form
           <Elements
             stripe={stripePromise}
@@ -523,6 +601,36 @@ export default function DepositModal({ children }: DepositModalProps) {
               onCancel={() => setStep('provider')}
             />
           </Elements>
+        ) : step === 'payment' && nuveiSessionToken && selectedProvider === 'nuvei' && providers?.nuvei ? (
+          // Step 3: Nuvei Payment Form
+          <>
+            {/* Load Nuvei SDK */}
+            <Script
+              src={providers.nuvei.sdkUrl}
+              onLoad={() => setNuveiLoaded(true)}
+              strategy="lazyOnload"
+            />
+            <NuveiPaymentForm
+              sessionToken={nuveiSessionToken}
+              clientUniqueId={nuveiClientUniqueId}
+              merchantId={providers.nuvei.merchantId || ''}
+              siteId={providers.nuvei.siteId || ''}
+              testMode={providers.nuvei.testMode}
+              amount={parseFloat(amount)}
+              totalAmount={calculateTotalPayment(parseFloat(amount))}
+              vatAmount={calculateVAT(parseFloat(amount))}
+              vatEnabled={vatEnabled}
+              vatPercentage={vatPercentage}
+              platformFeeAmount={calculatePlatformFee(parseFloat(amount))}
+              platformFeePercentage={processingFee}
+              sdkLoaded={nuveiLoaded}
+              onSuccess={() => {
+                setOpen(false);
+                resetModal();
+              }}
+              onCancel={() => setStep('provider')}
+            />
+          </>
         ) : null}
       </DialogContent>
     </Dialog>
@@ -688,6 +796,307 @@ function PaymentForm({
 
       <p className="text-xs text-center text-gray-500">
         Secured by Stripe • Your payment information is encrypted
+      </p>
+    </form>
+  );
+}
+
+// Nuvei Payment Form Component
+function NuveiPaymentForm({ 
+  sessionToken,
+  clientUniqueId,
+  merchantId,
+  siteId,
+  testMode,
+  amount, 
+  totalAmount,
+  vatAmount,
+  vatEnabled,
+  vatPercentage,
+  platformFeeAmount,
+  platformFeePercentage,
+  sdkLoaded,
+  onSuccess, 
+  onCancel 
+}: { 
+  sessionToken: string;
+  clientUniqueId: string;
+  merchantId: string;
+  siteId: string;
+  testMode: boolean;
+  amount: number; 
+  totalAmount: number;
+  vatAmount: number;
+  vatEnabled: boolean;
+  vatPercentage: number;
+  platformFeeAmount: number;
+  platformFeePercentage: number;
+  sdkLoaded: boolean;
+  onSuccess: () => void; 
+  onCancel: () => void 
+}) {
+  const router = useRouter();
+  const { settings, eurToCredits } = useAppSettings();
+  const cardFieldRef = useRef<HTMLDivElement>(null);
+  const [scard, setScard] = useState<ReturnType<ReturnType<NonNullable<typeof window.SafeCharge>>['fields']>['create']> | null>(null);
+  const [sfcInitialized, setSfcInitialized] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [cardHolderName, setCardHolderName] = useState('');
+
+  const creditsReceived = eurToCredits(amount);
+
+  // Initialize Nuvei when SDK is loaded
+  useEffect(() => {
+    if (!sdkLoaded || !window.SafeCharge || sfcInitialized || !cardFieldRef.current) return;
+
+    try {
+      // Initialize SafeCharge
+      const sfc = window.SafeCharge({
+        env: testMode ? 'int' : 'prod',
+        merchantId: merchantId,
+        merchantSiteId: siteId,
+      });
+
+      // Create fields instance
+      const ScFields = sfc.fields({
+        fonts: [{ cssUrl: 'https://fonts.googleapis.com/css?family=Inter' }],
+      });
+
+      // Nuvei Fields styles
+      const style = {
+        base: {
+          color: '#F3F4F6',
+          fontWeight: '500',
+          fontFamily: 'Inter, sans-serif',
+          fontSize: '16px',
+          fontSmoothing: 'antialiased',
+          '::placeholder': {
+            color: '#9CA3AF',
+          },
+        },
+        invalid: {
+          color: '#EF4444',
+          '::placeholder': {
+            color: '#FCA5A5',
+          },
+        },
+      };
+
+      // Create card field
+      const cardField = ScFields.create('card', { style });
+      cardField.attach(cardFieldRef.current);
+
+      // Listen for ready event
+      cardField.on('ready', () => {
+        console.log('Nuvei card field ready');
+      });
+
+      // Store reference for payment
+      setScard(cardField);
+      setSfcInitialized(true);
+    } catch (err) {
+      console.error('Failed to initialize Nuvei:', err);
+      setError('Failed to initialize payment form');
+    }
+  }, [sdkLoaded, merchantId, siteId, testMode, sfcInitialized]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!scard || !window.SafeCharge) {
+      setError('Payment form not ready');
+      return;
+    }
+
+    if (!cardHolderName.trim()) {
+      setError('Please enter the cardholder name');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const sfc = window.SafeCharge({
+        env: testMode ? 'int' : 'prod',
+        merchantId: merchantId,
+        merchantSiteId: siteId,
+      });
+
+      // Create payment
+      sfc.createPayment(
+        {
+          sessionToken,
+          clientUniqueId,
+          cardHolderName: cardHolderName.trim(),
+          paymentOption: scard,
+          billingAddress: {
+            country: 'US', // Will be overwritten by user's country if available
+          },
+        },
+        async (result) => {
+          console.log('Nuvei payment result:', result);
+
+          if (result.result === 'APPROVED' && result.errCode === '0') {
+            // Verify payment on server
+            const verifyResponse = await fetch('/api/nuvei/payment-status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionToken,
+                clientUniqueId,
+              }),
+            });
+
+            const verifyData = await verifyResponse.json();
+
+            if (verifyData.success || verifyData.status === 'APPROVED') {
+              setSuccess(true);
+              setTimeout(() => {
+                router.refresh();
+                onSuccess();
+              }, 2000);
+            } else {
+              setError(verifyData.reason || 'Payment verification failed');
+              setLoading(false);
+            }
+          } else {
+            setError(result.errorDescription || result.result || 'Payment failed');
+            setLoading(false);
+          }
+        }
+      );
+    } catch (err) {
+      console.error('Nuvei payment error:', err);
+      setError(err instanceof Error ? err.message : 'Payment failed');
+      setLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="py-8 text-center space-y-4">
+        <div className="mx-auto w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center">
+          <CheckCircle2 className="h-8 w-8 text-green-500" />
+        </div>
+        <div>
+          <h3 className="text-xl font-semibold text-gray-100">Payment Successful!</h3>
+          <p className="text-sm text-gray-400 mt-2">
+            {creditsReceived.toFixed(settings?.credits.decimals || 2)} {settings?.credits.symbol || 'Credits'} added to your wallet
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sdkLoaded) {
+    return (
+      <div className="py-8 text-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto text-green-500" />
+        <p className="text-sm text-gray-400">Loading secure payment form...</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="rounded-lg bg-gray-800/50 border border-gray-700 p-4 space-y-2">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-400">Credits Value</span>
+          <span className="text-lg font-bold text-gray-100">{settings?.currency.symbol || '€'}{amount.toFixed(2)}</span>
+        </div>
+        
+        {vatEnabled && vatAmount > 0 && (
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-gray-500">VAT ({vatPercentage}%)</span>
+            <span className="text-orange-400">+{settings?.currency.symbol || '€'}{vatAmount.toFixed(2)}</span>
+          </div>
+        )}
+        
+        {platformFeePercentage > 0 && platformFeeAmount > 0 && (
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-gray-500">Platform Fee ({platformFeePercentage}%)</span>
+            <span className="text-orange-400">+{settings?.currency.symbol || '€'}{platformFeeAmount.toFixed(2)}</span>
+          </div>
+        )}
+        
+        {(vatEnabled || platformFeePercentage > 0) && (
+          <div className="flex justify-between items-center pt-2 border-t border-gray-600">
+            <span className="text-sm font-semibold text-gray-300">Total to Pay</span>
+            <span className="text-lg font-bold text-white">{settings?.currency.symbol || '€'}{totalAmount.toFixed(2)}</span>
+          </div>
+        )}
+        
+        <div className="flex justify-between items-center pt-2 border-t border-gray-700">
+          <span className="text-sm font-semibold text-gray-300">You Receive</span>
+          <span className="text-yellow-400 font-bold flex items-center gap-1">
+            <Zap className="h-4 w-4" />
+            {creditsReceived.toFixed(settings?.credits.decimals || 2)} {settings?.credits.symbol || 'Credits'}
+          </span>
+        </div>
+      </div>
+
+      {/* Cardholder Name */}
+      <div className="space-y-2">
+        <Label htmlFor="cardHolderName" className="text-gray-300">Cardholder Name</Label>
+        <Input
+          id="cardHolderName"
+          type="text"
+          value={cardHolderName}
+          onChange={(e) => setCardHolderName(e.target.value)}
+          className="bg-gray-800 border-gray-700 text-gray-100"
+          placeholder="John Smith"
+          required
+        />
+      </div>
+
+      {/* Nuvei Card Field */}
+      <div className="space-y-2">
+        <Label className="text-gray-300">Card Details</Label>
+        <div
+          ref={cardFieldRef}
+          className="bg-gray-800 border border-gray-700 rounded-lg p-4 min-h-[50px]"
+        />
+      </div>
+
+      {error && (
+        <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 flex items-start gap-2">
+          <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+          <p className="text-xs text-red-400">{error}</p>
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={loading}
+          className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-100"
+        >
+          Back
+        </Button>
+        <Button
+          type="submit"
+          disabled={loading || !sfcInitialized}
+          className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            `Pay ${settings?.currency.symbol || '€'}${totalAmount.toFixed(2)}`
+          )}
+        </Button>
+      </div>
+
+      <p className="text-xs text-center text-gray-500">
+        Secured by Nuvei • Your payment information is encrypted
       </p>
     </form>
   );

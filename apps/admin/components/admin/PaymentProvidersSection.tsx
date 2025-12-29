@@ -76,6 +76,20 @@ const BUILT_IN_PROVIDERS = [
     ],
   },
   {
+    slug: 'nuvei',
+    displayName: 'Nuvei',
+    logo: '💎',
+    defaultCredentials: [
+      { key: 'merchant_id', isSecret: false, description: 'Nuvei Merchant ID (from Control Panel)' },
+      { key: 'site_id', isSecret: false, description: 'Nuvei Merchant Site ID (from Control Panel)' },
+      { key: 'secret_key', isSecret: true, description: 'Nuvei Secret Key (for checksum calculation)' },
+      { key: 'success_url', isSecret: false, description: 'Success URL (redirect after successful payment)' },
+      { key: 'pending_url', isSecret: false, description: 'Pending URL (redirect for pending payments)' },
+      { key: 'back_url', isSecret: false, description: 'Back URL (redirect when user cancels)' },
+      { key: 'failure_url', isSecret: false, description: 'Failure URL (redirect after failed payment)' },
+    ],
+  },
+  {
     slug: 'polar',
     displayName: 'Polar',
     logo: '❄️',
