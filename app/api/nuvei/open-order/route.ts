@@ -59,8 +59,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Generate unique transaction ID
-    const clientUniqueId = `deposit_${userId}_${Date.now()}`;
+    // Generate unique transaction ID (max 45 chars for Nuvei)
+    // Format: dep_[last8ofUserId]_[timestamp] = 4 + 8 + 1 + 13 = 26 chars
+    const shortUserId = userId.slice(-8);
+    const clientUniqueId = `dep_${shortUserId}_${Date.now()}`;
     
     // Get webhook URL for DMN notifications
     const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL;
@@ -97,6 +99,7 @@ export async function POST(req: NextRequest) {
         sessionToken: result.sessionToken,
         clientUniqueId,
         orderId: result.orderId,
+        fullUserId: userId, // Store full userId for reference
       },
     });
 
