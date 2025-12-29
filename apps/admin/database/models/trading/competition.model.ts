@@ -320,9 +320,9 @@ const CompetitionSchema = new Schema<ICompetition>(
     marginCallThreshold: {
       type: Number,
       required: true,
-      default: 50, // 50% of starting capital
+      default: 100, // Margin call level from risk settings (can be 100%+)
       min: 10,
-      max: 90,
+      max: 1000, // Allow high margin call levels
     },
     marginSettings: {
       type: {

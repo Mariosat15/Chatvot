@@ -256,9 +256,9 @@ const ChallengeSchema = new Schema<IChallenge>(
     marginCallThreshold: {
       type: Number,
       required: true,
-      default: 50,
+      default: 100, // Margin call level from risk settings (can be 100%+)
       min: 10,
-      max: 90,
+      max: 1000, // Allow high margin call levels
     },
     marginSettings: {
       type: {
