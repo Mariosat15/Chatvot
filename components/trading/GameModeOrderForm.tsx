@@ -81,6 +81,8 @@ interface GameModeOrderFormProps {
   // Margin thresholds from admin settings (optional - falls back to defaults)
   // This ensures admin panel issues don't break trading
   marginThresholds?: MarginThresholds;
+  disabled?: boolean; // Disable trading (e.g., when disqualified)
+  disabledReason?: string; // Reason for disabling
 }
 
 // Risk levels with gaming terminology and clear descriptions
@@ -128,6 +130,8 @@ export default function GameModeOrderForm({
   currentEquity,
   existingUsedMargin,
   marginThresholds = DEFAULT_MARGIN_THRESHOLDS,
+  disabled = false,
+  disabledReason,
 }: GameModeOrderFormProps) {
   const { symbol: chartSymbol, setSymbol: setChartSymbol } = useChartSymbol();
   const { prices, subscribe, unsubscribe } = usePrices();
@@ -235,7 +239,7 @@ export default function GameModeOrderForm({
   const hasEnoughBalance = marginRequired <= availableCapital;
   const positionWithinLimit = positionValue <= (availableCapital * leverage);
   const marginSafeToTrade = !currentlyBelowMarginCall && !wouldCauseMarginCall;
-  const canPlaceOrder = hasEnoughBalance && positionWithinLimit && openPositionsCount < maxPositions && marginSafeToTrade;
+  const canPlaceOrder = !disabled && hasEnoughBalance && positionWithinLimit && openPositionsCount < maxPositions && marginSafeToTrade;
 
   // Calculate max safe amount considering margin stopout levels
   // This ensures we don't push margin level below the WARNING threshold
@@ -776,7 +780,19 @@ export default function GameModeOrderForm({
         </div>
       )}
 
-      {!canPlaceOrder && !currentlyBelowMarginCall && !wouldCauseMarginCall && (
+      {/* Disabled state message (e.g., disqualified) */}
+      {disabled && (
+        <div className="bg-red/10 border border-red rounded-lg p-3 text-center">
+          <p className="text-sm text-red font-semibold">
+            🚫 Trading Disabled
+          </p>
+          <p className="text-xs text-dark-600 mt-1">
+            {disabledReason || 'You cannot place trades at this time.'}
+          </p>
+        </div>
+      )}
+
+      {!canPlaceOrder && !disabled && !currentlyBelowMarginCall && !wouldCauseMarginCall && (
         <div className="bg-red/10 border border-red rounded-lg p-3 text-center animate-pulse">
           <p className="text-sm text-red font-semibold">
             {!hasEnoughBalance 

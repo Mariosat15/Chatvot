@@ -106,6 +106,11 @@ export default function ParticipantStatusMonitor({
               description: 'Your account was liquidated due to margin call. You are no longer eligible for prizes.',
               duration: 10000,
             });
+
+            // Refresh the page after a short delay to update the UI
+            setTimeout(() => {
+              router.refresh();
+            }, 2000);
           }
 
           // Handle disqualification
@@ -117,6 +122,11 @@ export default function ParticipantStatusMonitor({
               description: data.reason || 'You did not meet the competition requirements.',
               duration: 10000,
             });
+
+            // Refresh the page after a short delay to update the UI
+            setTimeout(() => {
+              router.refresh();
+            }, 2000);
           }
         }
       } catch (error) {

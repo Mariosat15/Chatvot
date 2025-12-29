@@ -17,6 +17,8 @@ interface TradingInterfaceProps {
   existingUsedMargin: number;
   currentBalance: number;
   marginThresholds?: MarginThresholds;
+  disabled?: boolean; // Disable trading (e.g., when disqualified)
+  disabledReason?: string; // Reason for disabling (e.g., "You are disqualified")
 }
 
 // Create context for trading mode
@@ -65,6 +67,8 @@ export default function TradingInterface({
   existingUsedMargin,
   currentBalance,
   marginThresholds,
+  disabled = false,
+  disabledReason,
 }: TradingInterfaceProps) {
   const { mode, setMode } = useTradingMode();
 
@@ -103,6 +107,8 @@ export default function TradingInterface({
           existingUsedMargin={existingUsedMargin}
           currentBalance={currentBalance}
           marginThresholds={marginThresholds}
+          disabled={disabled}
+          disabledReason={disabledReason}
         />
       ) : (
         <GameModeOrderForm
@@ -114,6 +120,8 @@ export default function TradingInterface({
           currentEquity={currentEquity}
           existingUsedMargin={existingUsedMargin}
           marginThresholds={marginThresholds}
+          disabled={disabled}
+          disabledReason={disabledReason}
         />
       )}
     </div>

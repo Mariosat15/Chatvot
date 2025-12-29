@@ -75,6 +75,8 @@ interface OrderFormProps {
     WARNING: number;
     SAFE: number;
   };
+  disabled?: boolean; // Disable trading (e.g., when disqualified)
+  disabledReason?: string; // Reason for disabling
 }
 
 const OrderForm = ({
@@ -87,6 +89,8 @@ const OrderForm = ({
   existingUsedMargin,
   currentBalance,
   marginThresholds,
+  disabled = false,
+  disabledReason,
 }: OrderFormProps) => {
   const { prices, subscribe, unsubscribe, marketOpen, marketStatus } = usePrices();
   const { symbol, setSymbol: setChartSymbol } = useChartSymbol();
@@ -322,7 +326,9 @@ const OrderForm = ({
   // 2. Not at max positions
   // 3. Current margin is above margin call threshold
   // 4. Trade won't push margin below margin call
+  // 5. Trading is not disabled (e.g., disqualified)
   const canPlaceOrder =
+    !disabled &&
     availableCapital >= marginRequired && 
     openPositionsCount < maxPositions && 
     !currentlyBelowMarginCall &&
@@ -954,7 +960,9 @@ const OrderForm = ({
 
       {!canPlaceOrder && (
         <p className="text-xs text-red text-center">
-          {openPositionsCount >= maxPositions
+          {disabled
+            ? (disabledReason || '🚫 Trading is disabled')
+            : openPositionsCount >= maxPositions
             ? `Maximum ${maxPositions} positions reached`
             : 'Insufficient capital for this trade'}
         </p>

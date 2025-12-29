@@ -545,6 +545,11 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                       existingUsedMargin={participant.usedMargin}
                       currentBalance={participant.currentCapital}
                       marginThresholds={marginThresholds}
+                      disabled={isDisqualified}
+                      disabledReason={participantStatus === 'liquidated' 
+                        ? '💀 Your account was liquidated. You cannot place new trades.'
+                        : '🚫 You are disqualified. You cannot place new trades.'
+                      }
                     />
                   </div>
                 </div>
