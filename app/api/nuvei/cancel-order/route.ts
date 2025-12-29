@@ -30,12 +30,29 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { clientUniqueId, reason, status = 'cancelled', errorCode, errorDescription } = body;
 
+    // SECURITY: Validate required fields
     if (!clientUniqueId) {
       return NextResponse.json(
         { error: 'Missing clientUniqueId' },
         { status: 400 }
       );
     }
+    
+    // SECURITY: Validate clientUniqueId format to prevent injection
+    if (typeof clientUniqueId !== 'string' || clientUniqueId.length > 100) {
+      return NextResponse.json(
+        { error: 'Invalid clientUniqueId format' },
+        { status: 400 }
+      );
+    }
+    
+    // SECURITY: Sanitize reason to prevent XSS/injection
+    const sanitizedReason = typeof reason === 'string' 
+      ? reason.substring(0, 500).replace(/[<>]/g, '') 
+      : undefined;
+    const sanitizedErrorDesc = typeof errorDescription === 'string'
+      ? errorDescription.substring(0, 500).replace(/[<>]/g, '')
+      : undefined;
 
     await connectToDatabase();
 
@@ -83,14 +100,14 @@ export async function POST(req: NextRequest) {
     // Mark as failed or cancelled
     const newStatus = status === 'failed' ? 'failed' : 'cancelled';
     transaction.status = newStatus;
-    transaction.failureReason = reason || errorDescription || (newStatus === 'cancelled' ? 'User cancelled' : 'Payment failed');
+    transaction.failureReason = sanitizedReason || sanitizedErrorDesc || (newStatus === 'cancelled' ? 'User cancelled' : 'Payment failed');
     transaction.processedAt = new Date();
     transaction.metadata = {
       ...transaction.metadata,
-      clientErrorCode: errorCode,
-      clientErrorDescription: errorDescription,
+      clientErrorCode: typeof errorCode === 'string' ? errorCode.substring(0, 50) : errorCode,
+      clientErrorDescription: sanitizedErrorDesc,
       cancelledAt: new Date().toISOString(),
-      cancelReason: reason,
+      cancelReason: sanitizedReason,
     };
     
     await transaction.save();

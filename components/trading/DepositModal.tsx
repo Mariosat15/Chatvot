@@ -94,6 +94,10 @@ export default function DepositModal({ children }: DepositModalProps) {
   const [providers, setProviders] = useState<PaymentProviders | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<PaymentProvider>('stripe');
   const [step, setStep] = useState<'amount' | 'provider' | 'payment'>('amount');
+  
+  // SECURITY: Refs to prevent double-clicks and race conditions
+  const isProcessingRef = useRef(false);
+  const lastRequestIdRef = useRef<string | null>(null);
 
   const minDeposit = (settings as { transactions?: { minimumDeposit?: number } })?.transactions?.minimumDeposit || 10;
 
@@ -191,11 +195,19 @@ export default function DepositModal({ children }: DepositModalProps) {
 
   const handleAmountSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // SECURITY: Prevent double-submit
+    if (loading || isProcessingRef.current) {
+      console.log('🛡️ Blocked duplicate amount submit');
+      return;
+    }
+    
     setError('');
 
     const amountNum = parseFloat(amount);
     const currencySymbol = settings?.currency?.symbol || '€';
 
+    // SECURITY: Strict validation
     if (isNaN(amountNum) || amountNum < minDeposit) {
       setError(`Minimum is ${currencySymbol}${minDeposit}`);
       return;
@@ -203,6 +215,12 @@ export default function DepositModal({ children }: DepositModalProps) {
 
     if (amountNum > 10000) {
       setError(`Maximum is ${currencySymbol}10,000`);
+      return;
+    }
+    
+    // SECURITY: Ensure amount is a valid number with max 2 decimal places
+    if (!/^\d+(\.\d{1,2})?$/.test(amount)) {
+      setError('Invalid amount format');
       return;
     }
 
@@ -221,20 +239,46 @@ export default function DepositModal({ children }: DepositModalProps) {
   };
 
   const proceedWithProvider = async (provider: PaymentProvider) => {
+    // SECURITY: Prevent double-clicks and race conditions
+    if (isProcessingRef.current || loading) {
+      console.log('🛡️ Blocked duplicate request - already processing');
+      return;
+    }
+    
+    // Generate unique request ID for this transaction
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    lastRequestIdRef.current = requestId;
+    isProcessingRef.current = true;
+    
     setLoading(true);
     setError('');
 
     try {
       const amountNum = parseFloat(amount);
+      
+      // SECURITY: Double-check amount validation client-side
+      if (isNaN(amountNum) || amountNum < minDeposit || amountNum > 10000) {
+        throw new Error('Invalid amount');
+      }
+      
       const vatAmount = calculateVAT(amountNum);
       const platformFeeAmount = calculatePlatformFee(amountNum);
       const totalPayment = calculateTotalPayment(amountNum);
+
+      // SECURITY: Check if this request is still valid (not superseded)
+      if (lastRequestIdRef.current !== requestId) {
+        console.log('🛡️ Request superseded by newer request');
+        return;
+      }
 
       if (provider === 'stripe') {
         // Create Stripe payment intent
         const response = await fetch('/api/stripe/create-payment-intent', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Request-Id': requestId, // For server-side idempotency
+          },
           body: JSON.stringify({ 
             amount: amountNum,
             totalAmount: totalPayment,
@@ -257,7 +301,10 @@ export default function DepositModal({ children }: DepositModalProps) {
         // Create Nuvei session
         const response = await fetch('/api/nuvei/open-order', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Request-Id': requestId, // For server-side idempotency
+          },
           body: JSON.stringify({ 
             amount: totalPayment,
             currency: settings?.currency?.code || 'EUR',
@@ -278,7 +325,10 @@ export default function DepositModal({ children }: DepositModalProps) {
         // Create Paddle checkout
         const response = await fetch('/api/paddle/create-checkout', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Request-Id': requestId, // For server-side idempotency
+          },
           body: JSON.stringify({ 
             amount: amountNum,
             currency: settings?.currency?.code || 'EUR',
@@ -304,6 +354,7 @@ export default function DepositModal({ children }: DepositModalProps) {
       setStep('amount');
     } finally {
       setLoading(false);
+      isProcessingRef.current = false;
     }
   };
 
@@ -342,6 +393,10 @@ export default function DepositModal({ children }: DepositModalProps) {
     setNuveiClientUniqueId('');
     setNuveiUserEmail('');
     setNuveiLoaded(false);
+    
+    // SECURITY: Reset processing refs to allow new transactions
+    isProcessingRef.current = false;
+    lastRequestIdRef.current = null;
   };
 
   const renderProviderIcon = (provider: PaymentProvider) => {
@@ -1001,24 +1056,39 @@ function NuveiPaymentForm({
     };
   }, []);
 
+  // SECURITY: Ref to prevent double-clicks
+  const isSubmittingRef = useRef(false);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // SECURITY: Prevent double-clicks and race conditions
+    if (isSubmittingRef.current || loading) {
+      console.log('🛡️ Blocked duplicate payment submit - already processing');
+      return;
+    }
+
     if (!scard || !window.SafeCharge) {
-      setError('Payment form not ready');
+      setError('Payment form not ready. Please wait or refresh.');
       return;
     }
 
-    if (!cardHolderName.trim()) {
-      setError('Please enter the cardholder name');
+    // SECURITY: Validate card holder name (prevent XSS/injection)
+    const sanitizedName = cardHolderName.trim().replace(/[<>]/g, '');
+    if (!sanitizedName || sanitizedName.length < 2 || sanitizedName.length > 100) {
+      setError('Please enter a valid cardholder name (2-100 characters)');
       return;
     }
 
-    if (!email.trim() || !email.includes('@')) {
+    // SECURITY: Validate email format strictly
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
       setError('Please enter a valid email address');
       return;
     }
 
+    // Lock submission
+    isSubmittingRef.current = true;
     setLoading(true);
     setError('');
 
@@ -1069,6 +1139,7 @@ function NuveiPaymentForm({
 
             if (verifyData.success || verifyData.status === 'APPROVED') {
               setSuccess(true);
+              isSubmittingRef.current = false; // Reset on success
               setTimeout(() => {
                 router.refresh();
                 onSuccess();
@@ -1076,6 +1147,7 @@ function NuveiPaymentForm({
             } else {
               setError(verifyData.reason || 'Payment verification failed');
               setLoading(false);
+              isSubmittingRef.current = false; // Reset on verification failure
             }
           } else {
             // Payment failed - notify server to mark transaction as failed
@@ -1104,6 +1176,7 @@ function NuveiPaymentForm({
             
             setError(failReason);
             setLoading(false);
+            isSubmittingRef.current = false; // Reset on payment failure
           }
         }
       );
@@ -1128,6 +1201,7 @@ function NuveiPaymentForm({
       
       setError(errorMsg);
       setLoading(false);
+      isSubmittingRef.current = false; // Reset on exception
     }
   };
 

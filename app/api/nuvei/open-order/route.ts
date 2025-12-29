@@ -32,15 +32,56 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { amount, currency = 'EUR' } = body;
 
-    // Validate amount
-    if (!amount || isNaN(amount) || amount <= 0) {
+    // SECURITY: Strict amount validation
+    const amountNum = parseFloat(amount);
+    if (!amount || isNaN(amountNum) || amountNum <= 0) {
       return NextResponse.json(
         { error: 'Invalid amount' },
         { status: 400 }
       );
     }
+    
+    // SECURITY: Minimum deposit (10 EUR)
+    if (amountNum < 10) {
+      return NextResponse.json(
+        { error: 'Minimum deposit is €10' },
+        { status: 400 }
+      );
+    }
+    
+    // SECURITY: Maximum deposit (10,000 EUR) to prevent money laundering
+    if (amountNum > 10000) {
+      return NextResponse.json(
+        { error: 'Maximum deposit is €10,000' },
+        { status: 400 }
+      );
+    }
+    
+    // SECURITY: Validate currency
+    const allowedCurrencies = ['EUR', 'USD', 'GBP'];
+    if (!allowedCurrencies.includes(currency.toUpperCase())) {
+      return NextResponse.json(
+        { error: 'Invalid currency' },
+        { status: 400 }
+      );
+    }
 
     await connectToDatabase();
+    
+    // SECURITY: Check for recent pending transactions to prevent duplicate orders
+    const recentPending = await WalletTransaction.findOne({
+      userId,
+      status: 'pending',
+      provider: 'nuvei',
+      createdAt: { $gte: new Date(Date.now() - 60000) }, // Last 60 seconds
+    });
+    
+    if (recentPending) {
+      return NextResponse.json(
+        { error: 'A payment is already in progress. Please wait or cancel the previous transaction.' },
+        { status: 429 }
+      );
+    }
 
     // Ensure wallet exists
     let wallet = await CreditWallet.findOne({ userId });
