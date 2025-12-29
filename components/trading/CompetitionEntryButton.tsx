@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Trophy, Loader2, CheckCircle, AlertCircle, DollarSign } from 'lucide-react';
+import { Trophy, Loader2, CheckCircle, AlertCircle, DollarSign, History, Ban, Skull, XCircle } from 'lucide-react';
 import { enterCompetition } from '@/lib/actions/trading/competition.actions';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ interface CompetitionEntryButtonProps {
   userBalance: number;
   isUserIn: boolean;
   isFull: boolean;
+  participantStatus?: string; // 'active' | 'liquidated' | 'disqualified' | 'completed' | 'cancelled'
 }
 
 export default function CompetitionEntryButton({
@@ -22,6 +23,7 @@ export default function CompetitionEntryButton({
   userBalance,
   isUserIn,
   isFull,
+  participantStatus,
 }: CompetitionEntryButtonProps) {
   const [entering, setEntering] = useState(false);
   const router = useRouter();
@@ -31,7 +33,23 @@ export default function CompetitionEntryButton({
   const canAfford = userBalance >= entryFee;
   const isActive = competition.status === 'active';
   const isUpcoming = competition.status === 'upcoming';
+  const isCompleted = competition.status === 'completed';
   const canEnter = (isActive || isUpcoming) && !isFull && canAfford && !isUserIn;
+  
+  // Check if user is disqualified (liquidated or disqualified status)
+  const isDisqualified = participantStatus === 'liquidated' || participantStatus === 'disqualified';
+  
+  // Get disqualification reason for display
+  const getDisqualificationReason = () => {
+    switch (participantStatus) {
+      case 'liquidated':
+        return 'Your account was liquidated due to margin call.';
+      case 'disqualified':
+        return 'You were disqualified from this competition.';
+      default:
+        return 'You are no longer eligible for prizes.';
+    }
+  };
 
   const handleEnter = async () => {
     if (!canAfford) {
@@ -68,30 +86,66 @@ export default function CompetitionEntryButton({
       {/* Already Entered */}
       {isUserIn ? (
         <div className="space-y-4">
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-            <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-green-400">You&apos;re in this competition!</p>
-              <p className="text-xs text-gray-400 mt-1">
-                {isActive ? 'Start trading now' : 'Competition will start soon'}
-              </p>
-            </div>
-          </div>
+          {/* Disqualified State */}
+          {isDisqualified ? (
+            <>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                {participantStatus === 'liquidated' ? (
+                  <Skull className="h-5 w-5 text-red-500 shrink-0" />
+                ) : (
+                  <Ban className="h-5 w-5 text-red-500 shrink-0" />
+                )}
+                <div>
+                  <p className="text-sm font-medium text-red-400">You are disqualified</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {getDisqualificationReason()}
+                  </p>
+                </div>
+              </div>
 
-          {isActive ? (
-            <Link href={`/competitions/${competition._id}/trade`}>
-              <Button className="w-full bg-blue-500 hover:bg-blue-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-blue-500/25">
-                <Trophy className="mr-2 h-4 w-4" />
-                Start Trading
-              </Button>
-            </Link>
-          ) : isUpcoming ? (
-            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-              <p className="text-xs text-yellow-400 text-center">
-                ⏰ Trading will unlock when the competition starts
-              </p>
-            </div>
-          ) : null}
+              <Link href={`/competitions/${competition._id}/trade?viewOnly=true`}>
+                <Button className="w-full bg-purple-500 hover:bg-purple-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-purple-500/25">
+                  <History className="mr-2 h-4 w-4" />
+                  View Trade History
+                </Button>
+              </Link>
+            </>
+          ) : (
+            /* Active Participant */
+            <>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-green-400">You&apos;re in this competition!</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {isActive ? 'Start trading now' : isCompleted ? 'Competition has ended' : 'Competition will start soon'}
+                  </p>
+                </div>
+              </div>
+
+              {isActive ? (
+                <Link href={`/competitions/${competition._id}/trade`}>
+                  <Button className="w-full bg-blue-500 hover:bg-blue-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-blue-500/25">
+                    <Trophy className="mr-2 h-4 w-4" />
+                    Start Trading
+                  </Button>
+                </Link>
+              ) : isUpcoming ? (
+                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                  <p className="text-xs text-yellow-400 text-center">
+                    ⏰ Trading will unlock when the competition starts
+                  </p>
+                </div>
+              ) : isCompleted ? (
+                <Link href={`/competitions/${competition._id}/trade?viewOnly=true`}>
+                  <Button className="w-full bg-purple-500 hover:bg-purple-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-purple-500/25">
+                    <History className="mr-2 h-4 w-4" />
+                    View Trade History
+                  </Button>
+                </Link>
+              ) : null}
+            </>
+          )}
         </div>
       ) : (
         /* Entry Section */

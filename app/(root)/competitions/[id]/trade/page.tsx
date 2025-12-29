@@ -25,10 +25,12 @@ import { PositionEventsProvider } from '@/contexts/PositionEventsProvider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CompetitionInfoHeader } from '@/components/trading/CompetitionInfoHeader';
 import CompetitionStatusMonitor from '@/components/trading/CompetitionStatusMonitor';
+import ParticipantStatusMonitor from '@/components/trading/ParticipantStatusMonitor';
 import TradingArsenalPanel from '@/components/trading/TradingArsenalPanel';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Skull, Ban, History } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface TradingPageProps {
   params: Promise<{ id: string }>;
@@ -85,6 +87,10 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const participant = participantDoc as any;
 
+  // Check if participant is disqualified (liquidated or disqualified status)
+  const isDisqualified = participant.status === 'liquidated' || participant.status === 'disqualified';
+  const participantStatus = participant.status;
+
   // Get user's positions
   const positions = await getUserPositions(competitionId);
 
@@ -140,6 +146,15 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
           />
         )}
         
+        {/* Monitor participant status for live disqualification alerts - ONLY when not in view-only mode */}
+        {!isViewOnly && (
+          <ParticipantStatusMonitor 
+            competitionId={competitionId} 
+            initialParticipantStatus={participantStatus}
+            userId={session.user.id}
+          />
+        )}
+        
         <div className="min-h-screen bg-gradient-to-br from-dark-100 via-dark-100 to-dark-200">
         {/* View-Only Banner for Completed Competitions */}
         {isViewOnly && (
@@ -184,6 +199,23 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-400">
                           <span className="size-1.5 bg-purple-400 rounded-full" />
                           Viewing Results
+                        </span>
+                      ) : isDisqualified ? (
+                        <span className={cn(
+                          "inline-flex items-center gap-1 text-xs font-medium",
+                          participantStatus === 'liquidated' ? "text-red-400" : "text-orange-400"
+                        )}>
+                          {participantStatus === 'liquidated' ? (
+                            <>
+                              <Skull className="size-3.5" />
+                              Liquidated - Trading Disabled
+                            </>
+                          ) : (
+                            <>
+                              <Ban className="size-3.5" />
+                              Disqualified - Trading Disabled
+                            </>
+                          )}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-green-400">
@@ -402,6 +434,85 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                         <button className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-xl transition-colors">
                           View Full Results
                         </button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ) : isDisqualified ? (
+                /* Disqualified Mode - Show disqualification message */
+                <div className="bg-gradient-to-br from-red-500/10 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-red-500/30 shadow-2xl lg:sticky lg:top-6 backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-5">
+                    <h2 className="text-lg md:text-xl font-bold text-light-900 tracking-tight flex items-center gap-2">
+                      {participantStatus === 'liquidated' ? (
+                        <>
+                          <Skull className="h-6 w-6 text-red-400" />
+                          Account Liquidated
+                        </>
+                      ) : (
+                        <>
+                          <Ban className="h-6 w-6 text-orange-400" />
+                          Disqualified
+                        </>
+                      )}
+                    </h2>
+                    <span className={cn(
+                      "px-2 py-1 text-xs font-bold rounded",
+                      participantStatus === 'liquidated' 
+                        ? "bg-red-500/20 text-red-400" 
+                        : "bg-orange-500/20 text-orange-400"
+                    )}>
+                      {participantStatus === 'liquidated' ? 'LIQUIDATED' : 'DISQUALIFIED'}
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {/* Disqualification Alert */}
+                    <div className={cn(
+                      "p-4 rounded-xl border",
+                      participantStatus === 'liquidated' 
+                        ? "bg-red-500/10 border-red-500/30" 
+                        : "bg-orange-500/10 border-orange-500/30"
+                    )}>
+                      <p className={cn(
+                        "text-sm font-medium mb-2",
+                        participantStatus === 'liquidated' ? "text-red-300" : "text-orange-300"
+                      )}>
+                        {participantStatus === 'liquidated' 
+                          ? '💀 Your account was liquidated due to margin call.'
+                          : '🚫 You have been disqualified from this competition.'}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        You are no longer eligible for prizes in this competition. 
+                        You can still view your trade history.
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                      <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Final Capital</p>
+                      <p className="text-2xl font-bold text-gray-100">${participant.currentCapital.toLocaleString()}</p>
+                    </div>
+                    
+                    <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                      <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total P&L</p>
+                      <p className={`text-2xl font-bold ${participant.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {participant.pnl >= 0 ? '+' : ''}${participant.pnl?.toFixed(2) || '0.00'}
+                      </p>
+                    </div>
+                    
+                    <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                      <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Trades</p>
+                      <p className="text-2xl font-bold text-blue-400">{tradeHistory.length}</p>
+                    </div>
+
+                    <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                      <p className="text-sm text-red-300 text-center mb-3">
+                        Trading is disabled — You are disqualified
+                      </p>
+                      <Link href={`/competitions/${competitionId}`} className="block">
+                        <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold gap-2">
+                          <History className="h-4 w-4" />
+                          Back to Competition
+                        </Button>
                       </Link>
                     </div>
                   </div>

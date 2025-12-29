@@ -429,12 +429,13 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Entry Button/Info */}
-            {!isCompleted && (
+            {(!isCompleted || (isUserIn && userParticipant)) && (
               <CompetitionEntryButton
                 competition={competition}
                 userBalance={walletBalance.balance}
                 isUserIn={isUserIn}
                 isFull={isFull}
+                participantStatus={userParticipant?.status}
               />
             )}
 
