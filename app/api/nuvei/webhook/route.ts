@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
-import Transaction from '@/database/models/trading/transaction.model';
+import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import PaymentProvider from '@/database/models/payment-provider.model';
 import crypto from 'crypto';
@@ -130,14 +130,14 @@ export async function POST(req: NextRequest) {
     console.log(`Processing DMN: transactionId=${transactionId}, status=${status}, clientUniqueId=${clientUniqueId}`);
 
     // Find the pending transaction
-    let transaction = await Transaction.findOne({
+    let transaction = await WalletTransaction.findOne({
       'metadata.clientUniqueId': clientUniqueId,
       provider: 'nuvei',
     });
 
     if (!transaction) {
       // Try finding by orderId
-      transaction = await Transaction.findOne({
+      transaction = await WalletTransaction.findOne({
         'metadata.orderId': params.PPP_TransactionID,
         provider: 'nuvei',
       });

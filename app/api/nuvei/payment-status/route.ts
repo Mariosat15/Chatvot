@@ -7,11 +7,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { nuveiService } from '@/lib/services/nuvei.service';
 import { connectToDatabase } from '@/database/mongoose';
-import Transaction from '@/database/models/trading/transaction.model';
+import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 
 export async function POST(req: NextRequest) {
@@ -52,14 +52,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Find the transaction
-    let transaction = await Transaction.findOne({
+    let transaction = await WalletTransaction.findOne({
       userId,
       'metadata.sessionToken': sessionToken,
       provider: 'nuvei',
     });
 
     if (!transaction && clientUniqueId) {
-      transaction = await Transaction.findOne({
+      transaction = await WalletTransaction.findOne({
         userId,
         'metadata.clientUniqueId': clientUniqueId,
         provider: 'nuvei',
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
         const wallet = await CreditWallet.findOne({ userId });
         if (wallet) {
           // Check if this transaction was already credited
-          const alreadyCredited = await Transaction.findOne({
+          const alreadyCredited = await WalletTransaction.findOne({
             userId,
             providerTransactionId: result.transactionId,
             status: 'completed',

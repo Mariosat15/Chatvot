@@ -7,13 +7,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { nuveiService } from '@/lib/services/nuvei.service';
 import { connectToDatabase } from '@/database/mongoose';
-import User from '@/database/models/user.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import Transaction from '@/database/models/trading/transaction.model';
+import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,15 +41,6 @@ export async function POST(req: NextRequest) {
     }
 
     await connectToDatabase();
-
-    // Get user info
-    const user = await User.findById(userId);
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
 
     // Ensure wallet exists
     let wallet = await CreditWallet.findOne({ userId });
@@ -81,8 +71,8 @@ export async function POST(req: NextRequest) {
       amount: amount.toFixed(2),
       currency,
       clientUniqueId,
-      userEmail: user.email,
-      userCountry: user.country || 'US',
+      userEmail: session.user.email || '',
+      userCountry: 'US', // Will be overwritten by Nuvei if available
       notificationUrl,
     });
 
@@ -94,7 +84,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create pending transaction record
-    await Transaction.create({
+    await WalletTransaction.create({
       userId,
       walletId: wallet._id,
       type: 'deposit',
