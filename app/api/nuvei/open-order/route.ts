@@ -59,16 +59,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Get current balance for transaction record
+    const currentBalance = wallet.creditBalance || 0;
+
     // STEP 1: Create pending transaction FIRST to get its ID
     const pendingTransaction = await WalletTransaction.create({
       userId,
-      walletId: wallet._id,
-      type: 'deposit',
+      transactionType: 'deposit',
       amount,
       currency,
+      balanceBefore: currentBalance,
+      balanceAfter: currentBalance, // Will be updated when completed
       status: 'pending',
-      provider: 'nuvei',
+      paymentMethod: 'nuvei',
+      description: `Nuvei deposit of ${amount} ${currency}`,
       metadata: {
+        walletId: wallet._id.toString(),
         initiatedAt: new Date().toISOString(),
       },
     });

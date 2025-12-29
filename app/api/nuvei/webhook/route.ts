@@ -165,27 +165,32 @@ export async function POST(req: NextRequest) {
 
     // Update transaction based on status
     if (status === 'APPROVED' && errCode === 0) {
-      // Payment successful
+      // Credit the wallet FIRST to get new balance
+      const wallet = await CreditWallet.findOne({ userId: transaction.userId });
+      let newBalance = transaction.balanceBefore || 0;
+      
+      if (wallet) {
+        const oldBalance = wallet.creditBalance || 0;
+        wallet.creditBalance = oldBalance + transaction.amount;
+        wallet.totalDeposited = (wallet.totalDeposited || 0) + transaction.amount;
+        await wallet.save();
+        newBalance = wallet.creditBalance;
+        console.log(`Credited ${transaction.amount} to wallet for user ${transaction.userId}. New balance: ${newBalance}`);
+      } else {
+        console.error('Wallet not found for user:', transaction.userId);
+      }
+
+      // Payment successful - update transaction with new balance
       transaction.status = 'completed';
       transaction.providerTransactionId = nuveiTransactionId;
-      transaction.completedAt = new Date();
+      transaction.processedAt = new Date();
+      transaction.balanceAfter = newBalance;
       transaction.metadata = {
         ...transaction.metadata,
         dmnStatus: status,
         dmnTransactionId: nuveiTransactionId,
       };
       await transaction.save();
-
-      // Credit the wallet
-      const wallet = await CreditWallet.findOne({ userId: transaction.userId });
-      if (wallet) {
-        wallet.creditBalance += transaction.amount;
-        wallet.totalDeposited += transaction.amount;
-        await wallet.save();
-        console.log(`Credited ${transaction.amount} to wallet for user ${transaction.userId}`);
-      } else {
-        console.error('Wallet not found for user:', transaction.userId);
-      }
     } else if (status === 'DECLINED' || status === 'ERROR') {
       // Payment failed
       transaction.status = 'failed';
