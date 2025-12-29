@@ -97,7 +97,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
       const calculated = calculateCompetitionDifficulty({
         entryFee: competition.entryFee || competition.entryFeeCredits || 0,
         startingCapital: competition.startingCapital || competition.startingTradingPoints || 10000,
-        maxLeverage: competition.leverage?.max || competition.leverageAllowed || 100,
+        maxLeverage: riskSettings.maxLeverage,
         duration: Math.round((new Date(competition.endTime).getTime() - new Date(competition.startTime).getTime()) / (1000 * 60)),
         rules: competition.rules,
         riskLimits: competition.riskLimits,
@@ -387,7 +387,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                   <div className="p-2.5 bg-gray-900/50 rounded-lg text-center">
                     <p className="text-[10px] text-gray-500 uppercase">Leverage</p>
                     <p className="text-sm font-bold text-purple-400">
-                      1:{competition.leverage?.max || competition.leverageAllowed || 100}
+                      1:{riskSettings.maxLeverage}
                     </p>
                   </div>
                   <div className="p-2.5 bg-gray-900/50 rounded-lg text-center">

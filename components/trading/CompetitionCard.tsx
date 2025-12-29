@@ -106,9 +106,28 @@ export default function CompetitionCard({
   const theme = COMPETITION_THEMES[rankingMethod] || COMPETITION_THEMES.pnl;
   const rankingInfo = RANKING_DESCRIPTIONS[rankingMethod] || RANKING_DESCRIPTIONS.pnl;
 
-  // Calculate difficulty
-  // Get the actual max leverage from competition settings
-  const maxLeverage = competition.leverage?.max || competition.leverageAllowed || 100;
+  // Fetch platform risk settings for actual leverage
+  const [platformLeverage, setPlatformLeverage] = useState<number>(100);
+  
+  useEffect(() => {
+    const fetchRiskSettings = async () => {
+      try {
+        const res = await fetch('/api/trading/risk-settings');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.maxLeverage) {
+            setPlatformLeverage(data.settings.maxLeverage);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch risk settings:', err);
+      }
+    };
+    fetchRiskSettings();
+  }, []);
+
+  // Use platform leverage (actual trading leverage) instead of stored competition value
+  const maxLeverage = platformLeverage;
 
   const difficulty = useMemo(() => {
     // Check if competition has manual difficulty setting

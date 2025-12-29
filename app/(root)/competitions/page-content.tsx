@@ -135,6 +135,27 @@ export default function CompetitionsPageContent({
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyLevel[]>([]);
   const [levelFilter, setLevelFilter] = useState<number[]>([]);
   const [sortBy, setSortBy] = useState<'prize' | 'start' | 'participants' | 'entry' | 'difficulty'>('prize');
+  
+  // Platform risk settings (for actual leverage)
+  const [platformLeverage, setPlatformLeverage] = useState<number>(100);
+  
+  // Fetch platform risk settings on mount
+  useEffect(() => {
+    const fetchRiskSettings = async () => {
+      try {
+        const res = await fetch('/api/trading/risk-settings');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.maxLeverage) {
+            setPlatformLeverage(data.settings.maxLeverage);
+          }
+        }
+      } catch {
+        // Use default
+      }
+    };
+    fetchRiskSettings();
+  }, []);
 
   // Fetch fresh data
   const refreshData = useCallback(async (showSpinner = true) => {
@@ -241,7 +262,7 @@ export default function CompetitionsPageContent({
     return calculateCompetitionDifficulty({
       entryFeeCredits: c.entryFee || c.entryFeeCredits || 0,
       startingCapital: c.startingCapital || c.startingTradingPoints || 10000,
-      leverageAllowed: c.leverage?.max || c.leverageAllowed || 100,
+      leverageAllowed: platformLeverage, // Use platform leverage, not stored competition value
       maxParticipants: c.maxParticipants,
       participantCount: c.currentParticipants,
       durationHours,
@@ -249,7 +270,7 @@ export default function CompetitionsPageContent({
       riskLimits: c.riskLimits,
       levelRequirement: c.levelRequirement,
     });
-  }, []);
+  }, [platformLeverage]);
 
   // Get available level requirements
   const availableLevels = useMemo(() => {
