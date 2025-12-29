@@ -416,9 +416,12 @@ export default function PendingPaymentsSection() {
             <span className="capitalize">{payment.status}</span>
           </Badge>
           {/* Show failure/cancel reason */}
-          {(payment.status === 'failed' || payment.status === 'cancelled') && payment.failureReason && (
-            <p className="text-[10px] text-red-400 max-w-[120px] truncate text-center" title={payment.failureReason}>
-              {payment.failureReason}
+          {(payment.status === 'failed' || payment.status === 'cancelled') && (
+            <p 
+              className="text-[10px] text-red-400 max-w-[140px] truncate text-center" 
+              title={payment.failureReason || payment.metadata?.cancelReason || payment.metadata?.clientErrorDescription || payment.metadata?.errorReason || 'No reason recorded'}
+            >
+              {payment.failureReason || payment.metadata?.cancelReason || payment.metadata?.clientErrorDescription || payment.metadata?.errorReason || (payment.status === 'cancelled' ? 'User cancelled' : 'Card declined')}
             </p>
           )}
         </div>

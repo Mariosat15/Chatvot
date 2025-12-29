@@ -239,8 +239,11 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
           
           {/* Show failure/cancel reason for failed transactions */}
           {(transaction.status === 'failed' || transaction.status === 'cancelled') && (
-            <p className="text-xs text-red-400 mt-1 truncate" title={transaction.failureReason || transaction.metadata?.cancelReason || transaction.metadata?.clientErrorDescription}>
-              ❌ {transaction.failureReason || transaction.metadata?.cancelReason || transaction.metadata?.clientErrorDescription || (transaction.status === 'cancelled' ? 'Payment was cancelled' : 'Payment was declined')}
+            <p 
+              className="text-xs text-red-400 mt-1 truncate max-w-md" 
+              title={transaction.failureReason || transaction.metadata?.cancelReason || transaction.metadata?.clientErrorDescription || transaction.metadata?.errorReason || 'No details available'}
+            >
+              ❌ {transaction.failureReason || transaction.metadata?.cancelReason || transaction.metadata?.clientErrorDescription || transaction.metadata?.errorReason || (transaction.status === 'cancelled' ? 'Payment was cancelled by user' : 'Payment was declined by card issuer')}
             </p>
           )}
           <div className="flex items-center gap-2 mt-1">
