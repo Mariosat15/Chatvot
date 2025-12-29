@@ -433,8 +433,8 @@ export async function POST(request: NextRequest) {
       { session: mongoSession }
     );
 
-    // Record wallet transaction
-    await WalletTransaction.create(
+    // Record wallet transaction with proper description (same format as deposits)
+    const withdrawalTx = await WalletTransaction.create(
       [{
         userId: session.user.id,
         transactionType: 'withdrawal',
@@ -444,15 +444,72 @@ export async function POST(request: NextRequest) {
         currency: 'EUR',
         exchangeRate,
         status: 'pending',
-        description: `Withdrawal request for €${amountEUR.toFixed(2)}`,
+        description: `${amountCredits} credits (€${netAmountEUR.toFixed(2)} net after €${platformFee.toFixed(2)} fee)`,
         metadata: {
           withdrawalRequestId: withdrawalRequest[0]._id,
+          amountEUR,
           netAmountEUR,
           platformFee,
+          platformFeePercentage: feePercentage,
+          platformFeeFixed: feeFixed,
         },
       }],
       { session: mongoSession }
     );
+
+    // Create separate withdrawal fee transaction (same as deposits)
+    if (platformFee > 0) {
+      await WalletTransaction.create(
+        [{
+          userId: session.user.id,
+          transactionType: 'withdrawal_fee',
+          amount: -(platformFee * exchangeRate), // Fee in credits
+          balanceBefore: wallet.creditBalance,
+          balanceAfter: wallet.creditBalance, // Fee doesn't change balance (already deducted from withdrawal)
+          currency: 'EUR',
+          exchangeRate,
+          status: 'completed',
+          description: `Withdrawal fee: €${platformFee.toFixed(2)} (${feePercentage}%${feeFixed > 0 ? ` + €${feeFixed}` : ''})`,
+          metadata: {
+            withdrawalTransactionId: withdrawalTx[0]._id,
+            withdrawalRequestId: withdrawalRequest[0]._id,
+            platformFeePercentage: feePercentage,
+            platformFeeFixed: feeFixed,
+            platformFeeEUR: platformFee,
+          },
+        }],
+        { session: mongoSession }
+      );
+    }
+
+    await mongoSession.commitTransaction();
+
+    // Record withdrawal fee in platform financials (after commit, fire and forget)
+    if (platformFee > 0) {
+      try {
+        const { PlatformFinancialsService } = await import('@/lib/services/platform-financials.service');
+        
+        // Calculate bank fee for withdrawal (payout costs)
+        const bankWithdrawalFeePercentage = creditSettings.bankWithdrawalFeePercentage ?? 0.25;
+        const bankWithdrawalFeeFixed = creditSettings.bankWithdrawalFeeFixed ?? 0.25;
+        const bankFeeTotal = (amountEUR * bankWithdrawalFeePercentage / 100) + bankWithdrawalFeeFixed;
+        const netPlatformEarning = platformFee - bankFeeTotal;
+
+        console.log(`💵 Recording withdrawal fee to PlatformTransaction...`);
+        await PlatformFinancialsService.recordWithdrawalFee({
+          userId: session.user.id,
+          withdrawalAmount: amountEUR,
+          platformFeeAmount: platformFee,
+          bankFeeAmount: bankFeeTotal,
+          netEarning: netPlatformEarning,
+          transactionId: withdrawalTx[0]._id.toString(),
+        });
+        console.log(`✅ Withdrawal fee recorded: €${platformFee.toFixed(2)} (Bank: €${bankFeeTotal.toFixed(2)}, Net: €${netPlatformEarning.toFixed(2)})`);
+      } catch (error) {
+        console.error('❌ Error recording withdrawal fee:', error);
+        // Don't fail the withdrawal - fee recording is secondary
+      }
+    }
 
     // Check for auto-approval (sandbox mode only)
     let autoApproved = false;
@@ -463,7 +520,7 @@ export async function POST(request: NextRequest) {
       withdrawalRequest[0].isAutoApproved = true;
       withdrawalRequest[0].autoApprovalReason = 'Sandbox mode auto-approval';
       withdrawalRequest[0].processedAt = new Date();
-      await withdrawalRequest[0].save({ session: mongoSession });
+      await withdrawalRequest[0].save();
       autoApproved = true;
     } else if (
       withdrawalSettings.processingMode === 'automatic' &&
@@ -488,12 +545,10 @@ export async function POST(request: NextRequest) {
         withdrawalRequest[0].isAutoApproved = true;
         withdrawalRequest[0].autoApprovalReason = `Met auto-approval criteria: Amount ≤ €${withdrawalSettings.autoApproveMaxAmount}, Account age ${accountAge} days, Previous withdrawals: ${previousWithdrawals}`;
         withdrawalRequest[0].processedAt = new Date();
-        await withdrawalRequest[0].save({ session: mongoSession });
+        await withdrawalRequest[0].save();
         autoApproved = true;
       }
     }
-
-    await mongoSession.commitTransaction();
 
     // Note: Auto-approved withdrawals still need admin to complete the bank transfer
     // The auto-approval just skips the initial review step in sandbox mode
