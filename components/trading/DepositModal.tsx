@@ -68,6 +68,7 @@ declare global {
           result: string;
           errCode: string;
           errorDescription?: string;
+          reason?: string;
           transactionId?: string;
         }) => void
       ) => void;
@@ -292,7 +293,31 @@ export default function DepositModal({ children }: DepositModalProps) {
     }
   };
 
-  const resetModal = () => {
+  // Cancel pending Nuvei transaction
+  const cancelPendingNuveiTransaction = async (clientId: string) => {
+    if (!clientId) return;
+    try {
+      await fetch('/api/nuvei/cancel-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientUniqueId: clientId,
+          status: 'cancelled',
+          reason: 'User closed payment modal',
+        }),
+      });
+      console.log('Cancelled pending Nuvei transaction:', clientId);
+    } catch (err) {
+      console.error('Failed to cancel Nuvei transaction:', err);
+    }
+  };
+
+  const resetModal = async (cancelTransaction = true) => {
+    // Cancel any pending Nuvei transaction before resetting
+    if (cancelTransaction && nuveiClientUniqueId && step === 'payment' && selectedProvider === 'nuvei') {
+      await cancelPendingNuveiTransaction(nuveiClientUniqueId);
+    }
+    
     setAmount('50');
     setClientSecret('');
     setError('');
@@ -339,9 +364,12 @@ export default function DepositModal({ children }: DepositModalProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
+    <Dialog open={open} onOpenChange={async (isOpen) => {
+      if (!isOpen) {
+        // Cancel pending transaction when closing the modal
+        await resetModal(true);
+      }
       setOpen(isOpen);
-      if (!isOpen) resetModal();
     }}>
       <DialogTrigger asChild>
         {children}
@@ -603,7 +631,7 @@ export default function DepositModal({ children }: DepositModalProps) {
               platformFeePercentage={processingFee}
               onSuccess={() => {
                 setOpen(false);
-                resetModal();
+                resetModal(false); // Don't cancel - payment succeeded
               }}
               onCancel={() => setStep('provider')}
             />
@@ -648,7 +676,7 @@ export default function DepositModal({ children }: DepositModalProps) {
                 userEmail={nuveiUserEmail}
                 onSuccess={() => {
                   setOpen(false);
-                  resetModal();
+                  resetModal(false); // Don't cancel - payment succeeded
                 }}
                 onCancel={() => setStep('provider')}
               />
@@ -1021,14 +1049,55 @@ function NuveiPaymentForm({
               setLoading(false);
             }
           } else {
-            setError(result.errorDescription || result.result || 'Payment failed');
+            // Payment failed - notify server to mark transaction as failed
+            const failReason = result.errorDescription || result.reason || result.result || 'Payment failed';
+            console.log('Payment failed, notifying server:', { 
+              clientUniqueId, 
+              errorCode: result.errCode, 
+              reason: failReason 
+            });
+            
+            try {
+              await fetch('/api/nuvei/cancel-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  clientUniqueId,
+                  status: 'failed',
+                  reason: failReason,
+                  errorCode: result.errCode,
+                  errorDescription: result.errorDescription,
+                }),
+              });
+            } catch (cancelErr) {
+              console.error('Failed to notify server of payment failure:', cancelErr);
+            }
+            
+            setError(failReason);
             setLoading(false);
           }
         }
       );
     } catch (err) {
       console.error('Nuvei payment error:', err);
-      setError(err instanceof Error ? err.message : 'Payment failed');
+      const errorMsg = err instanceof Error ? err.message : 'Payment failed';
+      
+      // Notify server of the error
+      try {
+        await fetch('/api/nuvei/cancel-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientUniqueId,
+            status: 'failed',
+            reason: errorMsg,
+          }),
+        });
+      } catch (cancelErr) {
+        console.error('Failed to notify server of payment error:', cancelErr);
+      }
+      
+      setError(errorMsg);
       setLoading(false);
     }
   };
@@ -1151,7 +1220,25 @@ function NuveiPaymentForm({
         <Button
           type="button"
           variant="outline"
-          onClick={onCancel}
+          onClick={async () => {
+            // Cancel the pending transaction before going back
+            if (clientUniqueId && !success) {
+              try {
+                await fetch('/api/nuvei/cancel-order', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    clientUniqueId,
+                    status: 'cancelled',
+                    reason: 'User cancelled payment',
+                  }),
+                });
+              } catch (err) {
+                console.error('Failed to cancel transaction:', err);
+              }
+            }
+            onCancel();
+          }}
           disabled={loading}
           className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-100"
         >

@@ -25,24 +25,56 @@ export async function GET() {
     // Get Stripe client to verify payment intent statuses
     const stripe = await getStripeClient();
     
-    // Filter and verify pending payments against Stripe
+    // Filter and verify pending payments against payment providers
     const verifiedPendingPayments = [];
     
     for (const payment of pendingPayments) {
-      const paymentIntentId = (payment as any).paymentIntentId;
+      const paymentDoc = payment as any;
+      const provider = paymentDoc.provider || paymentDoc.metadata?.paymentProvider;
+      const paymentIntentId = paymentDoc.paymentIntentId;
+      const paymentAge = Date.now() - new Date(paymentDoc.createdAt).getTime();
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+      const isNuvei = provider === 'nuvei';
       
-      if (!paymentIntentId) {
-        // Old transaction without payment intent ID - check age
-        const paymentAge = Date.now() - new Date((payment as any).createdAt).getTime();
-        const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+      // Handle Nuvei payments
+      if (isNuvei) {
+        // Check if already cancelled/failed on client side
+        if (paymentDoc.status === 'failed' || paymentDoc.status === 'cancelled') {
+          console.log(`🚫 Nuvei payment ${paymentDoc._id} already ${paymentDoc.status}, skipping`);
+          continue;
+        }
         
+        // Auto-cancel old Nuvei pending payments (24 hours)
         if (paymentAge > maxAge) {
-          // Auto-cancel old payments without payment intent
-          console.log(`⏰ Auto-cancelling old pending payment without PI: ${(payment as any)._id}`);
-          await WalletTransaction.findByIdAndUpdate((payment as any)._id, {
+          console.log(`⏰ Auto-cancelling old Nuvei pending payment: ${paymentDoc._id}`);
+          await WalletTransaction.findByIdAndUpdate(paymentDoc._id, {
             status: 'cancelled',
             processedAt: new Date(),
-            description: `${(payment as any).description} - Auto-cancelled (no payment intent, expired)`,
+            failureReason: 'Auto-cancelled (expired - no payment completion after 24 hours)',
+            description: `${paymentDoc.description} - Auto-cancelled (expired)`,
+          });
+          continue;
+        }
+        
+        // Add Nuvei payment to verified list with provider info
+        verifiedPendingPayments.push({
+          ...payment,
+          providerStatus: 'pending',
+          providerNote: 'Nuvei payment awaiting verification',
+        });
+        continue;
+      }
+      
+      // Handle payments without payment intent ID (non-Stripe, non-Nuvei)
+      if (!paymentIntentId) {
+        if (paymentAge > maxAge) {
+          // Auto-cancel old payments without payment intent
+          console.log(`⏰ Auto-cancelling old pending payment without PI: ${paymentDoc._id}`);
+          await WalletTransaction.findByIdAndUpdate(paymentDoc._id, {
+            status: 'cancelled',
+            processedAt: new Date(),
+            failureReason: 'Auto-cancelled (expired - no payment intent, no completion)',
+            description: `${paymentDoc.description} - Auto-cancelled (no payment intent, expired)`,
           });
           continue;
         }

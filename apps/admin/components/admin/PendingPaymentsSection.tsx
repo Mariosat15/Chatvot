@@ -230,7 +230,28 @@ export default function PendingPaymentsSection() {
           fetchPaymentHistory();
         }
       } else {
-        toast.error(data.error || 'Failed to complete payment');
+        // Show specific error based on transaction status
+        if (data.transactionStatus === 'failed') {
+          toast.error(`❌ Cannot Complete: Payment FAILED\n${data.details || 'This payment was declined or encountered an error.'}`, {
+            duration: 6000,
+          });
+        } else if (data.transactionStatus === 'cancelled') {
+          toast.error(`🚫 Cannot Complete: Payment CANCELLED\n${data.details || 'User cancelled this transaction.'}`, {
+            duration: 6000,
+          });
+        } else if (data.transactionStatus === 'completed') {
+          toast.warning('Payment already completed', {
+            duration: 4000,
+          });
+        } else if (data.nuveiStatus) {
+          toast.error(`❌ Nuvei Payment Not Approved\nStatus: ${data.nuveiStatus}\n${data.details || ''}`, {
+            duration: 6000,
+          });
+        } else {
+          toast.error(data.error || 'Failed to complete payment');
+        }
+        // Refresh the list to show updated status
+        fetchPendingPayments();
       }
     } catch (error) {
       console.error('Error completing payment:', error);

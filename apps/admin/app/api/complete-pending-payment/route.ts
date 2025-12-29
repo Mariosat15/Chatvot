@@ -43,6 +43,94 @@ export async function POST(request: Request) {
     console.log('   User:', transaction.userId);
     console.log('   Amount:', transaction.amount, transaction.currency);
     console.log('   Credits:', transaction.creditsAmount);
+    console.log('   Provider:', transaction.provider || transaction.metadata?.paymentProvider || 'unknown');
+    console.log('   Status:', transaction.status);
+
+    // CRITICAL: Don't allow completing failed or cancelled transactions
+    if (transaction.status === 'failed') {
+      console.log('❌ Cannot complete: Transaction was FAILED');
+      console.log('   Failure Reason:', transaction.failureReason || 'Unknown');
+      return NextResponse.json(
+        { 
+          error: 'Cannot complete a failed payment', 
+          details: `This payment failed: ${transaction.failureReason || 'Payment was declined or encountered an error'}`,
+          transactionStatus: 'failed'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (transaction.status === 'cancelled') {
+      console.log('❌ Cannot complete: Transaction was CANCELLED');
+      console.log('   Cancel Reason:', transaction.failureReason || 'User cancelled');
+      return NextResponse.json(
+        { 
+          error: 'Cannot complete a cancelled payment', 
+          details: `This payment was cancelled: ${transaction.failureReason || 'User cancelled the transaction'}`,
+          transactionStatus: 'cancelled'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (transaction.status === 'completed') {
+      console.log('⚠️ Transaction already completed');
+      return NextResponse.json(
+        { 
+          error: 'Payment already completed', 
+          details: 'This payment has already been processed',
+          transactionStatus: 'completed'
+        },
+        { status: 400 }
+      );
+    }
+
+    // For Nuvei transactions, verify payment status before completing
+    const provider = transaction.provider || transaction.metadata?.paymentProvider;
+    if (provider === 'nuvei' && transaction.metadata?.clientUniqueId) {
+      console.log('🔍 Verifying Nuvei payment status before completing...');
+      
+      try {
+        const { nuveiService } = await import('@/lib/services/nuvei.service');
+        
+        // Check if we have a session token to verify
+        if (transaction.metadata?.sessionToken) {
+          const verifyResult = await nuveiService.getPaymentStatus(
+            transaction.metadata.sessionToken,
+            transaction.metadata.clientUniqueId
+          );
+          
+          console.log('   Nuvei verification result:', verifyResult);
+          
+          if ('error' in verifyResult) {
+            // Can't verify - transaction might be too old or invalid
+            console.log('⚠️ Could not verify Nuvei payment (may be expired or invalid)');
+          } else if (verifyResult.status !== 'APPROVED') {
+            // Payment was not approved by Nuvei
+            console.log(`❌ Nuvei payment status: ${verifyResult.status} - cannot complete`);
+            
+            // Update transaction to reflect actual status
+            transaction.status = verifyResult.status === 'DECLINED' ? 'failed' : 'cancelled';
+            transaction.failureReason = verifyResult.reason || `Nuvei status: ${verifyResult.status}`;
+            await transaction.save();
+            
+            return NextResponse.json(
+              { 
+                error: 'Payment was not approved by Nuvei', 
+                details: `Nuvei payment status: ${verifyResult.status}. ${verifyResult.reason || ''}`,
+                nuveiStatus: verifyResult.status
+              },
+              { status: 400 }
+            );
+          } else {
+            console.log('✅ Nuvei payment verified as APPROVED');
+          }
+        }
+      } catch (verifyError) {
+        console.error('⚠️ Error verifying Nuvei payment:', verifyError);
+        // Don't block - continue with manual completion but log the warning
+      }
+    }
 
     // Update transaction status
     transaction.status = 'completed';
