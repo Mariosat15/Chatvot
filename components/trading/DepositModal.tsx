@@ -311,7 +311,7 @@ export default function DepositModal({ children }: DepositModalProps) {
         setClientSecret(data.clientSecret);
         setStep('payment');
       } else if (provider === 'nuvei') {
-        // Create Nuvei session
+        // Create Nuvei session - send same fee breakdown as Stripe
         const response = await fetch('/api/nuvei/open-order', {
           method: 'POST',
           headers: { 
@@ -319,8 +319,14 @@ export default function DepositModal({ children }: DepositModalProps) {
             'X-Request-Id': requestId, // For server-side idempotency
           },
           body: JSON.stringify({ 
-            amount: totalPayment,
+            amount: totalPayment, // Total to charge (includes VAT + fees)
+            baseAmount: amountNum, // Credits value (what user receives)
             currency: settings?.currency?.code || 'EUR',
+            // Fee breakdown (same as Stripe)
+            vatAmount,
+            vatPercentage: vatEnabled ? vatPercentage : 0,
+            platformFeeAmount,
+            platformFeePercentage: processingFee,
           }),
         });
 

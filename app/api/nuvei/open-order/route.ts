@@ -3,7 +3,7 @@
  * Server-side endpoint to create a session token for Nuvei Web SDK
  * 
  * POST /api/nuvei/open-order
- * Body: { amount: number, currency: string }
+ * Body: { amount: number, currency: string, vatAmount, platformFeeAmount, etc. }
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -30,7 +30,16 @@ export async function POST(req: NextRequest) {
 
     const userId = session.user.id;
     const body = await req.json();
-    const { amount, currency = 'EUR' } = body;
+    const { 
+      amount, // Total amount to charge (includes VAT + platform fee)
+      currency = 'EUR',
+      // Fee breakdown from client (same as Stripe)
+      baseAmount, // Credits value (what user receives)
+      vatAmount = 0,
+      vatPercentage = 0,
+      platformFeeAmount = 0,
+      platformFeePercentage = 0,
+    } = body;
 
     // SECURITY: Strict amount validation
     const amountNum = parseFloat(amount);
@@ -69,8 +78,6 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
     
     // SECURITY: Check for recent pending transactions to prevent duplicate orders
-    // Only block if there's a very recent pending transaction (last 5 seconds)
-    // This prevents rapid double-clicks while allowing legitimate retries
     const recentPending = await WalletTransaction.findOne({
       userId,
       status: 'pending',
@@ -87,13 +94,12 @@ export async function POST(req: NextRequest) {
     }
     
     // Auto-cancel any OLD pending Nuvei transactions (older than 30 minutes)
-    // These are likely abandoned sessions
     const oldPending = await WalletTransaction.updateMany(
       {
         userId,
         status: 'pending',
         provider: 'nuvei',
-        createdAt: { $lt: new Date(Date.now() - 30 * 60 * 1000) }, // Older than 30 minutes
+        createdAt: { $lt: new Date(Date.now() - 30 * 60 * 1000) },
       },
       {
         $set: {
@@ -125,25 +131,70 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Get current balance for transaction record
     const currentBalance = wallet.creditBalance || 0;
+    
+    // Credits user will receive (base amount, not total charged)
+    const creditsToReceive = baseAmount || amountNum;
+    
+    // Get fee settings for bank fee calculation (same as Stripe)
+    const CreditConversionSettings = (await import('@/database/models/credit-conversion-settings.model')).default;
+    const feeSettings = await CreditConversionSettings.getSingleton();
+    
+    const bankDepositFeePercentage = feeSettings.bankDepositFeePercentage || 2.9;
+    const bankDepositFeeFixed = feeSettings.bankDepositFeeFixed || 0.30;
+    const bankFeePercentage = (amountNum * bankDepositFeePercentage) / 100;
+    const bankFeeTotal = bankFeePercentage + bankDepositFeeFixed;
+    const netPlatformEarning = (platformFeeAmount || 0) - bankFeeTotal;
 
-    // STEP 1: Create pending transaction FIRST to get its ID
+    // Build description (same format as Stripe)
+    let txDescription = `${creditsToReceive} credits`;
+    const feeParts = [];
+    if (vatAmount && vatAmount > 0) feeParts.push(`VAT €${vatAmount.toFixed(2)}`);
+    if (platformFeeAmount && platformFeeAmount > 0) feeParts.push(`Fee €${platformFeeAmount.toFixed(2)}`);
+    if (feeParts.length > 0) {
+      txDescription = `${creditsToReceive} credits (Total paid: €${amountNum.toFixed(2)} incl. ${feeParts.join(', ')})`;
+    }
+
+    console.log(`💰 Nuvei Deposit calculation:`);
+    console.log(`   Credits Value: €${creditsToReceive}`);
+    console.log(`   Total Charged: €${amountNum}`);
+    console.log(`   VAT (${vatPercentage}%): €${vatAmount}`);
+    console.log(`   Platform Fee (${platformFeePercentage}%): €${platformFeeAmount}`);
+    console.log(`   Bank Fee: €${bankFeeTotal.toFixed(2)}`);
+    console.log(`   Net Platform Earning: €${netPlatformEarning.toFixed(2)}`);
+
+    // STEP 1: Create pending transaction with full fee metadata (like Stripe)
     const pendingTransaction = await WalletTransaction.create({
       userId,
       transactionType: 'deposit',
-      amount,
+      amount: creditsToReceive, // Credits user will receive (not total charged)
       currency,
       balanceBefore: currentBalance,
-      balanceAfter: currentBalance, // Will be updated when completed
+      balanceAfter: currentBalance + creditsToReceive,
       status: 'pending',
-      provider: 'nuvei', // Payment provider
-      paymentMethod: 'card', // Payment method (card, etc.)
-      description: `Nuvei deposit of ${amount} ${currency}`,
+      provider: 'nuvei',
+      paymentMethod: 'card',
+      description: txDescription,
       metadata: {
         walletId: wallet._id.toString(),
         initiatedAt: new Date().toISOString(),
-        paymentProvider: 'nuvei', // Also in metadata for backwards compatibility
+        paymentProvider: 'nuvei',
+        // Same metadata as Stripe for financial tracking
+        eurAmount: creditsToReceive,
+        creditsReceived: creditsToReceive,
+        totalCharged: amountNum,
+        // VAT info
+        vatAmount: vatAmount || 0,
+        vatPercentage: vatPercentage || 0,
+        // Platform fees
+        platformDepositFeePercentage: platformFeePercentage || 0,
+        platformFeeAmount: platformFeeAmount || 0,
+        // Bank fees
+        bankDepositFeePercentage: bankDepositFeePercentage,
+        bankDepositFeeFixed: bankDepositFeeFixed,
+        bankFeeTotal: parseFloat(bankFeeTotal.toFixed(2)),
+        // Net calculations
+        netPlatformEarning: parseFloat(netPlatformEarning.toFixed(2)),
       },
     });
 
