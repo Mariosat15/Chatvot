@@ -83,10 +83,11 @@ const BUILT_IN_PROVIDERS = [
       { key: 'merchant_id', isSecret: false, description: 'Nuvei Merchant ID (from Control Panel)' },
       { key: 'site_id', isSecret: false, description: 'Nuvei Merchant Site ID (from Control Panel)' },
       { key: 'secret_key', isSecret: true, description: 'Nuvei Secret Key (for checksum calculation)' },
-      { key: 'success_url', isSecret: false, description: 'Success URL (redirect after successful payment)' },
-      { key: 'pending_url', isSecret: false, description: 'Pending URL (redirect for pending payments)' },
-      { key: 'back_url', isSecret: false, description: 'Back URL (redirect when user cancels)' },
-      { key: 'failure_url', isSecret: false, description: 'Failure URL (redirect after failed payment)' },
+      { key: 'dmn_url', isSecret: false, description: 'DMN URL (webhook for payment notifications) - AUTO-POPULATED' },
+      { key: 'success_url', isSecret: false, description: 'Success URL (redirect after successful payment) - AUTO-POPULATED' },
+      { key: 'pending_url', isSecret: false, description: 'Pending URL (redirect for pending payments) - AUTO-POPULATED' },
+      { key: 'back_url', isSecret: false, description: 'Back URL (redirect when user cancels) - AUTO-POPULATED' },
+      { key: 'failure_url', isSecret: false, description: 'Failure URL (redirect after failed payment) - AUTO-POPULATED' },
     ],
   },
   {
@@ -216,8 +217,74 @@ export default function PaymentProvidersSection() {
     }
   };
 
+  // Get the base URL for auto-populating URLs
+  const getBaseUrl = () => {
+    // Check for NEXT_PUBLIC_APP_URL environment variable first
+    if (typeof window !== 'undefined') {
+      // Try to get from meta tag or use window.location
+      const metaUrl = document.querySelector('meta[name="app-url"]')?.getAttribute('content');
+      if (metaUrl) return metaUrl.replace(/\/$/, '');
+    }
+    // Fallback to current origin (but this might be admin panel URL)
+    if (typeof window !== 'undefined') {
+      // If we're on admin subdomain or different port, try to construct main app URL
+      const origin = window.location.origin;
+      // Common pattern: admin.domain.com -> domain.com or localhost:3001 -> localhost:3000
+      if (origin.includes('admin.')) {
+        return origin.replace('admin.', '');
+      }
+      if (origin.includes(':3001')) {
+        return origin.replace(':3001', ':3000');
+      }
+      return origin;
+    }
+    return 'https://chartvolt.com'; // Default fallback
+  };
+
+  // Auto-populate Nuvei URLs
+  const autoPopulateNuveiUrls = (provider: PaymentProvider): PaymentProvider => {
+    if (provider.slug !== 'nuvei') return provider;
+    
+    const baseUrl = mainAppUrl || getBaseUrl();
+    const updatedCredentials = [...provider.credentials];
+    
+    // Define auto-populate URLs
+    const autoUrls: Record<string, string> = {
+      dmn_url: `${baseUrl}/api/nuvei/webhook`,
+      success_url: `${baseUrl}/wallet?status=success`,
+      pending_url: `${baseUrl}/wallet?status=pending`,
+      back_url: `${baseUrl}/wallet?status=cancelled`,
+      failure_url: `${baseUrl}/wallet?status=failed`,
+    };
+    
+    // Auto-populate empty URL fields
+    for (const cred of updatedCredentials) {
+      if (autoUrls[cred.key] && !cred.value) {
+        cred.value = autoUrls[cred.key];
+      }
+    }
+    
+    // Add missing URL credentials if they don't exist
+    for (const [key, value] of Object.entries(autoUrls)) {
+      if (!updatedCredentials.find(c => c.key === key)) {
+        updatedCredentials.push({
+          key,
+          value,
+          isSecret: false,
+          description: key === 'dmn_url' 
+            ? 'DMN URL (webhook for payment notifications)' 
+            : `${key.replace(/_/g, ' ')} - auto-populated`,
+        });
+      }
+    }
+    
+    return { ...provider, credentials: updatedCredentials };
+  };
+
   const handleOpenConfig = (provider: PaymentProvider) => {
-    setSelectedProvider(provider);
+    // Auto-populate URLs for Nuvei
+    const populatedProvider = autoPopulateNuveiUrls(provider);
+    setSelectedProvider(populatedProvider);
     setAutoConfigResult(null); // Reset auto-config result
     setConfigDialogOpen(true);
   };
@@ -684,6 +751,124 @@ export default function PaymentProvidersSection() {
                   className="bg-gray-900 border-gray-700 text-gray-100 mt-2"
                 />
               </div>
+
+              {/* Nuvei URL Configuration */}
+              {selectedProvider.slug === 'nuvei' && (
+                <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Zap className="h-5 w-5 text-purple-400" />
+                    <Label className="text-purple-300 font-semibold">Nuvei URL Configuration</Label>
+                  </div>
+                  
+                  <p className="text-xs text-gray-400 mb-3">
+                    URLs are auto-populated based on your domain. Copy these to your Nuvei Control Panel.
+                  </p>
+
+                  {/* Main App URL Override */}
+                  <div className="mb-4">
+                    <Label className="text-xs text-gray-400 mb-1 block">
+                      Main App URL (Override if needed)
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="url"
+                        placeholder="https://chartvolt.com"
+                        value={mainAppUrl}
+                        onChange={(e) => setMainAppUrl(e.target.value)}
+                        className="bg-gray-900 border-gray-700 text-gray-100 text-xs h-8 flex-1"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          const updated = autoPopulateNuveiUrls(selectedProvider);
+                          setSelectedProvider(updated);
+                          toast.success('URLs updated based on new domain');
+                        }}
+                        className="bg-purple-500 hover:bg-purple-600 text-white text-xs h-8"
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Update URLs
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* URL Preview Grid */}
+                  <div className="space-y-2">
+                    {['dmn_url', 'success_url', 'pending_url', 'back_url', 'failure_url'].map((urlKey) => {
+                      const cred = selectedProvider.credentials.find(c => c.key === urlKey);
+                      const labels: Record<string, { label: string; emoji: string; important?: boolean }> = {
+                        dmn_url: { label: 'DMN URL (Webhook)', emoji: '🔔', important: true },
+                        success_url: { label: 'Success URL', emoji: '✅' },
+                        pending_url: { label: 'Pending URL', emoji: '⏳' },
+                        back_url: { label: 'Back URL', emoji: '↩️' },
+                        failure_url: { label: 'Failure URL', emoji: '❌' },
+                      };
+                      const info = labels[urlKey];
+                      
+                      return (
+                        <div 
+                          key={urlKey} 
+                          className={`bg-gray-900/50 rounded p-2 flex items-center justify-between ${
+                            info?.important ? 'border border-yellow-500/50' : ''
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                              {info?.emoji} {info?.label}
+                              {info?.important && (
+                                <span className="text-yellow-400 text-[10px] px-1 py-0.5 bg-yellow-500/20 rounded">
+                                  REQUIRED
+                                </span>
+                              )}
+                            </span>
+                            <code className="text-xs text-gray-300 break-all block mt-1">
+                              {cred?.value || 'Not set'}
+                            </code>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (cred?.value) {
+                                navigator.clipboard.writeText(cred.value);
+                                toast.success(`${info?.label} copied!`);
+                              }
+                            }}
+                            className="ml-2 p-1.5 hover:bg-gray-700 rounded shrink-0"
+                          >
+                            <Copy className="h-3 w-3 text-gray-400" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Instructions */}
+                  <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded">
+                    <p className="text-xs text-yellow-400 font-semibold mb-2">
+                      📋 Setup Instructions for Nuvei Control Panel:
+                    </p>
+                    <ol className="text-xs text-gray-400 space-y-1 list-decimal list-inside">
+                      <li>Log into <a href="https://ppp-test.nuvei.com/cpanel" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Nuvei Control Panel</a></li>
+                      <li>Go to <strong>Settings → URLs</strong></li>
+                      <li>Copy each URL from above to the corresponding field</li>
+                      <li><strong>IMPORTANT:</strong> Set the DMN URL in <strong>Settings → DMN Settings</strong></li>
+                      <li>Enable &quot;Use DMN Selector&quot; toggle</li>
+                      <li>Save your changes</li>
+                    </ol>
+                  </div>
+
+                  <a
+                    href="https://ppp-test.nuvei.com/cpanel"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 text-xs text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Open Nuvei Control Panel
+                  </a>
+                </div>
+              )}
 
               {/* Auto-Configure Webhooks - Only for Stripe and Paddle */}
               {['stripe', 'paddle'].includes(selectedProvider.slug) && (

@@ -162,6 +162,7 @@ export default function DepositModal({ children }: DepositModalProps) {
   const [nuveiLoaded, setNuveiLoaded] = useState(false);
   const [nuveiSessionToken, setNuveiSessionToken] = useState('');
   const [nuveiClientUniqueId, setNuveiClientUniqueId] = useState('');
+  const [nuveiUserEmail, setNuveiUserEmail] = useState('');
 
   // Get available provider count
   const getAvailableProviders = () => {
@@ -256,6 +257,7 @@ export default function DepositModal({ children }: DepositModalProps) {
         const data = await response.json();
         setNuveiSessionToken(data.sessionToken);
         setNuveiClientUniqueId(data.clientUniqueId);
+        setNuveiUserEmail(data.userEmail || '');
         setStep('payment');
       } else if (provider === 'paddle') {
         // Create Paddle checkout
@@ -296,6 +298,11 @@ export default function DepositModal({ children }: DepositModalProps) {
     setError('');
     setLoading(false);
     setStep('amount');
+    // Reset Nuvei state
+    setNuveiSessionToken('');
+    setNuveiClientUniqueId('');
+    setNuveiUserEmail('');
+    setNuveiLoaded(false);
   };
 
   const renderProviderIcon = (provider: PaymentProvider) => {
@@ -638,7 +645,7 @@ export default function DepositModal({ children }: DepositModalProps) {
                 platformFeeAmount={calculatePlatformFee(parseFloat(amount))}
                 platformFeePercentage={processingFee}
                 sdkLoaded={nuveiLoaded}
-                userEmail=""
+                userEmail={nuveiUserEmail}
                 onSuccess={() => {
                   setOpen(false);
                   resetModal();

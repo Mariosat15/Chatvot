@@ -83,9 +83,12 @@ export async function POST(req: NextRequest) {
     // Format: txn_[24charTransactionId] = 4 + 24 = 28 chars
     const clientUniqueId = `txn_${pendingTransaction._id.toString()}`;
     
-    // Get webhook URL for DMN notifications
+    // Get webhook URL for DMN notifications (prefer stored DMN URL from admin config)
+    const clientConfig = await nuveiService.getClientConfig();
     const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL;
-    const notificationUrl = `${origin}/api/nuvei/webhook`;
+    // Use DMN URL from credentials if available, otherwise fallback to origin-based URL
+    const storedDmnUrl = process.env.NUVEI_DMN_URL;
+    const notificationUrl = storedDmnUrl || `${origin}/api/nuvei/webhook`;
 
     // STEP 3: Create order session with Nuvei
     const result = await nuveiService.openOrder({
@@ -118,15 +121,13 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Get client config for frontend
-    const clientConfig = await nuveiService.getClientConfig();
-
     return NextResponse.json({
       success: true,
       sessionToken: result.sessionToken,
       orderId: result.orderId,
       clientUniqueId,
       config: clientConfig,
+      userEmail: session.user.email || '',
     });
   } catch (error) {
     console.error('Nuvei open order error:', error);

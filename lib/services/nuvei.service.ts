@@ -22,6 +22,7 @@ interface NuveiCredentials {
   merchantId: string;
   siteId: string;
   secretKey: string;
+  dmnUrl?: string;
   successUrl?: string;
   pendingUrl?: string;
   backUrl?: string;
@@ -115,6 +116,9 @@ class NuveiService {
             case 'secret_key':
               credentials.secretKey = cred.value;
               break;
+            case 'dmn_url':
+              credentials.dmnUrl = cred.value;
+              break;
             case 'success_url':
               credentials.successUrl = cred.value;
               break;
@@ -150,6 +154,7 @@ class NuveiService {
       merchantId: process.env.NUVEI_MERCHANT_ID || '',
       siteId: process.env.NUVEI_SITE_ID || '',
       secretKey: process.env.NUVEI_SECRET_KEY || '',
+      dmnUrl: process.env.NUVEI_DMN_URL,
       successUrl: process.env.NUVEI_SUCCESS_URL,
       pendingUrl: process.env.NUVEI_PENDING_URL,
       backUrl: process.env.NUVEI_BACK_URL,
