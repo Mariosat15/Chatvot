@@ -394,10 +394,18 @@ export default function PendingPaymentsSection() {
         </div>
 
         {/* Status */}
-        <Badge className={`${STATUS_COLORS[payment.status]} flex items-center gap-1`}>
-          {STATUS_ICONS[payment.status]}
-          <span className="capitalize">{payment.status}</span>
-        </Badge>
+        <div className="flex flex-col items-center gap-1">
+          <Badge className={`${STATUS_COLORS[payment.status]} flex items-center gap-1`}>
+            {STATUS_ICONS[payment.status]}
+            <span className="capitalize">{payment.status}</span>
+          </Badge>
+          {/* Show failure/cancel reason */}
+          {(payment.status === 'failed' || payment.status === 'cancelled') && payment.failureReason && (
+            <p className="text-[10px] text-red-400 max-w-[120px] truncate text-center" title={payment.failureReason}>
+              {payment.failureReason}
+            </p>
+          )}
+        </div>
 
         {/* Provider & Transaction ID */}
         <div className="text-center w-36">
@@ -1118,11 +1126,45 @@ export default function PendingPaymentsSection() {
                 </div>
               )}
 
-              {/* Failure Reason */}
-              {detailDialog.payment.failureReason && (
+              {/* Failure Reason - Show for failed/cancelled transactions */}
+              {(detailDialog.payment.status === 'failed' || detailDialog.payment.status === 'cancelled') && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-red-400 mb-2">Failure Reason</h4>
-                  <p className="text-sm text-red-300">{detailDialog.payment.failureReason}</p>
+                  <h4 className="text-sm font-medium text-red-400 mb-2 flex items-center gap-2">
+                    <XCircle className="h-4 w-4" />
+                    {detailDialog.payment.status === 'failed' ? 'Payment Declined / Failed' : 'Payment Cancelled'}
+                  </h4>
+                  <div className="space-y-2">
+                    {detailDialog.payment.failureReason && (
+                      <p className="text-sm text-red-300">
+                        <span className="font-medium">Reason:</span> {detailDialog.payment.failureReason}
+                      </p>
+                    )}
+                    {detailDialog.payment.metadata?.clientErrorCode && (
+                      <p className="text-xs text-red-400/80">
+                        <span className="font-medium">Error Code:</span> {detailDialog.payment.metadata.clientErrorCode}
+                      </p>
+                    )}
+                    {detailDialog.payment.metadata?.clientErrorDescription && (
+                      <p className="text-xs text-red-400/80">
+                        <span className="font-medium">Error Description:</span> {detailDialog.payment.metadata.clientErrorDescription}
+                      </p>
+                    )}
+                    {detailDialog.payment.metadata?.errorReason && (
+                      <p className="text-xs text-red-400/80">
+                        <span className="font-medium">Provider Error:</span> {detailDialog.payment.metadata.errorReason}
+                      </p>
+                    )}
+                    {detailDialog.payment.metadata?.cancelReason && (
+                      <p className="text-xs text-red-400/80">
+                        <span className="font-medium">Cancel Reason:</span> {detailDialog.payment.metadata.cancelReason}
+                      </p>
+                    )}
+                    {detailDialog.payment.metadata?.cancelledAt && (
+                      <p className="text-xs text-gray-500">
+                        Cancelled at: {new Date(detailDialog.payment.metadata.cancelledAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 

@@ -236,6 +236,13 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
           ) : (
             <p className="text-xs text-gray-500 truncate">{transaction.description}</p>
           )}
+          
+          {/* Show failure/cancel reason for failed transactions */}
+          {(transaction.status === 'failed' || transaction.status === 'cancelled') && (
+            <p className="text-xs text-red-400 mt-1 truncate" title={transaction.failureReason || transaction.metadata?.cancelReason || transaction.metadata?.clientErrorDescription}>
+              ❌ {transaction.failureReason || transaction.metadata?.cancelReason || transaction.metadata?.clientErrorDescription || (transaction.status === 'cancelled' ? 'Payment was cancelled' : 'Payment was declined')}
+            </p>
+          )}
           <div className="flex items-center gap-2 mt-1">
             <p className="text-xs text-gray-600" suppressHydrationWarning>
               {new Date(transaction.createdAt).toLocaleString('en-US', {
