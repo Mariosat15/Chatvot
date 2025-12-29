@@ -5,12 +5,19 @@ import {
   Trophy, TrendingUp, TrendingDown, Target, BarChart3, 
   Activity, Clock, Flame, Award, Users, DollarSign,
   ArrowUpRight, ArrowDownRight, Zap, Shield, RefreshCw,
-  Play, Eye, ChevronRight, Sparkles, Medal, Crown
+  Play, Eye, ChevronRight, Sparkles, Medal, Crown,
+  AlertTriangle, Skull, Ban, CheckCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+
+interface CompetitionRules {
+  minimumTrades?: number;
+  minimumWinRate?: number;
+  disqualifyOnLiquidation?: boolean;
+}
 
 interface CompetitionDashboardProps {
   competitionId: string;
@@ -23,12 +30,14 @@ interface CompetitionDashboardProps {
     currentRank?: number;
     winningTrades?: number;
     losingTrades?: number;
+    status?: string;
   } | null;
   competitionStatus: 'upcoming' | 'active' | 'completed';
   startTime: string;
   endTime: string;
   startingCapital: number;
   totalParticipants: number;
+  competitionRules?: CompetitionRules;
 }
 
 interface AllTimeStats {
@@ -108,6 +117,7 @@ export default function CompetitionDashboard({
   endTime,
   startingCapital,
   totalParticipants,
+  competitionRules,
 }: CompetitionDashboardProps) {
   const { settings } = useAppSettings();
   const [allTimeStats, setAllTimeStats] = useState<AllTimeStats | null>(null);
@@ -223,8 +233,124 @@ export default function CompetitionDashboard({
 
   const rankInfo = getRankBadge(stats.currentRank, stats.totalParticipants || totalParticipants);
 
+  // Check disqualification status
+  const isLiquidated = initialParticipant?.status === 'liquidated';
+  const minimumTrades = competitionRules?.minimumTrades || 0;
+  const needsMoreTrades = minimumTrades > 0 && stats.totalTrades < minimumTrades;
+  const tradesRemaining = Math.max(0, minimumTrades - stats.totalTrades);
+  const minimumWinRate = competitionRules?.minimumWinRate || 0;
+  const winRate = stats.totalTrades > 0 ? (stats.winningTrades / stats.totalTrades) * 100 : 0;
+  const belowWinRate = minimumWinRate > 0 && winRate < minimumWinRate;
+  
+  // Is user at risk of disqualification?
+  const isDisqualified = isLiquidated;
+  const isAtRisk = !isDisqualified && (needsMoreTrades || belowWinRate) && isActive;
+
   return (
     <div className="space-y-6">
+      {/* 🚨 DISQUALIFICATION STATUS / WARNINGS */}
+      {/* Disqualified Banner */}
+      {isDisqualified && (
+        <div className="rounded-xl bg-gradient-to-r from-red-900/50 via-red-800/50 to-red-900/50 border-2 border-red-500/50 p-4 shadow-lg shadow-red-500/20 animate-pulse">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-500/30 rounded-xl">
+              <Skull className="h-8 w-8 text-red-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-red-400 flex items-center gap-2">
+                <Ban className="h-5 w-5" />
+                YOU ARE DISQUALIFIED
+              </h3>
+              <p className="text-sm text-red-300/80">
+                {isLiquidated 
+                  ? 'Your account was liquidated. You are no longer eligible for prizes in this competition.'
+                  : 'You have been disqualified from this competition.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* At Risk Warning */}
+      {isAtRisk && !isDisqualified && (
+        <div className="rounded-xl bg-gradient-to-r from-amber-900/30 via-orange-900/30 to-amber-900/30 border-2 border-amber-500/40 p-4">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-amber-500/20 rounded-xl shrink-0">
+              <AlertTriangle className="h-6 w-6 text-amber-400" />
+            </div>
+            <div className="flex-1 space-y-3">
+              <div>
+                <h3 className="text-lg font-bold text-amber-400 flex items-center gap-2">
+                  ⚠️ DISQUALIFICATION WARNING
+                </h3>
+                <p className="text-sm text-amber-300/70">You are at risk of being disqualified! Take action before the competition ends.</p>
+              </div>
+              
+              <div className="space-y-2">
+                {/* Minimum Trades Warning */}
+                {needsMoreTrades && (
+                  <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-amber-500/30">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-400" />
+                      <span className="text-sm text-gray-300">Minimum Trades Required</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-lg font-bold ${stats.totalTrades < minimumTrades ? 'text-red-400' : 'text-green-400'}`}>
+                        {stats.totalTrades}/{minimumTrades}
+                      </span>
+                      <span className="text-xs text-orange-400 font-semibold px-2 py-1 bg-orange-500/20 rounded">
+                        {tradesRemaining} more needed!
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Win Rate Warning */}
+                {belowWinRate && (
+                  <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-yellow-500/30">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4 text-yellow-400" />
+                      <span className="text-sm text-gray-300">Minimum Win Rate Required</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-lg font-bold ${winRate < minimumWinRate ? 'text-red-400' : 'text-green-400'}`}>
+                        {winRate.toFixed(1)}%
+                      </span>
+                      <span className="text-xs text-yellow-400">/ {minimumWinRate}% min</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Liquidation Warning if enabled */}
+                {competitionRules?.disqualifyOnLiquidation && (
+                  <div className="flex items-center gap-2 p-2 bg-red-500/10 rounded-lg border border-red-500/20">
+                    <Skull className="h-4 w-4 text-red-400" />
+                    <span className="text-xs text-red-300">Remember: Getting liquidated = instant disqualification!</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Qualified Badge - Show when all requirements are met */}
+      {!isDisqualified && !isAtRisk && competitionRules && (minimumTrades > 0 || minimumWinRate > 0) && isActive && (
+        <div className="rounded-xl bg-gradient-to-r from-green-900/20 via-emerald-900/20 to-green-900/20 border border-green-500/30 p-3">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 text-green-400" />
+            <span className="text-sm text-green-400 font-medium">
+              ✅ You meet all qualification requirements! Keep trading to improve your rank.
+            </span>
+            {minimumTrades > 0 && (
+              <span className="text-xs text-green-300/70 ml-auto">
+                Trades: {stats.totalTrades}/{minimumTrades} ✓
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Main Dashboard Card */}
       <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800/95 to-slate-900 border border-slate-700/50 overflow-hidden shadow-2xl">
         {/* Header with Status */}

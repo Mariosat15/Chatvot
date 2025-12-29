@@ -1,4 +1,4 @@
-import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, ArrowLeft, Target, Shield, AlertTriangle, Zap, Info, Percent, BarChart3, Skull, Bell } from 'lucide-react';
+import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, ArrowLeft, Target, Shield, AlertTriangle, Zap, Info, Percent, BarChart3, Skull, Bell, Ban } from 'lucide-react';
 import { getCompetitionById, getCompetitionLeaderboard, isUserInCompetition, getUserParticipant } from '@/lib/actions/trading/competition.actions';
 import { getWalletBalance } from '@/lib/actions/trading/wallet.actions';
 import { getTradingRiskSettings } from '@/lib/actions/trading/risk-settings.actions';
@@ -180,11 +180,17 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                   currentRank: userParticipant.currentRank,
                   winningTrades: userParticipant.winningTrades,
                   losingTrades: userParticipant.losingTrades,
+                  status: userParticipant.status,
                 }}
                 competitionStatus={isCompleted ? 'completed' : isActive ? 'active' : 'upcoming'}
                 startTime={new Date(competition.startTime).toISOString()}
                 endTime={new Date(competition.endTime).toISOString()}
                 startingCapital={competition.startingCapital || competition.startingTradingPoints || 10000}
+                competitionRules={competition.rules ? {
+                  minimumTrades: competition.rules.minimumTrades,
+                  minimumWinRate: competition.rules.minimumWinRate,
+                  disqualifyOnLiquidation: competition.rules.disqualifyOnLiquidation,
+                } : undefined}
                 totalParticipants={competition.currentParticipants}
               />
             )}
@@ -227,6 +233,118 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                   >
                     View Rules Guide
                   </Link>
+                </div>
+              </div>
+            )}
+
+            {/* ⚠️ DISQUALIFICATION RULES - Prominent Warning Section */}
+            {competition.rules && (competition.rules.minimumTrades > 0 || competition.rules.disqualifyOnLiquidation || competition.rules.minimumWinRate) && (
+              <div className="rounded-xl bg-gradient-to-br from-red-500/20 via-red-900/20 to-orange-900/20 border-2 border-red-500/40 p-6 shadow-lg shadow-red-500/10">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-red-500/20 rounded-lg">
+                    <Skull className="h-6 w-6 text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-red-400">⚠️ Disqualification Rules</h3>
+                    <p className="text-sm text-red-300/70">Breaking any rule below will result in DISQUALIFICATION from prizes</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  {/* Minimum Trades Requirement */}
+                  {competition.rules.minimumTrades > 0 && (
+                    <div className="p-4 bg-gray-900/70 rounded-xl border border-red-500/30">
+                      <div className="flex items-start gap-3">
+                        <div className="p-1.5 bg-orange-500/20 rounded-lg shrink-0">
+                          <AlertTriangle className="h-5 w-5 text-orange-400" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-bold text-orange-400">Minimum Trades Requirement</h4>
+                            <span className="px-3 py-1 bg-orange-500/20 text-orange-400 text-lg font-black rounded-lg">
+                              {competition.rules.minimumTrades} trades
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-300">
+                            You <strong className="text-white">MUST</strong> complete at least <strong className="text-orange-400">{competition.rules.minimumTrades} trade(s)</strong> before the competition ends.
+                          </p>
+                          <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
+                            <Ban className="h-3.5 w-3.5" />
+                            <span>Failing to meet this requirement = <strong>DISQUALIFIED</strong> (no prizes, regardless of rank)</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Liquidation = Disqualification */}
+                  {competition.rules.disqualifyOnLiquidation && (
+                    <div className="p-4 bg-gray-900/70 rounded-xl border border-red-500/30">
+                      <div className="flex items-start gap-3">
+                        <div className="p-1.5 bg-red-500/20 rounded-lg shrink-0">
+                          <Skull className="h-5 w-5 text-red-400" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-bold text-red-400">Liquidation = Disqualification</h4>
+                            <span className="px-3 py-1 bg-red-500/20 text-red-400 text-sm font-bold rounded-lg animate-pulse">
+                              ACTIVE
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-300">
+                            If your margin level drops to <strong className="text-red-400">{riskSettings.marginLiquidation}%</strong> and your positions are liquidated, you will be <strong className="text-red-400">IMMEDIATELY DISQUALIFIED</strong>.
+                          </p>
+                          <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
+                            <Ban className="h-3.5 w-3.5" />
+                            <span>Getting liquidated = <strong>DISQUALIFIED</strong> (no prizes, even if you were #1)</span>
+                          </p>
+                          <div className="mt-3 p-2 bg-red-500/10 rounded-lg border border-red-500/20">
+                            <p className="text-xs text-gray-400">
+                              💡 <strong>Tip:</strong> Use proper risk management! Set stop-losses and don&apos;t over-leverage. 
+                              Keep your margin level above <span className="text-yellow-400 font-bold">{riskSettings.marginWarning}%</span> to stay safe.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Minimum Win Rate (if set) */}
+                  {competition.rules.minimumWinRate && competition.rules.minimumWinRate > 0 && (
+                    <div className="p-4 bg-gray-900/70 rounded-xl border border-yellow-500/30">
+                      <div className="flex items-start gap-3">
+                        <div className="p-1.5 bg-yellow-500/20 rounded-lg shrink-0">
+                          <Target className="h-5 w-5 text-yellow-400" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-bold text-yellow-400">Minimum Win Rate</h4>
+                            <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 text-lg font-black rounded-lg">
+                              {competition.rules.minimumWinRate}%
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-300">
+                            Your win rate must be at least <strong className="text-yellow-400">{competition.rules.minimumWinRate}%</strong> at the end of the competition.
+                          </p>
+                          <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
+                            <Ban className="h-3.5 w-3.5" />
+                            <span>Win rate below {competition.rules.minimumWinRate}% = <strong>DISQUALIFIED</strong></span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Summary Warning */}
+                <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                  <p className="text-sm text-red-300 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Important:</strong> Disqualified participants will be marked with a strikethrough on the leaderboard 
+                      and will NOT receive any prizes, even if they would have finished in a prize-winning position.
+                    </span>
+                  </p>
                 </div>
               </div>
             )}
@@ -282,44 +400,6 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
               </div>
             )}
 
-            {/* Minimum Trades Requirement */}
-            {competition.rules?.minimumTrades > 0 && (
-              <div className="rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/30 p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <AlertTriangle className="h-5 w-5 text-orange-400" />
-                  <h3 className="text-lg font-semibold text-gray-100">Minimum Trades Requirement</h3>
-                </div>
-                
-                <div className="p-4 bg-gray-900/50 rounded-xl border border-orange-500/20">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-gray-300">Required Trades to Qualify</span>
-                    <span className="text-2xl font-black text-orange-400">{competition.rules.minimumTrades}</span>
-                  </div>
-                  
-                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                    <p className="text-sm text-red-400 flex items-start gap-2">
-                      <Skull className="h-4 w-4 shrink-0 mt-0.5" />
-                      <span>
-                        <strong>⚠️ Disqualification Warning:</strong> Traders who do not complete at least 
-                        <span className="font-black text-red-300 mx-1">{competition.rules.minimumTrades}</span> 
-                        trades before the competition ends will be <strong className="text-red-300">DISQUALIFIED</strong> and 
-                        will <strong>NOT</strong> be eligible for any prizes, regardless of their ranking position.
-                      </span>
-                    </p>
-                  </div>
-                  
-                  <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                    <p className="text-xs text-blue-300 flex items-start gap-2">
-                      <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                      <span>
-                        This requirement ensures all participants actively trade and prevents users from winning 
-                        by doing nothing. Make sure to place enough trades to qualify for prizes!
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Leaderboard */}
             <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
