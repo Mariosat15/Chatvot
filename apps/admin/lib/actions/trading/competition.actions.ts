@@ -292,17 +292,18 @@ export const createCompetition = async (competitionData: {
     registrationDeadline.setHours(registrationDeadline.getHours() - 1);
 
     // Fetch current trading risk settings to save with competition
-    const riskSettings = await TradingRiskSettings.findById('trading-risk-settings');
+    // Use getSingleton() which uses the correct ID 'global-trading-risk-settings'
+    const riskSettings = await TradingRiskSettings.getSingleton();
     const tradingRiskDefaults = {
-      maxLeverage: riskSettings?.maxLeverage || 100,
-      minLeverage: riskSettings?.minLeverage || 1,
-      defaultLeverage: riskSettings?.defaultLeverage || 10,
-      marginLiquidation: riskSettings?.marginLiquidation || 50,
-      marginCall: riskSettings?.marginCall || 100,
-      marginWarning: riskSettings?.marginWarning || 150,
-      marginSafe: riskSettings?.marginSafe || 200,
-      maxOpenPositions: riskSettings?.maxOpenPositions || 10,
-      maxPositionSize: riskSettings?.maxPositionSize || 100,
+      maxLeverage: riskSettings.maxLeverage,
+      minLeverage: riskSettings.minLeverage,
+      defaultLeverage: riskSettings.defaultLeverage,
+      marginLiquidation: riskSettings.marginLiquidation,
+      marginCall: riskSettings.marginCall,
+      marginWarning: riskSettings.marginWarning,
+      marginSafe: riskSettings.marginSafe,
+      maxOpenPositions: riskSettings.maxOpenPositions,
+      maxPositionSize: riskSettings.maxPositionSize,
     };
     
     console.log('📊 Using trading risk settings for competition:', tradingRiskDefaults);
