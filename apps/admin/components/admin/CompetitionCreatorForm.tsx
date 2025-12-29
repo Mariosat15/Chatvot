@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,7 @@ import {
   Plus, Minus, Loader2, CheckCircle, XCircle, 
   FileText, DollarSign, Calendar, Settings, Trophy, 
   ChevronRight, ChevronLeft, Shield, Users, TrendingUp, TrendingDown,
-  Clock, Target, Award, AlertCircle, AlertTriangle, Zap, Sparkles
+  Clock, Target, Award, AlertCircle, AlertTriangle, Zap, Sparkles, Gauge
 } from 'lucide-react';
 import { createCompetition } from '@/lib/actions/trading/competition.actions';
 import { useRouter } from 'next/navigation';
@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import CompetitionRulesSection from '@/components/admin/CompetitionRulesSection';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import AIGeneratorDialog from '@/components/admin/AIGeneratorDialog';
+import { calculateCompetitionDifficulty, DifficultyLevel } from '@/lib/utils/competition-difficulty';
 
 export default function CompetitionCreatorForm() {
   const router = useRouter();
@@ -107,6 +108,29 @@ export default function CompetitionCreatorForm() {
     mode: 'auto',
     manualLevel: undefined,
   });
+
+  // Auto-calculate difficulty based on current form settings
+  const autoCalculatedDifficulty = useMemo(() => {
+    const start = formData.startTime ? new Date(formData.startTime) : new Date();
+    const end = formData.endTime ? new Date(formData.endTime) : new Date(Date.now() + 60 * 60 * 1000);
+    const durationMinutes = Math.max(1, (end.getTime() - start.getTime()) / (1000 * 60));
+    
+    return calculateCompetitionDifficulty({
+      entryFee: formData.entryFeeCredits || 0,
+      startingCapital: formData.startingTradingPoints || 10000,
+      maxLeverage: formData.leverageAllowed || 100,
+      duration: durationMinutes,
+      rules: competitionRules,
+      riskLimits: formData.riskLimitsEnabled ? {
+        enabled: true,
+        maxDrawdownPercent: formData.maxDrawdownPercent,
+        dailyLossLimitPercent: formData.dailyLossLimitPercent,
+        equityCheckEnabled: formData.equityCheckEnabled,
+        equityDrawdownPercent: formData.equityDrawdownPercent,
+      } : undefined,
+      levelRequirement: levelRequirement.enabled ? levelRequirement : undefined,
+    });
+  }, [formData, competitionRules, levelRequirement]);
 
   // Market status state for validation
   const [marketStatus, setMarketStatus] = useState<{
@@ -1578,86 +1602,10 @@ export default function CompetitionCreatorForm() {
         />
       </div>
 
-      {/* Level Requirement */}
-                <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
-                  <h3 className="text-lg font-semibold text-gray-100 mb-2 flex items-center gap-2">
-                    <Award className="h-5 w-5 text-red-400" />
-                    Level Requirement
-                  </h3>
-        <p className="text-sm text-gray-400 mb-6">
-          Restrict this competition to specific trader levels
-        </p>
-        
-        <div className="space-y-6">
-          <div className="flex items-center space-x-3">
-            <Checkbox
-              id="levelEnabled"
-              checked={levelRequirement.enabled}
-              onCheckedChange={(checked) =>
-                setLevelRequirement((prev) => ({ ...prev, enabled: checked as boolean }))
-              }
-            />
-            <label
-              htmlFor="levelEnabled"
-              className="text-sm font-medium text-gray-200 cursor-pointer"
-            >
-              Enable Level Restrictions
-            </label>
-          </div>
-
-          {levelRequirement.enabled && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-lg bg-gray-900/50 border border-gray-700">
-              <div>
-                <Label className="text-gray-200">Minimum Level Required</Label>
-                <select
-                  value={levelRequirement.minLevel}
-                  onChange={(e) =>
-                    setLevelRequirement((prev) => ({ ...prev, minLevel: Number(e.target.value) }))
-                  }
-                            className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                  <option value={1}>🌱 Level 1: Novice Trader</option>
-                  <option value={2}>📚 Level 2: Apprentice Trader</option>
-                  <option value={3}>⚔️ Level 3: Skilled Trader</option>
-                  <option value={4}>🎯 Level 4: Expert Trader</option>
-                  <option value={5}>💎 Level 5: Elite Trader</option>
-                  <option value={6}>👑 Level 6: Master Trader</option>
-                  <option value={7}>🔥 Level 7: Grand Master</option>
-                  <option value={8}>⚡ Level 8: Trading Champion</option>
-                  <option value={9}>🌟 Level 9: Market Legend</option>
-                  <option value={10}>👑 Level 10: Trading God</option>
-                </select>
-              </div>
-
-              <div>
-                <Label className="text-gray-200">Maximum Level (Optional)</Label>
-                <select
-                  value={levelRequirement.maxLevel || ''}
-                  onChange={(e) =>
-                    setLevelRequirement((prev) => ({
-                      ...prev,
-                      maxLevel: e.target.value ? Number(e.target.value) : undefined,
-                    }))
-                  }
-                            className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                            <option value="">No Maximum</option>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => {
-                    if (level < levelRequirement.minLevel) return null;
-                              const levelNames = ['', '🌱 Level 1', '📚 Level 2', '⚔️ Level 3', '🎯 Level 4', '💎 Level 5', '👑 Level 6', '🔥 Level 7', '⚡ Level 8', '🌟 Level 9', '👑 Level 10'];
-                              return <option key={level} value={level}>{levelNames[level]}</option>;
-                  })}
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Difficulty Setting */}
+      {/* Difficulty Setting - MOVED ABOVE Level Requirement */}
                 <div className="p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl">
                   <h3 className="text-lg font-semibold text-gray-100 mb-2 flex items-center gap-2">
-                    <span className="text-2xl">🎯</span>
+                    <Gauge className="h-5 w-5 text-purple-400" />
                     Difficulty Level
                   </h3>
                   <p className="text-sm text-gray-400 mb-6">
@@ -1699,6 +1647,116 @@ export default function CompetitionCreatorForm() {
                         </div>
                       </button>
                     </div>
+
+                    {/* Auto Calculated Difficulty Preview */}
+                    {difficultySettings.mode === 'auto' && (
+                      <div className="space-y-4">
+                        {/* Live Preview */}
+                        <div className={`p-4 rounded-xl border-2 ${
+                          autoCalculatedDifficulty.level === 'Beginner' ? 'bg-green-500/10 border-green-500/40'
+                            : autoCalculatedDifficulty.level === 'Intermediate' ? 'bg-blue-500/10 border-blue-500/40'
+                            : autoCalculatedDifficulty.level === 'Advanced' ? 'bg-yellow-500/10 border-yellow-500/40'
+                            : autoCalculatedDifficulty.level === 'Expert' ? 'bg-orange-500/10 border-orange-500/40'
+                            : 'bg-red-500/10 border-red-500/40'
+                        }`}>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="text-3xl">
+                                {autoCalculatedDifficulty.level === 'Beginner' ? '🌱'
+                                  : autoCalculatedDifficulty.level === 'Intermediate' ? '📊'
+                                  : autoCalculatedDifficulty.level === 'Advanced' ? '⚡'
+                                  : autoCalculatedDifficulty.level === 'Expert' ? '🔥'
+                                  : '💀'}
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-400 mb-0.5">Auto-Calculated Level:</div>
+                                <div className={`text-xl font-black ${
+                                  autoCalculatedDifficulty.level === 'Beginner' ? 'text-green-400'
+                                    : autoCalculatedDifficulty.level === 'Intermediate' ? 'text-blue-400'
+                                    : autoCalculatedDifficulty.level === 'Advanced' ? 'text-yellow-400'
+                                    : autoCalculatedDifficulty.level === 'Expert' ? 'text-orange-400'
+                                    : 'text-red-400'
+                                }`}>
+                                  {autoCalculatedDifficulty.level.toUpperCase()}
+                                </div>
+                              </div>
+                            </div>
+                            <div className={`px-4 py-2 rounded-xl font-mono text-lg font-bold ${
+                              autoCalculatedDifficulty.level === 'Beginner' ? 'bg-green-500/20 text-green-400'
+                                : autoCalculatedDifficulty.level === 'Intermediate' ? 'bg-blue-500/20 text-blue-400'
+                                : autoCalculatedDifficulty.level === 'Advanced' ? 'bg-yellow-500/20 text-yellow-400'
+                                : autoCalculatedDifficulty.level === 'Expert' ? 'bg-orange-500/20 text-orange-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {autoCalculatedDifficulty.score}/100
+                            </div>
+                          </div>
+                          
+                          {/* Progress Bar */}
+                          <div className="h-3 bg-gray-800 rounded-full overflow-hidden mb-3">
+                            <div 
+                              className={`h-full transition-all duration-500 ${
+                                autoCalculatedDifficulty.level === 'Beginner' ? 'bg-gradient-to-r from-green-600 to-green-400'
+                                  : autoCalculatedDifficulty.level === 'Intermediate' ? 'bg-gradient-to-r from-blue-600 to-blue-400'
+                                  : autoCalculatedDifficulty.level === 'Advanced' ? 'bg-gradient-to-r from-yellow-600 to-yellow-400'
+                                  : autoCalculatedDifficulty.level === 'Expert' ? 'bg-gradient-to-r from-orange-600 to-orange-400'
+                                  : 'bg-gradient-to-r from-red-600 to-red-400'
+                              }`}
+                              style={{ width: `${autoCalculatedDifficulty.score}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-[10px] text-gray-500">
+                            <span>🌱 Beginner</span>
+                            <span>📊 Intermediate</span>
+                            <span>⚡ Advanced</span>
+                            <span>🔥 Expert</span>
+                            <span>💀 Extreme</span>
+                          </div>
+                        </div>
+
+                        {/* Recommendation Box */}
+                        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
+                            <div className="text-xs text-amber-300">
+                              <strong>Recommendation:</strong> Based on the calculated <strong className={
+                                autoCalculatedDifficulty.level === 'Beginner' ? 'text-green-400'
+                                  : autoCalculatedDifficulty.level === 'Intermediate' ? 'text-blue-400'
+                                  : autoCalculatedDifficulty.level === 'Advanced' ? 'text-yellow-400'
+                                  : autoCalculatedDifficulty.level === 'Expert' ? 'text-orange-400'
+                                  : 'text-red-400'
+                              }>{autoCalculatedDifficulty.level}</strong> difficulty, consider setting Level Requirement below to match. 
+                              {autoCalculatedDifficulty.level === 'Beginner' && ' Suitable for Level 1-3 traders.'}
+                              {autoCalculatedDifficulty.level === 'Intermediate' && ' Suitable for Level 2-5 traders.'}
+                              {autoCalculatedDifficulty.level === 'Advanced' && ' Suitable for Level 4-7 traders.'}
+                              {autoCalculatedDifficulty.level === 'Expert' && ' Suitable for Level 6-9 traders.'}
+                              {autoCalculatedDifficulty.level === 'Extreme' && ' Suitable for Level 8-10 traders only.'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Factors Info */}
+                        <div className="p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
+                          <div className="text-xs text-gray-400">
+                            <strong className="text-gray-300">Factors affecting difficulty:</strong>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {autoCalculatedDifficulty.factors.slice(0, 6).map((factor, idx) => (
+                                <span 
+                                  key={idx}
+                                  className={`px-2 py-1 rounded text-[10px] font-medium ${
+                                    factor.impact === 'high' ? 'bg-red-500/20 text-red-400' :
+                                    factor.impact === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                                    'bg-green-500/20 text-green-400'
+                                  }`}
+                                >
+                                  {factor.factor}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Manual Level Selection */}
                     {difficultySettings.mode === 'manual' && (
@@ -1775,31 +1833,84 @@ export default function CompetitionCreatorForm() {
                         )}
                       </div>
                     )}
-
-                    {/* Auto Calculation Info */}
-                    {difficultySettings.mode === 'auto' && (
-                      <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
-                        <div className="flex items-start gap-3">
-                          <span className="text-xl">🤖</span>
-                          <div>
-                            <div className="font-medium text-purple-300 mb-1">Auto Difficulty Calculation</div>
-                            <div className="text-xs text-gray-400">
-                              Difficulty will be automatically calculated based on:
-                              <ul className="mt-2 space-y-1 list-disc list-inside text-gray-500">
-                                <li>Entry fee amount</li>
-                                <li>Starting capital</li>
-                                <li>Leverage limits</li>
-                                <li>Competition duration</li>
-                                <li>Risk management rules</li>
-                                <li>Level requirements</li>
-                              </ul>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
+
+      {/* Level Requirement */}
+                <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
+                  <h3 className="text-lg font-semibold text-gray-100 mb-2 flex items-center gap-2">
+                    <Award className="h-5 w-5 text-red-400" />
+                    Level Requirement
+                  </h3>
+        <p className="text-sm text-gray-400 mb-6">
+          Restrict this competition to specific trader levels
+        </p>
+        
+        <div className="space-y-6">
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              id="levelEnabled"
+              checked={levelRequirement.enabled}
+              onCheckedChange={(checked) =>
+                setLevelRequirement((prev) => ({ ...prev, enabled: checked as boolean }))
+              }
+            />
+            <label
+              htmlFor="levelEnabled"
+              className="text-sm font-medium text-gray-200 cursor-pointer"
+            >
+              Enable Level Restrictions
+            </label>
+          </div>
+
+          {levelRequirement.enabled && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-lg bg-gray-900/50 border border-gray-700">
+              <div>
+                <Label className="text-gray-200">Minimum Level Required</Label>
+                <select
+                  value={levelRequirement.minLevel}
+                  onChange={(e) =>
+                    setLevelRequirement((prev) => ({ ...prev, minLevel: Number(e.target.value) }))
+                  }
+                            className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  <option value={1}>🌱 Level 1: Novice Trader</option>
+                  <option value={2}>📚 Level 2: Apprentice Trader</option>
+                  <option value={3}>⚔️ Level 3: Skilled Trader</option>
+                  <option value={4}>🎯 Level 4: Expert Trader</option>
+                  <option value={5}>💎 Level 5: Elite Trader</option>
+                  <option value={6}>👑 Level 6: Master Trader</option>
+                  <option value={7}>🔥 Level 7: Grand Master</option>
+                  <option value={8}>⚡ Level 8: Trading Champion</option>
+                  <option value={9}>🌟 Level 9: Market Legend</option>
+                  <option value={10}>👑 Level 10: Trading God</option>
+                </select>
+              </div>
+
+              <div>
+                <Label className="text-gray-200">Maximum Level (Optional)</Label>
+                <select
+                  value={levelRequirement.maxLevel || ''}
+                  onChange={(e) =>
+                    setLevelRequirement((prev) => ({
+                      ...prev,
+                      maxLevel: e.target.value ? Number(e.target.value) : undefined,
+                    }))
+                  }
+                            className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                            <option value="">No Maximum</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => {
+                    if (level < levelRequirement.minLevel) return null;
+                              const levelNames = ['', '🌱 Level 1', '📚 Level 2', '⚔️ Level 3', '🎯 Level 4', '💎 Level 5', '👑 Level 6', '🔥 Level 7', '⚡ Level 8', '🌟 Level 9', '👑 Level 10'];
+                              return <option key={level} value={level}>{levelNames[level]}</option>;
+                  })}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
               </div>
             </div>
           )}
