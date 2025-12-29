@@ -127,16 +127,25 @@ class VeriffService {
     }
 
     // Veriff requires HTTPS callback URLs - ensure we use HTTPS
-    let baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://chartvolt.com';
+    
+    // Force HTTPS - Veriff rejects HTTP URLs
     if (baseUrl.startsWith('http://')) {
       baseUrl = baseUrl.replace('http://', 'https://');
+    }
+    // Add https:// if no protocol specified
+    if (!baseUrl.startsWith('https://')) {
+      baseUrl = 'https://' + baseUrl.replace(/^\/\//, '');
     }
     // Ensure URL doesn't have trailing slash
     baseUrl = baseUrl.replace(/\/$/, '');
     
+    const callbackUrl = `${baseUrl}/api/kyc/webhook`;
+    console.log('🔐 Veriff callback URL:', callbackUrl);
+    
     const payload = {
       verification: {
-        callback: `${baseUrl}/api/kyc/webhook`,
+        callback: callbackUrl,
         person: {
           firstName: userData.firstName || undefined,
           lastName: userData.lastName || undefined,
