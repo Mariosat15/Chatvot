@@ -43,25 +43,6 @@ export async function GET() {
   try {
     await connectToDatabase();
     
-    // Get provider from database
-    const provider = await PaymentProvider.findOne({ slug: 'stripe', isActive: true });
-    
-    if (!provider) {
-      return NextResponse.json({
-        configured: false,
-        provider: null,
-      });
-    }
-
-    const stripeConfig = await getPaymentProviderCredentials('stripe');
-    
-    if (!stripeConfig) {
-      return NextResponse.json({
-        configured: false,
-        provider: null,
-      });
-    }
-
     // Get centralized fee settings
     const feeSettings = await CreditConversionSettings.getSingleton();
     const platformDepositFee = feeSettings.platformDepositFeePercentage || 0;
@@ -97,6 +78,19 @@ export async function GET() {
     
     console.log(`💳 Payment config - VAT enabled by admin: ${vatEnabled}, User country: ${userCountry}, Is EU: ${isEUCountry(userCountry)}, VAT applicable: ${vatApplicable}`);
 
+    // Check Stripe availability
+    let stripeAvailable = false;
+    let stripeConfig: any = null;
+    try {
+      const stripeProvider = await PaymentProvider.findOne({ slug: 'stripe', isActive: true });
+      if (stripeProvider) {
+        stripeConfig = await getPaymentProviderCredentials('stripe');
+        stripeAvailable = !!(stripeConfig && ((stripeConfig as any).publishable_key || (stripeConfig as any).public_key));
+      }
+    } catch (e) {
+      // Stripe not configured
+    }
+
     // Check Paddle availability
     let paddleAvailable = false;
     let paddleConfig: any = null;
@@ -111,19 +105,52 @@ export async function GET() {
 
     // Check Nuvei availability
     let nuveiConfig: any = null;
+    let nuveiAvailable = false;
     try {
       nuveiConfig = await nuveiService.getClientConfig();
+      nuveiAvailable = nuveiConfig?.enabled || false;
+      console.log('💳 Nuvei config check:', { nuveiConfig, nuveiAvailable });
     } catch (e) {
+      console.error('💳 Nuvei config error:', e);
       // Nuvei not configured
+    }
+
+    // Check if ANY provider is available
+    const anyProviderConfigured = stripeAvailable || paddleAvailable || nuveiAvailable;
+    
+    console.log('💳 Payment providers available:', { 
+      stripeAvailable, 
+      paddleAvailable, 
+      nuveiAvailable,
+      anyProviderConfigured 
+    });
+
+    if (!anyProviderConfigured) {
+      console.log('💳 No payment providers configured');
+      return NextResponse.json({
+        configured: false,
+        provider: null,
+        providers: {},
+      });
+    }
+
+    // Determine primary provider (first available)
+    let primaryProvider = 'stripe';
+    if (stripeAvailable) {
+      primaryProvider = 'stripe';
+    } else if (nuveiAvailable) {
+      primaryProvider = 'nuvei';
+    } else if (paddleAvailable) {
+      primaryProvider = 'paddle';
     }
 
     // Return available payment providers
     return NextResponse.json({
       configured: true,
-      // Primary provider (Stripe for backwards compatibility)
-      provider: 'stripe',
-      publishableKey: (stripeConfig as any).publishable_key || (stripeConfig as any).public_key || '',
-      testMode: stripeConfig.testMode || false,
+      // Primary provider
+      provider: primaryProvider,
+      publishableKey: stripeConfig ? ((stripeConfig as any).publishable_key || (stripeConfig as any).public_key || '') : '',
+      testMode: stripeConfig?.testMode || false,
       processingFee: platformDepositFee, // From centralized Fee Settings
       // VAT info
       vatEnabled: vatApplicable, // True only if admin enabled AND user is EU
@@ -132,9 +159,9 @@ export async function GET() {
       // Available payment providers
       providers: {
         stripe: {
-          available: true,
-          publishableKey: (stripeConfig as any).publishable_key || (stripeConfig as any).public_key || '',
-          testMode: stripeConfig.testMode || false,
+          available: stripeAvailable,
+          publishableKey: stripeConfig ? ((stripeConfig as any).publishable_key || (stripeConfig as any).public_key || '') : '',
+          testMode: stripeConfig?.testMode || false,
         },
         paddle: {
           available: paddleAvailable,
@@ -143,10 +170,10 @@ export async function GET() {
           vendorId: paddleConfig?.vendorId || null,
         },
         nuvei: {
-          available: nuveiConfig?.enabled || false,
+          available: nuveiAvailable,
           merchantId: nuveiConfig?.merchantId || null,
           siteId: nuveiConfig?.siteId || null,
-          testMode: nuveiConfig?.testMode || true,
+          testMode: nuveiConfig?.testMode ?? true,
           sdkUrl: nuveiConfig?.sdkUrl || NUVEI_SDK_URL,
         },
       },

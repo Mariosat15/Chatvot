@@ -88,6 +88,12 @@ class NuveiService {
       isActive: true 
     });
     
+    console.log('💳 Nuvei provider lookup:', { 
+      found: !!provider, 
+      isActive: provider?.isActive,
+      slug: provider?.slug 
+    });
+    
     if (!provider) {
       console.error('Nuvei provider not found or not active');
       return null;
