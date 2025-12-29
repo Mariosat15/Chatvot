@@ -628,13 +628,17 @@ export async function finalizeCompetition(competitionId: string) {
       
       // Notify disqualified participants - non-blocking
       const disqualifiedParticipants = leaderboard.filter(p => p.qualificationStatus === 'disqualified');
+      const { sendNotification } = await import('@/lib/services/notification.service');
       for (const participant of disqualifiedParticipants) {
-        notificationService.notifyDisqualified(
-          participant.userId,
-          competition._id.toString(),
-          competition.name,
-          participant.disqualificationReason || 'Did not meet competition requirements'
-        ).catch(e => console.error('Failed to send disqualification notification:', e));
+        sendNotification({
+          userId: participant.userId,
+          type: 'competition_disqualified',
+          metadata: {
+            competitionId: competition._id.toString(),
+            competitionName: competition.name,
+            reason: participant.disqualificationReason || 'Did not meet competition requirements',
+          },
+        }).catch(e => console.error('Failed to send disqualification notification:', e));
       }
       if (disqualifiedParticipants.length > 0) {
         console.log(`🔔 Sent ${disqualifiedParticipants.length} disqualification notifications`);

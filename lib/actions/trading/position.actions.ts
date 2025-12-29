@@ -1232,6 +1232,30 @@ export const checkMarginCalls = async (competitionId: string) => {
 
         console.log(`   ⚠️ ✅ Liquidated all ${openPositions.length} positions for: ${participant.username}`);
         console.log(`   📝 Participant status set to 'liquidated' for disqualification tracking`);
+
+        // Send disqualification notification if competition has disqualifyOnLiquidation enabled
+        try {
+          const Competition = (await import('@/database/models/trading/competition.model')).default;
+          const competition = await Competition.findById(participant.competitionId).lean();
+          
+          if (competition?.rules?.disqualifyOnLiquidation) {
+            const { sendNotification } = await import('@/lib/services/notification.service');
+            
+            // Send disqualification notification
+            await sendNotification({
+              userId: participant.userId,
+              type: 'competition_disqualified',
+              metadata: {
+                competitionId: participant.competitionId,
+                competitionName: competition.name,
+                reason: `Liquidated (margin level dropped to ${marginStatus.marginLevel.toFixed(2)}%)`,
+              },
+            });
+            console.log(`   🔔 Sent disqualification notification to ${participant.username}`);
+          }
+        } catch (notifError) {
+          console.error(`   ❌ Failed to send disqualification notification:`, notifError);
+        }
       } else {
         console.log(`   ✅ No liquidation needed (Status: ${marginStatus.status})`);
       }

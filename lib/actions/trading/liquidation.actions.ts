@@ -173,6 +173,30 @@ export const executeLiquidation = async (
         },
       });
       console.log(`📝 Participant ${session.user.id} marked as 'liquidated' for disqualification tracking`);
+
+      // Send disqualification notification if competition has disqualifyOnLiquidation enabled
+      try {
+        const Competition = (await import('@/database/models/trading/competition.model')).default;
+        const competition = await Competition.findById(competitionId).lean() as any;
+        
+        if (competition?.rules?.disqualifyOnLiquidation) {
+          const { sendNotification } = await import('@/lib/services/notification.service');
+          
+          // Send disqualification notification
+          await sendNotification({
+            userId: session.user.id,
+            type: 'competition_disqualified',
+            metadata: {
+              competitionId: competitionId,
+              competitionName: competition.name,
+              reason: `Liquidated (margin level dropped to ${marginStatus.marginLevel.toFixed(2)}%)`,
+            },
+          });
+          console.log(`🔔 Sent disqualification notification to user ${session.user.id}`);
+        }
+      } catch (notifError) {
+        console.error(`❌ Failed to send disqualification notification:`, notifError);
+      }
     }
 
     return {

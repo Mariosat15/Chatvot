@@ -133,6 +133,30 @@ export const checkUserMargin = async (competitionId: string) => {
       });
       console.log(`📝 Participant ${session.user.id} marked as 'liquidated' for disqualification tracking`);
 
+      // Send disqualification notification if competition has disqualifyOnLiquidation enabled
+      try {
+        const Competition = (await import('@/database/models/trading/competition.model')).default;
+        const competition = await Competition.findById(competitionId).lean() as any;
+        
+        if (competition?.rules?.disqualifyOnLiquidation) {
+          const { notificationService } = await import('@/lib/services/notification.service');
+          
+          // Send liquidation notification
+          await notificationService.notifyLiquidation(session.user.id, 'All positions');
+          
+          // Send disqualification notification
+          await notificationService.notifyDisqualified(
+            session.user.id,
+            competitionId,
+            competition.name,
+            `Liquidated (margin level dropped to ${marginStatus.marginLevel.toFixed(2)}%)`
+          );
+          console.log(`🔔 Sent disqualification notification to user ${session.user.id}`);
+        }
+      } catch (notifError) {
+        console.error(`❌ Failed to send disqualification notification:`, notifError);
+      }
+
       return {
         liquidated: true,
         marginLevel: marginStatus.marginLevel,

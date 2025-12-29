@@ -170,12 +170,36 @@ export async function runMarginCheck(): Promise<MarginCheckResult> {
           });
           console.log(`   📝 Participant ${participant.userId} marked as 'liquidated' for disqualification tracking`);
 
-          // Send notification (fire and forget)
+          // Send liquidation notification
           try {
-            const { notificationService } = await import('../../lib/services/notification.service');
-            await notificationService.notifyLiquidation(participant.userId, 'All positions');
+            const { sendNotification } = await import('../../lib/services/notification.service');
+            await sendNotification({
+              userId: participant.userId,
+              type: 'liquidation',
+              metadata: { symbol: 'All positions' },
+            });
           } catch {
             // Notification failure is not critical
+          }
+
+          // Send disqualification notification if competition has disqualifyOnLiquidation enabled
+          try {
+            const competition = await Competition.findById(participant.competitionId).lean();
+            if ((competition as any)?.rules?.disqualifyOnLiquidation) {
+              const { sendNotification } = await import('../../lib/services/notification.service');
+              await sendNotification({
+                userId: participant.userId,
+                type: 'competition_disqualified',
+                metadata: {
+                  competitionId: participant.competitionId,
+                  competitionName: (competition as any).name,
+                  reason: `Liquidated (margin level dropped to ${marginStatus.marginLevel.toFixed(2)}%)`,
+                },
+              });
+              console.log(`   🔔 Sent disqualification notification to ${participant.userId}`);
+            }
+          } catch (notifError) {
+            console.error(`   ❌ Failed to send disqualification notification:`, notifError);
           }
         }
       } catch (participantError) {

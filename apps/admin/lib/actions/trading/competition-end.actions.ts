@@ -619,8 +619,9 @@ export async function finalizeCompetition(competitionId: string) {
       
       // Notify disqualified participants - non-blocking
       const disqualifiedParticipants = leaderboard.filter(p => p.qualificationStatus === 'disqualified');
+      const { notificationService: disqualifyNotifService } = await import('@/lib/services/notification.service');
       for (const participant of disqualifiedParticipants) {
-        notificationService.notifyDisqualified(
+        disqualifyNotifService.notifyDisqualified(
           participant.userId,
           competition._id.toString(),
           competition.name,
