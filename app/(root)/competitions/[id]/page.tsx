@@ -40,6 +40,22 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
     const userParticipant = isUserIn ? await getUserParticipant(id) : null;
     const walletBalance = await getWalletBalance();
     const riskSettings = await getTradingRiskSettings();
+    
+    // Get user level for level requirement check (client-side)
+    let userLevel = { level: 1, title: 'Novice Trader', icon: '🌱' };
+    if (userId) {
+      try {
+        const { getUserLevel: fetchUserLevel } = await import('@/lib/services/xp-level.service');
+        const levelData = await fetchUserLevel(userId);
+        userLevel = {
+          level: levelData.currentLevel || 1,
+          title: levelData.currentTitle || 'Novice Trader',
+          icon: levelData.currentIcon || '🌱',
+        };
+      } catch {
+        // Use default level if fetch fails
+      }
+    }
 
     const isActive = competition.status === 'active';
     const isUpcoming = competition.status === 'upcoming';
@@ -604,6 +620,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                 isUserIn={isUserIn}
                 isFull={isFull}
                 participantStatus={userParticipant?.status}
+                userLevel={userLevel}
               />
             )}
 
