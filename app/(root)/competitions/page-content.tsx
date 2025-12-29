@@ -23,47 +23,6 @@ import { calculateCompetitionDifficulty, DifficultyLevel, getAllDifficultyLevels
 // Auto-refresh interval (10 seconds for real-time updates)
 const AUTO_REFRESH_INTERVAL = 10000;
 
-// Big Live Server Clock Component
-function LiveServerClock() {
-  const [time, setTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const hours = time.getUTCHours().toString().padStart(2, '0');
-  const minutes = time.getUTCMinutes().toString().padStart(2, '0');
-  const seconds = time.getUTCSeconds().toString().padStart(2, '0');
-  
-  const day = time.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
-  const date = time.getUTCDate();
-  const month = time.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
-
-  return (
-    <div className="flex flex-col items-center">
-      <div className="flex items-center gap-1 font-mono">
-        <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-cyan-300 to-cyan-500 tabular-nums drop-shadow-lg">
-          {hours}
-        </span>
-        <span className="text-4xl font-black text-cyan-400 animate-pulse">:</span>
-        <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-cyan-300 to-cyan-500 tabular-nums drop-shadow-lg">
-          {minutes}
-        </span>
-        <span className="text-4xl font-black text-cyan-400 animate-pulse">:</span>
-        <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-cyan-300 to-cyan-500 tabular-nums drop-shadow-lg">
-          {seconds}
-        </span>
-      </div>
-      <div className="text-xs text-gray-400 mt-1 font-medium">
-        {day}, {month} {date}
-      </div>
-    </div>
-  );
-}
-
 interface Competition {
   _id: string;
   name: string;
@@ -706,34 +665,6 @@ export default function CompetitionsPageContent({
           </div>
         </div>
       )}
-
-      {/* Big Live Server Clock */}
-      <div className="hidden sm:flex items-center justify-center">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800/80 via-gray-900/90 to-gray-800/80 border border-cyan-500/30 px-8 py-4 shadow-2xl shadow-cyan-500/10">
-          {/* Animated background effects */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/5 via-transparent to-transparent"></div>
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent"></div>
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400/30 to-transparent"></div>
-          
-          <div className="relative flex items-center gap-6">
-            {/* Clock Icon */}
-            <div className="relative">
-              <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl animate-pulse"></div>
-              <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center">
-                <Clock className="h-7 w-7 text-cyan-400" />
-              </div>
-            </div>
-            
-            {/* Time Display */}
-            <div className="text-center">
-              <div className="text-xs font-bold text-cyan-400/80 uppercase tracking-[0.2em] mb-1">
-                🌐 Server Time (UTC)
-              </div>
-              <LiveServerClock />
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Desktop Filter Bar */}
       <div className="hidden sm:flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between bg-gray-800/50 border border-gray-700/50 rounded-2xl p-4">
