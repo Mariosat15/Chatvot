@@ -10,13 +10,14 @@ import {
   Plus, Minus, Loader2, CheckCircle, XCircle, 
   FileText, DollarSign, Calendar, Settings, Trophy, 
   ChevronRight, ChevronLeft, Shield, Users, TrendingUp, TrendingDown,
-  Clock, Target, Award, AlertCircle, AlertTriangle, Zap
+  Clock, Target, Award, AlertCircle, AlertTriangle, Zap, Sparkles
 } from 'lucide-react';
 import { createCompetition } from '@/lib/actions/trading/competition.actions';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import CompetitionRulesSection from '@/components/admin/CompetitionRulesSection';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+import AIGeneratorDialog from '@/components/admin/AIGeneratorDialog';
 
 export default function CompetitionCreatorForm() {
   const router = useRouter();
@@ -649,11 +650,50 @@ export default function CompetitionCreatorForm() {
               </div>
               
               <div className="p-8 space-y-6">
+                {/* AI Generator Section */}
+                <div className="p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
+                        <Sparkles className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-purple-300">AI Content Generator</h4>
+                        <p className="text-xs text-gray-400">Let AI create a catchy title and description for you</p>
+                      </div>
+                    </div>
+                    <AIGeneratorDialog
+                      onGenerate={(data) => {
+                        if (data.title) {
+                          setFormData(prev => ({ ...prev, name: data.title! }));
+                        }
+                        if (data.description) {
+                          setFormData(prev => ({ ...prev, description: data.description! }));
+                        }
+                      }}
+                      generateType="both"
+                      currentTitle={formData.name}
+                      currentDescription={formData.description}
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <Label htmlFor="name" className="text-gray-300 flex items-center gap-2 mb-2">
-                    <FileText className="h-4 w-4 text-blue-400" />
-              Competition Name *
-            </Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label htmlFor="name" className="text-gray-300 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-400" />
+                      Competition Name *
+                    </Label>
+                    <AIGeneratorDialog
+                      onGenerate={(data) => {
+                        if (data.title) {
+                          setFormData(prev => ({ ...prev, name: data.title! }));
+                        }
+                      }}
+                      generateType="title"
+                      currentTitle={formData.name}
+                    />
+                  </div>
             <Input
               id="name"
               name="name"
@@ -670,10 +710,21 @@ export default function CompetitionCreatorForm() {
           </div>
 
           <div>
-                  <Label htmlFor="description" className="text-gray-300 flex items-center gap-2 mb-2">
-                    <FileText className="h-4 w-4 text-blue-400" />
-              Description *
-            </Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label htmlFor="description" className="text-gray-300 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-400" />
+                      Description *
+                    </Label>
+                    <AIGeneratorDialog
+                      onGenerate={(data) => {
+                        if (data.description) {
+                          setFormData(prev => ({ ...prev, description: data.description! }));
+                        }
+                      }}
+                      generateType="description"
+                      currentDescription={formData.description}
+                    />
+                  </div>
             <Textarea
               id="description"
               name="description"
