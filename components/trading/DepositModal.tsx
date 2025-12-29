@@ -604,32 +604,47 @@ export default function DepositModal({ children }: DepositModalProps) {
         ) : step === 'payment' && nuveiSessionToken && selectedProvider === 'nuvei' && providers?.nuvei ? (
           // Step 3: Nuvei Payment Form
           <>
-            {/* Load Nuvei SDK */}
+            {/* Load Nuvei SDK - use afterInteractive for faster loading */}
             <Script
               src={providers.nuvei.sdkUrl}
-              onLoad={() => setNuveiLoaded(true)}
-              strategy="lazyOnload"
-            />
-            <NuveiPaymentForm
-              sessionToken={nuveiSessionToken}
-              clientUniqueId={nuveiClientUniqueId}
-              merchantId={providers.nuvei.merchantId || ''}
-              siteId={providers.nuvei.siteId || ''}
-              testMode={providers.nuvei.testMode}
-              amount={parseFloat(amount)}
-              totalAmount={calculateTotalPayment(parseFloat(amount))}
-              vatAmount={calculateVAT(parseFloat(amount))}
-              vatEnabled={vatEnabled}
-              vatPercentage={vatPercentage}
-              platformFeeAmount={calculatePlatformFee(parseFloat(amount))}
-              platformFeePercentage={processingFee}
-              sdkLoaded={nuveiLoaded}
-              onSuccess={() => {
-                setOpen(false);
-                resetModal();
+              onLoad={() => {
+                console.log('Nuvei SDK loaded successfully');
+                setNuveiLoaded(true);
               }}
-              onCancel={() => setStep('provider')}
+              onError={(e) => {
+                console.error('Failed to load Nuvei SDK:', e);
+                setError('Failed to load payment form. Please refresh and try again.');
+              }}
+              strategy="afterInteractive"
             />
+            {!nuveiLoaded ? (
+              // Show loading while SDK loads
+              <div className="py-12 text-center space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-green-500" />
+                <p className="text-sm text-gray-400">Loading secure payment form...</p>
+              </div>
+            ) : (
+              <NuveiPaymentForm
+                sessionToken={nuveiSessionToken}
+                clientUniqueId={nuveiClientUniqueId}
+                merchantId={providers.nuvei.merchantId || ''}
+                siteId={providers.nuvei.siteId || ''}
+                testMode={providers.nuvei.testMode}
+                amount={parseFloat(amount)}
+                totalAmount={calculateTotalPayment(parseFloat(amount))}
+                vatAmount={calculateVAT(parseFloat(amount))}
+                vatEnabled={vatEnabled}
+                vatPercentage={vatPercentage}
+                platformFeeAmount={calculatePlatformFee(parseFloat(amount))}
+                platformFeePercentage={processingFee}
+                sdkLoaded={nuveiLoaded}
+                onSuccess={() => {
+                  setOpen(false);
+                  resetModal();
+                }}
+                onCancel={() => setStep('provider')}
+              />
+            )}
           </>
         ) : null}
       </DialogContent>
@@ -845,14 +860,20 @@ function NuveiPaymentForm({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [cardHolderName, setCardHolderName] = useState('');
+  const [cardFieldReady, setCardFieldReady] = useState(false);
 
   const creditsReceived = eurToCredits(amount);
 
   // Initialize Nuvei when SDK is loaded
   useEffect(() => {
-    if (!sdkLoaded || !window.SafeCharge || sfcInitialized || !cardFieldRef.current) return;
+    if (!sdkLoaded || !window.SafeCharge || sfcInitialized || !cardFieldRef.current) {
+      console.log('Nuvei init check:', { sdkLoaded, hasWindow: !!window.SafeCharge, sfcInitialized, hasRef: !!cardFieldRef.current });
+      return;
+    }
 
     try {
+      console.log('Initializing Nuvei with:', { merchantId, siteId, testMode });
+      
       // Initialize SafeCharge
       const sfc = window.SafeCharge({
         env: testMode ? 'int' : 'prod',
@@ -892,14 +913,21 @@ function NuveiPaymentForm({
       // Listen for ready event
       cardField.on('ready', () => {
         console.log('Nuvei card field ready');
+        setCardFieldReady(true);
+      });
+
+      // Listen for error
+      cardField.on('error', (evt: unknown) => {
+        console.error('Nuvei card field error:', evt);
       });
 
       // Store reference for payment
       setScard(cardField);
       setSfcInitialized(true);
+      console.log('Nuvei SDK initialized successfully');
     } catch (err) {
       console.error('Failed to initialize Nuvei:', err);
-      setError('Failed to initialize payment form');
+      setError('Failed to initialize payment form. Please try again.');
     }
   }, [sdkLoaded, merchantId, siteId, testMode, sfcInitialized]);
 
@@ -1058,8 +1086,15 @@ function NuveiPaymentForm({
         <Label className="text-gray-300">Card Details</Label>
         <div
           ref={cardFieldRef}
-          className="bg-gray-800 border border-gray-700 rounded-lg p-4 min-h-[50px]"
-        />
+          className="bg-gray-800 border border-gray-700 rounded-lg p-4 min-h-[50px] relative"
+        >
+          {!cardFieldReady && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-lg">
+              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+              <span className="ml-2 text-sm text-gray-400">Loading card form...</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {error && (
