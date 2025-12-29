@@ -228,15 +228,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // STEP 4: Update transaction with Nuvei response data
+    // STEP 4: Update transaction with Nuvei response data (use $set with dot notation to PRESERVE fee metadata)
     await WalletTransaction.findByIdAndUpdate(pendingTransaction._id, {
-      providerTransactionId: result.orderId,
-      metadata: {
-        sessionToken: result.sessionToken,
-        clientUniqueId,
-        orderId: result.orderId,
-        nuveiMerchantId: result.merchantId,
-        nuveiSiteId: result.merchantSiteId,
+      $set: {
+        providerTransactionId: result.orderId,
+        'metadata.sessionToken': result.sessionToken,
+        'metadata.clientUniqueId': clientUniqueId,
+        'metadata.orderId': result.orderId,
+        'metadata.nuveiMerchantId': result.merchantId,
+        'metadata.nuveiSiteId': result.merchantSiteId,
       },
     });
 

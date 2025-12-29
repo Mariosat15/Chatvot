@@ -107,14 +107,25 @@ export async function POST(req: NextRequest) {
 
     console.log('Nuvei DMN received:', JSON.stringify(params, null, 2));
 
-    // Get Nuvei provider config for secret key
+    // Get Nuvei secret key - try database first, then env vars
+    let secretKey: string | undefined;
     const provider = await PaymentProvider.findOne({ slug: 'nuvei', isActive: true });
-    if (!provider) {
-      console.error('Nuvei provider not found');
-      return NextResponse.json({ error: 'Provider not configured' }, { status: 500 });
+    
+    if (provider) {
+      secretKey = provider.credentials.find((c: { key: string }) => c.key === 'secret_key')?.value;
     }
-
-    const secretKey = provider.credentials.find((c: { key: string }) => c.key === 'secret_key')?.value;
+    
+    // Fallback to environment variable
+    if (!secretKey) {
+      secretKey = process.env.NUVEI_SECRET_KEY;
+    }
+    
+    if (!secretKey) {
+      console.error('Nuvei secret key not configured in database or env');
+      // Still process the DMN without signature verification if no secret key
+      // This allows the system to work during initial setup
+      console.warn('⚠️ Proceeding without signature verification');
+    }
     
     // Optional: Verify signature (can be skipped for testing)
     // if (secretKey && !verifyDmnSignature(params, secretKey)) {

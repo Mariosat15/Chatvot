@@ -180,6 +180,77 @@ class NotificationService {
     });
     return !!result;
   }
+
+  // ========== Convenience methods for specific notification types ==========
+
+  /**
+   * Send deposit completed notification
+   */
+  async notifyDepositCompleted(userId: string, amount: number, balance: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'deposit_completed',
+      variables: {
+        amount: `€${amount.toFixed(2)}`,
+        balance: `${balance.toFixed(2)}`,
+      },
+    });
+  }
+
+  /**
+   * Send withdrawal completed notification
+   */
+  async notifyWithdrawalCompleted(userId: string, amount: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'withdrawal_completed',
+      variables: {
+        amount: `€${amount.toFixed(2)}`,
+      },
+    });
+  }
+
+  /**
+   * Send badge earned notification
+   */
+  async notifyBadgeEarned(userId: string, badgeName: string, badgeDescription: string): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'badge_earned',
+      variables: {
+        badgeName,
+        badgeDescription,
+      },
+    });
+  }
+
+  /**
+   * Send competition disqualified notification
+   */
+  async notifyDisqualified(userId: string, competitionName: string, reason: string): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'competition_disqualified',
+      variables: {
+        competitionName,
+        reason,
+      },
+    });
+  }
+
+  /**
+   * Send liquidation notification
+   */
+  async notifyLiquidation(userId: string, competitionName: string, reason: string): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'liquidation',
+      variables: {
+        competitionName,
+        reason,
+      },
+    });
+  }
 }
 
 // Create singleton instance
