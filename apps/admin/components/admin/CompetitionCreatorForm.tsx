@@ -34,6 +34,12 @@ export default function CompetitionCreatorForm() {
   const currencySymbol = settings?.currency?.symbol || '€';
   const currencyCode = settings?.currency?.code || 'EUR';
 
+  // Risk settings from database
+  const [riskSettings, setRiskSettings] = useState<{
+    maxLeverage: number;
+    minLeverage: number;
+  } | null>(null);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -46,7 +52,7 @@ export default function CompetitionCreatorForm() {
     startTime: '',
     endDate: '',
     endTime: '',
-    leverageAllowed: 100,
+    leverageAllowed: 30, // Will be updated from risk settings
     platformFeePercentage: 10,
     // Risk Limits
     riskLimitsEnabled: false,
@@ -56,6 +62,31 @@ export default function CompetitionCreatorForm() {
     equityCheckEnabled: false,
     equityDrawdownPercent: 30,
   });
+
+  // Fetch risk settings on mount to get the correct leverage
+  useEffect(() => {
+    const fetchRiskSettings = async () => {
+      try {
+        const response = await fetch('/api/settings/trading-risk');
+        if (response.ok) {
+          const data = await response.json();
+          const settings = data.settings || data;
+          setRiskSettings({
+            maxLeverage: settings.maxLeverage || 100,
+            minLeverage: settings.minLeverage || 1,
+          });
+          // Update form with risk settings leverage
+          setFormData(prev => ({
+            ...prev,
+            leverageAllowed: settings.maxLeverage || 100,
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to fetch risk settings:', error);
+      }
+    };
+    fetchRiskSettings();
+  }, []);
 
   const [assetClasses, setAssetClasses] = useState({
     forex: true,
@@ -1323,13 +1354,20 @@ export default function CompetitionCreatorForm() {
                     <Zap className="h-4 w-4 text-orange-400" />
               Maximum Leverage (1:X) *
             </Label>
+                  {riskSettings && (
+                    <div className="mb-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                      <p className="text-xs text-blue-400">
+                        📊 Platform limit: 1:{riskSettings.minLeverage} to 1:{riskSettings.maxLeverage}
+                      </p>
+                    </div>
+                  )}
                   <div className="flex items-center gap-4">
             <Input
               id="leverageAllowed"
               name="leverageAllowed"
                       type="range"
-                      min="1"
-                      max="500"
+                      min={riskSettings?.minLeverage || 1}
+                      max={riskSettings?.maxLeverage || 500}
                       step="1"
                       value={formData.leverageAllowed}
                       onChange={handleInputChange}
@@ -1341,8 +1379,8 @@ export default function CompetitionCreatorForm() {
                   </div>
                   <Input
               type="number"
-              min="1"
-              max="500"
+              min={riskSettings?.minLeverage || 1}
+              max={riskSettings?.maxLeverage || 500}
               step="1"
               value={formData.leverageAllowed}
               onChange={handleInputChange}

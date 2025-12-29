@@ -380,12 +380,22 @@ export default function AdminDashboard({
   };
 
   const handleMenuClick = (item: MenuItem, childId?: string) => {
+    // Save scroll position before state change
+    const navElement = document.getElementById('admin-sidebar-nav');
+    const scrollPos = navElement?.scrollTop || 0;
+    
     if (item.children && !childId) {
       toggleMenu(item.id);
     } else {
       setActiveSection(childId || item.id);
       setMobileMenuOpen(false);
     }
+    
+    // Restore scroll position after state change
+    requestAnimationFrame(() => {
+      const nav = document.getElementById('admin-sidebar-nav');
+      if (nav) nav.scrollTop = scrollPos;
+    });
   };
 
   const isActive = (itemId: string, childId?: string) => {
@@ -519,8 +529,8 @@ export default function AdminDashboard({
         </div>
       )}
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4">
+      {/* Navigation - key prevents scroll reset on re-render */}
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4 scrollbar-thin scrollbar-track-gray-800 scrollbar-thumb-gray-600" id="admin-sidebar-nav">
         {menuGroups.map((group) => (
           <div key={group.id}>
             {/* Group Header */}
