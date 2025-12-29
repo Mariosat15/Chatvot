@@ -61,6 +61,8 @@ interface Payment {
   paymentIntentId?: string;
   paymentMethod?: string;
   paymentId?: string;
+  provider?: string; // nuvei, stripe, paddle, etc.
+  providerTransactionId?: string; // Provider's transaction ID
   description?: string;
   failureReason?: string;
   processedAt?: string;
@@ -380,7 +382,7 @@ export default function PendingPaymentsSection() {
         <div className="text-center w-24">
           <p className="text-xs text-gray-400">Provider</p>
           <p className="text-sm font-medium text-gray-200 capitalize">
-            {payment.metadata?.paymentProvider || 'stripe'}
+            {payment.provider || payment.metadata?.paymentProvider || payment.paymentMethod || 'Unknown'}
           </p>
         </div>
 
@@ -638,7 +640,7 @@ export default function PendingPaymentsSection() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                   <Input
-                    placeholder="Email, name, or payment ID..."
+                    placeholder="Email, name, transaction ID, or payment intent..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleHistorySearch()}
@@ -679,6 +681,7 @@ export default function PendingPaymentsSection() {
                     {providers.length === 0 && (
                       <>
                         <SelectItem value="stripe">Stripe</SelectItem>
+                        <SelectItem value="nuvei">Nuvei</SelectItem>
                         <SelectItem value="paddle">Paddle</SelectItem>
                       </>
                     )}
@@ -858,7 +861,7 @@ export default function PendingPaymentsSection() {
                     <span className="text-lg font-semibold capitalize">{detailDialog.payment.status}</span>
                   </div>
                   <Badge className={STATUS_COLORS[detailDialog.payment.status]}>
-                    {detailDialog.payment.metadata?.paymentProvider || 'stripe'}
+                    {detailDialog.payment.provider || detailDialog.payment.metadata?.paymentProvider || detailDialog.payment.paymentMethod || 'Unknown'}
                   </Badge>
                 </div>
               </div>
@@ -983,6 +986,14 @@ export default function PendingPaymentsSection() {
                     <span className="text-gray-500">Transaction ID:</span>
                     <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded">{detailDialog.payment._id}</code>
                   </div>
+                  {detailDialog.payment.providerTransactionId && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">Provider Transaction ID:</span>
+                      <code className="text-gray-300 bg-gray-800 px-2 py-1 rounded truncate max-w-[300px]">
+                        {detailDialog.payment.providerTransactionId}
+                      </code>
+                    </div>
+                  )}
                   {detailDialog.payment.paymentIntentId && (
                     <div className="flex justify-between items-center">
                       <span className="text-gray-500">Payment Intent:</span>

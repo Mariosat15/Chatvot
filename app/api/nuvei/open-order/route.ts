@@ -71,11 +71,13 @@ export async function POST(req: NextRequest) {
       balanceBefore: currentBalance,
       balanceAfter: currentBalance, // Will be updated when completed
       status: 'pending',
-      paymentMethod: 'nuvei',
+      provider: 'nuvei', // Payment provider
+      paymentMethod: 'card', // Payment method (card, etc.)
       description: `Nuvei deposit of ${amount} ${currency}`,
       metadata: {
         walletId: wallet._id.toString(),
         initiatedAt: new Date().toISOString(),
+        paymentProvider: 'nuvei', // Also in metadata for backwards compatibility
       },
     });
 

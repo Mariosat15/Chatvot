@@ -22,8 +22,10 @@ export interface IWalletTransaction extends Document {
   currency: string; // EUR, USD, etc.
   exchangeRate: number; // Exchange rate (1 credit = X EUR)
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
-  paymentMethod?: string; // stripe, paypal, bank_transfer
-  paymentId?: string; // Stripe payment ID, etc.
+  provider?: string; // Payment provider: stripe, nuvei, paddle, etc.
+  providerTransactionId?: string; // Provider's own transaction/payment ID
+  paymentMethod?: string; // card, bank_transfer, paypal, etc.
+  paymentId?: string; // Stripe payment ID, etc. (deprecated - use providerTransactionId)
   paymentIntentId?: string; // Stripe Payment Intent ID (for fraud detection)
   competitionId?: string; // If related to competition
   description: string; // Transaction description
@@ -88,6 +90,12 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
       enum: ['pending', 'completed', 'failed', 'cancelled'],
       default: 'pending',
     },
+    provider: {
+      type: String, // stripe, nuvei, paddle, etc.
+    },
+    providerTransactionId: {
+      type: String, // Provider's own transaction ID
+    },
     paymentMethod: {
       type: String,
     },
@@ -124,6 +132,9 @@ WalletTransactionSchema.index({ userId: 1, createdAt: -1 });
 WalletTransactionSchema.index({ competitionId: 1 });
 WalletTransactionSchema.index({ status: 1, createdAt: -1 });
 WalletTransactionSchema.index({ transactionType: 1, createdAt: -1 });
+WalletTransactionSchema.index({ provider: 1, createdAt: -1 });
+WalletTransactionSchema.index({ providerTransactionId: 1 }); // For webhook lookups
+WalletTransactionSchema.index({ paymentIntentId: 1 }); // For Stripe lookups
 
 const WalletTransaction =
   models?.WalletTransaction ||

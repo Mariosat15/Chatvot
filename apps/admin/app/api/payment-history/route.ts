@@ -48,9 +48,14 @@ export async function GET(request: NextRequest) {
       query.paymentMethod = paymentMethod;
     }
 
-    // Provider filter (from metadata)
+    // Provider filter (check both new field and metadata for backwards compatibility)
+    // Store provider conditions to combine with search later
+    let providerConditions: any[] | null = null;
     if (provider !== 'all') {
-      query['metadata.paymentProvider'] = provider;
+      providerConditions = [
+        { provider },
+        { 'metadata.paymentProvider': provider },
+      ];
     }
 
     // Date filters
@@ -98,12 +103,38 @@ export async function GET(request: NextRequest) {
       
       userIds = matchingUsers.map((u: any) => u.id || u._id?.toString());
       
-      // Also search by payment intent ID
-      query.$or = [
+      // Build search conditions - search by user, transaction IDs, and payment refs
+      const searchConditions: any[] = [
         { userId: { $in: userIds } },
         { paymentIntentId: searchRegex },
         { paymentId: searchRegex },
+        { providerTransactionId: searchRegex },
+        { 'metadata.orderId': searchRegex },
+        { 'metadata.clientUniqueId': searchRegex },
       ];
+      
+      // Try to search by _id if it looks like a MongoDB ObjectId
+      if (search.match(/^[0-9a-fA-F]{24}$/)) {
+        const { ObjectId } = await import('mongodb');
+        try {
+          searchConditions.push({ _id: new ObjectId(search) });
+        } catch {
+          // Invalid ObjectId, skip
+        }
+      }
+      
+      // Combine search with provider filter if both exist
+      if (providerConditions) {
+        query.$and = [
+          { $or: providerConditions },
+          { $or: searchConditions },
+        ];
+      } else {
+        query.$or = searchConditions;
+      }
+    } else if (providerConditions) {
+      // Just provider filter, no search
+      query.$or = providerConditions;
     }
 
     // Get total count
@@ -205,11 +236,16 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Get unique payment providers for filter dropdown
-    const providers = await WalletTransaction.distinct('metadata.paymentProvider', {
+    // Get unique payment providers for filter dropdown (from both new and old fields)
+    const providersFromField = await WalletTransaction.distinct('provider', {
+      transactionType: 'deposit',
+      provider: { $exists: true, $ne: null },
+    });
+    const providersFromMetadata = await WalletTransaction.distinct('metadata.paymentProvider', {
       transactionType: 'deposit',
       'metadata.paymentProvider': { $exists: true, $ne: null },
     });
+    const providers = [...new Set([...providersFromField, ...providersFromMetadata])];
 
     // Get unique payment methods for filter dropdown
     const paymentMethods = await WalletTransaction.distinct('paymentMethod', {
