@@ -120,20 +120,34 @@ export async function POST(req: NextRequest) {
     // }
 
     // Extract transaction details
-    const transactionId = params.TransactionID || params.transactionId || params.PPP_TransactionID;
+    const nuveiTransactionId = params.TransactionID || params.transactionId || params.PPP_TransactionID;
     const status = params.Status || params.ppp_status;
     const clientUniqueId = params.clientUniqueId || params.merchant_unique_id;
     const amount = parseFloat(params.totalAmount || params.amount || '0');
     const currency = params.currency;
     const errCode = parseInt(params.ErrCode || params.errCode || '0');
 
-    console.log(`Processing DMN: transactionId=${transactionId}, status=${status}, clientUniqueId=${clientUniqueId}`);
+    console.log(`Processing DMN: nuveiTransactionId=${nuveiTransactionId}, status=${status}, clientUniqueId=${clientUniqueId}`);
 
     // Find the pending transaction
-    let transaction = await WalletTransaction.findOne({
-      'metadata.clientUniqueId': clientUniqueId,
-      provider: 'nuvei',
-    });
+    // New format: clientUniqueId = "txn_[transactionId]" - extract and find directly
+    // Old format: clientUniqueId = "dep_[userId8]_[timestamp]" - search by metadata
+    let transaction = null;
+    
+    if (clientUniqueId?.startsWith('txn_')) {
+      // NEW FORMAT: Extract transaction ID directly from clientUniqueId
+      const ourTransactionId = clientUniqueId.replace('txn_', '');
+      transaction = await WalletTransaction.findById(ourTransactionId);
+      console.log(`Found transaction by ID: ${ourTransactionId}`, !!transaction);
+    }
+    
+    if (!transaction) {
+      // FALLBACK: Old format or search by metadata
+      transaction = await WalletTransaction.findOne({
+        'metadata.clientUniqueId': clientUniqueId,
+        provider: 'nuvei',
+      });
+    }
 
     if (!transaction) {
       // Try finding by orderId
@@ -153,12 +167,12 @@ export async function POST(req: NextRequest) {
     if (status === 'APPROVED' && errCode === 0) {
       // Payment successful
       transaction.status = 'completed';
-      transaction.providerTransactionId = transactionId;
+      transaction.providerTransactionId = nuveiTransactionId;
       transaction.completedAt = new Date();
       transaction.metadata = {
         ...transaction.metadata,
         dmnStatus: status,
-        dmnTransactionId: transactionId,
+        dmnTransactionId: nuveiTransactionId,
       };
       await transaction.save();
 
@@ -175,11 +189,11 @@ export async function POST(req: NextRequest) {
     } else if (status === 'DECLINED' || status === 'ERROR') {
       // Payment failed
       transaction.status = 'failed';
-      transaction.providerTransactionId = transactionId;
+      transaction.providerTransactionId = nuveiTransactionId;
       transaction.metadata = {
         ...transaction.metadata,
         dmnStatus: status,
-        dmnTransactionId: transactionId,
+        dmnTransactionId: nuveiTransactionId,
         errorCode: errCode,
         errorReason: params.Reason || params.errApmDescription || 'Payment declined',
       };
@@ -190,7 +204,7 @@ export async function POST(req: NextRequest) {
       transaction.metadata = {
         ...transaction.metadata,
         dmnStatus: status,
-        dmnTransactionId: transactionId,
+        dmnTransactionId: nuveiTransactionId,
       };
       await transaction.save();
       console.log(`Transaction ${transaction._id} still pending`);

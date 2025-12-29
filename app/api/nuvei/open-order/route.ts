@@ -59,16 +59,29 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Generate unique transaction ID (max 45 chars for Nuvei)
-    // Format: dep_[last8ofUserId]_[timestamp] = 4 + 8 + 1 + 13 = 26 chars
-    const shortUserId = userId.slice(-8);
-    const clientUniqueId = `dep_${shortUserId}_${Date.now()}`;
+    // STEP 1: Create pending transaction FIRST to get its ID
+    const pendingTransaction = await WalletTransaction.create({
+      userId,
+      walletId: wallet._id,
+      type: 'deposit',
+      amount,
+      currency,
+      status: 'pending',
+      provider: 'nuvei',
+      metadata: {
+        initiatedAt: new Date().toISOString(),
+      },
+    });
+
+    // STEP 2: Generate clientUniqueId using transaction ID (max 45 chars for Nuvei)
+    // Format: txn_[24charTransactionId] = 4 + 24 = 28 chars
+    const clientUniqueId = `txn_${pendingTransaction._id.toString()}`;
     
     // Get webhook URL for DMN notifications
     const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL;
     const notificationUrl = `${origin}/api/nuvei/webhook`;
 
-    // Create order session with Nuvei
+    // STEP 3: Create order session with Nuvei
     const result = await nuveiService.openOrder({
       amount: amount.toFixed(2),
       currency,
@@ -79,27 +92,23 @@ export async function POST(req: NextRequest) {
     });
 
     if ('error' in result) {
+      // Delete the pending transaction if Nuvei call failed
+      await WalletTransaction.findByIdAndDelete(pendingTransaction._id);
       return NextResponse.json(
         { error: result.error },
         { status: 500 }
       );
     }
 
-    // Create pending transaction record
-    await WalletTransaction.create({
-      userId,
-      walletId: wallet._id,
-      type: 'deposit',
-      amount,
-      currency,
-      status: 'pending',
-      provider: 'nuvei',
+    // STEP 4: Update transaction with Nuvei response data
+    await WalletTransaction.findByIdAndUpdate(pendingTransaction._id, {
       providerTransactionId: result.orderId,
       metadata: {
         sessionToken: result.sessionToken,
         clientUniqueId,
         orderId: result.orderId,
-        fullUserId: userId, // Store full userId for reference
+        nuveiMerchantId: result.merchantId,
+        nuveiSiteId: result.merchantSiteId,
       },
     });
 

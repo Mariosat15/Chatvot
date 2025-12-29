@@ -52,13 +52,29 @@ export async function POST(req: NextRequest) {
     }
 
     // Find the transaction
-    let transaction = await WalletTransaction.findOne({
-      userId,
-      'metadata.sessionToken': sessionToken,
-      provider: 'nuvei',
-    });
+    // New format: clientUniqueId = "txn_[transactionId]" - extract and find directly
+    let transaction = null;
+    
+    if (clientUniqueId?.startsWith('txn_')) {
+      // NEW FORMAT: Extract transaction ID directly
+      const ourTransactionId = clientUniqueId.replace('txn_', '');
+      transaction = await WalletTransaction.findOne({
+        _id: ourTransactionId,
+        userId, // Ensure it belongs to this user
+      });
+    }
+    
+    if (!transaction) {
+      // FALLBACK: Search by sessionToken
+      transaction = await WalletTransaction.findOne({
+        userId,
+        'metadata.sessionToken': sessionToken,
+        provider: 'nuvei',
+      });
+    }
 
     if (!transaction && clientUniqueId) {
+      // FALLBACK: Old format - search by metadata
       transaction = await WalletTransaction.findOne({
         userId,
         'metadata.clientUniqueId': clientUniqueId,
