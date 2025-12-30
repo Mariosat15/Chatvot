@@ -57,6 +57,8 @@ interface BankAccount {
   lastUsedAt?: string;
   totalPayouts: number;
   stripeAccountStatus?: string;
+  nuveiConnected?: boolean; // Whether bank is connected via Nuvei /accountCapture
+  nuveiUpoId?: string;
 }
 
 interface EditFormData {
@@ -120,7 +122,7 @@ export default function BankAccountsSection() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  // Note: Nuvei secure form removed - SEPA payouts create UPO automatically during withdrawal
+  const [connectingNuvei, setConnectingNuvei] = useState<string | null>(null); // Bank ID currently being connected
 
   // Form state
   const [formData, setFormData] = useState({
@@ -225,6 +227,43 @@ export default function BankAccountsSection() {
       }
     } catch (error) {
       toast.error('Failed to update default account');
+    }
+  };
+
+  /**
+   * Connect bank account with Nuvei via /accountCapture flow
+   * This redirects the user to Nuvei's hosted page to verify their bank details
+   * Required for automatic bank withdrawals
+   */
+  const handleConnectWithNuvei = async (account: BankAccount) => {
+    setConnectingNuvei(account.id);
+    
+    try {
+      const response = await fetch('/api/nuvei/account-capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          countryCode: account.country,
+          currencyCode: 'EUR',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.redirectUrl) {
+        toast.error(data.error || 'Failed to initiate bank verification');
+        return;
+      }
+
+      // Redirect user to Nuvei's bank capture page
+      toast.info('Redirecting to secure bank verification...');
+      window.location.href = data.redirectUrl;
+      
+    } catch (error) {
+      console.error('Error connecting with Nuvei:', error);
+      toast.error('Failed to connect with Nuvei');
+    } finally {
+      setConnectingNuvei(null);
     }
   };
 
@@ -542,6 +581,22 @@ export default function BankAccountsSection() {
         </CardHeader>
 
         <CardContent>
+          {/* Info banner about Nuvei connection */}
+          {accounts.length > 0 && accounts.some(acc => !acc.nuveiConnected) && (
+            <div className="mb-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-sm font-medium text-yellow-300">Bank Verification Required</h4>
+                  <p className="text-sm text-gray-400 mt-1">
+                    To enable automatic bank withdrawals, click &quot;Connect with Nuvei&quot; on your bank account. 
+                    You&apos;ll be redirected to a secure page to verify your bank details.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {accounts.length === 0 ? (
             <div className="text-center py-8 border border-dashed border-gray-600 rounded-lg">
               <Building2 className="h-12 w-12 text-gray-500 mx-auto mb-3" />
@@ -552,16 +607,10 @@ export default function BankAccountsSection() {
               <p className="text-gray-500 text-sm mb-4">
                 <span className="text-blue-400">Note:</span> If you don&apos;t add a bank account, withdrawals will be refunded to your original payment method (the card or account you used to purchase credits).
               </p>
-              <div className="flex gap-2 justify-center">
-                <Button onClick={() => setNuveiCountryDialogOpen(true)} className="bg-green-600 hover:bg-green-700">
-                  <Building2 className="h-4 w-4 mr-2" />
-                  Add via Secure Form
-                </Button>
-                <Button onClick={() => setAddDialogOpen(true)} variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Manually
-                </Button>
-              </div>
+              <Button onClick={() => setAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Bank Account
+              </Button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -596,6 +645,17 @@ export default function BankAccountsSection() {
                               Verified
                             </Badge>
                           )}
+                          {account.nuveiConnected ? (
+                            <Badge className="bg-emerald-500/20 text-emerald-300 text-xs">
+                              <Check className="h-3 w-3 mr-1" />
+                              Nuvei Ready
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-yellow-500/20 text-yellow-300 text-xs">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Setup Required
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-gray-400 mt-1">
                           {account.accountHolderName}
@@ -623,7 +683,24 @@ export default function BankAccountsSection() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Connect with Nuvei button - required for automatic withdrawals */}
+                      {!account.nuveiConnected && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleConnectWithNuvei(account)}
+                          disabled={connectingNuvei === account.id}
+                          className="border-emerald-600 text-emerald-400 hover:bg-emerald-500/10"
+                        >
+                          {connectingNuvei === account.id ? (
+                            <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <Check className="h-3 w-3 mr-1" />
+                          )}
+                          Connect with Nuvei
+                        </Button>
+                      )}
                       {!account.isDefault && (
                         <Button
                           variant="outline"

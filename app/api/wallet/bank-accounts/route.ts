@@ -19,6 +19,18 @@ export async function GET() {
     await connectToDatabase();
 
     const accounts = await UserBankAccount.getUserAccounts(session.user.id);
+    
+    // Check if user has any Nuvei bank UPOs
+    // These are created when user completes the /accountCapture flow
+    const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
+    const nuveiUpos = await NuveiUserPaymentOption.find({
+      userId: session.user.id,
+      type: 'bank',
+      isActive: true,
+    });
+    
+    const hasNuveiConnection = nuveiUpos.length > 0;
+    const nuveiUpoId = hasNuveiConnection ? nuveiUpos[0]?.userPaymentOptionId : null;
 
     // Mask sensitive data for response
     const maskedAccounts = accounts.map((account) => ({
@@ -40,6 +52,11 @@ export async function GET() {
       lastUsedAt: account.lastUsedAt,
       totalPayouts: account.totalPayouts,
       stripeAccountStatus: account.stripeAccountStatus,
+      // Nuvei connection status
+      // For now, we apply the Nuvei connection to all bank accounts
+      // since Nuvei uses userTokenId (not specific bank account)
+      nuveiConnected: hasNuveiConnection,
+      nuveiUpoId: nuveiUpoId,
     }));
 
     return NextResponse.json({

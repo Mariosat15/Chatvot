@@ -331,22 +331,67 @@ export async function POST(req: NextRequest) {
     });
 
     // Submit to Nuvei
-    // For bank transfers, use the new SEPA payout flow which creates UPO first
+    // For bank transfers, we need a userPaymentOptionId from the /accountCapture flow
     // For card refunds, use the standard submitWithdrawal with UPO
     let nuveiResult: Awaited<ReturnType<typeof nuveiService.submitWithdrawal>>;
     
     if (isBankTransfer && bankAccount) {
-      console.log('🏦 Using SEPA payout flow for bank transfer...');
-      nuveiResult = await nuveiService.submitSepaPayout({
+      console.log('🏦 Processing bank transfer payout...');
+      
+      // Look up if this bank account has a Nuvei UPO
+      // Bank payouts REQUIRE the user to have completed /accountCapture flow first!
+      // See: https://docs.nuvei.com/documentation/global-guides/local-bank-payouts/
+      const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
+      
+      // Find a Nuvei bank UPO for this user
+      const bankUpo = await NuveiUserPaymentOption.findOne({
+        userId,
+        type: 'bank',
+        isActive: true,
+      }).sort({ lastUsed: -1 }); // Use most recently used
+      
+      if (!bankUpo || !bankUpo.userPaymentOptionId) {
+        console.error('🏦 No Nuvei bank UPO found for user - they need to complete /accountCapture first');
+        
+        // Rollback balance
+        wallet.creditBalance = balanceBefore;
+        await wallet.save();
+        
+        // Update withdrawal request as failed
+        await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
+          status: 'failed',
+          failedAt: new Date(),
+          failedReason: 'Bank account not connected with Nuvei',
+          'metadata.refunded': true,
+          'metadata.refundedAt': new Date().toISOString(),
+          'metadata.refundedCredits': creditsNeeded,
+        });
+        
+        // Update wallet transaction as failed
+        await WalletTransaction.findByIdAndUpdate(walletTx._id, {
+          status: 'failed',
+          failureReason: 'Bank account not connected with Nuvei',
+          processedAt: new Date(),
+        });
+        
+        return NextResponse.json(
+          { 
+            error: 'Bank account not connected with Nuvei. Please go to Wallet > Bank Accounts and click "Connect with Nuvei" to complete the bank verification process.',
+            code: 'NUVEI_BANK_NOT_CONNECTED'
+          },
+          { status: 400 }
+        );
+      }
+      
+      console.log('🏦 Found Nuvei bank UPO:', bankUpo.userPaymentOptionId);
+      
+      nuveiResult = await nuveiService.submitBankPayout({
         userTokenId,
         amount: netAmountEUR.toFixed(2),
         currency: 'EUR',
         merchantWDRequestId,
-        iban: bankAccount.iban,
-        bic: bankAccount.swiftBic || undefined,  // SWIFT/BIC code
-        accountHolderName: bankAccount.accountHolderName || undefined,  // Account holder name
+        userPaymentOptionId: bankUpo.userPaymentOptionId,
         email: userEmail,
-        country: bankAccount.country || 'CY', // Default to Cyprus if not set
         firstName: userName?.split(' ')[0] || undefined,
         lastName: userName?.split(' ').slice(1).join(' ') || undefined,
         notificationUrl: withdrawalParams.notificationUrl,

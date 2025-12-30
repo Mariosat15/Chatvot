@@ -767,55 +767,50 @@ class NuveiService {
   }
   
   /**
-   * Submit a bank payout using SEPA
-   * This creates a UPO first (if needed), then submits the payout
+   * Submit a bank payout using a pre-registered UPO
    * 
-   * @param params - Withdrawal details including bank info
+   * IMPORTANT: Bank payouts require the user to have completed the /accountCapture flow first!
+   * You cannot create bank UPOs via API - the user MUST be redirected to Nuvei's page.
+   * 
+   * Flow:
+   * 1. User adds bank account → /accountCapture with apmgw_BankPayouts → redirect to Nuvei
+   * 2. User enters bank details on Nuvei's hosted page
+   * 3. Nuvei sends DMN with userPaymentOptionId
+   * 4. We save the userPaymentOptionId to the NuveiUserPaymentOption collection
+   * 5. When user wants to withdraw → /payout with the saved userPaymentOptionId (THIS METHOD)
+   * 
+   * Documentation: https://docs.nuvei.com/documentation/global-guides/local-bank-payouts/
+   * 
+   * @param params - Withdrawal details including the PRE-EXISTING userPaymentOptionId
    * @returns Withdrawal response
    */
-  async submitSepaPayout(params: {
+  async submitBankPayout(params: {
     userTokenId: string;
     amount: string;
     currency: string;
     merchantWDRequestId: string;
-    iban: string;
-    bic?: string;
-    accountHolderName?: string;
+    userPaymentOptionId: string;  // MUST be obtained from /accountCapture flow first!
     email: string;
-    country: string;
     firstName?: string;
     lastName?: string;
     notificationUrl?: string;
   }): Promise<WithdrawalResponse | { error: string }> {
-    console.log('\n🏦 Starting SEPA payout flow...');
+    console.log('\n🏦 Starting Bank payout with pre-registered UPO...');
+    console.log('🏦 UPO ID:', params.userPaymentOptionId);
     
-    // Step 1: Create SEPA UPO with IBAN
-    console.log('🏦 Step 1: Creating SEPA UPO...');
-    const upoResult = await this.addSepaUpo({
-      userTokenId: params.userTokenId,
-      iban: params.iban,
-      bic: params.bic,
-      accountHolderName: params.accountHolderName,
-      email: params.email,
-      country: params.country,
-      firstName: params.firstName,
-      lastName: params.lastName,
-    });
-    
-    if (upoResult.error || !upoResult.userPaymentOptionId) {
-      console.error('🏦 Failed to create SEPA UPO:', upoResult.error);
-      return { error: upoResult.error || 'Failed to create bank account for payout' };
+    if (!params.userPaymentOptionId) {
+      return { 
+        error: 'Bank account not connected with Nuvei. Please complete the bank verification process first by clicking "Connect with Nuvei" in your wallet settings.' 
+      };
     }
     
-    console.log('🏦 Step 2: Submitting payout with UPO:', upoResult.userPaymentOptionId);
-    
-    // Step 2: Submit payout with the UPO
+    // Submit payout with the existing UPO
     return this.submitWithdrawal({
       userTokenId: params.userTokenId,
       amount: params.amount,
       currency: params.currency,
       merchantWDRequestId: params.merchantWDRequestId,
-      userPaymentOptionId: upoResult.userPaymentOptionId,
+      userPaymentOptionId: params.userPaymentOptionId,
       userDetails: {
         email: params.email,
         firstName: params.firstName,
