@@ -171,13 +171,20 @@ export async function POST(req: NextRequest) {
     console.log('Nuvei DMN received:', JSON.stringify(params, null, 2));
 
     // ==============================
-    // DETECT DMN TYPE: Withdrawal vs Payment
+    // DETECT DMN TYPE: Withdrawal vs Payment vs Account Capture
     // ==============================
     const isWithdrawalDmn = !!(params.wdRequestId || params.wdRequestStatus || params.merchantWDRequestId || params.merchant_wd_request_id);
+    const isAccountCaptureDmn = params.payment_method === 'apmgw_BankPayouts' && params.userPaymentOptionId && params.upoRegistrationDate;
     
     if (isWithdrawalDmn) {
       console.log('📤 Processing WITHDRAWAL DMN');
       return await handleWithdrawalDmn(params);
+    }
+    
+    // Handle Account Capture DMN - this is when Nuvei confirms bank details have been saved
+    if (isAccountCaptureDmn) {
+      console.log('🏦 Processing ACCOUNT CAPTURE DMN');
+      return await handleAccountCaptureDmn(params);
     }
     
     console.log('📥 Processing PAYMENT DMN');
@@ -386,6 +393,87 @@ export async function POST(req: NextRequest) {
     console.error('Nuvei webhook error:', error);
     // Still return OK to prevent Nuvei from retrying
     return NextResponse.json({ status: 'OK', error: 'Internal error' });
+  }
+}
+
+/**
+ * Handle Account Capture DMN
+ * Called when user completes bank details entry via Nuvei's hosted page
+ * This saves the userPaymentOptionId for future bank payouts
+ */
+async function handleAccountCaptureDmn(params: NuveiDmnParams): Promise<NextResponse> {
+  try {
+    const userPaymentOptionId = params.userPaymentOptionId;
+    const userTokenId = params.user_token_id || params.userTokenId;
+    const paymentMethod = params.payment_method;
+    const upoRegistrationDate = params.upoRegistrationDate;
+    const status = params.Status || params.ppp_status;
+    
+    console.log('🏦 Account Capture DMN parsed:', {
+      userPaymentOptionId,
+      userTokenId,
+      paymentMethod,
+      upoRegistrationDate,
+      status,
+    });
+    
+    if (!userPaymentOptionId || !userTokenId) {
+      console.error('🏦 Account Capture DMN missing required fields');
+      return NextResponse.json({ status: 'OK', message: 'Missing required fields' });
+    }
+    
+    // Extract userId from userTokenId (format: "user_XXXXXX")
+    const userId = userTokenId.replace('user_', '');
+    
+    if (!userId) {
+      console.error('🏦 Could not extract userId from userTokenId:', userTokenId);
+      return NextResponse.json({ status: 'OK', message: 'Invalid userTokenId format' });
+    }
+    
+    // Import model here to avoid circular dependency
+    const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
+    
+    // Check if this UPO already exists
+    const existingUPO = await NuveiUserPaymentOption.findOne({
+      userId,
+      userPaymentOptionId,
+    });
+    
+    if (existingUPO) {
+      console.log('🏦 UPO already exists, updating lastUsed:', userPaymentOptionId);
+      existingUPO.lastUsed = new Date();
+      await existingUPO.save();
+      return NextResponse.json({ status: 'OK', message: 'UPO already registered' });
+    }
+    
+    // Create new bank UPO
+    const newUPO = await NuveiUserPaymentOption.create({
+      userId,
+      userPaymentOptionId,
+      type: 'bank',
+      paymentMethod,
+      registrationDate: upoRegistrationDate,
+      countryCode: params.country,
+      currencyCode: params.currency,
+      isActive: true,
+      lastUsed: new Date(),
+    });
+    
+    console.log('🏦 Bank UPO saved successfully:', {
+      id: newUPO._id,
+      userId,
+      userPaymentOptionId,
+    });
+    
+    return NextResponse.json({ 
+      status: 'OK', 
+      message: 'Bank account registered successfully',
+      userPaymentOptionId,
+    });
+    
+  } catch (error) {
+    console.error('🏦 Error handling Account Capture DMN:', error);
+    return NextResponse.json({ status: 'OK', message: 'Error processing DMN' });
   }
 }
 

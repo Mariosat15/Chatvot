@@ -147,6 +147,29 @@ interface CancelWithdrawalResponse {
   wdRequestStatus?: string;
 }
 
+// ========== Account Capture Types (for Bank Payouts) ==========
+
+interface AccountCaptureParams {
+  userTokenId: string;           // User's unique identifier
+  paymentMethod: string;         // e.g., 'apmgw_BankPayouts'
+  currencyCode: string;          // e.g., 'EUR'
+  countryCode: string;           // e.g., 'CY', 'DE'
+  languageCode?: string;         // e.g., 'en'
+  returnUrl?: string;            // URL to return after capture
+}
+
+interface AccountCaptureResponse {
+  status: 'SUCCESS' | 'ERROR';
+  errCode: number;
+  reason?: string;
+  redirectUrl?: string;          // URL to redirect user to enter bank details
+  sessionToken?: string;
+  merchantId?: string;
+  merchantSiteId?: string;
+  userTokenId?: string;
+  internalRequestId?: number;
+}
+
 class NuveiService {
   /**
    * Get Nuvei credentials from database or environment variables
@@ -499,6 +522,117 @@ class NuveiService {
     } catch (error) {
       console.error('💳 Nuvei getClientConfig error:', error);
       return { enabled: false, sdkUrl: NUVEI_SDK_URL };
+    }
+  }
+  
+  // ========== ACCOUNT CAPTURE (for Bank Payouts) ==========
+  
+  /**
+   * Initiate account capture for bank payouts
+   * This redirects the user to Nuvei's page to enter their bank details
+   * Once completed, Nuvei sends a DMN with the userPaymentOptionId
+   * 
+   * Documentation: https://docs.nuvei.com/documentation/global-guides/local-bank-payouts/
+   */
+  async accountCapture(params: AccountCaptureParams): Promise<AccountCaptureResponse | { error: string }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: 'Nuvei not configured or not active' };
+    }
+    
+    // First, get a session token
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `ac_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Get session token first
+    const sessionTokenChecksum = this.calculatePaymentStatusChecksum(
+      credentials.merchantId,
+      credentials.siteId,
+      clientRequestId,
+      timeStamp,
+      credentials.secretKey
+    );
+    
+    const sessionRequest = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      clientRequestId,
+      timeStamp,
+      checksum: sessionTokenChecksum,
+    };
+    
+    console.log('🏦 Getting session token for accountCapture...');
+    
+    try {
+      // Get session token
+      const sessionResponse = await fetch(`${apiUrl}/getSessionToken.do`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionRequest),
+      });
+      
+      const sessionData = await sessionResponse.json();
+      
+      if (sessionData.status !== 'SUCCESS') {
+        console.error('🏦 Failed to get session token:', sessionData);
+        return { error: sessionData.reason || 'Failed to get session token' };
+      }
+      
+      const sessionToken = sessionData.sessionToken;
+      console.log('🏦 Session token obtained:', sessionToken?.substring(0, 20) + '...');
+      
+      // Now call accountCapture
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://chartvolt.com';
+      const returnUrl = params.returnUrl || `${baseUrl}/api/nuvei/account-capture-callback`;
+      
+      const accountCaptureRequest = {
+        sessionToken,
+        merchantId: credentials.merchantId,
+        merchantSiteId: credentials.siteId,
+        userTokenId: params.userTokenId,
+        paymentMethod: params.paymentMethod,
+        currencyCode: params.currencyCode,
+        countryCode: params.countryCode,
+        languageCode: params.languageCode || 'en',
+        urlDetails: {
+          notificationUrl: credentials.dmnUrl || `${baseUrl}/api/nuvei/webhook`,
+        },
+      };
+      
+      console.log('\n');
+      console.log('╔════════════════════════════════════════════════════════════╗');
+      console.log('║     NUVEI ACCOUNT CAPTURE REQUEST                          ║');
+      console.log('╚════════════════════════════════════════════════════════════╝');
+      console.log('📤 ENDPOINT:', `${apiUrl}/accountCapture.do`);
+      console.log('📤 REQUEST BODY:');
+      console.log(JSON.stringify(accountCaptureRequest, null, 2));
+      
+      const captureResponse = await fetch(`${apiUrl}/accountCapture.do`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(accountCaptureRequest),
+      });
+      
+      const captureData = await captureResponse.json();
+      
+      console.log('📥 RESPONSE:');
+      console.log(JSON.stringify(captureData, null, 2));
+      console.log('╚════════════════════════════════════════════════════════════╝\n');
+      
+      if (captureData.status === 'SUCCESS' && captureData.redirectUrl) {
+        console.log('🏦 Account capture redirect URL obtained');
+        return captureData as AccountCaptureResponse;
+      } else {
+        console.error('🏦 Account capture failed:', captureData);
+        return { 
+          error: captureData.reason || `Account capture failed (code: ${captureData.errCode})`,
+          ...captureData,
+        };
+      }
+    } catch (error) {
+      console.error('🏦 Nuvei accountCapture error:', error);
+      return { error: 'Failed to initiate account capture' };
     }
   }
   
