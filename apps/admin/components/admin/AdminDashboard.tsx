@@ -87,6 +87,7 @@ import KYCSettingsSection from '@/components/admin/KYCSettingsSection';
 import KYCHistorySection from '@/components/admin/KYCHistorySection';
 import MarketSettingsSection from '@/components/admin/MarketSettingsSection';
 import DependencyUpdatesSection from '@/components/admin/DependencyUpdatesSection';
+import AdminOverviewDashboard from '@/components/admin/AdminOverviewDashboard';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -113,11 +114,27 @@ interface MenuGroup {
 
 // Menu organized by groups
 const menuGroups: MenuGroup[] = [
+  // Dashboard Overview (First Item)
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: <LayoutDashboard className="h-4 w-4" />,
+    color: 'text-blue-400',
+    items: [
+      {
+        id: 'overview',
+        label: 'Overview',
+        icon: <LayoutDashboard className="h-5 w-5" />,
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-500/10 hover:bg-blue-500/20',
+      },
+    ],
+  },
   // Content Management
   {
     id: 'content',
     label: 'Content',
-    icon: <LayoutDashboard className="h-4 w-4" />,
+    icon: <Home className="h-4 w-4" />,
     color: 'text-yellow-400',
     items: [
       {
@@ -350,7 +367,7 @@ export default function AdminDashboard({
   adminName = 'Admin',
 }: AdminDashboardProps) {
   const router = useRouter();
-  const [activeSection, setActiveSection] = useState(isFirstLogin ? 'credentials' : 'competitions');
+  const [activeSection, setActiveSection] = useState(isFirstLogin ? 'credentials' : 'overview');
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['settings', 'dev-zone-menu']);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -417,6 +434,8 @@ export default function AdminDashboard({
 
   const renderContent = () => {
     switch (activeSection) {
+      case 'overview':
+        return <AdminOverviewDashboard onNavigate={setActiveSection} />;
       case 'hero-page':
         return <LandingPageBuilder />;
       case 'competitions':
