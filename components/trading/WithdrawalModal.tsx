@@ -26,6 +26,7 @@ interface WithdrawalMethod {
   ibanLast4?: string;
   country?: string;
   isDefault?: boolean;
+  userPaymentOptionId?: string; // Nuvei UPO ID for card refunds
 }
 
 interface WithdrawalInfo {
@@ -162,11 +163,18 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
         };
         
         if (withdrawalMethod === 'card_refund') {
-          // For card refund, pass the card details from the original payment
+          // For card refund, we MUST pass the UPO ID for Nuvei to process
+          if (!selectedMethod.userPaymentOptionId) {
+            setError('This card cannot be used for automatic refund. No UPO available. Please use bank transfer instead.');
+            setLoading(false);
+            return;
+          }
+          
+          requestBody.userPaymentOptionId = selectedMethod.userPaymentOptionId;
           requestBody.cardDetails = {
-            paymentIntentId: selectedMethod.id, // Will be used for reference
             cardBrand: selectedMethod.cardBrand,
             cardLast4: selectedMethod.cardLast4,
+            userPaymentOptionId: selectedMethod.userPaymentOptionId,
           };
         } else {
           // For bank transfer, pass the bank account ID

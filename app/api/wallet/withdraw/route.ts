@@ -98,19 +98,49 @@ export async function GET() {
       ibanLast4?: string;
       country?: string;
       isDefault?: boolean;
+      userPaymentOptionId?: string; // Nuvei UPO ID for card refunds
     }> = [];
 
-    // Add original payment method if available
-    if (lastDeposit?.paymentMethod) {
+    // Try to get stored UPOs for card refunds (Nuvei)
+    let storedUPOs: any[] = [];
+    try {
+      const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
+      storedUPOs = await NuveiUserPaymentOption.getActiveUPOs(session.user.id);
+    } catch (e) {
+      console.log('Could not fetch stored UPOs (model may not exist yet)');
+    }
+
+    // Add stored UPOs as card options (these have valid UPO IDs for Nuvei refunds)
+    for (const upo of storedUPOs) {
+      const expiryStr = upo.expMonth && upo.expYear ? `${upo.expMonth}/${upo.expYear}` : '';
+      availableWithdrawalMethods.push({
+        id: `upo_${upo.userPaymentOptionId}`,
+        type: 'original_method',
+        label: `${upo.cardBrand || 'Card'} •••• ${upo.cardLast4 || '****'}`,
+        details: expiryStr ? `Expires ${expiryStr}` : 'From deposit',
+        cardBrand: upo.cardBrand,
+        cardLast4: upo.cardLast4,
+        userPaymentOptionId: upo.userPaymentOptionId, // CRITICAL: Include UPO ID
+      });
+    }
+
+    // Add original payment method if no UPOs stored but there's a deposit
+    // (without UPO, can only be used for manual refunds, not automatic Nuvei)
+    if (storedUPOs.length === 0 && lastDeposit?.paymentMethod) {
       const cardLast4 = lastDeposit.metadata?.cardLast4 || lastDeposit.metadata?.last4;
       const cardBrand = lastDeposit.metadata?.cardBrand || lastDeposit.metadata?.brand || lastDeposit.paymentMethod;
+      const upoFromDeposit = lastDeposit.metadata?.userPaymentOptionId;
+      
       availableWithdrawalMethods.push({
         id: 'original_method',
         type: 'original_method',
         label: `Original Payment Method`,
-        details: cardLast4 ? `${cardBrand} •••• ${cardLast4}` : cardBrand,
+        details: cardLast4 
+          ? `${cardBrand} •••• ${cardLast4}${!upoFromDeposit ? ' (manual only)' : ''}`
+          : cardBrand,
         cardBrand,
         cardLast4,
+        userPaymentOptionId: upoFromDeposit, // May be undefined if old deposit
       });
     }
 

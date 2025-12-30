@@ -45,8 +45,9 @@ export async function POST(req: NextRequest) {
     const { 
       amountEUR,
       withdrawalMethod, // 'card_refund' | 'bank_transfer'
-      cardDetails, // For card refund: { paymentIntentId, cardBrand, cardLast4 }
+      cardDetails, // For card refund: { paymentIntentId, cardBrand, cardLast4, userPaymentOptionId }
       bankAccountId, // For bank transfer: existing bank account ID
+      userPaymentOptionId, // Direct UPO ID if provided
     } = body;
 
     // Validate amount
@@ -130,9 +131,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get bank details for bank transfer
+    // Get bank details for bank transfer or UPO for card refund
     let bankAccount = null;
     let bankDetailsForRequest: any = null;
+    let actualUpoId: string | null = null;
     
     if (withdrawalMethod === 'bank_transfer') {
       if (!bankAccountId) {
@@ -162,9 +164,26 @@ export async function POST(req: NextRequest) {
         swiftBic: bankAccount.swiftBic,
       };
     } else if (withdrawalMethod === 'card_refund') {
-      if (!cardDetails) {
+      // For card refund, we MUST have a valid UPO ID
+      actualUpoId = userPaymentOptionId || cardDetails?.userPaymentOptionId;
+      
+      if (!actualUpoId) {
+        // Try to find a UPO from our stored records
+        const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
+        const storedUpo = await NuveiUserPaymentOption.getMostRecentUPO(userId);
+        
+        if (storedUpo) {
+          actualUpoId = storedUpo.userPaymentOptionId;
+          console.log(`💳 Using stored UPO ${actualUpoId} for card refund`);
+        }
+      }
+      
+      if (!actualUpoId) {
         return NextResponse.json(
-          { error: 'Please select a card for refund' },
+          { 
+            error: 'No card available for refund. You need to make a deposit first, or use bank transfer instead.',
+            code: 'NO_UPO_AVAILABLE'
+          },
           { status: 400 }
         );
       }
@@ -194,9 +213,10 @@ export async function POST(req: NextRequest) {
     };
 
     // Add payment method details for Nuvei
-    if (withdrawalMethod === 'card_refund' && cardDetails?.paymentIntentId) {
-      // For card refund, we send the original payment reference
-      withdrawalParams.merchantUniqueId = cardDetails.paymentIntentId;
+    if (withdrawalMethod === 'card_refund' && actualUpoId) {
+      // For card refund, we MUST pass the UPO ID from the original deposit
+      withdrawalParams.userPaymentOptionId = actualUpoId;
+      console.log(`💳 Using UPO ${actualUpoId} for card refund withdrawal`);
     } else if (withdrawalMethod === 'bank_transfer' && bankAccount) {
       withdrawalParams.bankDetails = {
         iban: bankAccount.iban,

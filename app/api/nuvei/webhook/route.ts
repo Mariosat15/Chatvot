@@ -62,6 +62,10 @@ interface NuveiDmnParams {
   uniqueCC?: string;
   errApmDescription?: string;
   
+  // UPO (User Payment Option) - needed for card refunds
+  userPaymentOptionId?: string;
+  upoRegistrationDate?: string;
+  
   [key: string]: string | undefined;
 }
 
@@ -225,8 +229,41 @@ export async function POST(req: NextRequest) {
         dmnStatus: status,
         dmnTransactionId: nuveiTransactionId,
         nuveiPPPTransactionId: params.PPP_TransactionID,
+        // IMPORTANT: Store UPO for future card refunds
+        userPaymentOptionId: params.userPaymentOptionId,
       };
       await transaction.save();
+      
+      // Store UPO for future card refunds (if provided)
+      if (params.userPaymentOptionId && transaction.userId) {
+        try {
+          // Store in a separate collection for quick lookup
+          const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
+          
+          await NuveiUserPaymentOption.findOneAndUpdate(
+            { 
+              userId: transaction.userId, 
+              userPaymentOptionId: params.userPaymentOptionId 
+            },
+            {
+              userId: transaction.userId,
+              userPaymentOptionId: params.userPaymentOptionId,
+              cardBrand: params.cardCompany,
+              cardLast4: params.cardNumber?.replace(/\*+/g, '').slice(-4),
+              expMonth: params.expMonth,
+              expYear: params.expYear,
+              uniqueCC: params.uniqueCC,
+              lastUsed: new Date(),
+              createdFromTransactionId: transaction._id.toString(),
+            },
+            { upsert: true, new: true }
+          );
+          console.log(`💳 Stored UPO ${params.userPaymentOptionId} for user ${transaction.userId}`);
+        } catch (upoError) {
+          console.error('Failed to store UPO:', upoError);
+          // Don't fail the payment if UPO storage fails
+        }
+      }
 
       // Use completeDeposit to handle wallet crediting, fee recording, and invoice
       // This ensures Nuvei deposits are tracked the same way as Stripe
