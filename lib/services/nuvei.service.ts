@@ -548,14 +548,27 @@ class NuveiService {
       requestBody.userPaymentOptionId = params.userPaymentOptionId;
     }
     
-    // For bank transfer
-    if (params.bankDetails) {
+    // For bank transfer - use SEPA/IBAN format for EUR withdrawals
+    if (params.bankDetails && params.bankDetails.iban) {
+      // Format IBAN for Nuvei (remove spaces, uppercase)
+      const cleanIban = params.bankDetails.iban.replace(/\s/g, '').toUpperCase();
+      const cleanBic = params.bankDetails.bic?.replace(/\s/g, '').toUpperCase();
+      
       requestBody.paymentOption = {
         alternativePaymentMethod: {
-          paymentMethod: 'apmgw_Bank_Transfer',
-          ...params.bankDetails,
+          paymentMethod: 'apmgw_SEPA',  // Use SEPA for EUR bank transfers
+          iban: cleanIban,
+          bic: cleanBic || undefined,
+          bankName: params.bankDetails.bankName || undefined,
+          accountHolderName: params.bankDetails.accountHolderName || undefined,
         },
       };
+      
+      console.log('💸 Bank transfer details:', {
+        method: 'apmgw_SEPA',
+        ibanPrefix: cleanIban.substring(0, 4) + '****',
+        hasBic: !!cleanBic,
+      });
     }
     
     // Notification URL for DMN

@@ -210,12 +210,13 @@ export async function POST(req: NextRequest) {
     const notificationUrl = storedDmnUrl || `${origin}/api/nuvei/webhook`;
 
     // STEP 3: Create order session with Nuvei
+    // Note: Don't specify userCountry - let Nuvei determine from card BIN for proper 3DS handling
     const result = await nuveiService.openOrder({
       amount: amount.toFixed(2),
       currency,
       clientUniqueId,
       userEmail: session.user.email || '',
-      userCountry: 'US', // Will be overwritten by Nuvei if available
+      // Let Nuvei determine country from card for proper 3DS2 compliance
       notificationUrl,
     });
 

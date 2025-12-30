@@ -1156,6 +1156,7 @@ function NuveiPaymentForm({
 
       // Create payment with required user details
       // The paymentOption MUST be from the same SafeCharge instance for 3DS to work
+      // Note: Country should match user's location for 3DS2 compliance
       sfc.createPayment(
         {
           sessionToken,
@@ -1166,10 +1167,11 @@ function NuveiPaymentForm({
             firstName,
             lastName,
             email: email.trim(),
+            country: 'CY', // Cyprus - where the business is registered
           },
           billingAddress: {
             email: email.trim(),
-            country: 'US',
+            country: 'CY', // Match with business location for EUR transactions
           },
         } as Parameters<typeof sfc.createPayment>[0],
         async (result: { result: string; errCode: string; errorDescription?: string; reason?: string; transactionId?: string }) => {

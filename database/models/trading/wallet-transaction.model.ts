@@ -7,6 +7,7 @@ export interface IWalletTransaction extends Document {
     | 'deposit' // User deposits EUR → gets credits
     | 'withdrawal' // User withdraws credits → gets EUR
     | 'withdrawal_fee' // Fee charged on withdrawal
+    | 'withdrawal_refund' // Withdrawal failed/cancelled (refund credits)
     | 'competition_entry' // User enters competition (deduct credits)
     | 'competition_win' // User wins competition (add credits)
     | 'competition_refund' // Competition cancelled (refund entry fee)
@@ -49,6 +50,7 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
         'deposit',
         'withdrawal',
         'withdrawal_fee',
+        'withdrawal_refund',
         'competition_entry',
         'competition_win',
         'competition_refund',
