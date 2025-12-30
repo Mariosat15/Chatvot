@@ -603,6 +603,9 @@ class NuveiService {
       
       // Now call accountCapture with the session token
       // Per Nuvei support: include amount parameter in the request
+      // Also include returnUrl for redirect after completion
+      const returnUrl = `${baseUrl}/wallet?bank_setup=success&message=${encodeURIComponent('Bank account connected successfully!')}`;
+      
       const accountCaptureRequest = {
         sessionToken,
         merchantId: credentials.merchantId,
@@ -610,10 +613,13 @@ class NuveiService {
         userTokenId: params.userTokenId,
         paymentMethod: params.paymentMethod,
         amount, // Required per Nuvei support
-        currencyCode: currency,
-        countryCode: params.countryCode,
+        currency, // Try 'currency' instead of 'currencyCode'
+        country: params.countryCode, // Try 'country' instead of 'countryCode'
         languageCode: params.languageCode || 'en',
         urlDetails: {
+          successUrl: returnUrl,
+          failureUrl: `${baseUrl}/wallet?bank_setup=failed&error=${encodeURIComponent('Bank verification failed')}`,
+          pendingUrl: `${baseUrl}/wallet?bank_setup=pending`,
           notificationUrl: credentials.dmnUrl || `${baseUrl}/api/nuvei/webhook`,
         },
       };
