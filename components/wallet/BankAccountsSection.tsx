@@ -120,9 +120,7 @@ export default function BankAccountsSection() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [nuveiSetupLoading, setNuveiSetupLoading] = useState(false);
-  const [nuveiCountryDialogOpen, setNuveiCountryDialogOpen] = useState(false);
-  const [nuveiCountry, setNuveiCountry] = useState('CY');
+  // Note: Nuvei secure form removed - SEPA payouts create UPO automatically during withdrawal
 
   // Form state
   const [formData, setFormData] = useState({
@@ -155,40 +153,6 @@ export default function BankAccountsSection() {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
-
-  // Handle Nuvei bank account setup (redirect to Nuvei's hosted page)
-  const handleNuveiBankSetup = async () => {
-    setNuveiSetupLoading(true);
-    
-    try {
-      const response = await fetch('/api/nuvei/account-capture', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          countryCode: nuveiCountry,
-          currencyCode: 'EUR',
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok || !data.redirectUrl) {
-        toast.error(data.error || 'Failed to initiate bank setup');
-        return;
-      }
-      
-      // Redirect to Nuvei's hosted bank details page
-      toast.info('Redirecting to secure bank setup...');
-      window.location.href = data.redirectUrl;
-      
-    } catch (error) {
-      console.error('Error initiating Nuvei bank setup:', error);
-      toast.error('Failed to initiate bank setup');
-    } finally {
-      setNuveiSetupLoading(false);
-      setNuveiCountryDialogOpen(false);
-    }
-  };
 
   const fetchAccounts = async () => {
     try {
@@ -409,91 +373,12 @@ export default function BankAccountsSection() {
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              {/* Nuvei Secure Bank Setup - Recommended */}
-              <Dialog open={nuveiCountryDialogOpen} onOpenChange={setNuveiCountryDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-green-600 hover:bg-green-700">
-                    <Building2 className="h-4 w-4 mr-2" />
-                    Add via Secure Form
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-md">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-green-400" />
-                      Secure Bank Setup
-                    </DialogTitle>
-                    <DialogDescription className="text-gray-400">
-                      You'll be redirected to a secure page to enter your bank details.
-                      This is the recommended method for adding bank accounts.
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label className="text-gray-300">Select Your Country</Label>
-                      <Select value={nuveiCountry} onValueChange={setNuveiCountry}>
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-600">
-                          {SEPA_COUNTRIES.map((country) => (
-                            <SelectItem key={country.code} value={country.code}>
-                              {country.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="bg-gray-800 rounded-lg p-4 text-sm text-gray-400 space-y-2">
-                      <p className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-400" />
-                        Bank-grade security
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-400" />
-                        Instant verification
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-400" />
-                        Supports all major European banks
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <DialogFooter className="mt-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setNuveiCountryDialogOpen(false)}
-                      className="border-gray-600 text-gray-300"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleNuveiBankSetup}
-                      disabled={nuveiSetupLoading}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      {nuveiSetupLoading ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                          Preparing...
-                        </>
-                      ) : (
-                        <>Continue to Secure Form</>
-                      )}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-              
-              {/* Manual Bank Account Entry */}
+              {/* Bank Account Entry - Primary method for SEPA withdrawals */}
               <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
+                  <Button className="bg-blue-600 hover:bg-blue-700">
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Manually
+                    Add Bank Account
                   </Button>
                 </DialogTrigger>
               <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-lg">
@@ -503,7 +388,8 @@ export default function BankAccountsSection() {
                     Add Bank Account
                   </DialogTitle>
                   <DialogDescription className="text-gray-400">
-                    Enter your bank details for receiving withdrawals. We support SEPA transfers.
+                    Enter your IBAN to receive withdrawals via SEPA bank transfer. 
+                    Your bank details are stored securely and verified when you make a withdrawal.
                   </DialogDescription>
                 </DialogHeader>
 
