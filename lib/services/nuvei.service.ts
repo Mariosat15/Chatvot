@@ -540,59 +540,69 @@ class NuveiService {
       return { error: 'Nuvei not configured or not active' };
     }
     
-    // First, get a session token
     const apiUrl = this.getApiUrl(credentials.testMode);
     const timeStamp = this.generateTimeStamp();
     const clientRequestId = `ac_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://chartvolt.com';
     
-    // Get session token first
-    const sessionTokenChecksum = this.calculatePaymentStatusChecksum(
-      credentials.merchantId,
-      credentials.siteId,
-      clientRequestId,
-      timeStamp,
-      credentials.secretKey
-    );
+    // IMPORTANT: /accountCapture requires a session token from /openOrder (not /getSessionToken)
+    // The /openOrder call establishes the order context with amount and currency
+    // See: https://docs.nuvei.com/documentation/global-guides/local-bank-payouts/
     
-    const sessionRequest = {
+    // Calculate checksum for openOrder: merchantId + merchantSiteId + clientRequestId + amount + currency + timeStamp + secretKey
+    const amount = '1.00'; // Nominal amount for account capture (not actually charged)
+    const currency = params.currencyCode || 'EUR';
+    
+    const openOrderChecksumString = credentials.merchantId 
+      + credentials.siteId 
+      + clientRequestId 
+      + amount 
+      + currency 
+      + timeStamp 
+      + credentials.secretKey;
+    const openOrderChecksum = crypto.createHash('sha256').update(openOrderChecksumString).digest('hex');
+    
+    const openOrderRequest = {
       merchantId: credentials.merchantId,
       merchantSiteId: credentials.siteId,
       clientRequestId,
+      clientUniqueId: `bank_capture_${params.userTokenId}_${Date.now()}`,
+      amount,
+      currency,
       timeStamp,
-      checksum: sessionTokenChecksum,
+      checksum: openOrderChecksum,
+      // Include user token for account linking
+      userTokenId: params.userTokenId,
     };
     
-    console.log('🏦 Getting session token for accountCapture...');
+    console.log('🏦 Getting session token via /openOrder for accountCapture...');
     
     try {
-      // Get session token
-      const sessionResponse = await fetch(`${apiUrl}/getSessionToken.do`, {
+      // Get session token via openOrder
+      const openOrderResponse = await fetch(`${apiUrl}/openOrder.do`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sessionRequest),
+        body: JSON.stringify(openOrderRequest),
       });
       
-      const sessionData = await sessionResponse.json();
+      const openOrderData = await openOrderResponse.json();
       
-      if (sessionData.status !== 'SUCCESS') {
-        console.error('🏦 Failed to get session token:', sessionData);
-        return { error: sessionData.reason || 'Failed to get session token' };
+      if (openOrderData.status !== 'SUCCESS') {
+        console.error('🏦 Failed to get session token via openOrder:', openOrderData);
+        return { error: openOrderData.reason || 'Failed to initialize bank capture session' };
       }
       
-      const sessionToken = sessionData.sessionToken;
-      console.log('🏦 Session token obtained:', sessionToken?.substring(0, 20) + '...');
+      const sessionToken = openOrderData.sessionToken;
+      console.log('🏦 Session token obtained via openOrder:', sessionToken?.substring(0, 20) + '...');
       
-      // Now call accountCapture
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://chartvolt.com';
-      const returnUrl = params.returnUrl || `${baseUrl}/api/nuvei/account-capture-callback`;
-      
+      // Now call accountCapture with the session token
       const accountCaptureRequest = {
         sessionToken,
         merchantId: credentials.merchantId,
         merchantSiteId: credentials.siteId,
         userTokenId: params.userTokenId,
         paymentMethod: params.paymentMethod,
-        currencyCode: params.currencyCode,
+        currencyCode: currency,
         countryCode: params.countryCode,
         languageCode: params.languageCode || 'en',
         urlDetails: {
