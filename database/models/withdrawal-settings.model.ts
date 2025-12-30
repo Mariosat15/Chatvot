@@ -40,6 +40,10 @@ export interface IWithdrawalSettings extends Document {
   maxWithdrawalsPerMonth: number;          // Maximum withdrawal requests per month
   holdPeriodAfterDeposit: number;          // Hours to wait after deposit before withdrawal
   
+  // API Rate Limiting (spam protection)
+  apiRateLimitEnabled: boolean;            // Enable/disable API rate limiting
+  apiRateLimitRequestsPerMinute: number;   // Max API requests per minute per user (0 = unlimited)
+  
   // Payout Methods
   allowedPayoutMethods: string[];          // ['stripe_refund', 'stripe_payout', 'bank_transfer', 'original_method']
   preferredPayoutMethod: string;           // Default payout method
@@ -187,6 +191,18 @@ const WithdrawalSettingsSchema = new Schema<IWithdrawalSettings>(
       type: Number,
       default: 0,  // Hours
       min: 0,
+    },
+    
+    // API Rate Limiting (spam protection)
+    apiRateLimitEnabled: {
+      type: Boolean,
+      default: true,  // Enabled by default for security
+    },
+    apiRateLimitRequestsPerMinute: {
+      type: Number,
+      default: 5,  // 5 requests per minute per user
+      min: 1,
+      max: 100,
     },
     
     // Payout Methods

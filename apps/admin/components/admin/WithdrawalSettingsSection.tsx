@@ -67,6 +67,10 @@ interface WithdrawalSettings {
   maxWithdrawalsPerMonth: number;
   holdPeriodAfterDeposit: number;
   
+  // API Rate Limiting (spam protection)
+  apiRateLimitEnabled: boolean;
+  apiRateLimitRequestsPerMinute: number;
+  
   // Payout Methods
   allowedPayoutMethods: string[];
   preferredPayoutMethod: string;
@@ -602,6 +606,37 @@ export default function WithdrawalSettingsSection() {
                   className="bg-gray-700 border-gray-600"
                 />
               </div>
+            </div>
+            
+            {/* API Rate Limiting */}
+            <div className="pt-4 border-t border-gray-700">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <Label className="text-gray-300">API Rate Limiting</Label>
+                  <p className="text-xs text-gray-500">Prevents rapid API requests (spam/DDoS protection)</p>
+                </div>
+                <Switch
+                  checked={settings.apiRateLimitEnabled ?? true}
+                  onCheckedChange={(checked) => updateSetting('apiRateLimitEnabled', checked)}
+                />
+              </div>
+              
+              {settings.apiRateLimitEnabled && (
+                <div>
+                  <Label className="text-gray-300">Requests Per Minute (per user)</Label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Maximum API requests allowed per minute for withdrawal operations
+                  </p>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={settings.apiRateLimitRequestsPerMinute ?? 5}
+                    onChange={(e) => updateSetting('apiRateLimitRequestsPerMinute', parseInt(e.target.value) || 5)}
+                    className="bg-gray-700 border-gray-600 w-24"
+                  />
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

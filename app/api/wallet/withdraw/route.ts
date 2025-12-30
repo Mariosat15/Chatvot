@@ -13,7 +13,6 @@ import Challenge from '@/database/models/trading/challenge.model';
 import AppSettings from '@/database/models/app-settings.model';
 import UserBankAccount from '@/database/models/user-bank-account.model';
 import KYCSettings from '@/database/models/kyc-settings.model';
-import { RateLimiters, getRateLimitHeaders } from '@/lib/utils/rate-limiter';
 import { sanitizeUserNote, sanitizeAmount } from '@/lib/utils/sanitize';
 
 /**
@@ -239,18 +238,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // SECURITY: Rate limiting - 3 withdrawal attempts per minute per user
-    const rateLimitResult = RateLimiters.withdrawal(session.user.id);
-    if (!rateLimitResult.success) {
-      console.log(`🛡️ Rate limit exceeded for user ${session.user.id} - withdrawal`);
-      return NextResponse.json(
-        { success: false, error: 'Too many requests. Please wait a moment before trying again.' },
-        { 
-          status: 429,
-          headers: getRateLimitHeaders(rateLimitResult),
-        }
-      );
+    await connectToDatabase();
+    
+    // SECURITY: Get settings from database (also used for rate limiting)
+    const withdrawalSettings = await WithdrawalSettings.getSingleton();
+    
+    // SECURITY: Rate limiting - uses admin-configured limits (default 5/min if not set)
+    if (withdrawalSettings.apiRateLimitEnabled !== false) {
+      const { checkRateLimit, getRateLimitHeaders } = await import('@/lib/utils/rate-limiter');
+      const rateLimitResult = checkRateLimit(session.user.id, {
+        maxRequests: withdrawalSettings.apiRateLimitRequestsPerMinute || 5,
+        windowMs: 60 * 1000, // 1 minute window
+        keyPrefix: 'withdrawal',
+      });
+      
+      if (!rateLimitResult.success) {
+        console.log(`🛡️ Rate limit exceeded for user ${session.user.id} - withdrawal`);
+        return NextResponse.json(
+          { success: false, error: 'Too many requests. Please wait a moment before trying again.' },
+          { 
+            status: 429,
+            headers: getRateLimitHeaders(rateLimitResult),
+          }
+        );
+      }
     }
+    
+    // withdrawalSettings is reused below - no need to fetch again
 
     const body = await request.json();
     const { withdrawalMethodId, userNote: rawUserNote } = body;
@@ -273,10 +287,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await connectToDatabase();
-
-    const [withdrawalSettings, creditSettings, wallet, appSettings, kycSettings] = await Promise.all([
-      WithdrawalSettings.getSingleton(),
+    // Note: connectToDatabase() already called above for rate limiting
+    // Fetch remaining settings (withdrawalSettings already fetched for rate limit check)
+    const [creditSettings, wallet, appSettings, kycSettings] = await Promise.all([
       CreditConversionSettings.getSingleton(),
       CreditWallet.findOne({ userId: session.user.id }).session(mongoSession),
       AppSettings.findById('global-app-settings'),
