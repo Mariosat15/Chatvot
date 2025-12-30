@@ -155,9 +155,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get DMN URL
+    // Get DMN URL - use the same webhook as payments (Nuvei uses single DMN URL for both)
     const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL;
-    withdrawalParams.notificationUrl = `${origin}/api/nuvei/withdrawal-webhook`;
+    withdrawalParams.notificationUrl = `${origin}/api/nuvei/webhook`;
 
     console.log('💸 Processing Nuvei withdrawal:', {
       userId,
