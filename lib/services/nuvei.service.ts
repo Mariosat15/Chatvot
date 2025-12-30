@@ -592,16 +592,8 @@ class NuveiService {
       // https://docs.nuvei.com/documentation/global-guides/local-bank-payouts/
       const currency = params.currencyCode || 'EUR';
       
-      // EXACT match to Nuvei docs example (no extra fields):
-      // {
-      //   "sessionToken": "<sessionToken from /getSessionToken>",
-      //   "merchantId": "<your merchantId>",
-      //   "merchantSiteId": "<your merchantSiteId>",
-      //   "userTokenId": "<unique customer identifier in merchant system>",
-      //   "paymentMethod": "apmgw_BankPayouts",
-      //   "currencyCode": "MXN",
-      //   "countryCode": "MX"
-      // }
+      // Based on Nuvei docs + error feedback:
+      // - languageCode is REQUIRED (despite not being in docs example)
       const accountCaptureRequest: Record<string, string> = {
         sessionToken,
         merchantId: credentials.merchantId,
@@ -610,6 +602,7 @@ class NuveiService {
         paymentMethod: params.paymentMethod,
         currencyCode: currency,
         countryCode: params.countryCode,
+        languageCode: params.languageCode || 'en',
       };
       
       console.log('\n');
