@@ -419,20 +419,35 @@ export default function PendingWithdrawalsSection() {
     return selected.every(w => w.status === firstStatus) ? firstStatus : null;
   };
 
+  // Generate Reference ID from withdrawal ID (matches email format)
+  const getRefId = (id: string) => id.slice(-8).toUpperCase();
+  
   const filteredWithdrawals = searchQuery
-    ? withdrawals.filter(
-        (w) =>
-          w.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          w.userId.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? withdrawals.filter((w) => {
+        const query = searchQuery.toLowerCase();
+        const refId = getRefId(w._id).toLowerCase();
+        return (
+          w.userEmail.toLowerCase().includes(query) ||
+          w.userId.toLowerCase().includes(query) ||
+          w._id.toLowerCase().includes(query) ||
+          refId.includes(query) ||
+          `wd-${refId}`.includes(query) // Also match "WD-" prefix format
+        );
+      })
     : withdrawals;
     
   const filteredHistoryWithdrawals = searchQuery
-    ? historyWithdrawals.filter(
-        (w) =>
-          w.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          w.userId.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? historyWithdrawals.filter((w) => {
+        const query = searchQuery.toLowerCase();
+        const refId = getRefId(w._id).toLowerCase();
+        return (
+          w.userEmail.toLowerCase().includes(query) ||
+          w.userId.toLowerCase().includes(query) ||
+          w._id.toLowerCase().includes(query) ||
+          refId.includes(query) ||
+          `wd-${refId}`.includes(query) // Also match "WD-" prefix format
+        );
+      })
     : historyWithdrawals;
 
   const formatDate = (dateStr: string) => {
@@ -473,6 +488,9 @@ export default function PendingWithdrawalsSection() {
             <Badge className={STATUS_COLORS[withdrawal.status]}>
               {withdrawal.status.toUpperCase()}
             </Badge>
+            <span className="text-xs font-mono text-gray-400 bg-gray-800 px-2 py-0.5 rounded select-all" title="Reference ID - Click to copy">
+              REF: {getRefId(withdrawal._id)}
+            </span>
             {withdrawal.isSandbox && (
               <Badge className="bg-purple-500/20 text-purple-300">
                 SANDBOX
@@ -742,7 +760,7 @@ export default function PendingWithdrawalsSection() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search by email or user ID..."
+                placeholder="Search by email, user ID, or Reference ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-gray-800 border-gray-700"
@@ -788,11 +806,11 @@ export default function PendingWithdrawalsSection() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               {/* Search */}
               <div className="lg:col-span-2">
-                <Label className="text-gray-400 text-xs">Search User</Label>
+                <Label className="text-gray-400 text-xs">Search</Label>
                 <div className="relative mt-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Email or user ID..."
+                    placeholder="Email, user ID, or Reference ID..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 bg-gray-700 border-gray-600"
@@ -1257,8 +1275,9 @@ export default function PendingWithdrawalsSection() {
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">Withdrawal ID</p>
-                  <p className="text-white font-mono text-sm">{detailDialog.withdrawal._id}</p>
+                  <p className="text-xs text-gray-500">Reference ID</p>
+                  <p className="text-white font-mono text-sm select-all">{getRefId(detailDialog.withdrawal._id)}</p>
+                  <p className="text-[10px] text-gray-500 font-mono mt-1 select-all" title="Full ID">{detailDialog.withdrawal._id}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Status</p>
