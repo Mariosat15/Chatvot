@@ -546,66 +546,51 @@ class NuveiService {
     // Remove trailing slash from baseUrl to avoid double slashes
     const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://chartvolt.com').replace(/\/$/, '');
     
-    // IMPORTANT: /accountCapture requires a session token from /openOrder (not /getSessionToken)
-    // The /openOrder call establishes the order context with amount and currency
+    // Per Nuvei documentation for Local Bank Payouts:
+    // "Generate a sessionToken. Press here for details." -> refers to /getSessionToken
+    // NOT /openOrder - the docs example explicitly shows "/getSessionToken"
     // See: https://docs.nuvei.com/documentation/global-guides/local-bank-payouts/
     
-    // Calculate checksum for openOrder: merchantId + merchantSiteId + clientRequestId + amount + currency + timeStamp + secretKey
-    const amount = '1.00'; // Nominal amount for account capture (not actually charged)
-    const currency = params.currencyCode || 'EUR';
-    
-    const openOrderChecksumString = credentials.merchantId 
+    // Calculate checksum for getSessionToken: merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey
+    const checksumString = credentials.merchantId 
       + credentials.siteId 
       + clientRequestId 
-      + amount 
-      + currency 
       + timeStamp 
       + credentials.secretKey;
-    const openOrderChecksum = crypto.createHash('sha256').update(openOrderChecksumString).digest('hex');
+    const checksum = crypto.createHash('sha256').update(checksumString).digest('hex');
     
-    // clientUniqueId max length is 45 chars
-    // Use short prefix + user ID last 8 chars + timestamp last 8 digits
-    const shortUserId = params.userTokenId.replace('user_', '').slice(-8);
-    const shortTimestamp = Date.now().toString().slice(-8);
-    const clientUniqueId = `bc_${shortUserId}_${shortTimestamp}`; // ~20 chars
-    
-    const openOrderRequest = {
+    const getSessionTokenRequest = {
       merchantId: credentials.merchantId,
       merchantSiteId: credentials.siteId,
       clientRequestId,
-      clientUniqueId,
-      amount,
-      currency,
       timeStamp,
-      checksum: openOrderChecksum,
-      // Include user token for account linking
-      userTokenId: params.userTokenId,
+      checksum,
     };
     
-    console.log('🏦 Getting session token via /openOrder for accountCapture...');
+    console.log('🏦 Getting session token via /getSessionToken for accountCapture...');
     
     try {
-      // Get session token via openOrder
-      const openOrderResponse = await fetch(`${apiUrl}/openOrder.do`, {
+      // Get session token via getSessionToken (as per Nuvei docs)
+      const sessionResponse = await fetch(`${apiUrl}/getSessionToken.do`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(openOrderRequest),
+        body: JSON.stringify(getSessionTokenRequest),
       });
       
-      const openOrderData = await openOrderResponse.json();
+      const sessionData = await sessionResponse.json();
       
-      if (openOrderData.status !== 'SUCCESS') {
-        console.error('🏦 Failed to get session token via openOrder:', openOrderData);
-        return { error: openOrderData.reason || 'Failed to initialize bank capture session' };
+      if (sessionData.status !== 'SUCCESS') {
+        console.error('🏦 Failed to get session token:', sessionData);
+        return { error: sessionData.reason || 'Failed to initialize bank capture session' };
       }
       
-      const sessionToken = openOrderData.sessionToken;
-      console.log('🏦 Session token obtained via openOrder:', sessionToken?.substring(0, 20) + '...');
+      const sessionToken = sessionData.sessionToken;
+      console.log('🏦 Session token obtained via getSessionToken:', sessionToken?.substring(0, 20) + '...');
       
       // Now call accountCapture with the session token
-      // Per Nuvei docs: use currencyCode and countryCode (not currency/country)
-      // Per Nuvei support: include amount parameter
-      const returnUrl = `${baseUrl}/wallet?bank_setup=success&message=${encodeURIComponent('Bank account connected successfully!')}`;
+      // Per Nuvei docs example, the minimal required fields are:
+      // sessionToken, merchantId, merchantSiteId, userTokenId, paymentMethod, currencyCode, countryCode
+      const currency = params.currencyCode || 'EUR';
       
       const accountCaptureRequest = {
         sessionToken,
@@ -613,14 +598,11 @@ class NuveiService {
         merchantSiteId: credentials.siteId,
         userTokenId: params.userTokenId,
         paymentMethod: params.paymentMethod,
-        amount, // Required per Nuvei support
-        currencyCode: currency, // Use currencyCode per docs
-        countryCode: params.countryCode, // Use countryCode per docs
+        currencyCode: currency,
+        countryCode: params.countryCode,
+        // Optional fields
         languageCode: params.languageCode || 'en',
         urlDetails: {
-          successUrl: returnUrl,
-          failureUrl: `${baseUrl}/wallet?bank_setup=failed&error=${encodeURIComponent('Bank verification failed')}`,
-          pendingUrl: `${baseUrl}/wallet?bank_setup=pending`,
           notificationUrl: credentials.dmnUrl || `${baseUrl}/api/nuvei/webhook`,
         },
       };
