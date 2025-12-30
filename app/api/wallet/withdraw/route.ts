@@ -384,6 +384,25 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+      
+      // Check if this bank account was set up via Nuvei (has UPO)
+      // If not, also check the NuveiUserPaymentOption collection for matching bank UPOs
+      if (!bankAccount.nuveiUserPaymentOptionId) {
+        // Try to find a bank UPO for this user
+        const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
+        const bankUpo = await NuveiUserPaymentOption.findOne({
+          userId: session.user.id,
+          type: 'bank',
+          isActive: true,
+        }).sort({ lastUsed: -1 });
+        
+        if (bankUpo) {
+          // Found a bank UPO, use it
+          console.log('💳 Found bank UPO for withdrawal:', bankUpo.userPaymentOptionId);
+          bankAccount.nuveiUserPaymentOptionId = bankUpo.userPaymentOptionId;
+        }
+      }
+      
       payoutMethodType = 'bank_transfer';
     }
 
@@ -528,8 +547,18 @@ export async function POST(request: NextRequest) {
         bankName: bankAccount.bankName,
         swiftBic: bankAccount.swiftBic,
         country: bankAccount.country,
+        // Include Nuvei UPO if available (required for automatic processing)
+        nuveiUserPaymentOptionId: bankAccount.nuveiUserPaymentOptionId,
       };
       withdrawalRequestData.bankAccountId = bankAccount._id;
+      
+      // If bank account has Nuvei UPO, also store it for card_refund-like processing
+      if (bankAccount.nuveiUserPaymentOptionId) {
+        withdrawalRequestData.originalCardDetails = {
+          userPaymentOptionId: bankAccount.nuveiUserPaymentOptionId,
+          type: 'bank_upo',
+        };
+      }
     }
 
     // Create withdrawal request
