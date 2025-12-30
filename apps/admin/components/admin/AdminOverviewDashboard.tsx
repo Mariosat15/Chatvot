@@ -200,6 +200,17 @@ function StatCard({
   );
 }
 
+interface ReconciliationSummary {
+  healthy: boolean;
+  totalUsersChecked: number;
+  issuesFound: number;
+  criticalIssues: number;
+  warningIssues: number;
+  usersWithMismatch: number;
+  totalDiscrepancy: number;
+  lastRun?: string;
+}
+
 export default function AdminOverviewDashboard({ 
   onNavigate 
 }: { 
@@ -209,6 +220,10 @@ export default function AdminOverviewDashboard({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  
+  // Reconciliation state
+  const [reconciliation, setReconciliation] = useState<ReconciliationSummary | null>(null);
+  const [reconciliationLoading, setReconciliationLoading] = useState(true);
 
   const fetchStats = async () => {
     try {
@@ -226,10 +241,41 @@ export default function AdminOverviewDashboard({
     }
   };
 
+  const fetchReconciliation = async () => {
+    try {
+      setReconciliationLoading(true);
+      const response = await fetch('/api/reconciliation?action=run', {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error('Failed to run reconciliation');
+      const data = await response.json();
+      
+      if (data.success && data.result) {
+        setReconciliation({
+          healthy: data.result.healthy,
+          totalUsersChecked: data.result.summary?.totalUsersChecked || 0,
+          issuesFound: data.result.summary?.issuesFound || 0,
+          criticalIssues: data.result.summary?.criticalIssues || 0,
+          warningIssues: data.result.summary?.warningIssues || 0,
+          usersWithMismatch: data.result.balanceCheck?.usersWithMismatch || 0,
+          totalDiscrepancy: data.result.balanceCheck?.totalDiscrepancy || 0,
+          lastRun: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error('Error running reconciliation:', error);
+      // Don't show toast, just set null state
+      setReconciliation(null);
+    } finally {
+      setReconciliationLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
+    fetchReconciliation(); // Run reconciliation check on load
     
-    // Auto-refresh every 30 seconds
+    // Auto-refresh stats every 30 seconds
     const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -237,6 +283,7 @@ export default function AdminOverviewDashboard({
   const handleRefresh = () => {
     setRefreshing(true);
     fetchStats();
+    fetchReconciliation(); // Also refresh reconciliation
   };
 
   if (loading) {
@@ -357,6 +404,159 @@ export default function AdminOverviewDashboard({
               <StatusIndicator status={stats.services.kyc} />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Reconciliation Check */}
+      <Card className={cn(
+        "border",
+        reconciliationLoading 
+          ? "bg-gray-900/50 border-gray-800"
+          : reconciliation?.healthy 
+            ? "bg-green-500/5 border-green-500/30" 
+            : "bg-red-500/5 border-red-500/30"
+      )}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Shield className={cn(
+                "h-5 w-5",
+                reconciliationLoading 
+                  ? "text-gray-400"
+                  : reconciliation?.healthy 
+                    ? "text-green-400" 
+                    : "text-red-400"
+              )} />
+              System Reconciliation
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {reconciliation?.lastRun && (
+                <span className="text-xs text-gray-500">
+                  Last check: {new Date(reconciliation.lastRun).toLocaleTimeString()}
+                </span>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-gray-600"
+                onClick={fetchReconciliation}
+                disabled={reconciliationLoading}
+              >
+                {reconciliationLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCcw className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {reconciliationLoading ? (
+            <div className="flex items-center gap-3 py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
+              <span className="text-gray-400">Running reconciliation checks...</span>
+            </div>
+          ) : reconciliation ? (
+            <div className="space-y-4">
+              {/* Main Status */}
+              <div className="flex items-center gap-3">
+                {reconciliation.healthy ? (
+                  <>
+                    <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center">
+                      <CheckCircle2 className="h-6 w-6 text-green-400" />
+                    </div>
+                    <div>
+                      <p className="text-green-400 font-semibold text-lg">All Systems Healthy</p>
+                      <p className="text-gray-400 text-sm">
+                        {reconciliation.totalUsersChecked} users checked, no issues found
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <AlertTriangle className="h-6 w-6 text-red-400" />
+                    </div>
+                    <div>
+                      <p className="text-red-400 font-semibold text-lg">Issues Detected</p>
+                      <p className="text-gray-400 text-sm">
+                        {reconciliation.issuesFound} issue(s) found across {reconciliation.usersWithMismatch} user(s)
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-white">{reconciliation.totalUsersChecked}</p>
+                  <p className="text-xs text-gray-400">Users Checked</p>
+                </div>
+                <div className={cn(
+                  "rounded-lg p-3 text-center",
+                  reconciliation.criticalIssues > 0 ? "bg-red-500/10" : "bg-gray-800/50"
+                )}>
+                  <p className={cn(
+                    "text-2xl font-bold",
+                    reconciliation.criticalIssues > 0 ? "text-red-400" : "text-white"
+                  )}>
+                    {reconciliation.criticalIssues}
+                  </p>
+                  <p className="text-xs text-gray-400">Critical Issues</p>
+                </div>
+                <div className={cn(
+                  "rounded-lg p-3 text-center",
+                  reconciliation.warningIssues > 0 ? "bg-yellow-500/10" : "bg-gray-800/50"
+                )}>
+                  <p className={cn(
+                    "text-2xl font-bold",
+                    reconciliation.warningIssues > 0 ? "text-yellow-400" : "text-white"
+                  )}>
+                    {reconciliation.warningIssues}
+                  </p>
+                  <p className="text-xs text-gray-400">Warnings</p>
+                </div>
+                <div className={cn(
+                  "rounded-lg p-3 text-center",
+                  reconciliation.totalDiscrepancy > 0 ? "bg-red-500/10" : "bg-gray-800/50"
+                )}>
+                  <p className={cn(
+                    "text-2xl font-bold",
+                    reconciliation.totalDiscrepancy > 0 ? "text-red-400" : "text-white"
+                  )}>
+                    {reconciliation.totalDiscrepancy.toFixed(0)}
+                  </p>
+                  <p className="text-xs text-gray-400">Credit Discrepancy</p>
+                </div>
+              </div>
+
+              {/* View Details Button */}
+              {!reconciliation.healthy && (
+                <Button
+                  className="w-full mt-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
+                  onClick={() => onNavigate?.('reconciliation')}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Detailed Reconciliation Report
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 py-4 text-gray-400">
+              <XCircle className="h-5 w-5" />
+              <span>Failed to run reconciliation check</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchReconciliation}
+                className="ml-auto"
+              >
+                Retry
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
