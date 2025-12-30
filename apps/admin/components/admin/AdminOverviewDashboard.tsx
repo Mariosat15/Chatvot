@@ -248,17 +248,19 @@ export default function AdminOverviewDashboard({
       if (!response.ok) throw new Error('Failed to run reconciliation');
       const data = await response.json();
       
-      if (data.success && data.result) {
+      if (data.success) {
         setReconciliation({
-          healthy: data.result.healthy,
-          totalUsersChecked: data.result.summary?.totalUsersChecked || 0,
-          issuesFound: data.result.summary?.issuesFound || 0,
-          criticalIssues: data.result.summary?.criticalIssues || 0,
-          warningIssues: data.result.summary?.warningIssues || 0,
-          usersWithMismatch: data.result.balanceCheck?.usersWithMismatch || 0,
-          totalDiscrepancy: data.result.balanceCheck?.totalDiscrepancy || 0,
-          lastRun: new Date().toISOString(),
+          healthy: data.healthy,
+          totalUsersChecked: data.summary?.totalUsersChecked || 0,
+          issuesFound: data.summary?.issuesFound || 0,
+          criticalIssues: data.summary?.criticalIssues || 0,
+          warningIssues: data.summary?.warningIssues || 0,
+          usersWithMismatch: data.balanceCheck?.usersWithMismatch || 0,
+          totalDiscrepancy: data.balanceCheck?.totalDiscrepancy || 0,
+          lastRun: data.runAt || new Date().toISOString(),
         });
+      } else {
+        throw new Error(data.error || 'Reconciliation failed');
       }
     } catch (error) {
       console.error('Error running reconciliation:', error);
