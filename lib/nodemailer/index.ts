@@ -668,18 +668,204 @@ interface DepositCompletedEmailData {
 }
 
 /**
+ * Build deposit completed email HTML from database template
+ */
+function buildDepositEmailHtml(
+    template: IEmailTemplate,
+    config: {
+        name: string;
+        credits: number;
+        amount: number;
+        paymentMethod: string;
+        transactionId: string;
+        newBalance: number;
+        platformName: string;
+        baseUrl: string;
+        logoUrl: string;
+        companyAddress: string;
+    }
+): string {
+    // If using custom HTML template
+    if (template.useCustomHtml && template.customHtmlTemplate) {
+        return template.customHtmlTemplate
+            .replace(/\{\{name\}\}/g, config.name)
+            .replace(/\{\{credits\}\}/g, config.credits.toString())
+            .replace(/\{\{amount\}\}/g, config.amount.toFixed(2))
+            .replace(/\{\{paymentMethod\}\}/g, config.paymentMethod)
+            .replace(/\{\{transactionId\}\}/g, config.transactionId)
+            .replace(/\{\{newBalance\}\}/g, config.newBalance.toFixed(0))
+            .replace(/\{\{platformName\}\}/g, config.platformName)
+            .replace(/\{\{baseUrl\}\}/g, config.baseUrl)
+            .replace(/\{\{logoUrl\}\}/g, config.logoUrl)
+            .replace(/\{\{companyAddress\}\}/g, config.companyAddress)
+            .replace(/\{\{competitionsUrl\}\}/g, `${config.baseUrl}/competitions`)
+            .replace(/\{\{year\}\}/g, new Date().getFullYear().toString());
+    }
+    
+    // Build feature list HTML
+    const featureItems = template.featureItems || [
+        'Browse active competitions and join one that matches your style',
+        'Challenge other traders in head-to-head matches',
+        'Climb the leaderboard and win real prizes!',
+    ];
+    
+    const featureListHtml = featureItems
+        .map((item: string) => `<li style="margin-bottom: 12px;">${item}</li>`)
+        .join('\n                                ');
+    
+    // Get the CTA URL
+    let ctaUrl = template.ctaButtonUrl || `${config.baseUrl}/competitions`;
+    ctaUrl = ctaUrl.replace(/\{\{baseUrl\}\}/g, config.baseUrl);
+    
+    // Build the dynamic template using database values
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deposit Confirmed - ${config.platformName}</title>
+    <style type="text/css">
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; margin: 0 !important; }
+            .mobile-padding { padding: 24px !important; }
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
+                    
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td align="left" style="padding: 40px 40px 20px 40px;">
+                            <img src="${config.logoUrl}" alt="${config.platformName}" width="150" style="max-width: 100%; height: auto;">
+                        </td>
+                    </tr>
+                    
+                    <!-- Main Content -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px 40px 40px;">
+                            
+                            <!-- Success Banner -->
+                            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center;">
+                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
+                                    ${template.headingText || '✓ Deposit Successful!'}
+                                </h1>
+                                <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                                    Your credits are now available
+                                </p>
+                            </div>
+                            
+                            <!-- Greeting -->
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                Hi ${config.name},
+                            </p>
+                            
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                ${template.introText || 'Great news! Your deposit has been processed successfully and your credits are ready to use.'}
+                            </p>
+                            
+                            <!-- Transaction Details -->
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+                                <h2 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #ffffff;">
+                                    Transaction Details
+                                </h2>
+                                
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Credits Purchased</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #10b981; font-weight: 700; font-size: 18px; border-bottom: 1px solid #30333A;">${config.credits} ⚡</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Amount Charged</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #ffffff; border-bottom: 1px solid #30333A;">€${config.amount.toFixed(2)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Payment Method</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #ffffff; border-bottom: 1px solid #30333A;">${config.paymentMethod}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af;">Transaction ID</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #9ca3af; font-family: monospace; font-size: 12px;">${config.transactionId}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            
+                            <!-- New Balance -->
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center; border: 1px solid #FDD458;">
+                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #9ca3af; text-transform: uppercase;">Your New Balance</p>
+                                <p style="margin: 0; font-size: 32px; font-weight: 700; color: #FDD458;">${config.newBalance.toFixed(0)} ⚡</p>
+                            </div>
+                            
+                            <!-- What's Next -->
+                            <div style="background-color: #050505; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #30333A;">
+                                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #FDD458;">
+                                    ${template.featureListLabel || "What's Next?"}
+                                </h3>
+                                <ul style="margin: 0; padding-left: 20px; color: #CCDADC; font-size: 14px; line-height: 1.8;">
+                                    ${featureListHtml}
+                                </ul>
+                            </div>
+                            
+                            <!-- Closing Text -->
+                            ${template.closingText ? `<p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">${template.closingText}</p>` : ''}
+                            
+                            <!-- CTA Button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <a href="${ctaUrl}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
+                                            ${template.ctaButtonText || 'Start Competing Now'}
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
+                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                ${config.companyAddress}
+                            </p>
+                            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                © ${new Date().getFullYear()} ${config.platformName} | <a href="${config.baseUrl}" style="color: #CCDADC !important; text-decoration: underline;">Visit Website</a>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+}
+
+/**
  * Send deposit completed email to user
  */
 export const sendDepositCompletedEmail = async (data: DepositCompletedEmailData) => {
     try {
         await connectToDatabase();
         
-        // Get settings
-        const [companySettings, settings, whiteLabelSettings] = await Promise.all([
+        // Get settings and template
+        const [companySettings, settings, whiteLabelSettings, template] = await Promise.all([
             CompanySettings.getSingleton(),
             getSettings(),
             WhiteLabel.findOne(),
+            getEmailTemplate('deposit_completed'),
         ]);
+        
+        // Check if template is active
+        if (!template.isActive) {
+            console.log(`ℹ️ [DEPOSIT] Email template is disabled, skipping email to ${data.email}`);
+            return;
+        }
         
         const platformName = settings.appName || companySettings.companyName || 'Chatvolt';
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
@@ -708,25 +894,32 @@ export const sendDepositCompletedEmail = async (data: DepositCompletedEmailData)
             companyAddress = parts.join(', ');
         }
         
-        // Build HTML template
-        const htmlTemplate = DEPOSIT_COMPLETED_EMAIL_TEMPLATE
-            .replace(/\{\{logoUrl\}\}/g, logoUrl)
-            .replace(/\{\{platformName\}\}/g, platformName)
-            .replace(/\{\{name\}\}/g, data.name)
+        // Build HTML from database template
+        const htmlTemplate = buildDepositEmailHtml(template, {
+            name: data.name,
+            credits: data.credits,
+            amount: data.amount,
+            paymentMethod: data.paymentMethod,
+            transactionId: data.transactionId,
+            newBalance: data.newBalance,
+            platformName,
+            baseUrl,
+            logoUrl,
+            companyAddress,
+        });
+        
+        // Replace variables in subject
+        let subject = template.subject || '✓ Deposit Confirmed - {{credits}} credits added to your account';
+        subject = subject
             .replace(/\{\{credits\}\}/g, data.credits.toString())
             .replace(/\{\{amount\}\}/g, data.amount.toFixed(2))
-            .replace(/\{\{paymentMethod\}\}/g, data.paymentMethod)
-            .replace(/\{\{transactionId\}\}/g, data.transactionId)
-            .replace(/\{\{newBalance\}\}/g, data.newBalance.toFixed(0))
-            .replace(/\{\{competitionsUrl\}\}/g, `${baseUrl}/competitions`)
-            .replace(/\{\{companyAddress\}\}/g, companyAddress)
-            .replace(/\{\{websiteUrl\}\}/g, companySettings.website || baseUrl)
-            .replace(/\{\{year\}\}/g, new Date().getFullYear().toString());
+            .replace(/\{\{platformName\}\}/g, platformName)
+            .replace(/\{\{name\}\}/g, data.name);
         
         const mailOptions = {
             from: `"${platformName}" <${settings.nodemailerEmail || process.env.NODEMAILER_EMAIL}>`,
             to: data.email,
-            subject: `✓ Deposit Confirmed - ${data.credits} credits added to your account`,
+            subject,
             text: `Hi ${data.name}, your deposit of €${data.amount.toFixed(2)} has been processed successfully. ${data.credits} credits have been added to your account. Your new balance is ${data.newBalance} credits.`,
             html: htmlTemplate,
         };
@@ -756,18 +949,228 @@ interface WithdrawalCompletedEmailData {
 }
 
 /**
+ * Build withdrawal completed email HTML from database template
+ */
+function buildWithdrawalEmailHtml(
+    template: IEmailTemplate,
+    config: {
+        name: string;
+        credits: number;
+        netAmount: number;
+        fee: number;
+        paymentMethod: string;
+        withdrawalId: string;
+        remainingBalance: number;
+        timelineMessage: string;
+        platformName: string;
+        baseUrl: string;
+        logoUrl: string;
+        companyAddress: string;
+        supportEmail: string;
+    }
+): string {
+    // If using custom HTML template
+    if (template.useCustomHtml && template.customHtmlTemplate) {
+        return template.customHtmlTemplate
+            .replace(/\{\{name\}\}/g, config.name)
+            .replace(/\{\{credits\}\}/g, config.credits.toString())
+            .replace(/\{\{netAmount\}\}/g, config.netAmount.toFixed(2))
+            .replace(/\{\{fee\}\}/g, config.fee.toFixed(2))
+            .replace(/\{\{paymentMethod\}\}/g, config.paymentMethod)
+            .replace(/\{\{withdrawalId\}\}/g, config.withdrawalId)
+            .replace(/\{\{remainingBalance\}\}/g, config.remainingBalance.toFixed(0))
+            .replace(/\{\{timelineMessage\}\}/g, config.timelineMessage)
+            .replace(/\{\{platformName\}\}/g, config.platformName)
+            .replace(/\{\{baseUrl\}\}/g, config.baseUrl)
+            .replace(/\{\{logoUrl\}\}/g, config.logoUrl)
+            .replace(/\{\{companyAddress\}\}/g, config.companyAddress)
+            .replace(/\{\{supportEmail\}\}/g, config.supportEmail)
+            .replace(/\{\{walletUrl\}\}/g, `${config.baseUrl}/wallet`)
+            .replace(/\{\{year\}\}/g, new Date().getFullYear().toString());
+    }
+    
+    // Build feature list HTML
+    const featureItems = template.featureItems || [
+        'Check your bank account or card statement for the incoming transfer',
+        'Allow 3-5 business days for the funds to appear',
+        'Contact support if you haven\'t received it after 7 days',
+    ];
+    
+    const featureListHtml = featureItems
+        .map((item: string) => `<li style="margin-bottom: 12px;">${item}</li>`)
+        .join('\n                                ');
+    
+    // Get the CTA URL
+    let ctaUrl = template.ctaButtonUrl || `${config.baseUrl}/wallet`;
+    ctaUrl = ctaUrl.replace(/\{\{baseUrl\}\}/g, config.baseUrl);
+    
+    // Build the dynamic template using database values
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Withdrawal Processed - ${config.platformName}</title>
+    <style type="text/css">
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; margin: 0 !important; }
+            .mobile-padding { padding: 24px !important; }
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
+                    
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td align="left" style="padding: 40px 40px 20px 40px;">
+                            <img src="${config.logoUrl}" alt="${config.platformName}" width="150" style="max-width: 100%; height: auto;">
+                        </td>
+                    </tr>
+                    
+                    <!-- Main Content -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px 40px 40px;">
+                            
+                            <!-- Success Banner -->
+                            <div style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center;">
+                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
+                                    ${template.headingText || '💸 Withdrawal Processed'}
+                                </h1>
+                                <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                                    Your funds are on the way
+                                </p>
+                            </div>
+                            
+                            <!-- Greeting -->
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                Hi ${config.name},
+                            </p>
+                            
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                ${template.introText || 'Your withdrawal request has been processed and your funds are on the way!'}
+                            </p>
+                            
+                            <!-- Transaction Details -->
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+                                <h2 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #ffffff;">
+                                    Withdrawal Details
+                                </h2>
+                                
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Credits Withdrawn</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #ffffff; font-weight: 600; border-bottom: 1px solid #30333A;">${config.credits} ⚡</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Processing Fee</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #ef4444; border-bottom: 1px solid #30333A;">-€${config.fee.toFixed(2)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Amount You Receive</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #10b981; font-weight: 700; font-size: 18px; border-bottom: 1px solid #30333A;">€${config.netAmount.toFixed(2)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af; border-bottom: 1px solid #30333A;">Payment Method</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #ffffff; border-bottom: 1px solid #30333A;">${config.paymentMethod}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 0; color: #9ca3af;">Reference ID</td>
+                                        <td style="padding: 12px 0; text-align: right; color: #9ca3af; font-family: monospace; font-size: 12px;">${config.withdrawalId}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            
+                            <!-- Remaining Balance -->
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center; border: 1px solid #30333A;">
+                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #9ca3af; text-transform: uppercase;">Remaining Balance</p>
+                                <p style="margin: 0; font-size: 32px; font-weight: 700; color: #FDD458;">${config.remainingBalance.toFixed(0)} ⚡</p>
+                            </div>
+                            
+                            <!-- Timeline Info -->
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 20px; margin-bottom: 24px; border-left: 4px solid #8B5CF6;">
+                                <p style="margin: 0; font-size: 14px; color: #CCDADC;">
+                                    ⏱️ ${config.timelineMessage}
+                                </p>
+                            </div>
+                            
+                            <!-- What's Next -->
+                            <div style="background-color: #050505; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #30333A;">
+                                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #FDD458;">
+                                    ${template.featureListLabel || "What's Next?"}
+                                </h3>
+                                <ul style="margin: 0; padding-left: 20px; color: #CCDADC; font-size: 14px; line-height: 1.8;">
+                                    ${featureListHtml}
+                                </ul>
+                            </div>
+                            
+                            <!-- Closing Text -->
+                            ${template.closingText ? `<p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">${template.closingText}</p>` : ''}
+                            
+                            <!-- CTA Button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <a href="${ctaUrl}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
+                                            ${template.ctaButtonText || 'View Wallet'}
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Support Note -->
+                            ${config.supportEmail ? `
+                            <p style="margin: 24px 0 0 0; font-size: 13px; color: #6b7280; text-align: center;">
+                                Questions? Contact us at <a href="mailto:${config.supportEmail}" style="color: #FDD458; text-decoration: none;">${config.supportEmail}</a>
+                            </p>
+                            ` : ''}
+                            
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
+                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                ${config.companyAddress}
+                            </p>
+                            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                © ${new Date().getFullYear()} ${config.platformName} | <a href="${config.baseUrl}" style="color: #CCDADC !important; text-decoration: underline;">Visit Website</a>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+}
+
+/**
  * Send withdrawal completed email to user
  */
 export const sendWithdrawalCompletedEmail = async (data: WithdrawalCompletedEmailData) => {
     try {
         await connectToDatabase();
         
-        // Get settings
-        const [companySettings, settings, whiteLabelSettings] = await Promise.all([
+        // Get settings and template
+        const [companySettings, settings, whiteLabelSettings, template] = await Promise.all([
             CompanySettings.getSingleton(),
             getSettings(),
             WhiteLabel.findOne(),
+            getEmailTemplate('withdrawal_completed'),
         ]);
+        
+        // Check if template is active
+        if (!template.isActive) {
+            console.log(`ℹ️ [WITHDRAWAL] Email template is disabled, skipping email to ${data.email}`);
+            return;
+        }
         
         const platformName = settings.appName || companySettings.companyName || 'Chatvolt';
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
@@ -796,6 +1199,9 @@ export const sendWithdrawalCompletedEmail = async (data: WithdrawalCompletedEmai
             companyAddress = parts.join(', ');
         }
         
+        // Get support email
+        const supportEmail = companySettings.email || settings.nodemailerEmail || '';
+        
         // Determine timeline message based on payment method
         let timelineMessage = 'Funds typically arrive within 3-5 business days, depending on your bank and payment method.';
         if (data.paymentMethod.toLowerCase().includes('card')) {
@@ -804,28 +1210,35 @@ export const sendWithdrawalCompletedEmail = async (data: WithdrawalCompletedEmai
             timelineMessage = 'Bank transfers typically arrive within 3-5 business days, depending on your bank.';
         }
         
-        // Build HTML template
-        const htmlTemplate = WITHDRAWAL_COMPLETED_EMAIL_TEMPLATE
-            .replace(/\{\{logoUrl\}\}/g, logoUrl)
-            .replace(/\{\{platformName\}\}/g, platformName)
-            .replace(/\{\{name\}\}/g, data.name)
-            .replace(/\{\{credits\}\}/g, data.credits.toString())
+        // Build HTML from database template
+        const htmlTemplate = buildWithdrawalEmailHtml(template, {
+            name: data.name,
+            credits: data.credits,
+            netAmount: data.netAmount,
+            fee: data.fee,
+            paymentMethod: data.paymentMethod,
+            withdrawalId: data.withdrawalId,
+            remainingBalance: data.remainingBalance,
+            timelineMessage,
+            platformName,
+            baseUrl,
+            logoUrl,
+            companyAddress,
+            supportEmail,
+        });
+        
+        // Replace variables in subject
+        let subject = template.subject || '💸 Withdrawal Processed - €{{netAmount}} on the way';
+        subject = subject
             .replace(/\{\{netAmount\}\}/g, data.netAmount.toFixed(2))
-            .replace(/\{\{fee\}\}/g, data.fee.toFixed(2))
-            .replace(/\{\{paymentMethod\}\}/g, data.paymentMethod)
-            .replace(/\{\{withdrawalId\}\}/g, data.withdrawalId)
-            .replace(/\{\{remainingBalance\}\}/g, data.remainingBalance.toFixed(0))
-            .replace(/\{\{timelineMessage\}\}/g, timelineMessage)
-            .replace(/\{\{walletUrl\}\}/g, `${baseUrl}/wallet`)
-            .replace(/\{\{companyAddress\}\}/g, companyAddress)
-            .replace(/\{\{websiteUrl\}\}/g, companySettings.website || baseUrl)
-            .replace(/\{\{supportEmail\}\}/g, companySettings.email || settings.nodemailerEmail || '')
-            .replace(/\{\{year\}\}/g, new Date().getFullYear().toString());
+            .replace(/\{\{credits\}\}/g, data.credits.toString())
+            .replace(/\{\{platformName\}\}/g, platformName)
+            .replace(/\{\{name\}\}/g, data.name);
         
         const mailOptions = {
             from: `"${platformName}" <${settings.nodemailerEmail || process.env.NODEMAILER_EMAIL}>`,
             to: data.email,
-            subject: `💸 Withdrawal Processed - €${data.netAmount.toFixed(2)} on the way`,
+            subject,
             text: `Hi ${data.name}, your withdrawal of ${data.credits} credits has been processed. €${data.netAmount.toFixed(2)} will be sent to your ${data.paymentMethod}. Your remaining balance is ${data.remainingBalance} credits.`,
             html: htmlTemplate,
         };

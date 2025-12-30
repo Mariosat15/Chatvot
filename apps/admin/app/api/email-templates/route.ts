@@ -139,12 +139,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Import the email sending function
-    const { sendTestWelcomeEmail } = await import('@/lib/nodemailer');
+    // Import the email sending functions
+    const { sendTestWelcomeEmail, sendTestDepositCompletedEmail, sendTestWithdrawalCompletedEmail } = await import('@/lib/nodemailer');
+
+    let emailSent = false;
 
     if (templateType === 'welcome') {
       await sendTestWelcomeEmail(testEmail);
-      
+      emailSent = true;
+    } else if (templateType === 'deposit_completed') {
+      await sendTestDepositCompletedEmail(testEmail);
+      emailSent = true;
+    } else if (templateType === 'withdrawal_completed') {
+      await sendTestWithdrawalCompletedEmail(testEmail);
+      emailSent = true;
+    }
+
+    if (emailSent) {
       // Log the test email
       const admin = await getAdminSession();
       if (admin) {

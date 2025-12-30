@@ -154,26 +154,87 @@ export async function getEmailTemplate(templateType: IEmailTemplate['templateTyp
   let template = await EmailTemplate.findOne({ templateType });
   
   if (!template) {
-    // Create default template
+    // Create default template with proper defaults for each type
+    const defaults = getTemplateDefaults(templateType);
     template = await EmailTemplate.create({
       templateType,
-      name: getDefaultName(templateType),
+      ...defaults,
     });
   }
   
   return template;
 }
 
-function getDefaultName(type: string): string {
-  const names: Record<string, string> = {
-    welcome: 'Welcome Email',
-    price_alert: 'Price Alert Email',
-    invoice: 'Invoice Email',
-    news_summary: 'News Summary Email',
-    inactive_reminder: 'Inactive User Reminder',
-    deposit_completed: 'Deposit Completed Email',
-    withdrawal_completed: 'Withdrawal Completed Email',
-  };
-  return names[type] || 'Email Template';
+function getTemplateDefaults(type: string): Partial<IEmailTemplate> {
+  switch (type) {
+    case 'deposit_completed':
+      return {
+        name: 'Deposit Completed Email',
+        subject: '✓ Deposit Confirmed - {{credits}} credits added to your account',
+        headingText: '✓ Deposit Successful!',
+        introText: 'Great news! Your deposit has been processed successfully and your credits are ready to use.',
+        featureListLabel: "What's Next?",
+        featureItems: [
+          'Browse active competitions and join one that matches your style',
+          'Challenge other traders in head-to-head matches',
+          'Climb the leaderboard and win real prizes!',
+        ],
+        closingText: '',
+        ctaButtonText: 'Start Competing Now',
+        ctaButtonUrl: '{{baseUrl}}/competitions',
+        useAIPersonalization: false,
+      };
+    
+    case 'withdrawal_completed':
+      return {
+        name: 'Withdrawal Completed Email',
+        subject: '💸 Withdrawal Processed - €{{netAmount}} on the way',
+        headingText: '💸 Withdrawal Processed',
+        introText: 'Your withdrawal request has been processed and your funds are on the way!',
+        featureListLabel: "What's Next?",
+        featureItems: [
+          'Check your bank account or card statement for the incoming transfer',
+          'Allow 3-5 business days for the funds to appear',
+          'Contact support if you haven\'t received it after 7 days',
+        ],
+        closingText: '',
+        ctaButtonText: 'View Wallet',
+        ctaButtonUrl: '{{baseUrl}}/wallet',
+        useAIPersonalization: false,
+      };
+    
+    case 'welcome':
+      return {
+        name: 'Welcome Email',
+        subject: 'Welcome to {{platformName}} - Start competing and win real prizes!',
+        headingText: 'Welcome aboard {{name}}',
+        introText: 'Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.',
+        featureListLabel: "Here's what you can do right now:",
+        featureItems: [
+          'Deposit credits to your wallet and enter trading competitions',
+          'Compete in live trading competitions with real-time market prices',
+          'Climb the leaderboard by trading smarter and win cash prizes',
+        ],
+        closingText: "Competitions run daily with prize pools waiting to be won. The top traders take home real money — will you be one of them?",
+        ctaButtonText: 'View Competitions',
+        ctaButtonUrl: '{{baseUrl}}/competitions',
+        useAIPersonalization: true,
+      };
+    
+    case 'price_alert':
+      return { name: 'Price Alert Email' };
+    
+    case 'invoice':
+      return { name: 'Invoice Email' };
+    
+    case 'news_summary':
+      return { name: 'News Summary Email' };
+    
+    case 'inactive_reminder':
+      return { name: 'Inactive User Reminder' };
+    
+    default:
+      return { name: 'Email Template' };
+  }
 }
 
