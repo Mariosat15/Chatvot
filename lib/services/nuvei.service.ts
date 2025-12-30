@@ -616,18 +616,28 @@ class NuveiService {
       };
     }
     
-    console.log('💸 Nuvei submitWithdrawal request:', {
-      userTokenId: params.userTokenId,
-      amount: params.amount,
-      currency: params.currency,
-      hasUPO: !!params.userPaymentOptionId,
-      hasBankDetails: !!params.bankDetails,
-    });
+    // ============================================================
+    // NUVEI WITHDRAWAL DEBUG - COPY THIS FOR SUPPORT
+    // ============================================================
     
-    // DEBUG: Log full request body (without secrets)
-    const debugBody = { ...requestBody };
-    delete debugBody.checksum;
-    console.log('💸 Nuvei payout.do full request body:', JSON.stringify(debugBody, null, 2));
+    // Create a sanitized copy for logging (hide checksum but show everything else)
+    const requestForNuvei = { ...requestBody };
+    delete requestForNuvei.checksum;
+    
+    console.log('\n');
+    console.log('╔════════════════════════════════════════════════════════════╗');
+    console.log('║     NUVEI WITHDRAWAL REQUEST - COPY FOR SUPPORT            ║');
+    console.log('╚════════════════════════════════════════════════════════════╝');
+    console.log('');
+    console.log('📤 ENDPOINT:', `${apiUrl}/payout.do`);
+    console.log('📤 METHOD: POST');
+    console.log('📤 CONTENT-TYPE: application/json');
+    console.log('');
+    console.log('📤 REQUEST BODY (checksum removed):');
+    console.log('─────────────────────────────────────');
+    console.log(JSON.stringify(requestForNuvei, null, 2));
+    console.log('─────────────────────────────────────');
+    console.log('');
     
     try {
       const response = await fetch(`${apiUrl}/payout.do`, {
@@ -640,17 +650,20 @@ class NuveiService {
       
       const data = await response.json();
       
-      console.log('💸 Nuvei submitWithdrawal response:', {
-        status: data.status,
-        errCode: data.errCode,
-        wdRequestId: data.wdRequestId,
-        wdRequestStatus: data.wdRequestStatus,
-      });
+      console.log('📥 RESPONSE STATUS:', response.status);
+      console.log('📥 RESPONSE BODY:');
+      console.log('─────────────────────────────────────');
+      console.log(JSON.stringify(data, null, 2));
+      console.log('─────────────────────────────────────');
+      console.log('');
+      console.log('╔════════════════════════════════════════════════════════════╗');
+      console.log('║     END NUVEI WITHDRAWAL DEBUG                             ║');
+      console.log('╚════════════════════════════════════════════════════════════╝');
+      console.log('\n');
       
       if (data.status === 'SUCCESS' && data.errCode === 0) {
         return data as WithdrawalResponse;
       } else {
-        console.error('💸 Nuvei submitWithdrawal failed:', data);
         return { 
           error: data.reason || `Withdrawal failed (code: ${data.errCode})`,
           ...data,
