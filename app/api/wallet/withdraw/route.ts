@@ -537,11 +537,18 @@ export async function POST(request: NextRequest) {
     // It will be recorded when the withdrawal is completed.
     console.log(`💵 Withdrawal fee (€${platformFee.toFixed(2)}) will be recorded when withdrawal is completed`);
 
-    // Check for auto-approval (sandbox mode only)
+    // Check for auto-approval
+    // Important: Only auto-approve if Nuvei automatic processing is enabled
+    // When Nuvei automatic is OFF (manual mode), withdrawals should stay in 'pending' for admin review
     let autoApproved = false;
+    const isManualMode = !withdrawalSettings.nuveiWithdrawalEnabled;
 
-    if (isSandbox && withdrawalSettings.sandboxAutoApprove) {
-      // Auto-approve sandbox withdrawals
+    if (isManualMode) {
+      // In manual mode, all withdrawals stay in 'pending' status
+      // Admin must manually approve/process them
+      console.log('💼 Manual mode: Withdrawal stays in pending for admin review');
+    } else if (isSandbox && withdrawalSettings.sandboxAutoApprove) {
+      // Auto-approve sandbox withdrawals ONLY when automatic processing is enabled
       withdrawalRequest[0].status = 'approved';
       withdrawalRequest[0].isAutoApproved = true;
       withdrawalRequest[0].autoApprovalReason = 'Sandbox mode auto-approval';
