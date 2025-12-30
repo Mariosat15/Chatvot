@@ -571,12 +571,14 @@ class NuveiService {
     
     // CRITICAL: For card refund using UPO, must be wrapped in paymentOption object
     // Nuvei API expects: { paymentOption: { userPaymentOptionId: "xxx" } }
-    // NOT: { userPaymentOptionId: "xxx" }
+    // The userPaymentOptionId MUST be a STRING, not a number
     if (params.userPaymentOptionId) {
+      // Ensure UPO ID is a string (Nuvei API requirement)
+      const upoId = String(params.userPaymentOptionId);
       requestBody.paymentOption = {
-        userPaymentOptionId: params.userPaymentOptionId,
+        userPaymentOptionId: upoId,
       };
-      console.log('💸 Card refund using UPO:', params.userPaymentOptionId);
+      console.log('💸 Card refund using UPO:', upoId, typeof upoId);
     }
     // For bank transfer - Nuvei requires specific APM setup
     // NOTE: Bank payouts (SEPA) must be enabled by Nuvei for your merchant account
