@@ -652,17 +652,18 @@ class NuveiService {
    */
   /**
    * Calculate checksum for addUPOAPM
-   * Format: SHA256(merchantId + merchantSiteId + clientRequestId + userTokenId + timeStamp + secretKey)
+   * Format: SHA256(merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey)
+   * Note: userTokenId is NOT included in the checksum (it's in the request body but not checksum)
    */
   calculateAddUpoChecksum(
     merchantId: string,
     siteId: string,
     clientRequestId: string,
-    userTokenId: string,
     timeStamp: string,
     secretKey: string
   ): string {
-    const data = `${merchantId}${siteId}${clientRequestId}${userTokenId}${timeStamp}${secretKey}`;
+    const data = `${merchantId}${siteId}${clientRequestId}${timeStamp}${secretKey}`;
+    console.log('📝 AddUPOAPM checksum input (secretKey hidden):', `${merchantId}${siteId}${clientRequestId}${timeStamp}[HIDDEN]`);
     return crypto.createHash('sha256').update(data).digest('hex');
   }
   
@@ -683,12 +684,12 @@ class NuveiService {
     const timeStamp = this.generateTimeStamp();
     const clientRequestId = `sepa_upo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Checksum for addUPOAPM: SHA256(merchantId + merchantSiteId + clientRequestId + userTokenId + timeStamp + secretKey)
+    // Checksum for addUPOAPM: SHA256(merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey)
+    // Note: userTokenId is NOT included in checksum (only in request body)
     const checksum = this.calculateAddUpoChecksum(
       credentials.merchantId,
       credentials.siteId,
       clientRequestId,
-      params.userTokenId,
       timeStamp,
       credentials.secretKey
     );

@@ -722,7 +722,7 @@ export default function CompetitionCreatorForm() {
                       <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
                         <Sparkles className="h-5 w-5 text-white" />
                       </div>
-                      <div>
+                <div>
                         <h4 className="text-sm font-semibold text-purple-300">AI Content Generator</h4>
                         <p className="text-xs text-gray-400">Let AI create a catchy title and description for you</p>
                       </div>
@@ -746,9 +746,9 @@ export default function CompetitionCreatorForm() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <Label htmlFor="name" className="text-gray-300 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-blue-400" />
-                      Competition Name *
-                    </Label>
+                    <FileText className="h-4 w-4 text-blue-400" />
+              Competition Name *
+            </Label>
                     <AIGeneratorDialog
                       onGenerate={(data) => {
                         if (data.title) {
@@ -777,9 +777,9 @@ export default function CompetitionCreatorForm() {
           <div>
                   <div className="flex items-center justify-between mb-2">
                     <Label htmlFor="description" className="text-gray-300 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-blue-400" />
-                      Description *
-                    </Label>
+                    <FileText className="h-4 w-4 text-blue-400" />
+              Description *
+            </Label>
                     <AIGeneratorDialog
                       onGenerate={(data) => {
                         if (data.description) {
@@ -1872,7 +1872,7 @@ export default function CompetitionCreatorForm() {
                       </div>
                     )}
                   </div>
-                </div>
+      </div>
 
       {/* Level Requirement */}
                 <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
