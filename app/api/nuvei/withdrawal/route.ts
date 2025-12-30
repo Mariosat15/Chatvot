@@ -383,11 +383,23 @@ export async function POST(req: NextRequest) {
 
       // Provide better error message for common errors
       let userFriendlyError = nuveiResult.error;
+      let suggestion = '';
+      
       if (nuveiResult.error.includes('1060') || nuveiResult.error.includes('payment data')) {
         if (withdrawalMethod === 'bank_transfer') {
-          userFriendlyError = 'Bank transfer withdrawals are not currently available. Please use card refund (withdraw to your original deposit card) or contact support.';
+          userFriendlyError = 'Bank transfer withdrawals are not currently available.';
+          suggestion = 'APM (SEPA) payouts may not be enabled for this merchant account. Please contact support for manual withdrawal processing.';
         } else {
-          userFriendlyError = 'Card refund failed. Please ensure you have made a deposit with this card first, or contact support.';
+          // Card refund error with valid UPO - likely merchant configuration issue
+          userFriendlyError = 'Automatic card refund is not available at this time.';
+          suggestion = actualUpoId 
+            ? 'Card payouts (Visa Direct/Mastercard Send) may not be enabled for this merchant account. Your withdrawal request has been converted to manual processing - our team will process it within 24-48 hours.'
+            : 'Please make a deposit first to enable card refunds, or contact support.';
+          
+          console.log('⚠️ Card payout failed with error 1060. This usually means:');
+          console.log('   1. Card payouts (Visa Direct/Mastercard Send) not enabled for merchant');
+          console.log('   2. Or the card type is not eligible for payouts (e.g., some credit cards)');
+          console.log('   UPO used:', actualUpoId);
         }
       }
 
@@ -395,9 +407,9 @@ export async function POST(req: NextRequest) {
         { 
           error: userFriendlyError,
           code: 'WITHDRAWAL_FAILED',
-          suggestion: withdrawalMethod === 'bank_transfer' 
-            ? 'Try using card refund instead, or request a manual withdrawal.' 
-            : 'Try making a deposit first to enable card refunds.',
+          suggestion,
+          // Let frontend know to fall back to manual
+          requiresManual: true,
         },
         { status: 400 }
       );
