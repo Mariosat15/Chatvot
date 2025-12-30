@@ -67,12 +67,21 @@ declare global {
             firstName?: string;
             lastName?: string;
             email?: string;
+            country?: string; // REQUIRED for 3DS2
+            phone?: string;
+            address?: string;
+            city?: string;
+            zip?: string;
           };
           billingAddress?: {
             firstName?: string;
             lastName?: string;
             email?: string;
-            country?: string;
+            country?: string; // REQUIRED for 3DS2 - without this, error 1136
+            address?: string;
+            city?: string;
+            zip?: string;
+            phone?: string;
           };
         },
         callback: (result: {
@@ -1201,12 +1210,16 @@ function NuveiPaymentForm({
             firstName,
             lastName,
             email: email.trim(),
+            // Country is REQUIRED for 3DS2 - error 1136 "Mandatory fields are missing" without it
+            country: 'CY', // Cyprus (merchant country for EUR transactions)
           },
-          // Billing address for 3DS2 - minimal required fields
+          // Billing address for 3DS2 - country is MANDATORY
+          // Without country, Nuvei returns error 1136 "Mandatory fields are missing"
           billingAddress: {
             firstName,
             lastName,
             email: email.trim(),
+            country: 'CY', // Cyprus (merchant country for EUR transactions)
           },
         } as Parameters<typeof sfc.createPayment>[0],
         async (result: { result: string; errCode: string; errorDescription?: string; reason?: string; transactionId?: string }) => {
