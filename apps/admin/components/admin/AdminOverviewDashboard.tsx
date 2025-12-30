@@ -244,9 +244,7 @@ export default function AdminOverviewDashboard({
   const fetchReconciliation = async () => {
     try {
       setReconciliationLoading(true);
-      const response = await fetch('/api/reconciliation?action=run', {
-        method: 'POST',
-      });
+      const response = await fetch('/api/reconciliation?action=run');
       if (!response.ok) throw new Error('Failed to run reconciliation');
       const data = await response.json();
       

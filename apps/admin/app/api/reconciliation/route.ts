@@ -284,7 +284,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { issueType, userId } = await request.json();
+    // Safely parse JSON body
+    let body: { issueType?: string; userId?: string } = {};
+    try {
+      const text = await request.text();
+      if (text) {
+        body = JSON.parse(text);
+      }
+    } catch {
+      await session.abortTransaction();
+      return NextResponse.json(
+        { success: false, error: 'Invalid JSON body' },
+        { status: 400 }
+      );
+    }
+
+    const { issueType, userId } = body;
 
     if (!issueType || !userId) {
       await session.abortTransaction();
