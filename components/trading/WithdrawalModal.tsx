@@ -152,10 +152,9 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
       
       // Check if Nuvei automatic withdrawals are enabled by admin
       const isAutomatic = withdrawalInfo?.nuveiEnabled === true;
-      let useManualFallback = false;
       
       if (isAutomatic) {
-        // Try AUTOMATIC WITHDRAWAL via Nuvei first
+        // AUTOMATIC WITHDRAWAL via Nuvei
         const withdrawalMethod = selectedMethod.type === 'original_method' ? 'card_refund' : 'bank_transfer';
         
         // Check if we have required data for automatic processing
@@ -205,30 +204,39 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
               }, 4000);
               return;
             } else {
-              // Automatic failed - fall back to manual
-              console.log('Automatic withdrawal failed, falling back to manual:', data.error);
-              useManualFallback = true;
+              // Automatic failed - show error (credits already refunded by the API)
+              // DO NOT fall back to manual as that creates duplicate withdrawal requests
+              const errorMsg = data.error || 'Automatic withdrawal failed';
+              setError(`${errorMsg}\n\nYour credits have been refunded. Please contact support if you need assistance.`);
+              setLoading(false);
+              return;
             }
           } catch (err) {
-            console.error('Automatic withdrawal error, falling back to manual:', err);
-            useManualFallback = true;
+            console.error('Automatic withdrawal error:', err);
+            setError('Automatic withdrawal failed. Your credits have been refunded. Please try again or contact support.');
+            setLoading(false);
+            return;
           }
         } else {
-          // Can't try automatic (e.g., no UPO for card refund)
-          console.log('Cannot use automatic withdrawal, using manual');
-          useManualFallback = true;
+          // Can't try automatic (e.g., no UPO for card refund) - show helpful error
+          if (withdrawalMethod === 'card_refund' && !selectedMethod.userPaymentOptionId) {
+            setError('Card refund requires a saved card from a previous deposit. Please make a deposit first or choose bank transfer.');
+          } else {
+            setError('Automatic withdrawal is not available for this method. Please contact support.');
+          }
+          setLoading(false);
+          return;
         }
       }
       
-      // MANUAL WITHDRAWAL - either Nuvei is disabled OR automatic failed/unavailable
-      // This ensures users can ALWAYS withdraw even if automatic processing isn't available
+      // MANUAL WITHDRAWAL - Nuvei automatic is disabled by admin
       const response = await fetch('/api/wallet/withdraw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amountEUR,
           withdrawalMethodId: selectedMethodId,
-          userNote: userNote.trim() || (useManualFallback ? 'Auto-fallback from Nuvei' : undefined),
+          userNote: userNote.trim() || undefined,
         }),
       });
 
@@ -241,9 +249,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
       }
 
       setSuccess({
-        message: useManualFallback 
-          ? 'Withdrawal submitted for manual processing (automatic processing unavailable)'
-          : data.message,
+        message: data.message,
         netAmountEUR: data.withdrawalRequest.netAmountEUR,
         processingHours: data.withdrawalRequest.estimatedProcessingHours,
         isAutoApproved: data.withdrawalRequest.isAutoApproved,
