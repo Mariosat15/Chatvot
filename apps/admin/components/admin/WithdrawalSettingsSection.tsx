@@ -655,7 +655,7 @@ export default function WithdrawalSettingsSection() {
                       <li>• Users can withdraw to their original deposit card (refund) or enter bank details</li>
                       <li>• Withdrawals are processed automatically through Nuvei</li>
                       <li>• Card refunds typically arrive in 3-5 business days</li>
-                      <li>• Bank transfers typically arrive in 1-3 business days</li>
+                      <li>• Bank transfers typically arrive in 3-5 business days</li>
                       <li>• Nuvei must be configured in Payment Providers</li>
                     </ul>
                   </div>

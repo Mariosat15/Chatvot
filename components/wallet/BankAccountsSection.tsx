@@ -663,7 +663,7 @@ export default function BankAccountsSection() {
                   When you request a withdrawal, you can choose to receive funds via bank transfer (SEPA) 
                   or refund to your original payment method. If you haven&apos;t added a bank account, 
                   withdrawals will automatically go back to the card or account you used to purchase credits. 
-                  Bank transfers typically take 1-3 business days.
+                  Withdrawals typically arrive in 3-5 business days.
                 </p>
               </div>
             </div>
