@@ -602,12 +602,14 @@ class NuveiService {
       console.log('🏦 Session token obtained via openOrder:', sessionToken?.substring(0, 20) + '...');
       
       // Now call accountCapture with the session token
+      // Per Nuvei support: include amount parameter in the request
       const accountCaptureRequest = {
         sessionToken,
         merchantId: credentials.merchantId,
         merchantSiteId: credentials.siteId,
         userTokenId: params.userTokenId,
         paymentMethod: params.paymentMethod,
+        amount, // Required per Nuvei support
         currencyCode: currency,
         countryCode: params.countryCode,
         languageCode: params.languageCode || 'en',
