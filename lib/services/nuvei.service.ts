@@ -543,7 +543,8 @@ class NuveiService {
     const apiUrl = this.getApiUrl(credentials.testMode);
     const timeStamp = this.generateTimeStamp();
     const clientRequestId = `ac_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://chartvolt.com';
+    // Remove trailing slash from baseUrl to avoid double slashes
+    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://chartvolt.com').replace(/\/$/, '');
     
     // IMPORTANT: /accountCapture requires a session token from /openOrder (not /getSessionToken)
     // The /openOrder call establishes the order context with amount and currency
@@ -602,8 +603,8 @@ class NuveiService {
       console.log('🏦 Session token obtained via openOrder:', sessionToken?.substring(0, 20) + '...');
       
       // Now call accountCapture with the session token
-      // Per Nuvei support: include amount parameter in the request
-      // Also include returnUrl for redirect after completion
+      // Per Nuvei docs: use currencyCode and countryCode (not currency/country)
+      // Per Nuvei support: include amount parameter
       const returnUrl = `${baseUrl}/wallet?bank_setup=success&message=${encodeURIComponent('Bank account connected successfully!')}`;
       
       const accountCaptureRequest = {
@@ -613,8 +614,8 @@ class NuveiService {
         userTokenId: params.userTokenId,
         paymentMethod: params.paymentMethod,
         amount, // Required per Nuvei support
-        currency, // Try 'currency' instead of 'currencyCode'
-        country: params.countryCode, // Try 'country' instead of 'countryCode'
+        currencyCode: currency, // Use currencyCode per docs
+        countryCode: params.countryCode, // Use countryCode per docs
         languageCode: params.languageCode || 'en',
         urlDetails: {
           successUrl: returnUrl,
