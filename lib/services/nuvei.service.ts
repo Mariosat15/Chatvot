@@ -654,6 +654,8 @@ class NuveiService {
   async addSepaUpo(params: {
     userTokenId: string;
     iban: string;
+    bic?: string;
+    accountHolderName?: string;
     email: string;
     country: string;
     firstName?: string;
@@ -670,6 +672,8 @@ class NuveiService {
     
     // Clean and format IBAN (remove spaces, uppercase)
     const cleanIban = params.iban.replace(/\s/g, '').toUpperCase();
+    // Clean and format BIC
+    const cleanBic = params.bic ? params.bic.replace(/\s/g, '').toUpperCase() : undefined;
     
     // Calculate checksum for addUPOAPM
     // Per Nuvei docs: SHA256(merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey)
@@ -681,20 +685,29 @@ class NuveiService {
       credentials.secretKey
     );
     
+    // Build apmData with SEPA-specific fields (lowercase keys per Nuvei docs)
+    // See: https://docs.nuvei.com/documentation/features/financial-operations/payout/#add-upo-addupoapm
+    const apmData: Record<string, string> = {
+      iban: cleanIban,  // lowercase per Nuvei docs
+    };
+    if (cleanBic) {
+      apmData.bic = cleanBic;  // lowercase per Nuvei docs
+    }
+    if (params.accountHolderName) {
+      apmData.accountHolderName = params.accountHolderName;
+    }
+    
     // /addUPOAPM uses CHECKSUM authentication only - NO sessionToken!
-    // See example in Nuvei Payout docs:
-    // https://docs.nuvei.com/documentation/features/financial-operations/payout/#add-upo-addupoapm
+    // paymentMethodName for SEPA is "apmgw_SEPA" (not "apmgw_SEPA_Payouts")
     const requestBody = {
       merchantId: credentials.merchantId,
       merchantSiteId: credentials.siteId,
       clientRequestId,
       userTokenId: params.userTokenId,
-      paymentMethodName: 'apmgw_SEPA_Payouts',  // SEPA for Europe
-      apmData: {
-        IBAN: cleanIban,
-      },
+      paymentMethodName: 'apmgw_SEPA',  // Correct SEPA payment method name
+      apmData,
       billingAddress: {
-        country: params.country,
+        countryCode: params.country,  // Use countryCode per Nuvei docs
         email: params.email,
         firstName: params.firstName || 'N/A',
         lastName: params.lastName || 'N/A',
@@ -705,14 +718,17 @@ class NuveiService {
     
     console.log('\n');
     console.log('╔════════════════════════════════════════════════════════════╗');
-    console.log('║     NUVEI ADD SEPA UPO REQUEST (checksum auth, NO session) ║');
+    console.log('║     NUVEI ADD SEPA UPO REQUEST (apmgw_SEPA)                 ║');
     console.log('╚════════════════════════════════════════════════════════════╝');
     console.log('📤 ENDPOINT:', `${apiUrl}/addUPOAPM.do`);
     console.log('📤 CHECKSUM INPUT:', `${credentials.merchantId}${credentials.siteId}${clientRequestId}${timeStamp}[SECRET]`);
     console.log('📤 REQUEST BODY (IBAN masked):');
     console.log(JSON.stringify({
       ...requestBody,
-      apmData: { IBAN: cleanIban.substring(0, 4) + '****' + cleanIban.slice(-4) },
+      apmData: { 
+        ...apmData, 
+        iban: cleanIban.substring(0, 4) + '****' + cleanIban.slice(-4) 
+      },
       checksum: '[HIDDEN]',
     }, null, 2));
     
@@ -755,6 +771,8 @@ class NuveiService {
     currency: string;
     merchantWDRequestId: string;
     iban: string;
+    bic?: string;
+    accountHolderName?: string;
     email: string;
     country: string;
     firstName?: string;
@@ -768,6 +786,8 @@ class NuveiService {
     const upoResult = await this.addSepaUpo({
       userTokenId: params.userTokenId,
       iban: params.iban,
+      bic: params.bic,
+      accountHolderName: params.accountHolderName,
       email: params.email,
       country: params.country,
       firstName: params.firstName,

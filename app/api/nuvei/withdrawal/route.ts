@@ -343,6 +343,8 @@ export async function POST(req: NextRequest) {
         currency: 'EUR',
         merchantWDRequestId,
         iban: bankAccount.iban,
+        bic: bankAccount.swiftBic || undefined,  // SWIFT/BIC code
+        accountHolderName: bankAccount.accountHolderName || undefined,  // Account holder name
         email: userEmail,
         country: bankAccount.country || 'CY', // Default to Cyprus if not set
         firstName: userName?.split(' ')[0] || undefined,
