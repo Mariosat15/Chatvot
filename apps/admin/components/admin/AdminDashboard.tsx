@@ -66,6 +66,7 @@ import DatabaseSection from '@/components/admin/DatabaseSection';
 import UsersSection from '@/components/admin/UsersSection';
 import PaymentProvidersSection from '@/components/admin/PaymentProvidersSection';
 import PendingPaymentsSection from '@/components/admin/PendingPaymentsSection';
+import FailedDepositsSection from '@/components/admin/FailedDepositsSection';
 import FraudMonitoringSection from '@/components/admin/FraudMonitoringSection';
 import AdminWikiSection from '@/components/admin/AdminWikiSection';
 import BadgeXPManagementSection from '@/components/admin/BadgeXPManagementSection';
@@ -240,6 +241,13 @@ const menuGroups: MenuGroup[] = [
         icon: <CreditCard className="h-5 w-5" />,
         color: 'text-yellow-400',
         bgColor: 'bg-yellow-500/10 hover:bg-yellow-500/20',
+      },
+      {
+        id: 'failed-deposits',
+        label: 'Failed Deposits',
+        icon: <AlertTriangle className="h-5 w-5" />,
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/10 hover:bg-red-500/20',
       },
       {
         id: 'withdrawals',
@@ -456,6 +464,8 @@ export default function AdminDashboard({
         return <MarketSettingsSection />;
       case 'payments':
         return <PendingPaymentsSection />;
+      case 'failed-deposits':
+        return <FailedDepositsSection />;
       case 'withdrawals':
         return <WithdrawalSettingsSection />;
       case 'pending-withdrawals':
