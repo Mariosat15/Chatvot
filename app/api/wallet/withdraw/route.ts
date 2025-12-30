@@ -489,54 +489,17 @@ export async function POST(request: NextRequest) {
       { session: mongoSession }
     );
 
-    // Create separate withdrawal fee transaction (same as deposits)
-    if (platformFee > 0) {
-      await WalletTransaction.create(
-        [{
-          userId: session.user.id,
-          transactionType: 'withdrawal_fee',
-          amount: -(platformFee * exchangeRate), // Fee in credits
-          balanceBefore: wallet.creditBalance,
-          balanceAfter: wallet.creditBalance, // Fee doesn't change balance (already deducted from withdrawal)
-          currency: 'EUR',
-          exchangeRate,
-          status: 'completed',
-          description: `Withdrawal fee: €${platformFee.toFixed(2)} (${feePercentage}%${feeFixed > 0 ? ` + €${feeFixed}` : ''})`,
-          metadata: {
-            withdrawalTransactionId: withdrawalTx[0]._id,
-            withdrawalRequestId: withdrawalRequest[0]._id,
-            platformFeePercentage: feePercentage,
-            platformFeeFixed: feeFixed,
-            platformFeeEUR: platformFee,
-          },
-        }],
-        { session: mongoSession }
-      );
-    }
+    // NOTE: Don't create withdrawal_fee transaction here!
+    // Withdrawal fees should ONLY be recorded when the withdrawal is actually COMPLETED by admin.
+    // This prevents charging users fees for failed/rejected withdrawals.
+    // The fee will be recorded in:
+    // - apps/admin/app/api/withdrawals/[id]/route.ts when admin marks as 'completed'
 
     await mongoSession.commitTransaction();
 
-    // Record withdrawal fee in platform financials (after commit, fire and forget)
-    if (platformFee > 0) {
-      try {
-        const { PlatformFinancialsService } = await import('@/lib/services/platform-financials.service');
-        
-        // Calculate bank fee for withdrawal (payout costs)
-        const bankWithdrawalFeePercentage = creditSettings.bankWithdrawalFeePercentage ?? 0.25;
-        const bankWithdrawalFeeFixed = creditSettings.bankWithdrawalFeeFixed ?? 0.25;
-        const bankFeeTotal = (amountEUR * bankWithdrawalFeePercentage / 100) + bankWithdrawalFeeFixed;
-        const netPlatformEarning = platformFee - bankFeeTotal;
-
-        console.log(`💵 Recording withdrawal fee to PlatformTransaction...`);
-        await PlatformFinancialsService.recordWithdrawalFee({
-          userId: session.user.id,
-          withdrawalAmount: amountEUR,
-          platformFeeAmount: platformFee,
-          bankFeeAmount: bankFeeTotal,
-          netEarning: netPlatformEarning,
-          transactionId: withdrawalTx[0]._id.toString(),
-        });
-        console.log(`✅ Withdrawal fee recorded: €${platformFee.toFixed(2)} (Bank: €${bankFeeTotal.toFixed(2)}, Net: €${netPlatformEarning.toFixed(2)})`);
+    // NOTE: Don't record withdrawal fee to platform financials here either!
+    // It will be recorded when the withdrawal is completed.
+    console.log(`💵 Withdrawal fee (€${platformFee.toFixed(2)}) will be recorded when withdrawal is completed`);
       } catch (error) {
         console.error('❌ Error recording withdrawal fee:', error);
         // Don't fail the withdrawal - fee recording is secondary

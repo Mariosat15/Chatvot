@@ -638,35 +638,16 @@ export const initiateWithdrawal = async (creditsAmount: number) => {
         { session: mongoSession }
       );
 
-      // Create separate transaction record for the withdrawal fee (platform revenue)
-      await WalletTransaction.create(
-        [
-          {
-            userId: session.user.id,
-            transactionType: 'withdrawal_fee',
-            amount: -feeAmountCredits,
-            balanceBefore: wallet.creditBalance - creditsAmount,
-            balanceAfter: wallet.creditBalance - totalCreditsDeducted,
-            currency: 'EUR',
-            exchangeRate: eurToCreditsRate,
-            status: 'completed',
-            description: `Withdrawal fee (${actualPlatformFeePercentage}%) for ${creditsAmount} Credits`,
-            metadata: {
-              withdrawalTransactionId: withdrawalTransaction[0]._id,
-              platformFeePercentage: actualPlatformFeePercentage,
-              creditsCharged: feeAmountCredits,
-              eurValue: platformFeeAmountEUR.toFixed(2),
-              bankFeeEUR: bankFeeTotalEUR.toFixed(2),
-              netPlatformEarningEUR: netPlatformEarningEUR.toFixed(2),
-            },
-          },
-        ],
-        { session: mongoSession }
-      );
+      // NOTE: Don't create withdrawal_fee transaction here!
+      // Withdrawal fees should ONLY be recorded when the withdrawal is actually COMPLETED by admin.
+      // This prevents charging users fees for failed/rejected withdrawals.
+      // The fee will be recorded in:
+      // - apps/admin/app/api/withdrawals/[id]/route.ts when admin marks as 'completed'
 
       await mongoSession.commitTransaction();
 
-      console.log(`💸 Withdrawal initiated: ${creditsAmount} Credits (€${eurNet.toFixed(2)} net) for user ${session.user.id}, fee: ${feeAmountCredits} Credits`);
+      console.log(`💸 Withdrawal initiated: ${creditsAmount} Credits (€${eurNet.toFixed(2)} net) for user ${session.user.id}`);
+      console.log(`💵 Withdrawal fee (€${platformFeeAmountEUR.toFixed(2)}) will be recorded when withdrawal is completed`);
       
       // Send withdrawal initiated notification
       try {
@@ -676,22 +657,8 @@ export const initiateWithdrawal = async (creditsAmount: number) => {
         console.error('Error sending withdrawal notification:', notifError);
       }
       
-      // Record withdrawal fee in platform financials (fire and forget)
-      if (platformFeeAmountEUR > 0) {
-        try {
-          const { PlatformFinancialsService } = await import('@/lib/services/platform-financials.service');
-          await PlatformFinancialsService.recordWithdrawalFee({
-            userId: session.user.id,
-            withdrawalAmount: eurGross,
-            platformFeeAmount: platformFeeAmountEUR,
-            bankFeeAmount: bankFeeTotalEUR,
-            netEarning: netPlatformEarningEUR,
-            transactionId: withdrawalTransaction[0]._id.toString(),
-          });
-        } catch (error) {
-          console.error('Error recording withdrawal fee:', error);
-        }
-      }
+      // NOTE: Don't record withdrawal fee to platform financials here!
+      // It will be recorded when the withdrawal is completed by admin.
 
       revalidatePath('/wallet');
 
