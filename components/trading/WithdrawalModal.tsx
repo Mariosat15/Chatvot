@@ -152,82 +152,83 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
       
       // Check if Nuvei automatic withdrawals are enabled by admin
       const isAutomatic = withdrawalInfo?.nuveiEnabled === true;
+      let useManualFallback = false;
       
       if (isAutomatic) {
-        // AUTOMATIC WITHDRAWAL via Nuvei - determined by admin settings, not user choice
+        // Try AUTOMATIC WITHDRAWAL via Nuvei first
         const withdrawalMethod = selectedMethod.type === 'original_method' ? 'card_refund' : 'bank_transfer';
         
-        const requestBody: any = {
-          amountEUR,
-          withdrawalMethod,
-        };
+        // Check if we have required data for automatic processing
+        const canTryAutomatic = withdrawalMethod === 'bank_transfer' || 
+          (withdrawalMethod === 'card_refund' && selectedMethod.userPaymentOptionId);
         
-        if (withdrawalMethod === 'card_refund') {
-          // For card refund, we MUST pass the UPO ID for Nuvei to process
-          if (!selectedMethod.userPaymentOptionId) {
-            setError('This card cannot be used for automatic refund. No UPO available. Please use bank transfer instead.');
-            setLoading(false);
-            return;
-          }
-          
-          requestBody.userPaymentOptionId = selectedMethod.userPaymentOptionId;
-          requestBody.cardDetails = {
-            cardBrand: selectedMethod.cardBrand,
-            cardLast4: selectedMethod.cardLast4,
-            userPaymentOptionId: selectedMethod.userPaymentOptionId,
+        if (canTryAutomatic) {
+          const requestBody: any = {
+            amountEUR,
+            withdrawalMethod,
           };
-        } else {
-          // For bank transfer, pass the bank account ID
-          requestBody.bankAccountId = selectedMethod.id;
-        }
-        
-        const response = await fetch('/api/nuvei/withdrawal', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          // If automatic withdrawal fails, suggest manual withdrawal
-          const errorMsg = data.error || 'Automatic withdrawal failed';
-          const suggestion = data.suggestion || '';
           
-          // Check if we should fall back to manual withdrawal
-          if (data.code === 'WITHDRAWAL_FAILED' || response.status === 400) {
-            setError(`${errorMsg}\n\nYour credits have been refunded. Please try again using the manual withdrawal option.`);
+          if (withdrawalMethod === 'card_refund') {
+            requestBody.userPaymentOptionId = selectedMethod.userPaymentOptionId;
+            requestBody.cardDetails = {
+              cardBrand: selectedMethod.cardBrand,
+              cardLast4: selectedMethod.cardLast4,
+              userPaymentOptionId: selectedMethod.userPaymentOptionId,
+            };
           } else {
-            setError(errorMsg + (suggestion ? `\n\n${suggestion}` : ''));
+            requestBody.bankAccountId = selectedMethod.id;
           }
-          setLoading(false);
-          return;
+          
+          try {
+            const response = await fetch('/api/nuvei/withdrawal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(requestBody),
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+              // Automatic withdrawal succeeded
+              setSuccess({
+                message: data.message || 'Withdrawal submitted for processing',
+                netAmountEUR: data.netAmountEUR,
+                processingHours: withdrawalMethod === 'card_refund' ? 72 : 48,
+                isAutoApproved: true,
+                isAutomatic: true,
+              });
+              
+              setTimeout(() => {
+                router.refresh();
+                setOpen(false);
+                resetModal();
+              }, 4000);
+              return;
+            } else {
+              // Automatic failed - fall back to manual
+              console.log('Automatic withdrawal failed, falling back to manual:', data.error);
+              useManualFallback = true;
+            }
+          } catch (err) {
+            console.error('Automatic withdrawal error, falling back to manual:', err);
+            useManualFallback = true;
+          }
+        } else {
+          // Can't try automatic (e.g., no UPO for card refund)
+          console.log('Cannot use automatic withdrawal, using manual');
+          useManualFallback = true;
         }
-        
-        setSuccess({
-          message: data.message || 'Withdrawal submitted for processing',
-          netAmountEUR: data.netAmountEUR,
-          processingHours: withdrawalMethod === 'card_refund' ? 72 : 48,
-          isAutoApproved: true,
-          isAutomatic: true,
-        });
-        
-        setTimeout(() => {
-          router.refresh();
-          setOpen(false);
-          resetModal();
-        }, 4000);
-        return;
       }
-
-      // MANUAL WITHDRAWAL (when Nuvei is disabled)
+      
+      // MANUAL WITHDRAWAL - either Nuvei is disabled OR automatic failed/unavailable
+      // This ensures users can ALWAYS withdraw even if automatic processing isn't available
       const response = await fetch('/api/wallet/withdraw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amountEUR,
           withdrawalMethodId: selectedMethodId,
-          userNote: userNote.trim() || undefined,
+          userNote: userNote.trim() || (useManualFallback ? 'Auto-fallback from Nuvei' : undefined),
         }),
       });
 
@@ -240,7 +241,9 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
       }
 
       setSuccess({
-        message: data.message,
+        message: useManualFallback 
+          ? 'Withdrawal submitted for manual processing (automatic processing unavailable)'
+          : data.message,
         netAmountEUR: data.withdrawalRequest.netAmountEUR,
         processingHours: data.withdrawalRequest.estimatedProcessingHours,
         isAutoApproved: data.withdrawalRequest.isAutoApproved,
