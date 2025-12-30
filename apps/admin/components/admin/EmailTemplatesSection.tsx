@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Mail, Save, Send, RefreshCw, Eye, Code, Sparkles, AlertCircle, Check, Plus, Trash2 } from 'lucide-react';
+import { Mail, Save, Send, RefreshCw, Eye, Code, Sparkles, AlertCircle, Check, Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,6 +43,83 @@ interface EmailTemplate {
   useCustomHtml: boolean;
   isActive: boolean;
 }
+
+type TemplateType = 'welcome' | 'deposit_completed' | 'withdrawal_completed';
+
+const TEMPLATE_CONFIG: Record<TemplateType, {
+  title: string;
+  description: string;
+  icon: typeof Mail;
+  variables: string[];
+  defaults: Partial<EmailTemplate>;
+}> = {
+  welcome: {
+    title: 'Welcome Email',
+    description: 'Sent to new users when they sign up',
+    icon: UserPlus,
+    variables: ['{{name}}', '{{platformName}}', '{{baseUrl}}', '{{companyAddress}}'],
+    defaults: {
+      templateType: 'welcome',
+      name: 'Welcome Email',
+      subject: 'Welcome to {{platformName}} - Start competing and win real prizes!',
+      headingText: 'Welcome aboard {{name}}',
+      introText: 'Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.',
+      featureListLabel: "Here's what you can do right now:",
+      featureItems: [
+        'Deposit credits to your wallet and enter trading competitions',
+        'Compete in live trading competitions with real-time market prices',
+        'Climb the leaderboard by trading smarter and win cash prizes',
+      ],
+      closingText: "Competitions run daily with prize pools waiting to be won. The top traders take home real money — will you be one of them?",
+      ctaButtonText: 'View Competitions',
+      ctaButtonUrl: '{{baseUrl}}/competitions',
+    },
+  },
+  deposit_completed: {
+    title: 'Deposit Completed',
+    description: 'Sent when a user\'s deposit is processed successfully',
+    icon: ArrowDownToLine,
+    variables: ['{{name}}', '{{credits}}', '{{amount}}', '{{paymentMethod}}', '{{transactionId}}', '{{newBalance}}', '{{platformName}}'],
+    defaults: {
+      templateType: 'deposit_completed',
+      name: 'Deposit Completed Email',
+      subject: '✓ Deposit Confirmed - {{credits}} credits added to your account',
+      headingText: 'Deposit Successful!',
+      introText: 'Great news! Your deposit has been processed successfully and your credits are ready to use.',
+      featureListLabel: "What's Next?",
+      featureItems: [
+        'Browse active competitions and join one that matches your style',
+        'Challenge other traders in head-to-head matches',
+        'Climb the leaderboard and win real prizes!',
+      ],
+      closingText: 'Start competing now and put your trading skills to the test!',
+      ctaButtonText: 'Start Competing Now',
+      ctaButtonUrl: '{{baseUrl}}/competitions',
+    },
+  },
+  withdrawal_completed: {
+    title: 'Withdrawal Completed',
+    description: 'Sent when a user\'s withdrawal is processed successfully',
+    icon: ArrowUpFromLine,
+    variables: ['{{name}}', '{{credits}}', '{{netAmount}}', '{{fee}}', '{{paymentMethod}}', '{{withdrawalId}}', '{{remainingBalance}}', '{{platformName}}'],
+    defaults: {
+      templateType: 'withdrawal_completed',
+      name: 'Withdrawal Completed Email',
+      subject: '💸 Withdrawal Processed - €{{netAmount}} on the way',
+      headingText: 'Withdrawal Processed',
+      introText: 'Your withdrawal request has been processed successfully. Here are the details of your transaction:',
+      featureListLabel: 'Timeline Information',
+      featureItems: [
+        'Card refunds typically arrive in 3-5 business days',
+        'Bank transfers typically arrive in 3-5 business days',
+        'Processing times may vary depending on your bank or holidays',
+      ],
+      closingText: 'Thank you for being part of our trading community!',
+      ctaButtonText: 'View Transaction History',
+      ctaButtonUrl: '{{baseUrl}}/wallet',
+    },
+  },
+};
 
 const DEFAULT_TEMPLATE: EmailTemplate = {
   templateType: 'welcome',
@@ -88,6 +165,7 @@ Return only the message text, no HTML.`,
 };
 
 export default function EmailTemplatesSection() {
+  const [selectedTemplateType, setSelectedTemplateType] = useState<TemplateType>('welcome');
   const [template, setTemplate] = useState<EmailTemplate>(DEFAULT_TEMPLATE);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,17 +176,31 @@ export default function EmailTemplatesSection() {
   const [newFeatureItem, setNewFeatureItem] = useState('');
 
   useEffect(() => {
-    fetchTemplate();
-  }, []);
+    fetchTemplate(selectedTemplateType);
+  }, [selectedTemplateType]);
 
-  const fetchTemplate = async () => {
+  const fetchTemplate = async (type: TemplateType) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/email-templates?type=welcome');
+      const response = await fetch(`/api/email-templates?type=${type}`);
       if (response.ok) {
         const data = await response.json();
         if (data.template) {
-          setTemplate({ ...DEFAULT_TEMPLATE, ...data.template });
+          const config = TEMPLATE_CONFIG[type];
+          setTemplate({ 
+            ...DEFAULT_TEMPLATE, 
+            ...config.defaults,
+            ...data.template,
+            templateType: type,
+          });
+        } else {
+          // Use defaults for this template type
+          const config = TEMPLATE_CONFIG[type];
+          setTemplate({
+            ...DEFAULT_TEMPLATE,
+            ...config.defaults,
+            templateType: type,
+          });
         }
       }
     } catch (error) {
@@ -125,11 +217,14 @@ export default function EmailTemplatesSection() {
       const response = await fetch('/api/email-templates', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(template),
+        body: JSON.stringify({
+          ...template,
+          templateType: selectedTemplateType,
+        }),
       });
 
       if (response.ok) {
-        toast.success('Email template updated successfully');
+        toast.success(`${TEMPLATE_CONFIG[selectedTemplateType].title} template updated successfully`);
       } else {
         throw new Error('Failed to save');
       }
@@ -157,7 +252,7 @@ export default function EmailTemplatesSection() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          templateType: 'welcome',
+          templateType: selectedTemplateType,
           testEmail,
         }),
       });
@@ -177,7 +272,12 @@ export default function EmailTemplatesSection() {
   };
 
   const handleResetToDefault = () => {
-    setTemplate(DEFAULT_TEMPLATE);
+    const config = TEMPLATE_CONFIG[selectedTemplateType];
+    setTemplate({
+      ...DEFAULT_TEMPLATE,
+      ...config.defaults,
+      templateType: selectedTemplateType,
+    });
     toast.info('Template reset to default values (not saved yet)');
   };
 
@@ -204,6 +304,9 @@ export default function EmailTemplatesSection() {
     setTemplate({ ...template, featureItems: newItems });
   };
 
+  const currentConfig = TEMPLATE_CONFIG[selectedTemplateType];
+  const TemplateIcon = currentConfig.icon;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -214,15 +317,38 @@ export default function EmailTemplatesSection() {
 
   return (
     <div className="space-y-6">
+      {/* Template Type Selector */}
+      <div className="flex gap-2 p-1 bg-gray-900 rounded-lg border border-gray-800">
+        {(Object.keys(TEMPLATE_CONFIG) as TemplateType[]).map((type) => {
+          const config = TEMPLATE_CONFIG[type];
+          const Icon = config.icon;
+          const isActive = selectedTemplateType === type;
+          return (
+            <button
+              key={type}
+              onClick={() => setSelectedTemplateType(type)}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
+                isActive
+                  ? 'bg-yellow-500 text-black font-medium'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{config.title}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Mail className="h-6 w-6 text-yellow-500" />
-            Welcome Email Template
+            <TemplateIcon className="h-6 w-6 text-yellow-500" />
+            {currentConfig.title} Template
           </h2>
           <p className="text-gray-400 mt-1">
-            Customize the email sent to new users when they sign up
+            {currentConfig.description}
           </p>
         </div>
         <div className="flex gap-2">
@@ -303,12 +429,12 @@ export default function EmailTemplatesSection() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
             <AlertCircle className="h-4 w-4" />
-            Available Variables
+            Available Variables for {currentConfig.title}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2 text-xs">
-            {['{{name}}', '{{platformName}}', '{{baseUrl}}', '{{companyAddress}}'].map((variable) => (
+            {currentConfig.variables.map((variable) => (
               <code key={variable} className="px-2 py-1 bg-gray-800 rounded text-yellow-400">
                 {variable}
               </code>
