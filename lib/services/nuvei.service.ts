@@ -569,15 +569,19 @@ class NuveiService {
       requestBody.userDetails = params.userDetails;
     }
     
-    // For card refund - use UPO ID from original deposit
+    // CRITICAL: For card refund using UPO, must be wrapped in paymentOption object
+    // Nuvei API expects: { paymentOption: { userPaymentOptionId: "xxx" } }
+    // NOT: { userPaymentOptionId: "xxx" }
     if (params.userPaymentOptionId) {
-      requestBody.userPaymentOptionId = params.userPaymentOptionId;
+      requestBody.paymentOption = {
+        userPaymentOptionId: params.userPaymentOptionId,
+      };
+      console.log('💸 Card refund using UPO:', params.userPaymentOptionId);
     }
-    
     // For bank transfer - Nuvei requires specific APM setup
     // NOTE: Bank payouts (SEPA) must be enabled by Nuvei for your merchant account
     // Contact Nuvei support to enable APM payouts if you get error 1060
-    if (params.bankDetails && params.bankDetails.iban) {
+    else if (params.bankDetails && params.bankDetails.iban) {
       // Format IBAN for Nuvei (remove spaces, uppercase)
       const cleanIban = params.bankDetails.iban.replace(/\s/g, '').toUpperCase();
       const cleanBic = params.bankDetails.bic?.replace(/\s/g, '').toUpperCase();
