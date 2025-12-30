@@ -13,6 +13,7 @@ import { nuveiService } from '@/lib/services/nuvei.service';
 import { connectToDatabase } from '@/database/mongoose';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import { RateLimiters, getRateLimitHeaders } from '@/lib/utils/rate-limiter';
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,6 +30,20 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.user.id;
+
+    // SECURITY: Rate limiting - 5 deposit attempts per minute per user
+    const rateLimitResult = RateLimiters.deposit(userId);
+    if (!rateLimitResult.success) {
+      console.log(`🛡️ Rate limit exceeded for user ${userId} - deposit`);
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a moment before trying again.' },
+        { 
+          status: 429,
+          headers: getRateLimitHeaders(rateLimitResult),
+        }
+      );
+    }
+
     const body = await req.json();
     const { 
       amount, // Total amount to charge (includes VAT + platform fee)

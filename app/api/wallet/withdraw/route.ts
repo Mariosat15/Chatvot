@@ -13,6 +13,8 @@ import Challenge from '@/database/models/trading/challenge.model';
 import AppSettings from '@/database/models/app-settings.model';
 import UserBankAccount from '@/database/models/user-bank-account.model';
 import KYCSettings from '@/database/models/kyc-settings.model';
+import { RateLimiters, getRateLimitHeaders } from '@/lib/utils/rate-limiter';
+import { sanitizeUserNote, sanitizeAmount } from '@/lib/utils/sanitize';
 
 /**
  * GET /api/wallet/withdraw
@@ -237,8 +239,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // SECURITY: Rate limiting - 3 withdrawal attempts per minute per user
+    const rateLimitResult = RateLimiters.withdrawal(session.user.id);
+    if (!rateLimitResult.success) {
+      console.log(`🛡️ Rate limit exceeded for user ${session.user.id} - withdrawal`);
+      return NextResponse.json(
+        { success: false, error: 'Too many requests. Please wait a moment before trying again.' },
+        { 
+          status: 429,
+          headers: getRateLimitHeaders(rateLimitResult),
+        }
+      );
+    }
+
     const body = await request.json();
-    const { amountEUR, withdrawalMethodId, userNote } = body;
+    const { withdrawalMethodId, userNote: rawUserNote } = body;
+    
+    // SECURITY: Sanitize inputs
+    const amountEUR = sanitizeAmount(body.amountEUR);
+    const userNote = sanitizeUserNote(rawUserNote);
 
     if (!amountEUR || amountEUR <= 0) {
       return NextResponse.json(
