@@ -1192,8 +1192,9 @@ function NuveiPaymentForm({
       });
 
       // Create payment with required user details for 3DS2 compliance
-      // According to Nuvei docs, 3DS2 requires complete user details
+      // According to Nuvei docs, 3DS2 requires complete user details including billing address
       // https://docs.nuvei.com/documentation/features/3d-secure/
+      // Error 1136 "Mandatory fields are missing" occurs when address/city/zip are not provided
       sfc.createPayment(
         {
           sessionToken,
@@ -1210,16 +1211,22 @@ function NuveiPaymentForm({
             firstName,
             lastName,
             email: email.trim(),
+            phone: '', // Optional but helps with 3DS2
             // Country is REQUIRED for 3DS2 - error 1136 "Mandatory fields are missing" without it
             country: 'CY', // Cyprus (merchant country for EUR transactions)
           },
-          // Billing address for 3DS2 - country is MANDATORY
-          // Without country, Nuvei returns error 1136 "Mandatory fields are missing"
+          // Billing address for 3DS2 - ALL fields are MANDATORY for 3DS2 to work
+          // Error 1136 "Mandatory fields are missing" occurs without these
           billingAddress: {
             firstName,
             lastName,
             email: email.trim(),
+            phone: '',
+            // All these fields are REQUIRED for 3DS2 compliance
             country: 'CY', // Cyprus (merchant country for EUR transactions)
+            address: 'N/A', // Required - using placeholder as we don't collect billing address
+            city: 'Nicosia', // Required - using merchant city
+            zip: '1000', // Required - using placeholder postal code
           },
         } as Parameters<typeof sfc.createPayment>[0],
         async (result: { result: string; errCode: string; errorDescription?: string; reason?: string; transactionId?: string }) => {
