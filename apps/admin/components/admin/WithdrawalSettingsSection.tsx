@@ -268,52 +268,33 @@ export default function WithdrawalSettingsSection() {
           </div>
         </div>
 
-        {/* Processing Mode Banner */}
+        {/* Processing Status Banner */}
         <div className="p-6 border-b border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
-                settings.processingMode === 'automatic' 
-                  ? 'bg-green-500/20' 
+                settings.nuveiWithdrawalEnabled 
+                  ? 'bg-purple-500/20' 
                   : 'bg-amber-500/20'
               }`}>
-                {settings.processingMode === 'automatic' ? (
-                  <Zap className="h-6 w-6 text-green-400" />
+                {settings.nuveiWithdrawalEnabled ? (
+                  <Zap className="h-6 w-6 text-purple-400" />
                 ) : (
                   <Users className="h-6 w-6 text-amber-400" />
                 )}
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Processing Mode</h3>
+                <h3 className="text-lg font-semibold text-white">Current Status</h3>
                 <p className="text-sm text-gray-400">
-                  {settings.processingMode === 'automatic' 
-                    ? 'System automatically processes qualifying withdrawals' 
-                    : 'Admin manually reviews and processes all withdrawals'}
+                  {settings.nuveiWithdrawalEnabled 
+                    ? '⚡ Automatic via Nuvei - Users can withdraw instantly to their card/bank' 
+                    : '👤 Manual - Admin reviews and processes withdrawals manually'}
                 </p>
               </div>
             </div>
-            <Select
-              value={settings.processingMode}
-              onValueChange={(value: 'automatic' | 'manual') => updateSetting('processingMode', value)}
-            >
-              <SelectTrigger className="w-48 bg-gray-700 border-gray-600">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manual">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-amber-400" />
-                    Manual Review
-                  </div>
-                </SelectItem>
-                <SelectItem value="automatic">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-green-400" />
-                    Automatic
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <Badge className={settings.nuveiWithdrawalEnabled ? 'bg-purple-500/20 text-purple-300' : 'bg-amber-500/20 text-amber-300'}>
+              {settings.nuveiWithdrawalEnabled ? '⚡ AUTOMATIC' : '👤 MANUAL'}
+            </Badge>
           </div>
         </div>
       </div>
@@ -846,17 +827,17 @@ export default function WithdrawalSettingsSection() {
         </Card>
       </div>
 
-      {/* Auto-Approval Rules */}
-      {settings.processingMode === 'automatic' && (
+      {/* Auto-Approval Rules - Only show when Nuvei is NOT enabled */}
+      {!settings.nuveiWithdrawalEnabled && (
         <Card className="bg-gray-800/50 border-emerald-500/30">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-emerald-400" />
               Auto-Approval Rules
-              <Badge className="bg-emerald-500/20 text-emerald-300">Automatic Mode</Badge>
+              <Badge className="bg-amber-500/20 text-amber-300">Manual Mode</Badge>
             </CardTitle>
             <CardDescription>
-              Configure which withdrawals are automatically approved (others go to manual review)
+              Auto-approve certain withdrawals without admin review (still processed manually via bank transfer)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
