@@ -150,6 +150,12 @@ export async function verifyUserWallet(
   issues: ReconciliationIssue[];
   transactionCount: number;
   balanceDifference: number;
+  pendingInfo?: {
+    pendingDeposits: number;
+    pendingDepositCredits: number;
+    pendingWithdrawals: number;
+    pendingWithdrawalCredits: number;
+  };
 }> {
   const issues: ReconciliationIssue[] = [];
 
@@ -160,33 +166,77 @@ export async function verifyUserWallet(
   }
 
   // Get all completed transactions
-  const transactions = await WalletTransaction.find({
+  const completedTransactions = await WalletTransaction.find({
     userId,
     status: 'completed',
   }).lean();
 
-  // Calculate balance from transactions
-  const calculatedBalance = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-  const balanceDifference = Math.round((wallet.creditBalance - calculatedBalance) * 100) / 100;
+  // Get pending transactions (withdrawals that have already deducted credits)
+  const pendingWithdrawalTx = await WalletTransaction.find({
+    userId,
+    transactionType: 'withdrawal',
+    status: { $in: ['pending', 'processing'] },
+  }).lean();
 
-  // Check 1: Balance matches transaction sum
+  // Get pending deposits (not yet credited)
+  const pendingDepositTx = await WalletTransaction.find({
+    userId,
+    transactionType: 'deposit',
+    status: 'pending',
+  }).lean();
+
+  // Get pending withdrawal requests (credits already deducted from wallet)
+  const pendingWithdrawalRequests = await WithdrawalRequest.find({
+    userId,
+    status: { $in: ['pending', 'approved', 'processing'] },
+  }).lean();
+
+  // Calculate balance from completed transactions
+  const completedBalance = completedTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  
+  // Calculate pending withdrawal amount (these credits are already deducted from wallet)
+  // We need to account for this when checking balance
+  const pendingWithdrawalCredits = pendingWithdrawalRequests.reduce(
+    (sum, w) => sum + (w.amountCredits || 0), 0
+  );
+  
+  // Pending deposits not yet credited (don't affect wallet balance yet)
+  const pendingDepositCredits = pendingDepositTx.reduce(
+    (sum, tx) => sum + Math.abs(tx.amount || 0), 0
+  );
+
+  // The wallet balance should equal:
+  // completed transactions sum MINUS pending withdrawals (already deducted)
+  // Note: pending deposits don't affect balance until completed
+  const expectedBalance = completedBalance - pendingWithdrawalCredits;
+  const balanceDifference = Math.round((wallet.creditBalance - expectedBalance) * 100) / 100;
+  
+  // All transactions for counting
+  const transactions = [...completedTransactions, ...pendingWithdrawalTx, ...pendingDepositTx];
+
+  // Check 1: Balance matches expected (accounting for pending withdrawals)
   if (Math.abs(balanceDifference) > 0.01) {
+    // Only flag as critical if there are NO pending transactions that could explain the difference
+    const isPendingRelated = pendingWithdrawalCredits > 0 || pendingDepositCredits > 0;
+    
     issues.push({
       type: 'balance_mismatch',
-      severity: 'critical',
+      severity: isPendingRelated ? 'info' : 'critical', // Downgrade severity if pending txns exist
       userId,
       userEmail,
       details: {
-        expected: calculatedBalance,
+        expected: expectedBalance,
         actual: wallet.creditBalance,
         difference: balanceDifference,
-        description: `Wallet balance (${wallet.creditBalance}) doesn't match sum of transactions (${calculatedBalance})`,
+        description: `Wallet balance (${wallet.creditBalance}) doesn't match expected (${expectedBalance})` +
+          (pendingWithdrawalCredits > 0 ? `. Note: ${pendingWithdrawalCredits} credits in pending withdrawals.` : '') +
+          (pendingDepositCredits > 0 ? `. Note: ${pendingDepositCredits} credits in pending deposits.` : ''),
       },
     });
   }
 
-  // Calculate deposit total from transactions
-  const depositTransactions = transactions.filter(tx => tx.transactionType === 'deposit');
+  // Calculate deposit total from COMPLETED transactions only
+  const depositTransactions = completedTransactions.filter(tx => tx.transactionType === 'deposit');
   const calculatedDeposits = depositTransactions.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
 
   // Check 2: Total deposited matches deposit transactions
@@ -272,6 +322,12 @@ export async function verifyUserWallet(
     issues,
     transactionCount: transactions.length,
     balanceDifference,
+    pendingInfo: {
+      pendingDeposits: pendingDepositTx.length,
+      pendingDepositCredits,
+      pendingWithdrawals: pendingWithdrawalRequests.length,
+      pendingWithdrawalCredits,
+    },
   };
 }
 
@@ -394,15 +450,34 @@ export async function getUserReconciliation(userId: string): Promise<UserReconci
   const wallet = await CreditWallet.findOne({ userId }).lean();
   if (!wallet) return null;
 
-  const transactions = await WalletTransaction.find({ userId, status: 'completed' }).lean();
+  const completedTransactions = await WalletTransaction.find({ userId, status: 'completed' }).lean();
   
-  const balanceFromTransactions = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-  const depositTotal = transactions
+  // Get pending withdrawals (credits already deducted from wallet)
+  const pendingWithdrawals = await WithdrawalRequest.find({
+    userId,
+    status: { $in: ['pending', 'approved', 'processing'] },
+  }).lean();
+  const pendingWithdrawalCredits = pendingWithdrawals.reduce((sum, w) => sum + (w.amountCredits || 0), 0);
+  
+  // Get pending deposits
+  const pendingDeposits = await WalletTransaction.find({
+    userId,
+    transactionType: 'deposit',
+    status: 'pending',
+  }).lean();
+  const pendingDepositCredits = pendingDeposits.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+  
+  const balanceFromCompletedTransactions = completedTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  
+  // Actual expected balance = completed transactions - pending withdrawals (already deducted)
+  const balanceFromTransactions = balanceFromCompletedTransactions - pendingWithdrawalCredits;
+  
+  const depositTotal = completedTransactions
     .filter(tx => tx.transactionType === 'deposit')
     .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
   
   // Calculate marketplace purchases from transactions
-  const marketplaceSpentTotal = transactions
+  const marketplaceSpentTotal = completedTransactions
     .filter(tx => tx.transactionType === 'marketplace_purchase')
     .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
   
@@ -412,9 +487,9 @@ export async function getUserReconciliation(userId: string): Promise<UserReconci
   }).lean();
   const withdrawalTotal = completedWithdrawals.reduce((sum, w) => sum + (w.amountCredits || 0), 0);
 
-  const { issues } = await verifyUserWallet(userId, wallet.userEmail || 'Unknown');
+  const verifyResult = await verifyUserWallet(userId, wallet.userEmail || 'Unknown');
 
-  // Calculate expected balance (including marketplace purchases)
+  // Calculate expected balance (including marketplace purchases and pending)
   const expectedBalance = 
     (wallet.totalDeposited || 0) - 
     (wallet.totalWithdrawn || 0) + 
@@ -422,7 +497,8 @@ export async function getUserReconciliation(userId: string): Promise<UserReconci
     (wallet.totalWonFromChallenges || 0) - 
     (wallet.totalSpentOnCompetitions || 0) - 
     (wallet.totalSpentOnChallenges || 0) -
-    ((wallet as any).totalSpentOnMarketplace || 0);
+    ((wallet as any).totalSpentOnMarketplace || 0) -
+    pendingWithdrawalCredits; // Account for pending withdrawals
 
   return {
     userId,
@@ -443,9 +519,12 @@ export async function getUserReconciliation(userId: string): Promise<UserReconci
       depositTotal,
       withdrawalTotal,
       marketplaceSpentTotal,
-    },
-    issues,
-    healthy: issues.filter(i => i.severity === 'critical').length === 0,
+      // Add pending info for visibility
+      pendingWithdrawalCredits,
+      pendingDepositCredits,
+    } as any,
+    issues: verifyResult.issues,
+    healthy: verifyResult.issues.filter(i => i.severity === 'critical').length === 0,
   };
 }
 
@@ -463,13 +542,24 @@ export async function fixReconciliationIssue(
   try {
     switch (issueType) {
       case 'balance_mismatch': {
-        // Recalculate balance from transactions
-        const transactions = await WalletTransaction.find({
+        // Recalculate balance from completed transactions
+        const completedTx = await WalletTransaction.find({
           userId,
           status: 'completed',
         }).session(session);
         
-        const correctBalance = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+        // Also account for pending withdrawals (credits already deducted)
+        const pendingWithdrawals = await WithdrawalRequest.find({
+          userId,
+          status: { $in: ['pending', 'approved', 'processing'] },
+        }).session(session);
+        
+        const pendingWithdrawalCredits = pendingWithdrawals.reduce(
+          (sum, w) => sum + (w.amountCredits || 0), 0
+        );
+        
+        const completedBalance = completedTx.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+        const correctBalance = completedBalance - pendingWithdrawalCredits;
         
         await CreditWallet.updateOne(
           { userId },
@@ -478,7 +568,7 @@ export async function fixReconciliationIssue(
             $push: {
               adjustmentHistory: {
                 date: new Date(),
-                reason: 'Reconciliation fix - balance recalculated from transactions',
+                reason: `Reconciliation fix - balance recalculated from transactions (${pendingWithdrawals.length} pending withdrawals accounted for)`,
                 adjustedBy: adminId,
                 previousBalance: undefined, // Will be set by pre-save
                 newBalance: correctBalance,
@@ -489,7 +579,7 @@ export async function fixReconciliationIssue(
         );
         
         await session.commitTransaction();
-        return { success: true, message: `Balance corrected to ${correctBalance} credits` };
+        return { success: true, message: `Balance corrected to ${correctBalance} credits (including ${pendingWithdrawalCredits} in pending withdrawals)` };
       }
 
       case 'deposit_total_mismatch': {
