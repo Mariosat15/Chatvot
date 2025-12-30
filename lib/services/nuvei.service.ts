@@ -667,6 +667,31 @@ class NuveiService {
       return { error: 'Nuvei not configured or not active' };
     }
     
+    // DEBUG: First check what UPOs Nuvei actually has for this user
+    console.log('\n🔍 DEBUG: Checking UPOs registered with Nuvei for this user...');
+    const upoCheck = await this.getUserPaymentOptions(params.userTokenId);
+    if (upoCheck.paymentMethods && upoCheck.paymentMethods.length > 0) {
+      console.log(`✅ Nuvei has ${upoCheck.paymentMethods.length} UPO(s) for ${params.userTokenId}:`);
+      upoCheck.paymentMethods.forEach((pm, i) => {
+        console.log(`   ${i + 1}. UPO ID: ${pm.userPaymentOptionId}, Type: ${pm.paymentMethodName}, Status: ${pm.upoStatus}, Card: ${pm.cardLastFourDigits || 'N/A'}`);
+      });
+      
+      // Check if our requested UPO exists in Nuvei
+      if (params.userPaymentOptionId) {
+        const found = upoCheck.paymentMethods.find(pm => pm.userPaymentOptionId === params.userPaymentOptionId);
+        if (found) {
+          console.log(`✅ Requested UPO ${params.userPaymentOptionId} FOUND in Nuvei`);
+        } else {
+          console.log(`❌ Requested UPO ${params.userPaymentOptionId} NOT FOUND in Nuvei! Available UPOs: ${upoCheck.paymentMethods.map(pm => pm.userPaymentOptionId).join(', ')}`);
+        }
+      }
+    } else if (upoCheck.error) {
+      console.log(`⚠️ Could not fetch UPOs: ${upoCheck.error}`);
+    } else {
+      console.log(`❌ Nuvei has NO UPOs for ${params.userTokenId}! UPOs might not have been saved during deposit.`);
+    }
+    console.log('');
+    
     const apiUrl = this.getApiUrl(credentials.testMode);
     const timeStamp = this.generateTimeStamp();
     const clientRequestId = `wd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
