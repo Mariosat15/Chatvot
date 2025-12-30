@@ -1169,6 +1169,8 @@ function NuveiPaymentForm({
           clientUniqueId,
           cardHolderName: cardHolderName.trim(),
           paymentOption: scard,
+          // IMPORTANT: Save payment method to create UPO for future refunds
+          savePM: true,
           // Full user details for 3DS2 Strong Customer Authentication (SCA)
           userDetails: {
             firstName,
@@ -1180,7 +1182,6 @@ function NuveiPaymentForm({
             firstName,
             lastName,
             email: email.trim(),
-            country: 'CY', // Cyprus for EUR transactions
           },
         } as Parameters<typeof sfc.createPayment>[0],
         async (result: { result: string; errCode: string; errorDescription?: string; reason?: string; transactionId?: string }) => {
@@ -1236,7 +1237,17 @@ function NuveiPaymentForm({
               console.error('Failed to notify server of payment failure:', cancelErr);
             }
             
-            setError(failReason);
+            // Provide more helpful error message for common failures
+            let userFriendlyError = failReason;
+            if (failReason.toLowerCase().includes('3d') || failReason.toLowerCase().includes('authentication')) {
+              userFriendlyError = '3D Secure authentication failed. This may be due to your bank\'s security settings. Please try a different card or use Stripe payment.';
+            } else if (failReason.toLowerCase().includes('declined')) {
+              userFriendlyError = 'Your card was declined. Please try a different card or contact your bank.';
+            } else if (failReason.toLowerCase().includes('system error') || failReason.toLowerCase().includes('retry')) {
+              userFriendlyError = 'Payment system is temporarily unavailable. Please try again in a few moments or use Stripe payment.';
+            }
+            
+            setError(userFriendlyError);
             setLoading(false);
             isSubmittingRef.current = false; // Reset on payment failure
           }

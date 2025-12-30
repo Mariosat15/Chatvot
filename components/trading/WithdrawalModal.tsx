@@ -190,13 +190,22 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
         const data = await response.json();
         
         if (!response.ok) {
-          setError(data.error || 'Automatic withdrawal failed');
+          // If automatic withdrawal fails, suggest manual withdrawal
+          const errorMsg = data.error || 'Automatic withdrawal failed';
+          const suggestion = data.suggestion || '';
+          
+          // Check if we should fall back to manual withdrawal
+          if (data.code === 'WITHDRAWAL_FAILED' || response.status === 400) {
+            setError(`${errorMsg}\n\nYour credits have been refunded. Please try again using the manual withdrawal option.`);
+          } else {
+            setError(errorMsg + (suggestion ? `\n\n${suggestion}` : ''));
+          }
           setLoading(false);
           return;
         }
         
         setSuccess({
-          message: data.message || 'Withdrawal submitted for automatic processing',
+          message: data.message || 'Withdrawal submitted for processing',
           netAmountEUR: data.netAmountEUR,
           processingHours: withdrawalMethod === 'card_refund' ? 72 : 48,
           isAutoApproved: true,
@@ -436,7 +445,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                 const maxEUR = Math.floor(withdrawalInfo.wallet.balanceEUR);
                 const minEUR = withdrawalInfo.settings.minimumWithdrawal;
                 // Generate smart presets based on balance
-                const presets = [];
+                const presets: number[] = [];
                 if (minEUR <= maxEUR) presets.push(minEUR);
                 if (minEUR * 2 <= maxEUR && minEUR * 2 > minEUR) presets.push(minEUR * 2);
                 if (minEUR * 5 <= maxEUR && !presets.includes(minEUR * 5)) presets.push(minEUR * 5);
