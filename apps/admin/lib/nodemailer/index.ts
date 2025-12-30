@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { INVOICE_EMAIL_TEMPLATE} from "@/lib/nodemailer/templates";
+import { INVOICE_EMAIL_TEMPLATE, DEPOSIT_COMPLETED_EMAIL_TEMPLATE, WITHDRAWAL_COMPLETED_EMAIL_TEMPLATE } from "@/lib/nodemailer/templates";
 import { connectToDatabase } from '@/database/mongoose';
 import { WhiteLabel } from '@/database/models/whitelabel.model';
 import { getSettings } from '@/lib/services/settings.service';
@@ -653,3 +653,189 @@ export const sendInvoiceEmail = async ({ invoiceId, customerEmail, customerName 
     
     console.log(`✅ [INVOICE] Email sent successfully for ${invoice.invoiceNumber}${pdfAttachment ? ' with PDF attachment' : ''}`);
 }
+
+/**
+ * Data for deposit completed email
+ */
+interface DepositCompletedEmailData {
+    email: string;
+    name: string;
+    credits: number;
+    amount: number;
+    paymentMethod: string;
+    transactionId: string;
+    newBalance: number;
+}
+
+/**
+ * Send deposit completed email to user
+ */
+export const sendDepositCompletedEmail = async (data: DepositCompletedEmailData) => {
+    try {
+        await connectToDatabase();
+        
+        // Get settings
+        const [companySettings, settings, whiteLabelSettings] = await Promise.all([
+            CompanySettings.getSingleton(),
+            getSettings(),
+            WhiteLabel.findOne(),
+        ]);
+        
+        const platformName = settings.appName || companySettings.companyName || 'Chatvolt';
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+        
+        // Get logo URL
+        let logoUrl = whiteLabelSettings?.emailLogo || '/assets/images/logo.png';
+        if (!logoUrl.startsWith('http')) {
+            if (isLocalhost) {
+                logoUrl = 'https://placehold.co/150x50/141414/FDD458?text=Logo';
+            } else {
+                logoUrl = `${baseUrl}${logoUrl}`;
+            }
+        }
+        
+        // Build company address
+        let companyAddress = '';
+        if (companySettings.addressLine1 || companySettings.city) {
+            const parts = [
+                companySettings.addressLine1,
+                companySettings.addressLine2,
+                companySettings.city,
+                companySettings.postalCode,
+                COUNTRY_NAMES[companySettings.country] || companySettings.country,
+            ].filter(Boolean);
+            companyAddress = parts.join(', ');
+        }
+        
+        // Build HTML template
+        const htmlTemplate = DEPOSIT_COMPLETED_EMAIL_TEMPLATE
+            .replace(/\{\{logoUrl\}\}/g, logoUrl)
+            .replace(/\{\{platformName\}\}/g, platformName)
+            .replace(/\{\{name\}\}/g, data.name)
+            .replace(/\{\{credits\}\}/g, data.credits.toString())
+            .replace(/\{\{amount\}\}/g, data.amount.toFixed(2))
+            .replace(/\{\{paymentMethod\}\}/g, data.paymentMethod)
+            .replace(/\{\{transactionId\}\}/g, data.transactionId)
+            .replace(/\{\{newBalance\}\}/g, data.newBalance.toFixed(0))
+            .replace(/\{\{competitionsUrl\}\}/g, `${baseUrl}/competitions`)
+            .replace(/\{\{companyAddress\}\}/g, companyAddress)
+            .replace(/\{\{websiteUrl\}\}/g, companySettings.website || baseUrl)
+            .replace(/\{\{year\}\}/g, new Date().getFullYear().toString());
+        
+        const mailOptions = {
+            from: `"${platformName}" <${settings.nodemailerEmail || process.env.NODEMAILER_EMAIL}>`,
+            to: data.email,
+            subject: `✓ Deposit Confirmed - ${data.credits} credits added to your account`,
+            text: `Hi ${data.name}, your deposit of €${data.amount.toFixed(2)} has been processed successfully. ${data.credits} credits have been added to your account. Your new balance is ${data.newBalance} credits.`,
+            html: htmlTemplate,
+        };
+        
+        const emailTransporter = await getTransporter();
+        await emailTransporter.sendMail(mailOptions);
+        
+        console.log(`✅ [DEPOSIT] Email sent to ${data.email} for ${data.credits} credits`);
+    } catch (error) {
+        console.error('❌ [DEPOSIT] Failed to send deposit email:', error);
+        // Don't throw - we don't want to fail the deposit if email fails
+    }
+};
+
+/**
+ * Data for withdrawal completed email
+ */
+interface WithdrawalCompletedEmailData {
+    email: string;
+    name: string;
+    credits: number;
+    netAmount: number;
+    fee: number;
+    paymentMethod: string;
+    withdrawalId: string;
+    remainingBalance: number;
+}
+
+/**
+ * Send withdrawal completed email to user
+ */
+export const sendWithdrawalCompletedEmail = async (data: WithdrawalCompletedEmailData) => {
+    try {
+        await connectToDatabase();
+        
+        // Get settings
+        const [companySettings, settings, whiteLabelSettings] = await Promise.all([
+            CompanySettings.getSingleton(),
+            getSettings(),
+            WhiteLabel.findOne(),
+        ]);
+        
+        const platformName = settings.appName || companySettings.companyName || 'Chatvolt';
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+        
+        // Get logo URL
+        let logoUrl = whiteLabelSettings?.emailLogo || '/assets/images/logo.png';
+        if (!logoUrl.startsWith('http')) {
+            if (isLocalhost) {
+                logoUrl = 'https://placehold.co/150x50/141414/FDD458?text=Logo';
+            } else {
+                logoUrl = `${baseUrl}${logoUrl}`;
+            }
+        }
+        
+        // Build company address
+        let companyAddress = '';
+        if (companySettings.addressLine1 || companySettings.city) {
+            const parts = [
+                companySettings.addressLine1,
+                companySettings.addressLine2,
+                companySettings.city,
+                companySettings.postalCode,
+                COUNTRY_NAMES[companySettings.country] || companySettings.country,
+            ].filter(Boolean);
+            companyAddress = parts.join(', ');
+        }
+        
+        // Determine timeline message based on payment method
+        let timelineMessage = 'Funds typically arrive within 3-5 business days, depending on your bank and payment method.';
+        if (data.paymentMethod.toLowerCase().includes('card')) {
+            timelineMessage = 'Card refunds typically arrive within 3-5 business days, depending on your card issuer.';
+        } else if (data.paymentMethod.toLowerCase().includes('bank') || data.paymentMethod.toLowerCase().includes('sepa')) {
+            timelineMessage = 'Bank transfers typically arrive within 3-5 business days, depending on your bank.';
+        }
+        
+        // Build HTML template
+        const htmlTemplate = WITHDRAWAL_COMPLETED_EMAIL_TEMPLATE
+            .replace(/\{\{logoUrl\}\}/g, logoUrl)
+            .replace(/\{\{platformName\}\}/g, platformName)
+            .replace(/\{\{name\}\}/g, data.name)
+            .replace(/\{\{credits\}\}/g, data.credits.toString())
+            .replace(/\{\{netAmount\}\}/g, data.netAmount.toFixed(2))
+            .replace(/\{\{fee\}\}/g, data.fee.toFixed(2))
+            .replace(/\{\{paymentMethod\}\}/g, data.paymentMethod)
+            .replace(/\{\{withdrawalId\}\}/g, data.withdrawalId)
+            .replace(/\{\{remainingBalance\}\}/g, data.remainingBalance.toFixed(0))
+            .replace(/\{\{timelineMessage\}\}/g, timelineMessage)
+            .replace(/\{\{walletUrl\}\}/g, `${baseUrl}/wallet`)
+            .replace(/\{\{companyAddress\}\}/g, companyAddress)
+            .replace(/\{\{websiteUrl\}\}/g, companySettings.website || baseUrl)
+            .replace(/\{\{supportEmail\}\}/g, companySettings.email || settings.nodemailerEmail || '')
+            .replace(/\{\{year\}\}/g, new Date().getFullYear().toString());
+        
+        const mailOptions = {
+            from: `"${platformName}" <${settings.nodemailerEmail || process.env.NODEMAILER_EMAIL}>`,
+            to: data.email,
+            subject: `💸 Withdrawal Processed - €${data.netAmount.toFixed(2)} on the way`,
+            text: `Hi ${data.name}, your withdrawal of ${data.credits} credits has been processed. €${data.netAmount.toFixed(2)} will be sent to your ${data.paymentMethod}. Your remaining balance is ${data.remainingBalance} credits.`,
+            html: htmlTemplate,
+        };
+        
+        const emailTransporter = await getTransporter();
+        await emailTransporter.sendMail(mailOptions);
+        
+        console.log(`✅ [WITHDRAWAL] Email sent to ${data.email} for €${data.netAmount.toFixed(2)}`);
+    } catch (error) {
+        console.error('❌ [WITHDRAWAL] Failed to send withdrawal email:', error);
+        // Don't throw - we don't want to fail the withdrawal if email fails
+    }
+};

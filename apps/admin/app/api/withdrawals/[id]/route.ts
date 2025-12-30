@@ -439,6 +439,36 @@ export async function PUT(
       // Don't fail the request if audit logging fails
     }
 
+    // Send withdrawal completed email to user
+    if (action === 'completed' && withdrawal.userEmail) {
+      try {
+        const { sendWithdrawalCompletedEmail } = await import('@/lib/nodemailer');
+        
+        // Determine payment method display name
+        let paymentMethodDisplay = 'Bank Transfer';
+        if (withdrawal.withdrawalMethod === 'card_refund' || withdrawal.payoutMethod === 'card_refund') {
+          paymentMethodDisplay = 'Card Refund';
+        } else if (withdrawal.payoutMethod === 'sepa' || withdrawal.withdrawalMethod === 'bank_transfer') {
+          paymentMethodDisplay = 'Bank Transfer (SEPA)';
+        }
+        
+        await sendWithdrawalCompletedEmail({
+          email: withdrawal.userEmail,
+          name: withdrawal.userName || withdrawal.userEmail.split('@')[0],
+          credits: withdrawal.amountCredits,
+          netAmount: withdrawal.netAmountEUR,
+          fee: withdrawal.platformFee || 0,
+          paymentMethod: paymentMethodDisplay,
+          withdrawalId: withdrawal._id.toString().slice(-8).toUpperCase(),
+          remainingBalance: withdrawal.walletBalanceAfter || 0,
+        });
+        console.log(`📧 Withdrawal completed email sent to ${withdrawal.userEmail}`);
+      } catch (emailError) {
+        console.error('❌ Error sending withdrawal email:', emailError);
+        // Don't fail the withdrawal if email fails
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: `Withdrawal ${action} successfully`,

@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IEmailTemplate extends Document {
-  templateType: 'welcome' | 'price_alert' | 'invoice' | 'news_summary' | 'inactive_reminder';
+  templateType: 'welcome' | 'price_alert' | 'invoice' | 'news_summary' | 'inactive_reminder' | 'deposit_completed' | 'withdrawal_completed';
   name: string;
   subject: string;
   fromName: string;
@@ -38,7 +38,7 @@ export interface IEmailTemplate extends Document {
 const EmailTemplateSchema = new Schema<IEmailTemplate>({
   templateType: {
     type: String,
-    enum: ['welcome', 'price_alert', 'invoice', 'news_summary', 'inactive_reminder'],
+    enum: ['welcome', 'price_alert', 'invoice', 'news_summary', 'inactive_reminder', 'deposit_completed', 'withdrawal_completed'],
     required: true,
     unique: true,
   },
@@ -171,6 +171,8 @@ function getDefaultName(type: string): string {
     invoice: 'Invoice Email',
     news_summary: 'News Summary Email',
     inactive_reminder: 'Inactive User Reminder',
+    deposit_completed: 'Deposit Completed Email',
+    withdrawal_completed: 'Withdrawal Completed Email',
   };
   return names[type] || 'Email Template';
 }

@@ -473,6 +473,33 @@ export const completeDeposit = async (
         // Don't throw - deposit already succeeded
       }
 
+      // Send deposit completed email to user
+      try {
+        const { sendDepositCompletedEmail } = await import('@/lib/nodemailer');
+        const { getUserById } = await import('@/lib/utils/user-lookup');
+        
+        const userId = transaction.userId.toString();
+        const user = await getUserById(userId);
+        const wallet = await CreditWallet.findOne({ userId: transaction.userId });
+        const newBalance = wallet?.creditBalance || creditsToAdd;
+        
+        if (user?.email) {
+          await sendDepositCompletedEmail({
+            email: user.email,
+            name: user.name || user.email.split('@')[0],
+            credits: creditsToAdd,
+            amount: transaction.metadata?.totalCharged || eurAmount + (platformFeeAmount || 0),
+            paymentMethod: paymentMethod || 'Card',
+            transactionId: transaction._id.toString().slice(-8).toUpperCase(),
+            newBalance: newBalance,
+          });
+          console.log(`📧 Deposit confirmation email sent to ${user.email}`);
+        }
+      } catch (error) {
+        console.error('❌ Error sending deposit email:', error);
+        // Don't throw - deposit already succeeded
+      }
+
       revalidatePath('/wallet');
 
       return { success: true, transaction: JSON.parse(JSON.stringify(transaction)) };

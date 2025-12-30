@@ -38,6 +38,8 @@ export async function GET(request: NextRequest) {
       'invoice',
       'news_summary',
       'inactive_reminder',
+      'deposit_completed',
+      'withdrawal_completed',
     ];
     
     const existingTypes = new Set(templates.map(t => t.templateType));
@@ -183,6 +185,8 @@ function getDefaultName(type: string): string {
     invoice: 'Invoice Email',
     news_summary: 'News Summary Email',
     inactive_reminder: 'Inactive User Reminder',
+    deposit_completed: 'Deposit Completed Email',
+    withdrawal_completed: 'Withdrawal Completed Email',
   };
   return names[type] || 'Email Template';
 }
