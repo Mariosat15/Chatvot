@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
     const isSandbox = appSettings?.simulatorModeEnabled ?? true;
     const kycRequiredForWithdrawal = (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) || withdrawalSettings.requireKYC;
 
-    // Determine withdrawal method (original method or bank account)
+    // Determine withdrawal method (original method, UPO card, or bank account)
     let bankAccount = null;
     let originalPaymentDetails = null;
     let payoutMethodType = 'bank_transfer';
@@ -306,8 +306,34 @@ export async function POST(request: NextRequest) {
         cardExpYear: lastDeposit.metadata?.cardExpYear,
         cardCountry: lastDeposit.metadata?.cardCountry,
       };
+    } else if (withdrawalMethodId.startsWith('upo_')) {
+      // Using a Nuvei UPO (User Payment Option) - card from previous deposit
+      const upoId = withdrawalMethodId.replace('upo_', '');
+      
+      // Try to find the UPO in our stored records
+      const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
+      const storedUpo = await NuveiUserPaymentOption.findOne({
+        userId: session.user.id,
+        userPaymentOptionId: upoId,
+      }).session(mongoSession);
+      
+      if (!storedUpo) {
+        // UPO not found in our records, but might still be valid in Nuvei
+        // For manual processing, just record the card details
+        console.log(`⚠️ UPO ${upoId} not found in local records, proceeding with manual withdrawal`);
+      }
+      
+      payoutMethodType = 'card_refund';
+      originalPaymentDetails = {
+        userPaymentOptionId: upoId,
+        paymentMethod: 'nuvei_card',
+        cardBrand: storedUpo?.cardBrand || 'Card',
+        cardLast4: storedUpo?.cardLast4 || '****',
+        cardExpMonth: storedUpo?.expiryMonth,
+        cardExpYear: storedUpo?.expiryYear,
+      };
     } else {
-      // Using bank account
+      // Using bank account - withdrawalMethodId should be a valid MongoDB ObjectId
       bankAccount = await UserBankAccount.findOne({
         _id: withdrawalMethodId,
         userId: session.user.id,
