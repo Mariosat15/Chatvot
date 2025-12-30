@@ -11,7 +11,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import OpenAI from 'openai';
 import { connectToDatabase } from '@/database/mongoose';
-import WhiteLabel from '@/database/models/whitelabel.model';
+import { WhiteLabel } from '@/database/models/whitelabel.model';
 
 const execAsync = promisify(exec);
 

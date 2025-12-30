@@ -13,7 +13,7 @@ import WithdrawalRequest from '@/database/models/trading/withdrawal-request.mode
 import FraudAlert from '@/database/models/fraud/fraud-alert.model';
 import KYCVerification from '@/database/models/kyc/kyc-verification.model';
 import PaymentProvider from '@/database/models/payment-provider.model';
-import WhiteLabel from '@/database/models/whitelabel.model';
+import { WhiteLabel } from '@/database/models/whitelabel.model';
 
 interface DashboardStats {
   // User Stats
