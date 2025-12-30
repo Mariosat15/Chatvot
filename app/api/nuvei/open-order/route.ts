@@ -210,12 +210,16 @@ export async function POST(req: NextRequest) {
     const notificationUrl = storedDmnUrl || `${origin}/api/nuvei/webhook`;
 
     // STEP 3: Create order session with Nuvei
+    // CRITICAL: Include userTokenId to enable UPO (User Payment Option) storage for future refunds
     // Note: Don't specify userCountry - let Nuvei determine from card BIN for proper 3DS handling
+    const userTokenId = `user_${userId}`;
     const result = await nuveiService.openOrder({
       amount: amount.toFixed(2),
       currency,
       clientUniqueId,
       userEmail: session.user.email || '',
+      // CRITICAL: userTokenId is required for UPO storage - without this, UPOs won't be saved
+      userTokenId,
       // Let Nuvei determine country from card for proper 3DS2 compliance
       notificationUrl,
     });
@@ -246,6 +250,8 @@ export async function POST(req: NextRequest) {
       sessionToken: result.sessionToken,
       orderId: result.orderId,
       clientUniqueId,
+      // CRITICAL: Pass userTokenId to frontend for createPayment - required for UPO storage
+      userTokenId,
       config: clientConfig,
       userEmail: session.user.email || '',
     });

@@ -38,6 +38,9 @@ interface OpenOrderParams {
   userEmail?: string;
   userCountry?: string;
   notificationUrl?: string;
+  // CRITICAL: userTokenId is required for UPO (User Payment Option) storage
+  // Without this, payment methods won't be saved for future refunds
+  userTokenId?: string;
 }
 
 interface OpenOrderResponse {
@@ -321,7 +324,7 @@ class NuveiService {
       credentials.secretKey
     );
     
-    const requestBody = {
+    const requestBody: Record<string, unknown> = {
       merchantId: credentials.merchantId,
       merchantSiteId: credentials.siteId,
       clientUniqueId: params.clientUniqueId,
@@ -350,11 +353,19 @@ class NuveiService {
       }),
     };
     
+    // CRITICAL: Add userTokenId if provided - required for UPO storage
+    // Without this, Nuvei won't save payment methods for future card refunds
+    if (params.userTokenId) {
+      requestBody.userTokenId = params.userTokenId;
+    }
+    
     console.log('📤 Nuvei openOrder request:', {
       clientUniqueId: params.clientUniqueId,
       amount: params.amount,
       currency: params.currency,
       notificationUrl: params.notificationUrl,
+      // userTokenId is CRITICAL for UPO storage
+      userTokenId: params.userTokenId ? `user_***${params.userTokenId.slice(-8)}` : 'NOT SET',
     });
     
     try {

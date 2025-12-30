@@ -59,7 +59,18 @@ declare global {
           clientUniqueId?: string;
           cardHolderName?: string;
           paymentOption: unknown;
+          // CRITICAL: userTokenId is required for UPO storage
+          userTokenId?: string;
+          // savePM enables saving the payment method as UPO
+          savePM?: boolean;
+          userDetails?: {
+            firstName?: string;
+            lastName?: string;
+            email?: string;
+          };
           billingAddress?: {
+            firstName?: string;
+            lastName?: string;
             email?: string;
             country?: string;
           };
@@ -173,6 +184,7 @@ export default function DepositModal({ children }: DepositModalProps) {
       setNuveiSessionToken('');
       setNuveiClientUniqueId('');
       setNuveiUserEmail('');
+      setNuveiUserTokenId('');
       // FIX: Check if Nuvei SDK is already loaded in the window object
       // The Script onLoad only fires once, so if SDK is already loaded, set nuveiLoaded to true
       setNuveiLoaded(typeof window !== 'undefined' && !!window.SafeCharge);
@@ -188,6 +200,8 @@ export default function DepositModal({ children }: DepositModalProps) {
   const [nuveiSessionToken, setNuveiSessionToken] = useState('');
   const [nuveiClientUniqueId, setNuveiClientUniqueId] = useState('');
   const [nuveiUserEmail, setNuveiUserEmail] = useState('');
+  // CRITICAL: userTokenId is required for Nuvei to store UPOs (User Payment Options) for future card refunds
+  const [nuveiUserTokenId, setNuveiUserTokenId] = useState('');
   
   // FIX: Sync nuveiLoaded with actual SDK state whenever we enter payment step
   useEffect(() => {
@@ -343,6 +357,8 @@ export default function DepositModal({ children }: DepositModalProps) {
         setNuveiSessionToken(data.sessionToken);
         setNuveiClientUniqueId(data.clientUniqueId);
         setNuveiUserEmail(data.userEmail || '');
+        // CRITICAL: Store userTokenId for createPayment - required for UPO storage
+        setNuveiUserTokenId(data.userTokenId || '');
         setStep('payment');
       } else if (provider === 'paddle') {
         // Create Paddle checkout
@@ -415,6 +431,7 @@ export default function DepositModal({ children }: DepositModalProps) {
     setNuveiSessionToken('');
     setNuveiClientUniqueId('');
     setNuveiUserEmail('');
+    setNuveiUserTokenId('');
     // FIX: Don't reset nuveiLoaded to false if SDK is already in window
     // The Script onLoad only fires once per page load
     setNuveiLoaded(typeof window !== 'undefined' && !!window.SafeCharge);
@@ -779,6 +796,8 @@ export default function DepositModal({ children }: DepositModalProps) {
                 platformFeePercentage={processingFee}
                 sdkLoaded={nuveiLoaded}
                 userEmail={nuveiUserEmail}
+                // CRITICAL: userTokenId is required for Nuvei to store UPOs for future card refunds
+                userTokenId={nuveiUserTokenId}
                 onSuccess={() => {
                   setOpen(false);
                   resetModal(false); // Don't cancel - payment succeeded
@@ -973,6 +992,7 @@ function NuveiPaymentForm({
   platformFeePercentage,
   sdkLoaded,
   userEmail,
+  userTokenId,
   onSuccess, 
   onCancel 
 }: { 
@@ -990,6 +1010,8 @@ function NuveiPaymentForm({
   platformFeePercentage: number;
   sdkLoaded: boolean;
   userEmail: string;
+  // CRITICAL: userTokenId is required for Nuvei to store UPOs (User Payment Options) for future card refunds
+  userTokenId: string;
   onSuccess: () => void; 
   onCancel: () => void 
 }) {
@@ -1169,6 +1191,9 @@ function NuveiPaymentForm({
           clientUniqueId,
           cardHolderName: cardHolderName.trim(),
           paymentOption: scard,
+          // CRITICAL: userTokenId is required for UPO storage - without this, Nuvei won't save
+          // the card for future refunds/withdrawals
+          userTokenId: userTokenId || undefined,
           // IMPORTANT: Save payment method to create UPO for future refunds
           savePM: true,
           // Full user details for 3DS2 Strong Customer Authentication (SCA)
