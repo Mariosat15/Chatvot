@@ -707,12 +707,16 @@ class NuveiService {
       // Clean and format IBAN (remove spaces, uppercase)
       const cleanIban = params.iban.replace(/\s/g, '').toUpperCase();
       
-      // Step 2: Call addUPOAPM with sessionToken (no separate checksum needed)
+      // Generate a fresh timestamp for the addUPOAPM request
+      const addUpoTimeStamp = this.generateTimeStamp();
+      
+      // Step 2: Call addUPOAPM with sessionToken
       const requestBody = {
         sessionToken,
         merchantId: credentials.merchantId,
         merchantSiteId: credentials.siteId,
         userTokenId: params.userTokenId,
+        clientRequestId: `add_upo_${Date.now()}`,
         paymentMethodName: 'apmgw_SEPA_Payouts',  // SEPA for Europe
         apmData: {
           IBAN: cleanIban,
@@ -723,6 +727,7 @@ class NuveiService {
           firstName: params.firstName || 'N/A',
           lastName: params.lastName || 'N/A',
         },
+        timeStamp: addUpoTimeStamp,
       };
       
       console.log('\n');
