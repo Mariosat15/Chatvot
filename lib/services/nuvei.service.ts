@@ -636,6 +636,161 @@ class NuveiService {
     }
   }
   
+  // ========== SEPA BANK PAYOUT METHODS ==========
+  
+  /**
+   * Add a SEPA bank account as a User Payment Option (UPO)
+   * This is the CORRECT method for European bank payouts
+   * 
+   * Instead of /accountCapture (which requires redirect), this uses /addUPOAPM
+   * which allows direct IBAN submission without redirect.
+   * 
+   * Documentation: https://docs.nuvei.com/documentation/europe-guides/sepa-payouts/
+   * 
+   * @param params - User token ID, IBAN, and billing details
+   * @returns userPaymentOptionId for use in /payout requests
+   */
+  async addSepaUpo(params: {
+    userTokenId: string;
+    iban: string;
+    email: string;
+    country: string;
+    firstName?: string;
+    lastName?: string;
+  }): Promise<{ userPaymentOptionId?: string; error?: string }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: 'Nuvei not configured or not active' };
+    }
+    
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `sepa_upo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Checksum for addUPOAPM: SHA256(merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey)
+    const checksum = this.calculatePaymentStatusChecksum(
+      credentials.merchantId,
+      credentials.siteId,
+      clientRequestId,
+      timeStamp,
+      credentials.secretKey
+    );
+    
+    // Clean and format IBAN (remove spaces, uppercase)
+    const cleanIban = params.iban.replace(/\s/g, '').toUpperCase();
+    
+    const requestBody = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      userTokenId: params.userTokenId,
+      clientRequestId,
+      paymentMethodName: 'apmgw_SEPA_Payouts',  // SEPA for Europe
+      apmData: {
+        IBAN: cleanIban,
+      },
+      billingAddress: {
+        country: params.country,
+        email: params.email,
+        firstName: params.firstName || 'N/A',
+        lastName: params.lastName || 'N/A',
+      },
+      timeStamp,
+      checksum,
+    };
+    
+    console.log('\n');
+    console.log('╔════════════════════════════════════════════════════════════╗');
+    console.log('║     NUVEI ADD SEPA UPO REQUEST                             ║');
+    console.log('╚════════════════════════════════════════════════════════════╝');
+    console.log('📤 ENDPOINT:', `${apiUrl}/addUPOAPM.do`);
+    console.log('📤 REQUEST BODY (IBAN masked):');
+    console.log(JSON.stringify({
+      ...requestBody,
+      apmData: { IBAN: cleanIban.substring(0, 4) + '****' + cleanIban.slice(-4) },
+      checksum: '[HIDDEN]',
+    }, null, 2));
+    
+    try {
+      const response = await fetch(`${apiUrl}/addUPOAPM.do`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+      
+      const data = await response.json();
+      
+      console.log('📥 RESPONSE:');
+      console.log(JSON.stringify(data, null, 2));
+      console.log('╚════════════════════════════════════════════════════════════╝\n');
+      
+      if (data.status === 'SUCCESS' && data.userPaymentOptionId) {
+        console.log('✅ SEPA UPO created successfully:', data.userPaymentOptionId);
+        return { userPaymentOptionId: String(data.userPaymentOptionId) };
+      } else {
+        console.error('❌ Failed to create SEPA UPO:', data.reason || data);
+        return { error: data.reason || `Failed to create SEPA UPO (code: ${data.errCode})` };
+      }
+    } catch (error) {
+      console.error('🏦 Nuvei addSepaUpo error:', error);
+      return { error: 'Failed to create bank account UPO' };
+    }
+  }
+  
+  /**
+   * Submit a bank payout using SEPA
+   * This creates a UPO first (if needed), then submits the payout
+   * 
+   * @param params - Withdrawal details including bank info
+   * @returns Withdrawal response
+   */
+  async submitSepaPayout(params: {
+    userTokenId: string;
+    amount: string;
+    currency: string;
+    merchantWDRequestId: string;
+    iban: string;
+    email: string;
+    country: string;
+    firstName?: string;
+    lastName?: string;
+    notificationUrl?: string;
+  }): Promise<WithdrawalResponse | { error: string }> {
+    console.log('\n🏦 Starting SEPA payout flow...');
+    
+    // Step 1: Create SEPA UPO with IBAN
+    console.log('🏦 Step 1: Creating SEPA UPO...');
+    const upoResult = await this.addSepaUpo({
+      userTokenId: params.userTokenId,
+      iban: params.iban,
+      email: params.email,
+      country: params.country,
+      firstName: params.firstName,
+      lastName: params.lastName,
+    });
+    
+    if (upoResult.error || !upoResult.userPaymentOptionId) {
+      console.error('🏦 Failed to create SEPA UPO:', upoResult.error);
+      return { error: upoResult.error || 'Failed to create bank account for payout' };
+    }
+    
+    console.log('🏦 Step 2: Submitting payout with UPO:', upoResult.userPaymentOptionId);
+    
+    // Step 2: Submit payout with the UPO
+    return this.submitWithdrawal({
+      userTokenId: params.userTokenId,
+      amount: params.amount,
+      currency: params.currency,
+      merchantWDRequestId: params.merchantWDRequestId,
+      userPaymentOptionId: upoResult.userPaymentOptionId,
+      userDetails: {
+        email: params.email,
+        firstName: params.firstName,
+        lastName: params.lastName,
+      },
+      notificationUrl: params.notificationUrl,
+    });
+  }
+  
   // ========== WITHDRAWAL METHODS ==========
   
   /**

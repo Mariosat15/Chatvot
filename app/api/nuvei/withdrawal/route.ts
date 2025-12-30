@@ -212,22 +212,21 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    // Add payment method details for Nuvei
-    if (withdrawalMethod === 'card_refund' && actualUpoId) {
-      // For card refund, we MUST pass the UPO ID from the original deposit
-      withdrawalParams.userPaymentOptionId = actualUpoId;
-      console.log(`💳 Using UPO ${actualUpoId} for card refund withdrawal`);
-    } else if (withdrawalMethod === 'bank_transfer' && bankAccount) {
-      withdrawalParams.bankDetails = {
-        iban: bankAccount.iban,
-        bic: bankAccount.swiftBic,
-        accountHolderName: bankAccount.accountHolderName,
-      };
-    }
-
     // Get DMN URL - use the same webhook as payments (Nuvei uses single DMN URL for both)
     const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL;
     withdrawalParams.notificationUrl = `${origin}/api/nuvei/webhook`;
+
+    // Determine if we're doing card or bank payout
+    const isCardRefund = withdrawalMethod === 'card_refund' && actualUpoId;
+    const isBankTransfer = withdrawalMethod === 'bank_transfer' && bankAccount;
+
+    // Add payment method details for Nuvei
+    if (isCardRefund) {
+      // For card refund, we MUST pass the UPO ID from the original deposit
+      withdrawalParams.userPaymentOptionId = actualUpoId;
+      console.log(`💳 Using UPO ${actualUpoId} for card refund withdrawal`);
+    }
+    // NOTE: For bank transfers, we'll use the new SEPA payout method below
 
     console.log('💸 Processing Nuvei withdrawal:', {
       userId,
@@ -235,6 +234,8 @@ export async function POST(req: NextRequest) {
       netAmountEUR,
       platformFee,
       method: withdrawalMethod,
+      isCardRefund,
+      isBankTransfer,
     });
 
     // Deduct credits from wallet FIRST (optimistic)
@@ -330,7 +331,28 @@ export async function POST(req: NextRequest) {
     });
 
     // Submit to Nuvei
-    const nuveiResult = await nuveiService.submitWithdrawal(withdrawalParams);
+    // For bank transfers, use the new SEPA payout flow which creates UPO first
+    // For card refunds, use the standard submitWithdrawal with UPO
+    let nuveiResult: Awaited<ReturnType<typeof nuveiService.submitWithdrawal>>;
+    
+    if (isBankTransfer && bankAccount) {
+      console.log('🏦 Using SEPA payout flow for bank transfer...');
+      nuveiResult = await nuveiService.submitSepaPayout({
+        userTokenId,
+        amount: netAmountEUR.toFixed(2),
+        currency: 'EUR',
+        merchantWDRequestId,
+        iban: bankAccount.iban,
+        email: userEmail,
+        country: bankAccount.country || 'CY', // Default to Cyprus if not set
+        firstName: userName?.split(' ')[0] || undefined,
+        lastName: userName?.split(' ').slice(1).join(' ') || undefined,
+        notificationUrl: withdrawalParams.notificationUrl,
+      });
+    } else {
+      // Card refund or other methods
+      nuveiResult = await nuveiService.submitWithdrawal(withdrawalParams);
+    }
 
     if ('error' in nuveiResult && nuveiResult.error) {
       // Nuvei failed - rollback EVERYTHING
