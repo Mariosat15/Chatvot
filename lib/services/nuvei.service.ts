@@ -707,16 +707,26 @@ class NuveiService {
       // Clean and format IBAN (remove spaces, uppercase)
       const cleanIban = params.iban.replace(/\s/g, '').toUpperCase();
       
-      // Generate a fresh timestamp for the addUPOAPM request
+      // Generate a fresh timestamp and clientRequestId for the addUPOAPM request
       const addUpoTimeStamp = this.generateTimeStamp();
+      const addUpoClientRequestId = `add_upo_${Date.now()}`;
       
-      // Step 2: Call addUPOAPM with sessionToken
+      // Calculate checksum for addUPOAPM: SHA256(merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey)
+      const addUpoChecksum = this.calculatePaymentStatusChecksum(
+        credentials.merchantId,
+        credentials.siteId,
+        addUpoClientRequestId,
+        addUpoTimeStamp,
+        credentials.secretKey
+      );
+      
+      // Step 2: Call addUPOAPM with sessionToken AND checksum
       const requestBody = {
         sessionToken,
         merchantId: credentials.merchantId,
         merchantSiteId: credentials.siteId,
         userTokenId: params.userTokenId,
-        clientRequestId: `add_upo_${Date.now()}`,
+        clientRequestId: addUpoClientRequestId,
         paymentMethodName: 'apmgw_SEPA_Payouts',  // SEPA for Europe
         apmData: {
           IBAN: cleanIban,
@@ -728,18 +738,21 @@ class NuveiService {
           lastName: params.lastName || 'N/A',
         },
         timeStamp: addUpoTimeStamp,
+        checksum: addUpoChecksum,
       };
       
       console.log('\n');
       console.log('╔════════════════════════════════════════════════════════════╗');
-      console.log('║     NUVEI ADD SEPA UPO REQUEST (with sessionToken)         ║');
+      console.log('║     NUVEI ADD SEPA UPO REQUEST (sessionToken + checksum)   ║');
       console.log('╚════════════════════════════════════════════════════════════╝');
       console.log('📤 ENDPOINT:', `${apiUrl}/addUPOAPM.do`);
+      console.log('📤 CHECKSUM INPUT:', `${credentials.merchantId}${credentials.siteId}${addUpoClientRequestId}${addUpoTimeStamp}[SECRET]`);
       console.log('📤 REQUEST BODY (IBAN masked):');
       console.log(JSON.stringify({
         ...requestBody,
         sessionToken: sessionToken?.substring(0, 20) + '...',
         apmData: { IBAN: cleanIban.substring(0, 4) + '****' + cleanIban.slice(-4) },
+        checksum: '[HIDDEN]',
       }, null, 2));
       
       const response = await fetch(`${apiUrl}/addUPOAPM.do`, {
