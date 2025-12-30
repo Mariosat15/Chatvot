@@ -462,7 +462,7 @@ export async function POST(request: NextRequest) {
 
     // Add method-specific details
     if (payoutMethodType === 'original_method' && originalPaymentDetails) {
-      // Original payment method (card refund)
+      // Original payment method (card refund from Stripe/other provider)
       withdrawalRequestData.originalPaymentId = originalPaymentDetails.paymentIntentId;
       withdrawalRequestData.originalPaymentMethod = originalPaymentDetails.paymentMethod;
       withdrawalRequestData.originalCardDetails = {
@@ -471,6 +471,16 @@ export async function POST(request: NextRequest) {
         expMonth: originalPaymentDetails.cardExpMonth,
         expYear: originalPaymentDetails.cardExpYear,
         country: originalPaymentDetails.cardCountry,
+      };
+    } else if (payoutMethodType === 'card_refund' && originalPaymentDetails) {
+      // Nuvei UPO card refund
+      withdrawalRequestData.originalPaymentMethod = originalPaymentDetails.paymentMethod || 'nuvei_card';
+      withdrawalRequestData.originalCardDetails = {
+        brand: originalPaymentDetails.cardBrand,
+        last4: originalPaymentDetails.cardLast4,
+        expMonth: originalPaymentDetails.cardExpMonth,
+        expYear: originalPaymentDetails.cardExpYear,
+        userPaymentOptionId: originalPaymentDetails.userPaymentOptionId,
       };
     } else if (bankAccount) {
       // Bank transfer
