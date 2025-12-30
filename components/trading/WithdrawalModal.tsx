@@ -419,11 +419,14 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                 />
               </div>
               <p className="text-xs text-gray-500">
-                Min: €{withdrawalInfo.settings.minimumWithdrawal} | 
+                Min: €{withdrawalInfo.settings.minimumWithdrawal.toFixed(2)} | 
                 Max: €{Math.min(
                   withdrawalInfo.settings.maximumWithdrawal,
                   withdrawalInfo.wallet.balanceEUR
                 ).toFixed(2)}
+                {withdrawalInfo.wallet.balanceEUR < withdrawalInfo.settings.maximumWithdrawal && (
+                  <span className="text-gray-600"> (limited by balance)</span>
+                )}
               </p>
             </div>
 
