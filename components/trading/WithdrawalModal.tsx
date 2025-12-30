@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Coins, Loader2, CheckCircle2, XCircle, Info, TrendingDown, AlertTriangle, Clock, Shield, CreditCard } from 'lucide-react';
+import { Coins, Loader2, CheckCircle2, XCircle, TrendingDown, AlertTriangle, Clock, Shield, CreditCard, Zap, Building2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { Switch } from '@/components/ui/switch';
 
 interface WithdrawalModalProps {
   children: React.ReactNode;
@@ -57,6 +58,25 @@ interface WithdrawalInfo {
   originalPaymentMethod: string | null;
   availableWithdrawalMethods: WithdrawalMethod[];
   hasWithdrawalMethod: boolean;
+  nuveiEnabled?: boolean; // Whether Nuvei automatic withdrawals are enabled
+}
+
+interface NuveiPaymentOption {
+  id: string;
+  type: 'card' | 'bank';
+  label: string;
+  details: string;
+  cardBrand?: string;
+  cardLast4?: string;
+  expiryDate?: string;
+  userPaymentOptionId?: string;
+  isFromNuvei: boolean;
+}
+
+interface BankDetails {
+  iban: string;
+  bic: string;
+  accountHolderName: string;
 }
 
 
@@ -73,9 +93,22 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     netAmountEUR: number;
     processingHours: number;
     isAutoApproved: boolean;
+    isAutomatic?: boolean;
   } | null>(null);
   const [withdrawalInfo, setWithdrawalInfo] = useState<WithdrawalInfo | null>(null);
   const router = useRouter();
+  
+  // Nuvei automatic withdrawal state
+  const [useAutomaticWithdrawal, setUseAutomaticWithdrawal] = useState(false);
+  const [nuveiPaymentOptions, setNuveiPaymentOptions] = useState<NuveiPaymentOption[]>([]);
+  const [loadingNuveiOptions, setLoadingNuveiOptions] = useState(false);
+  const [selectedNuveiOption, setSelectedNuveiOption] = useState<string>('');
+  const [withdrawalMethodType, setWithdrawalMethodType] = useState<'card_refund' | 'bank_transfer'>('card_refund');
+  const [bankDetails, setBankDetails] = useState<BankDetails>({
+    iban: '',
+    bic: '',
+    accountHolderName: '',
+  });
 
   // Fetch withdrawal info when modal opens
   useEffect(() => {
@@ -83,6 +116,38 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
       fetchWithdrawalInfo();
     }
   }, [open]);
+  
+  // Fetch Nuvei payment options when automatic mode is enabled
+  const fetchNuveiPaymentOptions = useCallback(async () => {
+    setLoadingNuveiOptions(true);
+    try {
+      const response = await fetch('/api/nuvei/user-payment-options');
+      const data = await response.json();
+      
+      if (response.ok && data.paymentOptions) {
+        setNuveiPaymentOptions(data.paymentOptions);
+        // Auto-select first Nuvei option if available
+        const firstNuveiOption = data.paymentOptions.find((p: NuveiPaymentOption) => p.isFromNuvei);
+        if (firstNuveiOption) {
+          setSelectedNuveiOption(firstNuveiOption.id);
+          setWithdrawalMethodType('card_refund');
+        } else {
+          // No card available, switch to bank transfer
+          setWithdrawalMethodType('bank_transfer');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch Nuvei payment options:', err);
+    } finally {
+      setLoadingNuveiOptions(false);
+    }
+  }, []);
+  
+  useEffect(() => {
+    if (useAutomaticWithdrawal && withdrawalInfo?.nuveiEnabled) {
+      fetchNuveiPaymentOptions();
+    }
+  }, [useAutomaticWithdrawal, withdrawalInfo?.nuveiEnabled, fetchNuveiPaymentOptions]);
 
   const fetchWithdrawalInfo = async () => {
     setFetchingInfo(true);
@@ -131,7 +196,99 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
         setLoading(false);
         return;
       }
+      
+      // AUTOMATIC WITHDRAWAL via Nuvei
+      if (useAutomaticWithdrawal && withdrawalInfo?.nuveiEnabled) {
+        // Validate based on method type
+        if (withdrawalMethodType === 'card_refund') {
+          const selectedOption = nuveiPaymentOptions.find(p => p.id === selectedNuveiOption);
+          if (!selectedOption?.isFromNuvei || !selectedOption?.userPaymentOptionId) {
+            setError('Please select a valid card for refund');
+            setLoading(false);
+            return;
+          }
+          
+          // Submit to Nuvei
+          const response = await fetch('/api/nuvei/withdrawal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amountEUR,
+              withdrawalMethod: 'card_refund',
+              userPaymentOptionId: selectedOption.userPaymentOptionId,
+            }),
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            setError(data.error || 'Automatic withdrawal failed');
+            setLoading(false);
+            return;
+          }
+          
+          setSuccess({
+            message: data.message || 'Withdrawal submitted for automatic processing',
+            netAmountEUR: data.netAmountEUR,
+            processingHours: 24,
+            isAutoApproved: true,
+            isAutomatic: true,
+          });
+        } else {
+          // Bank transfer
+          if (!bankDetails.iban || !bankDetails.bic || !bankDetails.accountHolderName) {
+            setError('Please fill in all bank details');
+            setLoading(false);
+            return;
+          }
+          
+          // Validate IBAN format (basic check)
+          if (bankDetails.iban.replace(/\s/g, '').length < 15) {
+            setError('Please enter a valid IBAN');
+            setLoading(false);
+            return;
+          }
+          
+          const response = await fetch('/api/nuvei/withdrawal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amountEUR,
+              withdrawalMethod: 'bank_transfer',
+              bankDetails: {
+                iban: bankDetails.iban.replace(/\s/g, '').toUpperCase(),
+                bic: bankDetails.bic.replace(/\s/g, '').toUpperCase(),
+                accountHolderName: bankDetails.accountHolderName.trim(),
+              },
+            }),
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            setError(data.error || 'Automatic withdrawal failed');
+            setLoading(false);
+            return;
+          }
+          
+          setSuccess({
+            message: data.message || 'Withdrawal submitted for automatic processing',
+            netAmountEUR: data.netAmountEUR,
+            processingHours: 48,
+            isAutoApproved: true,
+            isAutomatic: true,
+          });
+        }
+        
+        setTimeout(() => {
+          router.refresh();
+          setOpen(false);
+          resetModal();
+        }, 4000);
+        return;
+      }
 
+      // MANUAL WITHDRAWAL (existing flow)
       if (!selectedMethodId) {
         setError('Please select a withdrawal method');
         setLoading(false);
@@ -201,6 +358,10 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     setError('');
     setSuccess(null);
     setLoading(false);
+    setUseAutomaticWithdrawal(false);
+    setSelectedNuveiOption('');
+    setWithdrawalMethodType('card_refund');
+    setBankDetails({ iban: '', bic: '', accountHolderName: '' });
   };
 
   return (
@@ -232,11 +393,19 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
           // Success State
           <div className="py-8 text-center space-y-4">
             <div className="mx-auto w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="h-8 w-8 text-green-500" />
+              {success.isAutomatic ? (
+                <Zap className="h-8 w-8 text-green-500" />
+              ) : (
+                <CheckCircle2 className="h-8 w-8 text-green-500" />
+              )}
             </div>
             <div>
               <h3 className="text-xl font-semibold text-gray-100">
-                {success.isAutoApproved ? '🎉 Withdrawal Approved!' : 'Withdrawal Requested!'}
+                {success.isAutomatic 
+                  ? '⚡ Automatic Withdrawal Submitted!'
+                  : success.isAutoApproved 
+                    ? '🎉 Withdrawal Approved!' 
+                    : 'Withdrawal Requested!'}
               </h3>
               <p className="text-sm text-gray-400 mt-2">{success.message}</p>
               <div className="mt-4 bg-green-500/10 border border-green-500/30 rounded-lg p-4">
@@ -244,7 +413,9 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                   €{success.netAmountEUR.toFixed(2)} will be sent to you
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Estimated processing time: {success.processingHours} hours
+                  {success.isAutomatic 
+                    ? 'Processing automatically via Nuvei' 
+                    : `Estimated processing time: ${success.processingHours} hours`}
                 </p>
               </div>
             </div>
@@ -318,6 +489,162 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                 ≈ €{withdrawalInfo.wallet.balanceEUR.toFixed(2)} EUR
               </p>
             </div>
+            
+            {/* Automatic Withdrawal Toggle (Nuvei) */}
+            {withdrawalInfo.nuveiEnabled && (
+              <div className="rounded-lg bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
+                      <Zap className="h-5 w-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">Automatic Withdrawal</p>
+                      <p className="text-xs text-gray-400">
+                        Faster processing • Direct to card or bank
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={useAutomaticWithdrawal}
+                    onCheckedChange={setUseAutomaticWithdrawal}
+                    disabled={loading}
+                  />
+                </div>
+                
+                {useAutomaticWithdrawal && (
+                  <div className="mt-4 pt-4 border-t border-purple-500/20 space-y-4">
+                    {/* Method Type Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-gray-300 text-sm">Withdrawal Method</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setWithdrawalMethodType('card_refund')}
+                          disabled={loading}
+                          className={`flex items-center justify-center gap-2 ${
+                            withdrawalMethodType === 'card_refund'
+                              ? 'bg-purple-600 border-purple-500 text-white hover:bg-purple-700'
+                              : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+                          }`}
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          Card Refund
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setWithdrawalMethodType('bank_transfer')}
+                          disabled={loading}
+                          className={`flex items-center justify-center gap-2 ${
+                            withdrawalMethodType === 'bank_transfer'
+                              ? 'bg-purple-600 border-purple-500 text-white hover:bg-purple-700'
+                              : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+                          }`}
+                        >
+                          <Building2 className="h-4 w-4" />
+                          Bank Transfer
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {withdrawalMethodType === 'card_refund' && (
+                      <div className="space-y-2">
+                        {loadingNuveiOptions ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="h-5 w-5 text-purple-400 animate-spin" />
+                            <span className="ml-2 text-sm text-gray-400">Loading payment options...</span>
+                          </div>
+                        ) : nuveiPaymentOptions.filter(p => p.isFromNuvei).length > 0 ? (
+                          <>
+                            <Label className="text-gray-300 text-sm">Select Card</Label>
+                            <Select 
+                              value={selectedNuveiOption} 
+                              onValueChange={setSelectedNuveiOption}
+                              disabled={loading}
+                            >
+                              <SelectTrigger className="bg-gray-800 border-gray-700">
+                                <SelectValue placeholder="Select card for refund" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-gray-800 border-gray-700">
+                                {nuveiPaymentOptions.filter(p => p.isFromNuvei).map((option) => (
+                                  <SelectItem key={option.id} value={option.id}>
+                                    <div className="flex items-center gap-2">
+                                      <CreditCard className="h-4 w-4 text-purple-400" />
+                                      <span className="text-gray-100">{option.label}</span>
+                                      {option.expiryDate && (
+                                        <span className="text-xs text-gray-400">({option.expiryDate})</span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-gray-500">
+                              ⚡ Funds will be refunded to your original payment card
+                            </p>
+                          </>
+                        ) : (
+                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
+                              <div>
+                                <p className="text-sm text-amber-300">No cards available for refund</p>
+                                <p className="text-xs text-amber-200/70 mt-1">
+                                  Make a deposit first, or use bank transfer instead.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {withdrawalMethodType === 'bank_transfer' && (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="accountHolderName" className="text-gray-300 text-sm">Account Holder Name</Label>
+                          <Input
+                            id="accountHolderName"
+                            value={bankDetails.accountHolderName}
+                            onChange={(e) => setBankDetails(prev => ({ ...prev, accountHolderName: e.target.value }))}
+                            placeholder="John Doe"
+                            className="bg-gray-800 border-gray-700 text-gray-100"
+                            disabled={loading}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="iban" className="text-gray-300 text-sm">IBAN</Label>
+                          <Input
+                            id="iban"
+                            value={bankDetails.iban}
+                            onChange={(e) => setBankDetails(prev => ({ ...prev, iban: e.target.value.toUpperCase() }))}
+                            placeholder="DE89 3704 0044 0532 0130 00"
+                            className="bg-gray-800 border-gray-700 text-gray-100 font-mono"
+                            disabled={loading}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="bic" className="text-gray-300 text-sm">BIC/SWIFT</Label>
+                          <Input
+                            id="bic"
+                            value={bankDetails.bic}
+                            onChange={(e) => setBankDetails(prev => ({ ...prev, bic: e.target.value.toUpperCase() }))}
+                            placeholder="COBADEFFXXX"
+                            className="bg-gray-800 border-gray-700 text-gray-100 font-mono"
+                            disabled={loading}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          🏦 Bank transfers typically take 1-3 business days
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Amount Input */}
             <div className="space-y-2">
@@ -387,7 +714,8 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
               ))}
             </div>
 
-            {/* Withdrawal Method Selection */}
+            {/* Withdrawal Method Selection (Manual Mode Only) */}
+            {!useAutomaticWithdrawal && (
             <div className="space-y-2">
               <Label className="text-gray-300">Where to Send Funds</Label>
               {withdrawalInfo.availableWithdrawalMethods && withdrawalInfo.availableWithdrawalMethods.length > 0 ? (
@@ -462,6 +790,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                 </div>
               )}
             </div>
+            )}
 
             {/* Withdrawal Breakdown */}
             {withdrawal && withdrawal.eurAmount > 0 && (
@@ -512,13 +841,33 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             </div>
 
             {/* Processing Info */}
-            <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-4 space-y-2">
+            <div className={`rounded-lg p-4 space-y-2 ${
+              useAutomaticWithdrawal 
+                ? 'bg-purple-500/10 border border-purple-500/20'
+                : 'bg-blue-500/10 border border-blue-500/20'
+            }`}>
               <div className="flex items-start gap-2">
-                <Clock className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
-                <div className="space-y-1 text-xs text-blue-300">
-                  <p>• Estimated processing time: ~{withdrawalInfo.settings.processingTimeHours} hours</p>
-                  <p>• Funds will be sent to your registered payment method</p>
-                  <p>• You can cancel pending requests from your transaction history</p>
+                {useAutomaticWithdrawal ? (
+                  <Zap className="h-4 w-4 text-purple-400 mt-0.5 shrink-0" />
+                ) : (
+                  <Clock className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
+                )}
+                <div className={`space-y-1 text-xs ${useAutomaticWithdrawal ? 'text-purple-300' : 'text-blue-300'}`}>
+                  {useAutomaticWithdrawal ? (
+                    <>
+                      <p>• ⚡ Automatic processing via Nuvei payment gateway</p>
+                      <p>• {withdrawalMethodType === 'card_refund' 
+                          ? 'Card refunds typically arrive in 3-5 business days' 
+                          : 'Bank transfers typically arrive in 1-3 business days'}</p>
+                      <p>• You will receive a confirmation once the withdrawal is processed</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>• Estimated processing time: ~{withdrawalInfo.settings.processingTimeHours} hours</p>
+                      <p>• Funds will be sent to your registered payment method</p>
+                      <p>• You can cancel pending requests from your transaction history</p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -547,15 +896,27 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                   loading || 
                   !withdrawal || 
                   withdrawal.eurAmount < withdrawalInfo.settings.minimumWithdrawal ||
-                  !selectedMethodId ||
-                  !withdrawalInfo.hasWithdrawalMethod
+                  (useAutomaticWithdrawal 
+                    ? (withdrawalMethodType === 'card_refund' && !selectedNuveiOption) ||
+                      (withdrawalMethodType === 'bank_transfer' && (!bankDetails.iban || !bankDetails.bic || !bankDetails.accountHolderName))
+                    : (!selectedMethodId || !withdrawalInfo.hasWithdrawalMethod)
+                  )
                 }
-                className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold"
+                className={`flex-1 font-semibold ${
+                  useAutomaticWithdrawal 
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                    : 'bg-yellow-500 hover:bg-yellow-600 text-gray-900'
+                }`}
               >
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Processing...
+                  </>
+                ) : useAutomaticWithdrawal ? (
+                  <>
+                    <Zap className="mr-2 h-4 w-4" />
+                    Submit Automatic Withdrawal
                   </>
                 ) : (
                   'Request Withdrawal'

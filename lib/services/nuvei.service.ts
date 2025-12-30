@@ -77,6 +77,73 @@ interface PaymentStatusResponse {
   };
 }
 
+// ========== Withdrawal Types ==========
+
+interface SubmitWithdrawalParams {
+  userTokenId: string;           // User's unique identifier in your system
+  amount: string;                // Withdrawal amount
+  currency: string;              // Currency code (EUR, USD, etc.)
+  merchantWDRequestId: string;   // Your unique withdrawal request ID
+  merchantUniqueId?: string;     // Additional unique ID
+  userDetails?: {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  // For card withdrawal (refund to original card)
+  userPaymentOptionId?: string;  // UPO ID from original deposit
+  // For bank transfer
+  bankDetails?: {
+    bankName?: string;
+    bankBranchCode?: string;
+    accountNumber?: string;
+    iban?: string;
+    bic?: string;
+    accountHolderName?: string;
+  };
+  notificationUrl?: string;
+}
+
+interface WithdrawalResponse {
+  status: 'SUCCESS' | 'ERROR';
+  errCode: number;
+  reason?: string;
+  wdRequestId?: string;
+  wdRequestStatus?: 'Pending' | 'Approved' | 'Declined' | 'Processing' | 'Settled' | 'Cancelled';
+  merchantWDRequestId?: string;
+  userTokenId?: string;
+}
+
+interface GetWithdrawalRequestsParams {
+  userTokenId: string;
+}
+
+interface GetWithdrawalRequestsResponse {
+  status: 'SUCCESS' | 'ERROR';
+  errCode: number;
+  reason?: string;
+  withdrawalRequests?: Array<{
+    wdRequestId: string;
+    wdRequestStatus: string;
+    amount: string;
+    currency: string;
+    creationTime: string;
+    merchantWDRequestId?: string;
+  }>;
+}
+
+interface CancelWithdrawalParams {
+  userTokenId: string;
+  wdRequestId: string;
+}
+
+interface CancelWithdrawalResponse {
+  status: 'SUCCESS' | 'ERROR';
+  errCode: number;
+  reason?: string;
+  wdRequestStatus?: string;
+}
+
 class NuveiService {
   /**
    * Get Nuvei credentials from database or environment variables
@@ -406,6 +473,301 @@ class NuveiService {
     } catch (error) {
       console.error('💳 Nuvei getClientConfig error:', error);
       return { enabled: false, sdkUrl: NUVEI_SDK_URL };
+    }
+  }
+  
+  // ========== WITHDRAWAL METHODS ==========
+  
+  /**
+   * Calculate checksum for withdrawal requests
+   * SHA256(merchantId + merchantSiteId + clientRequestId + amount + currency + timeStamp + secretKey)
+   */
+  calculateWithdrawalChecksum(
+    merchantId: string,
+    siteId: string,
+    clientRequestId: string,
+    amount: string,
+    currency: string,
+    timeStamp: string,
+    secretKey: string
+  ): string {
+    const data = `${merchantId}${siteId}${clientRequestId}${amount}${currency}${timeStamp}${secretKey}`;
+    return crypto.createHash('sha256').update(data).digest('hex');
+  }
+  
+  /**
+   * Submit a withdrawal request to Nuvei
+   * Can be used for card refund (UPO) or bank transfer
+   * 
+   * Documentation: https://docs.nuvei.com/documentation/accept-payment/web-sdk/withdrawal/
+   */
+  async submitWithdrawal(params: SubmitWithdrawalParams): Promise<WithdrawalResponse | { error: string }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: 'Nuvei not configured or not active' };
+    }
+    
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `wd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const checksum = this.calculateWithdrawalChecksum(
+      credentials.merchantId,
+      credentials.siteId,
+      clientRequestId,
+      params.amount,
+      params.currency,
+      timeStamp,
+      credentials.secretKey
+    );
+    
+    // Build the request body
+    const requestBody: Record<string, unknown> = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      userTokenId: params.userTokenId,
+      clientRequestId,
+      amount: params.amount,
+      currency: params.currency,
+      merchantWDRequestId: params.merchantWDRequestId,
+      timeStamp,
+      checksum,
+    };
+    
+    // Add optional fields
+    if (params.merchantUniqueId) {
+      requestBody.merchantUniqueId = params.merchantUniqueId;
+    }
+    
+    if (params.userDetails) {
+      requestBody.userDetails = params.userDetails;
+    }
+    
+    // For card refund - use UPO ID from original deposit
+    if (params.userPaymentOptionId) {
+      requestBody.userPaymentOptionId = params.userPaymentOptionId;
+    }
+    
+    // For bank transfer
+    if (params.bankDetails) {
+      requestBody.paymentOption = {
+        alternativePaymentMethod: {
+          paymentMethod: 'apmgw_Bank_Transfer',
+          ...params.bankDetails,
+        },
+      };
+    }
+    
+    // Notification URL for DMN
+    if (params.notificationUrl || credentials.dmnUrl) {
+      requestBody.urlDetails = {
+        notificationUrl: params.notificationUrl || credentials.dmnUrl,
+      };
+    }
+    
+    console.log('💸 Nuvei submitWithdrawal request:', {
+      userTokenId: params.userTokenId,
+      amount: params.amount,
+      currency: params.currency,
+      hasUPO: !!params.userPaymentOptionId,
+      hasBankDetails: !!params.bankDetails,
+    });
+    
+    try {
+      const response = await fetch(`${apiUrl}/payout.do`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+      
+      const data = await response.json();
+      
+      console.log('💸 Nuvei submitWithdrawal response:', {
+        status: data.status,
+        errCode: data.errCode,
+        wdRequestId: data.wdRequestId,
+        wdRequestStatus: data.wdRequestStatus,
+      });
+      
+      if (data.status === 'SUCCESS' && data.errCode === 0) {
+        return data as WithdrawalResponse;
+      } else {
+        console.error('💸 Nuvei submitWithdrawal failed:', data);
+        return { 
+          error: data.reason || `Withdrawal failed (code: ${data.errCode})`,
+          ...data,
+        };
+      }
+    } catch (error) {
+      console.error('💸 Nuvei submitWithdrawal error:', error);
+      return { error: 'Failed to submit withdrawal to Nuvei' };
+    }
+  }
+  
+  /**
+   * Get list of pending withdrawal requests for a user
+   */
+  async getWithdrawalRequests(params: GetWithdrawalRequestsParams): Promise<GetWithdrawalRequestsResponse | { error: string }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: 'Nuvei not configured or not active' };
+    }
+    
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `getwd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Simple checksum for get requests
+    const checksum = this.calculatePaymentStatusChecksum(
+      credentials.merchantId,
+      credentials.siteId,
+      clientRequestId,
+      timeStamp,
+      credentials.secretKey
+    );
+    
+    const requestBody = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      userTokenId: params.userTokenId,
+      clientRequestId,
+      timeStamp,
+      checksum,
+    };
+    
+    try {
+      const response = await fetch(`${apiUrl}/getWDRequests.do`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+      
+      const data = await response.json();
+      return data as GetWithdrawalRequestsResponse;
+    } catch (error) {
+      console.error('💸 Nuvei getWithdrawalRequests error:', error);
+      return { error: 'Failed to get withdrawal requests' };
+    }
+  }
+  
+  /**
+   * Cancel a pending withdrawal request
+   */
+  async cancelWithdrawal(params: CancelWithdrawalParams): Promise<CancelWithdrawalResponse | { error: string }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: 'Nuvei not configured or not active' };
+    }
+    
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `cancelwd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const checksum = this.calculatePaymentStatusChecksum(
+      credentials.merchantId,
+      credentials.siteId,
+      clientRequestId,
+      timeStamp,
+      credentials.secretKey
+    );
+    
+    const requestBody = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      userTokenId: params.userTokenId,
+      wdRequestId: params.wdRequestId,
+      clientRequestId,
+      timeStamp,
+      checksum,
+    };
+    
+    try {
+      const response = await fetch(`${apiUrl}/cancelWDRequest.do`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+      
+      const data = await response.json();
+      
+      if (data.status === 'SUCCESS') {
+        return data as CancelWithdrawalResponse;
+      } else {
+        return { error: data.reason || 'Failed to cancel withdrawal' };
+      }
+    } catch (error) {
+      console.error('💸 Nuvei cancelWithdrawal error:', error);
+      return { error: 'Failed to cancel withdrawal' };
+    }
+  }
+  
+  /**
+   * Get user's stored payment options (UPOs) from previous deposits
+   * These can be used for card refund withdrawals
+   */
+  async getUserPaymentOptions(userTokenId: string): Promise<{
+    paymentMethods?: Array<{
+      userPaymentOptionId: string;
+      paymentMethodName: string;
+      upoName?: string;
+      upoStatus?: string;
+      expiryDate?: string;
+      cardLastFourDigits?: string;
+      cardType?: string;
+    }>;
+    error?: string;
+  }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: 'Nuvei not configured or not active' };
+    }
+    
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `getupo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const checksum = this.calculatePaymentStatusChecksum(
+      credentials.merchantId,
+      credentials.siteId,
+      clientRequestId,
+      timeStamp,
+      credentials.secretKey
+    );
+    
+    const requestBody = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      userTokenId,
+      clientRequestId,
+      timeStamp,
+      checksum,
+    };
+    
+    try {
+      const response = await fetch(`${apiUrl}/getUserUPOs.do`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+      
+      const data = await response.json();
+      
+      if (data.status === 'SUCCESS') {
+        return { paymentMethods: data.paymentMethods || [] };
+      } else {
+        return { error: data.reason || 'Failed to get payment options' };
+      }
+    } catch (error) {
+      console.error('💸 Nuvei getUserPaymentOptions error:', error);
+      return { error: 'Failed to get payment options' };
     }
   }
 }

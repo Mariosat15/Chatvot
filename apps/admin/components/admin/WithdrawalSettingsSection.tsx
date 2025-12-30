@@ -75,6 +75,10 @@ interface WithdrawalSettings {
   sandboxEnabled: boolean;
   sandboxAutoApprove: boolean;
   
+  // Nuvei Automatic Processing
+  nuveiWithdrawalEnabled: boolean;
+  nuveiPreferCardRefund: boolean;
+  
   // Notifications
   notifyAdminOnRequest: boolean;
   notifyAdminOnHighValue: boolean;
@@ -621,6 +625,85 @@ export default function WithdrawalSettingsSection() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Nuvei Automatic Withdrawal */}
+      <Card className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border-purple-500/30">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Zap className="h-5 w-5 text-purple-400" />
+            Automatic Withdrawal Processing (Nuvei)
+            {settings.nuveiWithdrawalEnabled && (
+              <Badge className="bg-purple-500/20 text-purple-300">Active</Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Enable automatic withdrawal processing via Nuvei payment gateway
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+            <div className="flex items-center gap-4">
+              <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
+                settings.nuveiWithdrawalEnabled 
+                  ? 'bg-purple-500/20' 
+                  : 'bg-gray-600/20'
+              }`}>
+                <Zap className={`h-6 w-6 ${settings.nuveiWithdrawalEnabled ? 'text-purple-400' : 'text-gray-500'}`} />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Enable Automatic Withdrawals</h3>
+                <p className="text-sm text-gray-400">
+                  When enabled, users can withdraw directly to their card or bank account via Nuvei
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={settings.nuveiWithdrawalEnabled}
+              onCheckedChange={(checked) => updateSetting('nuveiWithdrawalEnabled', checked)}
+            />
+          </div>
+          
+          {settings.nuveiWithdrawalEnabled && (
+            <>
+              <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-purple-400 mt-0.5" />
+                  <div className="text-sm text-purple-200">
+                    <p className="font-medium">How it works:</p>
+                    <ul className="mt-2 space-y-1 text-purple-300/80">
+                      <li>• Users can withdraw to their original deposit card (refund) or enter bank details</li>
+                      <li>• Withdrawals are processed automatically through Nuvei</li>
+                      <li>• Card refunds typically arrive in 3-5 business days</li>
+                      <li>• Bank transfers typically arrive in 1-3 business days</li>
+                      <li>• Nuvei must be configured in Payment Providers</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-gray-300">Prefer Card Refund</Label>
+                  <p className="text-xs text-gray-500">Suggest card refund over bank transfer to users</p>
+                </div>
+                <Switch
+                  checked={settings.nuveiPreferCardRefund}
+                  onCheckedChange={(checked) => updateSetting('nuveiPreferCardRefund', checked)}
+                />
+              </div>
+              
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-400" />
+                  <p className="text-xs text-amber-300">
+                    Make sure Nuvei is properly configured in Payment Providers before enabling automatic withdrawals.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Payout Methods */}
       <Card className="bg-gray-800/50 border-gray-700">

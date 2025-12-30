@@ -167,6 +167,8 @@ export async function GET() {
       // Available withdrawal methods for dropdown
       availableWithdrawalMethods,
       hasWithdrawalMethod: availableWithdrawalMethods.length > 0,
+      // Nuvei automatic withdrawal enabled
+      nuveiEnabled: withdrawalSettings.nuveiWithdrawalEnabled === true,
       // Legacy bank account info
       hasBankAccount,
       bankAccount: defaultBankAccount ? {

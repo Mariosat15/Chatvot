@@ -48,6 +48,10 @@ export interface IWithdrawalSettings extends Document {
   sandboxEnabled: boolean;                 // Enable withdrawals in sandbox mode
   sandboxAutoApprove: boolean;             // Auto-approve sandbox withdrawals
   
+  // Nuvei Automatic Processing
+  nuveiWithdrawalEnabled: boolean;         // Enable automatic processing via Nuvei
+  nuveiPreferCardRefund: boolean;          // Prefer refunding to original card over bank transfer
+  
   // Notifications
   notifyAdminOnRequest: boolean;           // Email admin on new withdrawal request
   notifyAdminOnHighValue: boolean;         // Email admin on high-value withdrawals
@@ -203,6 +207,16 @@ const WithdrawalSettingsSchema = new Schema<IWithdrawalSettings>(
     sandboxAutoApprove: {
       type: Boolean,
       default: true,
+    },
+    
+    // Nuvei Automatic Processing
+    nuveiWithdrawalEnabled: {
+      type: Boolean,
+      default: false,  // Disabled by default, admin must enable
+    },
+    nuveiPreferCardRefund: {
+      type: Boolean,
+      default: true,  // Prefer refunding to original card
     },
     
     // Notifications
