@@ -936,6 +936,23 @@ class NuveiService {
   }
   
   /**
+   * Calculate checksum for getUserUPOs
+   * Format: SHA256(merchantId + merchantSiteId + userTokenId + clientRequestId + timeStamp + secretKey)
+   * Note: userTokenId is included in this checksum (different from other endpoints)
+   */
+  calculateGetUposChecksum(
+    merchantId: string,
+    siteId: string,
+    userTokenId: string,
+    clientRequestId: string,
+    timeStamp: string,
+    secretKey: string
+  ): string {
+    const data = `${merchantId}${siteId}${userTokenId}${clientRequestId}${timeStamp}${secretKey}`;
+    return crypto.createHash('sha256').update(data).digest('hex');
+  }
+  
+  /**
    * Get user's stored payment options (UPOs) from previous deposits
    * These can be used for card refund withdrawals
    */
@@ -960,9 +977,11 @@ class NuveiService {
     const timeStamp = this.generateTimeStamp();
     const clientRequestId = `getupo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    const checksum = this.calculatePaymentStatusChecksum(
+    // getUserUPOs requires userTokenId in checksum calculation
+    const checksum = this.calculateGetUposChecksum(
       credentials.merchantId,
       credentials.siteId,
+      userTokenId,
       clientRequestId,
       timeStamp,
       credentials.secretKey
@@ -977,6 +996,8 @@ class NuveiService {
       checksum,
     };
     
+    console.log('📤 getUserUPOs request:', { userTokenId, clientRequestId, timeStamp });
+    
     try {
       const response = await fetch(`${apiUrl}/getUserUPOs.do`, {
         method: 'POST',
@@ -987,6 +1008,7 @@ class NuveiService {
       });
       
       const data = await response.json();
+      console.log('📥 getUserUPOs response:', JSON.stringify(data, null, 2));
       
       if (data.status === 'SUCCESS') {
         return { paymentMethods: data.paymentMethods || [] };
