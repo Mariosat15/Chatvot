@@ -588,11 +588,21 @@ class NuveiService {
       console.log('🏦 Session token obtained via getSessionToken:', sessionToken?.substring(0, 20) + '...');
       
       // Now call accountCapture with the session token
-      // Per Nuvei docs example, the minimal required fields are:
-      // sessionToken, merchantId, merchantSiteId, userTokenId, paymentMethod, currencyCode, countryCode
+      // Per Nuvei docs example - use EXACT minimal fields as shown in documentation:
+      // https://docs.nuvei.com/documentation/global-guides/local-bank-payouts/
       const currency = params.currencyCode || 'EUR';
       
-      const accountCaptureRequest = {
+      // EXACT match to Nuvei docs example (no extra fields):
+      // {
+      //   "sessionToken": "<sessionToken from /getSessionToken>",
+      //   "merchantId": "<your merchantId>",
+      //   "merchantSiteId": "<your merchantSiteId>",
+      //   "userTokenId": "<unique customer identifier in merchant system>",
+      //   "paymentMethod": "apmgw_BankPayouts",
+      //   "currencyCode": "MXN",
+      //   "countryCode": "MX"
+      // }
+      const accountCaptureRequest: Record<string, string> = {
         sessionToken,
         merchantId: credentials.merchantId,
         merchantSiteId: credentials.siteId,
@@ -600,11 +610,6 @@ class NuveiService {
         paymentMethod: params.paymentMethod,
         currencyCode: currency,
         countryCode: params.countryCode,
-        // Optional fields
-        languageCode: params.languageCode || 'en',
-        urlDetails: {
-          notificationUrl: credentials.dmnUrl || `${baseUrl}/api/nuvei/webhook`,
-        },
       };
       
       console.log('\n');
