@@ -81,6 +81,8 @@ interface UserReconciliationDetail {
     competitionWinTotal: number;
     challengeWinTotal: number;
     competitionSpentTotal: number;
+    pendingWithdrawalCredits?: number;
+    pendingDepositCredits?: number;
     challengeSpentTotal: number;
     marketplaceSpentTotal: number;
   };
@@ -572,18 +574,30 @@ export default function ReconciliationSection() {
                         </thead>
                         <tbody>
                           <tr className="border-b border-gray-800 bg-gray-800/30">
-                            <td className="py-2 px-3 text-gray-300 font-medium">💰 Credit Balance</td>
+                            <td className="py-2 px-3 text-gray-300 font-medium">
+                              💰 Credit Balance
+                              {((user.calculated.pendingWithdrawalCredits || 0) > 0 || (user.calculated.pendingDepositCredits || 0) > 0) && (
+                                <div className="text-xs text-yellow-400 mt-1">
+                                  {(user.calculated.pendingWithdrawalCredits || 0) > 0 && (
+                                    <span>⏳ {user.calculated.pendingWithdrawalCredits} pending withdrawal</span>
+                                  )}
+                                  {(user.calculated.pendingDepositCredits || 0) > 0 && (
+                                    <span className="ml-2">📥 {user.calculated.pendingDepositCredits} pending deposit</span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
                             <td className="py-2 px-3 text-right text-white font-mono">{user.wallet.creditBalance.toFixed(2)}</td>
                             <td className="py-2 px-3 text-right text-white font-mono">
-                              <span title={`From Transactions: ${user.calculated.balanceFromTransactions.toFixed(2)}`}>
+                              <span title={`Expected (accounting for pending): ${user.calculated.expectedBalance.toFixed(2)}`}>
                                 {user.calculated.expectedBalance.toFixed(2)}
                               </span>
                             </td>
                             <td className="py-2 px-3 text-right">
-                              {Math.abs(user.wallet.creditBalance - user.calculated.balanceFromTransactions) < 0.01 ? (
+                              {Math.abs(user.wallet.creditBalance - user.calculated.expectedBalance) < 0.01 ? (
                                 <span className="text-green-400">✓</span>
                               ) : (
-                                <span className="text-red-400">✗ {(user.wallet.creditBalance - user.calculated.balanceFromTransactions).toFixed(2)}</span>
+                                <span className="text-red-400">✗ {(user.wallet.creditBalance - user.calculated.expectedBalance).toFixed(2)}</span>
                               )}
                             </td>
                           </tr>
