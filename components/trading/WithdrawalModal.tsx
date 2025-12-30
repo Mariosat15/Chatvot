@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Coins, Loader2, CheckCircle2, XCircle, TrendingDown, AlertTriangle, Clock, Shield, CreditCard, Zap, Building2 } from 'lucide-react';
+import { Coins, Loader2, CheckCircle2, XCircle, TrendingDown, AlertTriangle, Clock, Shield, CreditCard, Building2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface WithdrawalModalProps {
@@ -306,19 +306,11 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
           // Success State
           <div className="py-8 text-center space-y-4">
             <div className="mx-auto w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center">
-              {success.isAutomatic ? (
-                <Zap className="h-8 w-8 text-green-500" />
-              ) : (
-                <CheckCircle2 className="h-8 w-8 text-green-500" />
-              )}
+              <CheckCircle2 className="h-8 w-8 text-green-500" />
             </div>
             <div>
               <h3 className="text-xl font-semibold text-gray-100">
-                {success.isAutomatic 
-                  ? '⚡ Automatic Withdrawal Submitted!'
-                  : success.isAutoApproved 
-                    ? '🎉 Withdrawal Approved!' 
-                    : 'Withdrawal Requested!'}
+                🎉 Withdrawal Submitted!
               </h3>
               <p className="text-sm text-gray-400 mt-2">{success.message}</p>
               <div className="mt-4 bg-green-500/10 border border-green-500/30 rounded-lg p-4">
@@ -326,9 +318,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                   €{success.netAmountEUR.toFixed(2)} will be sent to you
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
-                  {success.isAutomatic 
-                    ? 'Processing automatically via Nuvei' 
-                    : `Estimated processing time: ${success.processingHours} hours`}
+                  Typically arrives in 3-5 business days
                 </p>
               </div>
             </div>
@@ -403,22 +393,6 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
               </p>
             </div>
             
-            {/* Automatic Processing Notice (when Nuvei is enabled by admin) */}
-            {withdrawalInfo.nuveiEnabled && (
-              <div className="rounded-lg bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
-                    <Zap className="h-5 w-5 text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">⚡ Automatic Processing Enabled</p>
-                    <p className="text-xs text-gray-400">
-                      Withdrawals are processed automatically for faster payouts
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Amount Input */}
             <div className="space-y-2">
@@ -613,32 +587,15 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             </div>
 
             {/* Processing Info */}
-            <div className={`rounded-lg p-4 space-y-2 ${
-              withdrawalInfo.nuveiEnabled 
-                ? 'bg-purple-500/10 border border-purple-500/20'
-                : 'bg-blue-500/10 border border-blue-500/20'
-            }`}>
+            <div className="rounded-lg p-4 space-y-2 bg-blue-500/10 border border-blue-500/20">
               <div className="flex items-start gap-2">
-                {withdrawalInfo.nuveiEnabled ? (
-                  <Zap className="h-4 w-4 text-purple-400 mt-0.5 shrink-0" />
-                ) : (
-                  <Clock className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
-                )}
-                <div className={`space-y-1 text-xs ${withdrawalInfo.nuveiEnabled ? 'text-purple-300' : 'text-blue-300'}`}>
-                  {withdrawalInfo.nuveiEnabled ? (
-                    <>
-                      <p>• ⚡ Automatic processing via secure payment gateway</p>
-                      <p>• Card refunds typically arrive in 3-5 business days</p>
-                      <p>• Bank transfers typically arrive in 1-3 business days</p>
-                      <p>• You will receive a confirmation once the withdrawal is processed</p>
-                    </>
-                  ) : (
-                    <>
-                      <p>• Estimated processing time: ~{withdrawalInfo.settings.processingTimeHours} hours</p>
-                      <p>• Funds will be sent to your registered payment method</p>
-                      <p>• You can cancel pending requests from your transaction history</p>
-                    </>
-                  )}
+                <Clock className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
+                <div className="space-y-1 text-xs text-blue-300">
+                  <p>• Card refunds typically arrive in 3-5 business days</p>
+                  <p>• Bank transfers typically arrive in 3-5 business days</p>
+                  <p className="text-blue-400/70 italic mt-2">
+                    Note: Processing times may vary depending on your bank, card issuer, or public holidays.
+                  </p>
                 </div>
               </div>
             </div>
@@ -670,24 +627,15 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                   !selectedMethodId || 
                   !withdrawalInfo.hasWithdrawalMethod
                 }
-                className={`flex-1 font-semibold ${
-                  withdrawalInfo.nuveiEnabled 
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                    : 'bg-yellow-500 hover:bg-yellow-600 text-gray-900'
-                }`}
+                className="flex-1 font-semibold bg-yellow-500 hover:bg-yellow-600 text-gray-900"
               >
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Processing...
                   </>
-                ) : withdrawalInfo.nuveiEnabled ? (
-                  <>
-                    <Zap className="mr-2 h-4 w-4" />
-                    Withdraw Now
-                  </>
                 ) : (
-                  'Request Withdrawal'
+                  'Submit Withdrawal'
                 )}
               </Button>
             </div>
