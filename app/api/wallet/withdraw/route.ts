@@ -500,11 +500,6 @@ export async function POST(request: NextRequest) {
     // NOTE: Don't record withdrawal fee to platform financials here either!
     // It will be recorded when the withdrawal is completed.
     console.log(`💵 Withdrawal fee (€${platformFee.toFixed(2)}) will be recorded when withdrawal is completed`);
-      } catch (error) {
-        console.error('❌ Error recording withdrawal fee:', error);
-        // Don't fail the withdrawal - fee recording is secondary
-      }
-    }
 
     // Check for auto-approval (sandbox mode only)
     let autoApproved = false;
