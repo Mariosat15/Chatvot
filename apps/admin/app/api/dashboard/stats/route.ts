@@ -7,13 +7,16 @@
 import { NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { connectToDatabase } from '@/database/mongoose';
-import User from '@/database/models/user.model';
+import mongoose from 'mongoose';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import WithdrawalRequest from '@/database/models/trading/withdrawal-request.model';
+import WithdrawalRequest from '@/database/models/withdrawal-request.model';
 import FraudAlert from '@/database/models/fraud/fraud-alert.model';
-import KYCVerification from '@/database/models/kyc/kyc-verification.model';
 import PaymentProvider from '@/database/models/payment-provider.model';
 import { WhiteLabel } from '@/database/models/whitelabel.model';
+
+// Get User and KYCVerification collections directly (models not available in admin app)
+const getUserCollection = () => mongoose.connection.collection('users');
+const getKYCCollection = () => mongoose.connection.collection('kycverifications');
 
 interface DashboardStats {
   // User Stats
@@ -151,7 +154,7 @@ async function checkServiceStatus(): Promise<DashboardStats['services']> {
     }
     
     // Check WhiteLabel settings for other services
-    const settings = await WhiteLabel.findOne();
+    const settings = await WhiteLabel.findOne().lean() as Record<string, unknown> | null;
     if (settings) {
       // Massive WebSocket
       if (settings.massiveApiKey || process.env.MASSIVE_API_KEY) {
@@ -162,7 +165,7 @@ async function checkServiceStatus(): Promise<DashboardStats['services']> {
       if (settings.redisEnabled || process.env.REDIS_URL) {
         try {
           // Try to ping Redis if configured
-          const redisUrl = settings.redisUrl || process.env.REDIS_URL;
+          const redisUrl = (settings.redisUrl as string) || process.env.REDIS_URL;
           if (redisUrl) {
             services.redis = 'operational';
           }
@@ -193,6 +196,10 @@ export async function GET() {
     await connectToDatabase();
     
     const { startOfToday, startOfWeek, startOfMonth, thirtyDaysAgo } = getDateBoundaries();
+    
+    // Get collections for models not available in admin app
+    const usersCollection = getUserCollection();
+    const kycCollection = getKYCCollection();
     
     // Run all queries in parallel for efficiency
     const [
@@ -239,13 +246,13 @@ export async function GET() {
       // Service status
       services,
     ] = await Promise.all([
-      // User queries
-      User.countDocuments(),
-      User.countDocuments({ createdAt: { $gte: startOfToday } }),
-      User.countDocuments({ createdAt: { $gte: startOfWeek } }),
-      User.countDocuments({ createdAt: { $gte: startOfMonth } }),
-      User.countDocuments({ emailVerified: true }),
-      User.countDocuments({ updatedAt: { $gte: thirtyDaysAgo } }),
+      // User queries (using collection directly)
+      usersCollection.countDocuments(),
+      usersCollection.countDocuments({ createdAt: { $gte: startOfToday } }),
+      usersCollection.countDocuments({ createdAt: { $gte: startOfWeek } }),
+      usersCollection.countDocuments({ createdAt: { $gte: startOfMonth } }),
+      usersCollection.countDocuments({ emailVerified: true }),
+      usersCollection.countDocuments({ updatedAt: { $gte: thirtyDaysAgo } }),
       
       // Deposit queries
       WalletTransaction.aggregate([
@@ -279,18 +286,18 @@ export async function GET() {
       WithdrawalRequest.countDocuments({ status: 'approved' }),
       WithdrawalRequest.countDocuments({ status: { $in: ['failed', 'rejected'] }, updatedAt: { $gte: startOfToday } }),
       
-      // KYC queries
-      KYCVerification.countDocuments({ status: 'approved' }).catch(() => 0),
-      KYCVerification.countDocuments({ status: 'pending' }).catch(() => 0),
-      KYCVerification.countDocuments({ status: 'approved', updatedAt: { $gte: startOfToday } }).catch(() => 0),
-      KYCVerification.countDocuments({ status: 'rejected', updatedAt: { $gte: startOfToday } }).catch(() => 0),
+      // KYC queries (using collection directly)
+      kycCollection.countDocuments({ status: 'approved' }).catch(() => 0),
+      kycCollection.countDocuments({ status: 'pending' }).catch(() => 0),
+      kycCollection.countDocuments({ status: 'approved', updatedAt: { $gte: startOfToday } }).catch(() => 0),
+      kycCollection.countDocuments({ status: 'rejected', updatedAt: { $gte: startOfToday } }).catch(() => 0),
       
       // Fraud queries
       FraudAlert.countDocuments({ status: { $in: ['pending', 'investigating'] } }).catch(() => 0),
       FraudAlert.countDocuments({ status: { $in: ['pending', 'investigating'] }, priority: 'high' }).catch(() => 0),
       FraudAlert.countDocuments({ createdAt: { $gte: startOfToday } }).catch(() => 0),
-      User.countDocuments({ 'restrictions.status': 'suspended' }).catch(() => 0),
-      User.countDocuments({ 'restrictions.status': 'banned' }).catch(() => 0),
+      usersCollection.countDocuments({ 'restrictions.status': 'suspended' }).catch(() => 0),
+      usersCollection.countDocuments({ 'restrictions.status': 'banned' }).catch(() => 0),
       
       // Recent activity
       WalletTransaction.find({ transactionType: 'deposit' })
@@ -303,11 +310,11 @@ export async function GET() {
         .limit(5)
         .select('status amountEUR createdAt')
         .lean(),
-      User.find()
+      usersCollection.find()
         .sort({ createdAt: -1 })
         .limit(5)
-        .select('name email createdAt')
-        .lean(),
+        .project({ name: 1, email: 1, createdAt: 1 })
+        .toArray(),
       
       // Service status
       checkServiceStatus(),
