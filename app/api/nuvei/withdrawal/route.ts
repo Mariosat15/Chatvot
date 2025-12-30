@@ -313,23 +313,51 @@ export async function POST(req: NextRequest) {
     const nuveiResult = await nuveiService.submitWithdrawal(withdrawalParams);
 
     if ('error' in nuveiResult && nuveiResult.error) {
-      // Nuvei failed - rollback
+      // Nuvei failed - rollback EVERYTHING
       console.error('💸 Nuvei withdrawal failed:', nuveiResult.error);
       
-      // Restore balance
+      // CRITICAL: Restore FULL balance (includes amount that would have been fee)
+      // The fee was never separately deducted - it's part of the withdrawal amount
       wallet.creditBalance = balanceBefore;
       await wallet.save();
       
-      // Update records as failed
+      console.log(`💸 Refunded ${creditsNeeded} credits to user ${userId} due to immediate failure`);
+      
+      // Update withdrawal request as failed
       await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
         status: 'failed',
         failedAt: new Date(),
         failedReason: nuveiResult.error,
+        'metadata.refunded': true,
+        'metadata.refundedAt': new Date().toISOString(),
+        'metadata.refundedCredits': creditsNeeded,
       });
       
+      // Update wallet transaction as failed
       await WalletTransaction.findByIdAndUpdate(walletTx._id, {
         status: 'failed',
         failureReason: nuveiResult.error,
+        processedAt: new Date(),
+      });
+      
+      // Create a refund transaction for audit trail
+      await WalletTransaction.create({
+        userId,
+        transactionType: 'withdrawal_refund',
+        amount: creditsNeeded, // Full amount including what would have been fee
+        currency: 'EUR',
+        exchangeRate,
+        balanceBefore: wallet.creditBalance - creditsNeeded,
+        balanceAfter: wallet.creditBalance,
+        status: 'completed',
+        provider: 'nuvei',
+        description: `Withdrawal refund - ${nuveiResult.error}`,
+        metadata: {
+          withdrawalRequestId: withdrawalRequest._id.toString(),
+          merchantWDRequestId,
+          refundReason: nuveiResult.error,
+          originalAmountEUR: amount,
+        },
         processedAt: new Date(),
       });
 

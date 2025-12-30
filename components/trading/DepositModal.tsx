@@ -1020,12 +1020,16 @@ function NuveiPaymentForm({
     try {
       console.log('Initializing Nuvei with:', { merchantId, siteId, testMode });
       
-      // Initialize SafeCharge
+      // Initialize SafeCharge - STORE the instance for later use with createPayment
       const sfc = window.SafeCharge({
         env: testMode ? 'int' : 'prod',
         merchantId: merchantId,
         merchantSiteId: siteId,
       });
+      
+      // CRITICAL: Store the SafeCharge instance so createPayment uses the SAME instance
+      // This is required for 3DS to work - card data is tied to this specific instance
+      sfcRef.current = sfc;
 
       // Create fields instance
       const ScFields = sfc.fields({
@@ -1067,7 +1071,7 @@ function NuveiPaymentForm({
         console.error('Nuvei card field error:', evt);
       });
 
-      // Store reference for payment
+      // Store card field reference for payment
       setScard(cardField);
       setSfcInitialized(true);
       console.log('Nuvei SDK initialized successfully');
@@ -1087,9 +1091,14 @@ function NuveiPaymentForm({
       setScard(null);
       setSfcInitialized(false);
       setCardFieldReady(false);
+      // Clear SafeCharge instance
+      sfcRef.current = null;
     };
   }, []);
 
+  // Store SafeCharge instance for payment calls
+  const sfcRef = useRef<any>(null);
+  
   // SECURITY: Ref to prevent double-clicks
   const isSubmittingRef = useRef(false);
   
@@ -1127,11 +1136,18 @@ function NuveiPaymentForm({
     setError('');
 
     try {
-      const sfc = window.SafeCharge({
-        env: testMode ? 'int' : 'prod',
-        merchantId: merchantId,
-        merchantSiteId: siteId,
-      });
+      // IMPORTANT: Reuse the SAME SafeCharge instance that created the card field
+      // Creating a new instance breaks 3DS as the card data is lost
+      let sfc = sfcRef.current;
+      if (!sfc) {
+        // Fallback: create new instance (less ideal, may fail for 3DS)
+        console.warn('⚠️ SafeCharge instance not found, creating new one (3DS may fail)');
+        sfc = window.SafeCharge({
+          env: testMode ? 'int' : 'prod',
+          merchantId: merchantId,
+          merchantSiteId: siteId,
+        });
+      }
 
       // Parse cardholder name into first/last name
       const nameParts = cardHolderName.trim().split(' ');
@@ -1139,6 +1155,7 @@ function NuveiPaymentForm({
       const lastName = nameParts.slice(1).join(' ') || 'Customer';
 
       // Create payment with required user details
+      // The paymentOption MUST be from the same SafeCharge instance for 3DS to work
       sfc.createPayment(
         {
           sessionToken,
@@ -1155,7 +1172,7 @@ function NuveiPaymentForm({
             country: 'US',
           },
         } as Parameters<typeof sfc.createPayment>[0],
-        async (result) => {
+        async (result: { result: string; errCode: string; errorDescription?: string; reason?: string; transactionId?: string }) => {
           console.log('Nuvei payment result:', result);
 
           if (result.result === 'APPROVED' && result.errCode === '0') {
