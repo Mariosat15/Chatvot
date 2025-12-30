@@ -562,11 +562,17 @@ class NuveiService {
       + credentials.secretKey;
     const openOrderChecksum = crypto.createHash('sha256').update(openOrderChecksumString).digest('hex');
     
+    // clientUniqueId max length is 45 chars
+    // Use short prefix + user ID last 8 chars + timestamp last 8 digits
+    const shortUserId = params.userTokenId.replace('user_', '').slice(-8);
+    const shortTimestamp = Date.now().toString().slice(-8);
+    const clientUniqueId = `bc_${shortUserId}_${shortTimestamp}`; // ~20 chars
+    
     const openOrderRequest = {
       merchantId: credentials.merchantId,
       merchantSiteId: credentials.siteId,
       clientRequestId,
-      clientUniqueId: `bank_capture_${params.userTokenId}_${Date.now()}`,
+      clientUniqueId,
       amount,
       currency,
       timeStamp,
