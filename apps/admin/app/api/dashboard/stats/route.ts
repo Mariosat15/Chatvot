@@ -254,32 +254,62 @@ export async function GET() {
       usersCollection.countDocuments({ emailVerified: true }),
       usersCollection.countDocuments({ updatedAt: { $gte: thirtyDaysAgo } }),
       
-      // Deposit queries
+      // Deposit queries - use processedAt or createdAt for today's deposits
       WalletTransaction.aggregate([
         { $match: { transactionType: 'deposit', status: 'completed' } },
-        { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$metadata.eurAmount' } } },
+        { $group: { 
+          _id: null, 
+          count: { $sum: 1 }, 
+          total: { $sum: { $ifNull: ['$metadata.eurAmount', { $ifNull: ['$metadata.baseAmount', 0] }] } } 
+        } },
       ]),
       WalletTransaction.aggregate([
-        { $match: { transactionType: 'deposit', status: 'completed', completedAt: { $gte: startOfToday } } },
-        { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$metadata.eurAmount' } } },
+        { 
+          $match: { 
+            transactionType: 'deposit', 
+            status: 'completed', 
+            $or: [
+              { processedAt: { $gte: startOfToday } },
+              { createdAt: { $gte: startOfToday }, processedAt: { $exists: false } }
+            ]
+          } 
+        },
+        { $group: { 
+          _id: null, 
+          count: { $sum: 1 }, 
+          total: { $sum: { $ifNull: ['$metadata.eurAmount', { $ifNull: ['$metadata.baseAmount', 0] }] } } 
+        } },
       ]),
       WalletTransaction.aggregate([
         { $match: { transactionType: 'deposit', status: 'pending' } },
-        { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$metadata.eurAmount' } } },
+        { $group: { 
+          _id: null, 
+          count: { $sum: 1 }, 
+          total: { $sum: { $ifNull: ['$metadata.eurAmount', { $ifNull: ['$metadata.baseAmount', 0] }] } } 
+        } },
       ]),
       WalletTransaction.countDocuments({ transactionType: 'deposit', status: 'failed', updatedAt: { $gte: startOfToday } }),
       
-      // Withdrawal queries
+      // Withdrawal queries - include pending, approved, and processing
       WithdrawalRequest.aggregate([
         { $match: { status: 'completed' } },
         { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$amountEUR' } } },
       ]),
       WithdrawalRequest.aggregate([
-        { $match: { status: 'completed', processedAt: { $gte: startOfToday } } },
+        { 
+          $match: { 
+            status: 'completed', 
+            $or: [
+              { processedAt: { $gte: startOfToday } },
+              { updatedAt: { $gte: startOfToday }, processedAt: { $exists: false } }
+            ]
+          } 
+        },
         { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$amountEUR' } } },
       ]),
+      // Pending withdrawals - include pending, approved, and processing statuses
       WithdrawalRequest.aggregate([
-        { $match: { status: 'pending' } },
+        { $match: { status: { $in: ['pending', 'approved', 'processing'] } } },
         { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$amountEUR' } } },
       ]),
       WithdrawalRequest.countDocuments({ status: 'processing' }),

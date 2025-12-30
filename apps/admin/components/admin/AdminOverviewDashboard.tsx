@@ -383,7 +383,7 @@ export default function AdminOverviewDashboard({
           trend={stats.deposits.completedToday > 0 ? 'up' : 'neutral'}
           trendLabel={`Total: €${stats.deposits.totalEUR.toLocaleString()}`}
           color="green"
-          onClick={() => onNavigate?.('payment-history')}
+          onClick={() => onNavigate?.('financial')}
         />
         
         {/* Withdrawals Pending */}
@@ -407,7 +407,7 @@ export default function AdminOverviewDashboard({
           trend={stats.fraud.activeAlerts > 0 ? 'up' : 'neutral'}
           trendLabel={`${stats.fraud.alertsToday} new today`}
           color={stats.fraud.activeAlerts > 0 ? 'red' : 'green'}
-          onClick={() => onNavigate?.('fraud-monitoring')}
+          onClick={() => onNavigate?.('fraud')}
         />
       </div>
 
@@ -430,7 +430,7 @@ export default function AdminOverviewDashboard({
           subValue={`€${stats.deposits.pendingEUR.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
           icon={Clock}
           color={stats.deposits.pendingCount > 0 ? 'yellow' : 'green'}
-          onClick={() => onNavigate?.('pending-payments')}
+          onClick={() => onNavigate?.('payments')}
         />
         
         {/* KYC Pending */}
@@ -450,7 +450,7 @@ export default function AdminOverviewDashboard({
           subValue={`${stats.fraud.suspendedUsers} suspended, ${stats.fraud.bannedUsers} banned`}
           icon={UserX}
           color={stats.fraud.suspendedUsers + stats.fraud.bannedUsers > 0 ? 'red' : 'green'}
-          onClick={() => onNavigate?.('fraud-monitoring')}
+          onClick={() => onNavigate?.('fraud')}
         />
       </div>
 
@@ -581,7 +581,7 @@ export default function AdminOverviewDashboard({
             <Button
               variant="outline"
               className="border-gray-600 hover:bg-gray-800"
-              onClick={() => onNavigate?.('pending-payments')}
+              onClick={() => onNavigate?.('payments')}
             >
               <Clock className="h-4 w-4 mr-2" />
               Pending Deposits
@@ -609,7 +609,7 @@ export default function AdminOverviewDashboard({
             <Button
               variant="outline"
               className="border-gray-600 hover:bg-gray-800"
-              onClick={() => onNavigate?.('fraud-monitoring')}
+              onClick={() => onNavigate?.('fraud')}
             >
               <Shield className="h-4 w-4 mr-2" />
               Fraud Alerts
@@ -632,7 +632,7 @@ export default function AdminOverviewDashboard({
             <Button
               variant="outline"
               className="border-gray-600 hover:bg-gray-800"
-              onClick={() => onNavigate?.('platform-financials')}
+              onClick={() => onNavigate?.('financial')}
             >
               <BarChart3 className="h-4 w-4 mr-2" />
               Financials

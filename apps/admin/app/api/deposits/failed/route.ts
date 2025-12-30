@@ -56,18 +56,43 @@ export async function GET(request: NextRequest) {
 
     // Get user details for all transactions
     const userIds = [...new Set(transactions.map(t => t.userId))];
+    
+    // Get users from Better Auth users collection
     const usersCollection = mongoose.connection.collection('users');
     const users = await usersCollection.find(
       { id: { $in: userIds } },
       { projection: { id: 1, name: 1, email: 1 } }
     ).toArray();
     
-    const userMap = new Map(users.map(u => [u.id, u]));
+    // Also get from credit wallets which store user email
+    const walletsCollection = mongoose.connection.collection('creditwallets');
+    const wallets = await walletsCollection.find(
+      { userId: { $in: userIds } },
+      { projection: { userId: 1, userEmail: 1 } }
+    ).toArray();
+    
+    // Build user map from both sources
+    const userMap = new Map<string, { name?: string; email?: string }>();
+    
+    // First add from users collection
+    for (const u of users) {
+      userMap.set(u.id, { name: u.name, email: u.email });
+    }
+    
+    // Then supplement from wallets if user not found
+    for (const w of wallets) {
+      if (!userMap.has(w.userId) && w.userEmail) {
+        userMap.set(w.userId, { name: w.userEmail.split('@')[0], email: w.userEmail });
+      } else if (userMap.has(w.userId) && !userMap.get(w.userId)?.email && w.userEmail) {
+        const existing = userMap.get(w.userId)!;
+        userMap.set(w.userId, { ...existing, email: w.userEmail });
+      }
+    }
 
     // Enrich transactions with user info
     const enrichedTransactions = transactions.map(t => ({
       ...t,
-      user: userMap.get(t.userId) || { name: 'Unknown', email: 'Unknown' },
+      user: userMap.get(t.userId) || { name: 'Unknown', email: t.userId },
     }));
 
     // Get summary stats

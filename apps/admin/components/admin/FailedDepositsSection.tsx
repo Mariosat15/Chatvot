@@ -85,9 +85,15 @@ export default function FailedDepositsSection() {
   // Manual credit dialog
   const [selectedDeposit, setSelectedDeposit] = useState<FailedDeposit | null>(null);
   const [showCreditDialog, setShowCreditDialog] = useState(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [creditReason, setCreditReason] = useState('');
   const [verificationNotes, setVerificationNotes] = useState('');
   const [processing, setProcessing] = useState(false);
+
+  const openDetailsDialog = (deposit: FailedDeposit) => {
+    setSelectedDeposit(deposit);
+    setShowDetailsDialog(true);
+  };
 
   const fetchDeposits = async () => {
     try {
@@ -405,10 +411,7 @@ export default function FailedDepositsSection() {
                         variant="outline"
                         size="sm"
                         className="border-gray-600"
-                        onClick={() => {
-                          // Could open a detail view
-                          console.log('View details', deposit);
-                        }}
+                        onClick={() => openDetailsDialog(deposit)}
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         Details
@@ -548,6 +551,156 @@ export default function FailedDepositsSection() {
                 </>
               )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Details Dialog */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="bg-gray-900 border-gray-700 max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Eye className="h-5 w-5 text-blue-400" />
+              Deposit Details
+            </DialogTitle>
+            <DialogDescription>
+              Full transaction information
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedDeposit && (
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* User Info */}
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-400 mb-2">User Information</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-gray-500">Name:</span>
+                    <span className="text-white ml-2">{selectedDeposit.user?.name || 'Unknown'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Email:</span>
+                    <span className="text-white ml-2">{selectedDeposit.user?.email || 'Unknown'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-500">User ID:</span>
+                    <span className="text-white ml-2 font-mono text-xs">{selectedDeposit.userId}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transaction Info */}
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-400 mb-2">Transaction Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-gray-500">Amount:</span>
+                    <span className="text-green-400 ml-2 font-bold">
+                      €{(selectedDeposit.metadata?.eurAmount || selectedDeposit.metadata?.baseAmount || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Credits:</span>
+                    <span className="text-white ml-2">{Math.abs(selectedDeposit.amount)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">VAT:</span>
+                    <span className="text-white ml-2">€{(selectedDeposit.metadata?.vatAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Platform Fee:</span>
+                    <span className="text-white ml-2">€{(selectedDeposit.metadata?.platformFeeAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Status:</span>
+                    <span className={cn(
+                      'ml-2 font-medium',
+                      selectedDeposit.status === 'completed' && 'text-green-400',
+                      selectedDeposit.status === 'failed' && 'text-red-400',
+                      selectedDeposit.status === 'pending' && 'text-yellow-400'
+                    )}>
+                      {selectedDeposit.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Date:</span>
+                    <span className="text-white ml-2">{new Date(selectedDeposit.createdAt).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Info */}
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-400 mb-2">Payment Information</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-gray-500">Provider:</span>
+                    <span className="text-white ml-2">{selectedDeposit.provider || 'Unknown'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Card:</span>
+                    <span className="text-white ml-2">
+                      {selectedDeposit.metadata?.cardLast4 ? `•••• ${selectedDeposit.metadata.cardLast4}` : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-500">Provider TX ID:</span>
+                    <span className="text-white ml-2 font-mono text-xs">
+                      {selectedDeposit.providerTransactionId || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-500">Transaction ID:</span>
+                    <span className="text-white ml-2 font-mono text-xs">{selectedDeposit._id}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Failure Info */}
+              {selectedDeposit.failureReason && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-red-400 mb-2 flex items-center gap-1">
+                    <AlertTriangle className="h-4 w-4" />
+                    Failure Reason
+                  </h4>
+                  <p className="text-sm text-red-300">{selectedDeposit.failureReason}</p>
+                </div>
+              )}
+
+              {/* Resolution Info */}
+              {selectedDeposit.metadata?.manuallyResolved && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-green-400 mb-2 flex items-center gap-1">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Resolution Info
+                  </h4>
+                  <div className="text-sm text-green-300">
+                    <p>Resolved by: {selectedDeposit.metadata.resolvedByAdmin}</p>
+                    <p>Resolved at: {selectedDeposit.metadata.manualResolutionAt 
+                      ? new Date(selectedDeposit.metadata.manualResolutionAt).toLocaleString() 
+                      : 'Unknown'}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
+              Close
+            </Button>
+            {selectedDeposit && !selectedDeposit.metadata?.manuallyResolved && selectedDeposit.status === 'failed' && (
+              <Button
+                className="bg-green-600 hover:bg-green-700"
+                onClick={() => {
+                  setShowDetailsDialog(false);
+                  openCreditDialog(selectedDeposit);
+                }}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Manual Credit
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
