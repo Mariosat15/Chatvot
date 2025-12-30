@@ -706,13 +706,6 @@ async function getDetailedUserReconciliation(
     }
   }
 
-  // Calculate balance from completed transactions
-  const balanceFromCompletedTransactions = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-  
-  // The actual expected wallet balance = completed transactions - pending withdrawals
-  // (because pending withdrawals have already deducted credits from wallet but aren't in completed transactions)
-  const expectedWalletBalance = balanceFromCompletedTransactions - pendingWithdrawalCredits;
-
   // Get completed withdrawals from WithdrawalRequest (source of truth for withdrawals)
   const completedWithdrawals = await WithdrawalRequest.find({
     userId,
@@ -720,8 +713,8 @@ async function getDetailedUserReconciliation(
   }).lean();
   const withdrawalFromRequests = completedWithdrawals.reduce((sum, w) => sum + (w.amountCredits || 0), 0);
 
-  // Calculate EXPECTED balance using the formula (for reference only):
-  // Balance = Deposits - Withdrawals + Wins - Spends - Marketplace
+  // Calculate EXPECTED balance using wallet fields (most reliable):
+  // Balance = Deposits - Withdrawals + Wins - Spends - Marketplace - Pending
   const expectedFromFields = 
     walletData.totalDeposited - 
     walletData.totalWithdrawn + 
@@ -730,32 +723,29 @@ async function getDetailedUserReconciliation(
     walletData.totalSpentOnCompetitions - 
     walletData.totalSpentOnChallenges -
     walletData.totalSpentOnMarketplace;
+  
+  // The expected balance should account for pending withdrawals (credits already deducted)
+  const expectedWalletBalance = expectedFromFields - pendingWithdrawalCredits;
 
-  // Check for issues - compare stored balance with expected balance accounting for pending withdrawals
+  // Check for issues - compare stored balance with expected balance
   const balanceDiff = Math.abs(walletData.creditBalance - expectedWalletBalance);
   
-  // Only flag as issue if the difference can't be explained by pending transactions
+  // Only flag as issue if there's a real mismatch
   if (balanceDiff > 0.01) {
-    // Check if the difference matches pending amounts (allowing for small rounding)
-    const isPendingExplained = Math.abs(balanceDiff - pendingWithdrawalCredits) < 0.01 || 
-                                Math.abs(balanceDiff - pendingDepositCredits) < 0.01;
-    
-    if (!isPendingExplained) {
-      issues.push({
-        type: 'balance_mismatch',
-        severity: pendingWithdrawalCredits > 0 || pendingDepositCredits > 0 ? 'warning' : 'critical',
-        userId,
-        userEmail,
-        details: {
-          expected: Math.round(expectedWalletBalance * 100) / 100,
-          actual: walletData.creditBalance,
-          difference: Math.round((walletData.creditBalance - expectedWalletBalance) * 100) / 100,
-          description: `Balance mismatch: stored ${walletData.creditBalance}, expected ${Math.round(expectedWalletBalance * 100) / 100}` +
-            (pendingWithdrawalCredits > 0 ? ` (${pendingWithdrawalCredits} credits in pending withdrawals)` : '') +
-            (pendingDepositCredits > 0 ? ` (${pendingDepositCredits} credits in pending deposits)` : ''),
-        },
-      });
-    }
+    issues.push({
+      type: 'balance_mismatch',
+      severity: 'critical',
+      userId,
+      userEmail,
+      details: {
+        expected: Math.round(expectedWalletBalance * 100) / 100,
+        actual: walletData.creditBalance,
+        difference: Math.round((walletData.creditBalance - expectedWalletBalance) * 100) / 100,
+        description: `Balance mismatch: stored ${walletData.creditBalance}, expected ${Math.round(expectedWalletBalance * 100) / 100}` +
+          (pendingWithdrawalCredits > 0 ? ` (includes ${pendingWithdrawalCredits} credits in pending withdrawals)` : '') +
+          (pendingDepositCredits > 0 ? ` (${pendingDepositCredits} credits in pending deposits not yet credited)` : ''),
+      },
+    });
   }
 
   // Check deposit total
@@ -883,8 +873,9 @@ async function getDetailedUserReconciliation(
     userName,
     wallet: walletData,
     calculated: {
+      // Expected balance from wallet fields (Deposits - Withdrawals + Wins - Spends - Pending)
       expectedBalance: Math.round(expectedWalletBalance * 100) / 100,
-      balanceFromTransactions: Math.round(expectedWalletBalance * 100) / 100, // Now accounts for pending
+      balanceFromTransactions: Math.round(expectedWalletBalance * 100) / 100,
       depositTotal: Math.round(depositTotal * 100) / 100,
       withdrawalTotal: Math.round(withdrawalFromRequests * 100) / 100,
       competitionWinTotal: Math.round(competitionWinTotal * 100) / 100,
