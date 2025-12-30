@@ -140,6 +140,9 @@ export default function PendingWithdrawalsSection() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   
+  // Selection state for bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  
   // History tab filters
   const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
   const [historyDateFrom, setHistoryDateFrom] = useState('');
@@ -176,6 +179,7 @@ export default function PendingWithdrawalsSection() {
   useEffect(() => {
     fetchWithdrawals();
     fetchAdminBankAccounts();
+    clearSelection(); // Clear selection when filters change
   }, [statusFilter, sandboxFilter, page]);
   
   useEffect(() => {
@@ -294,37 +298,67 @@ export default function PendingWithdrawalsSection() {
         ? adminBankAccounts.find(b => b._id === selectedBankId)
         : null;
 
-      const response = await fetch(`/api/withdrawals/${actionDialog.withdrawal._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: actionDialog.action,
-          reason: actionReason,
-          adminNote: actionNote,
-          // Include company bank details when completing (send full details, backend will mask)
-          companyBankUsed: selectedBank ? {
-            bankId: selectedBank._id,
-            accountName: selectedBank.accountName,
-            accountHolderName: selectedBank.accountHolderName,
-            bankName: selectedBank.bankName,
-            iban: selectedBank.iban,
-            accountNumber: selectedBank.accountNumber,
-            country: selectedBank.country,
-            currency: selectedBank.currency,
-          } : undefined,
-        }),
-      });
+      // Get all withdrawals to process (either single or bulk)
+      const withdrawalsToProcess = selectedIds.size > 1 && selectedIds.has(actionDialog.withdrawal._id)
+        ? getSelectedWithdrawals()
+        : [actionDialog.withdrawal];
 
-      const data = await response.json();
-      if (!response.ok) {
-        toast.error(data.error || 'Action failed');
-        return;
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const withdrawal of withdrawalsToProcess) {
+        try {
+          const response = await fetch(`/api/withdrawals/${withdrawal._id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: actionDialog.action,
+              reason: actionReason,
+              adminNote: actionNote,
+              // Include company bank details when completing (send full details, backend will mask)
+              companyBankUsed: selectedBank ? {
+                bankId: selectedBank._id,
+                accountName: selectedBank.accountName,
+                accountHolderName: selectedBank.accountHolderName,
+                bankName: selectedBank.bankName,
+                iban: selectedBank.iban,
+                accountNumber: selectedBank.accountNumber,
+                country: selectedBank.country,
+                currency: selectedBank.currency,
+              } : undefined,
+            }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            errorCount++;
+            console.error(`Failed to process withdrawal ${withdrawal._id}:`, data.error);
+          } else {
+            successCount++;
+          }
+        } catch (err) {
+          errorCount++;
+          console.error(`Error processing withdrawal ${withdrawal._id}:`, err);
+        }
       }
 
-      toast.success(`Withdrawal ${actionDialog.action} successfully`);
+      // Show result
+      if (errorCount === 0) {
+        toast.success(
+          withdrawalsToProcess.length === 1
+            ? `Withdrawal ${actionDialog.action} successfully`
+            : `${successCount} withdrawal(s) ${actionDialog.action} successfully`
+        );
+      } else if (successCount > 0) {
+        toast.warning(`${successCount} succeeded, ${errorCount} failed`);
+      } else {
+        toast.error('Failed to process withdrawals');
+      }
+
       setActionDialog({ open: false, withdrawal: null, action: '' });
       setActionReason('');
       setActionNote('');
+      clearSelection(); // Clear selection after bulk action
       fetchWithdrawals();
       if (activeTab === 'history') {
         fetchHistoryWithdrawals();
@@ -341,6 +375,48 @@ export default function PendingWithdrawalsSection() {
     setActionDialog({ open: true, withdrawal, action });
     setActionReason('');
     setActionNote('');
+  };
+
+  // Selection handlers
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    const currentList = activeTab === 'pending' ? filteredWithdrawals : filteredHistoryWithdrawals;
+    if (selectedIds.size === currentList.length) {
+      // Deselect all
+      setSelectedIds(new Set());
+    } else {
+      // Select all
+      setSelectedIds(new Set(currentList.map(w => w._id)));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  // Get selected withdrawals
+  const getSelectedWithdrawals = (): WithdrawalRequest[] => {
+    const currentList = activeTab === 'pending' ? filteredWithdrawals : filteredHistoryWithdrawals;
+    return currentList.filter(w => selectedIds.has(w._id));
+  };
+
+  // Check if all selected have same status (for bulk actions)
+  const getCommonStatus = (): string | null => {
+    const selected = getSelectedWithdrawals();
+    if (selected.length === 0) return null;
+    const firstStatus = selected[0].status;
+    return selected.every(w => w.status === firstStatus) ? firstStatus : null;
   };
 
   const filteredWithdrawals = searchQuery
@@ -378,9 +454,20 @@ export default function PendingWithdrawalsSection() {
   const renderWithdrawalRow = (withdrawal: WithdrawalRequest, showActions: boolean = true) => (
     <div
       key={withdrawal._id}
-      className="bg-gray-700/30 rounded-xl p-4 hover:bg-gray-700/50 transition-colors"
+      className={`bg-gray-700/30 rounded-xl p-4 hover:bg-gray-700/50 transition-colors ${
+        selectedIds.has(withdrawal._id) ? 'ring-2 ring-teal-500 bg-teal-500/10' : ''
+      }`}
     >
       <div className="flex items-start justify-between gap-4">
+        {/* Checkbox for selection */}
+        <div className="flex items-center pt-1">
+          <input
+            type="checkbox"
+            checked={selectedIds.has(withdrawal._id)}
+            onChange={() => toggleSelection(withdrawal._id)}
+            className="h-5 w-5 rounded border-gray-600 bg-gray-700 text-teal-500 focus:ring-teal-500 focus:ring-offset-gray-800 cursor-pointer"
+          />
+        </div>
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
             <Badge className={STATUS_COLORS[withdrawal.status]}>
@@ -838,44 +925,176 @@ export default function PendingWithdrawalsSection() {
       {/* Withdrawals List */}
       <Card className="bg-gray-800/50 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-white flex items-center justify-between">
-            <span>
-              {activeTab === 'pending' 
-                ? `Withdrawal Requests (${total})` 
-                : `Withdrawal History (${historyTotal})`
-              }
-            </span>
-            {/* Pagination */}
-            {(activeTab === 'pending' ? totalPages : historyTotalPages) > 1 && (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => activeTab === 'pending' 
-                    ? setPage((p) => Math.max(1, p - 1))
-                    : setHistoryPage((p) => Math.max(1, p - 1))
-                  }
-                  disabled={activeTab === 'pending' ? page === 1 : historyPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm text-gray-400">
-                  Page {activeTab === 'pending' ? page : historyPage} of {activeTab === 'pending' ? totalPages : historyTotalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => activeTab === 'pending'
-                    ? setPage((p) => Math.min(totalPages, p + 1))
-                    : setHistoryPage((p) => Math.min(historyTotalPages, p + 1))
-                  }
-                  disabled={activeTab === 'pending' ? page === totalPages : historyPage === historyTotalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+          <div className="space-y-4">
+            <CardTitle className="text-white flex items-center justify-between">
+              <span>
+                {activeTab === 'pending' 
+                  ? `Withdrawal Requests (${total})` 
+                  : `Withdrawal History (${historyTotal})`
+                }
+              </span>
+              {/* Pagination */}
+              {(activeTab === 'pending' ? totalPages : historyTotalPages) > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => activeTab === 'pending' 
+                      ? setPage((p) => Math.max(1, p - 1))
+                      : setHistoryPage((p) => Math.max(1, p - 1))
+                    }
+                    disabled={activeTab === 'pending' ? page === 1 : historyPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-gray-400">
+                    Page {activeTab === 'pending' ? page : historyPage} of {activeTab === 'pending' ? totalPages : historyTotalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => activeTab === 'pending'
+                      ? setPage((p) => Math.min(totalPages, p + 1))
+                      : setHistoryPage((p) => Math.min(historyTotalPages, p + 1))
+                    }
+                    disabled={activeTab === 'pending' ? page === totalPages : historyPage === historyTotalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </CardTitle>
+            
+            {/* Selection Controls & Bulk Actions */}
+            {activeTab === 'pending' && (
+              <div className="flex flex-wrap items-center gap-3 p-3 bg-gray-700/30 rounded-lg">
+                {/* Select All Checkbox */}
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300 hover:text-white">
+                  <input
+                    type="checkbox"
+                    checked={filteredWithdrawals.length > 0 && selectedIds.size === filteredWithdrawals.length}
+                    onChange={selectAll}
+                    className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-teal-500 focus:ring-teal-500 focus:ring-offset-gray-800"
+                  />
+                  Select All
+                </label>
+                
+                {/* Selected Count */}
+                {selectedIds.size > 0 && (
+                  <>
+                    <div className="h-4 w-px bg-gray-600" />
+                    <span className="text-sm text-teal-400 font-medium">
+                      {selectedIds.size} selected
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearSelection}
+                      className="text-gray-400 hover:text-white h-7 px-2"
+                    >
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Clear
+                    </Button>
+                    
+                    <div className="h-4 w-px bg-gray-600" />
+                    
+                    {/* Bulk Actions based on common status */}
+                    {(() => {
+                      const commonStatus = getCommonStatus();
+                      const selected = getSelectedWithdrawals();
+                      
+                      if (!commonStatus || selected.length === 0) {
+                        return (
+                          <span className="text-xs text-amber-400">
+                            Select withdrawals with same status for bulk actions
+                          </span>
+                        );
+                      }
+                      
+                      return (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400">Bulk Actions:</span>
+                          {commonStatus === 'pending' && (
+                            <>
+                              <Button
+                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700 h-7 text-xs"
+                                onClick={() => {
+                                  // Process first selected
+                                  if (selected.length > 0) {
+                                    openActionDialog(selected[0], 'approved');
+                                  }
+                                }}
+                              >
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Approve ({selectedIds.size})
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  if (selected.length > 0) {
+                                    openActionDialog(selected[0], 'rejected');
+                                  }
+                                }}
+                              >
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Reject ({selectedIds.size})
+                              </Button>
+                            </>
+                          )}
+                          {commonStatus === 'approved' && (
+                            <Button
+                              size="sm"
+                              className="bg-purple-600 hover:bg-purple-700 h-7 text-xs"
+                              onClick={() => {
+                                if (selected.length > 0) {
+                                  openActionDialog(selected[0], 'processing');
+                                }
+                              }}
+                            >
+                              <PlayCircle className="h-3 w-3 mr-1" />
+                              Process ({selectedIds.size})
+                            </Button>
+                          )}
+                          {commonStatus === 'processing' && (
+                            <>
+                              <Button
+                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700 h-7 text-xs"
+                                onClick={() => {
+                                  if (selected.length > 0) {
+                                    openActionDialog(selected[0], 'completed');
+                                  }
+                                }}
+                              >
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Complete ({selectedIds.size})
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  if (selected.length > 0) {
+                                    openActionDialog(selected[0], 'failed');
+                                  }
+                                }}
+                              >
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Failed ({selectedIds.size})
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
               </div>
             )}
-          </CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {(activeTab === 'pending' ? loading : historyLoading) ? (
@@ -909,12 +1128,35 @@ export default function PendingWithdrawalsSection() {
               {actionDialog.action === 'processing' && '⚡ Start Processing'}
               {actionDialog.action === 'completed' && '🎉 Mark as Completed'}
               {actionDialog.action === 'failed' && '⚠️ Mark as Failed'}
+              {selectedIds.size > 1 && actionDialog.withdrawal && selectedIds.has(actionDialog.withdrawal._id) && (
+                <Badge className="ml-2 bg-teal-500/20 text-teal-300">
+                  Bulk: {selectedIds.size} selected
+                </Badge>
+              )}
             </DialogTitle>
             <DialogDescription>
               {actionDialog.withdrawal && (
-                <span>
-                  €{actionDialog.withdrawal.amountEUR.toFixed(2)} for {actionDialog.withdrawal.userEmail}
-                </span>
+                <>
+                  {selectedIds.size > 1 && selectedIds.has(actionDialog.withdrawal._id) ? (
+                    <div className="space-y-1">
+                      <span className="text-amber-300 font-medium">
+                        Processing {selectedIds.size} withdrawals:
+                      </span>
+                      <div className="text-xs text-gray-400 max-h-24 overflow-y-auto">
+                        {getSelectedWithdrawals().map(w => (
+                          <div key={w._id}>• €{w.amountEUR.toFixed(2)} - {w.userEmail}</div>
+                        ))}
+                      </div>
+                      <div className="text-sm text-white font-medium mt-2">
+                        Total: €{getSelectedWithdrawals().reduce((sum, w) => sum + w.amountEUR, 0).toFixed(2)}
+                      </div>
+                    </div>
+                  ) : (
+                    <span>
+                      €{actionDialog.withdrawal.amountEUR.toFixed(2)} for {actionDialog.withdrawal.userEmail}
+                    </span>
+                  )}
+                </>
               )}
             </DialogDescription>
           </DialogHeader>
