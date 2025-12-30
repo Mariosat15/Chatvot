@@ -645,7 +645,8 @@ class NuveiService {
    * Instead of /accountCapture (which requires redirect), this uses /addUPOAPM
    * which allows direct IBAN submission without redirect.
    * 
-   * Documentation: https://docs.nuvei.com/documentation/europe-guides/sepa-payouts/
+   * IMPORTANT: /addUPOAPM uses CHECKSUM authentication ONLY (NO sessionToken!)
+   * See: https://docs.nuvei.com/documentation/features/financial-operations/payout/#add-upo-addupoapm
    * 
    * @param params - User token ID, IBAN, and billing details
    * @returns userPaymentOptionId for use in /payout requests
@@ -665,10 +666,14 @@ class NuveiService {
     
     const apiUrl = this.getApiUrl(credentials.testMode);
     const timeStamp = this.generateTimeStamp();
-    const clientRequestId = `sepa_upo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const clientRequestId = `add_upo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Step 1: Get a session token first (like accountCapture does)
-    const sessionTokenChecksum = this.calculatePaymentStatusChecksum(
+    // Clean and format IBAN (remove spaces, uppercase)
+    const cleanIban = params.iban.replace(/\s/g, '').toUpperCase();
+    
+    // Calculate checksum for addUPOAPM
+    // Per Nuvei docs: SHA256(merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey)
+    const checksum = this.calculatePaymentStatusChecksum(
       credentials.merchantId,
       credentials.siteId,
       clientRequestId,
@@ -676,85 +681,42 @@ class NuveiService {
       credentials.secretKey
     );
     
-    const sessionRequest = {
+    // /addUPOAPM uses CHECKSUM authentication only - NO sessionToken!
+    // See example in Nuvei Payout docs:
+    // https://docs.nuvei.com/documentation/features/financial-operations/payout/#add-upo-addupoapm
+    const requestBody = {
       merchantId: credentials.merchantId,
       merchantSiteId: credentials.siteId,
       clientRequestId,
+      userTokenId: params.userTokenId,
+      paymentMethodName: 'apmgw_SEPA_Payouts',  // SEPA for Europe
+      apmData: {
+        IBAN: cleanIban,
+      },
+      billingAddress: {
+        country: params.country,
+        email: params.email,
+        firstName: params.firstName || 'N/A',
+        lastName: params.lastName || 'N/A',
+      },
       timeStamp,
-      checksum: sessionTokenChecksum,
+      checksum,
     };
     
-    console.log('🏦 Getting session token for addUPOAPM...');
+    console.log('\n');
+    console.log('╔════════════════════════════════════════════════════════════╗');
+    console.log('║     NUVEI ADD SEPA UPO REQUEST (checksum auth, NO session) ║');
+    console.log('╚════════════════════════════════════════════════════════════╝');
+    console.log('📤 ENDPOINT:', `${apiUrl}/addUPOAPM.do`);
+    console.log('📤 CHECKSUM INPUT:', `${credentials.merchantId}${credentials.siteId}${clientRequestId}${timeStamp}[SECRET]`);
+    console.log('📤 REQUEST BODY (IBAN masked):');
+    console.log(JSON.stringify({
+      ...requestBody,
+      apmData: { IBAN: cleanIban.substring(0, 4) + '****' + cleanIban.slice(-4) },
+      checksum: '[HIDDEN]',
+    }, null, 2));
     
     try {
-      // Get session token
-      const sessionResponse = await fetch(`${apiUrl}/getSessionToken.do`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sessionRequest),
-      });
-      
-      const sessionData = await sessionResponse.json();
-      
-      if (sessionData.status !== 'SUCCESS') {
-        console.error('🏦 Failed to get session token:', sessionData);
-        return { error: sessionData.reason || 'Failed to get session token' };
-      }
-      
-      const sessionToken = sessionData.sessionToken;
-      console.log('🏦 Session token obtained:', sessionToken?.substring(0, 20) + '...');
-      
-      // Clean and format IBAN (remove spaces, uppercase)
-      const cleanIban = params.iban.replace(/\s/g, '').toUpperCase();
-      
-      // Generate a fresh timestamp and clientRequestId for the addUPOAPM request
-      const addUpoTimeStamp = this.generateTimeStamp();
-      const addUpoClientRequestId = `add_upo_${Date.now()}`;
-      
-      // Calculate checksum for addUPOAPM: SHA256(merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey)
-      const addUpoChecksum = this.calculatePaymentStatusChecksum(
-        credentials.merchantId,
-        credentials.siteId,
-        addUpoClientRequestId,
-        addUpoTimeStamp,
-        credentials.secretKey
-      );
-      
-      // Step 2: Call addUPOAPM with sessionToken AND checksum
-      const requestBody = {
-        sessionToken,
-        merchantId: credentials.merchantId,
-        merchantSiteId: credentials.siteId,
-        userTokenId: params.userTokenId,
-        clientRequestId: addUpoClientRequestId,
-        paymentMethodName: 'apmgw_SEPA_Payouts',  // SEPA for Europe
-        apmData: {
-          IBAN: cleanIban,
-        },
-        billingAddress: {
-          country: params.country,
-          email: params.email,
-          firstName: params.firstName || 'N/A',
-          lastName: params.lastName || 'N/A',
-        },
-        timeStamp: addUpoTimeStamp,
-        checksum: addUpoChecksum,
-      };
-      
-      console.log('\n');
-      console.log('╔════════════════════════════════════════════════════════════╗');
-      console.log('║     NUVEI ADD SEPA UPO REQUEST (sessionToken + checksum)   ║');
-      console.log('╚════════════════════════════════════════════════════════════╝');
-      console.log('📤 ENDPOINT:', `${apiUrl}/addUPOAPM.do`);
-      console.log('📤 CHECKSUM INPUT:', `${credentials.merchantId}${credentials.siteId}${addUpoClientRequestId}${addUpoTimeStamp}[SECRET]`);
-      console.log('📤 REQUEST BODY (IBAN masked):');
-      console.log(JSON.stringify({
-        ...requestBody,
-        sessionToken: sessionToken?.substring(0, 20) + '...',
-        apmData: { IBAN: cleanIban.substring(0, 4) + '****' + cleanIban.slice(-4) },
-        checksum: '[HIDDEN]',
-      }, null, 2));
-      
       const response = await fetch(`${apiUrl}/addUPOAPM.do`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
