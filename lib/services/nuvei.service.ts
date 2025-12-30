@@ -622,6 +622,11 @@ class NuveiService {
       hasBankDetails: !!params.bankDetails,
     });
     
+    // DEBUG: Log full request body (without secrets)
+    const debugBody = { ...requestBody };
+    delete debugBody.checksum;
+    console.log('💸 Nuvei payout.do full request body:', JSON.stringify(debugBody, null, 2));
+    
     try {
       const response = await fetch(`${apiUrl}/payout.do`, {
         method: 'POST',
