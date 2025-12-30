@@ -57,11 +57,21 @@ export async function GET(request: NextRequest) {
     // Get user details for all transactions
     const userIds = [...new Set(transactions.map(t => t.userId))];
     
-    // Get users from Better Auth users collection
-    const usersCollection = mongoose.connection.collection('users');
+    // Convert to ObjectIds for _id lookup (Better Auth may use _id as ObjectId)
+    const objectIds = userIds
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+    
+    // Get users from Better Auth user collection (singular) - try both id field and _id
+    const usersCollection = mongoose.connection.collection('user');
     const users = await usersCollection.find(
-      { id: { $in: userIds } },
-      { projection: { id: 1, name: 1, email: 1 } }
+      { 
+        $or: [
+          { id: { $in: userIds } },
+          { _id: { $in: objectIds } }
+        ]
+      },
+      { projection: { _id: 1, id: 1, name: 1, email: 1 } }
     ).toArray();
     
     // Also get from credit wallets which store user email
@@ -74,9 +84,16 @@ export async function GET(request: NextRequest) {
     // Build user map from both sources
     const userMap = new Map<string, { name?: string; email?: string }>();
     
-    // First add from users collection
+    // First add from users collection - map by both id and _id.toString()
     for (const u of users) {
-      userMap.set(u.id, { name: u.name, email: u.email });
+      const idStr = u.id || u._id?.toString();
+      if (idStr) {
+        userMap.set(idStr, { name: u.name, email: u.email });
+      }
+      // Also set by _id string if different from id
+      if (u._id && u._id.toString() !== u.id) {
+        userMap.set(u._id.toString(), { name: u.name, email: u.email });
+      }
     }
     
     // Then supplement from wallets if user not found
