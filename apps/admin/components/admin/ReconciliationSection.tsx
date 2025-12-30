@@ -229,10 +229,73 @@ export default function ReconciliationSection() {
     run: ReconciliationHistoryItem | null;
   }>({ open: false, run: null });
 
-  // Filters
+  // Filters for history
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [severityFilter, setSeverityFilter] = useState('all');
+
+  // User details filters and state
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userIssueFilter, setUserIssueFilter] = useState<'all' | 'issues' | 'healthy'>('all');
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const [allUsersExpanded, setAllUsersExpanded] = useState(false);
+
+  // Toggle user expansion
+  const toggleUserExpanded = (userId: string) => {
+    setExpandedUsers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
+  // Expand/collapse all users
+  const toggleAllUsers = () => {
+    if (allUsersExpanded) {
+      setExpandedUsers(new Set());
+      setAllUsersExpanded(false);
+    } else {
+      if (result?.userDetails) {
+        setExpandedUsers(new Set(result.userDetails.map(u => u.userId)));
+      }
+      setAllUsersExpanded(true);
+    }
+  };
+
+  // Filter users based on search and issue filter
+  const getFilteredUsers = () => {
+    if (!result?.userDetails) return [];
+    
+    let filtered = result.userDetails;
+    
+    // Search filter
+    if (userSearchQuery.trim()) {
+      const query = userSearchQuery.toLowerCase();
+      filtered = filtered.filter(u => 
+        u.userEmail?.toLowerCase().includes(query) ||
+        u.userName?.toLowerCase().includes(query) ||
+        u.userId.toLowerCase().includes(query)
+      );
+    }
+    
+    // Issue filter
+    if (userIssueFilter === 'issues') {
+      filtered = filtered.filter(u => !u.healthy);
+    } else if (userIssueFilter === 'healthy') {
+      filtered = filtered.filter(u => u.healthy);
+    }
+    
+    // Sort by issues first
+    return filtered.sort((a, b) => {
+      if (!a.healthy && b.healthy) return -1;
+      if (a.healthy && !b.healthy) return 1;
+      return b.issues.length - a.issues.length;
+    });
+  };
 
   // Fetch history on mount and when filters change
   const fetchHistory = useCallback(async () => {
@@ -522,44 +585,175 @@ export default function ReconciliationSection() {
           {result.userDetails && result.userDetails.length > 0 && (
             <Card className="bg-gray-800/50 border-gray-700">
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-400" />
-                  Detailed User Reconciliation ({result.userDetails.length} users)
-                </CardTitle>
-                <CardDescription className="text-gray-400">
-                  Complete breakdown of each user&apos;s wallet with stored vs calculated values
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {result.userDetails.map((user) => (
-                  <div
-                    key={user.userId}
-                    className={`p-4 rounded-lg border ${
-                      user.healthy 
-                        ? 'bg-gray-900/50 border-gray-700' 
-                        : 'bg-red-500/5 border-red-500/30'
-                    }`}
-                  >
-                    {/* User Header */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full ${user.healthy ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
-                          {user.healthy ? (
-                            <CheckCircle className="h-5 w-5 text-green-400" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-400" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-white font-medium">{user.userName || user.userEmail?.split('@')[0] || 'Unknown'}</p>
-                          <p className="text-sm text-gray-400">{user.userEmail}</p>
-                          <p className="text-xs text-gray-500 font-mono">ID: {user.userId}</p>
-                        </div>
-                      </div>
-                      <Badge className={user.healthy ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
-                        {user.healthy ? 'Healthy' : `${user.issues.length} Issue(s)`}
-                      </Badge>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-white flex items-center gap-2">
+                      <Users className="h-5 w-5 text-blue-400" />
+                      Detailed User Reconciliation ({result.userDetails.length} users)
+                    </CardTitle>
+                    <CardDescription className="text-gray-400">
+                      Complete breakdown of each user&apos;s wallet with stored vs calculated values
+                    </CardDescription>
+                  </div>
+                  
+                  {/* Quick Stats */}
+                  <div className="flex items-center gap-4">
+                    <div className="text-center px-3 py-1 bg-red-500/10 rounded-lg">
+                      <p className="text-red-400 font-bold text-lg">
+                        {result.userDetails.filter(u => !u.healthy).length}
+                      </p>
+                      <p className="text-xs text-gray-400">Issues</p>
                     </div>
+                    <div className="text-center px-3 py-1 bg-green-500/10 rounded-lg">
+                      <p className="text-green-400 font-bold text-lg">
+                        {result.userDetails.filter(u => u.healthy).length}
+                      </p>
+                      <p className="text-xs text-gray-400">Healthy</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filters and Controls */}
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  {/* Search */}
+                  <div className="relative flex-1 min-w-[200px] max-w-sm">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search users by email, name, or ID..."
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      className="pl-10 bg-gray-900 border-gray-600"
+                    />
+                  </div>
+
+                  {/* Issue Filter */}
+                  <Select value={userIssueFilter} onValueChange={(v) => setUserIssueFilter(v as 'all' | 'issues' | 'healthy')}>
+                    <SelectTrigger className="w-[160px] bg-gray-900 border-gray-600">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Filter..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Users</SelectItem>
+                      <SelectItem value="issues">
+                        <span className="flex items-center gap-2">
+                          <XCircle className="h-3 w-3 text-red-400" />
+                          With Issues
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="healthy">
+                        <span className="flex items-center gap-2">
+                          <CheckCircle className="h-3 w-3 text-green-400" />
+                          Healthy Only
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Expand/Collapse All */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleAllUsers}
+                    className="border-gray-600"
+                  >
+                    {allUsersExpanded ? (
+                      <>
+                        <ChevronDown className="h-4 w-4 mr-2" />
+                        Collapse All
+                      </>
+                    ) : (
+                      <>
+                        <ChevronRight className="h-4 w-4 mr-2" />
+                        Expand All
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Jump to Issues */}
+                  {result.userDetails.some(u => !u.healthy) && userIssueFilter !== 'issues' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUserIssueFilter('issues')}
+                      className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      Jump to Issues ({result.userDetails.filter(u => !u.healthy).length})
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {getFilteredUsers().length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No users match your filters</p>
+                    <Button
+                      variant="link"
+                      className="text-blue-400"
+                      onClick={() => {
+                        setUserSearchQuery('');
+                        setUserIssueFilter('all');
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  </div>
+                ) : (
+                  getFilteredUsers().map((user) => (
+                    <Collapsible
+                      key={user.userId}
+                      open={expandedUsers.has(user.userId)}
+                      onOpenChange={() => toggleUserExpanded(user.userId)}
+                    >
+                      <div
+                        className={`rounded-lg border ${
+                          user.healthy 
+                            ? 'bg-gray-900/50 border-gray-700' 
+                            : 'bg-red-500/5 border-red-500/30'
+                        }`}
+                      >
+                        {/* User Header - Always visible */}
+                        <CollapsibleTrigger asChild>
+                          <div className="p-4 cursor-pointer hover:bg-gray-800/30 transition-colors flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {/* Expand/Collapse indicator */}
+                              <div className="text-gray-400">
+                                {expandedUsers.has(user.userId) ? (
+                                  <ChevronDown className="h-5 w-5" />
+                                ) : (
+                                  <ChevronRight className="h-5 w-5" />
+                                )}
+                              </div>
+                              <div className={`p-2 rounded-full ${user.healthy ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                                {user.healthy ? (
+                                  <CheckCircle className="h-5 w-5 text-green-400" />
+                                ) : (
+                                  <XCircle className="h-5 w-5 text-red-400" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-white font-medium">{user.userName || user.userEmail?.split('@')[0] || 'Unknown'}</p>
+                                <p className="text-sm text-gray-400">{user.userEmail}</p>
+                                <p className="text-xs text-gray-500 font-mono">ID: {user.userId}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {/* Quick balance info */}
+                              <div className="text-right text-sm hidden sm:block">
+                                <p className="text-gray-400">Balance</p>
+                                <p className="text-white font-mono">{user.wallet.creditBalance.toFixed(2)}</p>
+                              </div>
+                              <Badge className={user.healthy ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
+                                {user.healthy ? 'Healthy' : `${user.issues.length} Issue(s)`}
+                              </Badge>
+                            </div>
+                          </div>
+                        </CollapsibleTrigger>
+
+                        {/* Expandable Content */}
+                        <CollapsibleContent>
+                          <div className="px-4 pb-4 border-t border-gray-700/50 pt-4">
 
                     {/* Values Comparison Table */}
                     <div className="overflow-x-auto">
@@ -771,8 +965,12 @@ export default function ReconciliationSection() {
                         ))}
                       </div>
                     )}
-                  </div>
-                ))}
+                          </div>
+                        </CollapsibleContent>
+                      </div>
+                    </Collapsible>
+                  ))
+                )}
               </CardContent>
             </Card>
           )}
