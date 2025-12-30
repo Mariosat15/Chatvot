@@ -18,6 +18,8 @@ import WalletTransaction from '@/database/models/trading/wallet-transaction.mode
 import WithdrawalRequest from '@/database/models/withdrawal-request.model';
 import WithdrawalSettings from '@/database/models/withdrawal-settings.model';
 import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
+import UserBankAccount from '@/database/models/user-bank-account.model';
+import AppSettings from '@/database/models/app-settings.model';
 
 /**
  * POST - Submit a withdrawal request via Nuvei
@@ -37,12 +39,14 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.user.id;
+    const userEmail = session.user.email || '';
+    const userName = session.user.name || '';
     const body = await req.json();
     const { 
       amountEUR,
       withdrawalMethod, // 'card_refund' | 'bank_transfer'
-      userPaymentOptionId, // For card refund
-      bankDetails, // For bank transfer: { iban, bic, accountHolderName }
+      cardDetails, // For card refund: { paymentIntentId, cardBrand, cardLast4 }
+      bankAccountId, // For bank transfer: existing bank account ID
     } = body;
 
     // Validate amount
@@ -57,7 +61,12 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     // Check if Nuvei withdrawals are enabled
-    const withdrawalSettings = await WithdrawalSettings.getSingleton();
+    const [withdrawalSettings, creditSettings, wallet, appSettings] = await Promise.all([
+      WithdrawalSettings.getSingleton(),
+      CreditConversionSettings.getSingleton(),
+      CreditWallet.findOne({ userId }),
+      AppSettings.findById('global-app-settings'),
+    ]);
     
     if (!withdrawalSettings.nuveiWithdrawalEnabled) {
       return NextResponse.json(
@@ -66,8 +75,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get user's wallet
-    const wallet = await CreditWallet.findOne({ userId });
     if (!wallet) {
       return NextResponse.json(
         { error: 'Wallet not found' },
@@ -75,8 +82,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const isSandbox = appSettings?.simulatorModeEnabled ?? true;
+
     // Get fee settings
-    const creditSettings = await CreditConversionSettings.getSingleton();
     const feePercentage = withdrawalSettings.useCustomFees 
       ? withdrawalSettings.platformFeePercentage 
       : creditSettings.platformWithdrawalFeePercentage;
@@ -86,6 +94,7 @@ export async function POST(req: NextRequest) {
 
     // Calculate fees
     const platformFee = (amount * feePercentage / 100) + feeFixed;
+    const platformFeeCredits = platformFee * (creditSettings.eurToCreditsRate || 1);
     const netAmountEUR = amount - platformFee;
 
     if (netAmountEUR <= 0) {
@@ -95,8 +104,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check balance (assuming 1:1 EUR to credits for simplicity)
-    const exchangeRate = creditSettings.eurToCredits || 1;
+    // Check balance
+    const exchangeRate = creditSettings.eurToCreditsRate || 1;
     const creditsNeeded = amount * exchangeRate;
 
     if (wallet.creditBalance < creditsNeeded) {
@@ -121,11 +130,56 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Get bank details for bank transfer
+    let bankAccount = null;
+    let bankDetailsForRequest: any = null;
+    
+    if (withdrawalMethod === 'bank_transfer') {
+      if (!bankAccountId) {
+        return NextResponse.json(
+          { error: 'Please select a bank account for withdrawal' },
+          { status: 400 }
+        );
+      }
+      
+      bankAccount = await UserBankAccount.findOne({
+        _id: bankAccountId,
+        userId,
+        isActive: true,
+      });
+      
+      if (!bankAccount) {
+        return NextResponse.json(
+          { error: 'Bank account not found. Please add a bank account in your wallet settings.' },
+          { status: 400 }
+        );
+      }
+      
+      bankDetailsForRequest = {
+        accountHolderName: bankAccount.accountHolderName,
+        iban: bankAccount.ibanLast4 ? `****${bankAccount.ibanLast4}` : undefined,
+        bankName: bankAccount.bankName,
+        swiftBic: bankAccount.swiftBic,
+      };
+    } else if (withdrawalMethod === 'card_refund') {
+      if (!cardDetails) {
+        return NextResponse.json(
+          { error: 'Please select a card for refund' },
+          { status: 400 }
+        );
+      }
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid withdrawal method. Choose card_refund or bank_transfer.' },
+        { status: 400 }
+      );
+    }
+
     // Generate unique IDs
     const merchantWDRequestId = `wd_${userId.slice(-8)}_${Date.now()}`;
     const userTokenId = `user_${userId}`; // Nuvei user token
 
-    // Build withdrawal params
+    // Build withdrawal params for Nuvei
     const withdrawalParams: Parameters<typeof nuveiService.submitWithdrawal>[0] = {
       userTokenId,
       amount: netAmountEUR.toFixed(2),
@@ -133,26 +187,22 @@ export async function POST(req: NextRequest) {
       merchantWDRequestId,
       merchantUniqueId: `chartvolt_${merchantWDRequestId}`,
       userDetails: {
-        email: session.user.email || undefined,
-        firstName: session.user.name?.split(' ')[0] || undefined,
-        lastName: session.user.name?.split(' ').slice(1).join(' ') || undefined,
+        email: userEmail || undefined,
+        firstName: userName?.split(' ')[0] || undefined,
+        lastName: userName?.split(' ').slice(1).join(' ') || undefined,
       },
     };
 
-    // Add payment method details
-    if (withdrawalMethod === 'card_refund' && userPaymentOptionId) {
-      withdrawalParams.userPaymentOptionId = userPaymentOptionId;
-    } else if (withdrawalMethod === 'bank_transfer' && bankDetails) {
+    // Add payment method details for Nuvei
+    if (withdrawalMethod === 'card_refund' && cardDetails?.paymentIntentId) {
+      // For card refund, we send the original payment reference
+      withdrawalParams.merchantUniqueId = cardDetails.paymentIntentId;
+    } else if (withdrawalMethod === 'bank_transfer' && bankAccount) {
       withdrawalParams.bankDetails = {
-        iban: bankDetails.iban,
-        bic: bankDetails.bic,
-        accountHolderName: bankDetails.accountHolderName,
+        iban: bankAccount.iban,
+        bic: bankAccount.swiftBic,
+        accountHolderName: bankAccount.accountHolderName,
       };
-    } else {
-      return NextResponse.json(
-        { error: 'Invalid withdrawal method. Specify card_refund with UPO ID or bank_transfer with bank details.' },
-        { status: 400 }
-      );
     }
 
     // Get DMN URL - use the same webhook as payments (Nuvei uses single DMN URL for both)
@@ -172,18 +222,61 @@ export async function POST(req: NextRequest) {
     wallet.creditBalance -= creditsNeeded;
     await wallet.save();
 
-    // Create pending withdrawal request in our system
+    // Create pending withdrawal request with ALL required fields
     const withdrawalRequest = await WithdrawalRequest.create({
+      // Required user info
       userId,
-      amountRequested: creditsNeeded,
-      amountRequestedEUR: amount,
+      userEmail,
+      userName,
+      
+      // Required amount details
+      amountCredits: creditsNeeded,
+      amountEUR: amount,
+      exchangeRate,
+      
+      // Required fees
       platformFee,
+      platformFeeCredits,
+      bankFee: 0,
       netAmountEUR,
+      
+      // Status
       status: 'processing',
+      
+      // Required wallet state
+      walletBalanceBefore: balanceBefore,
+      walletBalanceAfter: wallet.creditBalance,
+      
+      // Payout details
       payoutMethod: withdrawalMethod === 'card_refund' ? 'nuvei_card_refund' : 'nuvei_bank_transfer',
-      payoutDetails: withdrawalMethod === 'card_refund' 
-        ? { userPaymentOptionId }
-        : { bankDetails },
+      payoutProvider: 'nuvei',
+      
+      // Method-specific details
+      ...(withdrawalMethod === 'card_refund' && cardDetails ? {
+        originalPaymentId: cardDetails.paymentIntentId,
+        originalPaymentMethod: 'card',
+        originalCardDetails: {
+          brand: cardDetails.cardBrand,
+          last4: cardDetails.cardLast4,
+        },
+      } : {}),
+      ...(withdrawalMethod === 'bank_transfer' && bankAccount ? {
+        bankDetails: bankDetailsForRequest,
+        bankAccountId: bankAccount._id,
+      } : {}),
+      
+      // KYC and other flags
+      isSandbox,
+      kycVerified: wallet.kycVerified,
+      isAutoApproved: true, // Automatic withdrawals are always "auto-approved"
+      autoApprovalReason: 'Automatic withdrawal via Nuvei',
+      
+      // Request info
+      requestedAt: new Date(),
+      ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+      userAgent: req.headers.get('user-agent'),
+      
+      // Metadata
       metadata: {
         merchantWDRequestId,
         userTokenId,
@@ -198,18 +291,20 @@ export async function POST(req: NextRequest) {
       transactionType: 'withdrawal',
       amount: -creditsNeeded,
       currency: 'EUR',
+      exchangeRate,
       balanceBefore,
       balanceAfter: wallet.creditBalance,
       status: 'pending',
       provider: 'nuvei',
-      description: `Withdrawal €${netAmountEUR.toFixed(2)} (Fee: €${platformFee.toFixed(2)})`,
+      description: `${creditsNeeded.toFixed(0)} credits (€${netAmountEUR.toFixed(2)} net after €${platformFee.toFixed(2)} fee)`,
       metadata: {
         withdrawalRequestId: withdrawalRequest._id.toString(),
         merchantWDRequestId,
         amountEUR: amount,
         netAmountEUR,
         platformFee,
-        feePercentage,
+        platformFeePercentage: feePercentage,
+        platformFeeFixed: feeFixed,
         withdrawalMethod,
       },
     });

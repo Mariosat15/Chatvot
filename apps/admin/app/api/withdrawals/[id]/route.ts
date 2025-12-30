@@ -323,7 +323,40 @@ export async function PUT(
       case 'failed':
         withdrawal.status = 'failed';
         withdrawal.failureReason = reason || 'Bank transfer failed';
+        withdrawal.failedAt = new Date();
         if (adminNote) withdrawal.adminNote = adminNote;
+        
+        // CRITICAL: Refund credits when withdrawal fails
+        const walletForRefund = await CreditWallet.findOne({ userId: withdrawal.userId }).session(session);
+        if (walletForRefund) {
+          const balanceBeforeRefund = walletForRefund.creditBalance;
+          walletForRefund.creditBalance += withdrawal.amountCredits;
+          await walletForRefund.save({ session });
+
+          // Record refund transaction
+          await WalletTransaction.create(
+            [{
+              userId: withdrawal.userId,
+              transactionType: 'withdrawal_refund',
+              amount: withdrawal.amountCredits,
+              balanceBefore: balanceBeforeRefund,
+              balanceAfter: walletForRefund.creditBalance,
+              currency: 'EUR',
+              exchangeRate: withdrawal.exchangeRate,
+              status: 'completed',
+              description: `Withdrawal failed - credits refunded: ${withdrawal.failureReason}`,
+              metadata: {
+                withdrawalRequestId: withdrawal._id,
+                reason: withdrawal.failureReason,
+              },
+              processedAt: new Date(),
+            }],
+            { session }
+          );
+
+          withdrawal.walletBalanceAfter = walletForRefund.creditBalance;
+          console.log(`💰 Refunded ${withdrawal.amountCredits} credits to user ${withdrawal.userId} due to failed withdrawal`);
+        }
         break;
     }
 

@@ -420,40 +420,57 @@ async function handleWithdrawalDmn(params: NuveiDmnParams): Promise<NextResponse
       
       const wallet = await CreditWallet.findOne({ userId: withdrawalRequest.userId });
       if (wallet) {
-        // Restore the credits
-        const creditsToRefund = Math.abs(withdrawalRequest.amountRequested);
-        wallet.creditBalance += creditsToRefund;
-        await wallet.save();
+        // Restore the credits - use amountCredits (new field) or amountRequested (old field)
+        const creditsToRefund = Math.abs(withdrawalRequest.amountCredits || withdrawalRequest.amountRequested || 0);
+        
+        if (creditsToRefund > 0) {
+          const balanceBefore = wallet.creditBalance;
+          wallet.creditBalance += creditsToRefund;
+          await wallet.save();
 
-        console.log(`💸 Refunded ${creditsToRefund} credits to user ${withdrawalRequest.userId}`);
+          console.log(`💸 Refunded ${creditsToRefund} credits to user ${withdrawalRequest.userId}`);
 
-        // Create refund transaction
-        await WalletTransaction.create({
-          userId: withdrawalRequest.userId,
-          transactionType: 'withdrawal_refund',
-          amount: creditsToRefund,
-          currency: 'EUR',
-          balanceBefore: wallet.creditBalance - creditsToRefund,
-          balanceAfter: wallet.creditBalance,
-          status: 'completed',
-          provider: 'nuvei',
-          description: `Withdrawal refund - ${reason || newStatus}`,
-          metadata: {
-            withdrawalRequestId: withdrawalRequest._id.toString(),
-            merchantWDRequestId,
-            refundReason: reason || newStatus,
-          },
-        });
+          // Create refund transaction
+          await WalletTransaction.create({
+            userId: withdrawalRequest.userId,
+            transactionType: 'withdrawal_refund',
+            amount: creditsToRefund,
+            currency: 'EUR',
+            exchangeRate: withdrawalRequest.exchangeRate || 1,
+            balanceBefore,
+            balanceAfter: wallet.creditBalance,
+            status: 'completed',
+            provider: 'nuvei',
+            description: `Withdrawal refund - ${reason || newStatus}`,
+            metadata: {
+              withdrawalRequestId: withdrawalRequest._id.toString(),
+              merchantWDRequestId,
+              refundReason: reason || newStatus,
+              originalAmountEUR: withdrawalRequest.amountEUR,
+            },
+          });
 
-        // Send notification
-        try {
-          const { sendWithdrawalFailedNotification } = await import('@/lib/services/notification.service');
-          await sendWithdrawalFailedNotification(
-            withdrawalRequest.userId,
-            reason || 'Withdrawal was declined or cancelled'
-          );
-        } catch (notifError) {
-          console.error('💸 Error sending withdrawal failed notification:', notifError);
+          // Update withdrawal request with refund info
+          await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
+            $set: {
+              'metadata.refunded': true,
+              'metadata.refundedAt': new Date().toISOString(),
+              'metadata.refundedCredits': creditsToRefund,
+            },
+          });
+
+          // Send notification
+          try {
+            const { sendWithdrawalFailedNotification } = await import('@/lib/services/notification.service');
+            await sendWithdrawalFailedNotification(
+              withdrawalRequest.userId,
+              reason || 'Withdrawal was declined or cancelled'
+            );
+          } catch (notifError) {
+            console.error('💸 Error sending withdrawal failed notification:', notifError);
+          }
+        } else {
+          console.warn('💸 No credits to refund (amountCredits is 0 or missing)');
         }
       }
     }
