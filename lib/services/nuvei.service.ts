@@ -679,35 +679,15 @@ class NuveiService {
     const firstName = params.firstName || 'N/A';
     const lastName = params.lastName || 'N/A';
     
-    // Build checksum according to Nuvei docs:
-    // "Include exactly the same fields as in the request."
-    // "Place the fields in exactly the same field order as in the request."
-    // "Concatenate the value of your merchantSecretKey to the end of the string"
-    // 
-    // Order: merchantId, merchantSiteId, clientRequestId, userTokenId, paymentMethodName,
-    //        apmData values (iban, bic?, accountHolderName?), 
-    //        billingAddress values (countryCode, email, firstName, lastName),
-    //        timeStamp, secretKey
-    let checksumString = credentials.merchantId 
+    // Standard checksum for Nuvei REST API endpoints:
+    // SHA256(merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey)
+    // This is the same formula used by getPaymentStatus, getUserUPOs, etc.
+    // The "all field values" approach is for Withdrawal API REDIRECTS, not REST API calls
+    const checksumString = credentials.merchantId 
       + credentials.siteId 
       + clientRequestId 
-      + params.userTokenId 
-      + paymentMethodName 
-      + cleanIban;
-    
-    // Add optional apmData fields only if they exist
-    if (cleanBic) {
-      checksumString += cleanBic;
-    }
-    if (params.accountHolderName) {
-      checksumString += params.accountHolderName;
-    }
-    
-    // Add billingAddress fields
-    checksumString += params.country + params.email + firstName + lastName;
-    
-    // Add timestamp and secret key
-    checksumString += timeStamp + credentials.secretKey;
+      + timeStamp 
+      + credentials.secretKey;
     
     const checksum = crypto.createHash('sha256').update(checksumString).digest('hex');
     
@@ -722,7 +702,7 @@ class NuveiService {
       apmData.accountHolderName = params.accountHolderName;
     }
     
-    // Build request body - field order matters for checksum!
+    // Build request body
     const requestBody = {
       merchantId: credentials.merchantId,
       merchantSiteId: credentials.siteId,
@@ -731,7 +711,7 @@ class NuveiService {
       paymentMethodName,
       apmData,
       billingAddress: {
-        countryCode: params.country,
+        country: params.country,
         email: params.email,
         firstName,
         lastName,
@@ -741,24 +721,15 @@ class NuveiService {
     };
     
     // Build display string for logging (hide secret key)
-    const checksumDisplayString = credentials.merchantId 
-      + credentials.siteId 
-      + clientRequestId 
-      + params.userTokenId 
-      + paymentMethodName 
-      + cleanIban
-      + (cleanBic || '')
-      + (params.accountHolderName || '')
-      + params.country + params.email + firstName + lastName
-      + timeStamp + '[SECRET]';
+    const checksumDisplayString = `${credentials.merchantId}${credentials.siteId}${clientRequestId}${timeStamp}[SECRET]`;
     
     console.log('\n');
     console.log('╔════════════════════════════════════════════════════════════╗');
     console.log('║     NUVEI ADD SEPA UPO REQUEST (apmgw_SEPA)                 ║');
     console.log('╚════════════════════════════════════════════════════════════╝');
     console.log('📤 ENDPOINT:', `${apiUrl}/addUPOAPM.do`);
-    console.log('📤 CHECKSUM INPUT (all field values in order):');
-    console.log(checksumDisplayString.replace(cleanIban, cleanIban.substring(0, 4) + '****' + cleanIban.slice(-4)));
+    console.log('📤 CHECKSUM FORMULA: merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey');
+    console.log('📤 CHECKSUM INPUT:', checksumDisplayString);
     console.log('📤 REQUEST BODY (IBAN masked):');
     console.log(JSON.stringify({
       ...requestBody,
