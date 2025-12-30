@@ -381,9 +381,25 @@ export async function POST(req: NextRequest) {
         processedAt: new Date(),
       });
 
+      // Provide better error message for common errors
+      let userFriendlyError = nuveiResult.error;
+      if (nuveiResult.error.includes('1060') || nuveiResult.error.includes('payment data')) {
+        if (withdrawalMethod === 'bank_transfer') {
+          userFriendlyError = 'Bank transfer withdrawals are not currently available. Please use card refund (withdraw to your original deposit card) or contact support.';
+        } else {
+          userFriendlyError = 'Card refund failed. Please ensure you have made a deposit with this card first, or contact support.';
+        }
+      }
+
       return NextResponse.json(
-        { error: nuveiResult.error },
-        { status: 500 }
+        { 
+          error: userFriendlyError,
+          code: 'WITHDRAWAL_FAILED',
+          suggestion: withdrawalMethod === 'bank_transfer' 
+            ? 'Try using card refund instead, or request a manual withdrawal.' 
+            : 'Try making a deposit first to enable card refunds.',
+        },
+        { status: 400 }
       );
     }
 

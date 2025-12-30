@@ -330,12 +330,15 @@ class NuveiService {
       amount: params.amount,
       timeStamp,
       checksum,
+      // Transaction type for 3DS - required for SCA compliance
+      transactionType: 'Sale',
+      // User details for 3DS2
       ...(params.userEmail && { 
         userDetails: {
           email: params.userEmail,
-          country: params.userCountry || 'US',
         }
       }),
+      // URL details for DMN and redirects
       ...(params.notificationUrl && {
         urlDetails: {
           notificationUrl: params.notificationUrl,
@@ -346,6 +349,13 @@ class NuveiService {
         }
       }),
     };
+    
+    console.log('📤 Nuvei openOrder request:', {
+      clientUniqueId: params.clientUniqueId,
+      amount: params.amount,
+      currency: params.currency,
+      notificationUrl: params.notificationUrl,
+    });
     
     try {
       const response = await fetch(`${apiUrl}/openOrder.do`, {
@@ -359,13 +369,18 @@ class NuveiService {
       const data = await response.json();
       
       if (data.status === 'SUCCESS') {
+        console.log('📥 Nuvei openOrder success:', {
+          sessionToken: data.sessionToken?.substring(0, 20) + '...',
+          orderId: data.orderId,
+          clientUniqueId: data.clientUniqueId,
+        });
         return data as OpenOrderResponse;
       } else {
-        console.error('Nuvei openOrder failed:', data);
+        console.error('❌ Nuvei openOrder failed:', data);
         return { error: data.reason || 'Failed to create order session' };
       }
     } catch (error) {
-      console.error('Nuvei openOrder error:', error);
+      console.error('❌ Nuvei openOrder error:', error);
       return { error: 'Failed to connect to Nuvei' };
     }
   }
@@ -548,26 +563,32 @@ class NuveiService {
       requestBody.userPaymentOptionId = params.userPaymentOptionId;
     }
     
-    // For bank transfer - use SEPA/IBAN format for EUR withdrawals
+    // For bank transfer - Nuvei requires specific APM setup
+    // NOTE: Bank payouts (SEPA) must be enabled by Nuvei for your merchant account
+    // Contact Nuvei support to enable APM payouts if you get error 1060
     if (params.bankDetails && params.bankDetails.iban) {
       // Format IBAN for Nuvei (remove spaces, uppercase)
       const cleanIban = params.bankDetails.iban.replace(/\s/g, '').toUpperCase();
       const cleanBic = params.bankDetails.bic?.replace(/\s/g, '').toUpperCase();
       
+      // Try different payout methods that Nuvei might support
+      // The exact method depends on your merchant configuration
       requestBody.paymentOption = {
         alternativePaymentMethod: {
-          paymentMethod: 'apmgw_SEPA',  // Use SEPA for EUR bank transfers
+          paymentMethod: 'apmgw_bank_payout', // Generic bank payout
           iban: cleanIban,
           bic: cleanBic || undefined,
           bankName: params.bankDetails.bankName || undefined,
-          accountHolderName: params.bankDetails.accountHolderName || undefined,
+          beneficiaryName: params.bankDetails.accountHolderName || undefined,
         },
       };
       
       console.log('💸 Bank transfer details:', {
-        method: 'apmgw_SEPA',
+        method: 'apmgw_bank_payout',
         ibanPrefix: cleanIban.substring(0, 4) + '****',
+        ibanLength: cleanIban.length,
         hasBic: !!cleanBic,
+        hasBeneficiaryName: !!params.bankDetails.accountHolderName,
       });
     }
     

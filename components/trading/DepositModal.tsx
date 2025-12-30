@@ -1154,24 +1154,33 @@ function NuveiPaymentForm({
       const firstName = nameParts[0] || 'Customer';
       const lastName = nameParts.slice(1).join(' ') || 'Customer';
 
-      // Create payment with required user details
-      // The paymentOption MUST be from the same SafeCharge instance for 3DS to work
-      // Note: Country should match user's location for 3DS2 compliance
+      console.log('🔐 Creating Nuvei payment:', { 
+        sessionToken: sessionToken?.substring(0, 20) + '...', 
+        clientUniqueId,
+        hasCardField: !!scard,
+      });
+
+      // Create payment with required user details for 3DS2 compliance
+      // According to Nuvei docs, 3DS2 requires complete user details
+      // https://docs.nuvei.com/documentation/features/3d-secure/
       sfc.createPayment(
         {
           sessionToken,
           clientUniqueId,
           cardHolderName: cardHolderName.trim(),
           paymentOption: scard,
+          // Full user details for 3DS2 Strong Customer Authentication (SCA)
           userDetails: {
             firstName,
             lastName,
             email: email.trim(),
-            country: 'CY', // Cyprus - where the business is registered
           },
+          // Billing address for 3DS2 - minimal required fields
           billingAddress: {
+            firstName,
+            lastName,
             email: email.trim(),
-            country: 'CY', // Match with business location for EUR transactions
+            country: 'CY', // Cyprus for EUR transactions
           },
         } as Parameters<typeof sfc.createPayment>[0],
         async (result: { result: string; errCode: string; errorDescription?: string; reason?: string; transactionId?: string }) => {
