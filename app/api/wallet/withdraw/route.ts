@@ -14,6 +14,7 @@ import AppSettings from '@/database/models/app-settings.model';
 import UserBankAccount from '@/database/models/user-bank-account.model';
 import KYCSettings from '@/database/models/kyc-settings.model';
 import { sanitizeUserNote, sanitizeAmount } from '@/lib/utils/sanitize';
+import { createSecurityLogger } from '@/lib/utils/security-logger';
 
 /**
  * GET /api/wallet/withdraw
@@ -226,6 +227,9 @@ export async function GET() {
  * Create a new withdrawal request
  */
 export async function POST(request: NextRequest) {
+  // SECURITY: Create logger for this request
+  const securityLogger = createSecurityLogger(request);
+  
   const mongoSession = await mongoose.startSession();
   mongoSession.startTransaction();
 
@@ -235,6 +239,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!session?.user?.id) {
+      await securityLogger.log({ statusCode: 401, success: false, errorMessage: 'Unauthorized' });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -632,6 +637,15 @@ export async function POST(request: NextRequest) {
       message = 'Withdrawal request approved! Processing will begin shortly.';
     }
 
+    // SECURITY: Log successful withdrawal request
+    await securityLogger.log({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      body: { amountEUR, netAmountEUR, withdrawalMethodId, autoApproved },
+      statusCode: 200,
+      success: true,
+    });
+
     return NextResponse.json({
       success: true,
       message,
@@ -649,6 +663,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     await mongoSession.abortTransaction();
     console.error('Error creating withdrawal:', error);
+    
+    // SECURITY: Log failed withdrawal request
+    await securityLogger.log({
+      statusCode: 500,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+    
     return NextResponse.json(
       { success: false, error: 'Failed to create withdrawal request' },
       { status: 500 }

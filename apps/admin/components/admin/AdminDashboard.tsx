@@ -50,6 +50,7 @@ import {
   ArrowUpFromLine,
   Calendar,
   Clock,
+  Package,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -85,6 +86,7 @@ import PendingWithdrawalsSection from '@/components/admin/PendingWithdrawalsSect
 import KYCSettingsSection from '@/components/admin/KYCSettingsSection';
 import KYCHistorySection from '@/components/admin/KYCHistorySection';
 import MarketSettingsSection from '@/components/admin/MarketSettingsSection';
+import DependencyUpdatesSection from '@/components/admin/DependencyUpdatesSection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -332,6 +334,7 @@ const menuGroups: MenuGroup[] = [
           { id: 'redis', label: 'Redis Cache', icon: <Server className="h-4 w-4" /> },
           { id: 'dev-settings', label: 'Test', icon: <Terminal className="h-4 w-4" /> },
           { id: 'performance-simulator', label: 'Performance Simulator', icon: <Activity className="h-4 w-4" /> },
+          { id: 'dependency-updates', label: 'Dependency Updates', icon: <Package className="h-4 w-4" /> },
         ],
       },
     ],
@@ -480,6 +483,8 @@ export default function AdminDashboard({
         return <DevSettingsSection />;
       case 'performance-simulator':
         return <PerformanceSimulatorSection />;
+      case 'dependency-updates':
+        return <DependencyUpdatesSection />;
       default:
         return <CompetitionsListSection />;
     }

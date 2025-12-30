@@ -14,8 +14,12 @@ import { connectToDatabase } from '@/database/mongoose';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import { RateLimiters, getRateLimitHeaders } from '@/lib/utils/rate-limiter';
+import { createSecurityLogger } from '@/lib/utils/security-logger';
 
 export async function POST(req: NextRequest) {
+  // SECURITY: Create logger for this request
+  const securityLogger = createSecurityLogger(req);
+  
   try {
     // Get authenticated user
     const session = await auth.api.getSession({
@@ -23,6 +27,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!session?.user?.id) {
+      await securityLogger.log({ statusCode: 401, success: false, errorMessage: 'Not authenticated' });
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
@@ -260,6 +265,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // SECURITY: Log successful deposit initiation
+    await securityLogger.log({
+      userId,
+      userEmail: session.user.email,
+      body: { amount: amountNum, currency, transactionId: pendingTransaction._id },
+      statusCode: 200,
+      success: true,
+    });
+
     return NextResponse.json({
       success: true,
       sessionToken: result.sessionToken,
@@ -272,6 +286,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Nuvei open order error:', error);
+    
+    // SECURITY: Log failed deposit initiation
+    await securityLogger.log({
+      statusCode: 500,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+    
     return NextResponse.json(
       { error: 'Failed to create payment session' },
       { status: 500 }
