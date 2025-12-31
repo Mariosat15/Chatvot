@@ -152,11 +152,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Nuvei UPO for bank account (for automatic withdrawals)
+    // Only if automatic withdrawals are enabled in admin settings
     let nuveiUpoId: string | undefined;
-    let nuveiStatus: string = 'pending';
+    let nuveiStatus: string = 'not_configured';
     
     const userTokenId = `user_${session.user.id}`;
     const cleanIban = iban?.replace(/\s/g, '').toUpperCase();
+    
+    // Check if automatic withdrawals are enabled
+    const WithdrawalSettings = (await import('@/database/models/withdrawal-settings.model')).default;
+    const withdrawalSettings = await WithdrawalSettings.findOne();
+    const automaticWithdrawalsEnabled = withdrawalSettings?.nuveiWithdrawalEnabled ?? false;
     
     // Get user email for Nuvei
     const userEmail = session.user.email || 'noemail@example.com';
@@ -165,7 +171,7 @@ export async function POST(request: NextRequest) {
     const firstName = nameParts[0] || 'N/A';
     const lastName = nameParts.slice(1).join(' ') || 'N/A';
     
-    if (cleanIban) {
+    if (cleanIban && automaticWithdrawalsEnabled) {
       try {
         console.log('🏦 Creating Nuvei bank UPO for user:', session.user.id);
         

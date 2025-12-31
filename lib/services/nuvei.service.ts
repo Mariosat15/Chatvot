@@ -684,13 +684,13 @@ class NuveiService {
     const firstName = params.firstName || 'N/A';
     const lastName = params.lastName || 'N/A';
     
-    // Standard checksum for Nuvei REST API endpoints:
-    // SHA256(merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey)
-    // This is the same formula used by getPaymentStatus, getUserUPOs, etc.
-    // The "all field values" approach is for Withdrawal API REDIRECTS, not REST API calls
+    // Checksum for addUPOAPM includes userTokenId:
+    // SHA256(merchantId + merchantSiteId + clientRequestId + userTokenId + timeStamp + secretKey)
+    // Similar to getUserUPOs which also requires userTokenId in checksum
     const checksumString = credentials.merchantId 
       + credentials.siteId 
       + clientRequestId 
+      + params.userTokenId
       + timeStamp 
       + credentials.secretKey;
     
@@ -726,14 +726,14 @@ class NuveiService {
     };
     
     // Build display string for logging (hide secret key)
-    const checksumDisplayString = `${credentials.merchantId}${credentials.siteId}${clientRequestId}${timeStamp}[SECRET]`;
+    const checksumDisplayString = `${credentials.merchantId}${credentials.siteId}${clientRequestId}${params.userTokenId}${timeStamp}[SECRET]`;
     
     console.log('\n');
     console.log('╔════════════════════════════════════════════════════════════╗');
     console.log('║     NUVEI ADD SEPA UPO REQUEST (apmgw_SEPA)                 ║');
     console.log('╚════════════════════════════════════════════════════════════╝');
     console.log('📤 ENDPOINT:', `${apiUrl}/addUPOAPM.do`);
-    console.log('📤 CHECKSUM FORMULA: merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey');
+    console.log('📤 CHECKSUM FORMULA: merchantId + merchantSiteId + clientRequestId + userTokenId + timeStamp + secretKey');
     console.log('📤 CHECKSUM INPUT:', checksumDisplayString);
     console.log('📤 REQUEST BODY (IBAN masked):');
     console.log(JSON.stringify({
