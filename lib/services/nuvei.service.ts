@@ -684,17 +684,38 @@ class NuveiService {
     const firstName = params.firstName || 'N/A';
     const lastName = params.lastName || 'N/A';
     
-    // Checksum for addUPOAPM includes userTokenId:
-    // SHA256(merchantId + merchantSiteId + clientRequestId + userTokenId + timeStamp + secretKey)
-    // Similar to getUserUPOs which also requires userTokenId in checksum
-    const checksumString = credentials.merchantId 
-      + credentials.siteId 
-      + clientRequestId 
-      + params.userTokenId
-      + timeStamp 
-      + credentials.secretKey;
+    // Try using sessionToken approach instead of checksum for addUPOAPM
+    // First get a session token, then use it for the request
+    const sessionChecksum = this.calculateSessionTokenChecksum(
+      credentials.merchantId,
+      credentials.siteId,
+      clientRequestId,
+      timeStamp,
+      credentials.secretKey
+    );
     
-    const checksum = crypto.createHash('sha256').update(checksumString).digest('hex');
+    // Get session token first
+    const sessionResponse = await fetch(`${apiUrl}/getSessionToken.do`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        merchantId: credentials.merchantId,
+        merchantSiteId: credentials.siteId,
+        clientRequestId,
+        timeStamp,
+        checksum: sessionChecksum,
+      }),
+    });
+    
+    const sessionData = await sessionResponse.json();
+    
+    if (sessionData.status !== 'SUCCESS') {
+      console.error('🏦 Failed to get session token for addUPOAPM:', sessionData);
+      return { error: sessionData.reason || 'Failed to get session token' };
+    }
+    
+    const sessionToken = sessionData.sessionToken;
+    console.log('🏦 Got session token for addUPOAPM:', sessionToken?.substring(0, 20) + '...');
     
     // Build apmData with SEPA-specific fields
     const apmData: Record<string, string> = {
@@ -707,8 +728,9 @@ class NuveiService {
       apmData.accountHolderName = params.accountHolderName;
     }
     
-    // Build request body
+    // Build request body with sessionToken (not checksum)
     const requestBody = {
+      sessionToken,
       merchantId: credentials.merchantId,
       merchantSiteId: credentials.siteId,
       clientRequestId,
@@ -722,27 +744,22 @@ class NuveiService {
         lastName,
       },
       timeStamp,
-      checksum,
     };
-    
-    // Build display string for logging (hide secret key)
-    const checksumDisplayString = `${credentials.merchantId}${credentials.siteId}${clientRequestId}${params.userTokenId}${timeStamp}[SECRET]`;
     
     console.log('\n');
     console.log('╔════════════════════════════════════════════════════════════╗');
     console.log('║     NUVEI ADD SEPA UPO REQUEST (apmgw_SEPA)                 ║');
     console.log('╚════════════════════════════════════════════════════════════╝');
     console.log('📤 ENDPOINT:', `${apiUrl}/addUPOAPM.do`);
-    console.log('📤 CHECKSUM FORMULA: merchantId + merchantSiteId + clientRequestId + userTokenId + timeStamp + secretKey');
-    console.log('📤 CHECKSUM INPUT:', checksumDisplayString);
+    console.log('📤 USING: sessionToken (obtained from /getSessionToken)');
     console.log('📤 REQUEST BODY (IBAN masked):');
     console.log(JSON.stringify({
       ...requestBody,
+      sessionToken: sessionToken?.substring(0, 20) + '...',
       apmData: { 
         ...apmData, 
         iban: cleanIban.substring(0, 4) + '****' + cleanIban.slice(-4) 
       },
-      checksum: '[HIDDEN]',
     }, null, 2));
     
     try {
