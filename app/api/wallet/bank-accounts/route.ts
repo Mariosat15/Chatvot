@@ -158,6 +158,13 @@ export async function POST(request: NextRequest) {
     const userTokenId = `user_${session.user.id}`;
     const cleanIban = iban?.replace(/\s/g, '').toUpperCase();
     
+    // Get user email for Nuvei
+    const userEmail = session.user.email || 'noemail@example.com';
+    // Parse account holder name into first/last for Nuvei
+    const nameParts = accountHolderName.trim().split(' ');
+    const firstName = nameParts[0] || 'N/A';
+    const lastName = nameParts.slice(1).join(' ') || 'N/A';
+    
     if (cleanIban) {
       try {
         console.log('🏦 Creating Nuvei bank UPO for user:', session.user.id);
@@ -168,7 +175,10 @@ export async function POST(request: NextRequest) {
           iban: cleanIban,
           bic: swiftBic?.toUpperCase(),
           accountHolderName: accountHolderName.trim(),
-          countryCode: country.toUpperCase(),
+          email: userEmail,
+          country: country.toUpperCase(),
+          firstName,
+          lastName,
         });
         
         if ('error' in nuveiResult) {
