@@ -171,6 +171,18 @@ export async function POST(request: NextRequest) {
     const firstName = nameParts[0] || 'N/A';
     const lastName = nameParts.slice(1).join(' ') || 'N/A';
     
+    // Get user's address info for Nuvei billing (required by SEPA)
+    const mongoose = await import('mongoose');
+    const userCollection = mongoose.default.connection.collection('user');
+    const userDoc = await userCollection.findOne({ 
+      $or: [
+        { _id: new mongoose.default.Types.ObjectId(session.user.id) },
+        { id: session.user.id }
+      ]
+    });
+    const userAddress = (userDoc as any)?.address || 'N/A';
+    const userCity = (userDoc as any)?.city || 'N/A';
+    
     if (cleanIban && automaticWithdrawalsEnabled) {
       try {
         console.log('🏦 Creating Nuvei bank UPO for user:', session.user.id);
@@ -185,6 +197,8 @@ export async function POST(request: NextRequest) {
           country: country.toUpperCase(),
           firstName,
           lastName,
+          address: userAddress,
+          city: userCity,
         });
         
         if ('error' in nuveiResult) {

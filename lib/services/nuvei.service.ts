@@ -665,6 +665,8 @@ class NuveiService {
     country: string;
     firstName?: string;
     lastName?: string;
+    address?: string;
+    city?: string;
   }): Promise<{ userPaymentOptionId?: string; error?: string }> {
     const credentials = await this.getCredentials();
     if (!credentials) {
@@ -686,13 +688,13 @@ class NuveiService {
     
     // Try using sessionToken approach instead of checksum for addUPOAPM
     // First get a session token, then use it for the request
-    const sessionChecksum = this.calculateSessionTokenChecksum(
-      credentials.merchantId,
-      credentials.siteId,
-      clientRequestId,
-      timeStamp,
-      credentials.secretKey
-    );
+    // Checksum for /getSessionToken: SHA256(merchantId + merchantSiteId + clientRequestId + timeStamp + secretKey)
+    const sessionChecksumString = credentials.merchantId 
+      + credentials.siteId 
+      + clientRequestId 
+      + timeStamp 
+      + credentials.secretKey;
+    const sessionChecksum = crypto.createHash('sha256').update(sessionChecksumString).digest('hex');
     
     // Get session token first
     const sessionResponse = await fetch(`${apiUrl}/getSessionToken.do`, {
@@ -742,6 +744,8 @@ class NuveiService {
         email: params.email,
         firstName,
         lastName,
+        address: params.address || 'N/A',
+        city: params.city || 'N/A',
       },
       timeStamp,
     };
