@@ -865,11 +865,12 @@ class NuveiService {
         console.log(`   ${i + 1}. UPO ID: ${pm.userPaymentOptionId}, Type: ${pm.paymentMethodName}, Status: ${pm.upoStatus}, Card: ${pm.cardLastFourDigits || 'N/A'}`);
       });
       
-      // Check if our requested UPO exists in Nuvei
+      // Check if our requested UPO exists in Nuvei (compare as strings to handle type mismatch)
       if (params.userPaymentOptionId) {
-        const found = upoCheck.paymentMethods.find(pm => pm.userPaymentOptionId === params.userPaymentOptionId);
+        const requestedUpo = String(params.userPaymentOptionId);
+        const found = upoCheck.paymentMethods.find(pm => String(pm.userPaymentOptionId) === requestedUpo);
         if (found) {
-          console.log(`✅ Requested UPO ${params.userPaymentOptionId} FOUND in Nuvei`);
+          console.log(`✅ Requested UPO ${params.userPaymentOptionId} FOUND in Nuvei (type: ${found.paymentMethodName})`);
         } else {
           console.log(`❌ Requested UPO ${params.userPaymentOptionId} NOT FOUND in Nuvei! Available UPOs: ${upoCheck.paymentMethods.map(pm => pm.userPaymentOptionId).join(', ')}`);
         }
@@ -917,16 +918,18 @@ class NuveiService {
       requestBody.userDetails = params.userDetails;
     }
     
-    // CRITICAL: For card refund using UPO, must be wrapped in paymentOption object
-    // Nuvei API expects: { paymentOption: { userPaymentOptionId: "xxx" } }
-    // The userPaymentOptionId MUST be a STRING, not a number
+    // For payout using UPO (card refund or APM payout)
+    // Nuvei API: { paymentOption: { userPaymentOptionId: xxx } }
+    // NOTE: Nuvei returns UPO IDs as numbers, so send as number for APM payouts
     if (params.userPaymentOptionId) {
-      // Ensure UPO ID is a string (Nuvei API requirement)
-      const upoId = String(params.userPaymentOptionId);
+      // Try as number first (Nuvei returns as number), fall back to string
+      const upoId = /^\d+$/.test(String(params.userPaymentOptionId)) 
+        ? Number(params.userPaymentOptionId) 
+        : String(params.userPaymentOptionId);
       requestBody.paymentOption = {
         userPaymentOptionId: upoId,
       };
-      console.log('💸 Card refund using UPO:', upoId, typeof upoId);
+      console.log('💸 Payout using UPO:', upoId, '(type:', typeof upoId, ')');
     }
     // For bank transfer - Nuvei requires specific APM setup
     // NOTE: Bank payouts (SEPA) must be enabled by Nuvei for your merchant account
