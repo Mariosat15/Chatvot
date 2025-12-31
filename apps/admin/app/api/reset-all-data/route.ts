@@ -30,7 +30,6 @@ import { UserPurchase } from '@/database/models/marketplace/user-purchase.model'
 import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
 import WithdrawalRequest from '@/database/models/withdrawal-request.model';
 import UserBankAccount from '@/database/models/user-bank-account.model';
-import NuveiUserPaymentOption from '@/database/models/nuvei-user-payment-option.model';
 import ReconciliationLog from '@/database/models/reconciliation-log.model';
 import KYCSession from '@/database/models/kyc-session.model';
 import UserNote from '@/database/models/user-notes.model';
@@ -115,6 +114,7 @@ export async function POST(request: Request) {
     const userCollection = mongoose.connection.collection('user');
     const alertsCollection = mongoose.connection.collection('alerts');
     const botExecutionsCollection = mongoose.connection.collection('botexecutions');
+    const nuveiPaymentOptionsCollection = mongoose.connection.collection('nuveiuserpaymentoptions');
     
     // Get all existing user IDs
     const existingUsers = await userCollection.find({}, { projection: { _id: 1 } }).toArray();
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
       marketplacePurchases: await UserPurchase.countDocuments(),
       withdrawalRequests: await WithdrawalRequest.countDocuments(),
       userBankAccounts: await UserBankAccount.countDocuments(),
-      nuveiPaymentOptions: await NuveiUserPaymentOption.countDocuments(),
+      nuveiPaymentOptions: await nuveiPaymentOptionsCollection.countDocuments(),
       authSessions: await sessionCollection.countDocuments(),
       alerts: await alertsCollection.countDocuments(),
       botExecutions: await botExecutionsCollection.countDocuments(),
@@ -270,8 +270,8 @@ export async function POST(request: Request) {
     console.log('✅ Deleted all user bank accounts');
 
     // Delete all Nuvei payment options (stored UPOs)
-    await NuveiUserPaymentOption.deleteMany({});
-    console.log('✅ Deleted all Nuvei payment options');
+    const nuveiDeleted = await nuveiPaymentOptionsCollection.deleteMany({});
+    console.log(`✅ Deleted ${nuveiDeleted.deletedCount} Nuvei payment options`);
 
     // Delete all auth sessions (Better Auth 'session' collection - NOT 'account' which has credentials!)
     const authSessionsDeleted = await sessionCollection.deleteMany({});
@@ -385,7 +385,7 @@ export async function POST(request: Request) {
       marketplacePurchases: await UserPurchase.countDocuments(),
       withdrawalRequests: await WithdrawalRequest.countDocuments(),
       userBankAccounts: await UserBankAccount.countDocuments(),
-      nuveiPaymentOptions: await NuveiUserPaymentOption.countDocuments(),
+      nuveiPaymentOptions: await nuveiPaymentOptionsCollection.countDocuments(),
       authSessions: await sessionCollection.countDocuments(),
       alerts: await alertsCollection.countDocuments(),
       botExecutions: await botExecutionsCollection.countDocuments(),
