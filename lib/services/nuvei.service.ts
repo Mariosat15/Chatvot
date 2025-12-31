@@ -809,13 +809,15 @@ class NuveiService {
       };
     }
     
-    // Submit payout with the existing UPO
-    return this.submitWithdrawal({
+    // Use unreferenced refund instead of payout for bank UPOs
+    // Nuvei enabled AllowRefundWithoutRelatedTransactionID for this
+    // See: https://docs.nuvei.com/documentation/features/financial-operations/refund/#With_a_UPO
+    return this.submitUnreferencedRefund({
       userTokenId: params.userTokenId,
       amount: params.amount,
       currency: params.currency,
-      merchantWDRequestId: params.merchantWDRequestId,
       userPaymentOptionId: params.userPaymentOptionId,
+      clientUniqueId: params.merchantWDRequestId,
       userDetails: {
         email: params.email,
         firstName: params.firstName,
@@ -823,6 +825,123 @@ class NuveiService {
       },
       notificationUrl: params.notificationUrl,
     });
+  }
+  
+  /**
+   * Submit an unreferenced refund using a UPO
+   * This is used for bank payouts when AllowRefundWithoutRelatedTransactionID is enabled
+   * 
+   * Documentation: https://docs.nuvei.com/documentation/features/financial-operations/refund/#With_a_UPO
+   */
+  async submitUnreferencedRefund(params: {
+    userTokenId: string;
+    amount: string;
+    currency: string;
+    userPaymentOptionId: string;
+    clientUniqueId: string;
+    userDetails?: {
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+    };
+    notificationUrl?: string;
+  }): Promise<WithdrawalResponse | { error: string }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: 'Nuvei not configured or not active' };
+    }
+    
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `refund_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Checksum for refundTransaction: merchantId + merchantSiteId + clientRequestId + clientUniqueId + amount + currency + timeStamp + secretKey
+    const checksumString = credentials.merchantId 
+      + credentials.siteId 
+      + clientRequestId 
+      + params.clientUniqueId 
+      + params.amount 
+      + params.currency 
+      + timeStamp 
+      + credentials.secretKey;
+    const checksum = crypto.createHash('sha256').update(checksumString).digest('hex');
+    
+    // UPO ID as number (Nuvei returns numbers)
+    const upoId = /^\d+$/.test(String(params.userPaymentOptionId)) 
+      ? Number(params.userPaymentOptionId) 
+      : params.userPaymentOptionId;
+    
+    const requestBody: Record<string, unknown> = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      clientRequestId,
+      clientUniqueId: params.clientUniqueId,
+      userTokenId: params.userTokenId,
+      amount: params.amount,
+      currency: params.currency,
+      paymentOption: {
+        userPaymentOptionId: upoId,
+      },
+      timeStamp,
+      checksum,
+    };
+    
+    if (params.userDetails) {
+      requestBody.userDetails = params.userDetails;
+    }
+    
+    if (params.notificationUrl) {
+      requestBody.urlDetails = {
+        notificationUrl: params.notificationUrl,
+      };
+    }
+    
+    console.log('\n');
+    console.log('╔════════════════════════════════════════════════════════════╗');
+    console.log('║     NUVEI UNREFERENCED REFUND REQUEST                      ║');
+    console.log('╚════════════════════════════════════════════════════════════╝');
+    console.log('📤 ENDPOINT:', `${apiUrl}/refundTransaction.do`);
+    console.log('📤 METHOD: POST');
+    console.log('📤 REQUEST BODY (checksum removed):');
+    console.log(JSON.stringify({ ...requestBody, checksum: '[HIDDEN]' }, null, 2));
+    
+    try {
+      const response = await fetch(`${apiUrl}/refundTransaction.do`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+      
+      const data = await response.json();
+      
+      console.log('📥 RESPONSE:');
+      console.log(JSON.stringify(data, null, 2));
+      console.log('╚════════════════════════════════════════════════════════════╝\n');
+      
+      if (data.status === 'SUCCESS' && data.transactionStatus === 'APPROVED') {
+        console.log('✅ Unreferenced refund successful:', data.transactionId);
+        // Map to WithdrawalResponse format
+        return {
+          status: 'SUCCESS',
+          errCode: 0,
+          reason: '',
+          wdRequestId: data.transactionId,
+          wdRequestStatus: 'Approved',
+          merchantId: data.merchantId,
+          merchantSiteId: data.merchantSiteId,
+          userTokenId: data.userTokenId,
+          internalRequestId: data.internalRequestId,
+          version: data.version,
+          clientRequestId: data.clientRequestId,
+        } as WithdrawalResponse;
+      } else {
+        console.error('❌ Unreferenced refund failed:', data.reason || data);
+        return { error: data.reason || `Refund failed (code: ${data.errCode})` };
+      }
+    } catch (error) {
+      console.error('💸 Nuvei refundTransaction error:', error);
+      return { error: 'Failed to process refund' };
+    }
   }
   
   // ========== WITHDRAWAL METHODS ==========
