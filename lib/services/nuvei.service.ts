@@ -855,11 +855,12 @@ class NuveiService {
     const timeStamp = this.generateTimeStamp();
     const clientRequestId = `refund_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Checksum for refundTransaction: merchantId + merchantSiteId + clientRequestId + clientUniqueId + amount + currency + timeStamp + secretKey
+    // Checksum for refundTransaction (standard Nuvei formula):
+    // SHA256(merchantId + merchantSiteId + clientRequestId + amount + currency + timeStamp + secretKey)
+    // Note: clientUniqueId is NOT part of the checksum
     const checksumString = credentials.merchantId 
       + credentials.siteId 
       + clientRequestId 
-      + params.clientUniqueId 
       + params.amount 
       + params.currency 
       + timeStamp 
