@@ -174,7 +174,11 @@ export async function POST(req: NextRequest) {
     // DETECT DMN TYPE: Withdrawal vs Payment vs Account Capture
     // ==============================
     const isWithdrawalDmn = !!(params.wdRequestId || params.wdRequestStatus || params.merchantWDRequestId || params.merchant_wd_request_id);
-    const isAccountCaptureDmn = params.payment_method === 'apmgw_BankPayouts' && params.userPaymentOptionId && params.upoRegistrationDate;
+    // Account Capture can be detected by:
+    // - type === "ACCOUNT_CAPTURE" (primary indicator)
+    // - OR payment_method === "apmgw_BankPayouts" with userPaymentOptionId
+    const isAccountCaptureDmn = params.type === 'ACCOUNT_CAPTURE' || 
+      (params.payment_method === 'apmgw_BankPayouts' && params.userPaymentOptionId && !params.TransactionID);
     
     if (isWithdrawalDmn) {
       console.log('📤 Processing WITHDRAWAL DMN');
@@ -182,8 +186,12 @@ export async function POST(req: NextRequest) {
     }
     
     // Handle Account Capture DMN - this is when Nuvei confirms bank details have been saved
+    // Note: Account capture DMNs don't need signature verification
     if (isAccountCaptureDmn) {
       console.log('🏦 Processing ACCOUNT CAPTURE DMN');
+      console.log('🏦 Type:', params.type);
+      console.log('🏦 UPO ID:', params.userPaymentOptionId);
+      console.log('🏦 User Token:', params.user_token_id);
       return await handleAccountCaptureDmn(params);
     }
     
