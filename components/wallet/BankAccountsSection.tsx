@@ -591,14 +591,14 @@ export default function BankAccountsSection() {
                               Verified
                             </Badge>
                           )}
-                          {account.nuveiConnected ? (
+                          {account.nuveiStatus === 'ready' || account.nuveiConnected ? (
                             <Badge className="bg-emerald-500/20 text-emerald-300 text-xs">
                               <Check className="h-3 w-3 mr-1" />
                               Ready for Withdrawals
                             </Badge>
                           ) : (
-                            <Badge className="bg-gray-500/20 text-gray-300 text-xs">
-                              Manual Processing
+                            <Badge className="bg-blue-500/20 text-blue-300 text-xs">
+                              Manual Review
                             </Badge>
                           )}
                         </div>

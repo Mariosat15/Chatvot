@@ -183,57 +183,15 @@ export async function POST(request: NextRequest) {
     const userAddress = (userDoc as any)?.address || 'N/A';
     const userCity = (userDoc as any)?.city || 'N/A';
     
+    // Note: We no longer try to create Nuvei UPO when adding bank account
+    // because /addUPOAPM keeps failing with checksum errors.
+    // Instead, when withdrawal is requested, we'll use /refundTransaction 
+    // with the bank details directly (Nuvei enabled AllowRefundWithoutRelatedTransactionID).
+    // The bank account is marked as ready for automatic processing if auto-withdrawals are enabled.
     if (cleanIban && automaticWithdrawalsEnabled) {
-      try {
-        console.log('🏦 Creating Nuvei bank UPO for user:', session.user.id);
-        
-        // Use addSepaUpo to create the UPO directly (no redirect needed)
-        const nuveiResult = await nuveiService.addSepaUpo({
-          userTokenId,
-          iban: cleanIban,
-          bic: swiftBic?.toUpperCase(),
-          accountHolderName: accountHolderName.trim(),
-          email: userEmail,
-          country: country.toUpperCase(),
-          firstName,
-          lastName,
-          address: userAddress,
-          city: userCity,
-        });
-        
-        if ('error' in nuveiResult) {
-          console.error('🏦 Nuvei UPO creation failed:', nuveiResult.error);
-          nuveiStatus = `error: ${nuveiResult.error}`;
-        } else if (nuveiResult.userPaymentOptionId) {
-          console.log('🏦 Nuvei UPO created:', nuveiResult.userPaymentOptionId);
-          nuveiUpoId = String(nuveiResult.userPaymentOptionId);
-          nuveiStatus = 'active';
-          
-          // Store the UPO in our database
-          await NuveiUserPaymentOption.findOneAndUpdate(
-            { 
-              userId: session.user.id, 
-              userPaymentOptionId: nuveiResult.userPaymentOptionId 
-            },
-            {
-              userId: session.user.id,
-              userTokenId,
-              userPaymentOptionId: nuveiResult.userPaymentOptionId,
-              type: 'bank',
-              paymentMethod: 'apmgw_SEPA',
-              ibanLast4: cleanIban.slice(-4),
-              accountHolderName: accountHolderName.trim(),
-              isActive: true,
-              lastUsed: new Date(),
-            },
-            { upsert: true, new: true }
-          );
-        }
-      } catch (nuveiError: any) {
-        console.error('🏦 Nuvei UPO creation error:', nuveiError);
-        nuveiStatus = `error: ${nuveiError.message}`;
-        // Don't fail - we can still store the bank details for manual processing
-      }
+      // Bank is ready for automatic processing - we'll pass IBAN directly to refundTransaction
+      nuveiStatus = 'ready';
+      console.log('🏦 Bank account ready for automatic withdrawals (will use refundTransaction with bank details)');
     }
 
     // Create the bank account record

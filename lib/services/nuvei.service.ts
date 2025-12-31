@@ -815,37 +815,178 @@ class NuveiService {
     amount: string;
     currency: string;
     merchantWDRequestId: string;
-    userPaymentOptionId: string;  // MUST be obtained from /accountCapture flow first!
+    // Bank details (required for direct bank transfer)
+    iban: string;
+    bic?: string;
+    accountHolderName: string;
+    // User details
     email: string;
     firstName?: string;
     lastName?: string;
+    address?: string;
+    city?: string;
+    country?: string;
     notificationUrl?: string;
   }): Promise<WithdrawalResponse | { error: string }> {
-    console.log('\n🏦 Starting Bank payout with pre-registered UPO...');
-    console.log('🏦 UPO ID:', params.userPaymentOptionId);
+    console.log('\n🏦 Starting Bank payout with direct IBAN...');
+    console.log('🏦 IBAN:', params.iban?.substring(0, 4) + '****' + params.iban?.slice(-4));
     
-    if (!params.userPaymentOptionId) {
-      return { 
-        error: 'Bank account not connected with Nuvei. Please complete the bank verification process first by clicking "Connect with Nuvei" in your wallet settings.' 
-      };
+    if (!params.iban) {
+      return { error: 'Bank account IBAN is required for bank payouts' };
     }
     
-    // Use unreferenced refund instead of payout for bank UPOs
+    // Use unreferenced refund with APM details directly
     // Nuvei enabled AllowRefundWithoutRelatedTransactionID for this
-    // See: https://docs.nuvei.com/documentation/features/financial-operations/refund/#With_a_UPO
-    return this.submitUnreferencedRefund({
+    return this.submitUnreferencedRefundWithBankDetails({
       userTokenId: params.userTokenId,
       amount: params.amount,
       currency: params.currency,
-      userPaymentOptionId: params.userPaymentOptionId,
       clientUniqueId: params.merchantWDRequestId,
-      userDetails: {
-        email: params.email,
-        firstName: params.firstName,
-        lastName: params.lastName,
-      },
+      iban: params.iban,
+      bic: params.bic,
+      accountHolderName: params.accountHolderName,
+      email: params.email,
+      firstName: params.firstName,
+      lastName: params.lastName,
+      address: params.address,
+      city: params.city,
+      country: params.country,
       notificationUrl: params.notificationUrl,
     });
+  }
+  
+  /**
+   * Submit an unreferenced refund with bank details directly (no UPO required)
+   * Uses /refundTransaction with alternativePaymentMethod containing IBAN
+   */
+  async submitUnreferencedRefundWithBankDetails(params: {
+    userTokenId: string;
+    amount: string;
+    currency: string;
+    clientUniqueId: string;
+    iban: string;
+    bic?: string;
+    accountHolderName: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    address?: string;
+    city?: string;
+    country?: string;
+    notificationUrl?: string;
+  }): Promise<WithdrawalResponse | { error: string }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: 'Nuvei not configured or not active' };
+    }
+    
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `refund_bank_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Clean IBAN and BIC
+    const cleanIban = params.iban.replace(/\s/g, '').toUpperCase();
+    const cleanBic = params.bic?.replace(/\s/g, '').toUpperCase();
+    
+    // Checksum for refundTransaction:
+    // SHA256(merchantId + merchantSiteId + clientRequestId + clientUniqueId + amount + currency + timeStamp + secretKey)
+    const checksumString = credentials.merchantId 
+      + credentials.siteId 
+      + clientRequestId 
+      + params.clientUniqueId 
+      + params.amount 
+      + params.currency 
+      + timeStamp 
+      + credentials.secretKey;
+    const checksum = crypto.createHash('sha256').update(checksumString).digest('hex');
+    
+    // Build request with bank details as alternativePaymentMethod
+    const requestBody: Record<string, any> = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      clientRequestId,
+      clientUniqueId: params.clientUniqueId,
+      userTokenId: params.userTokenId,
+      amount: params.amount,
+      currency: params.currency,
+      paymentOption: {
+        alternativePaymentMethod: {
+          paymentMethod: 'apmgw_SEPA',
+          iban: cleanIban,
+          bic: cleanBic || undefined,
+          accountHolderName: params.accountHolderName,
+        },
+      },
+      userDetails: {
+        email: params.email,
+        firstName: params.firstName || 'N/A',
+        lastName: params.lastName || 'N/A',
+        address: params.address || 'N/A',
+        city: params.city || 'N/A',
+        country: params.country || 'DE',
+      },
+      timeStamp,
+      checksum,
+    };
+    
+    if (params.notificationUrl) {
+      requestBody.urlDetails = { notificationUrl: params.notificationUrl };
+    }
+    
+    console.log('\n');
+    console.log('╔════════════════════════════════════════════════════════════╗');
+    console.log('║     NUVEI BANK REFUND REQUEST (Direct IBAN)                ║');
+    console.log('╚════════════════════════════════════════════════════════════╝');
+    console.log('📤 ENDPOINT:', `${apiUrl}/refundTransaction.do`);
+    console.log('📤 REQUEST BODY (IBAN masked):');
+    console.log(JSON.stringify({
+      ...requestBody,
+      checksum: '[HIDDEN]',
+      paymentOption: {
+        alternativePaymentMethod: {
+          paymentMethod: 'apmgw_SEPA',
+          iban: cleanIban.substring(0, 4) + '****' + cleanIban.slice(-4),
+          bic: cleanBic,
+          accountHolderName: params.accountHolderName,
+        },
+      },
+    }, null, 2));
+    
+    try {
+      const response = await fetch(`${apiUrl}/refundTransaction.do`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+      
+      const data = await response.json();
+      
+      console.log('📥 RESPONSE:');
+      console.log(JSON.stringify(data, null, 2));
+      console.log('╚════════════════════════════════════════════════════════════╝\n');
+      
+      if (data.status === 'SUCCESS' || data.transactionStatus === 'APPROVED') {
+        return {
+          status: 'SUCCESS',
+          wdRequestId: data.transactionId,
+          wdRequestStatus: data.transactionStatus || 'Approved',
+          merchantId: data.merchantId,
+          merchantSiteId: data.merchantSiteId,
+          userTokenId: data.userTokenId,
+          errCode: 0,
+          reason: '',
+        } as WithdrawalResponse;
+      } else {
+        console.error('❌ Bank refund failed:', data.reason || data.gwErrorReason);
+        return {
+          error: data.reason || data.gwErrorReason || `Bank refund failed (code: ${data.errCode || data.gwErrorCode})`,
+          ...data,
+        };
+      }
+    } catch (error) {
+      console.error('❌ Nuvei submitUnreferencedRefundWithBankDetails error:', error);
+      return { error: 'Failed to submit bank refund' };
+    }
   }
   
   /**
