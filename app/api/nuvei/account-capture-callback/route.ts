@@ -24,45 +24,48 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status') || searchParams.get('Status');
   const reason = searchParams.get('reason') || searchParams.get('Reason');
   const userPaymentOptionId = searchParams.get('userPaymentOptionId');
+  const pppStatus = searchParams.get('ppp_status');
   
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://chartvolt.com';
   
-  // Handle APPROVED, SUCCESS, or OK as success statuses
-  if (status === 'SUCCESS' || status === 'OK' || status === 'APPROVED') {
-    console.log('🏦 Account capture successful!');
-    console.log('🏦 userPaymentOptionId:', userPaymentOptionId);
+  // Check for explicit failure status
+  const isExplicitFailure = status === 'FAIL' || status === 'FAILED' || status === 'ERROR' || 
+                            pppStatus === 'FAIL' || pppStatus === 'ERROR';
+  
+  // Nuvei's internal redirect often doesn't pass any parameters
+  // If we get no params OR explicit success, assume success (DMN handles actual processing)
+  const hasNoParams = Object.keys(params).length === 0;
+  const isExplicitSuccess = status === 'SUCCESS' || status === 'OK' || status === 'APPROVED' ||
+                            pppStatus === 'OK' || pppStatus === 'SUCCESS';
+  
+  if (isExplicitFailure) {
+    console.log('🏦 Account capture explicitly failed:', reason || status);
+    return NextResponse.redirect(
+      `${baseUrl}/wallet?bank_setup=failed&error=${encodeURIComponent(reason || 'Bank verification failed. Please try again.')}`
+    );
+  }
+  
+  // Success case: explicit success OR no params (Nuvei's internal redirect)
+  // The DMN webhook handles the actual UPO saving
+  if (hasNoParams || isExplicitSuccess) {
+    console.log('🏦 Account capture callback - assuming success (DMN handles processing)');
+    console.log('🏦 hasNoParams:', hasNoParams, 'isExplicitSuccess:', isExplicitSuccess);
     
-    // If we have a UPO ID, save it (DMN will also save it as backup)
+    // If we have a UPO ID, log it (DMN already saved it)
     if (userPaymentOptionId) {
-      try {
-        await connectToDatabase();
-        const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
-        
-        // Check if this UPO already exists
-        const existing = await NuveiUserPaymentOption.findOne({ userPaymentOptionId });
-        
-        if (!existing) {
-          console.log('🏦 Saving new bank UPO from callback...');
-          // Note: We don't have userId here in callback, DMN will have it
-          // Just log for now - the DMN webhook will properly save it with userId
-        } else {
-          console.log('🏦 UPO already exists (saved via DMN)');
-        }
-      } catch (error) {
-        console.error('🏦 Error in callback UPO handling:', error);
-      }
+      console.log('🏦 userPaymentOptionId from callback:', userPaymentOptionId);
     }
     
     return NextResponse.redirect(
-      `${baseUrl}/wallet?bank_setup=success&message=${encodeURIComponent('Bank account connected successfully! You can now use it for withdrawals.')}`
-    );
-  } else {
-    // Failed - redirect with error
-    console.log('🏦 Account capture failed:', reason || status);
-    return NextResponse.redirect(
-      `${baseUrl}/wallet?bank_setup=failed&error=${encodeURIComponent(reason || 'Failed to add bank account')}`
+      `${baseUrl}/wallet?bank_setup=success&message=${encodeURIComponent('Bank account connected! You can now use automatic withdrawals.')}`
     );
   }
+  
+  // Unknown status - treat as potential failure but with friendly message
+  console.log('🏦 Account capture callback - unknown status:', status, pppStatus);
+  return NextResponse.redirect(
+    `${baseUrl}/wallet?bank_setup=pending&message=${encodeURIComponent('Bank verification is being processed. Check back shortly.')}`
+  );
 }
 
 // Also handle POST in case Nuvei sends POST

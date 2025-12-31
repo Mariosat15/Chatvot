@@ -461,30 +461,30 @@ async function handleAccountCaptureDmn(params: NuveiDmnParams): Promise<NextResp
       console.log('🏦 UPO already exists, updating lastUsed:', userPaymentOptionId);
       existingUPO.lastUsed = new Date();
       await existingUPO.save();
-      return NextResponse.json({ status: 'OK', message: 'UPO already registered' });
+    } else {
+      // Create new bank UPO
+      const newUPO = await NuveiUserPaymentOption.create({
+        userId,
+        userPaymentOptionId,
+        type: 'bank',
+        paymentMethod,
+        registrationDate: upoRegistrationDate,
+        countryCode: params.country,
+        currencyCode: params.currency,
+        isActive: true,
+        lastUsed: new Date(),
+      });
+      
+      console.log('🏦 Bank UPO saved successfully:', {
+        id: newUPO._id,
+        userId,
+        userPaymentOptionId,
+      });
     }
     
-    // Create new bank UPO
-    const newUPO = await NuveiUserPaymentOption.create({
-      userId,
-      userPaymentOptionId,
-      type: 'bank',
-      paymentMethod,
-      registrationDate: upoRegistrationDate,
-      countryCode: params.country,
-      currencyCode: params.currency,
-      isActive: true,
-      lastUsed: new Date(),
-    });
-    
-    console.log('🏦 Bank UPO saved successfully:', {
-      id: newUPO._id,
-      userId,
-      userPaymentOptionId,
-    });
-    
-    // Also update the user's bank account(s) with this UPO
+    // ALWAYS update the user's bank account(s) with this UPO
     // This links the UPO to their existing bank account so withdrawals can use it
+    // Run this regardless of whether UPO already existed or not
     try {
       const UserBankAccount = (await import('@/database/models/user-bank-account.model')).default;
       
