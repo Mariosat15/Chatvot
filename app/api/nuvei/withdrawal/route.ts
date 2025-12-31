@@ -331,16 +331,18 @@ export async function POST(req: NextRequest) {
     });
 
     // Submit to Nuvei
-    // For bank transfers, use bank details directly (IBAN, BIC)
+    // For bank transfers, use UPO from /accountCapture flow
     // For card refunds, use the standard submitWithdrawal with UPO
     let nuveiResult: Awaited<ReturnType<typeof nuveiService.submitWithdrawal>>;
     
     if (isBankTransfer && bankAccount) {
-      console.log('🏦 Processing bank transfer payout with direct IBAN...');
+      console.log('🏦 Processing bank transfer payout...');
       
-      // Check if bank account has IBAN
-      if (!bankAccount.iban) {
-        console.error('🏦 No IBAN found for bank account');
+      // Check if bank account has Nuvei UPO (from accountCapture flow)
+      const bankUpoId = bankAccount.nuveiUpoId;
+      
+      if (!bankUpoId) {
+        console.error('🏦 No Nuvei UPO found for bank account - user needs to complete accountCapture flow');
         
         // Rollback balance
         wallet.creditBalance = balanceBefore;
@@ -350,7 +352,7 @@ export async function POST(req: NextRequest) {
         await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
           status: 'failed',
           failedAt: new Date(),
-          failedReason: 'Bank account IBAN is missing',
+          failedReason: 'Bank account not verified for automatic withdrawals',
           'metadata.refunded': true,
           'metadata.refundedAt': new Date().toISOString(),
           'metadata.refundedCredits': creditsNeeded,
@@ -359,45 +361,31 @@ export async function POST(req: NextRequest) {
         // Update wallet transaction as failed
         await WalletTransaction.findByIdAndUpdate(walletTx._id, {
           status: 'failed',
-          failureReason: 'Bank account IBAN is missing',
+          failureReason: 'Bank account not verified for automatic withdrawals',
           processedAt: new Date(),
         });
         
         return NextResponse.json(
-          { error: 'Bank account IBAN is missing. Please update your bank account details.', code: 'BANK_IBAN_MISSING' },
+          { 
+            error: 'This bank account is not set up for automatic withdrawals. Please click "Enable Auto" on your bank account in wallet settings first.',
+            code: 'BANK_NOT_VERIFIED' 
+          },
           { status: 400 }
         );
       }
       
-      // Get user profile for address/city
-      const mongoose = await import('mongoose');
-      const userCollection = mongoose.default.connection.collection('user');
-      const userDoc = await userCollection.findOne({ 
-        $or: [
-          { _id: new mongoose.default.Types.ObjectId(userId) },
-          { id: userId }
-        ]
-      });
-      const userAddress = (userDoc as any)?.address || 'N/A';
-      const userCity = (userDoc as any)?.city || 'N/A';
+      console.log('🏦 Found Nuvei bank UPO:', bankUpoId);
       
-      console.log('🏦 Bank IBAN:', bankAccount.iban?.substring(0, 4) + '****' + bankAccount.iban?.slice(-4));
-      
-      // Submit bank payout with direct IBAN (no UPO needed)
+      // Submit bank payout using UPO from accountCapture
       nuveiResult = await nuveiService.submitBankPayout({
         userTokenId,
         amount: netAmountEUR.toFixed(2),
         currency: 'EUR',
         merchantWDRequestId,
-        iban: bankAccount.iban,
-        bic: bankAccount.swiftBic,
-        accountHolderName: bankAccount.accountHolderName,
+        userPaymentOptionId: bankUpoId,
         email: userEmail,
         firstName: userName?.split(' ')[0] || undefined,
         lastName: userName?.split(' ').slice(1).join(' ') || undefined,
-        address: userAddress,
-        city: userCity,
-        country: bankAccount.country || 'DE',
         notificationUrl: withdrawalParams.notificationUrl,
       });
     } else {

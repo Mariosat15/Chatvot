@@ -40,8 +40,8 @@ export async function GET() {
       addedAt: account.addedAt,
       lastUsedAt: account.lastUsedAt,
       totalPayouts: account.totalPayouts,
-      // Nuvei connection status - directly from bank account record
-      nuveiConnected: !!account.nuveiUpoId && account.nuveiStatus === 'active',
+      // Nuvei connection status - from database or computed
+      nuveiConnected: account.nuveiConnected || (!!account.nuveiUpoId && account.nuveiStatus === 'active'),
       nuveiUpoId: account.nuveiUpoId,
       nuveiStatus: account.nuveiStatus,
     }));

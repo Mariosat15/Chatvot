@@ -35,7 +35,8 @@ export interface IUserBankAccount extends Document {
   stripeAccountStatus?: string;        // Stripe account verification status
   
   // Nuvei Integration (for automatic bank payouts)
-  nuveiUpoId?: string;                 // Nuvei's UPO ID from addSepaUpo
+  nuveiUpoId?: string;                 // Nuvei's UPO ID from /accountCapture
+  nuveiConnected?: boolean;            // true if verified via /accountCapture
   nuveiStatus?: string;                // 'active', 'pending', or error message
   nuveiUserPaymentOptionId?: string;   // Legacy: Nuvei's UPO ID from /accountCapture
   nuveiRegistrationDate?: string;      // When UPO was created
@@ -136,6 +137,10 @@ const UserBankAccountSchema = new Schema<IUserBankAccount>(
     
     // Nuvei Integration (for automatic bank payouts)
     nuveiUpoId: String,
+    nuveiConnected: {
+      type: Boolean,
+      default: false,
+    },
     nuveiStatus: {
       type: String,
       default: 'pending',

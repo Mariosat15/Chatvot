@@ -20,6 +20,7 @@ import {
   Info,
   X,
   Pencil,
+  Zap,
 } from 'lucide-react';
 import {
   Dialog,
@@ -122,6 +123,7 @@ export default function BankAccountsSection() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [enablingAuto, setEnablingAuto] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -340,6 +342,44 @@ export default function BankAccountsSection() {
       fetchAccounts();
     } catch (error) {
       toast.error('Failed to remove bank account');
+    }
+  };
+
+  // Enable automatic withdrawals via Nuvei account capture
+  const handleEnableAutoWithdrawals = async (account: BankAccount) => {
+    setEnablingAuto(account.id);
+    try {
+      // Trigger account capture flow - this will redirect to Nuvei
+      const response = await fetch('/api/nuvei/account-capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bankAccountId: account.id,
+          country: account.country,
+          currency: 'EUR',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to start verification');
+        setEnablingAuto(null);
+        return;
+      }
+
+      // Redirect to Nuvei's hosted page
+      if (data.redirectUrl) {
+        toast.info('Redirecting to secure verification...');
+        window.location.href = data.redirectUrl;
+      } else {
+        toast.error('No redirect URL received');
+        setEnablingAuto(null);
+      }
+    } catch (error) {
+      console.error('Error enabling auto withdrawals:', error);
+      toast.error('Failed to start verification');
+      setEnablingAuto(null);
     }
   };
 
@@ -591,14 +631,15 @@ export default function BankAccountsSection() {
                               Verified
                             </Badge>
                           )}
-                          {account.nuveiStatus === 'ready' || account.nuveiConnected ? (
+                          {account.nuveiConnected ? (
                             <Badge className="bg-emerald-500/20 text-emerald-300 text-xs">
                               <Check className="h-3 w-3 mr-1" />
-                              Ready for Withdrawals
+                              Auto Withdrawals Enabled
                             </Badge>
                           ) : (
-                            <Badge className="bg-blue-500/20 text-blue-300 text-xs">
-                              Manual Review
+                            <Badge className="bg-amber-500/20 text-amber-300 text-xs">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Manual Review Only
                             </Badge>
                           )}
                         </div>
@@ -623,6 +664,27 @@ export default function BankAccountsSection() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
+                      {!account.nuveiConnected && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEnableAutoWithdrawals(account)}
+                          disabled={enablingAuto === account.id}
+                          className="border-emerald-600 text-emerald-400 hover:bg-emerald-500/10"
+                        >
+                          {enablingAuto === account.id ? (
+                            <>
+                              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                              Verifying...
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="h-3 w-3 mr-1" />
+                              Enable Auto
+                            </>
+                          )}
+                        </Button>
+                      )}
                       {!account.isDefault && (
                         <Button
                           variant="outline"

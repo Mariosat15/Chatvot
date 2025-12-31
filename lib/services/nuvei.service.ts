@@ -815,42 +815,34 @@ class NuveiService {
     amount: string;
     currency: string;
     merchantWDRequestId: string;
-    // Bank details (required for direct bank transfer)
-    iban: string;
-    bic?: string;
-    accountHolderName: string;
-    // User details
+    userPaymentOptionId: string;  // UPO from /accountCapture flow
     email: string;
     firstName?: string;
     lastName?: string;
-    address?: string;
-    city?: string;
-    country?: string;
     notificationUrl?: string;
   }): Promise<WithdrawalResponse | { error: string }> {
-    console.log('\n🏦 Starting Bank payout with direct IBAN...');
-    console.log('🏦 IBAN:', params.iban?.substring(0, 4) + '****' + params.iban?.slice(-4));
+    console.log('\n🏦 Starting Bank payout with UPO...');
+    console.log('🏦 UPO ID:', params.userPaymentOptionId);
     
-    if (!params.iban) {
-      return { error: 'Bank account IBAN is required for bank payouts' };
+    if (!params.userPaymentOptionId) {
+      return { 
+        error: 'Bank account not verified for automatic withdrawals. Please click "Enable Auto" on your bank account first.' 
+      };
     }
     
-    // Use unreferenced refund with APM details directly
-    // Nuvei enabled AllowRefundWithoutRelatedTransactionID for this
-    return this.submitUnreferencedRefundWithBankDetails({
+    // Use unreferenced refund with UPO
+    // Nuvei enabled AllowRefundWithoutRelatedTransactionID for sandbox
+    return this.submitUnreferencedRefund({
       userTokenId: params.userTokenId,
       amount: params.amount,
       currency: params.currency,
+      userPaymentOptionId: params.userPaymentOptionId,
       clientUniqueId: params.merchantWDRequestId,
-      iban: params.iban,
-      bic: params.bic,
-      accountHolderName: params.accountHolderName,
-      email: params.email,
-      firstName: params.firstName,
-      lastName: params.lastName,
-      address: params.address,
-      city: params.city,
-      country: params.country,
+      userDetails: {
+        email: params.email,
+        firstName: params.firstName,
+        lastName: params.lastName,
+      },
       notificationUrl: params.notificationUrl,
     });
   }

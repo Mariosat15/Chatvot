@@ -473,6 +473,31 @@ async function handleAccountCaptureDmn(params: NuveiDmnParams): Promise<NextResp
       userPaymentOptionId,
     });
     
+    // Also update the user's bank account(s) with this UPO
+    // This links the UPO to their existing bank account so withdrawals can use it
+    try {
+      const UserBankAccount = (await import('@/database/models/user-bank-account.model')).default;
+      
+      // Find user's default bank account (or most recent) and update it with the UPO
+      const bankAccount = await UserBankAccount.findOne({ 
+        userId, 
+        isActive: true 
+      }).sort({ isDefault: -1, createdAt: -1 });
+      
+      if (bankAccount) {
+        bankAccount.nuveiUpoId = String(userPaymentOptionId);
+        bankAccount.nuveiConnected = true;
+        bankAccount.nuveiStatus = 'active';
+        await bankAccount.save();
+        console.log('🏦 Updated bank account with UPO:', bankAccount._id);
+      } else {
+        console.log('🏦 No bank account found to update for user:', userId);
+      }
+    } catch (bankError) {
+      console.error('🏦 Error updating bank account with UPO:', bankError);
+      // Don't fail the DMN processing - the UPO is still saved
+    }
+    
     return NextResponse.json({ 
       status: 'OK', 
       message: 'Bank account registered successfully',
@@ -605,8 +630,8 @@ async function handleWithdrawalDmn(params: NuveiDmnParams): Promise<NextResponse
       
       const wallet = await CreditWallet.findOne({ userId: withdrawalRequest.userId });
       if (wallet) {
-        // Restore the credits - use amountCredits (new field) or amountRequested (old field)
-        const creditsToRefund = Math.abs(withdrawalRequest.amountCredits || withdrawalRequest.amountRequested || 0);
+        // Restore the credits
+        const creditsToRefund = Math.abs(withdrawalRequest.amountCredits || 0);
         
         if (creditsToRefund > 0) {
           const balanceBefore = wallet.creditBalance;
