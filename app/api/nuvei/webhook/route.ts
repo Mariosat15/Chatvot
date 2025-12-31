@@ -195,6 +195,16 @@ export async function POST(req: NextRequest) {
       return await handleAccountCaptureDmn(params);
     }
     
+    // Check if this is a CARD_TOKENIZATION DMN (informational only, no payment)
+    // These have empty fields and different checksum format - skip signature verification
+    const isCardTokenizationDmn = params.type === 'CARD_TOKENIZATION';
+    
+    if (isCardTokenizationDmn) {
+      console.log('🔐 Skipping CARD_TOKENIZATION DMN (informational only)');
+      // Just acknowledge receipt - no processing needed
+      return NextResponse.json({ status: 'OK', message: 'Card tokenization acknowledged' });
+    }
+    
     console.log('📥 Processing PAYMENT DMN');
     // Get Nuvei secret key - try database first, then env vars
     let secretKey: string | undefined;

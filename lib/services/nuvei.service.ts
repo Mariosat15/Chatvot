@@ -592,9 +592,13 @@ class NuveiService {
       // https://docs.nuvei.com/documentation/global-guides/local-bank-payouts/
       const currency = params.currencyCode || 'EUR';
       
+      // Build return URLs for after user submits bank details
+      const callbackUrl = `${baseUrl}/api/nuvei/account-capture-callback`;
+      
       // Based on Nuvei docs + error feedback:
       // - languageCode is REQUIRED (despite not being in docs example)
-      const accountCaptureRequest: Record<string, string> = {
+      // - urlDetails is REQUIRED for redirect after form submission
+      const accountCaptureRequest: Record<string, any> = {
         sessionToken,
         merchantId: credentials.merchantId,
         merchantSiteId: credentials.siteId,
@@ -603,6 +607,12 @@ class NuveiService {
         currencyCode: currency,
         countryCode: params.countryCode,
         languageCode: params.languageCode || 'en',
+        urlDetails: {
+          successUrl: callbackUrl,
+          failureUrl: callbackUrl,
+          pendingUrl: callbackUrl,
+          notificationUrl: `${baseUrl}/api/nuvei/webhook`,
+        },
       };
       
       console.log('\n');
