@@ -56,9 +56,9 @@ interface BankAccount {
   addedAt: string;
   lastUsedAt?: string;
   totalPayouts: number;
-  stripeAccountStatus?: string;
-  nuveiConnected?: boolean; // Whether bank is connected via Nuvei /accountCapture
+  nuveiConnected?: boolean; // Whether bank account has Nuvei UPO
   nuveiUpoId?: string;
+  nuveiStatus?: string;
 }
 
 interface EditFormData {
@@ -122,7 +122,6 @@ export default function BankAccountsSection() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [connectingNuvei, setConnectingNuvei] = useState<string | null>(null); // Bank ID currently being connected
 
   // Form state
   const [formData, setFormData] = useState({
@@ -189,7 +188,7 @@ export default function BankAccountsSection() {
         return;
       }
 
-      toast.success('Bank account added successfully!');
+      toast.success(data.message || 'Bank account added successfully!');
       setAddDialogOpen(false);
       fetchAccounts();
       
@@ -227,43 +226,6 @@ export default function BankAccountsSection() {
       }
     } catch (error) {
       toast.error('Failed to update default account');
-    }
-  };
-
-  /**
-   * Connect bank account with Nuvei via /accountCapture flow
-   * This redirects the user to Nuvei's hosted page to verify their bank details
-   * Required for automatic bank withdrawals
-   */
-  const handleConnectWithNuvei = async (account: BankAccount) => {
-    setConnectingNuvei(account.id);
-    
-    try {
-      const response = await fetch('/api/nuvei/account-capture', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          countryCode: account.country,
-          currencyCode: 'EUR',
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.redirectUrl) {
-        toast.error(data.error || 'Failed to initiate bank verification');
-        return;
-      }
-
-      // Redirect user to Nuvei's bank capture page
-      toast.info('Redirecting to secure bank verification...');
-      window.location.href = data.redirectUrl;
-      
-    } catch (error) {
-      console.error('Error connecting with Nuvei:', error);
-      toast.error('Failed to connect with Nuvei');
-    } finally {
-      setConnectingNuvei(null);
     }
   };
 
@@ -581,22 +543,6 @@ export default function BankAccountsSection() {
         </CardHeader>
 
         <CardContent>
-          {/* Info banner about Nuvei connection */}
-          {accounts.length > 0 && accounts.some(acc => !acc.nuveiConnected) && (
-            <div className="mb-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <div className="flex items-start gap-3">
-                <Info className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-sm font-medium text-yellow-300">Bank Verification Required</h4>
-                  <p className="text-sm text-gray-400 mt-1">
-                    To enable automatic bank withdrawals, click &quot;Connect with Nuvei&quot; on your bank account. 
-                    You&apos;ll be redirected to a secure page to verify your bank details.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          
           {accounts.length === 0 ? (
             <div className="text-center py-8 border border-dashed border-gray-600 rounded-lg">
               <Building2 className="h-12 w-12 text-gray-500 mx-auto mb-3" />
@@ -648,12 +594,11 @@ export default function BankAccountsSection() {
                           {account.nuveiConnected ? (
                             <Badge className="bg-emerald-500/20 text-emerald-300 text-xs">
                               <Check className="h-3 w-3 mr-1" />
-                              Nuvei Ready
+                              Ready for Withdrawals
                             </Badge>
                           ) : (
-                            <Badge className="bg-yellow-500/20 text-yellow-300 text-xs">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              Setup Required
+                            <Badge className="bg-gray-500/20 text-gray-300 text-xs">
+                              Manual Processing
                             </Badge>
                           )}
                         </div>
@@ -675,32 +620,9 @@ export default function BankAccountsSection() {
                             </span>
                           )}
                         </div>
-                        {account.stripeAccountStatus && account.stripeAccountStatus.startsWith('error') && (
-                          <p className="text-xs text-yellow-400 mt-2 flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3" />
-                            {account.stripeAccountStatus.replace('error: ', '')}
-                          </p>
-                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      {/* Connect with Nuvei button - required for automatic withdrawals */}
-                      {!account.nuveiConnected && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleConnectWithNuvei(account)}
-                          disabled={connectingNuvei === account.id}
-                          className="border-emerald-600 text-emerald-400 hover:bg-emerald-500/10"
-                        >
-                          {connectingNuvei === account.id ? (
-                            <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                          ) : (
-                            <Check className="h-3 w-3 mr-1" />
-                          )}
-                          Connect with Nuvei
-                        </Button>
-                      )}
                       {!account.isDefault && (
                         <Button
                           variant="outline"

@@ -385,10 +385,11 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Check if this bank account was set up via Nuvei (has UPO)
-      // If not, also check the NuveiUserPaymentOption collection for matching bank UPOs
-      if (!bankAccount.nuveiUserPaymentOptionId) {
-        // Try to find a bank UPO for this user
+      // Check if this bank account has a Nuvei UPO (created when account was added)
+      if (bankAccount.nuveiUpoId && bankAccount.nuveiStatus === 'active') {
+        console.log('💳 Bank account has Nuvei UPO:', bankAccount.nuveiUpoId);
+      } else if (!bankAccount.nuveiUpoId) {
+        // Try to find a bank UPO for this user in case it was created separately
         const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
         const bankUpo = await NuveiUserPaymentOption.findOne({
           userId: session.user.id,
@@ -397,9 +398,8 @@ export async function POST(request: NextRequest) {
         }).sort({ lastUsed: -1 });
         
         if (bankUpo) {
-          // Found a bank UPO, use it
-          console.log('💳 Found bank UPO for withdrawal:', bankUpo.userPaymentOptionId);
-          bankAccount.nuveiUserPaymentOptionId = bankUpo.userPaymentOptionId;
+          console.log('💳 Found bank UPO from separate record:', bankUpo.userPaymentOptionId);
+          bankAccount.nuveiUpoId = String(bankUpo.userPaymentOptionId);
         }
       }
       
@@ -548,14 +548,14 @@ export async function POST(request: NextRequest) {
         swiftBic: bankAccount.swiftBic,
         country: bankAccount.country,
         // Include Nuvei UPO if available (required for automatic processing)
-        nuveiUserPaymentOptionId: bankAccount.nuveiUserPaymentOptionId,
+        nuveiUpoId: bankAccount.nuveiUpoId,
       };
       withdrawalRequestData.bankAccountId = bankAccount._id;
       
-      // If bank account has Nuvei UPO, also store it for card_refund-like processing
-      if (bankAccount.nuveiUserPaymentOptionId) {
+      // If bank account has Nuvei UPO, also store it for automatic processing
+      if (bankAccount.nuveiUpoId) {
         withdrawalRequestData.originalCardDetails = {
-          userPaymentOptionId: bankAccount.nuveiUserPaymentOptionId,
+          userPaymentOptionId: bankAccount.nuveiUpoId,
           type: 'bank_upo',
         };
       }

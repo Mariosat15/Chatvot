@@ -3,7 +3,8 @@ import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { connectToDatabase } from '@/database/mongoose';
 import UserBankAccount from '@/database/models/user-bank-account.model';
-import Stripe from 'stripe';
+import NuveiUserPaymentOption from '@/database/models/nuvei-user-payment-option.model';
+import { nuveiService } from '@/lib/services/nuvei.service';
 
 /**
  * GET /api/wallet/bank-accounts
@@ -19,21 +20,9 @@ export async function GET() {
     await connectToDatabase();
 
     const accounts = await UserBankAccount.getUserAccounts(session.user.id);
-    
-    // Check if user has any Nuvei bank UPOs
-    // These are created when user completes the /accountCapture flow
-    const NuveiUserPaymentOption = (await import('@/database/models/nuvei-user-payment-option.model')).default;
-    const nuveiUpos = await NuveiUserPaymentOption.find({
-      userId: session.user.id,
-      type: 'bank',
-      isActive: true,
-    });
-    
-    const hasNuveiConnection = nuveiUpos.length > 0;
-    const nuveiUpoId = hasNuveiConnection ? nuveiUpos[0]?.userPaymentOptionId : null;
 
     // Mask sensitive data for response
-    const maskedAccounts = accounts.map((account) => ({
+    const maskedAccounts = accounts.map((account: any) => ({
       id: account._id,
       accountHolderName: account.accountHolderName,
       accountHolderType: account.accountHolderType,
@@ -51,12 +40,10 @@ export async function GET() {
       addedAt: account.addedAt,
       lastUsedAt: account.lastUsedAt,
       totalPayouts: account.totalPayouts,
-      stripeAccountStatus: account.stripeAccountStatus,
-      // Nuvei connection status
-      // For now, we apply the Nuvei connection to all bank accounts
-      // since Nuvei uses userTokenId (not specific bank account)
-      nuveiConnected: hasNuveiConnection,
-      nuveiUpoId: nuveiUpoId,
+      // Nuvei connection status - directly from bank account record
+      nuveiConnected: !!account.nuveiUpoId && account.nuveiStatus === 'active',
+      nuveiUpoId: account.nuveiUpoId,
+      nuveiStatus: account.nuveiStatus,
     }));
 
     return NextResponse.json({
@@ -164,49 +151,58 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create Stripe external account (if Stripe is configured)
-    let stripeExternalAccountId: string | undefined;
-    let stripeAccountStatus: string | undefined;
-
-    const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_TEST_SECRET_KEY;
-    if (stripeKey && iban) {
+    // Create Nuvei UPO for bank account (for automatic withdrawals)
+    let nuveiUpoId: string | undefined;
+    let nuveiStatus: string = 'pending';
+    
+    const userTokenId = `user_${session.user.id}`;
+    const cleanIban = iban?.replace(/\s/g, '').toUpperCase();
+    
+    if (cleanIban) {
       try {
-        const stripe = new Stripe(stripeKey, { apiVersion: '2024-12-18.acacia' });
+        console.log('🏦 Creating Nuvei bank UPO for user:', session.user.id);
         
-        // Create a token for the bank account
-        // Note: In test mode, use test bank account numbers
-        // For SEPA: Use test IBAN like DE89370400440532013000
-        const bankAccountToken = await stripe.tokens.create({
-          bank_account: {
-            country: country.toUpperCase(),
-            currency: currency.toLowerCase(),
-            account_holder_name: accountHolderName,
-            account_holder_type: accountHolderType,
-            // For SEPA countries, use IBAN
-            account_number: iban.replace(/\s/g, ''),
-          },
+        // Use addSepaUpo to create the UPO directly (no redirect needed)
+        const nuveiResult = await nuveiService.addSepaUpo({
+          userTokenId,
+          iban: cleanIban,
+          bic: swiftBic?.toUpperCase(),
+          accountHolderName: accountHolderName.trim(),
+          countryCode: country.toUpperCase(),
         });
-
-        console.log(`✅ Stripe bank account token created: ${bankAccountToken.id}`);
-        stripeExternalAccountId = bankAccountToken.id;
-        stripeAccountStatus = 'pending_verification';
-
-        // Note: To actually add this as an external account for payouts,
-        // you need either:
-        // 1. A Stripe Connect account for the user, OR
-        // 2. Add to your platform's account (not recommended for multi-user)
-        // 
-        // For now, we just create the token for verification
-        // Full Connect integration would be:
-        // const externalAccount = await stripe.accounts.createExternalAccount(
-        //   connectedAccountId,
-        //   { external_account: bankAccountToken.id }
-        // );
-
-      } catch (stripeError: any) {
-        console.error('Stripe bank account error:', stripeError);
-        // Don't fail - we can still store the bank details
-        stripeAccountStatus = `error: ${stripeError.message}`;
+        
+        if ('error' in nuveiResult) {
+          console.error('🏦 Nuvei UPO creation failed:', nuveiResult.error);
+          nuveiStatus = `error: ${nuveiResult.error}`;
+        } else if (nuveiResult.userPaymentOptionId) {
+          console.log('🏦 Nuvei UPO created:', nuveiResult.userPaymentOptionId);
+          nuveiUpoId = String(nuveiResult.userPaymentOptionId);
+          nuveiStatus = 'active';
+          
+          // Store the UPO in our database
+          await NuveiUserPaymentOption.findOneAndUpdate(
+            { 
+              userId: session.user.id, 
+              userPaymentOptionId: nuveiResult.userPaymentOptionId 
+            },
+            {
+              userId: session.user.id,
+              userTokenId,
+              userPaymentOptionId: nuveiResult.userPaymentOptionId,
+              type: 'bank',
+              paymentMethod: 'apmgw_SEPA',
+              ibanLast4: cleanIban.slice(-4),
+              accountHolderName: accountHolderName.trim(),
+              isActive: true,
+              lastUsed: new Date(),
+            },
+            { upsert: true, new: true }
+          );
+        }
+      } catch (nuveiError: any) {
+        console.error('🏦 Nuvei UPO creation error:', nuveiError);
+        nuveiStatus = `error: ${nuveiError.message}`;
+        // Don't fail - we can still store the bank details for manual processing
       }
     }
 
@@ -218,22 +214,28 @@ export async function POST(request: NextRequest) {
       bankName: bankName?.trim(),
       country: country.toUpperCase(),
       currency: currency.toLowerCase(),
-      iban: iban?.replace(/\s/g, '').toUpperCase(),
+      iban: cleanIban,
       accountNumber,
       routingNumber,
       swiftBic: swiftBic?.toUpperCase(),
-      stripeExternalAccountId,
-      stripeAccountStatus,
+      // Store Nuvei UPO info instead of Stripe
+      nuveiUpoId,
+      nuveiStatus,
       isDefault: setAsDefault,
-      isVerified: false, // Will be verified after first successful payout
-      nickname: nickname?.trim() || `${bankName || 'Bank'} ****${iban?.slice(-4) || accountNumber?.slice(-4)}`,
+      isVerified: nuveiStatus === 'active', // Mark as verified if Nuvei UPO created successfully
+      nickname: nickname?.trim() || `${bankName || 'Bank'} ****${cleanIban?.slice(-4) || accountNumber?.slice(-4)}`,
     });
 
     console.log(`✅ Bank account added for user ${session.user.id}: ${bankAccount._id}`);
+    if (nuveiUpoId) {
+      console.log(`✅ Nuvei UPO linked: ${nuveiUpoId}`);
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Bank account added successfully',
+      message: nuveiUpoId 
+        ? 'Bank account added and connected for automatic withdrawals!' 
+        : 'Bank account added (manual processing)',
       account: {
         id: bankAccount._id,
         accountHolderName: bankAccount.accountHolderName,
@@ -242,7 +244,9 @@ export async function POST(request: NextRequest) {
         ibanLast4: bankAccount.ibanLast4,
         isDefault: bankAccount.isDefault,
         nickname: bankAccount.nickname,
-        stripeAccountStatus: bankAccount.stripeAccountStatus,
+        nuveiConnected: !!nuveiUpoId,
+        nuveiUpoId: nuveiUpoId,
+        nuveiStatus: nuveiStatus,
       },
     });
   } catch (error) {
