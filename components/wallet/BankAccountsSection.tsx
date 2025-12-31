@@ -355,8 +355,8 @@ export default function BankAccountsSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bankAccountId: account.id,
-          country: account.country,
-          currency: 'EUR',
+          countryCode: account.country,
+          currencyCode: 'EUR',
         }),
       });
 
