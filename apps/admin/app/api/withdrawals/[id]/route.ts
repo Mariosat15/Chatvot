@@ -199,30 +199,37 @@ export async function PUT(
           const balanceBefore = wallet.creditBalance;
           wallet.creditBalance += withdrawal.amountCredits;
           await wallet.save({ session });
-
-          // Record refund transaction
-          await WalletTransaction.create(
-            [{
-              userId: withdrawal.userId,
-              transactionType: 'admin_adjustment',
-              amount: withdrawal.amountCredits,
-              balanceBefore,
-              balanceAfter: wallet.creditBalance,
-              currency: 'EUR',
-              exchangeRate: withdrawal.exchangeRate,
-              status: 'completed',
-              description: `Withdrawal ${action} - credits refunded`,
-              metadata: {
-                withdrawalRequestId: withdrawal._id,
-                reason: withdrawal.rejectionReason,
-              },
-              processedAt: new Date(),
-            }],
-            { session }
-          );
-
           withdrawal.walletBalanceAfter = wallet.creditBalance;
         }
+
+        // CRITICAL: Update the original wallet transaction - make it "completed" with 0 amount
+        // This way the reconciliation counts it correctly (no effect on balance since amount=0)
+        // and we maintain the audit trail
+        await WalletTransaction.updateOne(
+          {
+            userId: withdrawal.userId,
+            transactionType: 'withdrawal',
+            status: 'pending',
+            $or: [
+              { 'metadata.withdrawalRequestId': withdrawal._id },
+              { 'metadata.withdrawalRequestId': withdrawal._id.toString() },
+            ],
+          },
+          {
+            $set: {
+              status: 'completed', // Mark as completed so it's counted
+              amount: 0, // Set amount to 0 since withdrawal was reversed
+              processedAt: new Date(),
+              description: `Withdrawal ${action} - credits returned to wallet`,
+              'metadata.originalAmount': withdrawal.amountCredits,
+              'metadata.refundReason': withdrawal.rejectionReason,
+              'metadata.wasReversed': true,
+            },
+          },
+          { session }
+        );
+
+        console.log(`💰 Refunded ${withdrawal.amountCredits} credits to user ${withdrawal.userId} (withdrawal ${action})`);
         break;
 
       case 'processing':
@@ -315,11 +322,21 @@ export async function PUT(
           }
         }
 
-        // Update wallet's total withdrawn
-        const userWallet = await CreditWallet.findOne({ userId: withdrawal.userId }).session(session);
-        if (userWallet) {
-          userWallet.totalWithdrawn += withdrawal.amountCredits;
-          await userWallet.save({ session });
+        // Update wallet's total withdrawn (only if not already counted)
+        const alreadyCounted = withdrawal.metadata?.totalWithdrawnUpdated === true;
+        if (!alreadyCounted) {
+          const userWallet = await CreditWallet.findOne({ userId: withdrawal.userId }).session(session);
+          if (userWallet) {
+            userWallet.totalWithdrawn = (userWallet.totalWithdrawn || 0) + withdrawal.amountCredits;
+            await userWallet.save({ session });
+          }
+          
+          // Mark as counted to prevent duplicates
+          withdrawal.metadata = withdrawal.metadata || {};
+          withdrawal.metadata.totalWithdrawnUpdated = true;
+          console.log(`💸 Updated totalWithdrawn: +${withdrawal.amountCredits} credits for user ${withdrawal.userId}`);
+        } else {
+          console.log(`💸 totalWithdrawn already updated for withdrawal ${withdrawal._id}, skipping`);
         }
 
         // Calculate bank fee from settings (what bank charges us for the payout)
@@ -369,6 +386,29 @@ export async function PUT(
           { session }
         );
 
+        // CRITICAL: Update the wallet transaction to 'completed' for reconciliation
+        const walletTxUpdate = await WalletTransaction.updateOne(
+          {
+            userId: withdrawal.userId,
+            transactionType: 'withdrawal',
+            status: 'pending',
+            $or: [
+              { 'metadata.withdrawalRequestId': withdrawal._id },
+              { 'metadata.withdrawalRequestId': withdrawal._id.toString() },
+            ],
+          },
+          {
+            $set: {
+              status: 'completed',
+              processedAt: new Date(),
+              paymentId: withdrawal.payoutId || `manual_${Date.now()}`,
+              description: `Withdrawal completed - €${withdrawalNetAmount.toFixed(2)} sent to ${withdrawal.payoutMethod === 'bank_transfer' ? 'bank' : 'card'}`,
+            },
+          },
+          { session }
+        );
+        console.log(`   📝 Updated wallet transaction: ${walletTxUpdate.modifiedCount} record(s) updated`);
+
         console.log(`✅ Withdrawal ${withdrawal._id} marked as COMPLETED by ${admin.email}`);
         break;
 
@@ -384,31 +424,36 @@ export async function PUT(
           const balanceBeforeRefund = walletForRefund.creditBalance;
           walletForRefund.creditBalance += withdrawal.amountCredits;
           await walletForRefund.save({ session });
-
-          // Record refund transaction
-          await WalletTransaction.create(
-            [{
-              userId: withdrawal.userId,
-              transactionType: 'withdrawal_refund',
-              amount: withdrawal.amountCredits,
-              balanceBefore: balanceBeforeRefund,
-              balanceAfter: walletForRefund.creditBalance,
-              currency: 'EUR',
-              exchangeRate: withdrawal.exchangeRate,
-              status: 'completed',
-              description: `Withdrawal failed - credits refunded: ${withdrawal.failureReason}`,
-              metadata: {
-                withdrawalRequestId: withdrawal._id,
-                reason: withdrawal.failureReason,
-              },
-              processedAt: new Date(),
-            }],
-            { session }
-          );
-
           withdrawal.walletBalanceAfter = walletForRefund.creditBalance;
-          console.log(`💰 Refunded ${withdrawal.amountCredits} credits to user ${withdrawal.userId} due to failed withdrawal`);
         }
+
+        // CRITICAL: Update the original wallet transaction - make it "completed" with 0 amount
+        // This way the reconciliation counts it correctly (no effect on balance since amount=0)
+        await WalletTransaction.updateOne(
+          {
+            userId: withdrawal.userId,
+            transactionType: 'withdrawal',
+            status: 'pending',
+            $or: [
+              { 'metadata.withdrawalRequestId': withdrawal._id },
+              { 'metadata.withdrawalRequestId': withdrawal._id.toString() },
+            ],
+          },
+          {
+            $set: {
+              status: 'completed', // Mark as completed so it's counted
+              amount: 0, // Set amount to 0 since withdrawal was reversed
+              processedAt: new Date(),
+              description: `Withdrawal failed - credits returned to wallet: ${withdrawal.failureReason}`,
+              'metadata.originalAmount': withdrawal.amountCredits,
+              'metadata.failureReason': withdrawal.failureReason,
+              'metadata.wasReversed': true,
+            },
+          },
+          { session }
+        );
+
+        console.log(`💰 Refunded ${withdrawal.amountCredits} credits to user ${withdrawal.userId} due to failed withdrawal`);
         break;
     }
 

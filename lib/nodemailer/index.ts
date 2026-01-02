@@ -1155,6 +1155,8 @@ function buildWithdrawalEmailHtml(
  * Send withdrawal completed email to user
  */
 export const sendWithdrawalCompletedEmail = async (data: WithdrawalCompletedEmailData) => {
+    console.log(`📧 [WITHDRAWAL] sendWithdrawalCompletedEmail called for ${data.email}`);
+    
     try {
         await connectToDatabase();
         
@@ -1166,9 +1168,12 @@ export const sendWithdrawalCompletedEmail = async (data: WithdrawalCompletedEmai
             getEmailTemplate('withdrawal_completed'),
         ]);
         
+        console.log(`📧 [WITHDRAWAL] Template found: ${template?.name || 'NONE'}, isActive: ${template?.isActive}`);
+        
         // Check if template is active
         if (!template.isActive) {
-            console.log(`ℹ️ [WITHDRAWAL] Email template is disabled, skipping email to ${data.email}`);
+            console.log(`⚠️ [WITHDRAWAL] Email template "withdrawal_completed" is DISABLED in admin settings, skipping email to ${data.email}`);
+            console.log(`   → Go to Admin → Email Settings → Enable "withdrawal_completed" template`);
             return;
         }
         

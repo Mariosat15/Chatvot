@@ -675,38 +675,135 @@ async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
       await WalletTransaction.findByIdAndUpdate(walletTx._id, { $set: txUpdateData });
     }
     
+    // IMPORTANT: If payout completed, update wallet stats and record platform fee
+    if (newStatus === 'completed') {
+      const CreditWalletModel = (await import('@/database/models/trading/credit-wallet.model')).default;
+      const wallet = await CreditWalletModel.findOne({ userId: withdrawalRequest.userId });
+      
+      if (wallet) {
+        // Only update totalWithdrawn if not already counted (prevent double-counting from sync + DMN)
+        const wdMetadata = (withdrawalRequest as any).metadata || {};
+        const alreadyCounted = wdMetadata.totalWithdrawnUpdated === true;
+        if (!alreadyCounted) {
+          const creditsWithdrawn = withdrawalRequest.amountCredits || 0;
+          wallet.totalWithdrawn = (wallet.totalWithdrawn || 0) + creditsWithdrawn;
+          await wallet.save();
+          
+          // Mark as counted to prevent duplicates
+          await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
+            $set: { 'metadata.totalWithdrawnUpdated': true },
+          });
+          console.log(`💸 Payout DMN: Updated totalWithdrawn: +${creditsWithdrawn} credits for user ${withdrawalRequest.userId}`);
+        } else {
+          console.log(`💸 Payout DMN: totalWithdrawn already updated for withdrawal ${withdrawalRequest._id}, skipping`);
+        }
+      }
+      
+      // Record platform fee as revenue (if any fee was charged and not already recorded)
+      const platformFee = withdrawalRequest.platformFee || 0;
+      if (platformFee > 0) {
+        try {
+          const { PlatformTransaction } = await import('@/database/models/platform-financials.model');
+          
+          // Check if fee already recorded (prevent duplicates)
+          const existingFee = await PlatformTransaction.findOne({
+            transactionType: 'withdrawal_fee',
+            sourceId: withdrawalRequest._id.toString(),
+          });
+          
+          if (!existingFee) {
+            await PlatformTransaction.create({
+              transactionType: 'withdrawal_fee',
+              amount: withdrawalRequest.platformFeeCredits || platformFee,
+              amountEUR: platformFee,
+              sourceType: 'user_withdrawal',
+              sourceId: withdrawalRequest._id.toString(),
+              sourceName: withdrawalRequest.userEmail,
+              userId: withdrawalRequest.userId,
+              feeDetails: {
+                withdrawalAmount: withdrawalRequest.amountEUR,
+                platformFee,
+                netAmount: withdrawalRequest.netAmountEUR,
+                withdrawalMethod: withdrawalRequest.payoutMethod,
+                provider: 'nuvei',
+                completedViaDmn: true,
+              },
+              description: `Automatic withdrawal fee from ${withdrawalRequest.userEmail}`,
+            });
+            console.log(`💸 Payout DMN: Recorded platform fee: €${platformFee}`);
+          } else {
+            console.log(`💸 Payout DMN: Platform fee already recorded for withdrawal ${withdrawalRequest._id}`);
+          }
+        } catch (feeError) {
+          console.error('💸 Payout DMN: Error recording platform fee (non-blocking):', feeError);
+        }
+      }
+      
+      // Send email notification for completed withdrawal
+      const emailToUse = withdrawalRequest.userEmail;
+      console.log(`📧 Payout DMN: Checking email notification, userEmail=${emailToUse || 'NOT SET'}`);
+      
+      if (emailToUse) {
+        try {
+          const { sendWithdrawalCompletedEmail } = await import('@/lib/nodemailer');
+          
+          // Determine payment method display name
+          let paymentMethodDisplay = 'Bank Transfer';
+          if (withdrawalRequest.payoutMethod?.includes('card')) {
+            paymentMethodDisplay = 'Card Payout';
+          } else if (withdrawalRequest.payoutMethod?.includes('bank') || withdrawalRequest.payoutMethod?.includes('sepa')) {
+            paymentMethodDisplay = 'Bank Transfer (SEPA)';
+          }
+          
+          console.log(`📧 Payout DMN: Sending email to ${emailToUse}...`);
+          
+          await sendWithdrawalCompletedEmail({
+            email: emailToUse,
+            name: withdrawalRequest.userName || emailToUse.split('@')[0],
+            credits: withdrawalRequest.amountCredits || 0,
+            netAmount: withdrawalRequest.netAmountEUR || 0,
+            fee: withdrawalRequest.platformFee || 0,
+            paymentMethod: paymentMethodDisplay,
+            withdrawalId: withdrawalRequest._id.toString().slice(-8).toUpperCase(),
+            remainingBalance: wallet?.creditBalance || 0,
+          });
+          console.log(`✅ Payout DMN: Email sent successfully to ${emailToUse}`);
+        } catch (emailError) {
+          console.error('❌ Payout DMN: Error sending email:', emailError);
+        }
+      } else {
+        console.warn('⚠️ Payout DMN: Cannot send email - no email address on withdrawal request');
+      }
+    }
+    
     // Refund credits if payout failed
     if (shouldRefund) {
       const CreditWallet = (await import('@/database/models/trading/credit-wallet.model')).default;
       const wallet = await CreditWallet.findOne({ userId: withdrawalRequest.userId });
       
       if (wallet) {
-        const creditsToRefund = withdrawalRequest.amountCredits;
-        const balanceBefore = wallet.creditBalance;
+        const creditsToRefund = withdrawalRequest.amountCredits || 0;
         wallet.creditBalance += creditsToRefund;
         await wallet.save();
         
         console.log(`💸 Payout DMN: Refunded ${creditsToRefund} credits to user ${withdrawalRequest.userId}`);
         
-        // Create refund transaction
-        await WalletTransaction.create({
-          userId: withdrawalRequest.userId,
-          transactionType: 'withdrawal_refund',
-          amount: creditsToRefund,
-          currency: 'EUR',
-          exchangeRate: withdrawalRequest.exchangeRate,
-          balanceBefore,
-          balanceAfter: wallet.creditBalance,
-          status: 'completed',
-          provider: 'nuvei',
-          description: `Payout refund - ${reason || 'Declined'}`,
-          metadata: {
-            withdrawalRequestId: withdrawalRequest._id.toString(),
-            payoutTransactionId: transactionId,
-            refundReason: reason || 'Payout declined',
-          },
-          processedAt: new Date(),
-        });
+        // Update the original wallet transaction - mark as completed with 0 amount
+        // This ensures reconciliation is correct (no net effect since reversed)
+        if (walletTx) {
+          await WalletTransaction.findByIdAndUpdate(walletTx._id, {
+            $set: {
+              status: 'completed',
+              amount: 0, // Set to 0 since withdrawal was reversed
+              processedAt: new Date(),
+              description: `Payout failed - credits returned: ${reason || 'Declined'}`,
+              'metadata.originalAmount': creditsToRefund,
+              'metadata.payoutDmnStatus': status,
+              'metadata.wasReversed': true,
+              'metadata.refundReason': reason || 'Payout declined',
+            },
+          });
+        }
       }
     }
     
@@ -833,6 +930,70 @@ async function handleWithdrawalDmn(params: NuveiDmnParams): Promise<NextResponse
       await WalletTransaction.findByIdAndUpdate(walletTx._id, txUpdate);
     }
 
+    // IMPORTANT: If withdrawal completed (settled), update wallet stats and record platform fee
+    if (newStatus === 'completed') {
+      const wallet = await CreditWallet.findOne({ userId: withdrawalRequest.userId });
+      
+      if (wallet) {
+        // Only update totalWithdrawn if not already counted (prevent double-counting from sync + DMN)
+        const wdMeta = (withdrawalRequest as any).metadata || {};
+        const alreadyCounted = wdMeta.totalWithdrawnUpdated === true;
+        if (!alreadyCounted) {
+          const creditsWithdrawn = Math.abs(withdrawalRequest.amountCredits || 0);
+          wallet.totalWithdrawn = (wallet.totalWithdrawn || 0) + creditsWithdrawn;
+          await wallet.save();
+          
+          // Mark as counted to prevent duplicates
+          await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
+            $set: { 'metadata.totalWithdrawnUpdated': true },
+          });
+          console.log(`💸 Withdrawal DMN: Updated totalWithdrawn: +${creditsWithdrawn} credits for user ${withdrawalRequest.userId}`);
+        } else {
+          console.log(`💸 Withdrawal DMN: totalWithdrawn already updated for withdrawal ${withdrawalRequest._id}, skipping`);
+        }
+      }
+      
+      // Record platform fee as revenue (if any fee was charged and not already recorded)
+      const platformFee = withdrawalRequest.platformFee || 0;
+      if (platformFee > 0) {
+        try {
+          const { PlatformTransaction } = await import('@/database/models/platform-financials.model');
+          
+          // Check if fee already recorded (prevent duplicates)
+          const existingFee = await PlatformTransaction.findOne({
+            transactionType: 'withdrawal_fee',
+            sourceId: withdrawalRequest._id.toString(),
+          });
+          
+          if (!existingFee) {
+            await PlatformTransaction.create({
+              transactionType: 'withdrawal_fee',
+              amount: withdrawalRequest.platformFeeCredits || platformFee,
+              amountEUR: platformFee,
+              sourceType: 'user_withdrawal',
+              sourceId: withdrawalRequest._id.toString(),
+              sourceName: withdrawalRequest.userEmail,
+              userId: withdrawalRequest.userId,
+              feeDetails: {
+                withdrawalAmount: withdrawalRequest.amountEUR,
+                platformFee,
+                netAmount: withdrawalRequest.netAmountEUR,
+                withdrawalMethod: withdrawalRequest.payoutMethod,
+                provider: 'nuvei',
+                completedViaDmn: true,
+              },
+              description: `Automatic withdrawal fee from ${withdrawalRequest.userEmail}`,
+            });
+            console.log(`💸 Withdrawal DMN: Recorded platform fee: €${platformFee}`);
+          } else {
+            console.log(`💸 Withdrawal DMN: Platform fee already recorded for withdrawal ${withdrawalRequest._id}`);
+          }
+        } catch (feeError) {
+          console.error('💸 Withdrawal DMN: Error recording platform fee (non-blocking):', feeError);
+        }
+      }
+    }
+
     // Handle refund if needed (failed/cancelled)
     if (shouldRefund) {
       console.log('💸 Refunding credits for failed/cancelled withdrawal');
@@ -843,31 +1004,26 @@ async function handleWithdrawalDmn(params: NuveiDmnParams): Promise<NextResponse
         const creditsToRefund = Math.abs(withdrawalRequest.amountCredits || 0);
         
         if (creditsToRefund > 0) {
-          const balanceBefore = wallet.creditBalance;
           wallet.creditBalance += creditsToRefund;
           await wallet.save();
 
           console.log(`💸 Refunded ${creditsToRefund} credits to user ${withdrawalRequest.userId}`);
 
-          // Create refund transaction
-          await WalletTransaction.create({
-            userId: withdrawalRequest.userId,
-            transactionType: 'withdrawal_refund',
-            amount: creditsToRefund,
-            currency: 'EUR',
-            exchangeRate: withdrawalRequest.exchangeRate || 1,
-            balanceBefore,
-            balanceAfter: wallet.creditBalance,
-            status: 'completed',
-            provider: 'nuvei',
-            description: `Withdrawal refund - ${reason || newStatus}`,
-            metadata: {
-              withdrawalRequestId: withdrawalRequest._id.toString(),
-              merchantWDRequestId,
-              refundReason: reason || newStatus,
-              originalAmountEUR: withdrawalRequest.amountEUR,
-            },
-          });
+          // Update the original wallet transaction - mark as completed with 0 amount
+          // This ensures reconciliation is correct (no net effect since reversed)
+          if (walletTx) {
+            await WalletTransaction.findByIdAndUpdate(walletTx._id, {
+              $set: {
+                status: 'completed',
+                amount: 0, // Set to 0 since withdrawal was reversed
+                processedAt: new Date(),
+                description: `Withdrawal ${newStatus} - credits returned: ${reason || 'Declined'}`,
+                'metadata.originalAmount': creditsToRefund,
+                'metadata.wasReversed': true,
+                'metadata.refundReason': reason || newStatus,
+              },
+            });
+          }
 
           // Update withdrawal request with refund info
           await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
@@ -894,16 +1050,57 @@ async function handleWithdrawalDmn(params: NuveiDmnParams): Promise<NextResponse
       }
     }
 
-    // Send success notification
+    // Send success notification and email
     if (newStatus === 'completed') {
+      // In-app notification
       try {
         const { sendWithdrawalCompletedNotification } = await import('@/lib/services/notification.service');
         await sendWithdrawalCompletedNotification(
           withdrawalRequest.userId,
           `€${withdrawalRequest.netAmountEUR?.toFixed(2) || params.amount}`
         );
+        console.log(`✅ Withdrawal DMN: In-app notification sent`);
       } catch (notifError) {
         console.error('💸 Error sending withdrawal completed notification:', notifError);
+      }
+      
+      // Email notification
+      const emailToSend = withdrawalRequest.userEmail;
+      console.log(`📧 Withdrawal DMN: Checking email notification, userEmail=${emailToSend || 'NOT SET'}`);
+      
+      if (emailToSend) {
+        try {
+          const { sendWithdrawalCompletedEmail } = await import('@/lib/nodemailer');
+          
+          // Get user's current balance
+          const wallet = await CreditWallet.findOne({ userId: withdrawalRequest.userId });
+          
+          // Determine payment method display name
+          let paymentMethodDisplay = 'Bank Transfer';
+          if (withdrawalRequest.payoutMethod?.includes('card')) {
+            paymentMethodDisplay = 'Card Payout';
+          } else if (withdrawalRequest.payoutMethod?.includes('bank') || withdrawalRequest.payoutMethod?.includes('sepa')) {
+            paymentMethodDisplay = 'Bank Transfer (SEPA)';
+          }
+          
+          console.log(`📧 Withdrawal DMN: Sending email to ${emailToSend}...`);
+          
+          await sendWithdrawalCompletedEmail({
+            email: emailToSend,
+            name: withdrawalRequest.userName || emailToSend.split('@')[0],
+            credits: withdrawalRequest.amountCredits || 0,
+            netAmount: withdrawalRequest.netAmountEUR || 0,
+            fee: withdrawalRequest.platformFee || 0,
+            paymentMethod: paymentMethodDisplay,
+            withdrawalId: withdrawalRequest._id.toString().slice(-8).toUpperCase(),
+            remainingBalance: wallet?.creditBalance || 0,
+          });
+          console.log(`✅ Withdrawal DMN: Email sent successfully to ${emailToSend}`);
+        } catch (emailError) {
+          console.error('❌ Withdrawal DMN: Error sending email:', emailError);
+        }
+      } else {
+        console.warn('⚠️ Withdrawal DMN: Cannot send email - no email address on withdrawal request');
       }
     }
 

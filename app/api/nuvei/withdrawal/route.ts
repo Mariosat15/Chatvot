@@ -223,7 +223,7 @@ export async function POST(req: NextRequest) {
     const isBankTransfer = withdrawalMethod === 'bank_transfer' && bankAccount;
 
     // Add payment method details for Nuvei
-    if (isCardPayout) {
+    if (isCardPayout && actualUpoId) {
       // For card refund, we MUST pass the UPO ID from the original deposit
       withdrawalParams.userPaymentOptionId = actualUpoId;
       console.log(`💳 Using UPO ${actualUpoId} for card refund withdrawal`);
@@ -461,33 +461,29 @@ export async function POST(req: NextRequest) {
         'metadata.refundedCredits': creditsNeeded,
       });
       
-      // Update wallet transaction as failed
+      // Update wallet transaction - mark as completed with 0 amount (reversed)
+      // This ensures reconciliation is correct (no net effect since reversed)
       await WalletTransaction.findByIdAndUpdate(walletTx._id, {
-        status: 'failed',
-        failureReason: nuveiResult.error,
-        processedAt: new Date(),
-      });
-      
-      // Create a refund transaction for audit trail
-      await WalletTransaction.create({
-        userId,
-        transactionType: 'withdrawal_refund',
-        amount: creditsNeeded,
-        currency: 'EUR',
-        exchangeRate,
-        balanceBefore: wallet.creditBalance - creditsNeeded,
-        balanceAfter: wallet.creditBalance,
         status: 'completed',
-        provider: 'nuvei',
-        description: `Withdrawal refund - ${nuveiResult.error}`,
-        metadata: {
-          withdrawalRequestId: withdrawalRequest._id.toString(),
-          merchantWDRequestId,
-          refundReason: nuveiResult.error,
-          originalAmountEUR: amount,
-        },
+        amount: 0, // Set to 0 since withdrawal was reversed
         processedAt: new Date(),
+        description: `Withdrawal declined - credits returned: ${nuveiResult.error}`,
+        'metadata.originalAmount': creditsNeeded,
+        'metadata.wasReversed': true,
+        'metadata.failureReason': nuveiResult.error,
       });
+
+      // Send failure notification
+      try {
+        const { sendWithdrawalFailedNotification } = await import('@/lib/services/notification.service');
+        await sendWithdrawalFailedNotification(
+          userId,
+          'The payment processor declined the transaction. Your credits have been returned to your wallet.'
+        );
+        console.log(`📧 Withdrawal failed notification sent for user ${userId}`);
+      } catch (notifError) {
+        console.error('❌ Error sending withdrawal failed notification:', notifError);
+      }
 
       return NextResponse.json(
         { 
@@ -499,9 +495,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Success - update with Nuvei response
+    // Type assertion: At this point, we know nuveiResult is not an error type
+    const successResult = nuveiResult as Exclude<typeof nuveiResult, { error: string }>;
+    
     // Determine final status based on Nuvei's response
     // transactionStatus can be: APPROVED, DECLINED, PENDING, ERROR (case-insensitive check)
-    const nuveiStatus = (nuveiResult.wdRequestStatus || nuveiResult.transactionStatus || '').toUpperCase();
+    const nuveiStatus = (successResult.wdRequestStatus || successResult.transactionStatus || '').toUpperCase();
     let finalStatus: 'processing' | 'completed' | 'failed' = 'processing';
     let statusMessage = 'Withdrawal submitted successfully';
     
@@ -518,7 +517,7 @@ export async function POST(req: NextRequest) {
     }
     
     console.log('💸 Nuvei payout response:', {
-      transactionId: nuveiResult.wdRequestId || nuveiResult.transactionId,
+      transactionId: successResult.wdRequestId || successResult.transactionId,
       transactionStatus: nuveiStatus,
       finalStatus,
     });
@@ -527,10 +526,10 @@ export async function POST(req: NextRequest) {
       $set: {
         status: finalStatus,
         ...(finalStatus === 'completed' ? { completedAt: new Date() } : {}),
-        ...(finalStatus === 'failed' ? { failedAt: new Date(), failedReason: nuveiResult.reason || 'Declined by processor' } : {}),
-        'metadata.nuveiTransactionId': nuveiResult.wdRequestId || nuveiResult.transactionId,
+        ...(finalStatus === 'failed' ? { failedAt: new Date(), failedReason: successResult.reason || 'Declined by processor' } : {}),
+        'metadata.nuveiTransactionId': successResult.wdRequestId || successResult.transactionId,
         'metadata.nuveiTransactionStatus': nuveiStatus,
-        'metadata.nuveiWdRequestId': nuveiResult.wdRequestId,
+        'metadata.nuveiWdRequestId': successResult.wdRequestId,
         'metadata.nuveiWdStatus': nuveiStatus,
       },
     });
@@ -539,54 +538,144 @@ export async function POST(req: NextRequest) {
       $set: {
         status: finalStatus === 'completed' ? 'completed' : (finalStatus === 'failed' ? 'failed' : 'pending'),
         ...(finalStatus !== 'processing' ? { processedAt: new Date() } : {}),
-        providerTransactionId: nuveiResult.wdRequestId || nuveiResult.transactionId,
-        'metadata.nuveiTransactionId': nuveiResult.wdRequestId || nuveiResult.transactionId,
+        providerTransactionId: successResult.wdRequestId || successResult.transactionId,
+        'metadata.nuveiTransactionId': successResult.wdRequestId || successResult.transactionId,
         'metadata.nuveiTransactionStatus': nuveiStatus,
       },
     });
+
+    // IMPORTANT: If withdrawal completed immediately (APPROVED), update wallet stats and record platform fee
+    if (finalStatus === 'completed') {
+      // Update wallet's totalWithdrawn counter
+      wallet.totalWithdrawn = (wallet.totalWithdrawn || 0) + creditsNeeded;
+      await wallet.save();
+      console.log(`💸 Updated wallet totalWithdrawn: +${creditsNeeded} credits`);
+      
+      // Mark as counted to prevent DMN from double-counting
+      await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
+        $set: { 'metadata.totalWithdrawnUpdated': true },
+      });
+
+      // Record platform fee as revenue (if any fee was charged)
+      if (platformFee > 0) {
+        try {
+          const { PlatformTransaction } = await import('@/database/models/platform-financials.model');
+          await PlatformTransaction.create({
+            transactionType: 'withdrawal_fee',
+            amount: platformFeeCredits,
+            amountEUR: platformFee,
+            sourceType: 'user_withdrawal',
+            sourceId: withdrawalRequest._id.toString(),
+            sourceName: userEmail,
+            userId,
+            feeDetails: {
+              withdrawalAmount: amount,
+              platformFee,
+              netAmount: netAmountEUR,
+              withdrawalMethod,
+              provider: 'nuvei',
+            },
+            description: `Automatic withdrawal fee from ${userEmail}`,
+          });
+          console.log(`💸 Recorded platform fee: €${platformFee} (${platformFeeCredits} credits)`);
+        } catch (feeError) {
+          console.error('💸 Error recording platform fee (non-blocking):', feeError);
+          // Don't fail the withdrawal for fee recording errors
+        }
+      }
+    }
 
     // If failed, refund the credits
     if (finalStatus === 'failed') {
       wallet.creditBalance = balanceBefore;
       await wallet.save();
       
-      // Create refund transaction
-      await WalletTransaction.create({
-        userId,
-        transactionType: 'withdrawal_refund',
-        amount: creditsNeeded,
-        currency: 'EUR',
-        exchangeRate,
-        balanceBefore: wallet.creditBalance - creditsNeeded,
-        balanceAfter: wallet.creditBalance,
+      // Update the wallet transaction - mark as completed with 0 amount (reversed)
+      // This ensures reconciliation is correct (no net effect since reversed)
+      await WalletTransaction.findByIdAndUpdate(walletTx._id, {
         status: 'completed',
-        provider: 'nuvei',
-        description: `Withdrawal refund - ${nuveiResult.reason || 'Declined by processor'}`,
-        metadata: {
-          withdrawalRequestId: withdrawalRequest._id.toString(),
-          merchantWDRequestId,
-          refundReason: nuveiResult.reason || 'Declined by processor',
-        },
+        amount: 0, // Set to 0 since withdrawal was reversed
         processedAt: new Date(),
+        description: `Withdrawal declined - credits returned: ${successResult.reason || 'Declined by processor'}`,
+        'metadata.originalAmount': creditsNeeded,
+        'metadata.wasReversed': true,
+        'metadata.failureReason': successResult.reason || 'Declined by processor',
       });
+      
+      // Send failure notification
+      try {
+        const { sendWithdrawalFailedNotification } = await import('@/lib/services/notification.service');
+        await sendWithdrawalFailedNotification(
+          userId,
+          successResult.reason || 'Withdrawal was declined by the payment processor. Your credits have been returned.'
+        );
+        console.log(`📧 Withdrawal declined notification sent for user ${userId}`);
+      } catch (notifError) {
+        console.error('❌ Error sending withdrawal declined notification:', notifError);
+      }
       
       return NextResponse.json({
         success: false,
         error: statusMessage,
-        wdRequestId: nuveiResult.wdRequestId,
+        wdRequestId: successResult.wdRequestId,
         wdRequestStatus: nuveiStatus,
       }, { status: 400 });
     }
 
     console.log('💸 Nuvei withdrawal completed successfully:', {
-      transactionId: nuveiResult.wdRequestId || nuveiResult.transactionId,
+      transactionId: successResult.wdRequestId || successResult.transactionId,
       status: finalStatus,
+      userEmail: userEmail || 'NOT SET',
     });
+
+    // Send email notification for completed or processing withdrawals
+    // Get email from withdrawal request as fallback (it was saved with user info)
+    const emailToUse = userEmail || withdrawalRequest.userEmail;
+    const nameToUse = userName || withdrawalRequest.userName || (emailToUse ? emailToUse.split('@')[0] : 'User');
+    
+    console.log(`📧 Checking email notification: status=${finalStatus}, email=${emailToUse || 'NONE'}`);
+    
+    if (finalStatus === 'completed' || finalStatus === 'processing') {
+      if (emailToUse) {
+        try {
+          const { sendWithdrawalCompletedEmail } = await import('@/lib/nodemailer');
+          
+          // Determine payment method display name
+          let paymentMethodDisplay = 'Bank Transfer';
+          if (withdrawalMethod === 'card_refund' || withdrawalMethod === 'card_payout') {
+            paymentMethodDisplay = 'Card Payout';
+          } else if (withdrawalMethod === 'bank_transfer') {
+            paymentMethodDisplay = 'Bank Transfer (SEPA)';
+          }
+          
+          console.log(`📧 Sending withdrawal email to ${emailToUse}...`);
+          
+          await sendWithdrawalCompletedEmail({
+            email: emailToUse,
+            name: nameToUse,
+            credits: creditsNeeded,
+            netAmount: netAmountEUR,
+            fee: platformFee,
+            paymentMethod: paymentMethodDisplay,
+            withdrawalId: withdrawalRequest._id.toString().slice(-8).toUpperCase(),
+            remainingBalance: wallet.creditBalance,
+          });
+          console.log(`✅ Automatic withdrawal email sent to ${emailToUse}`);
+        } catch (emailError) {
+          console.error('❌ Error sending automatic withdrawal email:', emailError);
+          // Don't fail the withdrawal if email fails
+        }
+      } else {
+        console.warn('⚠️ Cannot send withdrawal email - no email address available');
+      }
+    } else {
+      console.log(`📧 Skipping email - status is ${finalStatus} (not completed/processing)`);
+    }
 
     return NextResponse.json({
       success: true,
       message: statusMessage,
-      wdRequestId: nuveiResult.wdRequestId || nuveiResult.transactionId,
+      wdRequestId: successResult.wdRequestId || successResult.transactionId,
       wdRequestStatus: nuveiStatus,
       status: finalStatus,
       netAmountEUR,
