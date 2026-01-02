@@ -112,9 +112,15 @@ interface WithdrawalResponse {
   errCode: number;
   reason?: string;
   wdRequestId?: string;
-  wdRequestStatus?: 'Pending' | 'Approved' | 'Declined' | 'Processing' | 'Settled' | 'Cancelled';
+  wdRequestStatus?: string; // Can be: APPROVED, DECLINED, PENDING, ERROR, Processing, Settled, Cancelled
   merchantWDRequestId?: string;
   userTokenId?: string;
+  merchantId?: string;
+  merchantSiteId?: string;
+  // Additional fields from /payout response
+  transactionId?: string;
+  transactionStatus?: string;
+  userPaymentOptionId?: string;
 }
 
 interface GetWithdrawalRequestsParams {
@@ -1425,10 +1431,28 @@ class NuveiService {
       console.log('\n');
       
       if (data.status === 'SUCCESS' && data.errCode === 0) {
-        return data as WithdrawalResponse;
+        // Map /payout response fields to our expected format
+        // Nuvei /payout returns: transactionId, transactionStatus
+        // We need: wdRequestId, wdRequestStatus
+        const response: WithdrawalResponse = {
+          status: data.status,
+          errCode: data.errCode,
+          reason: data.reason || '',
+          merchantId: data.merchantId,
+          merchantSiteId: data.merchantSiteId,
+          userTokenId: data.userTokenId,
+          // Map the transaction fields
+          wdRequestId: data.transactionId,
+          wdRequestStatus: data.transactionStatus, // APPROVED, DECLINED, PENDING, ERROR
+          // Include additional useful fields
+          transactionId: data.transactionId,
+          transactionStatus: data.transactionStatus,
+          userPaymentOptionId: data.userPaymentOptionId,
+        };
+        return response;
       } else {
         return { 
-          error: data.reason || `Withdrawal failed (code: ${data.errCode})`,
+          error: data.reason || data.gwErrorReason || `Withdrawal failed (code: ${data.errCode || data.gwErrorCode})`,
           ...data,
         };
       }

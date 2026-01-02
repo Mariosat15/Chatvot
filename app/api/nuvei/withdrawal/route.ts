@@ -477,34 +477,96 @@ export async function POST(req: NextRequest) {
     }
 
     // Success - update with Nuvei response
+    // Determine final status based on Nuvei's response
+    // transactionStatus can be: APPROVED, DECLINED, PENDING, ERROR
+    const nuveiStatus = nuveiResult.wdRequestStatus || nuveiResult.transactionStatus;
+    let finalStatus: 'processing' | 'completed' | 'failed' = 'processing';
+    let statusMessage = 'Withdrawal submitted successfully';
+    
+    if (nuveiStatus === 'APPROVED') {
+      finalStatus = 'completed';
+      statusMessage = '🎉 Withdrawal approved! Funds will be sent to your card within 1-3 business days.';
+    } else if (nuveiStatus === 'DECLINED' || nuveiStatus === 'ERROR') {
+      finalStatus = 'failed';
+      statusMessage = 'Withdrawal was declined by the payment processor.';
+    }
+    // PENDING status keeps finalStatus as 'processing'
+    
+    console.log('💸 Nuvei payout response:', {
+      transactionId: nuveiResult.wdRequestId || nuveiResult.transactionId,
+      transactionStatus: nuveiStatus,
+      finalStatus,
+    });
+    
     await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
       $set: {
+        status: finalStatus,
+        ...(finalStatus === 'completed' ? { completedAt: new Date() } : {}),
+        ...(finalStatus === 'failed' ? { failedAt: new Date(), failedReason: nuveiResult.reason || 'Declined by processor' } : {}),
+        'metadata.nuveiTransactionId': nuveiResult.wdRequestId || nuveiResult.transactionId,
+        'metadata.nuveiTransactionStatus': nuveiStatus,
         'metadata.nuveiWdRequestId': nuveiResult.wdRequestId,
-        'metadata.nuveiWdStatus': nuveiResult.wdRequestStatus,
+        'metadata.nuveiWdStatus': nuveiStatus,
       },
     });
 
     await WalletTransaction.findByIdAndUpdate(walletTx._id, {
       $set: {
-        providerTransactionId: nuveiResult.wdRequestId,
-        'metadata.nuveiWdRequestId': nuveiResult.wdRequestId,
-        'metadata.nuveiWdStatus': nuveiResult.wdRequestStatus,
+        status: finalStatus === 'completed' ? 'completed' : (finalStatus === 'failed' ? 'failed' : 'pending'),
+        ...(finalStatus !== 'processing' ? { processedAt: new Date() } : {}),
+        providerTransactionId: nuveiResult.wdRequestId || nuveiResult.transactionId,
+        'metadata.nuveiTransactionId': nuveiResult.wdRequestId || nuveiResult.transactionId,
+        'metadata.nuveiTransactionStatus': nuveiStatus,
       },
     });
 
-    console.log('💸 Nuvei withdrawal submitted successfully:', {
-      wdRequestId: nuveiResult.wdRequestId,
-      wdRequestStatus: nuveiResult.wdRequestStatus,
+    // If failed, refund the credits
+    if (finalStatus === 'failed') {
+      wallet.creditBalance = balanceBefore;
+      await wallet.save();
+      
+      // Create refund transaction
+      await WalletTransaction.create({
+        userId,
+        transactionType: 'withdrawal_refund',
+        amount: creditsNeeded,
+        currency: 'EUR',
+        exchangeRate,
+        balanceBefore: wallet.creditBalance - creditsNeeded,
+        balanceAfter: wallet.creditBalance,
+        status: 'completed',
+        provider: 'nuvei',
+        description: `Withdrawal refund - ${nuveiResult.reason || 'Declined by processor'}`,
+        metadata: {
+          withdrawalRequestId: withdrawalRequest._id.toString(),
+          merchantWDRequestId,
+          refundReason: nuveiResult.reason || 'Declined by processor',
+        },
+        processedAt: new Date(),
+      });
+      
+      return NextResponse.json({
+        success: false,
+        error: statusMessage,
+        wdRequestId: nuveiResult.wdRequestId,
+        wdRequestStatus: nuveiStatus,
+      }, { status: 400 });
+    }
+
+    console.log('💸 Nuvei withdrawal completed successfully:', {
+      transactionId: nuveiResult.wdRequestId || nuveiResult.transactionId,
+      status: finalStatus,
     });
 
     return NextResponse.json({
       success: true,
-      message: 'Withdrawal submitted successfully',
-      wdRequestId: nuveiResult.wdRequestId,
-      wdRequestStatus: nuveiResult.wdRequestStatus,
+      message: statusMessage,
+      wdRequestId: nuveiResult.wdRequestId || nuveiResult.transactionId,
+      wdRequestStatus: nuveiStatus,
+      status: finalStatus,
       netAmountEUR,
       platformFee,
-      estimatedProcessingTime: '1-3 business days',
+      estimatedProcessingTime: finalStatus === 'completed' ? '1-3 business days for funds to arrive' : '1-3 business days',
     });
   } catch (error) {
     console.error('Nuvei withdrawal error:', error);

@@ -205,7 +205,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'OK', message: 'Card tokenization acknowledged' });
     }
     
-    console.log('📥 Processing PAYMENT DMN');
+    // Check if this is a PAYOUT (Credit) DMN vs DEPOSIT (Sale) DMN
+    // Nuvei sends both as type: "DEPOSIT" but uses transactionType to distinguish
+    const isPayoutDmn = params.transactionType === 'Credit';
+    
+    if (isPayoutDmn) {
+      console.log('💸 Processing PAYOUT DMN');
+      console.log('💸 TransactionID:', params.TransactionID);
+      console.log('💸 ClientRequestId:', params.clientRequestId);
+      console.log('💸 Status:', params.Status);
+      return await handlePayoutDmn(params);
+    }
+    
+    console.log('📥 Processing DEPOSIT DMN');
     // Get Nuvei secret key - try database first, then env vars
     let secretKey: string | undefined;
     const provider = await PaymentProvider.findOne({ slug: 'nuvei', isActive: true });
@@ -516,6 +528,177 @@ async function handleAccountCaptureDmn(params: NuveiDmnParams): Promise<NextResp
     
   } catch (error) {
     console.error('🏦 Error handling Account Capture DMN:', error);
+    return NextResponse.json({ status: 'OK', message: 'Error processing DMN' });
+  }
+}
+
+/**
+ * Handle Payout (Credit) DMN
+ * Called when transactionType === 'Credit' (from /payout endpoint)
+ * This is different from handleWithdrawalDmn which handles /withdraw endpoint
+ */
+async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
+  try {
+    const transactionId = params.TransactionID || params.transactionId;
+    const clientRequestId = params.clientRequestId; // e.g., "wd_1767336267062_p8k5v87d9"
+    const status = params.Status || params.ppp_status;
+    const errCode = parseInt(params.ErrCode || params.errCode || '0');
+    const reason = params.Reason || '';
+    const amount = params.totalAmount;
+    const userTokenId = params.user_token_id || params.userid;
+    
+    console.log('💸 Payout DMN parsed:', {
+      transactionId,
+      clientRequestId,
+      status,
+      errCode,
+      amount,
+      userTokenId,
+    });
+    
+    // For payouts, we need to find by clientRequestId which is stored in metadata
+    // or find by nuveiTransactionId
+    let withdrawalRequest = null;
+    let walletTx = null;
+    
+    // Try to find by clientRequestId (stored as metadata.nuveiTransactionId or nuveiWdRequestId)
+    if (clientRequestId) {
+      // The withdrawal route stores clientRequestId in various metadata fields
+      withdrawalRequest = await WithdrawalRequest.findOne({
+        $or: [
+          { 'metadata.nuveiTransactionId': transactionId },
+          { 'metadata.nuveiWdRequestId': transactionId },
+        ]
+      });
+      
+      walletTx = await WalletTransaction.findOne({
+        $or: [
+          { 'metadata.nuveiTransactionId': transactionId },
+          { providerTransactionId: transactionId },
+        ]
+      });
+    }
+    
+    // If not found by transactionId, try by userTokenId and recent timestamp
+    if (!withdrawalRequest && userTokenId) {
+      const userId = userTokenId.replace('user_', '');
+      // Find recent withdrawal request for this user that's in processing state
+      withdrawalRequest = await WithdrawalRequest.findOne({
+        userId,
+        status: { $in: ['processing', 'approved'] },
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }, // Last 24 hours
+      }).sort({ createdAt: -1 });
+      
+      if (withdrawalRequest) {
+        walletTx = await WalletTransaction.findOne({
+          'metadata.withdrawalRequestId': withdrawalRequest._id.toString(),
+        });
+      }
+    }
+    
+    if (!withdrawalRequest) {
+      console.log('💸 Payout DMN: Withdrawal request not found for transactionId:', transactionId);
+      // This is OK - the withdrawal was already updated synchronously when the payout was submitted
+      // The DMN is just a confirmation
+      return NextResponse.json({ status: 'OK', message: 'Withdrawal request not found (likely already processed)' });
+    }
+    
+    // Check if already processed
+    if (withdrawalRequest.status === 'completed' || withdrawalRequest.status === 'failed') {
+      console.log(`💸 Payout DMN: Withdrawal ${withdrawalRequest._id} already ${withdrawalRequest.status}, skipping`);
+      return NextResponse.json({ status: 'OK', message: 'Already processed' });
+    }
+    
+    // Determine new status based on Nuvei response
+    let newStatus: 'completed' | 'failed' | 'processing';
+    let shouldRefund = false;
+    
+    if (status === 'APPROVED' && errCode === 0) {
+      newStatus = 'completed';
+    } else if (status === 'DECLINED' || status === 'ERROR' || errCode !== 0) {
+      newStatus = 'failed';
+      shouldRefund = true;
+    } else if (status === 'PENDING') {
+      newStatus = 'processing';
+    } else {
+      // Unknown status - log and keep as processing
+      console.log('💸 Payout DMN: Unknown status:', status);
+      newStatus = 'processing';
+    }
+    
+    console.log(`💸 Payout DMN: Updating withdrawal ${withdrawalRequest._id} from ${withdrawalRequest.status} to ${newStatus}`);
+    
+    // Update withdrawal request
+    const updateData: any = {
+      status: newStatus,
+      'metadata.payoutDmnReceived': true,
+      'metadata.payoutDmnStatus': status,
+      'metadata.payoutDmnTransactionId': transactionId,
+      'metadata.payoutDmnTimestamp': new Date().toISOString(),
+    };
+    
+    if (newStatus === 'completed') {
+      updateData.completedAt = new Date();
+    } else if (newStatus === 'failed') {
+      updateData.failedAt = new Date();
+      updateData.failedReason = reason || `Payout declined: ${status}`;
+    }
+    
+    await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, { $set: updateData });
+    
+    // Update wallet transaction if found
+    if (walletTx) {
+      const txUpdateData: any = {
+        status: newStatus === 'completed' ? 'completed' : (newStatus === 'failed' ? 'failed' : 'pending'),
+        'metadata.payoutDmnStatus': status,
+        'metadata.payoutDmnTransactionId': transactionId,
+      };
+      if (newStatus !== 'processing') {
+        txUpdateData.processedAt = new Date();
+      }
+      await WalletTransaction.findByIdAndUpdate(walletTx._id, { $set: txUpdateData });
+    }
+    
+    // Refund credits if payout failed
+    if (shouldRefund) {
+      const CreditWallet = (await import('@/database/models/trading/credit-wallet.model')).default;
+      const wallet = await CreditWallet.findOne({ userId: withdrawalRequest.userId });
+      
+      if (wallet) {
+        const creditsToRefund = withdrawalRequest.amountCredits;
+        const balanceBefore = wallet.creditBalance;
+        wallet.creditBalance += creditsToRefund;
+        await wallet.save();
+        
+        console.log(`💸 Payout DMN: Refunded ${creditsToRefund} credits to user ${withdrawalRequest.userId}`);
+        
+        // Create refund transaction
+        await WalletTransaction.create({
+          userId: withdrawalRequest.userId,
+          transactionType: 'withdrawal_refund',
+          amount: creditsToRefund,
+          currency: 'EUR',
+          exchangeRate: withdrawalRequest.exchangeRate,
+          balanceBefore,
+          balanceAfter: wallet.creditBalance,
+          status: 'completed',
+          provider: 'nuvei',
+          description: `Payout refund - ${reason || 'Declined'}`,
+          metadata: {
+            withdrawalRequestId: withdrawalRequest._id.toString(),
+            payoutTransactionId: transactionId,
+            refundReason: reason || 'Payout declined',
+          },
+          processedAt: new Date(),
+        });
+      }
+    }
+    
+    console.log(`💸 Payout DMN processed successfully: ${withdrawalRequest._id} -> ${newStatus}`);
+    return NextResponse.json({ status: 'OK', message: `Payout DMN processed: ${newStatus}` });
+    
+  } catch (error) {
+    console.error('💸 Error handling Payout DMN:', error);
     return NextResponse.json({ status: 'OK', message: 'Error processing DMN' });
   }
 }
