@@ -937,22 +937,32 @@ class NuveiService {
       console.log(JSON.stringify(data, null, 2));
       console.log('╚════════════════════════════════════════════════════════════╝\n');
       
-      if (data.status === 'SUCCESS' && data.transactionStatus === 'APPROVED') {
-        console.log('✅ Payout successful:', data.transactionId);
+      // For payouts, transactionStatus can be:
+      // - APPROVED: Payout approved and will be processed
+      // - PENDING: Payout submitted and waiting for bank processing (common for bank transfers)
+      // - DECLINED/ERROR: Payout failed
+      const isSuccess = data.status === 'SUCCESS' && 
+        (data.transactionStatus === 'APPROVED' || data.transactionStatus === 'PENDING');
+      
+      if (isSuccess) {
+        console.log('✅ Payout submitted successfully:', data.transactionId, 'Status:', data.transactionStatus);
         return {
           status: 'SUCCESS',
           errCode: 0,
           reason: '',
           wdRequestId: data.transactionId,
-          wdRequestStatus: 'Approved',
+          wdRequestStatus: data.transactionStatus, // Keep original status (APPROVED or PENDING)
+          transactionStatus: data.transactionStatus,
+          transactionId: data.transactionId,
           merchantId: data.merchantId,
           merchantSiteId: data.merchantSiteId,
           userTokenId: data.userTokenId,
+          userPaymentOptionId: data.userPaymentOptionId,
         } as WithdrawalResponse;
       } else {
-        console.error('❌ Payout failed:', data.reason || data.gwErrorReason);
+        console.error('❌ Payout failed:', data.reason || data.gwErrorReason || data.transactionStatus);
         return {
-          error: data.reason || data.gwErrorReason || `Payout failed (code: ${data.errCode || data.gwErrorCode})`,
+          error: data.reason || data.gwErrorReason || `Payout failed: ${data.transactionStatus || 'Unknown error'} (code: ${data.errCode || data.gwErrorCode || 'N/A'})`,
           ...data,
         };
       }

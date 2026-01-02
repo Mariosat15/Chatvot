@@ -500,19 +500,22 @@ export async function POST(req: NextRequest) {
 
     // Success - update with Nuvei response
     // Determine final status based on Nuvei's response
-    // transactionStatus can be: APPROVED, DECLINED, PENDING, ERROR
-    const nuveiStatus = nuveiResult.wdRequestStatus || nuveiResult.transactionStatus;
+    // transactionStatus can be: APPROVED, DECLINED, PENDING, ERROR (case-insensitive check)
+    const nuveiStatus = (nuveiResult.wdRequestStatus || nuveiResult.transactionStatus || '').toUpperCase();
     let finalStatus: 'processing' | 'completed' | 'failed' = 'processing';
     let statusMessage = 'Withdrawal submitted successfully';
     
     if (nuveiStatus === 'APPROVED') {
       finalStatus = 'completed';
-      statusMessage = '🎉 Withdrawal approved! Funds will be sent to your card within 1-3 business days.';
+      statusMessage = '🎉 Withdrawal approved! Funds will be sent to your account within 1-3 business days.';
+    } else if (nuveiStatus === 'PENDING') {
+      // Bank payouts typically start as PENDING and become APPROVED via DMN
+      finalStatus = 'processing';
+      statusMessage = '✅ Withdrawal submitted! Your bank transfer is being processed and will arrive within 1-3 business days.';
     } else if (nuveiStatus === 'DECLINED' || nuveiStatus === 'ERROR') {
       finalStatus = 'failed';
       statusMessage = 'Withdrawal was declined by the payment processor.';
     }
-    // PENDING status keeps finalStatus as 'processing'
     
     console.log('💸 Nuvei payout response:', {
       transactionId: nuveiResult.wdRequestId || nuveiResult.transactionId,

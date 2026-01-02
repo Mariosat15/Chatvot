@@ -540,7 +540,7 @@ async function handleAccountCaptureDmn(params: NuveiDmnParams): Promise<NextResp
 async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
   try {
     const transactionId = params.TransactionID || params.transactionId;
-    const clientRequestId = params.clientRequestId; // e.g., "wd_1767336267062_p8k5v87d9"
+    const clientUniqueId = params.clientUniqueId || params.merchant_unique_id; // e.g., "wd_37d7b921_1767337078495"
     const status = params.Status || params.ppp_status;
     const errCode = parseInt(params.ErrCode || params.errCode || '0');
     const reason = params.Reason || '';
@@ -549,21 +549,19 @@ async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
     
     console.log('💸 Payout DMN parsed:', {
       transactionId,
-      clientRequestId,
+      clientUniqueId,
       status,
       errCode,
       amount,
       userTokenId,
     });
     
-    // For payouts, we need to find by clientRequestId which is stored in metadata
-    // or find by nuveiTransactionId
+    // For payouts, we need to find by transactionId, clientUniqueId, or metadata
     let withdrawalRequest = null;
     let walletTx = null;
     
-    // Try to find by clientRequestId (stored as metadata.nuveiTransactionId or nuveiWdRequestId)
-    if (clientRequestId) {
-      // The withdrawal route stores clientRequestId in various metadata fields
+    // First try to find by transactionId (stored when payout was submitted)
+    if (transactionId) {
       withdrawalRequest = await WithdrawalRequest.findOne({
         $or: [
           { 'metadata.nuveiTransactionId': transactionId },
@@ -579,13 +577,31 @@ async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
       });
     }
     
-    // If not found by transactionId, try by userTokenId and recent timestamp
+    // If not found by transactionId, try by clientUniqueId
+    // Note: clientUniqueId = merchantWDRequestId (e.g., "wd_37d7b921_1767337078495")
+    if (!withdrawalRequest && clientUniqueId) {
+      withdrawalRequest = await WithdrawalRequest.findOne({
+        $or: [
+          { 'metadata.merchantWDRequestId': clientUniqueId },
+          { 'metadata.clientUniqueId': clientUniqueId },
+        ]
+      });
+      
+      walletTx = await WalletTransaction.findOne({
+        $or: [
+          { 'metadata.merchantWDRequestId': clientUniqueId },
+          { 'metadata.clientUniqueId': clientUniqueId },
+        ]
+      });
+    }
+    
+    // If still not found, try by userTokenId and recent timestamp
     if (!withdrawalRequest && userTokenId) {
       const userId = userTokenId.replace('user_', '');
       // Find recent withdrawal request for this user that's in processing state
       withdrawalRequest = await WithdrawalRequest.findOne({
         userId,
-        status: { $in: ['processing', 'approved'] },
+        status: { $in: ['processing', 'approved', 'pending'] },
         createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }, // Last 24 hours
       }).sort({ createdAt: -1 });
       
@@ -597,7 +613,7 @@ async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
     }
     
     if (!withdrawalRequest) {
-      console.log('💸 Payout DMN: Withdrawal request not found for transactionId:', transactionId);
+      console.log('💸 Payout DMN: Withdrawal request not found for:', { transactionId, clientUniqueId });
       // This is OK - the withdrawal was already updated synchronously when the payout was submitted
       // The DMN is just a confirmation
       return NextResponse.json({ status: 'OK', message: 'Withdrawal request not found (likely already processed)' });
