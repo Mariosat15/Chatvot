@@ -83,6 +83,9 @@ interface WithdrawalSettings {
   nuveiWithdrawalEnabled: boolean;
   nuveiPreferCardRefund: boolean;
   
+  // Manual Mode with Payment Processor
+  usePaymentProcessorForManual: boolean;
+  
   // Notifications
   notifyAdminOnRequest: boolean;
   notifyAdminOnHighValue: boolean;
@@ -862,8 +865,82 @@ export default function WithdrawalSettingsSection() {
         </Card>
       </div>
 
-      {/* Auto-Approval Rules - Only show when Nuvei is NOT enabled */}
+      {/* Manual Mode Settings - Only show when Nuvei automatic is NOT enabled */}
       {!settings.nuveiWithdrawalEnabled && (
+        <>
+          {/* Payment Processor Integration for Manual Mode */}
+          <Card className="bg-gradient-to-br from-blue-900/30 to-cyan-900/30 border-blue-500/30">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-blue-400" />
+                Payment Processor for Manual Withdrawals
+                {settings.usePaymentProcessorForManual && (
+                  <Badge className="bg-blue-500/20 text-blue-300">Active</Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Route manual withdrawals through Nuvei for automated payment processing
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="flex items-center gap-4">
+                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
+                    settings.usePaymentProcessorForManual 
+                      ? 'bg-blue-500/20' 
+                      : 'bg-gray-600/20'
+                  }`}>
+                    <CreditCard className={`h-6 w-6 ${settings.usePaymentProcessorForManual ? 'text-blue-400' : 'text-gray-500'}`} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Use Nuvei for Manual Withdrawals</h3>
+                    <p className="text-sm text-gray-400">
+                      When enabled, withdrawal requests are sent to Nuvei. Admin approval triggers the actual payout.
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={settings.usePaymentProcessorForManual}
+                  onCheckedChange={(checked) => updateSetting('usePaymentProcessorForManual', checked)}
+                />
+              </div>
+              
+              {settings.usePaymentProcessorForManual ? (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-blue-400 mt-0.5" />
+                    <div className="text-sm text-blue-200">
+                      <p className="font-medium">How it works (Nuvei-managed manual mode):</p>
+                      <ul className="mt-2 space-y-1 text-blue-300/80">
+                        <li>1. User requests withdrawal → Request created in Nuvei (PENDING)</li>
+                        <li>2. Admin reviews request in your dashboard</li>
+                        <li>3. Admin approves → Nuvei receives approval and processes the payout</li>
+                        <li>4. Admin declines → Nuvei cancels the request, credits refunded</li>
+                        <li>• Nuvei handles the actual money transfer to user</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-amber-400 mt-0.5" />
+                    <div className="text-sm text-amber-200">
+                      <p className="font-medium">How it works (Pure manual mode):</p>
+                      <ul className="mt-2 space-y-1 text-amber-300/80">
+                        <li>1. User requests withdrawal → Request stored in your system</li>
+                        <li>2. Admin reviews request and sees user&apos;s bank details</li>
+                        <li>3. Admin manually transfers money via bank or card refund</li>
+                        <li>4. Admin marks withdrawal as completed after payment</li>
+                        <li>• You handle the actual money transfer manually</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
         <Card className="bg-gray-800/50 border-emerald-500/30">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
@@ -872,7 +949,7 @@ export default function WithdrawalSettingsSection() {
               <Badge className="bg-amber-500/20 text-amber-300">Manual Mode</Badge>
             </CardTitle>
             <CardDescription>
-              Auto-approve certain withdrawals without admin review (still processed manually via bank transfer)
+              Auto-approve certain withdrawals without admin review (still processed {settings.usePaymentProcessorForManual ? 'via Nuvei' : 'manually via bank transfer'})
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -936,6 +1013,7 @@ export default function WithdrawalSettingsSection() {
             )}
           </CardContent>
         </Card>
+        </>
       )}
 
       {/* Last Updated Info */}

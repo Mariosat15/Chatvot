@@ -152,7 +152,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
         {/* Auto-refresh when competition status changes */}
         <CompetitionStatusMonitor 
           competitionId={id} 
-          initialStatus={competition.status}
+          initialStatus={competition.status} 
           userId={userId}
         />
         
@@ -248,16 +248,16 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
             {/* User's Dashboard */}
             {isUserIn && userParticipant && (
               <CompetitionDashboard
-                competitionId={id}
+              competitionId={id}
                 initialParticipant={{
-                  _id: userParticipant._id.toString(),
-                  currentCapital: userParticipant.currentCapital,
-                  pnl: userParticipant.pnl,
-                  pnlPercentage: userParticipant.pnlPercentage,
-                  totalTrades: userParticipant.totalTrades,
-                  currentRank: userParticipant.currentRank,
-                  winningTrades: userParticipant.winningTrades,
-                  losingTrades: userParticipant.losingTrades,
+                _id: userParticipant._id.toString(),
+                currentCapital: userParticipant.currentCapital,
+                pnl: userParticipant.pnl,
+                pnlPercentage: userParticipant.pnlPercentage,
+                totalTrades: userParticipant.totalTrades,
+                currentRank: userParticipant.currentRank,
+                winningTrades: userParticipant.winningTrades,
+                losingTrades: userParticipant.losingTrades,
                   status: userParticipant.status,
                 }}
                 competitionStatus={isCompleted ? 'completed' : isActive ? 'active' : 'upcoming'}
@@ -402,14 +402,14 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
 
                 {/* Asset Classes */}
                 <div className="flex flex-wrap gap-1.5">
-                  {competition.assetClasses.map((asset: string) => (
+                      {competition.assetClasses.map((asset: string) => (
                     <span key={asset} className="px-2 py-1 rounded bg-blue-500/20 text-xs font-medium text-blue-400 uppercase">
                       {asset === 'forex' && '💱 '}{asset === 'crypto' && '₿ '}{asset === 'stocks' && '📈 '}{asset}
-                    </span>
-                  ))}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
             {/* Difficulty Level */}
             <div className={`rounded-xl bg-gradient-to-br ${diffColors.bg} border ${diffColors.border} p-4`}>
@@ -418,40 +418,40 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                   <Gauge className={`h-4 w-4 ${diffColors.text}`} />
                   <span className="text-sm font-semibold text-white">Difficulty</span>
                   <span className="text-lg">{emojiMap[difficultyData.level]}</span>
-                </div>
+                      </div>
                 <span className={`px-2 py-1 rounded-lg text-xs font-bold ${diffColors.barColor}/20 ${diffColors.text}`}>
                   {difficultyData.label}
                 </span>
-              </div>
+                      </div>
               
               {/* Progress Bar */}
               <div className="mb-2">
                 <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
                   <div className={`h-full ${diffColors.barColor} transition-all`} style={{ width: `${difficultyData.score}%` }} />
-                </div>
+                    </div>
                 <div className="flex justify-between text-[10px] text-gray-500 mt-1">
                   <span>Easier</span>
                   <span className={diffColors.text}>{difficultyData.score}/100</span>
                   <span>Harder</span>
-                </div>
               </div>
-              
-              <p className="text-xs text-gray-400">{descriptionMap[difficultyData.level]}</p>
             </div>
 
+              <p className="text-xs text-gray-400">{descriptionMap[difficultyData.level]}</p>
+              </div>
+              
             {/* ===== SECTION 3: RULES & REQUIREMENTS ===== */}
             {/* Competition Rules */}
             {competition.rules && (
               <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                     <Trophy className="h-4 w-4 text-yellow-500" />
                     <h3 className="text-sm font-semibold text-gray-100">Competition Rules</h3>
                   </div>
                   <Link href="/help/competitions" className="text-xs text-blue-400 hover:text-blue-300">
                     View Guide
                   </Link>
-                </div>
+                    </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400">Ranking:</span>
@@ -468,15 +468,15 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                     <div className="flex items-center justify-between">
                       <span className="text-gray-400">Min Trades:</span>
                       <span className="font-medium text-amber-400">{competition.rules.minimumTrades}</span>
-                    </div>
+                </div>
                   )}
                   {competition.rules.minimumWinRate > 0 && (
-                    <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between">
                       <span className="text-gray-400">Min Win Rate:</span>
                       <span className="font-medium text-amber-400">{competition.rules.minimumWinRate}%</span>
                     </div>
-                  )}
-                </div>
+                      )}
+                    </div>
               </div>
             )}
 
@@ -486,7 +486,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-lg">👑</span>
                   <h3 className="text-sm font-semibold text-purple-400">Level Requirement</h3>
-                </div>
+                  </div>
                 <p className="text-sm font-medium text-white">
                   {(() => {
                     const levelNames = ['', '🌱 Novice', '📚 Apprentice', '⚔️ Skilled', '🎯 Expert', '💎 Elite', '👑 Master', '🔥 Grand Master', '⚡ Champion', '🌟 Legend', '👑 Trading God'];
@@ -494,8 +494,8 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                     const max = competition.levelRequirement.maxLevel;
                     return max ? `${levelNames[min]} to ${levelNames[max]}` : `${levelNames[min]} or higher`;
                   })()}
-                </p>
-              </div>
+                  </p>
+                </div>
             )}
 
             {/* Disqualification Rules */}
@@ -535,8 +535,8 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                       </div>
                       <p className="text-[10px] text-gray-500">Win rate below {competition.rules.minimumWinRate}% = disqualified</p>
                     </div>
-                  )}
-                </div>
+                      )}
+                    </div>
               </div>
             )}
 
@@ -548,53 +548,53 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                 <h3 className="text-sm font-semibold text-gray-100">Risk Limits</h3>
                 <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${competition.riskLimits?.enabled ? 'bg-red-500/20 text-red-400' : 'bg-gray-700 text-gray-500'}`}>
                   {competition.riskLimits?.enabled ? '🛡️ ACTIVE' : 'OFF'}
-                </span>
+                    </span>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-2 bg-gray-900/50 rounded-lg">
                   <span className="text-xs text-gray-400">Max Drawdown</span>
                   <span className={`text-sm font-bold ${competition.riskLimits?.enabled ? 'text-red-400' : 'text-gray-500'}`}>
                     {competition.riskLimits?.maxDrawdownPercent || 50}%
-                  </span>
+                    </span>
                 </div>
                 <div className="flex items-center justify-between p-2 bg-gray-900/50 rounded-lg">
                   <span className="text-xs text-gray-400">Daily Loss Limit</span>
                   <span className={`text-sm font-bold ${competition.riskLimits?.enabled ? 'text-orange-400' : 'text-gray-500'}`}>
                     {competition.riskLimits?.dailyLossLimitPercent || 20}%
-                  </span>
+                    </span>
                 </div>
                 {competition.riskLimits?.equityCheckEnabled && (
                   <div className="flex items-center justify-between p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
                     <span className="text-xs text-purple-400">Equity Drawdown</span>
                     <span className="text-sm font-bold text-purple-400">{competition.riskLimits?.equityDrawdownPercent || 30}%</span>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-
+              </div>
+              
             {/* Margin Levels */}
             <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Skull className="h-4 w-4 text-red-400" />
                 <h3 className="text-sm font-semibold text-gray-100">Margin Levels</h3>
-              </div>
-              
+                </div>
+                
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-2 bg-red-500/10 rounded-lg border border-red-500/20">
                   <div className="flex items-center gap-1.5">
                     <Skull className="h-3 w-3 text-red-500" />
                     <span className="text-xs text-red-400">Liquidation</span>
-                  </div>
+                    </div>
                   <span className="text-sm font-black text-red-500">{riskSettings.marginLiquidation}%</span>
-                </div>
+                  </div>
                 <div className="flex items-center justify-between p-2 bg-orange-500/10 rounded-lg border border-orange-500/20">
                   <div className="flex items-center gap-1.5">
                     <Bell className="h-3 w-3 text-orange-400" />
                     <span className="text-xs text-orange-400">Margin Call</span>
-                  </div>
-                  <span className="text-sm font-black text-orange-400">{riskSettings.marginCall}%</span>
                 </div>
+                  <span className="text-sm font-black text-orange-400">{riskSettings.marginCall}%</span>
+                    </div>
                 <div className="flex items-center justify-between p-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
                   <div className="flex items-center gap-1.5">
                     <AlertTriangle className="h-3 w-3 text-yellow-400" />
@@ -606,7 +606,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                   <div className="flex items-center gap-1.5">
                     <Shield className="h-3 w-3 text-green-400" />
                     <span className="text-xs text-green-400">Safe</span>
-                  </div>
+                    </div>
                   <span className="text-sm font-black text-green-400">{riskSettings.marginSafe}%</span>
                 </div>
               </div>
@@ -634,7 +634,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                 <div className="flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-yellow-500" />
                   <h3 className="text-sm font-semibold text-gray-100">Prize Distribution</h3>
-                </div>
+            </div>
                 {competition.platformFeePercentage > 0 && (
                   <span className="text-[10px] text-blue-400">Fee: {competition.platformFeePercentage}%</span>
                 )}
@@ -662,8 +662,8 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                       {currentParticipants >= prizePositions 
                         ? `✅ ${currentParticipants}/${prizePositions} positions filled` 
                         : `🎁 ${currentParticipants}/${prizePositions} filled - ${unclaimedPercentage}% bonus available!`}
-                    </div>
-
+                      </div>
+                      
                     {/* Prize List */}
                     <div className="space-y-2">
                       {competition.prizeDistribution.map((prize: { percentage: number; rank?: number }, index: number) => {
@@ -673,14 +673,14 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                         
                         return (
                           <div key={index} className={`p-2.5 rounded-lg flex items-center justify-between ${isFilled ? 'bg-gray-800/50 border border-gray-700' : 'bg-gray-900/30 opacity-50'}`}>
-                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2">
                               <Trophy className={`h-4 w-4 ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-gray-400' : index === 2 ? 'text-orange-600' : 'text-gray-600'}`} />
                               <span className="text-sm font-medium text-gray-300">#{prize.rank ?? index + 1}</span>
                               <span className="px-1.5 py-0.5 text-[10px] rounded bg-yellow-500/20 text-yellow-400">{prize.percentage}%</span>
-                              {isFilled && bonusPerWinner > 0 && (
+                                {isFilled && bonusPerWinner > 0 && (
                                 <span className="px-1.5 py-0.5 text-[10px] rounded bg-green-500/20 text-green-400">+{bonusPerWinner.toFixed(1)}%</span>
-                              )}
-                            </div>
+                                )}
+                              </div>
                             <span className={`text-sm font-bold ${isFilled ? 'text-yellow-500' : 'text-gray-500'}`}>
                               {isFilled ? `€${netAmount.toFixed(2)}` : '—'}
                             </span>

@@ -56,6 +56,11 @@ export interface IWithdrawalSettings extends Document {
   nuveiWithdrawalEnabled: boolean;         // Enable automatic processing via Nuvei
   nuveiPreferCardRefund: boolean;          // Prefer refunding to original card over bank transfer
   
+  // Manual Mode with Payment Processor
+  // When enabled in manual mode: User requests → Nuvei (PENDING) → Admin approves → Nuvei processes payment
+  // When disabled in manual mode: User requests → Admin approves → Admin manually sends money
+  usePaymentProcessorForManual: boolean;   // Use Nuvei for manual withdrawals (create pending requests in Nuvei)
+  
   // Notifications
   notifyAdminOnRequest: boolean;           // Email admin on new withdrawal request
   notifyAdminOnHighValue: boolean;         // Email admin on high-value withdrawals
@@ -233,6 +238,14 @@ const WithdrawalSettingsSchema = new Schema<IWithdrawalSettings>(
     nuveiPreferCardRefund: {
       type: Boolean,
       default: true,  // Prefer refunding to original card
+    },
+    
+    // Manual Mode with Payment Processor
+    // When enabled: Withdrawal requests are sent to Nuvei, admin approval triggers Nuvei payout
+    // When disabled: Pure manual mode - admin processes withdrawals outside the system
+    usePaymentProcessorForManual: {
+      type: Boolean,
+      default: false,  // Pure manual mode by default
     },
     
     // Notifications

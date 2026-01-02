@@ -163,6 +163,30 @@ export async function PUT(
 
       case 'rejected':
       case 'cancelled':
+        // If this withdrawal was created in Nuvei, decline it there too
+        const nuveiWdReqId = withdrawal.metadata?.nuveiWdRequestId;
+        if (nuveiWdReqId) {
+          try {
+            console.log('🏦 Declining withdrawal in Nuvei...', nuveiWdReqId);
+            const NuveiService = (await import('@/lib/services/nuvei.service')).default;
+            const nuveiService = NuveiService.getInstance();
+            
+            const nuveiResult = await nuveiService.declineWithdrawRequest({
+              wdRequestId: nuveiWdReqId,
+              merchantWDRequestId: withdrawal.metadata?.merchantWDRequestId,
+            });
+            
+            if (!nuveiResult.success) {
+              console.error('❌ Failed to decline withdrawal in Nuvei:', nuveiResult.error);
+              withdrawal.adminNote = (withdrawal.adminNote || '') + `\n⚠️ Nuvei decline note: ${nuveiResult.error}`;
+            } else {
+              console.log('✅ Nuvei withdrawal declined');
+            }
+          } catch (nuveiError) {
+            console.error('❌ Error calling Nuvei decline API:', nuveiError);
+          }
+        }
+        
         withdrawal.status = action === 'rejected' ? 'rejected' : 'cancelled';
         withdrawal.rejectedBy = admin.adminId;
         withdrawal.rejectedAt = new Date();
@@ -207,6 +231,34 @@ export async function PUT(
         break;
 
       case 'completed':
+        // If this withdrawal was created in Nuvei (manual mode with payment processor),
+        // approve it in Nuvei so they process the actual payout
+        const nuveiWdRequestId = withdrawal.metadata?.nuveiWdRequestId;
+        if (nuveiWdRequestId) {
+          try {
+            console.log('🏦 Approving withdrawal in Nuvei...', nuveiWdRequestId);
+            const NuveiService = (await import('@/lib/services/nuvei.service')).default;
+            const nuveiService = NuveiService.getInstance();
+            
+            const nuveiResult = await nuveiService.approveWithdrawRequest({
+              wdRequestId: nuveiWdRequestId,
+              merchantWDRequestId: withdrawal.metadata?.merchantWDRequestId,
+            });
+            
+            if (!nuveiResult.success) {
+              console.error('❌ Failed to approve withdrawal in Nuvei:', nuveiResult.error);
+              // Don't block completion - Nuvei may have already processed it
+              withdrawal.adminNote = (withdrawal.adminNote || '') + `\n⚠️ Nuvei approval note: ${nuveiResult.error}`;
+            } else {
+              console.log('✅ Nuvei withdrawal approved - they will process the payout');
+              withdrawal.adminNote = (withdrawal.adminNote || '') + `\n✅ Nuvei payout approved`;
+            }
+          } catch (nuveiError) {
+            console.error('❌ Error calling Nuvei approve API:', nuveiError);
+            withdrawal.adminNote = (withdrawal.adminNote || '') + `\n⚠️ Nuvei API error (manual follow-up may be needed)`;
+          }
+        }
+        
         withdrawal.status = 'completed';
         withdrawal.completedAt = new Date();
         withdrawal.payoutStatus = 'completed';

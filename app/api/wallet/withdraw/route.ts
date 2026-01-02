@@ -613,6 +613,75 @@ export async function POST(request: NextRequest) {
       // In manual mode, all withdrawals stay in 'pending' status
       // Admin must manually approve/process them
       console.log('💼 Manual mode: Withdrawal stays in pending for admin review');
+      
+      // If usePaymentProcessorForManual is enabled, create the request in Nuvei
+      // This allows Nuvei to process the payout when admin approves
+      if (withdrawalSettings.usePaymentProcessorForManual) {
+        try {
+          console.log('🏦 Creating withdrawal request in Nuvei (manual mode with processor)...');
+          
+          // Get user's UPO for the withdrawal method
+          let userPaymentOptionId: string | undefined;
+          
+          if (payoutMethodType === 'card_payout' && originalPaymentDetails?.userPaymentOptionId) {
+            userPaymentOptionId = originalPaymentDetails.userPaymentOptionId;
+          } else if (payoutMethodType === 'bank_transfer' && bankAccount) {
+            // Get UPO from bank account if connected to Nuvei
+            userPaymentOptionId = bankAccount.nuveiUpoId;
+          }
+          
+          if (userPaymentOptionId) {
+            const NuveiService = (await import('@/lib/services/nuvei.service')).default;
+            const nuveiService = NuveiService.getInstance();
+            
+            const merchantWDRequestId = `wd_${session.user.id.slice(-8)}_${Date.now()}`;
+            const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL;
+            
+            const nuveiResult = await nuveiService.createWithdrawRequest({
+              userTokenId: `user_${session.user.id}`,
+              amount: netAmountEUR.toFixed(2),
+              currency: 'EUR',
+              merchantWDRequestId,
+              userPaymentOptionId,
+              email: session.user.email || undefined,
+              firstName: session.user.name?.split(' ')[0] || undefined,
+              lastName: session.user.name?.split(' ').slice(1).join(' ') || undefined,
+              notificationUrl: `${origin}/api/nuvei/webhook`,
+            });
+            
+            if ('error' in nuveiResult && nuveiResult.error) {
+              console.error('❌ Failed to create Nuvei withdrawal request:', nuveiResult.error);
+              // Don't fail the withdrawal - just mark for manual processing
+              withdrawalRequest[0].metadata = {
+                ...withdrawalRequest[0].metadata,
+                nuveiError: nuveiResult.error,
+                requiresManualProcessing: true,
+              };
+            } else {
+              console.log('✅ Nuvei withdrawal request created:', nuveiResult.wdRequestId);
+              withdrawalRequest[0].metadata = {
+                ...withdrawalRequest[0].metadata,
+                nuveiWdRequestId: nuveiResult.wdRequestId,
+                nuveiWdStatus: nuveiResult.wdRequestStatus,
+                merchantWDRequestId,
+                usePaymentProcessor: true,
+              };
+            }
+            await withdrawalRequest[0].save();
+          } else {
+            console.log('⚠️ No UPO available for Nuvei - will require full manual processing');
+            withdrawalRequest[0].metadata = {
+              ...withdrawalRequest[0].metadata,
+              requiresManualProcessing: true,
+              noUpoReason: 'No payment option linked',
+            };
+            await withdrawalRequest[0].save();
+          }
+        } catch (nuveiError) {
+          console.error('❌ Error creating Nuvei withdrawal request:', nuveiError);
+          // Don't fail - just mark for manual processing
+        }
+      }
     } else if (isSandbox && withdrawalSettings.sandboxAutoApprove) {
       // Auto-approve sandbox withdrawals ONLY when automatic processing is enabled
       withdrawalRequest[0].status = 'approved';
