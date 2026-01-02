@@ -820,39 +820,163 @@ class NuveiService {
    * @param params - Withdrawal details including the PRE-EXISTING userPaymentOptionId
    * @returns Withdrawal response
    */
+  /**
+   * Submit a payout (withdrawal) using an existing UPO
+   * Works for both card and bank account UPOs
+   * 
+   * Documentation: https://docs.nuvei.com/documentation/features/financial-operations/payout/
+   */
+  async submitPayout(params: {
+    userTokenId: string;
+    amount: string;
+    currency: string;
+    clientUniqueId: string;
+    userPaymentOptionId: string;  // UPO from deposit or /accountCapture
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    ipAddress?: string;
+    notificationUrl?: string;
+  }): Promise<WithdrawalResponse | { error: string }> {
+    console.log('\n💸 Starting Payout with UPO...');
+    console.log('💸 UPO ID:', params.userPaymentOptionId);
+    
+    if (!params.userPaymentOptionId) {
+      return { error: 'No payment option available for payout' };
+    }
+    
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: 'Nuvei not configured or not active' };
+    }
+    
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `payout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Checksum for /payout:
+    // SHA256(merchantId + merchantSiteId + clientRequestId + amount + currency + timeStamp + secretKey)
+    const checksumString = credentials.merchantId 
+      + credentials.siteId 
+      + clientRequestId 
+      + params.amount 
+      + params.currency 
+      + timeStamp 
+      + credentials.secretKey;
+    const checksum = crypto.createHash('sha256').update(checksumString).digest('hex');
+    
+    console.log('📝 Payout checksum input (masked):', 
+      `${credentials.merchantId}${credentials.siteId}${clientRequestId}${params.amount}${params.currency}${timeStamp}[SECRET]`);
+    
+    // UPO ID as string (Nuvei accepts both)
+    const upoId = String(params.userPaymentOptionId);
+    
+    const requestBody: Record<string, unknown> = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      clientRequestId,
+      clientUniqueId: params.clientUniqueId,
+      userTokenId: params.userTokenId,
+      amount: params.amount,
+      currency: params.currency,
+      userPaymentOption: {
+        userPaymentOptionId: upoId,
+      },
+      timeStamp,
+      checksum,
+    };
+    
+    // Add user details if provided
+    if (params.email || params.firstName || params.lastName) {
+      requestBody.userDetails = {
+        email: params.email,
+        firstName: params.firstName,
+        lastName: params.lastName,
+      };
+    }
+    
+    // Add device details if IP provided
+    if (params.ipAddress) {
+      requestBody.deviceDetails = {
+        ipAddress: params.ipAddress,
+      };
+    }
+    
+    // Add notification URL
+    if (params.notificationUrl) {
+      requestBody.urlDetails = {
+        notificationUrl: params.notificationUrl,
+      };
+    }
+    
+    console.log('\n');
+    console.log('╔════════════════════════════════════════════════════════════╗');
+    console.log('║     NUVEI PAYOUT REQUEST (with UPO)                        ║');
+    console.log('╚════════════════════════════════════════════════════════════╝');
+    console.log('📤 ENDPOINT:', `${apiUrl}/payout.do`);
+    console.log('📤 METHOD: POST');
+    console.log('📤 REQUEST BODY:');
+    console.log(JSON.stringify({ ...requestBody, checksum: '[HIDDEN]' }, null, 2));
+    
+    try {
+      const response = await fetch(`${apiUrl}/payout.do`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+      
+      const data = await response.json();
+      
+      console.log('📥 RESPONSE:');
+      console.log(JSON.stringify(data, null, 2));
+      console.log('╚════════════════════════════════════════════════════════════╝\n');
+      
+      if (data.status === 'SUCCESS' && data.transactionStatus === 'APPROVED') {
+        console.log('✅ Payout successful:', data.transactionId);
+        return {
+          status: 'SUCCESS',
+          errCode: 0,
+          reason: '',
+          wdRequestId: data.transactionId,
+          wdRequestStatus: 'Approved',
+          merchantId: data.merchantId,
+          merchantSiteId: data.merchantSiteId,
+          userTokenId: data.userTokenId,
+        } as WithdrawalResponse;
+      } else {
+        console.error('❌ Payout failed:', data.reason || data.gwErrorReason);
+        return {
+          error: data.reason || data.gwErrorReason || `Payout failed (code: ${data.errCode || data.gwErrorCode})`,
+          ...data,
+        };
+      }
+    } catch (error) {
+      console.error('❌ Nuvei payout error:', error);
+      return { error: 'Failed to process payout' };
+    }
+  }
+
+  // Alias for backward compatibility
   async submitBankPayout(params: {
     userTokenId: string;
     amount: string;
     currency: string;
     merchantWDRequestId: string;
-    userPaymentOptionId: string;  // UPO from /accountCapture flow
+    userPaymentOptionId: string;
     email: string;
     firstName?: string;
     lastName?: string;
     notificationUrl?: string;
   }): Promise<WithdrawalResponse | { error: string }> {
-    console.log('\n🏦 Starting Bank payout with UPO...');
-    console.log('🏦 UPO ID:', params.userPaymentOptionId);
-    
-    if (!params.userPaymentOptionId) {
-      return { 
-        error: 'Bank account not verified for automatic withdrawals. Please click "Enable Auto" on your bank account first.' 
-      };
-    }
-    
-    // Use unreferenced refund with UPO
-    // Nuvei enabled AllowRefundWithoutRelatedTransactionID for sandbox
-    return this.submitUnreferencedRefund({
+    return this.submitPayout({
       userTokenId: params.userTokenId,
       amount: params.amount,
       currency: params.currency,
-      userPaymentOptionId: params.userPaymentOptionId,
       clientUniqueId: params.merchantWDRequestId,
-      userDetails: {
-        email: params.email,
-        firstName: params.firstName,
-        lastName: params.lastName,
-      },
+      userPaymentOptionId: params.userPaymentOptionId,
+      email: params.email,
+      firstName: params.firstName,
+      lastName: params.lastName,
       notificationUrl: params.notificationUrl,
     });
   }
@@ -1208,17 +1332,16 @@ class NuveiService {
     }
     
     // For payout using UPO (card refund or APM payout)
-    // Nuvei API: { paymentOption: { userPaymentOptionId: xxx } }
-    // NOTE: Nuvei returns UPO IDs as numbers, so send as number for APM payouts
+    // Nuvei Payout API: { userPaymentOption: { userPaymentOptionId: xxx } }
+    // See: https://docs.nuvei.com/documentation/features/financial-operations/payout/
+    // NOTE: Field name is "userPaymentOption" (singular) NOT "paymentOption"
     if (params.userPaymentOptionId) {
-      // Try as number first (Nuvei returns as number), fall back to string
-      const upoId = /^\d+$/.test(String(params.userPaymentOptionId)) 
-        ? Number(params.userPaymentOptionId) 
-        : String(params.userPaymentOptionId);
-      requestBody.paymentOption = {
+      // Send UPO as string for consistency
+      const upoId = String(params.userPaymentOptionId);
+      requestBody.userPaymentOption = {
         userPaymentOptionId: upoId,
       };
-      console.log('💸 Payout using UPO:', upoId, '(type:', typeof upoId, ')');
+      console.log('💸 Payout using UPO:', upoId);
     }
     // For bank transfer - Nuvei requires specific APM setup
     // NOTE: Bank payouts (SEPA) must be enabled by Nuvei for your merchant account
