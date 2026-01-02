@@ -360,7 +360,7 @@ export async function POST(request: NextRequest) {
         console.log(`⚠️ UPO ${upoId} not found in local records, proceeding with manual withdrawal`);
       }
       
-      payoutMethodType = 'card_refund';
+      payoutMethodType = 'card_payout';
       originalPaymentDetails = {
         userPaymentOptionId: upoId,
         paymentMethod: 'nuvei_card',
@@ -528,7 +528,7 @@ export async function POST(request: NextRequest) {
         expYear: originalPaymentDetails.cardExpYear,
         country: originalPaymentDetails.cardCountry,
       };
-    } else if (payoutMethodType === 'card_refund' && originalPaymentDetails) {
+    } else if (payoutMethodType === 'card_payout' && originalPaymentDetails) {
       // Nuvei UPO card refund
       withdrawalRequestData.originalPaymentMethod = originalPaymentDetails.paymentMethod || 'nuvei_card';
       withdrawalRequestData.originalCardDetails = {

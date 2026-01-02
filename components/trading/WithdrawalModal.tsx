@@ -155,11 +155,11 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
       
       if (isAutomatic) {
         // AUTOMATIC WITHDRAWAL via Nuvei
-        const withdrawalMethod = selectedMethod.type === 'original_method' ? 'card_refund' : 'bank_transfer';
+        const withdrawalMethod = selectedMethod.type === 'original_method' ? 'card_payout' : 'bank_transfer';
         
         // Check if we have required data for automatic processing
         const canTryAutomatic = withdrawalMethod === 'bank_transfer' || 
-          (withdrawalMethod === 'card_refund' && selectedMethod.userPaymentOptionId);
+          (withdrawalMethod === 'card_payout' && selectedMethod.userPaymentOptionId);
         
         if (canTryAutomatic) {
           const requestBody: any = {
@@ -167,7 +167,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             withdrawalMethod,
           };
           
-          if (withdrawalMethod === 'card_refund') {
+          if (withdrawalMethod === 'card_payout') {
             requestBody.userPaymentOptionId = selectedMethod.userPaymentOptionId;
             requestBody.cardDetails = {
               cardBrand: selectedMethod.cardBrand,
@@ -192,7 +192,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
               setSuccess({
                 message: data.message || 'Withdrawal submitted for processing',
                 netAmountEUR: data.netAmountEUR,
-                processingHours: withdrawalMethod === 'card_refund' ? 72 : 48,
+                processingHours: withdrawalMethod === 'card_payout' ? 72 : 48,
                 isAutoApproved: true,
                 isAutomatic: true,
               });
@@ -219,7 +219,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
           }
         } else {
           // Can't try automatic (e.g., no UPO for card refund) - show helpful error
-          if (withdrawalMethod === 'card_refund' && !selectedMethod.userPaymentOptionId) {
+          if (withdrawalMethod === 'card_payout' && !selectedMethod.userPaymentOptionId) {
             setError('Card refund requires a saved card from a previous deposit. Please make a deposit first or choose bank transfer.');
           } else {
             setError('Automatic withdrawal is not available for this method. Please contact support.');

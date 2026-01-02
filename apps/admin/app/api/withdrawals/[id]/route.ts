@@ -446,7 +446,7 @@ export async function PUT(
         
         // Determine payment method display name
         let paymentMethodDisplay = 'Bank Transfer';
-        if (withdrawal.withdrawalMethod === 'card_refund' || withdrawal.payoutMethod === 'card_refund') {
+        if (withdrawal.withdrawalMethod === 'card_refund' || withdrawal.payoutMethod === 'card_refund' || withdrawal.withdrawalMethod === 'card_payout' || withdrawal.payoutMethod === 'card_payout' || withdrawal.payoutMethod === 'nuvei_card_payout') {
           paymentMethodDisplay = 'Card Refund';
         } else if (withdrawal.payoutMethod === 'sepa' || withdrawal.withdrawalMethod === 'bank_transfer') {
           paymentMethodDisplay = 'Bank Transfer (SEPA)';

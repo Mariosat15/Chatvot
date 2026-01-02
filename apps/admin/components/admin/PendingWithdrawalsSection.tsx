@@ -533,12 +533,12 @@ export default function PendingWithdrawalsSection() {
             <div>
               <p className="text-gray-500 text-xs">Method</p>
               <p className="text-white flex items-center gap-1">
-                {withdrawal.payoutMethod === 'original_method' ? (
+                {withdrawal.payoutMethod === 'original_method' || withdrawal.payoutMethod === 'nuvei_card_payout' || withdrawal.payoutMethod === 'card_payout' ? (
                   <>
                     <CreditCard className="h-3 w-3 text-blue-400" />
-                    <span>Card Refund</span>
+                    <span>Card Payout</span>
                   </>
-                ) : withdrawal.payoutMethod === 'bank_transfer' ? (
+                ) : withdrawal.payoutMethod === 'bank_transfer' || withdrawal.payoutMethod === 'nuvei_bank_transfer' ? (
                   <>
                     <Building2 className="h-3 w-3 text-teal-400" />
                     <span>Bank Transfer</span>
@@ -1327,9 +1327,9 @@ export default function PendingWithdrawalsSection() {
                 <div>
                   <p className="text-xs text-gray-500">Payout Method</p>
                   <p className="text-white">
-                    {detailDialog.withdrawal.payoutMethod === 'original_method' 
-                      ? '💳 Card Refund (Original Payment)'
-                      : detailDialog.withdrawal.payoutMethod === 'bank_transfer'
+                    {(detailDialog.withdrawal.payoutMethod === 'original_method' || detailDialog.withdrawal.payoutMethod === 'nuvei_card_payout' || detailDialog.withdrawal.payoutMethod === 'card_payout')
+                      ? '💳 Card Payout'
+                      : (detailDialog.withdrawal.payoutMethod === 'bank_transfer' || detailDialog.withdrawal.payoutMethod === 'nuvei_bank_transfer')
                         ? '🏦 Bank Transfer'
                         : detailDialog.withdrawal.payoutMethod?.replace(/_/g, ' ') || 'Manual'}
                   </p>
@@ -1452,11 +1452,11 @@ export default function PendingWithdrawalsSection() {
               </div>
 
               {/* Payment Method Details Section - Show ONLY the method user selected */}
-              {detailDialog.withdrawal.payoutMethod === 'original_method' ? (
-                // Card Refund - User chose to refund to original payment method
+              {(detailDialog.withdrawal.payoutMethod === 'original_method' || detailDialog.withdrawal.payoutMethod === 'nuvei_card_payout' || detailDialog.withdrawal.payoutMethod === 'card_payout') ? (
+                // Card Payout - User chose to payout to original card
                 <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
                   <h4 className="text-blue-300 font-semibold mb-3 flex items-center gap-2">
-                    💳 Original Payment Method (Card Refund)
+                    💳 Card Payout
                   </h4>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     {detailDialog.withdrawal.originalCardDetails ? (
@@ -1524,7 +1524,7 @@ export default function PendingWithdrawalsSection() {
                     </div>
                   )}
                 </div>
-              ) : detailDialog.withdrawal.payoutMethod === 'bank_transfer' && detailDialog.withdrawal.userBankDetails ? (
+              ) : (detailDialog.withdrawal.payoutMethod === 'bank_transfer' || detailDialog.withdrawal.payoutMethod === 'nuvei_bank_transfer') && detailDialog.withdrawal.userBankDetails ? (
                 // Bank Transfer - User chose bank transfer with their bank details
                 <div className="mt-6 p-4 bg-teal-500/10 border border-teal-500/30 rounded-xl">
                   <h4 className="text-teal-300 font-semibold mb-3 flex items-center gap-2">

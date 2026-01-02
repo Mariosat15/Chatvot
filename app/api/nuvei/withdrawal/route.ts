@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { 
       amountEUR,
-      withdrawalMethod, // 'card_refund' | 'bank_transfer'
+      withdrawalMethod, // 'card_payout' | 'bank_transfer'
       cardDetails, // For card refund: { paymentIntentId, cardBrand, cardLast4, userPaymentOptionId }
       bankAccountId, // For bank transfer: existing bank account ID
       userPaymentOptionId, // Direct UPO ID if provided
@@ -160,10 +160,12 @@ export async function POST(req: NextRequest) {
       bankDetailsForRequest = {
         accountHolderName: bankAccount.accountHolderName,
         iban: bankAccount.ibanLast4 ? `****${bankAccount.ibanLast4}` : undefined,
+        fullIban: bankAccount.iban, // Store full IBAN for admin to process manually
         bankName: bankAccount.bankName,
         swiftBic: bankAccount.swiftBic,
+        country: bankAccount.country,
       };
-    } else if (withdrawalMethod === 'card_refund') {
+    } else if (withdrawalMethod === 'card_refund' || withdrawalMethod === 'card_payout') {
       // For card refund, we MUST have a valid UPO ID
       actualUpoId = userPaymentOptionId || cardDetails?.userPaymentOptionId;
       
@@ -189,7 +191,7 @@ export async function POST(req: NextRequest) {
       }
     } else {
       return NextResponse.json(
-        { error: 'Invalid withdrawal method. Choose card_refund or bank_transfer.' },
+        { error: 'Invalid withdrawal method. Choose card_payout or bank_transfer.' },
         { status: 400 }
       );
     }
@@ -217,11 +219,11 @@ export async function POST(req: NextRequest) {
     withdrawalParams.notificationUrl = `${origin}/api/nuvei/webhook`;
 
     // Determine if we're doing card or bank payout
-    const isCardRefund = withdrawalMethod === 'card_refund' && actualUpoId;
+    const isCardPayout = (withdrawalMethod === 'card_refund' || withdrawalMethod === 'card_payout') && actualUpoId;
     const isBankTransfer = withdrawalMethod === 'bank_transfer' && bankAccount;
 
     // Add payment method details for Nuvei
-    if (isCardRefund) {
+    if (isCardPayout) {
       // For card refund, we MUST pass the UPO ID from the original deposit
       withdrawalParams.userPaymentOptionId = actualUpoId;
       console.log(`💳 Using UPO ${actualUpoId} for card refund withdrawal`);
@@ -234,7 +236,7 @@ export async function POST(req: NextRequest) {
       netAmountEUR,
       platformFee,
       method: withdrawalMethod,
-      isCardRefund,
+      isCardPayout,
       isBankTransfer,
     });
 
@@ -269,11 +271,11 @@ export async function POST(req: NextRequest) {
       walletBalanceAfter: wallet.creditBalance,
       
       // Payout details
-      payoutMethod: withdrawalMethod === 'card_refund' ? 'nuvei_card_refund' : 'nuvei_bank_transfer',
+      payoutMethod: (withdrawalMethod === 'card_refund' || withdrawalMethod === 'card_payout') ? 'nuvei_card_payout' : 'nuvei_bank_transfer',
       payoutProvider: 'nuvei',
       
       // Method-specific details
-      ...(withdrawalMethod === 'card_refund' && cardDetails ? {
+      ...((withdrawalMethod === 'card_refund' || withdrawalMethod === 'card_payout') && cardDetails ? {
         originalPaymentId: cardDetails.paymentIntentId,
         originalPaymentMethod: 'card',
         originalCardDetails: {
@@ -394,15 +396,60 @@ export async function POST(req: NextRequest) {
     }
 
     if ('error' in nuveiResult && nuveiResult.error) {
-      // Nuvei failed - rollback EVERYTHING
       console.error('💸 Nuvei withdrawal failed:', nuveiResult.error);
       
-      // CRITICAL: Restore FULL balance (includes amount that would have been fee)
-      // The fee was never separately deducted - it's part of the withdrawal amount
+      // Determine if this is a technical error (should fallback to manual) or a business error (should fail)
+      // Technical errors: connection issues, timeouts, API errors that can be retried
+      // Business errors: declined by processor, invalid card, insufficient funds on processor side
+      const isTechnicalError = 
+        nuveiResult.error.includes('1060') || // Payment data issues - might need manual processing
+        nuveiResult.error.includes('timeout') ||
+        nuveiResult.error.includes('connection') ||
+        nuveiResult.error.includes('network') ||
+        nuveiResult.error.includes('unavailable') ||
+        nuveiResult.error.includes('General Error') ||
+        nuveiResult.error.includes('checksum');
+      
+      if (isTechnicalError) {
+        // FALLBACK TO MANUAL PROCESSING
+        // Don't refund credits - keep withdrawal in pending for admin to process
+        console.log('💸 Technical error detected - falling back to manual processing');
+        
+        await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
+          status: 'pending', // Keep as pending for admin review
+          'metadata.autoProcessingFailed': true,
+          'metadata.autoProcessingError': nuveiResult.error,
+          'metadata.autoProcessingFailedAt': new Date().toISOString(),
+          'metadata.requiresManualProcessing': true,
+        });
+        
+        await WalletTransaction.findByIdAndUpdate(walletTx._id, {
+          status: 'pending',
+          'metadata.autoProcessingFailed': true,
+          'metadata.autoProcessingError': nuveiResult.error,
+        });
+        
+        const userMessage = 'Automatic processing is temporarily unavailable. Your withdrawal has been queued for manual processing by our team within 24-48 hours.';
+        
+        return NextResponse.json({
+          success: true, // Not an error from user perspective
+          message: userMessage,
+          status: 'pending',
+          fallbackToManual: true,
+          netAmountEUR,
+          platformFee,
+          estimatedProcessingTime: '24-48 hours (manual processing)',
+        });
+      }
+      
+      // BUSINESS ERROR - Actually failed, refund credits
+      console.log('💸 Business error detected - refunding credits');
+      
+      // Restore balance
       wallet.creditBalance = balanceBefore;
       await wallet.save();
       
-      console.log(`💸 Refunded ${creditsNeeded} credits to user ${userId} due to immediate failure`);
+      console.log(`💸 Refunded ${creditsNeeded} credits to user ${userId} due to failure`);
       
       // Update withdrawal request as failed
       await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
@@ -425,7 +472,7 @@ export async function POST(req: NextRequest) {
       await WalletTransaction.create({
         userId,
         transactionType: 'withdrawal_refund',
-        amount: creditsNeeded, // Full amount including what would have been fee
+        amount: creditsNeeded,
         currency: 'EUR',
         exchangeRate,
         balanceBefore: wallet.creditBalance - creditsNeeded,
@@ -442,35 +489,10 @@ export async function POST(req: NextRequest) {
         processedAt: new Date(),
       });
 
-      // Provide better error message for common errors
-      let userFriendlyError = nuveiResult.error;
-      let suggestion = '';
-      
-      if (nuveiResult.error.includes('1060') || nuveiResult.error.includes('payment data')) {
-        if (withdrawalMethod === 'bank_transfer') {
-          userFriendlyError = 'Bank transfer withdrawals are not currently available.';
-          suggestion = 'APM (SEPA) payouts may not be enabled for this merchant account. Please contact support for manual withdrawal processing.';
-        } else {
-          // Card refund error with valid UPO - likely merchant configuration issue
-          userFriendlyError = 'Automatic card refund is not available at this time.';
-          suggestion = actualUpoId 
-            ? 'Card payouts (Visa Direct/Mastercard Send) may not be enabled for this merchant account. Your withdrawal request has been converted to manual processing - our team will process it within 24-48 hours.'
-            : 'Please make a deposit first to enable card refunds, or contact support.';
-          
-          console.log('⚠️ Card payout failed with error 1060. This usually means:');
-          console.log('   1. Card payouts (Visa Direct/Mastercard Send) not enabled for merchant');
-          console.log('   2. Or the card type is not eligible for payouts (e.g., some credit cards)');
-          console.log('   UPO used:', actualUpoId);
-        }
-      }
-
       return NextResponse.json(
         { 
-          error: userFriendlyError,
-          code: 'WITHDRAWAL_FAILED',
-          suggestion,
-          // Let frontend know to fall back to manual
-          requiresManual: true,
+          error: nuveiResult.error,
+          code: 'WITHDRAWAL_DECLINED',
         },
         { status: 400 }
       );
