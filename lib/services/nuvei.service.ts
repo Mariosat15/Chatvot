@@ -1019,14 +1019,14 @@ class NuveiService {
     const timeStamp = this.generateTimeStamp();
     const clientRequestId = `refund_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Checksum for refundTransaction (per Nuvei Checksum Tool):
-    // For unreferenced refunds (no relatedTransactionId), the formula is:
-    // SHA256(merchantId + merchantSiteId + clientRequestId + clientUniqueId + amount + currency + timeStamp + secretKey)
-    // Note: Do NOT include relatedTransactionId if not sending it in the request
+    // Checksum for refundTransaction:
+    // Standard formula (same as most Nuvei endpoints):
+    // SHA256(merchantId + merchantSiteId + clientRequestId + amount + currency + timeStamp + secretKey)
+    // Note: clientUniqueId is NOT part of the checksum!
+    // See: https://docs.nuvei.com/documentation/features/financial-operations/refund/#With_a_UPO
     const checksumString = credentials.merchantId 
       + credentials.siteId 
       + clientRequestId 
-      + params.clientUniqueId 
       + params.amount 
       + params.currency 
       + timeStamp 
@@ -1034,7 +1034,7 @@ class NuveiService {
     const checksum = crypto.createHash('sha256').update(checksumString).digest('hex');
     
     console.log('📝 Checksum input (masked):', 
-      `${credentials.merchantId}${credentials.siteId}${clientRequestId}${params.clientUniqueId}${params.amount}${params.currency}${timeStamp}[SECRET]`);
+      `${credentials.merchantId}${credentials.siteId}${clientRequestId}${params.amount}${params.currency}${timeStamp}[SECRET]`);
     
     // UPO ID as number (Nuvei returns numbers)
     const upoId = /^\d+$/.test(String(params.userPaymentOptionId)) 
