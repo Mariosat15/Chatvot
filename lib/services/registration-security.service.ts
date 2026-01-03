@@ -703,8 +703,10 @@ export async function recordFailedLogin(data: {
         }
       }
       
-      // Create fraud alert if threshold reached
-      if (entry.count >= settings.failedLoginAlertThreshold) {
+      // Create fraud alert when account is locked (same threshold as lockout)
+      // Note: failedLoginAlertThreshold can be used to require more attempts before alerting
+      // but typically we want to alert when account is locked
+      if (entry.count >= Math.min(settings.failedLoginAlertThreshold, settings.maxFailedLoginsBeforeLockout)) {
         console.log(`🚨 ALERT: Brute force attack detected on ${data.email} from IP ${ip}`);
         try {
           const FraudAlert = (await import('@/database/models/fraud/fraud-alert.model')).default;

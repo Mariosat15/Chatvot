@@ -280,7 +280,7 @@ export const DEFAULT_FRAUD_SETTINGS: Partial<IFraudSettings> = {
   maxFailedLoginsBeforeLockout: 5,
   loginLockoutDurationMinutes: 15,
   loginCooldownAfterFailedAttempts: 3,
-  failedLoginAlertThreshold: 10,
+  failedLoginAlertThreshold: 5, // Same as lockout threshold - alert when account is locked
   trackFailedLogins: true,
 };
 
