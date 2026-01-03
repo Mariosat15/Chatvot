@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongoose';
+import { connectToDatabase } from '@/database/mongoose';
 import WithdrawalSettings from '@/database/models/withdrawal-settings.model';
 
 /**
