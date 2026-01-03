@@ -10,7 +10,9 @@ export type FraudAlertType =
   | 'suspicious_behavior'   // Other suspicious patterns
   | 'vpn_usage'             // VPN/Proxy detected
   | 'high_risk_device'      // Device with high risk score
-  | 'duplicate_kyc';        // Same ID document used across multiple accounts
+  | 'duplicate_kyc'         // Same ID document used across multiple accounts
+  | 'brute_force'           // Too many failed login attempts
+  | 'rate_limit_exceeded';  // Registration/API rate limit exceeded
 
 export type AlertStatus = 'pending' | 'investigating' | 'resolved' | 'dismissed';
 export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
@@ -67,7 +69,9 @@ const FraudAlertSchema = new Schema<IFraudAlert>({
       'suspicious_behavior',
       'vpn_usage',
       'high_risk_device',
-      'duplicate_kyc'
+      'duplicate_kyc',
+      'brute_force',
+      'rate_limit_exceeded'
     ]
   },
   severity: { 
