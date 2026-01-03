@@ -263,6 +263,18 @@ router.post('/login', async (req: Request, res: Response) => {
       return;
     }
 
+    // SECURITY: Enforce email verification before allowing login
+    // This matches the behavior of the main app's signInWithEmail
+    if (!user.emailVerified) {
+      console.log(`⚠️ Login blocked for unverified user: ${email}`);
+      res.status(403).json({ 
+        error: 'Email not verified',
+        message: 'Please verify your email address before signing in. Check your inbox for the verification link.',
+        code: 'EMAIL_NOT_VERIFIED'
+      });
+      return;
+    }
+
     const totalDuration = Date.now() - startTime;
     console.log(`✅ User logged in in ${totalDuration}ms`);
 
