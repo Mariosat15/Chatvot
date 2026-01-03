@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Mail, Save, Send, RefreshCw, Eye, Code, Sparkles, AlertCircle, Check, Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, UserPlus } from 'lucide-react';
+import { Mail, Save, Send, RefreshCw, Eye, Code, Sparkles, AlertCircle, Check, Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, UserPlus, MailCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,7 +44,7 @@ interface EmailTemplate {
   isActive: boolean;
 }
 
-type TemplateType = 'welcome' | 'deposit_completed' | 'withdrawal_completed';
+type TemplateType = 'welcome' | 'deposit_completed' | 'withdrawal_completed' | 'email_verification';
 
 const TEMPLATE_CONFIG: Record<TemplateType, {
   title: string;
@@ -117,6 +117,28 @@ const TEMPLATE_CONFIG: Record<TemplateType, {
       closingText: 'Thank you for being part of our trading community!',
       ctaButtonText: 'View Transaction History',
       ctaButtonUrl: '{{baseUrl}}/wallet',
+    },
+  },
+  email_verification: {
+    title: 'Email Verification',
+    description: 'Sent to users to verify their email address',
+    icon: MailCheck,
+    variables: ['{{name}}', '{{verificationLink}}', '{{platformName}}', '{{baseUrl}}', '{{companyAddress}}', '{{expiryHours}}'],
+    defaults: {
+      templateType: 'email_verification',
+      name: 'Email Verification',
+      subject: 'Verify your email address - {{platformName}}',
+      headingText: 'Verify Your Email',
+      introText: 'Thanks for signing up! Please verify your email address to activate your account and start trading.',
+      featureListLabel: 'After verification you can:',
+      featureItems: [
+        'Access your account and wallet',
+        'Deposit funds and enter competitions',
+        'Compete with other traders and win prizes',
+      ],
+      closingText: 'This verification link will expire in {{expiryHours}} hours. If you didn\'t create an account, you can safely ignore this email.',
+      ctaButtonText: 'Verify Email Address',
+      ctaButtonUrl: '{{verificationLink}}',
     },
   },
 };

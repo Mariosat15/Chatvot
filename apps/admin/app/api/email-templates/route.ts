@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
       'inactive_reminder',
       'deposit_completed',
       'withdrawal_completed',
+      'email_verification',
     ];
     
     const existingTypes = new Set(templates.map(t => t.templateType));
@@ -140,7 +141,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Import the email sending functions
-    const { sendTestWelcomeEmail, sendTestDepositCompletedEmail, sendTestWithdrawalCompletedEmail } = await import('@/lib/nodemailer');
+    const { sendTestWelcomeEmail, sendTestDepositCompletedEmail, sendTestWithdrawalCompletedEmail, sendTestEmailVerificationEmail } = await import('@/lib/nodemailer');
 
     let emailSent = false;
 
@@ -152,6 +153,9 @@ export async function POST(request: NextRequest) {
       emailSent = true;
     } else if (templateType === 'withdrawal_completed') {
       await sendTestWithdrawalCompletedEmail(testEmail);
+      emailSent = true;
+    } else if (templateType === 'email_verification') {
+      await sendTestEmailVerificationEmail(testEmail);
       emailSent = true;
     }
 
@@ -198,6 +202,7 @@ function getDefaultName(type: string): string {
     inactive_reminder: 'Inactive User Reminder',
     deposit_completed: 'Deposit Completed Email',
     withdrawal_completed: 'Withdrawal Completed Email',
+    email_verification: 'Email Verification',
   };
   return names[type] || 'Email Template';
 }

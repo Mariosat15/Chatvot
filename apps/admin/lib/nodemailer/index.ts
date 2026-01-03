@@ -1205,3 +1205,213 @@ export const sendTestWithdrawalCompletedEmail = async (testEmail: string) => {
     
     console.log(`✅ [TEST] Withdrawal email sent to ${testEmail}`);
 };
+
+/**
+ * Get email verification email config from database
+ */
+async function getEmailVerificationConfig() {
+    await connectToDatabase();
+    
+    const [template, companySettings, settings, whiteLabelSettings] = await Promise.all([
+        getEmailTemplate('email_verification'),
+        CompanySettings.getSingleton(),
+        getSettings(),
+        WhiteLabel.findOne(),
+    ]);
+    
+    const platformName = settings.appName || companySettings.companyName || 'Chatvolt';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+    
+    // Get logo URL
+    let logoUrl = whiteLabelSettings?.emailLogo || '/assets/images/logo.png';
+    if (!logoUrl.startsWith('http')) {
+        if (isLocalhost) {
+            logoUrl = 'https://placehold.co/150x50/141414/FDD458?text=Logo';
+        } else {
+            logoUrl = `${baseUrl}${logoUrl}`;
+        }
+    }
+    
+    // Build company address
+    let companyAddress = '';
+    if (companySettings.addressLine1 || companySettings.city) {
+        const parts = [
+            companySettings.addressLine1,
+            companySettings.addressLine2,
+            companySettings.city,
+            companySettings.postalCode,
+            COUNTRY_NAMES[companySettings.country] || companySettings.country,
+        ].filter(Boolean);
+        companyAddress = parts.join(', ');
+    }
+    
+    return {
+        template,
+        platformName,
+        baseUrl,
+        logoUrl,
+        companyAddress,
+        supportEmail: companySettings.email || settings.nodemailerEmail || '',
+        settings,
+    };
+}
+
+/**
+ * Build email verification HTML from database template
+ */
+function buildEmailVerificationHtml(
+    template: IEmailTemplate,
+    config: {
+        name: string;
+        verificationLink: string;
+        expiryHours: number;
+        platformName: string;
+        baseUrl: string;
+        logoUrl: string;
+        companyAddress: string;
+    }
+): string {
+    // If using custom HTML template
+    if (template.useCustomHtml && template.customHtmlTemplate) {
+        return template.customHtmlTemplate
+            .replace(/\{\{name\}\}/g, config.name)
+            .replace(/\{\{verificationLink\}\}/g, config.verificationLink)
+            .replace(/\{\{expiryHours\}\}/g, config.expiryHours.toString())
+            .replace(/\{\{platformName\}\}/g, config.platformName)
+            .replace(/\{\{baseUrl\}\}/g, config.baseUrl)
+            .replace(/\{\{logoUrl\}\}/g, config.logoUrl)
+            .replace(/\{\{companyAddress\}\}/g, config.companyAddress)
+            .replace(/\{\{year\}\}/g, new Date().getFullYear().toString());
+    }
+    
+    // Build feature list HTML
+    const featureItems = template.featureItems || [
+        'Access your account and wallet',
+        'Deposit funds and enter competitions',
+        'Compete with other traders and win prizes',
+    ];
+    
+    const featureListHtml = featureItems
+        .map((item: string) => `<li style="margin-bottom: 12px;">${item}</li>`)
+        .join('\n                                ');
+    
+    // Get the CTA URL (verification link)
+    const ctaUrl = config.verificationLink;
+    
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email - ${config.platformName}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
+                    
+                    <tr>
+                        <td align="left" style="padding: 40px 40px 20px 40px;">
+                            <img src="${config.logoUrl}" alt="${config.platformName}" width="150" style="max-width: 100%; height: auto;">
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="padding: 20px 40px 40px 40px;">
+                            
+                            <div style="background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center;">
+                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
+                                    ${template.headingText || '✉️ Verify Your Email'}
+                                </h1>
+                                <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">One more step to activate your account</p>
+                            </div>
+                            
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Hi ${config.name},</p>
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">${template.introText || 'Thanks for signing up! Please verify your email address to activate your account and start trading.'}</p>
+                            
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 24px;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="${ctaUrl}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 48px; border-radius: 8px; font-size: 16px; font-weight: 600;">${template.ctaButtonText || 'Verify Email Address'}</a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <div style="background-color: #050505; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #30333A;">
+                                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #FDD458;">${template.featureListLabel || 'After verification you can:'}</h3>
+                                <ul style="margin: 0; padding-left: 20px; color: #CCDADC; font-size: 14px; line-height: 1.8;">${featureListHtml}</ul>
+                            </div>
+                            
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 16px; margin-bottom: 24px; border-left: 4px solid #F59E0B;">
+                                <p style="margin: 0; font-size: 13px; color: #9ca3af;">
+                                    ⚠️ This link will expire in <strong style="color: #FDD458;">${config.expiryHours} hours</strong>. If you didn't create an account, you can safely ignore this email.
+                                </p>
+                            </div>
+                            
+                            <p style="margin: 0 0 16px 0; font-size: 13px; color: #6b7280;">
+                                If the button doesn't work, copy and paste this link into your browser:
+                            </p>
+                            <p style="margin: 0 0 24px 0; font-size: 12px; color: #9ca3af; word-break: break-all; background-color: #1E1E1E; padding: 12px; border-radius: 4px; font-family: monospace;">
+                                ${ctaUrl}
+                            </p>
+                            
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
+                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">${config.companyAddress}</p>
+                            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">© ${new Date().getFullYear()} ${config.platformName}</p>
+                        </td>
+                    </tr>
+                    
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+}
+
+/**
+ * Send a test email verification email (for admin preview)
+ */
+export const sendTestEmailVerificationEmail = async (testEmail: string) => {
+    const config = await getEmailVerificationConfig();
+    const { template, platformName, baseUrl, logoUrl, companyAddress, settings } = config;
+    
+    // Create a fake verification link for testing
+    const testVerificationLink = `${baseUrl}/api/auth/verify-email?token=TEST_TOKEN_123456789`;
+    
+    // Build HTML from database template with test data
+    const htmlTemplate = buildEmailVerificationHtml(template, {
+        name: 'Test User',
+        verificationLink: testVerificationLink,
+        expiryHours: 24,
+        platformName,
+        baseUrl,
+        logoUrl,
+        companyAddress,
+    });
+    
+    // Replace variables in subject
+    let subject = `[TEST] ${template.subject || 'Verify your email address - {{platformName}}'}`;
+    subject = subject
+        .replace(/\{\{platformName\}\}/g, platformName)
+        .replace(/\{\{name\}\}/g, 'Test User');
+    
+    const mailOptions = {
+        from: `"${platformName}" <${settings.nodemailerEmail || process.env.NODEMAILER_EMAIL}>`,
+        to: testEmail,
+        subject,
+        text: '[TEST] Email verification preview. Click the link to verify your email address.',
+        html: htmlTemplate,
+    };
+    
+    const emailTransporter = await getTransporter();
+    await emailTransporter.sendMail(mailOptions);
+    
+    console.log(`✅ [TEST] Email verification email sent to ${testEmail}`);
+};
