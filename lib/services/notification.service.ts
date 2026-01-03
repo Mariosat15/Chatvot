@@ -184,30 +184,118 @@ class NotificationService {
   // ========== Convenience methods for specific notification types ==========
 
   /**
+   * Send deposit initiated notification
+   */
+  async notifyDepositInitiated(userId: string, amount: number): Promise<any> {
+    console.log(`🔔 Sending deposit_initiated notification to ${userId}`);
+    console.log(`   Amount: €${amount.toFixed(2)}`);
+    try {
+      const result = await this.send({
+        userId,
+        templateId: 'deposit_initiated',
+        variables: { amount: `€${amount.toFixed(2)}` },
+      });
+      if (result) {
+        console.log(`✅ Deposit initiated notification CREATED: ${result._id}`);
+      } else {
+        console.log(`⚠️ Deposit initiated notification NOT created (check template/preferences)`);
+      }
+      return result;
+    } catch (error) {
+      console.error('❌ Error in notifyDepositInitiated:', error);
+      return null;
+    }
+  }
+
+  /**
    * Send deposit completed notification
    */
   async notifyDepositCompleted(userId: string, amount: number, balance: number): Promise<any> {
-    return this.send({
-      userId,
-      templateId: 'deposit_completed',
-      variables: {
-        amount: `€${amount.toFixed(2)}`,
-        balance: `${balance.toFixed(2)}`,
-      },
-    });
+    console.log(`🔔 Sending deposit_completed notification to ${userId}`);
+    try {
+      const result = await this.send({
+        userId,
+        templateId: 'deposit_completed',
+        variables: { amount: `€${amount.toFixed(2)}`, balance: balance.toFixed(2) },
+      });
+      console.log(`✅ Deposit notification result:`, result ? 'sent' : 'not sent');
+      return result;
+    } catch (error) {
+      console.error('❌ Error in notifyDepositCompleted:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Send deposit failed notification
+   */
+  async notifyDepositFailed(userId: string, amount: number, reason: string): Promise<any> {
+    console.log(`🔔 Sending deposit_failed notification to ${userId}`);
+    try {
+      const result = await this.send({
+        userId,
+        templateId: 'deposit_failed',
+        variables: { amount: `€${amount.toFixed(2)}`, reason },
+      });
+      return result;
+    } catch (error) {
+      console.error('❌ Error in notifyDepositFailed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Send withdrawal initiated notification
+   */
+  async notifyWithdrawalInitiated(userId: string, amount: number): Promise<any> {
+    console.log(`🔔 Sending withdrawal_initiated notification to ${userId}`);
+    try {
+      const result = await this.send({
+        userId,
+        templateId: 'withdrawal_initiated',
+        variables: { amount: `€${amount.toFixed(2)}` },
+      });
+      return result;
+    } catch (error) {
+      console.error('❌ Error in notifyWithdrawalInitiated:', error);
+      return null;
+    }
   }
 
   /**
    * Send withdrawal completed notification
    */
   async notifyWithdrawalCompleted(userId: string, amount: number): Promise<any> {
-    return this.send({
-      userId,
-      templateId: 'withdrawal_completed',
-      variables: {
-        amount: `€${amount.toFixed(2)}`,
-      },
-    });
+    console.log(`🔔 Sending withdrawal_completed notification to ${userId}`);
+    try {
+      const result = await this.send({
+        userId,
+        templateId: 'withdrawal_completed',
+        variables: { amount: `€${amount.toFixed(2)}` },
+      });
+      return result;
+    } catch (error) {
+      console.error('❌ Error in notifyWithdrawalCompleted:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Send withdrawal failed notification
+   */
+  async notifyWithdrawalFailed(userId: string, amount: number, reason: string): Promise<any> {
+    console.log(`🔔 Sending withdrawal_failed notification to ${userId}`);
+    try {
+      const result = await this.send({
+        userId,
+        templateId: 'withdrawal_failed',
+        variables: { amount: `€${amount.toFixed(2)}`, reason },
+      });
+      return result;
+    } catch (error) {
+      console.error('❌ Error in notifyWithdrawalFailed:', error);
+      return null;
+    }
   }
 
   /**
