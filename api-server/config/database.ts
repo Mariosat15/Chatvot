@@ -66,6 +66,12 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
       
       mongoose.connection.once('connected', onConnected);
       mongoose.connection.once('error', onError);
+      
+      // RACE CONDITION FIX: Check if connection completed between state check and listener registration
+      // If connected now, the 'connected' event already fired and won't fire again
+      if (mongoose.connection.readyState === 1) {
+        onConnected();
+      }
     });
     return mongoose;
   }
@@ -160,6 +166,12 @@ export async function ensureDbReady(): Promise<void> {
       
       mongoose.connection.once('connected', onConnected);
       mongoose.connection.once('error', onError);
+      
+      // RACE CONDITION FIX: Check if connection completed between state check and listener registration
+      // If connected now, the 'connected' event already fired and won't fire again
+      if (mongoose.connection.readyState === 1) {
+        onConnected();
+      }
     });
   }
 }
