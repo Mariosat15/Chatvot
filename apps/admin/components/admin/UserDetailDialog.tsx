@@ -345,8 +345,12 @@ export default function UserDetailDialog({
     }
   };
 
+  const [updatingKYC, setUpdatingKYC] = useState(false);
+  
   const handleUpdateKYCStatus = async (verified: boolean, status: string) => {
+    setUpdatingKYC(true);
     try {
+      console.log(`📋 [Admin] Updating KYC for ${userId}: verified=${verified}, status=${status}`);
       const response = await fetch(`/api/users/${userId}/kyc`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -355,13 +359,20 @@ export default function UserDetailDialog({
 
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ [Admin] KYC update response:', data);
         setKycStatus(data.kycStatus);
-        toast.success('KYC status updated');
+        toast.success(`KYC ${status === 'approved' ? 'approved' : 'status updated'} successfully`);
         onRefresh?.();
+      } else {
+        const errorData = await response.json();
+        console.error('❌ [Admin] KYC update failed:', errorData);
+        toast.error(errorData.error || 'Failed to update KYC status');
       }
     } catch (error) {
       console.error('Error updating KYC status:', error);
       toast.error('Failed to update KYC status');
+    } finally {
+      setUpdatingKYC(false);
     }
   };
 
@@ -370,6 +381,7 @@ export default function UserDetailDialog({
       return;
     }
     
+    setUpdatingKYC(true);
     try {
       const response = await fetch(`/api/users/${userId}/kyc`, {
         method: 'PUT',
@@ -386,10 +398,15 @@ export default function UserDetailDialog({
         setKycStatus(data.kycStatus);
         toast.success('KYC status reset successfully. User can now verify again.');
         onRefresh?.();
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to reset KYC status');
       }
     } catch (error) {
       console.error('Error resetting KYC:', error);
       toast.error('Failed to reset KYC status');
+    } finally {
+      setUpdatingKYC(false);
     }
   };
 
@@ -653,8 +670,13 @@ export default function UserDetailDialog({
                           variant="outline"
                           className="text-green-400 hover:text-green-300"
                           onClick={() => handleUpdateKYCStatus(true, 'approved')}
+                          disabled={updatingKYC}
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" />
+                          {updatingKYC ? (
+                            <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                          )}
                           Approve
                         </Button>
                       )}
@@ -664,8 +686,13 @@ export default function UserDetailDialog({
                           variant="outline"
                           className="text-red-400 hover:text-red-300"
                           onClick={() => handleUpdateKYCStatus(false, 'declined')}
+                          disabled={updatingKYC}
                         >
-                          <XCircle className="h-4 w-4 mr-1" />
+                          {updatingKYC ? (
+                            <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <XCircle className="h-4 w-4 mr-1" />
+                          )}
                           Decline
                         </Button>
                       )}
@@ -674,8 +701,9 @@ export default function UserDetailDialog({
                         variant="outline"
                         className="text-orange-400 hover:text-orange-300"
                         onClick={handleResetKYC}
+                        disabled={updatingKYC}
                       >
-                        <RefreshCw className="h-4 w-4 mr-1" />
+                        <RefreshCw className={`h-4 w-4 mr-1 ${updatingKYC ? 'animate-spin' : ''}`} />
                         Reset KYC
                       </Button>
                       <Button
@@ -683,6 +711,7 @@ export default function UserDetailDialog({
                         variant="outline"
                         className="text-red-500 hover:text-red-400 border-red-500/50"
                         onClick={handleBanForKYC}
+                        disabled={updatingKYC}
                       >
                         <Ban className="h-4 w-4 mr-1" />
                         Ban for KYC

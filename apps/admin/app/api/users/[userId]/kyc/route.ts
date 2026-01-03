@@ -56,6 +56,8 @@ export async function PUT(
     const body = await req.json();
     await connectToDatabase();
 
+    console.log(`📋 [Admin KYC] Updating KYC for user ${userId}:`, body);
+
     const updateFields: Record<string, any> = {};
     
     if (body.kycVerified !== undefined) {
@@ -75,15 +77,37 @@ export async function PUT(
       updateFields.kycAttempts = 0;
     }
 
-    const wallet = await CreditWallet.findOneAndUpdate(
-      { userId },
-      { $set: updateFields },
-      { new: true }
-    );
+    // Try to find existing wallet
+    let wallet = await CreditWallet.findOne({ userId });
 
     if (!wallet) {
-      return NextResponse.json({ error: 'User wallet not found' }, { status: 404 });
+      console.log(`📋 [Admin KYC] Creating new wallet for user ${userId}`);
+      // Create wallet if it doesn't exist
+      wallet = await CreditWallet.create({
+        userId,
+        creditBalance: 0,
+        totalEarnings: 0,
+        totalDeposited: 0,
+        totalWithdrawn: 0,
+        kycVerified: updateFields.kycVerified || false,
+        kycStatus: updateFields.kycStatus || 'none',
+        kycVerifiedAt: updateFields.kycVerifiedAt,
+        kycExpiresAt: updateFields.kycExpiresAt,
+        kycAttempts: 0,
+      });
+    } else {
+      // Update existing wallet
+      wallet = await CreditWallet.findOneAndUpdate(
+        { userId },
+        { $set: updateFields },
+        { new: true }
+      );
     }
+
+    console.log(`✅ [Admin KYC] Updated wallet:`, {
+      kycVerified: wallet?.kycVerified,
+      kycStatus: wallet?.kycStatus,
+    });
 
     // Create audit log
     const AuditLog = (await import('@/database/models/audit-log.model')).default;
