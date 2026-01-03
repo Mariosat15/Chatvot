@@ -3,6 +3,7 @@ import { mongodbAdapter} from "better-auth/adapters/mongodb";
 import { connectToDatabase} from "@/database/mongoose";
 import { nextCookies} from "better-auth/next-js";
 import { validateEnvironment } from "@/lib/utils/validate-env";
+import bcrypt from "bcryptjs";
 
 let authInstance: ReturnType<typeof betterAuth> | null = null;
 let authInitPromise: Promise<ReturnType<typeof betterAuth>> | null = null;
@@ -38,6 +39,16 @@ export const getAuth = async (): Promise<ReturnType<typeof betterAuth>> => {
                     minPasswordLength: 8,
                     maxPasswordLength: 128,
                     autoSignIn: true,
+                    // Use bcrypt to match API server's password hashing
+                    // API server uses bcryptjs with 12 rounds for non-blocking hashing
+                    password: {
+                        hash: async (password) => {
+                            return await bcrypt.hash(password, 12);
+                        },
+                        verify: async ({ hash, password }) => {
+                            return await bcrypt.compare(password, hash);
+                        },
+                    },
                 },
                 plugins: [nextCookies()],
             });
