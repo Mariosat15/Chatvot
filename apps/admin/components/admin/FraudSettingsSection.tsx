@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Settings, Save, RefreshCw, Shield, Eye, AlertTriangle, UserX, Fingerprint } from 'lucide-react';
+import { Settings, Save, RefreshCw, Shield, Eye, AlertTriangle, UserX, Fingerprint, Bot, Mail, Lock, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FraudSettings {
@@ -47,6 +47,36 @@ interface FraudSettings {
   // Rate Limiting
   maxSignupsPerHour: number;
   maxEntriesPerHour: number;
+  
+  // Registration Security
+  registrationRateLimitEnabled: boolean;
+  maxRegistrationsPerIPPerHour: number;
+  maxRegistrationsPerIPPerDay: number;
+  registrationCooldownMinutes: number;
+  blockDisposableEmails: boolean;
+  disposableEmailDomains: string[];
+  blockedEmailDomains: string[];
+  honeypotEnabled: boolean;
+  registrationChallengeEnabled: boolean;
+  registrationChallengeProvider: string;
+  registrationChallengeKey: string;
+  blockSuspiciousPatterns: boolean;
+  suspiciousNamePatterns: string[];
+  blockNumericOnlyNames: boolean;
+  blockSingleCharacterNames: boolean;
+  minNameLength: number;
+  blockDatacenterIPs: boolean;
+  blockKnownBadIPs: boolean;
+  genericErrorMessages: boolean;
+  
+  // Login Security
+  loginRateLimitEnabled: boolean;
+  maxLoginAttemptsPerHour: number;
+  maxFailedLoginsBeforeLockout: number;
+  loginLockoutDurationMinutes: number;
+  loginCooldownAfterFailedAttempts: number;
+  failedLoginAlertThreshold: number;
+  trackFailedLogins: boolean;
 }
 
 export default function FraudSettingsSection() {
@@ -564,6 +594,341 @@ export default function FraudSettingsSection() {
                       <li>All accounts using that document are automatically suspended</li>
                       <li>Withdrawals remain enabled so users can retrieve their funds</li>
                       <li>Users see the suspension message and are directed to contact support</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Registration Security */}
+      <Card className="bg-gray-800 border-gray-700 border-green-500/30">
+        <CardHeader>
+          <CardTitle className="text-gray-100 flex items-center gap-2">
+            <Bot className="h-5 w-5 text-green-500" />
+            Registration Security (Anti-Bot/Anti-Fraud)
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Protect against automated bot registrations and fraudulent sign-ups
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Rate Limiting */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+              <div>
+                <Label className="text-gray-300 font-medium">Registration Rate Limiting</Label>
+                <p className="text-sm text-gray-500">
+                  Limit registration attempts per IP address
+                </p>
+              </div>
+              <Switch
+                checked={settings.registrationRateLimitEnabled}
+                onCheckedChange={(checked) => updateSetting('registrationRateLimitEnabled', checked)}
+              />
+            </div>
+
+            {settings.registrationRateLimitEnabled && (
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-gray-300">Max Registrations/Hour (per IP)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={settings.maxRegistrationsPerIPPerHour || 5}
+                    onChange={(e) => updateSetting('maxRegistrationsPerIPPerHour', parseInt(e.target.value))}
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-2"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-300">Max Registrations/Day (per IP)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="500"
+                    value={settings.maxRegistrationsPerIPPerDay || 10}
+                    onChange={(e) => updateSetting('maxRegistrationsPerIPPerDay', parseInt(e.target.value))}
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-2"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-300">Cooldown (minutes)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="60"
+                    value={settings.registrationCooldownMinutes || 1}
+                    onChange={(e) => updateSetting('registrationCooldownMinutes', parseInt(e.target.value))}
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-2"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bot Protection */}
+          <div className="space-y-4">
+            <Label className="text-gray-300 text-lg">Bot Protection</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                <div>
+                  <Label className="text-gray-300 text-sm">Honeypot Trap</Label>
+                  <p className="text-xs text-gray-500">Hidden field that bots fill out</p>
+                </div>
+                <Switch
+                  checked={settings.honeypotEnabled}
+                  onCheckedChange={(checked) => updateSetting('honeypotEnabled', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                <div>
+                  <Label className="text-gray-300 text-sm">Generic Error Messages</Label>
+                  <p className="text-xs text-gray-500">Hide specific block reasons</p>
+                </div>
+                <Switch
+                  checked={settings.genericErrorMessages}
+                  onCheckedChange={(checked) => updateSetting('genericErrorMessages', checked)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Email Protection */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-blue-400" />
+              <Label className="text-gray-300 text-lg">Email Protection</Label>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+              <div>
+                <Label className="text-gray-300 text-sm">Block Disposable Emails</Label>
+                <p className="text-xs text-gray-500">Block temporary/throwaway email services</p>
+              </div>
+              <Switch
+                checked={settings.blockDisposableEmails}
+                onCheckedChange={(checked) => updateSetting('blockDisposableEmails', checked)}
+              />
+            </div>
+
+            <div>
+              <Label className="text-gray-300">Blocked Email Domains (custom)</Label>
+              <p className="text-sm text-gray-500 mb-2">Add specific domains to block (comma-separated)</p>
+              <Input
+                value={(settings.blockedEmailDomains || []).join(', ')}
+                onChange={(e) => updateSetting('blockedEmailDomains', e.target.value.split(',').map(d => d.trim()).filter(Boolean))}
+                placeholder="competitor.com, spam.net"
+                className="bg-gray-900 border-gray-700 text-gray-100"
+              />
+            </div>
+          </div>
+
+          {/* Name Validation */}
+          <div className="space-y-4">
+            <Label className="text-gray-300 text-lg">Name Validation</Label>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                <div>
+                  <Label className="text-gray-300 text-sm">Block Suspicious Patterns</Label>
+                  <p className="text-xs text-gray-500">e.g., &quot;test123&quot;, &quot;asdf&quot;</p>
+                </div>
+                <Switch
+                  checked={settings.blockSuspiciousPatterns}
+                  onCheckedChange={(checked) => updateSetting('blockSuspiciousPatterns', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                <div>
+                  <Label className="text-gray-300 text-sm">Block Numeric Names</Label>
+                  <p className="text-xs text-gray-500">Names like &quot;12345&quot;</p>
+                </div>
+                <Switch
+                  checked={settings.blockNumericOnlyNames}
+                  onCheckedChange={(checked) => updateSetting('blockNumericOnlyNames', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                <div>
+                  <Label className="text-gray-300 text-sm">Block Single Char Names</Label>
+                  <p className="text-xs text-gray-500">Names like &quot;A&quot;</p>
+                </div>
+                <Switch
+                  checked={settings.blockSingleCharacterNames}
+                  onCheckedChange={(checked) => updateSetting('blockSingleCharacterNames', checked)}
+                />
+              </div>
+
+              <div>
+                <Label className="text-gray-300 text-sm">Min Name Length</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={settings.minNameLength || 2}
+                  onChange={(e) => updateSetting('minNameLength', parseInt(e.target.value))}
+                  className="bg-gray-900 border-gray-700 text-gray-100 mt-1"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-gray-300">Suspicious Name Patterns (regex)</Label>
+              <p className="text-sm text-gray-500 mb-2">Regex patterns to detect suspicious names (comma-separated)</p>
+              <Input
+                value={(settings.suspiciousNamePatterns || []).join(', ')}
+                onChange={(e) => updateSetting('suspiciousNamePatterns', e.target.value.split(',').map(d => d.trim()).filter(Boolean))}
+                placeholder="^test[0-9]*$, ^user[0-9]*$"
+                className="bg-gray-900 border-gray-700 text-gray-100"
+              />
+            </div>
+          </div>
+
+          {/* IP Intelligence */}
+          <div className="space-y-4">
+            <Label className="text-gray-300 text-lg">IP Intelligence</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                <div>
+                  <Label className="text-gray-300 text-sm">Block Datacenter IPs</Label>
+                  <p className="text-xs text-gray-500">Block hosting/cloud provider IPs</p>
+                </div>
+                <Switch
+                  checked={settings.blockDatacenterIPs}
+                  onCheckedChange={(checked) => updateSetting('blockDatacenterIPs', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                <div>
+                  <Label className="text-gray-300 text-sm">Block Known Bad IPs</Label>
+                  <p className="text-xs text-gray-500">Block IPs from threat lists</p>
+                </div>
+                <Switch
+                  checked={settings.blockKnownBadIPs}
+                  onCheckedChange={(checked) => updateSetting('blockKnownBadIPs', checked)}
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Login Security / Brute Force Protection */}
+      <Card className="bg-gray-800 border-gray-700 border-purple-500/30">
+        <CardHeader>
+          <CardTitle className="text-gray-100 flex items-center gap-2">
+            <Lock className="h-5 w-5 text-purple-500" />
+            Login Security (Brute Force Protection)
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Protect accounts from credential stuffing and brute force attacks
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+            <div>
+              <Label className="text-gray-300 font-medium">Enable Login Rate Limiting</Label>
+              <p className="text-sm text-gray-500">
+                Limit login attempts and lock accounts after repeated failures
+              </p>
+            </div>
+            <Switch
+              checked={settings.loginRateLimitEnabled}
+              onCheckedChange={(checked) => updateSetting('loginRateLimitEnabled', checked)}
+            />
+          </div>
+
+          {settings.loginRateLimitEnabled && (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <Label className="text-gray-300">Max Logins/Hour (per IP)</Label>
+                  <Input
+                    type="number"
+                    min="5"
+                    max="100"
+                    value={settings.maxLoginAttemptsPerHour || 20}
+                    onChange={(e) => updateSetting('maxLoginAttemptsPerHour', parseInt(e.target.value))}
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-2"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-300">Failed Attempts Before Lockout</Label>
+                  <Input
+                    type="number"
+                    min="3"
+                    max="20"
+                    value={settings.maxFailedLoginsBeforeLockout || 5}
+                    onChange={(e) => updateSetting('maxFailedLoginsBeforeLockout', parseInt(e.target.value))}
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-2"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-300">Lockout Duration (minutes)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="1440"
+                    value={settings.loginLockoutDurationMinutes || 15}
+                    onChange={(e) => updateSetting('loginLockoutDurationMinutes', parseInt(e.target.value))}
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-2"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-300">Cooldown (seconds)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="60"
+                    value={settings.loginCooldownAfterFailedAttempts || 3}
+                    onChange={(e) => updateSetting('loginCooldownAfterFailedAttempts', parseInt(e.target.value))}
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-2"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                  <div>
+                    <Label className="text-gray-300 text-sm">Track Failed Logins</Label>
+                    <p className="text-xs text-gray-500">Store failed attempts for analysis</p>
+                  </div>
+                  <Switch
+                    checked={settings.trackFailedLogins}
+                    onCheckedChange={(checked) => updateSetting('trackFailedLogins', checked)}
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-gray-300 text-sm">Alert After X Failed Attempts</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={settings.failedLoginAlertThreshold || 10}
+                    onChange={(e) => updateSetting('failedLoginAlertThreshold', parseInt(e.target.value))}
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-1"
+                  />
+                </div>
+              </div>
+
+              {/* Info box */}
+              <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Clock className="h-5 w-5 text-purple-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-gray-300">
+                    <p className="font-medium text-purple-400 mb-1">How it works:</p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-400">
+                      <li>After <strong>{settings.maxFailedLoginsBeforeLockout || 5}</strong> failed attempts, account is locked for <strong>{settings.loginLockoutDurationMinutes || 15}</strong> minutes</li>
+                      <li>Rate limit: Max <strong>{settings.maxLoginAttemptsPerHour || 20}</strong> login attempts per hour per IP</li>
+                      <li>A fraud alert is created after <strong>{settings.failedLoginAlertThreshold || 10}</strong> failed attempts</li>
+                      <li>Users see remaining attempts to encourage legitimate recovery via password reset</li>
                     </ul>
                   </div>
                 </div>

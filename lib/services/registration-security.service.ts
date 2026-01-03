@@ -1,0 +1,578 @@
+/**
+ * Registration Security Service
+ * 
+ * State-of-the-art protection against:
+ * - Bot registration attacks
+ * - Disposable email abuse
+ * - Rate limiting violations
+ * - Suspicious pattern detection
+ * - Brute force attacks
+ * 
+ * All checks are configurable via the admin Fraud Settings panel.
+ */
+
+import { connectToDatabase } from '@/database/mongoose';
+import FraudSettings, { IFraudSettings, DEFAULT_FRAUD_SETTINGS } from '@/database/models/fraud/fraud-settings.model';
+import { headers } from 'next/headers';
+
+// In-memory rate limiting cache (consider Redis for production clusters)
+interface RateLimitEntry {
+  count: number;
+  firstAttempt: number;
+  lastAttempt: number;
+}
+
+const registrationRateLimit: Map<string, RateLimitEntry> = new Map();
+const loginRateLimit: Map<string, RateLimitEntry> = new Map();
+const failedLoginAttempts: Map<string, { count: number; lastAttempt: number; lockedUntil?: number }> = new Map();
+
+// Clean up old entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  
+  for (const [key, entry] of registrationRateLimit.entries()) {
+    if (now - entry.lastAttempt > oneHour) {
+      registrationRateLimit.delete(key);
+    }
+  }
+  
+  for (const [key, entry] of loginRateLimit.entries()) {
+    if (now - entry.lastAttempt > oneHour) {
+      loginRateLimit.delete(key);
+    }
+  }
+  
+  for (const [key, entry] of failedLoginAttempts.entries()) {
+    if (entry.lockedUntil && now > entry.lockedUntil) {
+      failedLoginAttempts.delete(key);
+    } else if (now - entry.lastAttempt > oneHour) {
+      failedLoginAttempts.delete(key);
+    }
+  }
+}, 10 * 60 * 1000);
+
+// Extended disposable email domains list (comprehensive)
+const EXTENDED_DISPOSABLE_DOMAINS = [
+  // Popular disposable services
+  'tempmail.com', 'guerrillamail.com', '10minutemail.com', 'throwaway.email',
+  'mailinator.com', 'yopmail.com', 'temp-mail.org', 'fakeinbox.com',
+  'getnada.com', 'mohmal.com', 'tempail.com', 'dispostable.com',
+  'mailnesia.com', 'trashmail.com', 'sharklasers.com', 'guerrillamail.info',
+  'grr.la', 'spam4.me', 'mytemp.email', 'tempr.email', 'discard.email',
+  'dropmail.me', 'emailondeck.com', 'getairmail.com', 'crazymailing.com',
+  // Additional domains
+  'tempinbox.com', 'throwawaymail.com', 'mailcatch.com', 'mailsac.com',
+  'tmpmail.org', 'tmpmail.net', 'mailtemp.net', 'guerillamail.com',
+  'guerillamail.net', 'guerillamail.org', 'guerillamail.biz', 'guerillamail.de',
+  'maildrop.cc', 'inboxalias.com', 'spamgourmet.com', 'mintemail.com',
+  'mytrashmail.com', 'tempomail.fr', 'mailforspam.com', 'spambox.us',
+  'incognitomail.org', 'hushmail.me', 'anonmails.de', 'anonymbox.com',
+  'fakemailgenerator.com', 'getnowmail.com', 'instantemailaddress.com',
+  'jetable.org', 'kasmail.com', 'mailexpire.com', 'mailnull.com',
+  'nospam.ws', 'nwldx.com', 'otherinbox.com', 'pookmail.com',
+  'rcpt.at', 'rmqkr.net', 'safetymail.info', 'sendspamhere.com',
+  'sofimail.com', 'spamavert.com', 'spamday.com', 'spamfree24.org',
+  'spamobox.com', 'tempemail.net', 'tempmailer.com', 'tempmailo.com',
+  'tempmailaddress.com', 'throwam.com', 'trashmail.net', 'wegwerfmail.de',
+  'wegwerfmail.net', 'wegwerfmail.org', 'yepmail.net', 'yuurok.com',
+  'zehnminutenmail.de', 'cock.li', 'airmail.cc', 'getmail.com',
+  'protonmail.com', 'tutanota.com', 'tutanota.de', 'tutamail.com',
+  // Numbers-based domains
+  '10mail.org', '20mail.it', '33mail.com', '60minutemail.com',
+  // Misc
+  'burnermail.io', 'tempemailaddress.com', 'binkmail.com', 'bobmail.info',
+  'bofthew.com', 'budaya-tionghoa.com', 'bugmenot.com', 'cellurl.com',
+  'cheatmail.de', 'crapmail.org', 'e4ward.com', 'emailigo.de', 'emailsensei.com',
+  'emailtemporario.com.br', 'ephemail.net', 'etranquil.com', 'example.com',
+];
+
+export interface RegistrationSecurityResult {
+  allowed: boolean;
+  reason?: string;
+  code?: string;
+  riskScore?: number;
+}
+
+export interface LoginSecurityResult {
+  allowed: boolean;
+  reason?: string;
+  code?: string;
+  remainingAttempts?: number;
+  lockoutUntil?: Date;
+}
+
+/**
+ * Get current fraud settings (cached)
+ */
+let cachedSettings: IFraudSettings | null = null;
+let settingsCacheTime = 0;
+const SETTINGS_CACHE_TTL = 60 * 1000; // 1 minute cache
+
+async function getFraudSettings(): Promise<IFraudSettings> {
+  const now = Date.now();
+  
+  if (cachedSettings && now - settingsCacheTime < SETTINGS_CACHE_TTL) {
+    return cachedSettings;
+  }
+  
+  try {
+    await connectToDatabase();
+    let settings = await FraudSettings.findOne();
+    
+    if (!settings) {
+      settings = await FraudSettings.create(DEFAULT_FRAUD_SETTINGS);
+    }
+    
+    cachedSettings = settings;
+    settingsCacheTime = now;
+    return settings;
+  } catch (error) {
+    console.error('Error loading fraud settings:', error);
+    // Return defaults if DB fails
+    return DEFAULT_FRAUD_SETTINGS as IFraudSettings;
+  }
+}
+
+/**
+ * Get client IP from request headers
+ */
+export async function getClientIP(): Promise<string> {
+  try {
+    const headersList = await headers();
+    
+    // Check various headers for real IP (in order of reliability)
+    const forwardedFor = headersList.get('x-forwarded-for');
+    if (forwardedFor) {
+      // Get the first IP in the chain (client IP)
+      return forwardedFor.split(',')[0].trim();
+    }
+    
+    const realIP = headersList.get('x-real-ip');
+    if (realIP) return realIP;
+    
+    const cfConnectingIP = headersList.get('cf-connecting-ip');
+    if (cfConnectingIP) return cfConnectingIP;
+    
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * Check if email is from a disposable email service
+ */
+export function isDisposableEmail(email: string, customDomains: string[] = []): boolean {
+  const domain = email.toLowerCase().split('@')[1];
+  if (!domain) return false;
+  
+  // Check extended list
+  if (EXTENDED_DISPOSABLE_DOMAINS.includes(domain)) {
+    return true;
+  }
+  
+  // Check custom domains from settings
+  if (customDomains.some(d => domain === d.toLowerCase() || domain.endsWith('.' + d.toLowerCase()))) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Check if email domain is blocked
+ */
+export function isBlockedEmailDomain(email: string, blockedDomains: string[]): boolean {
+  const domain = email.toLowerCase().split('@')[1];
+  if (!domain) return false;
+  
+  return blockedDomains.some(d => domain === d.toLowerCase() || domain.endsWith('.' + d.toLowerCase()));
+}
+
+/**
+ * Check if name matches suspicious patterns
+ */
+export function isSuspiciousName(name: string, patterns: string[]): { suspicious: boolean; pattern?: string } {
+  const lowerName = name.toLowerCase().trim();
+  
+  for (const pattern of patterns) {
+    try {
+      const regex = new RegExp(pattern, 'i');
+      if (regex.test(lowerName)) {
+        return { suspicious: true, pattern };
+      }
+    } catch {
+      // Invalid regex, skip
+    }
+  }
+  
+  return { suspicious: false };
+}
+
+/**
+ * Check registration rate limit for IP
+ */
+function checkRegistrationRateLimit(
+  ip: string, 
+  maxPerHour: number, 
+  maxPerDay: number
+): { allowed: boolean; reason?: string } {
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  const oneDay = 24 * oneHour;
+  
+  const entry = registrationRateLimit.get(ip);
+  
+  if (!entry) {
+    registrationRateLimit.set(ip, { count: 1, firstAttempt: now, lastAttempt: now });
+    return { allowed: true };
+  }
+  
+  // Reset if more than 24 hours since first attempt
+  if (now - entry.firstAttempt > oneDay) {
+    registrationRateLimit.set(ip, { count: 1, firstAttempt: now, lastAttempt: now });
+    return { allowed: true };
+  }
+  
+  // Check hourly limit
+  if (now - entry.lastAttempt < oneHour && entry.count >= maxPerHour) {
+    return { 
+      allowed: false, 
+      reason: 'Too many registration attempts. Please try again later.' 
+    };
+  }
+  
+  // Check daily limit
+  if (entry.count >= maxPerDay) {
+    return { 
+      allowed: false, 
+      reason: 'Daily registration limit reached. Please try again tomorrow.' 
+    };
+  }
+  
+  // Update count
+  entry.count++;
+  entry.lastAttempt = now;
+  
+  return { allowed: true };
+}
+
+/**
+ * Check if honeypot was triggered (bot detection)
+ */
+export function checkHoneypot(honeypotValue?: string): boolean {
+  // Honeypot should be empty - if filled, it's a bot
+  return !!honeypotValue && honeypotValue.trim().length > 0;
+}
+
+/**
+ * Main registration security check
+ * Call this before processing registration
+ */
+export async function validateRegistration(data: {
+  email: string;
+  name: string;
+  honeypot?: string;
+  ip?: string;
+  fingerprint?: string;
+}): Promise<RegistrationSecurityResult> {
+  const settings = await getFraudSettings();
+  const ip = data.ip || await getClientIP();
+  let riskScore = 0;
+  
+  // 1. Check honeypot (bot trap)
+  if (settings.honeypotEnabled && checkHoneypot(data.honeypot)) {
+    console.log(`🤖 Bot detected via honeypot from IP: ${ip}`);
+    return {
+      allowed: false,
+      reason: settings.genericErrorMessages 
+        ? 'Registration failed. Please try again.' 
+        : 'Bot detected.',
+      code: 'BOT_DETECTED',
+      riskScore: 100
+    };
+  }
+  
+  // 2. Check IP whitelist (skip other checks if whitelisted)
+  if (settings.whitelistedIPs?.includes(ip)) {
+    return { allowed: true, riskScore: 0 };
+  }
+  
+  // 3. Check rate limiting
+  if (settings.registrationRateLimitEnabled) {
+    const rateCheck = checkRegistrationRateLimit(
+      ip,
+      settings.maxRegistrationsPerIPPerHour || 5,
+      settings.maxRegistrationsPerIPPerDay || 10
+    );
+    
+    if (!rateCheck.allowed) {
+      console.log(`⚠️ Rate limit exceeded for IP: ${ip}`);
+      return {
+        allowed: false,
+        reason: rateCheck.reason,
+        code: 'RATE_LIMIT_EXCEEDED',
+        riskScore: 80
+      };
+    }
+  }
+  
+  // 4. Check disposable email
+  if (settings.blockDisposableEmails) {
+    const allDisposableDomains = [
+      ...EXTENDED_DISPOSABLE_DOMAINS,
+      ...(settings.disposableEmailDomains || [])
+    ];
+    
+    if (isDisposableEmail(data.email, allDisposableDomains)) {
+      console.log(`📧 Disposable email blocked: ${data.email}`);
+      return {
+        allowed: false,
+        reason: settings.genericErrorMessages
+          ? 'Please use a valid email address.'
+          : 'Disposable email addresses are not allowed.',
+        code: 'DISPOSABLE_EMAIL',
+        riskScore: 90
+      };
+    }
+  }
+  
+  // 5. Check blocked email domains
+  if (settings.blockedEmailDomains?.length > 0) {
+    if (isBlockedEmailDomain(data.email, settings.blockedEmailDomains)) {
+      console.log(`📧 Blocked email domain: ${data.email}`);
+      return {
+        allowed: false,
+        reason: settings.genericErrorMessages
+          ? 'Please use a different email address.'
+          : 'This email domain is not allowed.',
+        code: 'BLOCKED_DOMAIN',
+        riskScore: 85
+      };
+    }
+  }
+  
+  // 6. Check name length
+  const nameLength = data.name.trim().length;
+  if (nameLength < (settings.minNameLength || 2)) {
+    return {
+      allowed: false,
+      reason: `Name must be at least ${settings.minNameLength || 2} characters.`,
+      code: 'NAME_TOO_SHORT',
+      riskScore: 50
+    };
+  }
+  
+  // 7. Check single character names
+  if (settings.blockSingleCharacterNames && nameLength === 1) {
+    return {
+      allowed: false,
+      reason: 'Please enter your full name.',
+      code: 'INVALID_NAME',
+      riskScore: 60
+    };
+  }
+  
+  // 8. Check numeric-only names
+  if (settings.blockNumericOnlyNames && /^[0-9]+$/.test(data.name.trim())) {
+    return {
+      allowed: false,
+      reason: 'Please enter a valid name.',
+      code: 'INVALID_NAME',
+      riskScore: 70
+    };
+  }
+  
+  // 9. Check suspicious name patterns
+  if (settings.blockSuspiciousPatterns && settings.suspiciousNamePatterns?.length > 0) {
+    const nameCheck = isSuspiciousName(data.name, settings.suspiciousNamePatterns);
+    if (nameCheck.suspicious) {
+      console.log(`⚠️ Suspicious name pattern detected: ${data.name} (pattern: ${nameCheck.pattern})`);
+      riskScore += 30;
+      
+      // Don't block, but increase risk score
+      // Actual blocking should only happen for clear violations
+    }
+  }
+  
+  // 10. Check for common bot patterns in email
+  const emailPrefix = data.email.split('@')[0].toLowerCase();
+  const botPatterns = [
+    /^test[0-9]*$/,
+    /^user[0-9]+$/,
+    /^admin[0-9]*$/,
+    /^[a-z]{1,2}[0-9]{6,}$/,  // Single letter + many numbers
+    /^[0-9]+$/,  // Numbers only
+  ];
+  
+  for (const pattern of botPatterns) {
+    if (pattern.test(emailPrefix)) {
+      riskScore += 20;
+      break;
+    }
+  }
+  
+  // Log high-risk registrations
+  if (riskScore >= 40) {
+    console.log(`⚠️ High-risk registration: email=${data.email}, name=${data.name}, ip=${ip}, score=${riskScore}`);
+  }
+  
+  return { allowed: true, riskScore };
+}
+
+/**
+ * Check login rate limiting and account lockout
+ */
+export async function validateLogin(data: {
+  email: string;
+  ip?: string;
+}): Promise<LoginSecurityResult> {
+  const settings = await getFraudSettings();
+  const ip = data.ip || await getClientIP();
+  const key = `${data.email}:${ip}`;
+  
+  // Check IP whitelist
+  if (settings.whitelistedIPs?.includes(ip)) {
+    return { allowed: true };
+  }
+  
+  // Check if login rate limiting is enabled
+  if (!settings.loginRateLimitEnabled) {
+    return { allowed: true };
+  }
+  
+  const now = Date.now();
+  const entry = failedLoginAttempts.get(key);
+  
+  // Check if account is locked
+  if (entry?.lockedUntil && now < entry.lockedUntil) {
+    const lockoutEnd = new Date(entry.lockedUntil);
+    return {
+      allowed: false,
+      reason: 'Account temporarily locked due to too many failed attempts.',
+      code: 'ACCOUNT_LOCKED',
+      lockoutUntil: lockoutEnd,
+      remainingAttempts: 0
+    };
+  }
+  
+  // Check login rate (per hour)
+  const rateEntry = loginRateLimit.get(ip);
+  if (rateEntry) {
+    const oneHour = 60 * 60 * 1000;
+    if (now - rateEntry.firstAttempt < oneHour && rateEntry.count >= settings.maxLoginAttemptsPerHour) {
+      return {
+        allowed: false,
+        reason: 'Too many login attempts. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED'
+      };
+    }
+  }
+  
+  // Update rate limit tracking
+  if (rateEntry) {
+    rateEntry.count++;
+    rateEntry.lastAttempt = now;
+  } else {
+    loginRateLimit.set(ip, { count: 1, firstAttempt: now, lastAttempt: now });
+  }
+  
+  return { 
+    allowed: true,
+    remainingAttempts: entry 
+      ? Math.max(0, settings.maxFailedLoginsBeforeLockout - entry.count)
+      : settings.maxFailedLoginsBeforeLockout
+  };
+}
+
+/**
+ * Record a failed login attempt
+ */
+export async function recordFailedLogin(data: {
+  email: string;
+  ip?: string;
+}): Promise<{ locked: boolean; remainingAttempts: number; lockoutUntil?: Date }> {
+  const settings = await getFraudSettings();
+  const ip = data.ip || await getClientIP();
+  const key = `${data.email}:${ip}`;
+  
+  if (!settings.trackFailedLogins) {
+    return { locked: false, remainingAttempts: settings.maxFailedLoginsBeforeLockout };
+  }
+  
+  const now = Date.now();
+  const entry = failedLoginAttempts.get(key);
+  
+  if (entry) {
+    entry.count++;
+    entry.lastAttempt = now;
+    
+    // Check if should lock
+    if (entry.count >= settings.maxFailedLoginsBeforeLockout) {
+      entry.lockedUntil = now + (settings.loginLockoutDurationMinutes * 60 * 1000);
+      
+      console.log(`🔒 Account locked: ${data.email} from IP ${ip} (${entry.count} failed attempts)`);
+      
+      // TODO: Create fraud alert if threshold reached
+      if (entry.count >= settings.failedLoginAlertThreshold) {
+        console.log(`🚨 ALERT: Brute force attack detected on ${data.email} from IP ${ip}`);
+        // Could trigger notification to admin here
+      }
+      
+      return {
+        locked: true,
+        remainingAttempts: 0,
+        lockoutUntil: new Date(entry.lockedUntil)
+      };
+    }
+    
+    return {
+      locked: false,
+      remainingAttempts: settings.maxFailedLoginsBeforeLockout - entry.count
+    };
+  } else {
+    failedLoginAttempts.set(key, { count: 1, lastAttempt: now });
+    return {
+      locked: false,
+      remainingAttempts: settings.maxFailedLoginsBeforeLockout - 1
+    };
+  }
+}
+
+/**
+ * Clear failed login attempts on successful login
+ */
+export async function clearFailedLogins(data: {
+  email: string;
+  ip?: string;
+}): Promise<void> {
+  const ip = data.ip || await getClientIP();
+  const key = `${data.email}:${ip}`;
+  failedLoginAttempts.delete(key);
+}
+
+/**
+ * Get current security status for admin dashboard
+ */
+export function getSecurityStats(): {
+  activeRateLimits: number;
+  lockedAccounts: number;
+  failedLoginTracking: number;
+} {
+  const now = Date.now();
+  let lockedCount = 0;
+  
+  for (const entry of failedLoginAttempts.values()) {
+    if (entry.lockedUntil && now < entry.lockedUntil) {
+      lockedCount++;
+    }
+  }
+  
+  return {
+    activeRateLimits: registrationRateLimit.size,
+    lockedAccounts: lockedCount,
+    failedLoginTracking: failedLoginAttempts.size
+  };
+}
+

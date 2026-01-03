@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {useForm} from "react-hook-form";
 import {Button} from "@/components/ui/button";
 import InputField from "@/components/forms/InputField";
@@ -11,6 +11,11 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {useDeviceFingerprint} from "@/hooks/useDeviceFingerprint";
 import { Check, X } from 'lucide-react';
+
+// Extended form data with honeypot
+interface ExtendedSignUpFormData extends SignUpFormData {
+  website?: string; // Honeypot field - should always be empty
+}
 
 // Password strength requirements
 const PASSWORD_REQUIREMENTS = [
@@ -26,6 +31,7 @@ const SignUp = () => {
     const { track: trackFingerprint } = useDeviceFingerprint({ auto: false });
     const [passwordStrength, setPasswordStrength] = useState<Record<string, boolean>>({});
     const [showRequirements, setShowRequirements] = useState(false);
+    const formStartTime = useRef(Date.now()); // Track form load time for bot detection
     
     const {
         register,
@@ -33,7 +39,7 @@ const SignUp = () => {
         control,
         watch,
         formState: { errors, isSubmitting },
-    } = useForm<SignUpFormData>({
+    } = useForm<ExtendedSignUpFormData>({
         defaultValues: {
             fullName: '',
             email: '',
@@ -43,6 +49,7 @@ const SignUp = () => {
             address: '',
             city: '',
             postalCode: '',
+            website: '', // Honeypot - must remain empty
         },
         mode: 'onBlur'
     });
@@ -61,7 +68,23 @@ const SignUp = () => {
     // Check if all password requirements are met
     const allRequirementsMet = PASSWORD_REQUIREMENTS.every(req => passwordStrength[req.id]);
 
-    const onSubmit = async (data: SignUpFormData) => {
+    const onSubmit = async (data: ExtendedSignUpFormData) => {
+        // SECURITY: Check honeypot (bot trap) - should always be empty
+        if (data.website && data.website.trim().length > 0) {
+            console.log('🤖 Bot detected via honeypot');
+            // Silently fail - don't reveal detection to bots
+            toast.error('Registration failed. Please try again.');
+            return;
+        }
+
+        // SECURITY: Check form fill time - bots fill forms instantly
+        const fillTime = Date.now() - formStartTime.current;
+        if (fillTime < 3000) { // Less than 3 seconds is suspicious
+            console.log('🤖 Suspicious form fill time:', fillTime, 'ms');
+            toast.error('Please take your time filling out the form.');
+            return;
+        }
+
         // Validate password meets all requirements (direct check, not state-dependent)
         const passwordValid = PASSWORD_REQUIREMENTS.every(req => req.test(data.password));
         if (!passwordValid) {
@@ -70,7 +93,12 @@ const SignUp = () => {
         }
 
         try {
-            const result = await signUpWithEmail(data);
+            // Pass honeypot value to server for additional validation
+            const result = await signUpWithEmail({
+                ...data,
+                honeypot: data.website
+            } as SignUpFormData & { honeypot?: string });
+            
             if(result.success) {
                 // Track device fingerprint after successful sign-up
                 await trackFingerprint();
@@ -167,6 +195,23 @@ const SignUp = () => {
                         validate: (value: string) => value === password || 'Passwords do not match'
                     }}
                 />
+
+                {/* Honeypot field - invisible to users, visible to bots */}
+                <div 
+                    aria-hidden="true" 
+                    className="absolute -left-[9999px] -top-[9999px] opacity-0 pointer-events-none"
+                    tabIndex={-1}
+                >
+                    <label htmlFor="website">Website (leave blank)</label>
+                    <input
+                        {...register('website')}
+                        type="text"
+                        id="website"
+                        name="website"
+                        autoComplete="off"
+                        tabIndex={-1}
+                    />
+                </div>
 
                 <CountrySelectField
                     name="country"

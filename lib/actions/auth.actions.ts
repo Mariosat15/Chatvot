@@ -7,9 +7,44 @@ import { ObjectId } from 'mongodb';
 import { sendWelcomeEmail } from "@/lib/nodemailer";
 import EmailTemplate from "@/database/models/email-template.model";
 import { sendVerificationEmail } from "@/lib/services/email-verification.service";
+import { validateRegistration, validateLogin, recordFailedLogin, clearFailedLogins, getClientIP } from "@/lib/services/registration-security.service";
 
-export const signUpWithEmail = async ({ email, password, fullName, country, address, city, postalCode }: SignUpFormData) => {
+export const signUpWithEmail = async ({ 
+    email, 
+    password, 
+    fullName, 
+    country, 
+    address, 
+    city, 
+    postalCode,
+    honeypot 
+}: SignUpFormData & { honeypot?: string }) => {
     try {
+        // Get client IP for security checks
+        const ip = await getClientIP();
+        
+        // SECURITY: Validate registration with comprehensive checks
+        const securityResult = await validateRegistration({
+            email,
+            name: fullName,
+            honeypot,
+            ip
+        });
+        
+        if (!securityResult.allowed) {
+            console.log(`🛡️ Registration blocked: ${securityResult.code} - ${securityResult.reason}`);
+            return { 
+                error: securityResult.reason || 'Registration failed. Please try again.',
+                success: false,
+                code: securityResult.code
+            };
+        }
+        
+        // Log high-risk registrations
+        if (securityResult.riskScore && securityResult.riskScore >= 40) {
+            console.log(`⚠️ High-risk registration allowed: email=${email}, ip=${ip}, score=${securityResult.riskScore}`);
+        }
+        
         // SECURITY: Prevent users from signing up with admin email
         const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase() || '';
         if (email.toLowerCase() === adminEmail) {
@@ -104,6 +139,21 @@ export const signUpWithEmail = async ({ email, password, fullName, country, addr
 
 export const signInWithEmail = async ({ email, password }: SignInFormData) => {
     try {
+        const ip = await getClientIP();
+        
+        // SECURITY: Check login rate limiting and account lockout
+        const loginCheck = await validateLogin({ email, ip });
+        
+        if (!loginCheck.allowed) {
+            console.log(`🔒 Login blocked: ${loginCheck.code} for ${email} from IP ${ip}`);
+            return { 
+                success: false, 
+                error: loginCheck.reason || 'Too many login attempts. Please try again later.',
+                code: loginCheck.code,
+                lockoutUntil: loginCheck.lockoutUntil
+            };
+        }
+        
         // First check if email is verified
         const mongoose = await connectToDatabase();
         const db = mongoose.connection.db;
@@ -121,12 +171,37 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
             }
         }
         
-        const response = await auth.api.signInEmail({ body: { email, password } })
-
-        return { success: true, data: response }
+        try {
+            const response = await auth.api.signInEmail({ body: { email, password } });
+            
+            // SECURITY: Clear failed login attempts on success
+            await clearFailedLogins({ email, ip });
+            
+            return { success: true, data: response };
+        } catch (authError) {
+            // SECURITY: Record failed login attempt
+            const failResult = await recordFailedLogin({ email, ip });
+            
+            if (failResult.locked) {
+                console.log(`🔒 Account locked after failed attempt: ${email}`);
+                return { 
+                    success: false, 
+                    error: `Account temporarily locked. Try again after ${failResult.lockoutUntil?.toLocaleTimeString()}.`,
+                    code: 'ACCOUNT_LOCKED',
+                    lockoutUntil: failResult.lockoutUntil
+                };
+            }
+            
+            const remainingMsg = failResult.remainingAttempts > 0 
+                ? ` (${failResult.remainingAttempts} attempts remaining)`
+                : '';
+            
+            console.log(`⚠️ Failed login for ${email} from IP ${ip}. Remaining: ${failResult.remainingAttempts}`);
+            return { success: false, error: `Invalid email or password${remainingMsg}` };
+        }
     } catch (e) {
-        console.log('Sign in failed', e)
-        return { success: false, error: 'Invalid email or password' }
+        console.log('Sign in failed', e);
+        return { success: false, error: 'Invalid email or password' };
     }
 }
 
