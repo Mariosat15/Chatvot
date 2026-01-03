@@ -146,11 +146,25 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
         
         if (!loginCheck.allowed) {
             console.log(`🔒 Login blocked: ${loginCheck.code} for ${email} from IP ${ip}`);
+            
+            // Calculate remaining time for user-friendly message
+            let errorMessage = loginCheck.reason || 'Too many login attempts. Please try again later.';
+            if (loginCheck.lockoutUntil) {
+                const remainingMs = loginCheck.lockoutUntil.getTime() - Date.now();
+                if (remainingMs > 0) {
+                    const remainingMinutes = Math.ceil(remainingMs / 60000);
+                    errorMessage = `Account temporarily locked. Please try again in ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}.`;
+                }
+            }
+            
             return { 
                 success: false, 
-                error: loginCheck.reason || 'Too many login attempts. Please try again later.',
+                error: errorMessage,
                 code: loginCheck.code,
-                lockoutUntil: loginCheck.lockoutUntil
+                lockoutUntil: loginCheck.lockoutUntil,
+                remainingMinutes: loginCheck.lockoutUntil 
+                    ? Math.ceil((loginCheck.lockoutUntil.getTime() - Date.now()) / 60000)
+                    : undefined
             };
         }
         
@@ -184,11 +198,24 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
             
             if (failResult.locked) {
                 console.log(`🔒 Account locked after failed attempt: ${email}`);
+                
+                // Calculate remaining time for user-friendly message
+                let lockoutMessage = 'Account temporarily locked due to too many failed attempts.';
+                let remainingMinutes = 0;
+                if (failResult.lockoutUntil) {
+                    const remainingMs = failResult.lockoutUntil.getTime() - Date.now();
+                    remainingMinutes = Math.ceil(remainingMs / 60000);
+                    if (remainingMinutes > 0) {
+                        lockoutMessage = `Account temporarily locked. Please try again in ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}.`;
+                    }
+                }
+                
                 return { 
                     success: false, 
-                    error: `Account temporarily locked. Try again after ${failResult.lockoutUntil?.toLocaleTimeString()}.`,
+                    error: lockoutMessage,
                     code: 'ACCOUNT_LOCKED',
-                    lockoutUntil: failResult.lockoutUntil
+                    lockoutUntil: failResult.lockoutUntil,
+                    remainingMinutes
                 };
             }
             

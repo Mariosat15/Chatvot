@@ -114,6 +114,18 @@ const SignIn = () => {
                 toast.error('Email not verified', {
                     description: result.error || 'Please verify your email before signing in.'
                 });
+            } else if (result.code === 'ACCOUNT_LOCKED') {
+                // Account is locked - show detailed message
+                toast.error('Account Locked', {
+                    description: result.error,
+                    duration: 10000, // Show for 10 seconds
+                });
+            } else if (result.code === 'RATE_LIMIT_EXCEEDED') {
+                // Rate limit exceeded
+                toast.error('Too Many Attempts', {
+                    description: result.error || 'Please wait a moment before trying again.',
+                    duration: 8000,
+                });
             } else {
                 toast.error('Sign in failed', {
                     description: result.error || 'Invalid email or password.'
