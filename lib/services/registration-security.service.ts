@@ -768,6 +768,25 @@ export async function isAccountLocked(email: string): Promise<{
 }
 
 /**
+ * Clear ALL in-memory lockouts and rate limits (admin reset)
+ */
+export async function clearAllLockouts(): Promise<number> {
+  const failedLoginCount = failedLoginAttempts.size;
+  const rateLimitCount = registrationRateLimit.size;
+  const loginRateCount = loginRateLimit.size;
+  
+  // Clear all in-memory maps
+  failedLoginAttempts.clear();
+  registrationRateLimit.clear();
+  loginRateLimit.clear();
+  
+  const totalCleared = failedLoginCount + rateLimitCount + loginRateCount;
+  console.log(`🔓 Cleared all in-memory lockouts: ${failedLoginCount} failed logins, ${rateLimitCount} registration limits, ${loginRateCount} login limits`);
+  
+  return totalCleared;
+}
+
+/**
  * Get current security status for admin dashboard
  */
 export function getSecurityStats(): {
