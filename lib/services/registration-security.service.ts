@@ -548,20 +548,10 @@ export async function validateLogin(data: {
           remainingAttempts: 0
         };
       }
-    } else {
-      // No active lockout in database - user is not locked
-      // Clear any stale in-memory entries for this user
-      const keysToDelete: string[] = [];
-      for (const [k] of failedLoginAttempts.entries()) {
-        if (k.toLowerCase().startsWith(`${data.email.toLowerCase()}:`)) {
-          keysToDelete.push(k);
-        }
-      }
-      if (keysToDelete.length > 0) {
-        keysToDelete.forEach(k => failedLoginAttempts.delete(k));
-        console.log(`🧹 Cleared ${keysToDelete.length} stale in-memory entries for ${data.email}`);
-      }
     }
+    // NOTE: Do NOT clear in-memory entries here!
+    // They are used by recordFailedLogin to count failed attempts
+    // Only admin unlock should clear entries
   } catch (dbError) {
     console.error('Error checking database lockout:', dbError);
     // On database error, allow login rather than lock out users
