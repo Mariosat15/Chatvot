@@ -592,10 +592,13 @@ export async function validateLogin(data: {
     loginRateLimit.set(ip, { count: 1, firstAttempt: now, lastAttempt: now });
   }
   
+  // Get failed login count from in-memory (for display purposes only)
+  const failedEntry = failedLoginAttempts.get(key);
+  
   return { 
     allowed: true,
-    remainingAttempts: entry 
-      ? Math.max(0, settings.maxFailedLoginsBeforeLockout - entry.count)
+    remainingAttempts: failedEntry 
+      ? Math.max(0, settings.maxFailedLoginsBeforeLockout - failedEntry.count)
       : settings.maxFailedLoginsBeforeLockout
   };
 }
