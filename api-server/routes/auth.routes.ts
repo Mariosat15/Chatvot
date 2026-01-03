@@ -10,6 +10,7 @@ import { Router, Request, Response } from 'express';
 import { hashPassword, comparePassword } from '../workers/worker-pool';
 import mongoose, { Document, Model } from 'mongoose';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
 const router = Router();
 
@@ -171,11 +172,33 @@ router.post('/login', async (req: Request, res: Response) => {
     const totalDuration = Date.now() - startTime;
     console.log(`✅ User logged in in ${totalDuration}ms`);
 
-    // In production, you'd generate a JWT here
+    // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET;
+    if (!jwtSecret) {
+      console.error('❌ JWT_SECRET or BETTER_AUTH_SECRET not configured');
+      res.status(500).json({ error: 'Server configuration error' });
+      return;
+    }
+    
+    const userId = user.id || user._id?.toString();
+    const token = jwt.sign(
+      { 
+        userId,
+        email: user.email,
+        name: user.name,
+      },
+      jwtSecret,
+      { 
+        expiresIn: '7d',  // Token expires in 7 days
+        issuer: 'chartvolt-api',
+      }
+    );
+    
     res.status(200).json({
       success: true,
+      token,
       user: {
-        id: user.id || user._id,  // Prefer better-auth's id, fallback to _id
+        id: userId,
         email: user.email,
         name: user.name,
       },
