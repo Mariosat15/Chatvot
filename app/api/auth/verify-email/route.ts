@@ -6,37 +6,37 @@ import { verifyEmailToken, resendVerificationEmail } from '@/lib/services/email-
  * Verify email with token from email link
  */
 export async function GET(request: NextRequest) {
+  // Get base URL for redirects
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000';
+  
   try {
     const searchParams = request.nextUrl.searchParams;
     const token = searchParams.get('token');
     const userId = searchParams.get('userId');
     
+    console.log('📧 Email verification request:', { token: token?.substring(0, 10) + '...', userId });
+    
     if (!token || !userId) {
-      // Redirect to sign-in with error
-      return NextResponse.redirect(
-        new URL('/sign-in?verification=invalid', request.url)
-      );
+      console.log('❌ Missing token or userId');
+      return NextResponse.redirect(`${baseUrl}/sign-in?verification=invalid`);
     }
     
     const result = await verifyEmailToken(token, userId);
+    console.log('📧 Verification result:', result);
     
     if (result.success) {
       // Redirect to sign-in with success message
-      return NextResponse.redirect(
-        new URL('/sign-in?verification=success', request.url)
-      );
+      console.log('✅ Email verified successfully, redirecting to sign-in');
+      return NextResponse.redirect(`${baseUrl}/sign-in?verification=success`);
     } else {
       // Redirect to sign-in with error
       const errorParam = result.error?.includes('expired') ? 'expired' : 'invalid';
-      return NextResponse.redirect(
-        new URL(`/sign-in?verification=${errorParam}`, request.url)
-      );
+      console.log(`❌ Verification failed: ${result.error}`);
+      return NextResponse.redirect(`${baseUrl}/sign-in?verification=${errorParam}`);
     }
   } catch (error) {
     console.error('❌ Email verification error:', error);
-    return NextResponse.redirect(
-      new URL('/sign-in?verification=error', request.url)
-    );
+    return NextResponse.redirect(`${baseUrl}/sign-in?verification=error`);
   }
 }
 
