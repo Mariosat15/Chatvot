@@ -117,9 +117,13 @@ const getAccountModel = (): Model<IAccount> => {
  * Register a new user
  * Uses worker thread for bcrypt hashing (non-blocking)
  * Creates both user and account records to match better-auth schema
+ * Uses MongoDB transaction to ensure atomicity (no orphaned users)
  */
 router.post('/register', async (req: Request, res: Response) => {
   const startTime = Date.now();
+  
+  // Start a MongoDB session for transaction
+  const session = await mongoose.startSession();
   
   try {
     const { email, password, name } = req.body;
@@ -132,11 +136,18 @@ router.post('/register', async (req: Request, res: Response) => {
     const User = getUserModel();
     const Account = getAccountModel();
 
-    // Check if user already exists
+    // Check if user already exists (before starting transaction)
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      res.status(409).json({ error: 'User already exists' });
-      return;
+      // Check if they have an account - if not, they're orphaned and we should allow re-registration
+      const existingAccount = await Account.findOne({ userId: existingUser.id, providerId: 'credential' });
+      if (existingAccount) {
+        res.status(409).json({ error: 'User already exists' });
+        return;
+      }
+      // User exists but no account - delete orphaned user and proceed
+      console.log(`🔧 Found orphaned user ${email}, cleaning up...`);
+      await User.deleteOne({ _id: existingUser._id });
     }
 
     // Hash password using worker thread (NON-BLOCKING!)
@@ -146,25 +157,32 @@ router.post('/register', async (req: Request, res: Response) => {
     
     console.log(`🔐 Password hashed in ${hashDuration}ms (non-blocking)`);
 
-    // Create user with better-auth compatible fields (NO password here!)
+    // Create user and account in a transaction (atomic operation)
     const userId = generateUserId();
     const accountId = generateUserId();
     
-    const user = await User.create({
-      id: userId,
-      email,
-      name: name || email.split('@')[0],
-      emailVerified: false,
-      role: 'trader',
-    });
+    let createdUser: IUser | null = null;
     
-    // Create account record with password (better-auth stores credentials here)
-    await Account.create({
-      id: accountId,
-      userId: userId,
-      accountId: userId, // For credential auth, accountId equals userId
-      providerId: 'credential', // This identifies email/password auth
-      password: hashedPassword,
+    await session.withTransaction(async () => {
+      // Create user with better-auth compatible fields (NO password here!)
+      const [user] = await User.create([{
+        id: userId,
+        email,
+        name: name || email.split('@')[0],
+        emailVerified: false,
+        role: 'trader',
+      }], { session });
+      
+      createdUser = user;
+      
+      // Create account record with password (better-auth stores credentials here)
+      await Account.create([{
+        id: accountId,
+        userId: userId,
+        accountId: userId, // For credential auth, accountId equals userId
+        providerId: 'credential', // This identifies email/password auth
+        password: hashedPassword,
+      }], { session });
     });
 
     const totalDuration = Date.now() - startTime;
@@ -173,9 +191,9 @@ router.post('/register', async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       user: {
-        id: user.id,  // Return better-auth's id, not _id
-        email: user.email,
-        name: user.name,
+        id: createdUser?.id || userId,  // Return better-auth's id, not _id
+        email: createdUser?.email || email,
+        name: createdUser?.name || name || email.split('@')[0],
       },
       timing: {
         total: totalDuration,
@@ -189,6 +207,9 @@ router.post('/register', async (req: Request, res: Response) => {
       error: 'Registration failed',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
+  } finally {
+    // Always end the session
+    await session.endSession();
   }
 });
 
@@ -400,7 +421,7 @@ router.post('/register-batch', async (req: Request, res: Response) => {
     const hashedUsers = await Promise.all(hashPromises);
     const totalBcryptTime = Date.now() - bcryptStart; // Actual wall-clock time for all parallel hashes
 
-    // Save users sequentially (to handle duplicates gracefully)
+    // Save users sequentially with transactions (to handle duplicates and ensure atomicity)
     for (const userData of hashedUsers) {
       if (!userData.hashedPassword) {
         results.push({ success: false, email: userData.email, error: 'Hash failed' });
@@ -408,37 +429,55 @@ router.post('/register-batch', async (req: Request, res: Response) => {
         continue;
       }
 
+      // Start a session for each user's transaction
+      const session = await mongoose.startSession();
+      
       try {
         // Check if user exists
         const existing = await User.findOne({ email: userData.email });
         if (existing) {
-          results.push({ success: false, email: userData.email, error: 'Already exists' });
-          failureCount++;
-          continue;
+          // Check if they have an account - if not, they're orphaned
+          const existingAccount = await Account.findOne({ userId: existing.id, providerId: 'credential' });
+          if (existingAccount) {
+            results.push({ success: false, email: userData.email, error: 'Already exists' });
+            failureCount++;
+            await session.endSession();
+            continue;
+          }
+          // User exists but no account - delete orphaned user and proceed
+          console.log(`🔧 Found orphaned user ${userData.email}, cleaning up...`);
+          await User.deleteOne({ _id: existing._id });
         }
 
         const userId = generateUserId();
         const accountId = generateUserId();
         
-        // Create user (no password here - better-auth stores it in account)
-        const user = await User.create({
-          id: userId,
-          email: userData.email,
-          name: userData.name || userData.email.split('@')[0],
-          emailVerified: false,
-          role: 'trader',
-        });
+        let createdUserId: string | null = null;
         
-        // Create account with password (better-auth compatible)
-        await Account.create({
-          id: accountId,
-          userId: userId,
-          accountId: userId,
-          providerId: 'credential',
-          password: userData.hashedPassword,
+        // Use transaction to ensure both user and account are created atomically
+        await session.withTransaction(async () => {
+          // Create user (no password here - better-auth stores it in account)
+          const [user] = await User.create([{
+            id: userId,
+            email: userData.email,
+            name: userData.name || userData.email.split('@')[0],
+            emailVerified: false,
+            role: 'trader',
+          }], { session });
+          
+          createdUserId = user.id;
+          
+          // Create account with password (better-auth compatible)
+          await Account.create([{
+            id: accountId,
+            userId: userId,
+            accountId: userId,
+            providerId: 'credential',
+            password: userData.hashedPassword,
+          }], { session });
         });
 
-        results.push({ success: true, email: userData.email, userId: user.id });
+        results.push({ success: true, email: userData.email, userId: createdUserId || userId });
         successCount++;
       } catch (error) {
         results.push({ 
@@ -447,6 +486,8 @@ router.post('/register-batch', async (req: Request, res: Response) => {
           error: error instanceof Error ? error.message : 'Unknown error' 
         });
         failureCount++;
+      } finally {
+        await session.endSession();
       }
     }
 
