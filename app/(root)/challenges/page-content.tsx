@@ -70,7 +70,9 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
       console.error('Failed to fetch challenges:', error);
     } finally {
       setLoading(false);
-      setIsRefreshing(false);
+      // Only clear the refresh spinner if this call was the one that set it
+      // This prevents auto-refresh from prematurely hiding the manual refresh spinner
+      if (showSpinner) setIsRefreshing(false);
     }
   }, []);
 
