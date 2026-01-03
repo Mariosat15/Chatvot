@@ -502,10 +502,14 @@ export async function validateLogin(data: {
   const nowDate = new Date();
   
   // ========================================
-  // CRITICAL: Check DATABASE FIRST for lockouts
-  // This ensures lockouts persist across server restarts
+  // CRITICAL: Check DATABASE ONLY for lockouts
+  // Database is the ONLY source of truth for lockout state
+  // In-memory is NOT reliable in serverless/multi-instance environments
   // ========================================
   try {
+    const { connectToDatabase } = await import('@/database/mongoose');
+    await connectToDatabase();
+    
     const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
     
     // Use case-insensitive regex to match email
@@ -519,30 +523,22 @@ export async function validateLogin(data: {
     }).sort({ lockedAt: -1 });
     
     if (dbLockout) {
-      console.log(`🔒 [validateLogin] Found DB lockout for ${data.email}: ID=${dbLockout._id}, isActive=${dbLockout.isActive}`);
+      console.log(`🔒 [validateLogin] Found active DB lockout: ID=${dbLockout._id}, email=${data.email}`);
       
-      // Lockout found in database - this is the source of truth
       const lockoutEnd = dbLockout.lockedUntil ? new Date(dbLockout.lockedUntil) : null;
-      
-      // Also sync to in-memory for performance
-      failedLoginAttempts.set(key, {
-        count: dbLockout.failedAttempts,
-        lastAttempt: dbLockout.lastAttemptAt?.getTime() || now,
-        lockedUntil: lockoutEnd?.getTime()
-      });
       
       // Check if temporary lockout has expired
       if (lockoutEnd && now >= lockoutEnd.getTime()) {
-        // Lockout expired - clear it
+        // Lockout expired - clear it in database
         await AccountLockout.findByIdAndUpdate(dbLockout._id, {
           isActive: false,
           unlockedAt: nowDate,
           unlockedReason: 'Lockout expired'
         });
-        failedLoginAttempts.delete(key);
-        console.log(`🔓 Lockout expired for ${data.email}, auto-cleared`);
+        console.log(`🔓 Lockout expired for ${data.email}, auto-cleared from database`);
+        // Continue - allow login
       } else {
-        // Still locked
+        // Still locked - block login
         console.log(`🔒 Login blocked: ACCOUNT_LOCKED for ${data.email} from IP ${ip}`);
         return {
           allowed: false,
@@ -552,24 +548,28 @@ export async function validateLogin(data: {
           remainingAttempts: 0
         };
       }
+    } else {
+      // No active lockout in database - user is not locked
+      // Clear any stale in-memory entries for this user
+      const keysToDelete: string[] = [];
+      for (const [k] of failedLoginAttempts.entries()) {
+        if (k.toLowerCase().startsWith(`${data.email.toLowerCase()}:`)) {
+          keysToDelete.push(k);
+        }
+      }
+      if (keysToDelete.length > 0) {
+        keysToDelete.forEach(k => failedLoginAttempts.delete(k));
+        console.log(`🧹 Cleared ${keysToDelete.length} stale in-memory entries for ${data.email}`);
+      }
     }
   } catch (dbError) {
     console.error('Error checking database lockout:', dbError);
-    // Fall back to in-memory check if database fails
+    // On database error, allow login rather than lock out users
   }
   
-  // Check in-memory lockout (fallback/performance)
-  const entry = failedLoginAttempts.get(key);
-  if (entry?.lockedUntil && now < entry.lockedUntil) {
-    const lockoutEnd = new Date(entry.lockedUntil);
-    return {
-      allowed: false,
-      reason: 'Account temporarily locked due to too many failed attempts.',
-      code: 'ACCOUNT_LOCKED',
-      lockoutUntil: lockoutEnd,
-      remainingAttempts: 0
-    };
-  }
+  // NOTE: We do NOT check in-memory for lockouts anymore
+  // In-memory is only used for tracking failed attempts within a single instance
+  // The database is the ONLY source of truth for lockout state
   
   // Check login rate (per hour)
   const rateEntry = loginRateLimit.get(ip);
