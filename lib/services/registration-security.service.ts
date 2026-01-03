@@ -423,6 +423,7 @@ export async function validateRegistration(data: {
 
 /**
  * Check login rate limiting and account lockout
+ * IMPORTANT: Checks DATABASE FIRST for persistence across server restarts
  */
 export async function validateLogin(data: {
   email: string;
@@ -443,9 +444,62 @@ export async function validateLogin(data: {
   }
   
   const now = Date.now();
-  const entry = failedLoginAttempts.get(key);
+  const nowDate = new Date();
   
-  // Check if account is locked
+  // ========================================
+  // CRITICAL: Check DATABASE FIRST for lockouts
+  // This ensures lockouts persist across server restarts
+  // ========================================
+  try {
+    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    const dbLockout = await AccountLockout.findOne({
+      email: data.email,
+      isActive: true,
+      $or: [
+        { lockedUntil: { $gt: nowDate } }, // Temporary lockout not expired
+        { lockedUntil: null } // Permanent lockout
+      ]
+    }).sort({ lockedAt: -1 });
+    
+    if (dbLockout) {
+      // Lockout found in database - this is the source of truth
+      const lockoutEnd = dbLockout.lockedUntil ? new Date(dbLockout.lockedUntil) : null;
+      
+      // Also sync to in-memory for performance
+      failedLoginAttempts.set(key, {
+        count: dbLockout.failedAttempts,
+        lastAttempt: dbLockout.lastAttemptAt?.getTime() || now,
+        lockedUntil: lockoutEnd?.getTime()
+      });
+      
+      // Check if temporary lockout has expired
+      if (lockoutEnd && now >= lockoutEnd.getTime()) {
+        // Lockout expired - clear it
+        await AccountLockout.findByIdAndUpdate(dbLockout._id, {
+          isActive: false,
+          unlockedAt: nowDate,
+          unlockedReason: 'Lockout expired'
+        });
+        failedLoginAttempts.delete(key);
+        console.log(`🔓 Lockout expired for ${data.email}, auto-cleared`);
+      } else {
+        // Still locked
+        return {
+          allowed: false,
+          reason: 'Account temporarily locked due to too many failed attempts.',
+          code: 'ACCOUNT_LOCKED',
+          lockoutUntil: lockoutEnd || undefined,
+          remainingAttempts: 0
+        };
+      }
+    }
+  } catch (dbError) {
+    console.error('Error checking database lockout:', dbError);
+    // Fall back to in-memory check if database fails
+  }
+  
+  // Check in-memory lockout (fallback/performance)
+  const entry = failedLoginAttempts.get(key);
   if (entry?.lockedUntil && now < entry.lockedUntil) {
     const lockoutEnd = new Date(entry.lockedUntil);
     return {
@@ -831,5 +885,106 @@ export function getSecurityStats(): {
     lockedAccounts: lockedCount,
     failedLoginTracking: failedLoginAttempts.size
   };
+}
+
+/**
+ * Clean up expired lockouts from database
+ * Should be called periodically or on server startup
+ */
+export async function cleanupExpiredLockouts(): Promise<number> {
+  try {
+    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    const now = new Date();
+    
+    const result = await AccountLockout.updateMany(
+      {
+        isActive: true,
+        lockedUntil: { $lte: now, $ne: null }
+      },
+      {
+        $set: {
+          isActive: false,
+          unlockedAt: now,
+          unlockedReason: 'Lockout expired'
+        }
+      }
+    );
+    
+    if (result.modifiedCount > 0) {
+      console.log(`🔓 Cleaned up ${result.modifiedCount} expired lockouts`);
+    }
+    
+    return result.modifiedCount;
+  } catch (error) {
+    console.error('Failed to cleanup expired lockouts:', error);
+    return 0;
+  }
+}
+
+/**
+ * Load active lockouts from database into memory
+ * Called on server startup to ensure consistency
+ */
+export async function loadActiveLockoutsFromDatabase(): Promise<number> {
+  try {
+    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    const now = new Date();
+    
+    // First cleanup expired lockouts
+    await cleanupExpiredLockouts();
+    
+    // Load active lockouts
+    const activeLockouts = await AccountLockout.find({
+      isActive: true,
+      $or: [
+        { lockedUntil: { $gt: now } },
+        { lockedUntil: null }
+      ]
+    });
+    
+    let loaded = 0;
+    for (const lockout of activeLockouts) {
+      const key = `${lockout.email}:${lockout.ipAddress || 'unknown'}`;
+      failedLoginAttempts.set(key, {
+        count: lockout.failedAttempts,
+        lastAttempt: lockout.lastAttemptAt?.getTime() || Date.now(),
+        lockedUntil: lockout.lockedUntil?.getTime()
+      });
+      loaded++;
+    }
+    
+    if (loaded > 0) {
+      console.log(`📥 Loaded ${loaded} active lockouts from database into memory`);
+    }
+    
+    return loaded;
+  } catch (error) {
+    console.error('Failed to load lockouts from database:', error);
+    return 0;
+  }
+}
+
+/**
+ * Get database lockout statistics
+ */
+export async function getDatabaseLockoutStats(): Promise<{
+  activeLockouts: number;
+  expiredLockouts: number;
+  totalLockouts: number;
+}> {
+  try {
+    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    
+    const [active, expired, total] = await Promise.all([
+      AccountLockout.countDocuments({ isActive: true }),
+      AccountLockout.countDocuments({ isActive: false }),
+      AccountLockout.countDocuments({})
+    ]);
+    
+    return { activeLockouts: active, expiredLockouts: expired, totalLockouts: total };
+  } catch (error) {
+    console.error('Failed to get lockout stats:', error);
+    return { activeLockouts: 0, expiredLockouts: 0, totalLockouts: 0 };
+  }
 }
 
