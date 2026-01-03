@@ -14,11 +14,11 @@ import jwt from 'jsonwebtoken';
 
 const router = Router();
 
-// User interface for type safety - MUST match better-auth's user schema
+// User interface - matches better-auth's user schema (NO password field!)
+// better-auth stores passwords in the 'account' collection, not 'user'
 interface IUser extends Document {
   id: string;           // better-auth's primary identifier (NOT MongoDB's _id)
   email: string;
-  password: string;
   name?: string;
   emailVerified: boolean;
   image?: string;
@@ -27,8 +27,26 @@ interface IUser extends Document {
   updatedAt: Date;
 }
 
-// Cached model to avoid recreation
+// Account interface - matches better-auth's account schema
+// This is where passwords are stored with providerId='credential'
+interface IAccount extends Document {
+  id: string;
+  userId: string;
+  accountId: string;
+  providerId: string;
+  password?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  accessTokenExpiresAt?: Date;
+  refreshTokenExpiresAt?: Date;
+  scope?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Cached models to avoid recreation
 let UserModel: Model<IUser> | null = null;
+let AccountModel: Model<IAccount> | null = null;
 
 /**
  * Generate a unique ID compatible with better-auth
@@ -49,26 +67,56 @@ const getUserModel = (): Model<IUser> => {
   }
   
   // Define schema matching better-auth's user structure
-  // Use 'user' collection (singular) to match better-auth's collection name
+  // NO password field - that goes in account collection
   const userSchema = new mongoose.Schema<IUser>({
-    id: { type: String, required: true, unique: true }, // better-auth's ID field
+    id: { type: String, required: true, unique: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
     name: { type: String },
     emailVerified: { type: Boolean, default: false },
     image: { type: String },
     role: { type: String, default: 'trader' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-  }, { collection: 'user' }); // Explicitly set collection name to match better-auth
+  }, { collection: 'user' });
 
   UserModel = mongoose.model<IUser>('User', userSchema);
   return UserModel;
 };
 
+// Get or create Account model with proper typing
+const getAccountModel = (): Model<IAccount> => {
+  if (AccountModel) return AccountModel;
+  
+  if (mongoose.models.Account) {
+    AccountModel = mongoose.models.Account as Model<IAccount>;
+    return AccountModel;
+  }
+  
+  // Define schema matching better-auth's account structure
+  // This stores credentials with providerId='credential' for email/password auth
+  const accountSchema = new mongoose.Schema<IAccount>({
+    id: { type: String, required: true, unique: true },
+    userId: { type: String, required: true, index: true },
+    accountId: { type: String, required: true },
+    providerId: { type: String, required: true },
+    password: { type: String }, // Hashed password for credential auth
+    accessToken: { type: String },
+    refreshToken: { type: String },
+    accessTokenExpiresAt: { type: Date },
+    refreshTokenExpiresAt: { type: Date },
+    scope: { type: String },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  }, { collection: 'account' });
+
+  AccountModel = mongoose.model<IAccount>('Account', accountSchema);
+  return AccountModel;
+};
+
 /**
  * Register a new user
  * Uses worker thread for bcrypt hashing (non-blocking)
+ * Creates both user and account records to match better-auth schema
  */
 router.post('/register', async (req: Request, res: Response) => {
   const startTime = Date.now();
@@ -82,6 +130,7 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     const User = getUserModel();
+    const Account = getAccountModel();
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -97,15 +146,25 @@ router.post('/register', async (req: Request, res: Response) => {
     
     console.log(`🔐 Password hashed in ${hashDuration}ms (non-blocking)`);
 
-    // Create user with better-auth compatible fields
+    // Create user with better-auth compatible fields (NO password here!)
     const userId = generateUserId();
+    const accountId = generateUserId();
+    
     const user = await User.create({
-      id: userId,  // better-auth's ID field
+      id: userId,
       email,
-      password: hashedPassword,
       name: name || email.split('@')[0],
       emailVerified: false,
       role: 'trader',
+    });
+    
+    // Create account record with password (better-auth stores credentials here)
+    await Account.create({
+      id: accountId,
+      userId: userId,
+      accountId: userId, // For credential auth, accountId equals userId
+      providerId: 'credential', // This identifies email/password auth
+      password: hashedPassword,
     });
 
     const totalDuration = Date.now() - startTime;
@@ -136,6 +195,7 @@ router.post('/register', async (req: Request, res: Response) => {
 /**
  * Login user
  * Uses worker thread for bcrypt compare (non-blocking)
+ * Looks up password from account collection (better-auth compatible)
  */
 router.post('/login', async (req: Request, res: Response) => {
   const startTime = Date.now();
@@ -149,17 +209,30 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const User = getUserModel();
+    const Account = getAccountModel();
 
-    // Find user
+    // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
 
+    // Find credential account for this user (better-auth stores password here)
+    const account = await Account.findOne({ 
+      userId: user.id, 
+      providerId: 'credential' 
+    });
+    
+    if (!account || !account.password) {
+      // No credential account - user may have registered via OAuth only
+      res.status(401).json({ error: 'Invalid credentials' });
+      return;
+    }
+
     // Compare password using worker thread (NON-BLOCKING!)
     const compareStart = Date.now();
-    const isValid = await comparePassword(password, user.password);
+    const isValid = await comparePassword(password, account.password);
     const compareDuration = Date.now() - compareStart;
 
     console.log(`🔐 Password compared in ${compareDuration}ms (non-blocking)`);
@@ -180,15 +253,8 @@ router.post('/login', async (req: Request, res: Response) => {
       return;
     }
     
-    // Ensure consistent user ID format
-    // If user doesn't have better-auth's `id` field (legacy user), migrate them
-    let userId = user.id;
-    if (!userId) {
-      // Legacy user without better-auth ID - generate and save one for consistency
-      userId = generateUserId();
-      await User.updateOne({ _id: user._id }, { $set: { id: userId } });
-      console.log(`🔄 Migrated legacy user ${user.email} to better-auth ID format`);
-    }
+    // Use user.id (already in correct format from better-auth)
+    const userId = user.id;
     
     const token = jwt.sign(
       { 
@@ -280,6 +346,7 @@ router.post('/register-batch', async (req: Request, res: Response) => {
     }
 
     const User = getUserModel();
+    const Account = getAccountModel();
     const results: Array<{ success: boolean; email: string; userId?: string; error?: string }> = [];
     let successCount = 0;
     let failureCount = 0;
@@ -347,13 +414,24 @@ router.post('/register-batch', async (req: Request, res: Response) => {
         }
 
         const userId = generateUserId();
+        const accountId = generateUserId();
+        
+        // Create user (no password here - better-auth stores it in account)
         const user = await User.create({
-          id: userId,  // better-auth's ID field
+          id: userId,
           email: userData.email,
-          password: userData.hashedPassword,
           name: userData.name || userData.email.split('@')[0],
           emailVerified: false,
           role: 'trader',
+        });
+        
+        // Create account with password (better-auth compatible)
+        await Account.create({
+          id: accountId,
+          userId: userId,
+          accountId: userId,
+          providerId: 'credential',
+          password: userData.hashedPassword,
         });
 
         results.push({ success: true, email: userData.email, userId: user.id });
