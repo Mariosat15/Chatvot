@@ -180,7 +180,16 @@ router.post('/login', async (req: Request, res: Response) => {
       return;
     }
     
-    const userId = user.id || user._id?.toString();
+    // Ensure consistent user ID format
+    // If user doesn't have better-auth's `id` field (legacy user), migrate them
+    let userId = user.id;
+    if (!userId) {
+      // Legacy user without better-auth ID - generate and save one for consistency
+      userId = generateUserId();
+      await User.updateOne({ _id: user._id }, { $set: { id: userId } });
+      console.log(`🔄 Migrated legacy user ${user.email} to better-auth ID format`);
+    }
+    
     const token = jwt.sign(
       { 
         userId,
@@ -198,7 +207,7 @@ router.post('/login', async (req: Request, res: Response) => {
       success: true,
       token,
       user: {
-        id: userId,
+        id: userId,  // Always returns consistent UUID format
         email: user.email,
         name: user.name,
       },
