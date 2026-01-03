@@ -62,8 +62,9 @@ const SignUp = () => {
     const allRequirementsMet = PASSWORD_REQUIREMENTS.every(req => passwordStrength[req.id]);
 
     const onSubmit = async (data: SignUpFormData) => {
-        // Validate password meets all requirements
-        if (!allRequirementsMet) {
+        // Validate password meets all requirements (direct check, not state-dependent)
+        const passwordValid = PASSWORD_REQUIREMENTS.every(req => req.test(data.password));
+        if (!passwordValid) {
             toast.error('Password does not meet security requirements');
             return;
         }
@@ -124,7 +125,10 @@ const SignUp = () => {
                         error={errors.password}
                         validation={{ 
                             required: 'Password is required',
-                            validate: () => allRequirementsMet || 'Password does not meet security requirements'
+                            // Directly test value instead of relying on potentially stale state
+                            validate: (value: string) => 
+                                PASSWORD_REQUIREMENTS.every(req => req.test(value)) || 
+                                'Password does not meet security requirements'
                         }}
                         onFocus={() => setShowRequirements(true)}
                     />
