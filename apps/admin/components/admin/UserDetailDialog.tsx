@@ -18,6 +18,8 @@ import {
   Ban,
   Calendar,
   Mail,
+  MailCheck,
+  MailX,
   Coins,
   History,
   Edit,
@@ -173,6 +175,10 @@ export default function UserDetailDialog({
   const [customReason, setCustomReason] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [savingRestriction, setSavingRestriction] = useState(false);
+  
+  // Email Verification State
+  const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
+  const [updatingEmailVerification, setUpdatingEmailVerification] = useState(false);
 
   const fetchUserData = useCallback(async () => {
     if (!userId) return;
@@ -199,6 +205,13 @@ export default function UserDetailDialog({
       if (restrictionsResponse.ok) {
         const restrictionsData = await restrictionsResponse.json();
         setRestrictions(restrictionsData.restrictions || []);
+      }
+      
+      // Fetch email verification status
+      const emailVerificationResponse = await fetch(`/api/users/${userId}/email-verification`);
+      if (emailVerificationResponse.ok) {
+        const emailVerificationData = await emailVerificationResponse.json();
+        setEmailVerified(emailVerificationData.emailVerified);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -388,6 +401,60 @@ export default function UserDetailDialog({
     setShowRestrictionForm(true);
   };
 
+  const handleVerifyEmail = async () => {
+    setUpdatingEmailVerification(true);
+    try {
+      const response = await fetch(`/api/users/${userId}/email-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify' }),
+      });
+
+      if (response.ok) {
+        setEmailVerified(true);
+        toast.success('Email verified successfully');
+        onRefresh?.();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to verify email');
+      }
+    } catch (error) {
+      console.error('Error verifying email:', error);
+      toast.error('Failed to verify email');
+    } finally {
+      setUpdatingEmailVerification(false);
+    }
+  };
+
+  const handleResetEmailVerification = async () => {
+    if (!confirm('Are you sure you want to reset this user\'s email verification? They will need to verify their email again.')) {
+      return;
+    }
+    
+    setUpdatingEmailVerification(true);
+    try {
+      const response = await fetch(`/api/users/${userId}/email-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset' }),
+      });
+
+      if (response.ok) {
+        setEmailVerified(false);
+        toast.success('Email verification reset successfully');
+        onRefresh?.();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to reset email verification');
+      }
+    } catch (error) {
+      console.error('Error resetting email verification:', error);
+      toast.error('Failed to reset email verification');
+    } finally {
+      setUpdatingEmailVerification(false);
+    }
+  };
+
   const activeRestrictions = restrictions.filter((r) => r.isActive);
   const kycStatusConfig = KYC_STATUS_CONFIG[kycStatus?.status || 'none'] || KYC_STATUS_CONFIG.none;
   const KYCIcon = kycStatusConfig.icon;
@@ -472,6 +539,60 @@ export default function UserDetailDialog({
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Email Verification Section */}
+              <Card className={`border ${emailVerified ? 'bg-green-500/10 border-green-500/30' : 'bg-yellow-500/10 border-yellow-500/30'}`}>
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${emailVerified ? 'bg-green-500/20' : 'bg-yellow-500/20'}`}>
+                        {emailVerified ? (
+                          <MailCheck className="h-5 w-5 text-green-400" />
+                        ) : (
+                          <MailX className="h-5 w-5 text-yellow-400" />
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-white">Email Verification</h4>
+                        <Badge className={`${emailVerified ? 'bg-green-500' : 'bg-yellow-500'} text-white mt-1`}>
+                          {emailVerified ? 'VERIFIED' : 'NOT VERIFIED'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {!emailVerified && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-green-400 hover:text-green-300"
+                          onClick={handleVerifyEmail}
+                          disabled={updatingEmailVerification}
+                        >
+                          <MailCheck className="h-4 w-4 mr-1" />
+                          {updatingEmailVerification ? 'Verifying...' : 'Verify Email'}
+                        </Button>
+                      )}
+                      {emailVerified && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-orange-400 hover:text-orange-300"
+                          onClick={handleResetEmailVerification}
+                          disabled={updatingEmailVerification}
+                        >
+                          <RefreshCw className="h-4 w-4 mr-1" />
+                          {updatingEmailVerification ? 'Resetting...' : 'Reset Verification'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    {emailVerified 
+                      ? 'User has verified their email address and can sign in.'
+                      : 'User has not verified their email address. They cannot sign in until verified.'}
+                  </p>
+                </CardContent>
+              </Card>
 
               {/* Quick Actions */}
               <div className="flex gap-2">

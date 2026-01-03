@@ -6,6 +6,7 @@ import {connectToDatabase} from "@/database/mongoose";
 import { ObjectId } from 'mongodb';
 import { sendWelcomeEmail } from "@/lib/nodemailer";
 import EmailTemplate from "@/database/models/email-template.model";
+import { sendVerificationEmail } from "@/lib/services/email-verification.service";
 
 export const signUpWithEmail = async ({ email, password, fullName, country, address, city, postalCode }: SignUpFormData) => {
     try {
@@ -50,6 +51,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, addr
                             city,
                             postalCode,
                             role, // All signups are traders - admin role assigned via admin panel only
+                            emailVerified: false, // Must verify email before login
                             updatedAt: new Date()
                         } 
                     }
@@ -62,9 +64,22 @@ export const signUpWithEmail = async ({ email, password, fullName, country, addr
                 } else {
                     console.log(`✅ Sign-up: Profile data saved for user ${userId}`, { country, address, city, postalCode });
                 }
+                
+                // Send verification email (required before login)
+                try {
+                    await sendVerificationEmail({
+                        email,
+                        name: fullName,
+                        userId: userId,
+                    });
+                    console.log(`✅ Verification email sent to ${email}`);
+                } catch (verificationError) {
+                    console.error('⚠️ Failed to send verification email:', verificationError);
+                    // Don't fail registration, but log it
+                }
             }
 
-            // Send welcome email directly (replaces Inngest)
+            // Send welcome email (separate from verification)
             try {
                 const template = await EmailTemplate.findOne({ templateType: 'welcome' });
                 if (template?.isActive !== false) {
@@ -89,12 +104,29 @@ export const signUpWithEmail = async ({ email, password, fullName, country, addr
 
 export const signInWithEmail = async ({ email, password }: SignInFormData) => {
     try {
+        // First check if email is verified
+        const mongoose = await connectToDatabase();
+        const db = mongoose.connection.db;
+        
+        if (db) {
+            const user = await db.collection('user').findOne({ email });
+            
+            if (user && user.emailVerified === false) {
+                return { 
+                    success: false, 
+                    error: 'Please verify your email before signing in. Check your inbox for the verification link.',
+                    needsVerification: true,
+                    email: email
+                };
+            }
+        }
+        
         const response = await auth.api.signInEmail({ body: { email, password } })
 
         return { success: true, data: response }
     } catch (e) {
         console.log('Sign in failed', e)
-        return { success: false, error: 'Sign in failed' }
+        return { success: false, error: 'Invalid email or password' }
     }
 }
 
