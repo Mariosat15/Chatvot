@@ -77,6 +77,7 @@ export async function GET(
 
 /**
  * DELETE /api/users/[userId]/lockout - Unlock user account
+ * This clears database lockouts AND calls main app to clear in-memory lockouts
  */
 export async function DELETE(
   req: NextRequest,
@@ -129,8 +130,30 @@ export async function DELETE(
       }
     );
 
-    if (result.modifiedCount === 0) {
-      return NextResponse.json({ error: 'No active lockouts found for this user' }, { status: 404 });
+    // Also call main app to clear in-memory lockouts
+    if (userEmail) {
+      try {
+        const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const adminApiKey = process.env.ADMIN_API_KEY || process.env.INTERNAL_API_KEY;
+        
+        await fetch(`${mainAppUrl}/api/admin/lockouts/unlock`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-admin-api-key': adminApiKey || '',
+          },
+          body: JSON.stringify({ 
+            email: userEmail,
+            userId,
+            adminId: session.id,
+            reason: reason || 'Admin manual unlock' 
+          }),
+        });
+        console.log(`✅ [Admin] In-memory lockouts cleared for user: ${userId}`);
+      } catch (memoryError) {
+        console.warn('⚠️ Could not clear in-memory lockouts (main app may be unreachable):', memoryError);
+        // Continue even if this fails - database is already cleared
+      }
     }
 
     // Create audit log

@@ -39,7 +39,9 @@ export class SuspicionScoringService {
     tradingSimilarity: 30,  // 30% for similar trading patterns
     mirrorTrading: 35,      // 35% for mirror trading detection
     timezoneLanguage: 10,   // 10% for same timezone + language
-    deviceSwitching: 15     // 15% for unusual device switching
+    deviceSwitching: 15,    // 15% for unusual device switching
+    bruteForce: 35,         // 35% for brute force login attempts
+    rateLimitExceeded: 25   // 25% for rate limit violations
   };
   
   /**
@@ -360,6 +362,38 @@ export class SuspicionScoringService {
       method: 'deviceSwitching',
       percentage: this.PERCENTAGE_VALUES.deviceSwitching,
       evidence: `Used ${deviceCount} different devices within ${timeWindowHours} hours`
+    });
+  }
+  
+  /**
+   * Calculate score for brute force login attempts (+35%)
+   */
+  static async scoreBruteForce(
+    userId: string,
+    failedAttempts: number,
+    ipAddress: string,
+    email?: string
+  ): Promise<void> {
+    await this.updateScore(userId, {
+      method: 'bruteForce',
+      percentage: this.PERCENTAGE_VALUES.bruteForce,
+      evidence: `Brute force attack: ${failedAttempts} failed login attempts from IP ${ipAddress}${email ? ` for ${email}` : ''}`
+    });
+  }
+  
+  /**
+   * Calculate score for rate limit violations (+25%)
+   */
+  static async scoreRateLimitExceeded(
+    userId: string,
+    limitType: 'registration' | 'login' | 'api',
+    attempts: number,
+    ipAddress: string
+  ): Promise<void> {
+    await this.updateScore(userId, {
+      method: 'rateLimitExceeded',
+      percentage: this.PERCENTAGE_VALUES.rateLimitExceeded,
+      evidence: `Rate limit exceeded: ${attempts} ${limitType} attempts from IP ${ipAddress}`
     });
   }
   

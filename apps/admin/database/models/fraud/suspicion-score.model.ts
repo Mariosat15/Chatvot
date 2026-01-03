@@ -51,6 +51,8 @@ export interface ISuspicionScore extends Document {
     timezoneLanguage: IScoreBreakdown;
     deviceSwitching: IScoreBreakdown;
     kycDuplicate: IScoreBreakdown;
+    bruteForce: IScoreBreakdown;       // Brute force login attempts
+    rateLimitExceeded: IScoreBreakdown; // Rate limit violations
   };
   
   linkedAccounts: ILinkedAccount[];
@@ -211,6 +213,14 @@ const SuspicionScoreSchema = new Schema<ISuspicionScore>({
     kycDuplicate: {
       type: ScoreBreakdownSchema,
       default: () => ({ percentage: 0, evidence: '' })
+    },
+    bruteForce: {
+      type: ScoreBreakdownSchema,
+      default: () => ({ percentage: 0, evidence: '' })
+    },
+    rateLimitExceeded: {
+      type: ScoreBreakdownSchema,
+      default: () => ({ percentage: 0, evidence: '' })
     }
   },
   
@@ -260,7 +270,9 @@ SuspicionScoreSchema.methods.addPercentage = function(
       mirrorTrading: 35,
       timezoneLanguage: 10,
       deviceSwitching: 15,
-      kycDuplicate: 50
+      kycDuplicate: 50,
+      bruteForce: 35,         // Brute force login attempts
+      rateLimitExceeded: 25,  // Rate limit violations
     };
     
     const maxPercentage = maxPercentagePerMethod[method] || 50;

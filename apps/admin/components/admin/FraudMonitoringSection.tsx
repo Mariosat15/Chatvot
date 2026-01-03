@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { 
   Shield, AlertTriangle, Users, Monitor, RefreshCw, Search, 
   Eye, CheckCircle, XCircle, Clock, Ban, Info, TrendingUp, Activity, Settings, Bug,
-  UserX, Trash2, AlertOctagon, ExternalLink 
+  UserX, Trash2, AlertOctagon, ExternalLink, Unlock, Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -129,6 +129,61 @@ export default function FraudMonitoringSection() {
   const [fraudScores, setFraudScores] = useState<Record<string, any>>({});
   const [selectedScoreUserId, setSelectedScoreUserId] = useState<string | null>(null);
   const [showScoreDialog, setShowScoreDialog] = useState(false);
+  const [unlockingAccount, setUnlockingAccount] = useState<string | null>(null);
+
+  // Handler to unlock a locked account (for brute_force alerts)
+  const handleUnlockAccount = async (alert: FraudAlert) => {
+    // Get email from evidence if available
+    const email = alert.evidence?.[0]?.data?.email || alert.primaryUserId;
+    
+    if (!email) {
+      toast.error('Cannot unlock: No email found in alert');
+      return;
+    }
+    
+    if (!confirm(`Are you sure you want to unlock the account for ${email}?`)) {
+      return;
+    }
+    
+    setUnlockingAccount(alert._id);
+    try {
+      // Try unlocking by email first
+      const response = await fetch(`/api/lockouts/${encodeURIComponent(email)}/unlock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Admin manual unlock from fraud investigation' }),
+      });
+
+      if (response.ok) {
+        toast.success(`Account unlocked for ${email}`);
+        // Also dismiss the alert
+        await handleInvestigationAction(alert, 'dismiss');
+        fetchAlerts();
+      } else {
+        // Try unlocking by userId
+        const userId = alert.primaryUserId;
+        const userResponse = await fetch(`/api/users/${userId}/lockout`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'Admin manual unlock from fraud investigation' }),
+        });
+        
+        if (userResponse.ok) {
+          toast.success(`Account unlocked for user ${userId}`);
+          await handleInvestigationAction(alert, 'dismiss');
+          fetchAlerts();
+        } else {
+          const error = await userResponse.json().catch(() => ({}));
+          toast.error(error.error || 'Failed to unlock account');
+        }
+      }
+    } catch (error) {
+      console.error('Error unlocking account:', error);
+      toast.error('Failed to unlock account');
+    } finally {
+      setUnlockingAccount(null);
+    }
+  };
 
   useEffect(() => {
     fetchAlerts();
@@ -931,6 +986,24 @@ export default function FraudMonitoringSection() {
                               <CheckCircle className="h-4 w-4 mr-1" />
                               Dismiss
                             </Button>
+                            
+                            {/* Unlock button for brute_force alerts */}
+                            {alert.alertType === 'brute_force' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleUnlockAccount(alert)}
+                                disabled={unlockingAccount === alert._id}
+                                className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 w-full"
+                              >
+                                {unlockingAccount === alert._id ? (
+                                  <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                                ) : (
+                                  <Unlock className="h-4 w-4 mr-1" />
+                                )}
+                                Unlock Account
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardContent>
