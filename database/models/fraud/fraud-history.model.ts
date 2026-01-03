@@ -16,7 +16,9 @@ export type FraudActionType =
   | 'alert_resolved'
   | 'evidence_added'
   | 'manual_review'
-  | 'auto_action';
+  | 'auto_action'
+  | 'account_locked'
+  | 'account_unlocked';
 
 // Severity levels for tracking escalation
 export type ActionSeverity = 'low' | 'medium' | 'high' | 'critical';
@@ -143,7 +145,7 @@ export interface LogActionParams {
 const FraudHistorySchema = new Schema<IFraudHistory>(
   {
     userId: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.Mixed, // Accept both ObjectId and String (for UUIDs)
       ref: 'User',
       required: true,
       index: true,
@@ -174,6 +176,8 @@ const FraudHistorySchema = new Schema<IFraudHistory>(
         'evidence_added',
         'manual_review',
         'auto_action',
+        'account_locked',
+        'account_unlocked',
       ],
       required: true,
       index: true,
@@ -314,35 +318,47 @@ FraudHistorySchema.statics.getRecentActions = async function(
     .exec();
 };
 
+// Helper to safely convert to ObjectId or return null
+function safeObjectId(id: string | undefined | null): mongoose.Types.ObjectId | null {
+  if (!id) return null;
+  try {
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      return new mongoose.Types.ObjectId(id);
+    }
+  } catch {
+    // Invalid ObjectId format
+  }
+  return null;
+}
+
 // Static method: Log a new action
 FraudHistorySchema.statics.logAction = async function(
   params: LogActionParams
 ): Promise<IFraudHistory> {
+  // Handle userId - can be ObjectId string or UUID string
+  let userIdValue: mongoose.Types.ObjectId | string = params.userId;
+  const objectId = safeObjectId(params.userId);
+  if (objectId) {
+    userIdValue = objectId;
+  }
+  
   const history = new this({
-    userId: new mongoose.Types.ObjectId(params.userId),
+    userId: userIdValue,
     userEmail: params.userEmail,
     userName: params.userName,
     actionType: params.actionType,
     actionSeverity: params.actionSeverity,
     performedBy: {
       type: params.performedBy.type,
-      adminId: params.performedBy.adminId 
-        ? new mongoose.Types.ObjectId(params.performedBy.adminId) 
-        : undefined,
+      adminId: safeObjectId(params.performedBy.adminId),
       adminEmail: params.performedBy.adminEmail,
       adminName: params.performedBy.adminName,
     },
     reason: params.reason,
     details: params.details,
-    relatedAlertId: params.relatedAlertId 
-      ? new mongoose.Types.ObjectId(params.relatedAlertId) 
-      : undefined,
-    relatedRestrictionId: params.relatedRestrictionId 
-      ? new mongoose.Types.ObjectId(params.relatedRestrictionId) 
-      : undefined,
-    relatedCompetitionId: params.relatedCompetitionId 
-      ? new mongoose.Types.ObjectId(params.relatedCompetitionId) 
-      : undefined,
+    relatedAlertId: safeObjectId(params.relatedAlertId),
+    relatedRestrictionId: safeObjectId(params.relatedRestrictionId),
+    relatedCompetitionId: safeObjectId(params.relatedCompetitionId),
     evidence: params.evidence,
     previousState: params.previousState,
     newState: params.newState,

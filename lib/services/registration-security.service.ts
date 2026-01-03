@@ -655,23 +655,32 @@ export async function recordFailedLogin(data: {
           try {
             const FraudHistory = (await import('@/database/models/fraud/fraud-history.model')).FraudHistory;
             await FraudHistory.logAction({
-              userId: data.userId || 'unknown',
+              userId: data.userId || data.email, // Use email as fallback ID
               userEmail: data.email,
               userName: data.email.split('@')[0],
-              actionType: 'auto_suspended',
+              actionType: 'account_locked',
               actionSeverity: 'high',
               performedBy: {
                 type: 'automated',
-                systemReason: 'brute_force_detection',
               },
               reason: 'Brute Force Attack Detected',
-              details: `Account locked after ${entry.count} failed login attempts from IP ${ip}. Lockout duration: ${settings.loginLockoutDurationMinutes} minutes.`,
-              stateBefore: { accountStatus: 'active' },
-              stateAfter: { accountStatus: 'locked', lockedUntil: lockoutUntilDate },
+              details: `Account locked after ${entry.count} failed login attempts from IP ${ip}. Lockout duration: ${settings.loginLockoutDurationMinutes} minutes. Locked until: ${lockoutUntilDate.toLocaleString()}.`,
+              previousState: { accountStatus: 'active' },
+              newState: { accountStatus: 'locked' },
+              duration: {
+                startDate: new Date(),
+                endDate: lockoutUntilDate,
+                isPermanent: false,
+                durationDays: settings.loginLockoutDurationMinutes / (60 * 24),
+              },
+              ipAddress: ip,
             });
             console.log(`📝 Fraud history logged for brute force on ${data.email}`);
           } catch (historyError) {
             console.error('Failed to log fraud history:', historyError);
+            if (historyError instanceof Error) {
+              console.error('History error details:', historyError.message);
+            }
           }
         } catch (alertError) {
           console.error('Failed to create fraud alert:', alertError);

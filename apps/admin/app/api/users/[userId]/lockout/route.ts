@@ -130,13 +130,18 @@ export async function DELETE(
       }
     );
 
-    // Also call main app to clear in-memory lockouts
+    // CRITICAL: Call main app to clear in-memory lockouts
+    // Without this, user stays blocked even though database shows unlocked!
+    let inMemoryCleared = false;
     if (userEmail) {
       try {
         const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
         const adminApiKey = process.env.ADMIN_API_KEY || process.env.INTERNAL_API_KEY;
         
-        await fetch(`${mainAppUrl}/api/admin/lockouts/unlock`, {
+        console.log(`📡 [Admin] Calling main app to clear in-memory lockouts...`);
+        console.log(`📡 [Admin] Main app URL: ${mainAppUrl}`);
+        
+        const response = await fetch(`${mainAppUrl}/api/admin/lockouts/unlock`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -149,11 +154,45 @@ export async function DELETE(
             reason: reason || 'Admin manual unlock' 
           }),
         });
-        console.log(`✅ [Admin] In-memory lockouts cleared for user: ${userId}`);
+        
+        const responseData = await response.json().catch(() => ({}));
+        
+        if (response.ok) {
+          console.log(`✅ [Admin] In-memory lockouts cleared for user: ${userId}`, responseData);
+          inMemoryCleared = true;
+        } else {
+          console.error(`❌ [Admin] Main app returned error:`, response.status, responseData);
+        }
       } catch (memoryError) {
-        console.warn('⚠️ Could not clear in-memory lockouts (main app may be unreachable):', memoryError);
-        // Continue even if this fails - database is already cleared
+        console.error('❌ [Admin] Could not call main app to clear in-memory lockouts:', memoryError);
+        // Log full error for debugging
+        if (memoryError instanceof Error) {
+          console.error('Error details:', memoryError.message, memoryError.stack);
+        }
       }
+    }
+    
+    // Log to FraudHistory
+    try {
+      const FraudHistory = (await import('@/database/models/fraud/fraud-history.model')).FraudHistory;
+      await FraudHistory.logAction({
+        userId: userId,
+        userEmail: userEmail || 'unknown',
+        userName: userEmail?.split('@')[0] || 'Unknown',
+        actionType: 'account_unlocked',
+        actionSeverity: 'medium',
+        performedBy: {
+          type: 'admin',
+          adminId: session.id,
+          adminEmail: session.email || undefined,
+          adminName: session.name || undefined,
+        },
+        reason: reason || 'Admin manual unlock',
+        details: `Account unlocked by admin. Database lockouts cleared: ${result.modifiedCount}. In-memory cleared: ${inMemoryCleared}`,
+      });
+      console.log(`📝 [Admin] Fraud history logged for unlock`);
+    } catch (historyError) {
+      console.error('Failed to log unlock to fraud history:', historyError);
     }
 
     // Create audit log
