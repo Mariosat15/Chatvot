@@ -219,8 +219,13 @@ router.post('/register-batch', async (req: Request, res: Response) => {
       return;
     }
     
-    // Verify the provided key matches
-    if (providedKey !== internalApiKey) {
+    // Verify the provided key matches using timing-safe comparison
+    // This prevents timing attacks that could reveal the key character by character
+    const isValidKey = providedKey && 
+      providedKey.length === internalApiKey.length &&
+      crypto.timingSafeEqual(Buffer.from(providedKey), Buffer.from(internalApiKey));
+    
+    if (!isValidKey) {
       console.warn(`⚠️ Unauthorized batch registration attempt from ${req.ip}`);
       res.status(401).json({ 
         error: 'Unauthorized',
