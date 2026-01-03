@@ -610,7 +610,32 @@ export async function recordFailedLogin(data: {
   }
   
   const now = Date.now();
-  const entry = failedLoginAttempts.get(key);
+  let entry = failedLoginAttempts.get(key);
+  
+  // IMPORTANT: Check database for recent unlock BEFORE incrementing counter
+  // This prevents immediate re-lock after admin unlocks an account
+  try {
+    const { connectToDatabase } = await import('@/database/mongoose');
+    await connectToDatabase();
+    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    
+    // Check if there's a recent unlock (within last 5 minutes)
+    const recentUnlock = await AccountLockout.findOne({
+      email: { $regex: new RegExp(`^${data.email}$`, 'i') },
+      isActive: false,
+      unlockedAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) } // Last 5 minutes
+    }).sort({ unlockedAt: -1 });
+    
+    if (recentUnlock && entry && entry.count >= settings.maxFailedLoginsBeforeLockout - 1) {
+      // Admin recently unlocked this account, but in-memory counter is stale
+      // Reset the counter to start fresh
+      console.log(`🔄 Recent unlock detected for ${data.email}, resetting failed login counter`);
+      entry.count = 0;
+      entry.lockedUntil = undefined;
+    }
+  } catch (dbCheckError) {
+    console.error('Error checking for recent unlock:', dbCheckError);
+  }
   
   if (entry) {
     entry.count++;
