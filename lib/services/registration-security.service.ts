@@ -26,6 +26,58 @@ const registrationRateLimit: Map<string, RateLimitEntry> = new Map();
 const loginRateLimit: Map<string, RateLimitEntry> = new Map();
 const failedLoginAttempts: Map<string, { count: number; lastAttempt: number; lockedUntil?: number }> = new Map();
 
+// Flag to track if we've loaded lockouts from database on startup
+let lockoutsLoadedFromDB = false;
+
+/**
+ * Load active lockouts from database into memory
+ * Called automatically on first login validation
+ */
+async function ensureLockoutsLoaded(): Promise<void> {
+  if (lockoutsLoadedFromDB) return;
+  
+  try {
+    console.log('📥 [Startup] Loading active lockouts from database...');
+    const { connectToDatabase } = await import('@/database/mongoose');
+    await connectToDatabase();
+    
+    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    const now = new Date();
+    
+    // Load active lockouts that haven't expired
+    const activeLockouts = await AccountLockout.find({
+      isActive: true,
+      $or: [
+        { lockedUntil: { $gt: now } }, // Temporary lockouts not yet expired
+        { lockedUntil: null } // Permanent lockouts
+      ]
+    });
+    
+    let loaded = 0;
+    for (const lockout of activeLockouts) {
+      const key = `${lockout.email}:${lockout.ipAddress || 'unknown'}`;
+      failedLoginAttempts.set(key, {
+        count: lockout.failedAttempts || 5,
+        lastAttempt: lockout.lastAttemptAt?.getTime() || Date.now(),
+        lockedUntil: lockout.lockedUntil?.getTime()
+      });
+      loaded++;
+    }
+    
+    if (loaded > 0) {
+      console.log(`✅ [Startup] Loaded ${loaded} active lockouts from database into memory`);
+    } else {
+      console.log('✅ [Startup] No active lockouts found in database');
+    }
+    
+    lockoutsLoadedFromDB = true;
+  } catch (error) {
+    console.error('❌ [Startup] Failed to load lockouts from database:', error);
+    // Don't retry - set flag to prevent repeated attempts
+    lockoutsLoadedFromDB = true;
+  }
+}
+
 // Clean up old entries every 10 minutes
 setInterval(() => {
   const now = Date.now();
@@ -429,6 +481,9 @@ export async function validateLogin(data: {
   email: string;
   ip?: string;
 }): Promise<LoginSecurityResult> {
+  // Ensure lockouts are loaded from database on first call (server restart recovery)
+  await ensureLockoutsLoaded();
+  
   const settings = await getFraudSettings();
   const ip = data.ip || await getClientIP();
   const key = `${data.email}:${ip}`;
@@ -571,11 +626,15 @@ export async function recordFailedLogin(data: {
       
       console.log(`🔒 Account locked: ${data.email} from IP ${ip} (${entry.count} failed attempts)`);
       
-      // Persist lockout to database for admin visibility
+      // CRITICAL: Persist lockout to database - this is the source of truth
+      // Without this, lockouts are lost on server restart
       try {
+        const { connectToDatabase } = await import('@/database/mongoose');
+        await connectToDatabase();
+        
         const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
-        await AccountLockout.findOneAndUpdate(
-          { email: data.email, isActive: true },
+        const savedLockout = await AccountLockout.findOneAndUpdate(
+          { email: data.email, ipAddress: ip, isActive: true },
           {
             $set: {
               userId: data.userId,
@@ -591,10 +650,34 @@ export async function recordFailedLogin(data: {
           },
           { upsert: true, new: true }
         );
-        console.log(`📝 Lockout persisted to database for: ${data.email}`);
+        console.log(`📝 Lockout persisted to database for: ${data.email} (ID: ${savedLockout._id})`);
       } catch (dbError) {
-        console.error('Failed to persist lockout to database:', dbError);
-        // Continue with in-memory lockout even if DB fails
+        console.error('❌ CRITICAL: Failed to persist lockout to database:', dbError);
+        console.error('⚠️ Lockout is only in-memory and will be lost on server restart!');
+        // Try one more time with a fresh connection
+        try {
+          const mongoose = await import('mongoose');
+          if (mongoose.default.connection.readyState !== 1) {
+            console.log('🔄 Attempting database reconnection...');
+            const { connectToDatabase } = await import('@/database/mongoose');
+            await connectToDatabase();
+          }
+          const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+          await AccountLockout.create({
+            userId: data.userId,
+            email: data.email,
+            ipAddress: ip,
+            reason: 'failed_login',
+            failedAttempts: entry.count,
+            lastAttemptAt: new Date(entry.lastAttempt),
+            lockedAt: new Date(),
+            lockedUntil: lockoutUntilDate,
+            isActive: true,
+          });
+          console.log(`📝 Lockout persisted to database (retry) for: ${data.email}`);
+        } catch (retryError) {
+          console.error('❌ CRITICAL: Retry also failed:', retryError);
+        }
       }
       
       // Create fraud alert if threshold reached
@@ -738,18 +821,36 @@ export async function clearFailedLogins(data: {
 
 /**
  * Manually unlock an account (admin action)
+ * ALWAYS clears in-memory lockouts regardless of database state
  */
 export async function adminUnlockAccount(data: {
   email: string;
   adminId: string;
   reason?: string;
 }): Promise<boolean> {
+  let inMemoryCleared = 0;
+  let dbCleared = 0;
+  
   try {
-    // Clear in-memory lockouts for all IPs
+    // CRITICAL: Clear ALL in-memory lockouts for this email (any IP)
+    const keysToDelete: string[] = [];
     for (const [key] of failedLoginAttempts.entries()) {
       if (key.startsWith(`${data.email}:`)) {
-        failedLoginAttempts.delete(key);
+        keysToDelete.push(key);
       }
+    }
+    
+    for (const key of keysToDelete) {
+      failedLoginAttempts.delete(key);
+      inMemoryCleared++;
+    }
+    
+    console.log(`🔓 [In-Memory] Cleared ${inMemoryCleared} lockout entries for ${data.email}`);
+    
+    // Also clear from loginRateLimit map
+    for (const [key] of loginRateLimit.entries()) {
+      // loginRateLimit is keyed by IP, but we should clear it too for this user
+      // Actually loginRateLimit is by IP, not email, so skip this
     }
     
     // Clear database lockout
@@ -766,10 +867,23 @@ export async function adminUnlockAccount(data: {
       }
     );
     
-    console.log(`🔓 Account unlocked by admin: ${data.email} (${result.modifiedCount} lockouts cleared)`);
-    return result.modifiedCount > 0;
+    dbCleared = result.modifiedCount;
+    console.log(`🔓 [Database] Cleared ${dbCleared} lockout entries for ${data.email}`);
+    
+    // Return true if we cleared ANYTHING (in-memory OR database)
+    const success = inMemoryCleared > 0 || dbCleared > 0;
+    console.log(`🔓 Account unlocked by admin: ${data.email} (memory: ${inMemoryCleared}, db: ${dbCleared}, success: ${success})`);
+    
+    // Even if nothing was cleared, we should return true to indicate the unlock was processed
+    // The user might have already been unlocked or the lockout expired
+    return true;
   } catch (error) {
     console.error('Failed to unlock account:', error);
+    // Even on error, if we cleared in-memory, that's a partial success
+    if (inMemoryCleared > 0) {
+      console.log(`⚠️ Partial unlock: cleared ${inMemoryCleared} in-memory entries but database update failed`);
+      return true;
+    }
     return false;
   }
 }
