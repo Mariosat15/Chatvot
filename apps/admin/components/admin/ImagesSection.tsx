@@ -464,11 +464,12 @@ export default function ImagesSection() {
               <Input
                 type="number"
                 value={authSettings.authPageTestimonialRating}
-                onChange={(e) => setAuthSettings(prev => ({ ...prev, authPageTestimonialRating: Math.min(5, Math.max(1, parseInt(e.target.value) || 1)) }))}
+                onChange={(e) => setAuthSettings(prev => ({ ...prev, authPageTestimonialRating: Math.min(5, Math.max(0, parseInt(e.target.value) || 0)) }))}
                 className="bg-gray-900 border-gray-700 text-white w-24"
-                min={1}
+                min={0}
                 max={5}
               />
+              <span className="text-xs text-gray-500">(0 = hide stars)</span>
               <div className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star

@@ -969,7 +969,7 @@ const HeroSettingsSchema = new Schema<IHeroSettings>({
   authPageTestimonialText: { type: String, default: 'chatvolt turned my watchlist into a winning list. The alerts are spot-on, and I feel more confident making moves in the market' },
   authPageTestimonialAuthor: { type: String, default: 'Ethan R.' },
   authPageTestimonialRole: { type: String, default: 'Retail Investor' },
-  authPageTestimonialRating: { type: Number, default: 5, min: 1, max: 5 },
+  authPageTestimonialRating: { type: Number, default: 5, min: 0, max: 5 }, // 0 = hide stars
   authPageDashboardImage: { type: String, default: '/assets/images/dashboard.png' },
   
   // Advanced
