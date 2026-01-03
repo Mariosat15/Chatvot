@@ -274,12 +274,10 @@ router.post('/login', async (req: Request, res: Response) => {
       return;
     }
     
-    // Use user.id (already in correct format from better-auth)
-    const userId = user.id;
-    
+    // Use 'id' field to match middleware expectations (AuthenticatedRequest interface)
     const token = jwt.sign(
       { 
-        userId,
+        id: user.id,  // Must be 'id' not 'userId' to match auth middleware
         email: user.email,
         name: user.name,
       },
@@ -294,7 +292,7 @@ router.post('/login', async (req: Request, res: Response) => {
       success: true,
       token,
       user: {
-        id: userId,  // Always returns consistent UUID format
+        id: user.id,  // Always returns consistent UUID format
         email: user.email,
         name: user.name,
       },
