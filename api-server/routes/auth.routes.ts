@@ -284,10 +284,40 @@ router.post('/register-batch', async (req: Request, res: Response) => {
     let successCount = 0;
     let failureCount = 0;
 
-    // Process users with parallel bcrypt hashing
+    // Validate each user before processing
+    const validUsers: Array<{ email: string; password: string; name?: string }> = [];
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    for (const userData of users) {
+      // Validate email
+      if (!userData.email || typeof userData.email !== 'string' || !emailRegex.test(userData.email)) {
+        results.push({ 
+          success: false, 
+          email: userData.email || 'unknown', 
+          error: 'Invalid or missing email' 
+        });
+        failureCount++;
+        continue;
+      }
+      
+      // Validate password
+      if (!userData.password || typeof userData.password !== 'string' || userData.password.length < 6) {
+        results.push({ 
+          success: false, 
+          email: userData.email, 
+          error: 'Invalid or missing password (min 6 characters)' 
+        });
+        failureCount++;
+        continue;
+      }
+      
+      validUsers.push(userData);
+    }
+
+    // Process validated users with parallel bcrypt hashing
     // Track wall-clock time for the parallel operation (not sum of individual times)
     const bcryptStart = Date.now();
-    const hashPromises = users.map(async (userData: { email: string; password: string; name?: string }) => {
+    const hashPromises = validUsers.map(async (userData) => {
       try {
         const hashedPassword = await hashPassword(userData.password, 12);
         return { ...userData, hashedPassword };
