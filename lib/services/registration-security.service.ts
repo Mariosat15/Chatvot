@@ -507,8 +507,10 @@ export async function validateLogin(data: {
   // ========================================
   try {
     const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    
+    // Use case-insensitive regex to match email
     const dbLockout = await AccountLockout.findOne({
-      email: data.email,
+      email: { $regex: new RegExp(`^${data.email}$`, 'i') },
       isActive: true,
       $or: [
         { lockedUntil: { $gt: nowDate } }, // Temporary lockout not expired
@@ -517,6 +519,8 @@ export async function validateLogin(data: {
     }).sort({ lockedAt: -1 });
     
     if (dbLockout) {
+      console.log(`🔒 [validateLogin] Found DB lockout for ${data.email}: ID=${dbLockout._id}, isActive=${dbLockout.isActive}`);
+      
       // Lockout found in database - this is the source of truth
       const lockoutEnd = dbLockout.lockedUntil ? new Date(dbLockout.lockedUntil) : null;
       
@@ -539,6 +543,7 @@ export async function validateLogin(data: {
         console.log(`🔓 Lockout expired for ${data.email}, auto-cleared`);
       } else {
         // Still locked
+        console.log(`🔒 Login blocked: ACCOUNT_LOCKED for ${data.email} from IP ${ip}`);
         return {
           allowed: false,
           reason: 'Account temporarily locked due to too many failed attempts.',
@@ -831,32 +836,55 @@ export async function adminUnlockAccount(data: {
   let inMemoryCleared = 0;
   let dbCleared = 0;
   
+  console.log(`🔓 [Unlock] ========== STARTING UNLOCK ==========`);
+  console.log(`🔓 [Unlock] Email: ${data.email}`);
+  console.log(`🔓 [Unlock] In-memory map size: ${failedLoginAttempts.size}`);
+  
+  // Log all keys in memory for debugging
+  if (failedLoginAttempts.size > 0) {
+    console.log(`🔓 [Unlock] All in-memory keys:`, Array.from(failedLoginAttempts.keys()));
+  }
+  
   try {
     // CRITICAL: Clear ALL in-memory lockouts for this email (any IP)
+    // Use case-insensitive matching
+    const emailLower = data.email.toLowerCase();
     const keysToDelete: string[] = [];
+    
     for (const [key] of failedLoginAttempts.entries()) {
-      if (key.startsWith(`${data.email}:`)) {
+      if (key.toLowerCase().startsWith(`${emailLower}:`)) {
         keysToDelete.push(key);
       }
     }
+    
+    console.log(`🔓 [Unlock] Keys matching email: ${keysToDelete.length}`, keysToDelete);
     
     for (const key of keysToDelete) {
       failedLoginAttempts.delete(key);
       inMemoryCleared++;
     }
     
-    console.log(`🔓 [In-Memory] Cleared ${inMemoryCleared} lockout entries for ${data.email}`);
+    console.log(`🔓 [In-Memory] Cleared ${inMemoryCleared} lockout entries`);
     
-    // Also clear from loginRateLimit map
-    for (const [key] of loginRateLimit.entries()) {
-      // loginRateLimit is keyed by IP, but we should clear it too for this user
-      // Actually loginRateLimit is by IP, not email, so skip this
+    // Ensure database connection
+    const { connectToDatabase } = await import('@/database/mongoose');
+    await connectToDatabase();
+    
+    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    
+    // DEBUG: First, let's see ALL lockouts for this email
+    const allLockouts = await AccountLockout.find({ 
+      email: { $regex: new RegExp(`^${data.email}$`, 'i') }
+    }).lean();
+    
+    console.log(`🔓 [Database] Found ${allLockouts.length} total lockouts for ${data.email}:`);
+    for (const l of allLockouts) {
+      console.log(`   - ID: ${(l as any)._id}, isActive: ${(l as any).isActive}, IP: ${(l as any).ipAddress}`);
     }
     
-    // Clear database lockout
-    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    // Clear ALL lockouts for this email (regardless of isActive status to be safe)
     const result = await AccountLockout.updateMany(
-      { email: data.email, isActive: true },
+      { email: { $regex: new RegExp(`^${data.email}$`, 'i') } },
       { 
         $set: { 
           isActive: false, 
@@ -868,23 +896,16 @@ export async function adminUnlockAccount(data: {
     );
     
     dbCleared = result.modifiedCount;
-    console.log(`🔓 [Database] Cleared ${dbCleared} lockout entries for ${data.email}`);
+    console.log(`🔓 [Database] Cleared ${dbCleared} lockout entries`);
+    console.log(`🔓 [Unlock] ========== UNLOCK COMPLETE ==========`);
     
-    // Return true if we cleared ANYTHING (in-memory OR database)
-    const success = inMemoryCleared > 0 || dbCleared > 0;
-    console.log(`🔓 Account unlocked by admin: ${data.email} (memory: ${inMemoryCleared}, db: ${dbCleared}, success: ${success})`);
-    
-    // Even if nothing was cleared, we should return true to indicate the unlock was processed
-    // The user might have already been unlocked or the lockout expired
     return true;
   } catch (error) {
-    console.error('Failed to unlock account:', error);
-    // Even on error, if we cleared in-memory, that's a partial success
-    if (inMemoryCleared > 0) {
-      console.log(`⚠️ Partial unlock: cleared ${inMemoryCleared} in-memory entries but database update failed`);
-      return true;
+    console.error('❌ [Unlock] Failed to unlock account:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', error.message);
     }
-    return false;
+    return inMemoryCleared > 0;
   }
 }
 
