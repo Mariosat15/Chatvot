@@ -306,7 +306,10 @@ router.post('/register-batch', async (req: Request, res: Response) => {
   try {
     // SECURITY: Require internal API key to prevent abuse
     const internalApiKey = process.env.INTERNAL_API_KEY;
-    const providedKey = req.headers['x-internal-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
+    // Get provided key from header (handle array case - take first value)
+    const headerKey = req.headers['x-internal-api-key'];
+    const authKey = req.headers['authorization']?.replace('Bearer ', '');
+    const providedKey = Array.isArray(headerKey) ? headerKey[0] : headerKey || authKey;
     
     // If no internal API key is configured, disable this endpoint entirely
     if (!internalApiKey) {
@@ -320,6 +323,7 @@ router.post('/register-batch', async (req: Request, res: Response) => {
     // Verify the provided key matches using timing-safe comparison
     // This prevents timing attacks that could reveal the key character by character
     const isValidKey = providedKey && 
+      typeof providedKey === 'string' &&
       providedKey.length === internalApiKey.length &&
       crypto.timingSafeEqual(Buffer.from(providedKey), Buffer.from(internalApiKey));
     
