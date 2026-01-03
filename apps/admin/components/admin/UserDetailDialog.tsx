@@ -23,6 +23,8 @@ import {
   Coins,
   History,
   Edit,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import {
   Dialog,
@@ -179,6 +181,17 @@ export default function UserDetailDialog({
   // Email Verification State
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
   const [updatingEmailVerification, setUpdatingEmailVerification] = useState(false);
+  
+  // Account Lockout State
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockoutInfo, setLockoutInfo] = useState<{
+    reason: string;
+    lockedAt: string;
+    lockedUntil?: string;
+    failedAttempts: number;
+    ipAddress?: string;
+  } | null>(null);
+  const [unlockingAccount, setUnlockingAccount] = useState(false);
 
   const fetchUserData = useCallback(async () => {
     if (!userId) return;
@@ -212,6 +225,24 @@ export default function UserDetailDialog({
       if (emailVerificationResponse.ok) {
         const emailVerificationData = await emailVerificationResponse.json();
         setEmailVerified(emailVerificationData.emailVerified);
+      }
+      
+      // Fetch lockout status
+      const lockoutResponse = await fetch(`/api/users/${userId}/lockout`);
+      if (lockoutResponse.ok) {
+        const lockoutData = await lockoutResponse.json();
+        setIsLocked(lockoutData.isLocked);
+        if (lockoutData.lockout) {
+          setLockoutInfo({
+            reason: lockoutData.lockout.reason,
+            lockedAt: lockoutData.lockout.lockedAt,
+            lockedUntil: lockoutData.lockout.lockedUntil,
+            failedAttempts: lockoutData.lockout.failedAttempts,
+            ipAddress: lockoutData.lockout.ipAddress,
+          });
+        } else {
+          setLockoutInfo(null);
+        }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -418,6 +449,34 @@ export default function UserDetailDialog({
     setShowRestrictionForm(true);
   };
 
+  const handleUnlockAccount = async () => {
+    if (!confirm('Are you sure you want to unlock this account?')) return;
+    
+    setUnlockingAccount(true);
+    try {
+      const response = await fetch(`/api/users/${userId}/lockout`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Admin manual unlock' }),
+      });
+
+      if (response.ok) {
+        setIsLocked(false);
+        setLockoutInfo(null);
+        toast.success('Account unlocked successfully');
+        onRefresh?.();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to unlock account');
+      }
+    } catch (error) {
+      console.error('Error unlocking account:', error);
+      toast.error('Failed to unlock account');
+    } finally {
+      setUnlockingAccount(false);
+    }
+  };
+
   const handleVerifyEmail = async () => {
     setUpdatingEmailVerification(true);
     try {
@@ -489,6 +548,14 @@ export default function UserDetailDialog({
               <span className="text-sm font-normal text-gray-400">{userEmail}</span>
             </div>
             <div className="ml-auto flex items-center gap-2">
+              {/* Locked Badge */}
+              {isLocked && (
+                <Badge className="bg-red-600 text-white flex items-center gap-1">
+                  <Lock className="h-3 w-3" />
+                  Locked
+                </Badge>
+              )}
+              
               {/* KYC Badge */}
               <Badge
                 variant="secondary"
@@ -611,8 +678,81 @@ export default function UserDetailDialog({
                 </CardContent>
               </Card>
 
+              {/* Account Security / Lockout Section */}
+              {isLocked && lockoutInfo && (
+                <Card className="bg-red-500/10 border border-red-500/30">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-red-500/20 rounded-lg">
+                          <Lock className="h-5 w-5 text-red-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-white">Account Locked</h4>
+                          <Badge className="bg-red-500 text-white mt-1">
+                            {lockoutInfo.lockedUntil ? 'TEMPORARY' : 'PERMANENT'}
+                          </Badge>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-green-400 hover:text-green-300 border-green-500/50"
+                        onClick={handleUnlockAccount}
+                        disabled={unlockingAccount}
+                      >
+                        {unlockingAccount ? (
+                          <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <Unlock className="h-4 w-4 mr-1" />
+                        )}
+                        Unlock Account
+                      </Button>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-400">Reason:</span>
+                        <span className="text-white ml-2 capitalize">{lockoutInfo.reason.replace(/_/g, ' ')}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Failed Attempts:</span>
+                        <span className="text-red-400 ml-2">{lockoutInfo.failedAttempts}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Locked At:</span>
+                        <span className="text-white ml-2">{new Date(lockoutInfo.lockedAt).toLocaleString()}</span>
+                      </div>
+                      {lockoutInfo.lockedUntil && (
+                        <div>
+                          <span className="text-gray-400">Expires:</span>
+                          <span className="text-yellow-400 ml-2">{new Date(lockoutInfo.lockedUntil).toLocaleString()}</span>
+                        </div>
+                      )}
+                      {lockoutInfo.ipAddress && (
+                        <div className="col-span-2">
+                          <span className="text-gray-400">IP Address:</span>
+                          <span className="text-white ml-2 font-mono text-xs">{lockoutInfo.ipAddress}</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Quick Actions */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                {isLocked && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUnlockAccount}
+                    disabled={unlockingAccount}
+                    className="text-green-400 hover:bg-green-500/20 border-green-500/50"
+                  >
+                    <Unlock className="h-4 w-4 mr-2" />
+                    Unlock Account
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"

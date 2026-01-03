@@ -487,11 +487,12 @@ export async function validateLogin(data: {
 }
 
 /**
- * Record a failed login attempt
+ * Record a failed login attempt - persists to database for admin visibility
  */
 export async function recordFailedLogin(data: {
   email: string;
   ip?: string;
+  userId?: string;
 }): Promise<{ locked: boolean; remainingAttempts: number; lockoutUntil?: Date }> {
   const settings = await getFraudSettings();
   const ip = data.ip || await getClientIP();
@@ -510,20 +511,67 @@ export async function recordFailedLogin(data: {
     
     // Check if should lock
     if (entry.count >= settings.maxFailedLoginsBeforeLockout) {
-      entry.lockedUntil = now + (settings.loginLockoutDurationMinutes * 60 * 1000);
+      const lockoutDuration = settings.loginLockoutDurationMinutes * 60 * 1000;
+      entry.lockedUntil = now + lockoutDuration;
+      const lockoutUntilDate = new Date(entry.lockedUntil);
       
       console.log(`🔒 Account locked: ${data.email} from IP ${ip} (${entry.count} failed attempts)`);
       
-      // TODO: Create fraud alert if threshold reached
+      // Persist lockout to database for admin visibility
+      try {
+        const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+        await AccountLockout.findOneAndUpdate(
+          { email: data.email, isActive: true },
+          {
+            $set: {
+              userId: data.userId,
+              email: data.email,
+              ipAddress: ip,
+              reason: 'failed_login',
+              failedAttempts: entry.count,
+              lastAttemptAt: new Date(entry.lastAttempt),
+              lockedAt: new Date(),
+              lockedUntil: lockoutUntilDate,
+              isActive: true,
+            }
+          },
+          { upsert: true, new: true }
+        );
+        console.log(`📝 Lockout persisted to database for: ${data.email}`);
+      } catch (dbError) {
+        console.error('Failed to persist lockout to database:', dbError);
+        // Continue with in-memory lockout even if DB fails
+      }
+      
+      // Create fraud alert if threshold reached
       if (entry.count >= settings.failedLoginAlertThreshold) {
         console.log(`🚨 ALERT: Brute force attack detected on ${data.email} from IP ${ip}`);
-        // Could trigger notification to admin here
+        try {
+          const FraudAlert = (await import('@/database/models/fraud/fraud-alert.model')).default;
+          await FraudAlert.create({
+            userId: data.userId,
+            userEmail: data.email,
+            alertType: 'brute_force',
+            severity: 'high',
+            status: 'pending',
+            title: 'Brute Force Attack Detected',
+            description: `${entry.count} failed login attempts from IP ${ip}`,
+            metadata: {
+              failedAttempts: entry.count,
+              ipAddress: ip,
+              lockedUntil: lockoutUntilDate,
+            },
+            riskScore: 80,
+          });
+        } catch (alertError) {
+          console.error('Failed to create fraud alert:', alertError);
+        }
       }
       
       return {
         locked: true,
         remainingAttempts: 0,
-        lockoutUntil: new Date(entry.lockedUntil)
+        lockoutUntil: lockoutUntilDate
       };
     }
     
@@ -550,6 +598,140 @@ export async function clearFailedLogins(data: {
   const ip = data.ip || await getClientIP();
   const key = `${data.email}:${ip}`;
   failedLoginAttempts.delete(key);
+  
+  // Also clear database lockout
+  try {
+    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    await AccountLockout.updateMany(
+      { email: data.email, isActive: true },
+      { 
+        $set: { 
+          isActive: false, 
+          unlockedAt: new Date(),
+          unlockedReason: 'Successful login' 
+        }
+      }
+    );
+  } catch (error) {
+    console.error('Failed to clear database lockout:', error);
+  }
+}
+
+/**
+ * Manually unlock an account (admin action)
+ */
+export async function adminUnlockAccount(data: {
+  email: string;
+  adminId: string;
+  reason?: string;
+}): Promise<boolean> {
+  try {
+    // Clear in-memory lockouts for all IPs
+    for (const [key] of failedLoginAttempts.entries()) {
+      if (key.startsWith(`${data.email}:`)) {
+        failedLoginAttempts.delete(key);
+      }
+    }
+    
+    // Clear database lockout
+    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    const result = await AccountLockout.updateMany(
+      { email: data.email, isActive: true },
+      { 
+        $set: { 
+          isActive: false, 
+          unlockedAt: new Date(),
+          unlockedBy: data.adminId,
+          unlockedReason: data.reason || 'Admin manual unlock'
+        }
+      }
+    );
+    
+    console.log(`🔓 Account unlocked by admin: ${data.email} (${result.modifiedCount} lockouts cleared)`);
+    return result.modifiedCount > 0;
+  } catch (error) {
+    console.error('Failed to unlock account:', error);
+    return false;
+  }
+}
+
+/**
+ * Get all active lockouts (for admin dashboard)
+ */
+export async function getActiveLockouts(): Promise<Array<{
+  email: string;
+  userId?: string;
+  ipAddress?: string;
+  reason: string;
+  failedAttempts: number;
+  lockedAt: Date;
+  lockedUntil?: Date;
+  isTemporary: boolean;
+}>> {
+  try {
+    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    const now = new Date();
+    
+    const lockouts = await AccountLockout.find({
+      isActive: true,
+      $or: [
+        { lockedUntil: { $gt: now } },
+        { lockedUntil: null }
+      ]
+    }).sort({ lockedAt: -1 }).lean();
+    
+    return lockouts.map(l => ({
+      email: l.email,
+      userId: l.userId,
+      ipAddress: l.ipAddress,
+      reason: l.reason,
+      failedAttempts: l.failedAttempts,
+      lockedAt: l.lockedAt,
+      lockedUntil: l.lockedUntil,
+      isTemporary: !!l.lockedUntil,
+    }));
+  } catch (error) {
+    console.error('Failed to get active lockouts:', error);
+    return [];
+  }
+}
+
+/**
+ * Check if a specific user/email is locked
+ */
+export async function isAccountLocked(email: string): Promise<{
+  locked: boolean;
+  reason?: string;
+  lockedUntil?: Date;
+  failedAttempts?: number;
+}> {
+  try {
+    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+    const now = new Date();
+    
+    const lockout = await AccountLockout.findOne({
+      email,
+      isActive: true,
+      $or: [
+        { lockedUntil: { $gt: now } },
+        { lockedUntil: null }
+      ]
+    }).sort({ lockedAt: -1 });
+    
+    if (lockout) {
+      return {
+        locked: true,
+        reason: lockout.reason,
+        lockedUntil: lockout.lockedUntil,
+        failedAttempts: lockout.failedAttempts,
+      };
+    }
+    
+    return { locked: false };
+  } catch (error) {
+    console.error('Failed to check account lock:', error);
+    return { locked: false };
+  }
 }
 
 /**
