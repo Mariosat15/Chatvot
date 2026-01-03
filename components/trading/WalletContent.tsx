@@ -10,6 +10,11 @@ import TransactionHistory from '@/components/trading/TransactionHistory';
 import BankAccountsSection from '@/components/wallet/BankAccountsSection';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 
+interface WithdrawalSettings {
+  bankWithdrawalsEnabled?: boolean;
+  cardWithdrawalsEnabled?: boolean;
+}
+
 interface WalletContentProps {
   stats: {
     currentBalance: number;
@@ -30,6 +35,10 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
   const searchParams = useSearchParams();
   const router = useRouter();
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'error' | null>(null);
+  const [withdrawalSettings, setWithdrawalSettings] = useState<WithdrawalSettings>({
+    bankWithdrawalsEnabled: true,
+    cardWithdrawalsEnabled: true,
+  });
 
   // Handle payment return from Stripe/Paddle
   useEffect(() => {
@@ -50,6 +59,25 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
       }, 5000);
     }
   }, [searchParams, router]);
+
+  // Fetch withdrawal settings to check if bank withdrawals are enabled
+  useEffect(() => {
+    const fetchWithdrawalSettings = async () => {
+      try {
+        const response = await fetch('/api/wallet/withdrawal-settings');
+        if (response.ok) {
+          const data = await response.json();
+          setWithdrawalSettings({
+            bankWithdrawalsEnabled: data.bankWithdrawalsEnabled ?? true,
+            cardWithdrawalsEnabled: data.cardWithdrawalsEnabled ?? true,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch withdrawal settings:', error);
+      }
+    };
+    fetchWithdrawalSettings();
+  }, []);
 
   if (!settings) return null;
 
@@ -249,8 +277,8 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
         </div>
       </div>
 
-      {/* Bank Accounts for Withdrawals */}
-      <BankAccountsSection />
+      {/* Bank Accounts for Withdrawals - Only show if enabled in admin settings */}
+      {withdrawalSettings.bankWithdrawalsEnabled && <BankAccountsSection />}
 
       {/* Transaction History */}
       <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6">

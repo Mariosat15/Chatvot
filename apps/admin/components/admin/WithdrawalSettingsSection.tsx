@@ -36,6 +36,10 @@ interface WithdrawalSettings {
   // Processing Mode
   processingMode: 'automatic' | 'manual';
   
+  // Withdrawal Methods
+  bankWithdrawalsEnabled: boolean;
+  cardWithdrawalsEnabled: boolean;
+  
   // Withdrawal Limits
   minimumWithdrawal: number;
   maximumWithdrawal: number;
@@ -305,6 +309,97 @@ export default function WithdrawalSettingsSection() {
           </div>
         </div>
       </div>
+
+      {/* Withdrawal Methods - NEW SECTION */}
+      <Card className="bg-gradient-to-br from-cyan-900/30 to-blue-900/30 border-cyan-500/30">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Building className="h-5 w-5 text-cyan-400" />
+            Withdrawal Methods
+          </CardTitle>
+          <CardDescription>
+            Enable or disable withdrawal methods available to users
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Bank Withdrawals */}
+            <div className={`p-4 rounded-lg border transition-all ${
+              settings.bankWithdrawalsEnabled 
+                ? 'bg-cyan-500/10 border-cyan-500/50' 
+                : 'bg-gray-700/30 border-gray-600'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                    settings.bankWithdrawalsEnabled ? 'bg-cyan-500/20' : 'bg-gray-600/30'
+                  }`}>
+                    <Building className={`h-5 w-5 ${settings.bankWithdrawalsEnabled ? 'text-cyan-400' : 'text-gray-500'}`} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">Bank Transfers</p>
+                    <p className="text-xs text-gray-400">Allow users to add bank accounts for withdrawals</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={settings.bankWithdrawalsEnabled ?? true}
+                  onCheckedChange={(checked) => updateSetting('bankWithdrawalsEnabled', checked)}
+                />
+              </div>
+              {settings.bankWithdrawalsEnabled && (
+                <div className="mt-3 pt-3 border-t border-gray-700">
+                  <p className="text-xs text-cyan-300/70">
+                    ✓ Users can add bank accounts in their wallet
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {/* Card Withdrawals */}
+            <div className={`p-4 rounded-lg border transition-all ${
+              settings.cardWithdrawalsEnabled 
+                ? 'bg-purple-500/10 border-purple-500/50' 
+                : 'bg-gray-700/30 border-gray-600'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                    settings.cardWithdrawalsEnabled ? 'bg-purple-500/20' : 'bg-gray-600/30'
+                  }`}>
+                    <CreditCard className={`h-5 w-5 ${settings.cardWithdrawalsEnabled ? 'text-purple-400' : 'text-gray-500'}`} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">Card Payouts</p>
+                    <p className="text-xs text-gray-400">Allow refunds to original deposit card</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={settings.cardWithdrawalsEnabled ?? true}
+                  onCheckedChange={(checked) => updateSetting('cardWithdrawalsEnabled', checked)}
+                />
+              </div>
+              {settings.cardWithdrawalsEnabled && (
+                <div className="mt-3 pt-3 border-t border-gray-700">
+                  <p className="text-xs text-purple-300/70">
+                    ✓ Users can withdraw to their deposit card
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {!settings.bankWithdrawalsEnabled && !settings.cardWithdrawalsEnabled && (
+            <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-400" />
+                <p className="text-sm text-red-300">
+                  Warning: No withdrawal methods are enabled. Users won&apos;t be able to withdraw.
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Withdrawal Limits */}

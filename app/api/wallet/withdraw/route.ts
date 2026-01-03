@@ -146,26 +146,44 @@ export async function GET() {
       });
     }
 
-    // Add bank accounts
-    for (const bankAccount of bankAccounts) {
-      availableWithdrawalMethods.push({
-        id: bankAccount._id.toString(),
-        type: 'bank_account',
-        label: bankAccount.nickname || `Bank Account ****${bankAccount.ibanLast4}`,
-        details: bankAccount.bankName 
-          ? `${bankAccount.bankName} (****${bankAccount.ibanLast4})`
-          : `****${bankAccount.ibanLast4}`,
-        bankName: bankAccount.bankName,
-        ibanLast4: bankAccount.ibanLast4,
-        country: bankAccount.country,
-        isDefault: bankAccount.isDefault,
-      });
+    // Add bank accounts (only if bank withdrawals are enabled)
+    const bankWithdrawalsEnabled = withdrawalSettings.bankWithdrawalsEnabled ?? true;
+    const cardWithdrawalsEnabled = withdrawalSettings.cardWithdrawalsEnabled ?? true;
+    
+    if (bankWithdrawalsEnabled) {
+      for (const bankAccount of bankAccounts) {
+        availableWithdrawalMethods.push({
+          id: bankAccount._id.toString(),
+          type: 'bank_account',
+          label: bankAccount.nickname || `Bank Account ****${bankAccount.ibanLast4}`,
+          details: bankAccount.bankName 
+            ? `${bankAccount.bankName} (****${bankAccount.ibanLast4})`
+            : `****${bankAccount.ibanLast4}`,
+          bankName: bankAccount.bankName,
+          ibanLast4: bankAccount.ibanLast4,
+          country: bankAccount.country,
+          isDefault: bankAccount.isDefault,
+        });
+      }
     }
+    
+    // Filter out card methods if card withdrawals are disabled
+    const filteredWithdrawalMethods = cardWithdrawalsEnabled 
+      ? availableWithdrawalMethods 
+      : availableWithdrawalMethods.filter(m => m.type !== 'original_method');
 
     // Update warning if no methods available
-    if (availableWithdrawalMethods.length === 0 && eligibility.eligible) {
+    if (filteredWithdrawalMethods.length === 0 && eligibility.eligible) {
       eligibility.warnings = eligibility.warnings || [];
-      eligibility.warnings.push('No withdrawal method available. Please add a bank account or make a deposit first.');
+      if (!bankWithdrawalsEnabled && !cardWithdrawalsEnabled) {
+        eligibility.warnings.push('Withdrawals are currently disabled by the administrator.');
+      } else if (!bankWithdrawalsEnabled) {
+        eligibility.warnings.push('Bank withdrawals are currently disabled. You can only withdraw to your card.');
+      } else if (!cardWithdrawalsEnabled) {
+        eligibility.warnings.push('Card withdrawals are currently disabled. Please add a bank account.');
+      } else {
+        eligibility.warnings.push('No withdrawal method available. Please add a bank account or make a deposit first.');
+      }
     }
 
     return NextResponse.json({
@@ -196,13 +214,16 @@ export async function GET() {
       },
       isSandbox,
       originalPaymentMethod: lastDeposit?.paymentMethod || null,
-      // Available withdrawal methods for dropdown
-      availableWithdrawalMethods,
-      hasWithdrawalMethod: availableWithdrawalMethods.length > 0,
+      // Available withdrawal methods for dropdown (filtered by enabled methods)
+      availableWithdrawalMethods: filteredWithdrawalMethods,
+      hasWithdrawalMethod: filteredWithdrawalMethods.length > 0,
+      // Withdrawal method settings
+      bankWithdrawalsEnabled,
+      cardWithdrawalsEnabled,
       // Nuvei automatic withdrawal enabled
       nuveiEnabled: withdrawalSettings.nuveiWithdrawalEnabled === true,
-      // Legacy bank account info
-      hasBankAccount,
+      // Legacy bank account info (only if bank withdrawals enabled)
+      hasBankAccount: bankWithdrawalsEnabled && hasBankAccount,
       bankAccount: defaultBankAccount ? {
         id: defaultBankAccount._id,
         nickname: defaultBankAccount.nickname,
