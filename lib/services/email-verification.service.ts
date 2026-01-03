@@ -8,6 +8,20 @@ import { connectToDatabase } from '@/database/mongoose';
 import EmailTemplate from '@/database/models/email-template.model';
 import { getTransporter } from '@/lib/nodemailer';
 import { getSettings } from '@/lib/services/settings.service';
+import { ObjectId } from 'mongodb';
+
+/**
+ * Build query to find user by multiple ID formats
+ * Better-auth may use either `id` field or `_id` field
+ */
+function buildUserIdQuery(userId: string): Record<string, unknown>[] {
+  const queries: Record<string, unknown>[] = [{ id: userId }];
+  if (ObjectId.isValid(userId)) {
+    queries.push({ _id: new ObjectId(userId) });
+  }
+  queries.push({ _id: userId });
+  return queries;
+}
 
 // Verification token expires in 24 hours
 const TOKEN_EXPIRY_HOURS = 24;
@@ -66,8 +80,10 @@ export async function sendVerificationEmail({ email, name, userId }: SendVerific
     }
     
     // Update user with verification token
-    await db.collection('user').updateOne(
-      { id: userId },
+    // Use $or query to handle different ID formats from better-auth
+    const userQueries = buildUserIdQuery(userId);
+    const updateResult = await db.collection('user').updateOne(
+      { $or: userQueries },
       { 
         $set: { 
           emailVerificationToken: token,
@@ -77,6 +93,8 @@ export async function sendVerificationEmail({ email, name, userId }: SendVerific
         } 
       }
     );
+    
+    console.log(`📧 Token stored for user ${userId}: matched=${updateResult.matchedCount}, modified=${updateResult.modifiedCount}`);
     
     // Build verification URL
     const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}&userId=${userId}`;
@@ -200,13 +218,28 @@ export async function verifyEmailToken(token: string, userId: string): Promise<V
       return { success: false, error: 'Database connection failed' };
     }
     
-    // Find user with matching token
+    // Build queries to handle different ID formats
+    const userQueries = buildUserIdQuery(userId);
+    
+    // Find user with matching token (using $or for ID and $and for token)
     const user = await db.collection('user').findOne({
-      id: userId,
-      emailVerificationToken: token,
+      $and: [
+        { $or: userQueries },
+        { emailVerificationToken: token }
+      ]
     });
     
+    console.log(`📧 Looking for user ${userId} with token: found=${!!user}`);
+    
     if (!user) {
+      // Try to find user without token to give better error message
+      const userWithoutToken = await db.collection('user').findOne({ $or: userQueries });
+      if (userWithoutToken) {
+        if (userWithoutToken.emailVerified === true) {
+          return { success: false, error: 'Email is already verified. Please sign in.' };
+        }
+        console.log(`📧 User found but token doesn't match. Stored token: ${userWithoutToken.emailVerificationToken?.substring(0, 10)}...`);
+      }
       return { success: false, error: 'Invalid verification link' };
     }
     
@@ -216,8 +249,8 @@ export async function verifyEmailToken(token: string, userId: string): Promise<V
     }
     
     // Mark email as verified and clear token
-    await db.collection('user').updateOne(
-      { id: userId },
+    const updateResult = await db.collection('user').updateOne(
+      { $or: userQueries },
       { 
         $set: { 
           emailVerified: true,
@@ -230,7 +263,13 @@ export async function verifyEmailToken(token: string, userId: string): Promise<V
       }
     );
     
-    console.log(`✅ Email verified for user ${userId}`);
+    console.log(`✅ Email verified for user ${userId}: matched=${updateResult.matchedCount}, modified=${updateResult.modifiedCount}`);
+    
+    if (updateResult.modifiedCount === 0) {
+      console.error(`⚠️ User found but update failed for ${userId}`);
+      return { success: false, error: 'Verification failed. Please try again.' };
+    }
+    
     return { success: true, userId };
   } catch (error) {
     console.error('❌ Email verification failed:', error);
@@ -289,7 +328,8 @@ export async function isEmailVerified(userId: string): Promise<boolean> {
     
     if (!db) return false;
     
-    const user = await db.collection('user').findOne({ id: userId });
+    const userQueries = buildUserIdQuery(userId);
+    const user = await db.collection('user').findOne({ $or: userQueries });
     return user?.emailVerified === true;
   } catch (error) {
     console.error('❌ Error checking email verification:', error);
@@ -309,8 +349,9 @@ export async function adminVerifyEmail(userId: string): Promise<{ success: boole
       return { success: false, error: 'Database connection failed' };
     }
     
+    const userQueries = buildUserIdQuery(userId);
     const result = await db.collection('user').updateOne(
-      { id: userId },
+      { $or: userQueries },
       { 
         $set: { 
           emailVerified: true,
@@ -347,8 +388,9 @@ export async function adminResetEmailVerification(userId: string): Promise<{ suc
       return { success: false, error: 'Database connection failed' };
     }
     
+    const userQueries = buildUserIdQuery(userId);
     const result = await db.collection('user').updateOne(
-      { id: userId },
+      { $or: userQueries },
       { 
         $set: { 
           emailVerified: false,
