@@ -612,37 +612,55 @@ export async function recordFailedLogin(data: {
   const now = Date.now();
   let entry = failedLoginAttempts.get(key);
   
-  // IMPORTANT: Check database for recent unlock BEFORE incrementing counter
-  // This prevents immediate re-lock after admin unlocks an account
-  try {
-    const { connectToDatabase } = await import('@/database/mongoose');
-    await connectToDatabase();
-    const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
-    
-    // Check if there's a recent unlock (within last 5 minutes)
-    const recentUnlock = await AccountLockout.findOne({
-      email: { $regex: new RegExp(`^${data.email}$`, 'i') },
-      isActive: false,
-      unlockedAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) } // Last 5 minutes
-    }).sort({ unlockedAt: -1 });
-    
-    if (recentUnlock && entry && entry.count >= settings.maxFailedLoginsBeforeLockout - 1) {
-      // Admin recently unlocked this account, but in-memory counter is stale
-      // Reset the counter to start fresh
-      console.log(`🔄 Recent unlock detected for ${data.email}, resetting failed login counter`);
-      entry.count = 0;
-      entry.lockedUntil = undefined;
-    }
-  } catch (dbCheckError) {
-    console.error('Error checking for recent unlock:', dbCheckError);
-  }
-  
   if (entry) {
     entry.count++;
     entry.lastAttempt = now;
     
     // Check if should lock
     if (entry.count >= settings.maxFailedLoginsBeforeLockout) {
+      // IMPORTANT: Before locking, verify this isn't stale data from before an unlock
+      // Check if there's no active lockout but there was a recent unlock
+      try {
+        const { connectToDatabase } = await import('@/database/mongoose');
+        await connectToDatabase();
+        const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
+        
+        // Check for active lockout first
+        const activeLockout = await AccountLockout.findOne({
+          email: { $regex: new RegExp(`^${data.email}$`, 'i') },
+          isActive: true
+        });
+        
+        if (!activeLockout) {
+          // No active lockout - check if there was a recent unlock
+          const recentUnlock = await AccountLockout.findOne({
+            email: { $regex: new RegExp(`^${data.email}$`, 'i') },
+            isActive: false,
+            unlockedAt: { $exists: true }
+          }).sort({ unlockedAt: -1 });
+          
+          // If there's a recent unlock and our entry started before the unlock, reset
+          if (recentUnlock && recentUnlock.unlockedAt) {
+            const unlockTime = recentUnlock.unlockedAt.getTime();
+            const entryStartTime = entry.lastAttempt - (entry.count * 2000); // Approximate start
+            
+            if (unlockTime > entryStartTime) {
+              // The unlock happened during our counting period - counter is stale
+              console.log(`🔄 Stale counter detected for ${data.email} (unlock at ${recentUnlock.unlockedAt}), resetting`);
+              entry.count = 1; // Reset to current attempt only
+              entry.lockedUntil = undefined;
+              
+              return {
+                locked: false,
+                remainingAttempts: settings.maxFailedLoginsBeforeLockout - 1
+              };
+            }
+          }
+        }
+      } catch (staleCheckError) {
+        console.error('Error checking for stale counter:', staleCheckError);
+      }
+      
       const lockoutDuration = settings.loginLockoutDurationMinutes * 60 * 1000;
       entry.lockedUntil = now + lockoutDuration;
       const lockoutUntilDate = new Date(entry.lockedUntil);
@@ -652,9 +670,6 @@ export async function recordFailedLogin(data: {
       // CRITICAL: Persist lockout to database - this is the source of truth
       // Without this, lockouts are lost on server restart
       try {
-        const { connectToDatabase } = await import('@/database/mongoose');
-        await connectToDatabase();
-        
         const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
         const savedLockout = await AccountLockout.findOneAndUpdate(
           { email: data.email, ipAddress: ip, isActive: true },
