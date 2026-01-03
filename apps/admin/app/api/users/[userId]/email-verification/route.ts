@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
-import { headers } from 'next/headers';
+import { verifyAdminAuth } from '@/lib/admin/auth';
 import { connectToDatabase } from '@/database/mongoose';
 import mongoose from 'mongoose';
 import { ObjectId } from 'mongodb';
@@ -15,11 +14,9 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const auth = await verifyAdminAuth();
 
-    if (!session?.user) {
+    if (!auth.isAuthenticated) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -59,11 +56,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const auth = await verifyAdminAuth();
 
-    if (!session?.user) {
+    if (!auth.isAuthenticated) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -139,4 +134,3 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Failed to update verification status' }, { status: 500 });
   }
 }
-
