@@ -39,13 +39,22 @@ export async function GET(request: Request) {
 
     // Get specific user score
     if (userId) {
-      const score = await SuspicionScoringService.getScore(userId);
+      let score = await SuspicionScoringService.getScore(userId);
       
+      // If no score exists, create one with default values
       if (!score) {
-        return NextResponse.json({
-          success: false,
-          message: 'Score not found for this user'
-        }, { status: 404 });
+        // Create a new score for this user
+        score = await SuspicionScoringService.getOrCreateScore(userId);
+        
+        // Convert to plain object
+        score = await SuspicionScoringService.getScore(userId);
+        
+        if (!score) {
+          return NextResponse.json({
+            success: false,
+            message: 'Could not create score for this user'
+          }, { status: 500 });
+        }
       }
 
       return NextResponse.json({

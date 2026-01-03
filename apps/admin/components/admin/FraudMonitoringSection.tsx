@@ -133,8 +133,10 @@ export default function FraudMonitoringSection() {
 
   // Handler to unlock a locked account (for brute_force alerts)
   const handleUnlockAccount = async (alert: FraudAlert) => {
-    // Get email from evidence if available
-    const email = alert.evidence?.[0]?.data?.email || alert.primaryUserId;
+    // Get email from evidence if available, or from primaryUserId if it looks like an email
+    const evidenceEmail = alert.evidence?.[0]?.data?.email;
+    const isEmailId = alert.primaryUserId?.includes('@');
+    const email = evidenceEmail || (isEmailId ? alert.primaryUserId : null);
     
     if (!email) {
       toast.error('Cannot unlock: No email found in alert');
@@ -147,34 +149,34 @@ export default function FraudMonitoringSection() {
     
     setUnlockingAccount(alert._id);
     try {
-      // Try unlocking by email first
+      // Try unlocking by email
       const response = await fetch(`/api/lockouts/${encodeURIComponent(email)}/unlock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: 'Admin manual unlock from fraud investigation' }),
       });
 
-      if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok || data.success) {
         toast.success(`Account unlocked for ${email}`);
         // Also dismiss the alert
         await handleInvestigationAction(alert, 'dismiss');
         fetchAlerts();
       } else {
-        // Try unlocking by userId
-        const userId = alert.primaryUserId;
-        const userResponse = await fetch(`/api/users/${userId}/lockout`, {
-          method: 'DELETE',
+        // Try via clear-all endpoint as fallback
+        const clearAllResponse = await fetch('/api/lockouts/clear-all', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason: 'Admin manual unlock from fraud investigation' }),
+          body: JSON.stringify({ email }),
         });
         
-        if (userResponse.ok) {
-          toast.success(`Account unlocked for user ${userId}`);
+        if (clearAllResponse.ok) {
+          toast.success(`Account unlocked for ${email}`);
           await handleInvestigationAction(alert, 'dismiss');
           fetchAlerts();
         } else {
-          const error = await userResponse.json().catch(() => ({}));
-          toast.error(error.error || 'Failed to unlock account');
+          toast.error(data.error || 'Failed to unlock account');
         }
       }
     } catch (error) {

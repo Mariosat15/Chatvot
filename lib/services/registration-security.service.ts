@@ -596,6 +596,29 @@ export async function recordFailedLogin(data: {
               console.error('Failed to update suspicion score:', scoreError);
             }
           }
+          
+          // Log to fraud history
+          try {
+            const FraudHistory = (await import('@/database/models/fraud/fraud-history.model')).FraudHistory;
+            await FraudHistory.logAction({
+              userId: data.userId || 'unknown',
+              userEmail: data.email,
+              userName: data.email.split('@')[0],
+              actionType: 'auto_suspended',
+              actionSeverity: 'high',
+              performedBy: {
+                type: 'automated',
+                systemReason: 'brute_force_detection',
+              },
+              reason: 'Brute Force Attack Detected',
+              details: `Account locked after ${entry.count} failed login attempts from IP ${ip}. Lockout duration: ${settings.loginLockoutDurationMinutes} minutes.`,
+              stateBefore: { accountStatus: 'active' },
+              stateAfter: { accountStatus: 'locked', lockedUntil: lockoutUntilDate },
+            });
+            console.log(`📝 Fraud history logged for brute force on ${data.email}`);
+          } catch (historyError) {
+            console.error('Failed to log fraud history:', historyError);
+          }
         } catch (alertError) {
           console.error('Failed to create fraud alert:', alertError);
         }
