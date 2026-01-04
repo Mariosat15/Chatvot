@@ -188,6 +188,71 @@ router.post('/register', async (req: Request, res: Response) => {
     const totalDuration = Date.now() - startTime;
     console.log(`✅ User registered in ${totalDuration}ms`);
 
+    // Send verification email (matching main app behavior)
+    let verificationEmailSent = false;
+    try {
+      // Generate verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const tokenExpiry = new Date();
+      tokenExpiry.setHours(tokenExpiry.getHours() + 24); // 24 hour expiry
+      
+      // Store token on user document
+      const User = getUserModel();
+      await User.findOneAndUpdate(
+        { id: userId },
+        { 
+          emailVerificationToken: verificationToken,
+          emailVerificationTokenExpiry: tokenExpiry,
+        }
+      );
+      
+      // Build verification URL
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000';
+      const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}&userId=${userId}`;
+      
+      // Send email using nodemailer (if available in this environment)
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || process.env.NODEMAILER_HOST,
+        port: parseInt(process.env.SMTP_PORT || process.env.NODEMAILER_PORT || '587'),
+        secure: (process.env.SMTP_SECURE || process.env.NODEMAILER_SECURE) === 'true',
+        auth: {
+          user: process.env.SMTP_USER || process.env.NODEMAILER_EMAIL,
+          pass: process.env.SMTP_PASS || process.env.NODEMAILER_PASSWORD,
+        },
+      });
+      
+      const platformName = process.env.PLATFORM_NAME || 'ChartVolt';
+      const senderEmail = process.env.SMTP_USER || process.env.NODEMAILER_EMAIL || 'noreply@chartvolt.com';
+      
+      await transporter.sendMail({
+        from: `"${platformName}" <${senderEmail}>`,
+        to: email,
+        subject: `Verify your email - ${platformName}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #1a1a1a; color: #ffffff; padding: 40px;">
+            <h1 style="color: #f5c518; margin-bottom: 24px;">Verify Your Email</h1>
+            <p style="margin-bottom: 24px;">Thanks for signing up! Please click the button below to verify your email address.</p>
+            <a href="${verificationUrl}" style="display: inline-block; background-color: #f5c518; color: #000000; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold;">
+              Verify Email
+            </a>
+            <p style="margin-top: 24px; color: #888888; font-size: 14px;">
+              Or copy this link: ${verificationUrl}
+            </p>
+            <p style="margin-top: 24px; color: #888888; font-size: 12px;">
+              This link expires in 24 hours. If you didn't create an account, you can ignore this email.
+            </p>
+          </div>
+        `,
+      });
+      
+      verificationEmailSent = true;
+      console.log(`📧 Verification email sent to ${email}`);
+    } catch (emailError) {
+      console.error('⚠️ Failed to send verification email:', emailError);
+      // Don't fail registration if email fails, but log it
+    }
+
     res.status(201).json({
       success: true,
       user: {
@@ -195,6 +260,10 @@ router.post('/register', async (req: Request, res: Response) => {
         email: createdUser?.email || email,
         name: createdUser?.name || name || email.split('@')[0],
       },
+      message: verificationEmailSent 
+        ? 'Registration successful! Please check your email to verify your account.'
+        : 'Registration successful! Please contact support if you did not receive a verification email.',
+      emailVerificationRequired: true,
       timing: {
         total: totalDuration,
         bcrypt: hashDuration,
