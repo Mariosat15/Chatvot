@@ -43,10 +43,30 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/auth/verify-email
  * Resend verification email
+ * Can be called with email in body OR uses logged-in user's email
  */
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json();
+    // Try to get email from body first
+    let email: string | undefined;
+    
+    try {
+      const body = await request.json();
+      email = body.email;
+    } catch {
+      // No body or invalid JSON - try to get from session
+    }
+    
+    // If no email in body, try to get from logged-in user's session
+    if (!email) {
+      const { auth } = await import('@/lib/better-auth/auth');
+      const { headers } = await import('next/headers');
+      const session = await auth.api.getSession({ headers: await headers() });
+      
+      if (session?.user?.email) {
+        email = session.user.email;
+      }
+    }
     
     if (!email) {
       return NextResponse.json(

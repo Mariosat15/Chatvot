@@ -5,11 +5,36 @@ import { FingerprintProvider } from "@/contexts/FingerprintProvider";
 import GlobalPresenceTracker from "@/components/GlobalPresenceTracker";
 import UserSidebar from "@/components/UserSidebar";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import { connectToDatabase } from "@/database/mongoose";
 
 const Layout = async ({ children }: { children: React.ReactNode }) => {
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user) redirect('/sign-in');
+
+  // SECURITY: Check if user's email is verified
+  // This prevents users who registered but haven't verified their email from accessing the app
+  try {
+    const mongoose = await connectToDatabase();
+    const db = mongoose.connection.db;
+    if (db) {
+      const user = await db.collection('user').findOne({ 
+        $or: [
+          { id: session.user.id },
+          { _id: session.user.id }
+        ]
+      });
+      
+      if (user && !user.emailVerified) {
+        console.log(`🚫 Blocking unverified user from accessing app: ${session.user.email}`);
+        // Sign out the user and redirect to sign-in with message
+        redirect('/verify-email-required');
+      }
+    }
+  } catch (error) {
+    console.error('Error checking email verification:', error);
+    // Continue if check fails - don't block users due to database errors
+  }
 
   const user = {
     id: session.user.id,
