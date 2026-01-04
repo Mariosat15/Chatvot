@@ -375,39 +375,48 @@ export default function FraudMonitoringSection() {
     }
   };
 
-  // Reset all alerts handler
-  const handleResetAllAlerts = async () => {
+  // Reset all security data handler
+  const handleResetAllSecurityData = async () => {
     if (!resetPassword) {
       toast.error('Admin password is required');
       return;
     }
 
     try {
-      const token = localStorage.getItem('adminToken');
-      const response = await fetch('/api/fraud/reset-alerts', {
+      // First verify password
+      const verifyResponse = await fetch('/api/verify-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: resetPassword })
+      });
+
+      if (!verifyResponse.ok) {
+        toast.error('Invalid admin password');
+        return;
+      }
+
+      // Then call the reset endpoint
+      const response = await fetch('/api/fraud/settings/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clearAllSecurityData: true })
       });
 
       const data = await response.json();
       
       if (response.ok) {
-        toast.success(data.message);
+        toast.success(data.message || 'All security data cleared!');
         setShowResetDialog(false);
         setResetPassword('');
         // Refresh data
         await fetchAlerts();
         await fetchDevices();
       } else {
-        toast.error(data.message || 'Failed to reset alerts');
+        toast.error(data.error || 'Failed to reset security data');
       }
     } catch (error) {
-      console.error('Error resetting alerts:', error);
-      toast.error('Failed to reset alerts');
+      console.error('Error resetting security data:', error);
+      toast.error('Failed to reset security data');
     }
   };
 
@@ -593,7 +602,7 @@ export default function FraudMonitoringSection() {
             className="bg-red-600 hover:bg-red-700"
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Reset All Alerts
+            Reset All Security Data
           </Button>
           <Button
             onClick={() => {
@@ -2293,16 +2302,16 @@ export default function FraudMonitoringSection() {
         </DialogContent>
       </Dialog>
 
-      {/* Reset All Alerts Dialog */}
+      {/* Reset All Security Data Dialog */}
       <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <DialogContent className="bg-gray-900 border-gray-700 text-gray-100">
+        <DialogContent className="bg-gray-900 border-gray-700 text-gray-100 max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-2xl text-gray-100 flex items-center gap-3">
               <AlertOctagon className="h-6 w-6 text-red-500" />
-              Reset All Fraud Alerts
+              Reset All Security Data
             </DialogTitle>
             <DialogDescription className="text-gray-400">
-              This will permanently delete all fraud alerts and reset all device risk scores.
+              This will permanently delete ALL security and fraud data, and reset settings to defaults.
             </DialogDescription>
           </DialogHeader>
 
@@ -2314,10 +2323,14 @@ export default function FraudMonitoringSection() {
                   <p className="text-red-400 font-semibold mb-2">⚠️ WARNING: This action cannot be undone!</p>
                   <ul className="text-sm text-gray-400 space-y-1">
                     <li>• All fraud alerts will be deleted</li>
+                    <li>• All fraud history will be deleted</li>
+                    <li>• All suspicion scores will be deleted</li>
                     <li>• All device fingerprints will be deleted</li>
-                    <li>• All user restrictions will be removed (users will be unbanned/unsuspended)</li>
-                    <li>• All flags and suspicions will be cleared</li>
-                    <li>• You can re-detect frauds after this</li>
+                    <li>• All payment fingerprints will be deleted</li>
+                    <li>• All behavioral profiles will be deleted</li>
+                    <li>• All security logs will be deleted</li>
+                    <li>• All account lockouts will be cleared</li>
+                    <li>• Fraud settings will be reset to defaults</li>
                   </ul>
                 </div>
               </div>
@@ -2350,12 +2363,12 @@ export default function FraudMonitoringSection() {
               Cancel
             </Button>
             <Button
-              onClick={handleResetAllAlerts}
+              onClick={handleResetAllSecurityData}
               disabled={!resetPassword}
               className="bg-red-600 hover:bg-red-700"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Reset All Alerts
+              Reset All Security Data
             </Button>
           </DialogFooter>
         </DialogContent>
