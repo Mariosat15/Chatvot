@@ -30,6 +30,8 @@ export async function POST(request: Request) {
       lockouts: 0,
       fraudAlerts: 0,
       suspicionScores: 0,
+      workerJobs: 0,
+      securityLogs: 0,
     };
 
     // Also clear all fraud-related data if requested
@@ -87,6 +89,32 @@ export async function POST(request: Request) {
         clearedData.suspicionScores = scoreResult.modifiedCount;
         console.log(`📊 Reset ${scoreResult.modifiedCount} suspicion scores`);
 
+        // Clear worker_jobs collection
+        try {
+          const mongoose = await import('mongoose');
+          const db = mongoose.connection.db;
+          if (db) {
+            const jobsResult = await db.collection('worker_jobs').deleteMany({});
+            clearedData.workerJobs = jobsResult.deletedCount;
+            console.log(`🔧 Cleared ${jobsResult.deletedCount} worker jobs`);
+          }
+        } catch (jobsError) {
+          console.warn('⚠️ Could not clear worker_jobs:', jobsError);
+        }
+
+        // Clear securitylogs collection
+        try {
+          const mongoose = await import('mongoose');
+          const db = mongoose.connection.db;
+          if (db) {
+            const logsResult = await db.collection('securitylogs').deleteMany({});
+            clearedData.securityLogs = logsResult.deletedCount;
+            console.log(`📋 Cleared ${logsResult.deletedCount} security logs`);
+          }
+        } catch (logsError) {
+          console.warn('⚠️ Could not clear securitylogs:', logsError);
+        }
+
         // Also try to call main app to clear in-memory lockouts
         try {
           const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
@@ -118,7 +146,7 @@ export async function POST(request: Request) {
       settings: JSON.parse(JSON.stringify(settings)),
       clearedData,
       message: clearFraudData 
-        ? `Settings reset to defaults. Cleared ${clearedData.lockouts} lockouts, ${clearedData.fraudAlerts} alerts, and ${clearedData.suspicionScores} scores.`
+        ? `Settings reset to defaults. Cleared ${clearedData.lockouts} lockouts, ${clearedData.fraudAlerts} alerts, ${clearedData.suspicionScores} scores, ${clearedData.workerJobs} jobs, ${clearedData.securityLogs} logs.`
         : 'Settings reset to defaults'
     });
   } catch (error) {

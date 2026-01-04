@@ -143,24 +143,68 @@ export default function FraudSettingsSection() {
   };
 
   const handleReset = async () => {
-    if (!confirm('Reset all fraud settings to defaults? This cannot be undone.')) return;
+    if (!confirm('Reset all fraud settings to defaults? This will also clear lockouts, alerts, and scores. This cannot be undone.')) return;
     
     setSaving(true);
     try {
       const response = await fetch('/api/fraud/settings/reset', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clearFraudData: true })
       });
 
       if (response.ok) {
         const data = await response.json();
         setSettings(data.settings);
-        toast.success('Settings reset to defaults');
+        toast.success(`Settings reset! Cleared: ${data.clearedData?.lockouts || 0} lockouts, ${data.clearedData?.fraudAlerts || 0} alerts, ${data.clearedData?.suspicionScores || 0} scores`);
       } else {
         toast.error('Failed to reset settings');
       }
     } catch (error) {
       console.error('Error resetting settings:', error);
       toast.error('Error resetting settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetAllUsers = async () => {
+    const confirmMessage = `⚠️ DANGER: This will DELETE ALL user data including:
+    
+• All user accounts
+• All credential accounts  
+• All account lockouts
+• All user online statuses
+• All credit wallets
+• All worker jobs
+• All security logs
+
+This action CANNOT be undone! Type "DELETE ALL USERS" to confirm:`;
+
+    const confirmation = prompt(confirmMessage);
+    if (confirmation !== 'DELETE ALL USERS') {
+      toast.error('Reset cancelled - confirmation did not match');
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      const response = await fetch('/api/admin/reset-all-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation: 'DELETE ALL USERS' })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(`All user data cleared! ${data.message}`);
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to reset user data');
+      }
+    } catch (error) {
+      console.error('Error resetting user data:', error);
+      toast.error('Error resetting user data');
     } finally {
       setSaving(false);
     }
@@ -210,13 +254,22 @@ export default function FraudSettingsSection() {
         </div>
         <div className="flex gap-2">
           <Button
+            onClick={handleResetAllUsers}
+            variant="outline"
+            disabled={saving}
+            className="bg-red-900/50 border-red-600 hover:bg-red-800 text-red-300"
+          >
+            <UserX className="h-4 w-4 mr-2" />
+            Reset All Users
+          </Button>
+          <Button
             onClick={handleReset}
             variant="outline"
             disabled={saving}
             className="bg-gray-700 border-gray-600 hover:bg-gray-600"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
-            Reset
+            Reset Fraud
           </Button>
           <Button
             onClick={handleSave}
