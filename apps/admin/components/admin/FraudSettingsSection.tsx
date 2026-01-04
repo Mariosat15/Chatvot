@@ -142,27 +142,27 @@ export default function FraudSettingsSection() {
     }
   };
 
-  const handleReset = async () => {
-    if (!confirm('Reset all fraud settings to defaults? This will also clear lockouts, alerts, and scores. This cannot be undone.')) return;
+  const handleResetAllSecurityData = async () => {
+    if (!confirm('⚠️ DANGER: Reset ALL security data?\n\nThis will DELETE:\n• All fraud alerts\n• All fraud history\n• All suspicion scores\n• All device fingerprints\n• All payment fingerprints\n• All behavioral profiles\n• All security logs\n• All account lockouts\n\nAnd RESET settings to defaults.\n\nThis cannot be undone!')) return;
     
     setSaving(true);
     try {
       const response = await fetch('/api/fraud/settings/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clearFraudData: true })
+        body: JSON.stringify({ clearFraudData: true, clearAllSecurityData: true })
       });
 
       if (response.ok) {
         const data = await response.json();
         setSettings(data.settings);
-        toast.success(`Settings reset! Cleared: ${data.clearedData?.lockouts || 0} lockouts, ${data.clearedData?.fraudAlerts || 0} alerts, ${data.clearedData?.suspicionScores || 0} scores`);
+        toast.success(`All security data cleared! ${data.message || ''}`);
       } else {
-        toast.error('Failed to reset settings');
+        toast.error('Failed to reset security data');
       }
     } catch (error) {
-      console.error('Error resetting settings:', error);
-      toast.error('Error resetting settings');
+      console.error('Error resetting security data:', error);
+      toast.error('Error resetting security data');
     } finally {
       setSaving(false);
     }
@@ -212,13 +212,13 @@ export default function FraudSettingsSection() {
         </div>
         <div className="flex gap-2">
           <Button
-            onClick={handleReset}
+            onClick={handleResetAllSecurityData}
             variant="outline"
             disabled={saving}
-            className="bg-gray-700 border-gray-600 hover:bg-gray-600"
+            className="bg-red-900/50 border-red-600 hover:bg-red-800 text-red-300"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
-            Reset Fraud Settings
+            Reset All Security Data
           </Button>
           <Button
             onClick={handleSave}

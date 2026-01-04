@@ -5,8 +5,9 @@ import mongoose from 'mongoose';
 
 /**
  * POST /api/admin/reset-all-users
- * DANGER: Deletes ALL user accounts and related data
- * Only deletes: user, account, accountlockouts, useronlinestatuses, creditwallets, userrestrictions
+ * DANGER: Deletes ALL user accounts and ALL related user data
+ * Includes: accounts, trading data, financial data, progress, etc.
+ * Keeps: Competition/Challenge templates, admin settings, marketplace items
  * Requires explicit confirmation to prevent accidental data loss
  */
 export async function POST(request: NextRequest) {
@@ -34,18 +35,50 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log('🚨 [ADMIN] Starting USER DATA RESET...');
+    console.log('🚨 [ADMIN] Starting FULL USER DATA RESET...');
     
     const results: Record<string, number> = {};
     
-    // ONLY delete user-related collections (NOT fraud, jobs, logs, etc.)
+    // ALL user-related collections to delete
     const collectionsToReset = [
-      'user',              // User accounts
-      'account',           // Login credentials (better-auth)
-      'accountlockouts',   // Account lockouts
-      'useronlinestatuses',// Online status
-      'creditwallets',     // User wallets
-      'userrestrictions',  // Bans/suspensions
+      // User accounts
+      'user',
+      'account',
+      'session',
+      'accountlockouts',
+      'useronlinestatuses',
+      'userpresences',
+      
+      // User wallets & financial
+      'creditwallets',
+      'wallettransactions',
+      'withdrawalrequests',
+      'userbankaccounts',
+      'nuveiuserpaymentoptions',
+      
+      // User trading data
+      'competitionparticipants',
+      'challengeparticipants',
+      'tradingpositions',
+      'tradehistories',
+      'tradingorders',
+      'positionevents',
+      
+      // User progress
+      'userlevels',
+      'userbadges',
+      'userpurchases',
+      
+      // User settings & other
+      'userrestrictions',
+      'usernotificationpreferences',
+      'notifications',
+      'usernotes',
+      'kycsessions',
+      'alerts',
+      
+      // Verification tokens
+      'verifications',
     ];
     
     for (const collectionName of collectionsToReset) {
@@ -53,11 +86,11 @@ export async function POST(request: NextRequest) {
         const collection = db.collection(collectionName);
         const result = await collection.deleteMany({});
         results[collectionName] = result.deletedCount;
-        console.log(`   ✅ Cleared ${collectionName}: ${result.deletedCount} documents`);
+        if (result.deletedCount > 0) {
+          console.log(`   ✅ Cleared ${collectionName}: ${result.deletedCount} documents`);
+        }
       } catch (collError) {
-        // Collection might not exist, that's OK
         results[collectionName] = 0;
-        console.log(`   ⚠️ Collection ${collectionName}: not found or empty`);
       }
     }
     
@@ -72,7 +105,7 @@ export async function POST(request: NextRequest) {
       await AuditLog.create({
         action: 'reset_all_users',
         actionCategory: 'system',
-        description: `User data reset - deleted ${totalDeleted} documents`,
+        description: `Full user data reset - deleted ${totalDeleted} documents across ${Object.keys(results).filter(k => results[k] > 0).length} collections`,
         metadata: results,
         status: 'success',
         userId: 'admin',

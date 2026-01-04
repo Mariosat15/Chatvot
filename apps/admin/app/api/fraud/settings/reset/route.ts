@@ -1,21 +1,24 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
+import mongoose from 'mongoose';
 import FraudSettings, { DEFAULT_FRAUD_SETTINGS } from '@/database/models/fraud/fraud-settings.model';
 import { requireAdminAuth } from '@/lib/admin/auth';
 
 /**
  * POST /api/fraud/settings/reset
- * Reset to default settings AND clear all fraud-related data (admin only)
+ * Reset to default settings AND clear ALL security/fraud-related data (admin only)
+ * Clears: fraud alerts, fraud history, suspicion scores, device fingerprints,
+ * payment fingerprints, behavioral profiles, security logs, account lockouts
  */
 export async function POST(request: Request) {
   try {
     await requireAdminAuth();
     await connectToDatabase();
 
-    // Parse body to check if we should also clear fraud data
     const body = await request.json().catch(() => ({}));
-    const clearFraudData = body.clearFraudData !== false; // Default to true
+    const clearAllSecurityData = body.clearAllSecurityData || body.clearFraudData;
 
+    // Reset settings to defaults
     let settings = await FraudSettings.findOne();
     
     if (!settings) {
@@ -26,127 +29,67 @@ export async function POST(request: Request) {
       await settings.save();
     }
 
-    let clearedData = {
-      lockouts: 0,
-      fraudAlerts: 0,
-      suspicionScores: 0,
-      workerJobs: 0,
-      securityLogs: 0,
-    };
+    const clearedData: Record<string, number> = {};
+    const db = mongoose.connection.db;
 
-    // Also clear all fraud-related data if requested
-    if (clearFraudData) {
-      try {
-        // Clear all active account lockouts
-        const AccountLockout = (await import('@/database/models/account-lockout.model')).default;
-        const lockoutResult = await AccountLockout.updateMany(
-          { isActive: true },
-          { 
-            $set: { 
-              isActive: false, 
-              unlockedAt: new Date(),
-              unlockedReason: 'Admin fraud settings reset' 
-            }
-          }
-        );
-        clearedData.lockouts = lockoutResult.modifiedCount;
-        console.log(`🔓 Cleared ${lockoutResult.modifiedCount} active lockouts`);
+    if (clearAllSecurityData && db) {
+      console.log('🚨 [ADMIN] Starting FULL SECURITY DATA RESET...');
 
-        // Clear pending fraud alerts (mark as dismissed)
-        const FraudAlert = (await import('@/database/models/fraud/fraud-alert.model')).default;
-        const alertResult = await FraudAlert.updateMany(
-          { status: { $in: ['pending', 'investigating'] } },
-          { $set: { status: 'dismissed', resolvedAt: new Date(), resolvedBy: 'system_reset' } }
-        );
-        clearedData.fraudAlerts = alertResult.modifiedCount;
-        console.log(`🚨 Dismissed ${alertResult.modifiedCount} fraud alerts`);
+      // List of all security-related collections to DELETE
+      const collectionsToDelete = [
+        'fraudalerts',
+        'fraudhistories',
+        'fraudhistory',
+        'suspicionscores',
+        'devicefingerprints',
+        'paymentfingerprints',
+        'behavioralsimilarities',
+        'tradingbehaviorprofiles',
+        'securitylogs',
+        'accountlockouts',
+      ];
 
-        // Reset all suspicion scores
-        const SuspicionScore = (await import('@/database/models/fraud/suspicion-score.model')).default;
-        const scoreResult = await SuspicionScore.updateMany(
-          {},
-          { 
-            $set: { 
-              totalScore: 0, 
-              riskLevel: 'low',
-              'scoreBreakdown.deviceMatch.percentage': 0,
-              'scoreBreakdown.ipMatch.percentage': 0,
-              'scoreBreakdown.ipBrowserMatch.percentage': 0,
-              'scoreBreakdown.sameCity.percentage': 0,
-              'scoreBreakdown.samePayment.percentage': 0,
-              'scoreBreakdown.rapidCreation.percentage': 0,
-              'scoreBreakdown.coordinatedEntry.percentage': 0,
-              'scoreBreakdown.tradingSimilarity.percentage': 0,
-              'scoreBreakdown.mirrorTrading.percentage': 0,
-              'scoreBreakdown.timezoneLanguage.percentage': 0,
-              'scoreBreakdown.deviceSwitching.percentage': 0,
-              'scoreBreakdown.kycDuplicate.percentage': 0,
-              'scoreBreakdown.bruteForce.percentage': 0,
-              'scoreBreakdown.rateLimitExceeded.percentage': 0,
-            }
-          }
-        );
-        clearedData.suspicionScores = scoreResult.modifiedCount;
-        console.log(`📊 Reset ${scoreResult.modifiedCount} suspicion scores`);
-
-        // Clear worker_jobs collection
+      for (const collectionName of collectionsToDelete) {
         try {
-          const mongoose = await import('mongoose');
-          const db = mongoose.connection.db;
-          if (db) {
-            const jobsResult = await db.collection('worker_jobs').deleteMany({});
-            clearedData.workerJobs = jobsResult.deletedCount;
-            console.log(`🔧 Cleared ${jobsResult.deletedCount} worker jobs`);
+          const result = await db.collection(collectionName).deleteMany({});
+          clearedData[collectionName] = result.deletedCount;
+          if (result.deletedCount > 0) {
+            console.log(`   ✅ Deleted ${collectionName}: ${result.deletedCount} documents`);
           }
-        } catch (jobsError) {
-          console.warn('⚠️ Could not clear worker_jobs:', jobsError);
+        } catch (err) {
+          clearedData[collectionName] = 0;
         }
-
-        // Clear securitylogs collection
-        try {
-          const mongoose = await import('mongoose');
-          const db = mongoose.connection.db;
-          if (db) {
-            const logsResult = await db.collection('securitylogs').deleteMany({});
-            clearedData.securityLogs = logsResult.deletedCount;
-            console.log(`📋 Cleared ${logsResult.deletedCount} security logs`);
-          }
-        } catch (logsError) {
-          console.warn('⚠️ Could not clear securitylogs:', logsError);
-        }
-
-        // Also try to call main app to clear in-memory lockouts
-        try {
-          const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-          const adminApiKey = process.env.ADMIN_API_KEY || process.env.INTERNAL_API_KEY;
-          
-          // This clears ALL in-memory lockouts on the main app
-          await fetch(`${mainAppUrl}/api/admin/lockouts/clear-all`, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-admin-api-key': adminApiKey || '',
-            },
-          });
-          console.log(`✅ In-memory lockouts cleared on main app`);
-        } catch (memoryError) {
-          console.warn('⚠️ Could not clear in-memory lockouts on main app:', memoryError);
-        }
-
-      } catch (clearError) {
-        console.error('Error clearing fraud data:', clearError);
-        // Continue even if clearing fails
       }
+
+      // Also try to call main app to clear in-memory lockouts
+      try {
+        const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const adminApiKey = process.env.ADMIN_API_KEY || process.env.INTERNAL_API_KEY;
+        
+        await fetch(`${mainAppUrl}/api/admin/lockouts/clear-all`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-admin-api-key': adminApiKey || '',
+          },
+        });
+        console.log(`   ✅ In-memory lockouts cleared on main app`);
+      } catch (memoryError) {
+        console.warn('   ⚠️ Could not clear in-memory lockouts on main app');
+      }
+
+      console.log('🚨 [ADMIN] SECURITY DATA RESET COMPLETE');
     }
 
-    console.log('✅ Fraud settings reset to defaults');
+    const totalDeleted = Object.values(clearedData).reduce((sum, count) => sum + count, 0);
 
     return NextResponse.json({
       success: true,
       settings: JSON.parse(JSON.stringify(settings)),
       clearedData,
-      message: clearFraudData 
-        ? `Settings reset to defaults. Cleared ${clearedData.lockouts} lockouts, ${clearedData.fraudAlerts} alerts, ${clearedData.suspicionScores} scores, ${clearedData.workerJobs} jobs, ${clearedData.securityLogs} logs.`
+      totalDeleted,
+      message: clearAllSecurityData 
+        ? `All security data cleared! Deleted ${totalDeleted} documents. Settings reset to defaults.`
         : 'Settings reset to defaults'
     });
   } catch (error) {

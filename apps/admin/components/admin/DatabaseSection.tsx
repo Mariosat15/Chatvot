@@ -18,10 +18,13 @@ export default function DatabaseSection() {
   const [resetting, setResetting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [showUsersPasswordDialog, setShowUsersPasswordDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showResetUsersDialog, setShowResetUsersDialog] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
+  const [usersAdminPassword, setUsersAdminPassword] = useState('');
   const [verifyingPassword, setVerifyingPassword] = useState(false);
+  const [verifyingUsersPassword, setVerifyingUsersPassword] = useState(false);
   const [resetConfirmation, setResetConfirmation] = useState('');
   const [resetUsersConfirmation, setResetUsersConfirmation] = useState('');
   const [resettingUsers, setResettingUsers] = useState(false);
@@ -149,6 +152,38 @@ export default function DatabaseSection() {
       toast.error('Error verifying password');
     } finally {
       setVerifyingPassword(false);
+    }
+  };
+
+  const handleVerifyUsersPassword = async () => {
+    if (!usersAdminPassword) {
+      toast.error('Please enter admin password');
+      return;
+    }
+
+    setVerifyingUsersPassword(true);
+    try {
+      const response = await fetch('/api/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: usersAdminPassword }),
+      });
+
+      if (response.ok) {
+        toast.success('Password verified');
+        setShowUsersPasswordDialog(false);
+        setUsersAdminPassword('');
+        // Show the reset users confirmation dialog
+        setShowResetUsersDialog(true);
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Invalid admin password');
+      }
+    } catch (error) {
+      console.error('Error verifying password:', error);
+      toast.error('Error verifying password');
+    } finally {
+      setVerifyingUsersPassword(false);
     }
   };
 
@@ -329,7 +364,7 @@ export default function DatabaseSection() {
           </Button>
 
           <Button
-            onClick={() => setShowResetUsersDialog(true)}
+            onClick={() => setShowUsersPasswordDialog(true)}
             className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white h-14 text-lg font-bold mt-4"
           >
             <UserX className="h-5 w-5 mr-2" />
@@ -482,6 +517,85 @@ export default function DatabaseSection() {
               className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-bold"
             >
               {verifyingPassword ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Verify & Continue
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Users Password Verification Dialog */}
+      <Dialog open={showUsersPasswordDialog} onOpenChange={setShowUsersPasswordDialog}>
+        <DialogContent className="bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-orange-700 text-gray-100">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-orange-500 flex items-center gap-2">
+              <Shield className="h-6 w-6" />
+              Admin Verification Required
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Enter your admin password to proceed with user data reset
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-orange-500">⚠️ CRITICAL ACTION</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    You are about to delete ALL user accounts and their data. This action requires admin authentication.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="usersAdminPassword" className="text-gray-300">
+                Admin Password *
+              </Label>
+              <Input
+                id="usersAdminPassword"
+                type="password"
+                placeholder="Enter admin password"
+                value={usersAdminPassword}
+                onChange={(e) => setUsersAdminPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !verifyingUsersPassword) {
+                    handleVerifyUsersPassword();
+                  }
+                }}
+                className="bg-gray-900 border-gray-700 text-gray-100"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowUsersPasswordDialog(false);
+                setUsersAdminPassword('');
+              }}
+              className="bg-gray-700 hover:bg-gray-600 text-gray-100 border-gray-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleVerifyUsersPassword}
+              disabled={verifyingUsersPassword || !usersAdminPassword}
+              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold"
+            >
+              {verifyingUsersPassword ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                   Verifying...
@@ -665,53 +779,84 @@ export default function DatabaseSection() {
 
       {/* Reset Users Confirmation Dialog */}
       <AlertDialog open={showResetUsersDialog} onOpenChange={setShowResetUsersDialog}>
-        <AlertDialogContent className="bg-gray-900 border-2 border-orange-500 max-w-lg">
+        <AlertDialogContent className="bg-gray-900 border-2 border-orange-500 max-w-2xl max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-2xl font-bold text-orange-500 flex items-center gap-2">
               <AlertTriangle className="h-6 w-6" />
               ⚠️ DANGER: Reset ALL Users
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm text-gray-400">
-              This action will permanently delete all user accounts and related data.
+              This action will permanently delete all user accounts and ALL related user data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           
           <div className="text-gray-300 space-y-4 px-2">
             <p className="text-lg font-semibold">This will PERMANENTLY DELETE:</p>
             
-            <ul className="space-y-2 text-sm">
-              <li className="flex items-center gap-2">
-                <span className="text-red-400">❌</span>
-                <span>All user accounts (user collection)</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-red-400">❌</span>
-                <span>All login credentials (account collection)</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-red-400">❌</span>
-                <span>All account lockouts</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-red-400">❌</span>
-                <span>All user online statuses</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-red-400">❌</span>
-                <span>All credit wallets</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-red-400">❌</span>
-                <span>All user restrictions (bans/suspensions)</span>
-              </li>
-            </ul>
+            {/* User Accounts */}
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+              <p className="text-orange-400 font-semibold text-sm mb-2">👤 User Accounts</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All user accounts</span>
+                <span>❌ All login credentials</span>
+                <span>❌ All account lockouts</span>
+                <span>❌ All user online statuses</span>
+                <span>❌ All credit wallets</span>
+                <span>❌ All user restrictions</span>
+                <span>❌ All auth sessions</span>
+                <span>❌ All user presence data</span>
+              </div>
+            </div>
 
+            {/* User Trading Data */}
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+              <p className="text-red-400 font-semibold text-sm mb-2">📊 User Trading Data</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All competition participants</span>
+                <span>❌ All challenge participants</span>
+                <span>❌ All trading positions</span>
+                <span>❌ All trade history</span>
+                <span>❌ All orders</span>
+                <span>❌ All position events</span>
+              </div>
+            </div>
+
+            {/* User Financial Data */}
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+              <p className="text-purple-400 font-semibold text-sm mb-2">💰 User Financial Data</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All wallet transactions</span>
+                <span>❌ All withdrawal requests</span>
+                <span>❌ All user bank accounts</span>
+                <span>❌ All Nuvei payment options</span>
+                <span>❌ All marketplace purchases</span>
+                <span>❌ All KYC sessions</span>
+              </div>
+            </div>
+
+            {/* User Progress & Other */}
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+              <p className="text-blue-400 font-semibold text-sm mb-2">📈 User Progress & Other</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All user levels & XP</span>
+                <span>❌ All user badges</span>
+                <span>❌ All notifications</span>
+                <span>❌ All notification preferences</span>
+                <span>❌ All user notes</span>
+                <span>❌ All user alerts</span>
+              </div>
+            </div>
+
+            {/* What's Preserved */}
             <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
               <p className="text-green-400 font-semibold text-sm mb-2">✅ KEEPS (will NOT delete):</p>
-              <div className="text-xs text-green-300 space-y-1">
-                <p>✅ All trading data (competitions, positions, etc.)</p>
-                <p>✅ All admin settings and configurations</p>
-                <p>✅ All fraud alerts and history</p>
+              <div className="grid grid-cols-2 gap-1 text-xs text-green-300">
+                <span>✅ Competitions (templates)</span>
+                <span>✅ Challenges (templates)</span>
+                <span>✅ Admin settings</span>
+                <span>✅ Fraud settings</span>
+                <span>✅ Payment providers</span>
+                <span>✅ Marketplace items</span>
               </div>
             </div>
 
