@@ -6,6 +6,7 @@ import GlobalPresenceTracker from "@/components/GlobalPresenceTracker";
 import UserSidebar from "@/components/UserSidebar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import { connectToDatabase } from "@/database/mongoose";
+import { ObjectId } from "mongodb";
 
 const Layout = async ({ children }: { children: React.ReactNode }) => {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -18,16 +19,27 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
     if (db) {
-      const user = await db.collection('user').findOne({ 
+      // Build query to match user by id (string) or _id (ObjectId)
+      const userIdString = session.user.id;
+      const query: { $or: object[] } = {
         $or: [
-          { id: session.user.id },
-          { _id: session.user.id }
+          { id: userIdString },
         ]
-      });
+      };
       
-      if (user && !user.emailVerified) {
+      // Also try ObjectId if it's a valid 24-character hex string
+      if (userIdString && /^[0-9a-fA-F]{24}$/.test(userIdString)) {
+        query.$or.push({ _id: new ObjectId(userIdString) });
+      }
+      
+      const user = await db.collection('user').findOne(query);
+      
+      console.log(`🔍 Email verification check for ${session.user.email}: found=${!!user}, emailVerified=${user?.emailVerified}`);
+      
+      // Block if user exists and email is NOT verified
+      // emailVerified can be false, null, or undefined - all mean not verified
+      if (user && user.emailVerified !== true) {
         console.log(`🚫 Blocking unverified user from accessing app: ${session.user.email}`);
-        // Sign out the user and redirect to sign-in with message
         redirect('/verify-email-required');
       }
     }
