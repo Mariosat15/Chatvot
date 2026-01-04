@@ -289,22 +289,35 @@ export async function resendVerificationEmail(email: string): Promise<{ success:
       return { success: false, error: 'Database connection failed' };
     }
     
-    // Find user by email
-    const user = await db.collection('user').findOne({ email });
+    // Find user by email (case-insensitive)
+    const user = await db.collection('user').findOne({ 
+      email: { $regex: new RegExp(`^${email}$`, 'i') } 
+    });
     
     if (!user) {
       return { success: false, error: 'No account found with this email' };
     }
     
-    if (user.emailVerified) {
+    if (user.emailVerified === true) {
       return { success: false, error: 'Email is already verified' };
     }
+    
+    // Get user ID - better-auth may use 'id' field or '_id'
+    // Convert _id to string if id doesn't exist
+    const userId = user.id || user._id?.toString();
+    
+    if (!userId) {
+      console.error('❌ User found but has no ID:', user.email);
+      return { success: false, error: 'User account error' };
+    }
+    
+    console.log(`📧 Resending verification email to ${user.email} (userId: ${userId})`);
     
     // Send new verification email
     const sent = await sendVerificationEmail({
       email: user.email,
       name: user.name || 'User',
-      userId: user.id,
+      userId: userId,
     });
     
     if (!sent) {
