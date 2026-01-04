@@ -168,48 +168,6 @@ export default function FraudSettingsSection() {
     }
   };
 
-  const handleResetAllUsers = async () => {
-    const confirmMessage = `⚠️ DANGER: This will DELETE ALL user data including:
-    
-• All user accounts
-• All credential accounts  
-• All account lockouts
-• All user online statuses
-• All credit wallets
-• All worker jobs
-• All security logs
-
-This action CANNOT be undone! Type "DELETE ALL USERS" to confirm:`;
-
-    const confirmation = prompt(confirmMessage);
-    if (confirmation !== 'DELETE ALL USERS') {
-      toast.error('Reset cancelled - confirmation did not match');
-      return;
-    }
-    
-    setSaving(true);
-    try {
-      const response = await fetch('/api/admin/reset-all-users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmation: 'DELETE ALL USERS' })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        toast.success(`All user data cleared! ${data.message}`);
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.error || 'Failed to reset user data');
-      }
-    } catch (error) {
-      console.error('Error resetting user data:', error);
-      toast.error('Error resetting user data');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateSetting = (key: keyof FraudSettings, value: any) => {
     if (!settings) return;
@@ -254,22 +212,13 @@ This action CANNOT be undone! Type "DELETE ALL USERS" to confirm:`;
         </div>
         <div className="flex gap-2">
           <Button
-            onClick={handleResetAllUsers}
-            variant="outline"
-            disabled={saving}
-            className="bg-red-900/50 border-red-600 hover:bg-red-800 text-red-300"
-          >
-            <UserX className="h-4 w-4 mr-2" />
-            Reset All Users
-          </Button>
-          <Button
             onClick={handleReset}
             variant="outline"
             disabled={saving}
             className="bg-gray-700 border-gray-600 hover:bg-gray-600"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
-            Reset Fraud
+            Reset Fraud Settings
           </Button>
           <Button
             onClick={handleSave}

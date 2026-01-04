@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Search, RefreshCw, Trophy, Trash2, AlertTriangle, Shield, Download } from 'lucide-react';
+import { Search, RefreshCw, Trophy, Trash2, AlertTriangle, Shield, Download, UserX } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function DatabaseSection() {
@@ -19,9 +19,12 @@ export default function DatabaseSection() {
   const [loading, setLoading] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showResetUsersDialog, setShowResetUsersDialog] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [verifyingPassword, setVerifyingPassword] = useState(false);
   const [resetConfirmation, setResetConfirmation] = useState('');
+  const [resetUsersConfirmation, setResetUsersConfirmation] = useState('');
+  const [resettingUsers, setResettingUsers] = useState(false);
 
   const handleCheckDatabase = async () => {
     setChecking(true);
@@ -193,6 +196,43 @@ export default function DatabaseSection() {
     }
   };
 
+  const handleResetUsers = async () => {
+    if (resetUsersConfirmation !== 'DELETE_ALL_USERS') {
+      toast.error('⚠️ You must type exactly: DELETE_ALL_USERS');
+      return;
+    }
+
+    setResettingUsers(true);
+    try {
+      toast.loading('🚨 Deleting all user data...', { id: 'reset-users' });
+      
+      const response = await fetch('/api/admin/reset-all-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation: 'DELETE_ALL_USERS' }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(
+          `✅ ALL USER DATA DELETED!\n\n${data.message}`,
+          { id: 'reset-users', duration: 8000 }
+        );
+        setShowResetUsersDialog(false);
+        setResetUsersConfirmation('');
+        router.refresh();
+      } else {
+        toast.error(`Failed: ${data.error || data.message}`, { id: 'reset-users' });
+      }
+    } catch (error) {
+      toast.error('Reset failed. Check console for details.', { id: 'reset-users' });
+      console.error('Reset users error:', error);
+    } finally {
+      setResettingUsers(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Database Diagnostics */}
@@ -267,12 +307,17 @@ export default function DatabaseSection() {
         </div>
         <div className="p-6">
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4">
-            <p className="text-red-300 text-sm font-semibold mb-2">⚠️ Warning:</p>
-            <p className="text-gray-300 text-sm">
-              The button below will permanently delete all trading data including competitions, 
-              participants, positions, trade history, orders, wallet transactions, and reset all wallet balances (including competition spending/winnings).
-              User accounts will be preserved.
-            </p>
+            <p className="text-red-300 text-sm font-semibold mb-2">⚠️ Warning - Two Reset Options:</p>
+            <div className="text-gray-300 text-sm space-y-3">
+              <div>
+                <span className="text-red-400 font-semibold">Reset All Data (Red):</span> Deletes ALL trading data, financial records, fraud data, 
+                notifications, sessions, worker jobs, security logs. Keeps user accounts.
+              </div>
+              <div>
+                <span className="text-orange-400 font-semibold">Reset All Users (Orange):</span> Deletes ONLY user accounts, 
+                login credentials, wallets, lockouts, online status, and restrictions. Keeps trading data.
+              </div>
+            </div>
           </div>
 
           <Button
@@ -283,7 +328,15 @@ export default function DatabaseSection() {
             Reset All Data
           </Button>
 
-          <div className="space-y-3">
+          <Button
+            onClick={() => setShowResetUsersDialog(true)}
+            className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white h-14 text-lg font-bold mt-4"
+          >
+            <UserX className="h-5 w-5 mr-2" />
+            Reset All Users
+          </Button>
+
+          <div className="space-y-3 mt-4">
             <Button
               onClick={async () => {
                 try {
@@ -603,6 +656,108 @@ export default function DatabaseSection() {
                 <>
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete Everything
+                </>
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset Users Confirmation Dialog */}
+      <AlertDialog open={showResetUsersDialog} onOpenChange={setShowResetUsersDialog}>
+        <AlertDialogContent className="bg-gray-900 border-2 border-orange-500 max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-orange-500 flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6" />
+              ⚠️ DANGER: Reset ALL Users
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-gray-400">
+              This action will permanently delete all user accounts and related data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="text-gray-300 space-y-4 px-2">
+            <p className="text-lg font-semibold">This will PERMANENTLY DELETE:</p>
+            
+            <ul className="space-y-2 text-sm">
+              <li className="flex items-center gap-2">
+                <span className="text-red-400">❌</span>
+                <span>All user accounts (user collection)</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-red-400">❌</span>
+                <span>All login credentials (account collection)</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-red-400">❌</span>
+                <span>All account lockouts</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-red-400">❌</span>
+                <span>All user online statuses</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-red-400">❌</span>
+                <span>All credit wallets</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-red-400">❌</span>
+                <span>All user restrictions (bans/suspensions)</span>
+              </li>
+            </ul>
+
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+              <p className="text-green-400 font-semibold text-sm mb-2">✅ KEEPS (will NOT delete):</p>
+              <div className="text-xs text-green-300 space-y-1">
+                <p>✅ All trading data (competitions, positions, etc.)</p>
+                <p>✅ All admin settings and configurations</p>
+                <p>✅ All fraud alerts and history</p>
+              </div>
+            </div>
+
+            <p className="text-orange-400 font-bold text-center py-2 bg-orange-500/20 rounded-lg">
+              ⚠️ THIS CANNOT BE UNDONE!
+            </p>
+            
+            <div className="space-y-2">
+              <Label htmlFor="resetUsersConfirmation" className="text-white font-bold">
+                Type <span className="text-orange-400 font-mono">DELETE_ALL_USERS</span> to confirm:
+              </Label>
+              <Input
+                id="resetUsersConfirmation"
+                value={resetUsersConfirmation}
+                onChange={(e) => setResetUsersConfirmation(e.target.value)}
+                placeholder="DELETE_ALL_USERS"
+                className="bg-gray-800 border-orange-500 text-white font-mono"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              className="bg-gray-700 text-white hover:bg-gray-600"
+              onClick={() => {
+                setShowResetUsersDialog(false);
+                setResetUsersConfirmation('');
+              }}
+            >
+              Cancel (Safe)
+            </AlertDialogCancel>
+            <Button
+              onClick={handleResetUsers}
+              disabled={resetUsersConfirmation !== 'DELETE_ALL_USERS' || resettingUsers}
+              className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {resettingUsers ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <UserX className="h-4 w-4 mr-2" />
+                  Delete All Users
                 </>
               )}
             </Button>

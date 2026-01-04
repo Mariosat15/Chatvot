@@ -5,7 +5,8 @@ import mongoose from 'mongoose';
 
 /**
  * POST /api/admin/reset-all-users
- * DANGER: Deletes ALL user data from the database
+ * DANGER: Deletes ALL user accounts and related data
+ * Only deletes: user, account, accountlockouts, useronlinestatuses, creditwallets, userrestrictions
  * Requires explicit confirmation to prevent accidental data loss
  */
 export async function POST(request: NextRequest) {
@@ -16,9 +17,9 @@ export async function POST(request: NextRequest) {
     const { confirmation } = body;
     
     // Require explicit confirmation
-    if (confirmation !== 'DELETE ALL USERS') {
+    if (confirmation !== 'DELETE_ALL_USERS') {
       return NextResponse.json(
-        { error: 'Invalid confirmation. You must type "DELETE ALL USERS" exactly.' },
+        { error: 'Invalid confirmation. You must type "DELETE_ALL_USERS" exactly.' },
         { status: 400 }
       );
     }
@@ -33,28 +34,18 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log('🚨 [ADMIN] Starting FULL USER DATA RESET...');
+    console.log('🚨 [ADMIN] Starting USER DATA RESET...');
     
     const results: Record<string, number> = {};
     
-    // List of collections to clear
+    // ONLY delete user-related collections (NOT fraud, jobs, logs, etc.)
     const collectionsToReset = [
-      'user',
-      'account',
-      'accountlockouts',
-      'useronlinestatuses',
-      'creditwallets',
-      'worker_jobs',
-      'securitylogs',
-      // Also clear related collections
-      'fraudalerts',
-      'fraudhistory',
-      'suspicionscores',
-      'userrestrictions',
-      'kycsessions',
-      'notifications',
-      'verifications',
-      'sessions',
+      'user',              // User accounts
+      'account',           // Login credentials (better-auth)
+      'accountlockouts',   // Account lockouts
+      'useronlinestatuses',// Online status
+      'creditwallets',     // User wallets
+      'userrestrictions',  // Bans/suspensions
     ];
     
     for (const collectionName of collectionsToReset) {
@@ -81,7 +72,7 @@ export async function POST(request: NextRequest) {
       await AuditLog.create({
         action: 'reset_all_users',
         actionCategory: 'system',
-        description: `Full user data reset - deleted ${totalDeleted} documents`,
+        description: `User data reset - deleted ${totalDeleted} documents`,
         metadata: results,
         status: 'success',
         userId: 'admin',
