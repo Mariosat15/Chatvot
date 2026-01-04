@@ -43,7 +43,15 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
         redirect('/verify-email-required');
       }
     }
-  } catch (error) {
+  } catch (error: unknown) {
+    // IMPORTANT: Re-throw NEXT_REDIRECT errors - these are intentional redirects from redirect()
+    // Next.js redirect() throws an error with digest starting with 'NEXT_REDIRECT'
+    if (error && typeof error === 'object' && 'digest' in error) {
+      const digest = (error as { digest?: string }).digest;
+      if (digest?.startsWith('NEXT_REDIRECT')) {
+        throw error;
+      }
+    }
     console.error('Error checking email verification:', error);
     // Continue if check fails - don't block users due to database errors
   }
