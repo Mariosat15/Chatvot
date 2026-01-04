@@ -446,34 +446,125 @@ export default function DatabaseSection() {
 
       {/* Reset Confirmation Dialog */}
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <AlertDialogContent className="bg-gray-900 border-2 border-red-500">
+        <AlertDialogContent className="bg-gray-900 border-2 border-red-500 max-w-2xl max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-2xl font-bold text-red-500 flex items-center gap-2">
               <AlertTriangle className="h-6 w-6" />
               ⚠️ DANGER: Reset ALL Data
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm text-gray-400">
-              This action will permanently delete all competition data and reset wallets.
+              This action will permanently delete all trading data and reset wallets.
             </AlertDialogDescription>
           </AlertDialogHeader>
           
-          <div className="text-gray-300 space-y-4 px-6">
+          <div className="text-gray-300 space-y-4 px-2">
             <p className="text-lg font-semibold">This will PERMANENTLY DELETE:</p>
-            <ul className="list-disc list-inside space-y-2 text-sm">
-              <li>❌ All competitions</li>
-              <li>❌ All participants</li>
-              <li>❌ All trading positions</li>
-              <li>❌ All trade history</li>
-              <li>❌ All orders</li>
-              <li>❌ All wallet transactions</li>
-              <li>❌ Reset all wallet balances to 0</li>
-              <li>❌ Reset competition spending to 0</li>
-              <li>❌ Reset competition winnings to 0</li>
-            </ul>
-            <p className="text-green-400 font-semibold">✅ KEEPS: User accounts and login credentials</p>
-            <p className="text-yellow-400 font-bold mt-4">⚠️ THIS CANNOT BE UNDONE!</p>
             
-            <div className="mt-6 space-y-2">
+            {/* Trading Data */}
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+              <p className="text-red-400 font-semibold text-sm mb-2">📊 Trading Data</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All competitions</span>
+                <span>❌ All competition participants</span>
+                <span>❌ All 1v1 challenges</span>
+                <span>❌ All challenge participants</span>
+                <span>❌ All trading positions</span>
+                <span>❌ All trade history</span>
+                <span>❌ All orders</span>
+                <span>❌ All position events</span>
+              </div>
+            </div>
+
+            {/* Financial Data */}
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+              <p className="text-orange-400 font-semibold text-sm mb-2">💰 Financial Data</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All wallet transactions</span>
+                <span>❌ All withdrawal requests</span>
+                <span>❌ All user bank accounts</span>
+                <span>❌ All Nuvei payment options</span>
+                <span>❌ All platform transactions</span>
+                <span>❌ All platform snapshots</span>
+                <span>❌ All VAT payments</span>
+                <span>❌ All invoices</span>
+                <span>❌ All reconciliation logs</span>
+                <span>❌ All marketplace purchases</span>
+              </div>
+            </div>
+
+            {/* Fraud & Security Data */}
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+              <p className="text-purple-400 font-semibold text-sm mb-2">🛡️ Fraud & Security Data</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All fraud alerts</span>
+                <span>❌ All fraud history</span>
+                <span>❌ All device fingerprints</span>
+                <span>❌ All suspicion scores</span>
+                <span>❌ All payment fingerprints</span>
+                <span>❌ All behavioral similarity</span>
+                <span>❌ All trading behavior profiles</span>
+                <span>❌ All user restrictions</span>
+              </div>
+            </div>
+
+            {/* User Progress & Misc */}
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+              <p className="text-blue-400 font-semibold text-sm mb-2">📈 User Progress & Other</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All user levels & XP</span>
+                <span>❌ All user badges</span>
+                <span>❌ All KYC sessions</span>
+                <span>❌ All notifications</span>
+                <span>❌ All notification preferences</span>
+                <span>❌ All user notes</span>
+                <span>❌ All user presence data</span>
+                <span>❌ All auth sessions</span>
+                <span>❌ All audit logs</span>
+                <span>❌ All alerts</span>
+                <span>❌ All bot executions</span>
+                <span>❌ All orphan wallets</span>
+              </div>
+            </div>
+
+            {/* Resets */}
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+              <p className="text-yellow-400 font-semibold text-sm mb-2">🔄 Will RESET to 0/defaults:</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>🔄 All wallet balances → 0</span>
+                <span>🔄 Total deposited → 0</span>
+                <span>🔄 Total withdrawn → 0</span>
+                <span>🔄 Competition spending → 0</span>
+                <span>🔄 Competition winnings → 0</span>
+                <span>🔄 Challenge spending → 0</span>
+                <span>🔄 Challenge winnings → 0</span>
+                <span>🔄 Marketplace spending → 0</span>
+                <span>🔄 KYC status → none</span>
+                <span>🔄 Badge configs → defaults</span>
+                <span>🔄 XP configs → defaults</span>
+                <span>🔄 Item purchase counts → 0</span>
+              </div>
+            </div>
+
+            {/* What's Preserved */}
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+              <p className="text-green-400 font-semibold text-sm mb-2">✅ KEEPS (will NOT delete):</p>
+              <div className="grid grid-cols-2 gap-1 text-xs text-green-300">
+                <span>✅ User accounts</span>
+                <span>✅ Login credentials</span>
+                <span>✅ Admin settings</span>
+                <span>✅ Fee settings</span>
+                <span>✅ Payment providers</span>
+                <span>✅ Marketplace items</span>
+                <span>✅ KYC settings</span>
+                <span>✅ App settings</span>
+              </div>
+            </div>
+
+            <p className="text-red-400 font-bold text-center py-2 bg-red-500/20 rounded-lg">
+              ⚠️ THIS CANNOT BE UNDONE!
+            </p>
+            
+            <div className="space-y-2">
               <Label htmlFor="resetConfirmation" className="text-white font-bold">
                 Type <span className="text-red-400 font-mono">RESET_ALL_DATA</span> to confirm:
               </Label>
