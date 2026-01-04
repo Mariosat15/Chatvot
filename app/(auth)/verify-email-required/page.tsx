@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, RefreshCw, LogOut, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { authClient } from '@/lib/better-auth/auth-client';
+import { signOut } from '@/lib/actions/auth.actions';
 
 export default function VerifyEmailRequiredPage() {
   const router = useRouter();
@@ -39,7 +39,7 @@ export default function VerifyEmailRequiredPage() {
 
   const handleSignOut = async () => {
     try {
-      await authClient.signOut();
+      await signOut();
       router.push('/sign-in');
     } catch (error) {
       console.error('Error signing out:', error);
