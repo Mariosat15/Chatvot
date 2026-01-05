@@ -138,6 +138,8 @@ router.post('/register', async (req: Request, res: Response) => {
 
     // Check if user already exists (before starting transaction)
     const existingUser = await User.findOne({ email });
+    let orphanedUserId: string | null = null;
+    
     if (existingUser) {
       // Check if they have an account - if not, they're orphaned and we should allow re-registration
       const existingAccount = await Account.findOne({ userId: existingUser.id, providerId: 'credential' });
@@ -145,9 +147,9 @@ router.post('/register', async (req: Request, res: Response) => {
         res.status(409).json({ error: 'User already exists' });
         return;
       }
-      // User exists but no account - delete orphaned user and proceed
-      console.log(`🔧 Found orphaned user ${email}, cleaning up...`);
-      await User.deleteOne({ _id: existingUser._id });
+      // Mark for deletion inside transaction (for atomicity)
+      orphanedUserId = existingUser._id.toString();
+      console.log(`🔧 Found orphaned user ${email}, will clean up in transaction...`);
     }
 
     // Hash password using worker thread (NON-BLOCKING!)
@@ -164,6 +166,13 @@ router.post('/register', async (req: Request, res: Response) => {
     let createdUser: IUser | null = null;
     
     await session.withTransaction(async () => {
+      // Delete orphaned user inside transaction (if exists)
+      // This ensures if new user creation fails, orphan is NOT deleted
+      if (orphanedUserId) {
+        await User.deleteOne({ _id: orphanedUserId }, { session });
+        console.log(`🔧 Deleted orphaned user in transaction`);
+      }
+      
       // Create user with better-auth compatible fields (NO password here!)
       const [user] = await User.create([{
         id: userId,
@@ -516,6 +525,8 @@ router.post('/register-batch', async (req: Request, res: Response) => {
       try {
         // Check if user exists
         const existing = await User.findOne({ email: userData.email });
+        let orphanedUserId: string | null = null;
+        
         if (existing) {
           // Check if they have an account - if not, they're orphaned
           const existingAccount = await Account.findOne({ userId: existing.id, providerId: 'credential' });
@@ -526,9 +537,9 @@ router.post('/register-batch', async (req: Request, res: Response) => {
             // Using continue in try-finally still executes finally first
             continue;
           }
-          // User exists but no account - delete orphaned user and proceed
-          console.log(`🔧 Found orphaned user ${userData.email}, cleaning up...`);
-          await User.deleteOne({ _id: existing._id });
+          // Mark for deletion inside transaction (for atomicity)
+          orphanedUserId = existing._id.toString();
+          console.log(`🔧 Found orphaned user ${userData.email}, will clean up in transaction...`);
         }
 
         const userId = generateUserId();
@@ -538,6 +549,13 @@ router.post('/register-batch', async (req: Request, res: Response) => {
         
         // Use transaction to ensure both user and account are created atomically
         await session.withTransaction(async () => {
+          // Delete orphaned user inside transaction (if exists)
+          // This ensures if new user creation fails, orphan is NOT deleted
+          if (orphanedUserId) {
+            await User.deleteOne({ _id: orphanedUserId }, { session });
+            console.log(`🔧 Deleted orphaned user in transaction`);
+          }
+          
           // Create user (no password here - better-auth stores it in account)
           const [user] = await User.create([{
             id: userId,
