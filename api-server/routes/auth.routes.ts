@@ -21,6 +21,8 @@ interface IUser extends Document {
   email: string;
   name?: string;
   emailVerified: boolean;
+  emailVerificationToken?: string;       // Token for email verification
+  emailVerificationTokenExpiry?: Date;   // When the token expires
   image?: string;
   role?: string;
   createdAt: Date;
@@ -73,6 +75,8 @@ const getUserModel = (): Model<IUser> => {
     email: { type: String, required: true, unique: true },
     name: { type: String },
     emailVerified: { type: Boolean, default: false },
+    emailVerificationToken: { type: String },       // Token for email verification
+    emailVerificationTokenExpiry: { type: Date },   // When the token expires
     image: { type: String },
     role: { type: String, default: 'trader' },
     createdAt: { type: Date, default: Date.now },
