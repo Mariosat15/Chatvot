@@ -11,14 +11,12 @@ import { WhiteLabel } from '@/database/models/whitelabel.model';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import mongoose from 'mongoose';
 
-// Import models
+// Import models (non-fraud models that are well-registered)
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import UserLevel from '@/database/models/user-level.model';
-import UserBadge from '@/database/models/user-badge.model';
-import PaymentFingerprint from '@/database/models/fraud/payment-fingerprint.model';
-import FraudAlert from '@/database/models/fraud/fraud-alert.model';
-import SuspicionScore from '@/database/models/fraud/suspicion-score.model';
+// Note: Fraud-related models (PaymentFingerprint, FraudAlert, SuspicionScore) 
+// are queried via raw MongoDB to avoid schema registration issues
 
 // Types
 interface ToolCall {
@@ -313,28 +311,43 @@ const TOOLS: OpenAI.ChatCompletionTool[] = [
 async function executeGetSharedPaymentMethods(args: any): Promise<AgentResult> {
   const minSharedCount = args.minSharedCount || 2;
   const provider = args.provider === 'all' ? undefined : args.provider;
+  const db = mongoose.connection.db!;
 
+  // Use raw MongoDB query to avoid schema registration issues
   const query: any = { isShared: true };
   if (provider) query.paymentProvider = provider;
 
-  const sharedPayments = await PaymentFingerprint.find(query)
-    .populate('userId', 'name email')
+  const sharedPayments = await db.collection('paymentfingerprints')
+    .find(query)
     .sort({ riskScore: -1 })
     .limit(50)
-    .lean();
+    .toArray();
+
+  // Get user info for each payment fingerprint
+  const userIds = [...new Set(sharedPayments.map((p: any) => p.userId?.toString()).filter(Boolean))];
+  const users = await db.collection('user').find({
+    $or: [
+      { id: { $in: userIds } },
+      { _id: { $in: userIds.filter((id: string) => mongoose.Types.ObjectId.isValid(id)).map((id: string) => new mongoose.Types.ObjectId(id)) } }
+    ]
+  }).toArray();
+  const userMap = new Map(users.map((u: any) => [u.id || u._id?.toString(), u]));
 
   const data = sharedPayments
     .filter((p: any) => (p.linkedUserIds?.length || 0) >= minSharedCount - 1)
-    .map((p: any) => ({
-      fingerprint: p.paymentFingerprint?.substring(0, 12) + '...',
-      provider: p.paymentProvider,
-      owner: p.userId?.email || 'Unknown',
-      sharedWith: p.linkedUserIds?.length || 0,
-      cardLast4: p.cardLast4 || '—',
-      cardBrand: p.cardBrand || '—',
-      riskScore: p.riskScore,
-      lastUsed: p.lastUsed,
-    }));
+    .map((p: any) => {
+      const user = userMap.get(p.userId?.toString());
+      return {
+        fingerprint: p.paymentFingerprint?.substring(0, 12) + '...',
+        provider: p.paymentProvider,
+        owner: user?.email || 'Unknown',
+        sharedWith: p.linkedUserIds?.length || 0,
+        cardLast4: p.cardLast4 || '—',
+        cardBrand: p.cardBrand || '—',
+        riskScore: p.riskScore,
+        lastUsed: p.lastUsed,
+      };
+    });
 
   return {
     type: 'table',
@@ -355,15 +368,18 @@ async function executeGetSharedPaymentMethods(args: any): Promise<AgentResult> {
 
 async function executeGetFraudAlerts(args: any): Promise<AgentResult> {
   const limit = args.limit || 20;
+  const db = mongoose.connection.db!;
   const query: any = {};
   
   if (args.status && args.status !== 'all') query.status = args.status;
   if (args.severity && args.severity !== 'all') query.severity = args.severity;
 
-  const alerts = await FraudAlert.find(query)
+  // Use raw MongoDB query to avoid schema registration issues
+  const alerts = await db.collection('fraudalerts')
+    .find(query)
     .sort({ createdAt: -1 })
     .limit(limit)
-    .lean();
+    .toArray();
 
   const data = alerts.map((a: any) => ({
     id: a._id.toString().substring(0, 8),
@@ -424,7 +440,8 @@ async function executeGetUserDetails(args: any): Promise<AgentResult> {
     CreditWallet.findOne({ userId }).lean() as Promise<any>,
     WalletTransaction.find({ userId }).sort({ createdAt: -1 }).limit(10).lean(),
     UserLevel.findOne({ userId }).lean() as Promise<any>,
-    SuspicionScore.findOne({ userId }).lean() as Promise<any>,
+    // Use raw MongoDB for suspicion score to avoid schema registration issues
+    db.collection('suspicionscores').findOne({ userId }) as Promise<any>,
   ]);
 
   return {
@@ -886,12 +903,14 @@ async function executeGetHighRiskUsers(args: any): Promise<AgentResult> {
   const limit = args.limit || 20;
   const db = mongoose.connection.db!;
 
-  const highRiskScores = await SuspicionScore.find({ totalScore: { $gte: minScore } })
+  // Use raw MongoDB query to avoid schema registration issues
+  const highRiskScores = await db.collection('suspicionscores')
+    .find({ totalScore: { $gte: minScore } })
     .sort({ totalScore: -1 })
     .limit(limit)
-    .lean();
+    .toArray();
 
-  const userIds = highRiskScores.map((s: any) => s.userId);
+  const userIds = highRiskScores.map((s: any) => s.userId?.toString()).filter(Boolean);
   const users = await db.collection('user').find({ 
     $or: [
       { id: { $in: userIds } },
@@ -901,7 +920,7 @@ async function executeGetHighRiskUsers(args: any): Promise<AgentResult> {
   const userMap = new Map(users.map((u: any) => [u.id || u._id?.toString(), u]));
 
   const data = highRiskScores.map((s: any) => {
-    const user = userMap.get(s.userId);
+    const user = userMap.get(s.userId?.toString());
     return {
       email: user?.email || 'Unknown',
       name: user?.name || '—',
