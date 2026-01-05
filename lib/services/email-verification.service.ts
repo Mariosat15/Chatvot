@@ -239,8 +239,10 @@ export async function verifyEmailToken(token: string, userId: string): Promise<V
           return { success: false, error: 'Email is already verified. Please sign in.' };
         }
         console.log(`📧 User found but token doesn't match. Stored token: ${userWithoutToken.emailVerificationToken?.substring(0, 10)}...`);
+        // Token doesn't match - user probably clicked old link after requesting new one
+        return { success: false, error: 'This verification link is outdated. Please check your email for the latest verification link, or request a new one.' };
       }
-      return { success: false, error: 'Invalid verification link' };
+      return { success: false, error: 'Invalid verification link. Please request a new verification email.' };
     }
     
     // Check if token has expired

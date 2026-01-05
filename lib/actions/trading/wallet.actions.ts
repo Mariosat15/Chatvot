@@ -257,7 +257,9 @@ export const completeDeposit = async (
         throw new Error('Transaction not found');
       }
 
-      if (transaction.status !== 'pending') {
+      // Accept both 'pending' and 'processing' statuses
+      // 'processing' is set by webhook's atomic claim before calling completeDeposit
+      if (transaction.status !== 'pending' && transaction.status !== 'processing') {
         throw new Error('Transaction already processed');
       }
 
