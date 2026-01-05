@@ -532,53 +532,110 @@ async function executeGetPendingKYC(args: any): Promise<AgentResult> {
 async function executeGetFinancialSummary(args: any): Promise<AgentResult> {
   const period = args.period || 'month';
   
-  let dateFilter: any = {};
-  const now = new Date();
-  
-  switch (period) {
-    case 'today':
-      dateFilter = { $gte: new Date(now.setHours(0, 0, 0, 0)) };
-      break;
-    case 'week':
-      dateFilter = { $gte: new Date(now.setDate(now.getDate() - 7)) };
-      break;
-    case 'month':
-      dateFilter = { $gte: new Date(now.setMonth(now.getMonth() - 1)) };
-      break;
-    case 'year':
-      dateFilter = { $gte: new Date(now.setFullYear(now.getFullYear() - 1)) };
-      break;
-  }
+  // Create new date for each calculation to avoid mutation issues
+  const getDateFilter = () => {
+    const now = new Date();
+    switch (period) {
+      case 'today':
+        return { $gte: new Date(now.setHours(0, 0, 0, 0)) };
+      case 'week':
+        return { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+      case 'month':
+        return { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
+      case 'year':
+        return { $gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) };
+      default:
+        return {};
+    }
+  };
 
+  const dateFilter = getDateFilter();
+  
   const depositQuery: any = { transactionType: 'deposit', status: 'completed' };
   const withdrawalQuery: any = { transactionType: 'withdrawal', status: 'completed' };
+  const withdrawalFeeQuery: any = { transactionType: 'withdrawal_fee', status: 'completed' };
+  const platformFeeQuery: any = { transactionType: 'platform_fee', status: 'completed' };
   
-  if (period !== 'all') {
+  if (period !== 'all' && Object.keys(dateFilter).length > 0) {
     depositQuery.processedAt = dateFilter;
     withdrawalQuery.processedAt = dateFilter;
+    withdrawalFeeQuery.createdAt = dateFilter;
+    platformFeeQuery.createdAt = dateFilter;
   }
 
-  const [deposits, withdrawals] = await Promise.all([
+  const [deposits, withdrawals, withdrawalFees, platformFees] = await Promise.all([
     WalletTransaction.find(depositQuery).lean(),
     WalletTransaction.find(withdrawalQuery).lean(),
+    WalletTransaction.find(withdrawalFeeQuery).lean(),
+    WalletTransaction.find(platformFeeQuery).lean(),
   ]);
 
-  const totalDeposits = deposits.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
-  const totalWithdrawals = withdrawals.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
-  const totalFees = deposits.reduce((sum: number, d: any) => sum + (d.platformFee || 0) + (d.bankFee || 0), 0);
-  const totalVAT = deposits.reduce((sum: number, d: any) => sum + (d.vatAmount || 0), 0);
+  // Calculate deposit totals (amount is in credits, EUR value is in metadata)
+  const totalDepositsCredits = deposits.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+  
+  // Get EUR values from metadata for accurate financial reporting
+  const totalDepositsEUR = deposits.reduce((sum: number, d: any) => {
+    // Try to get actual EUR charged from metadata
+    const eurValue = d.metadata?.totalCharged || d.metadata?.eurAmount || (d.amount / (d.exchangeRate || 1));
+    return sum + eurValue;
+  }, 0);
+
+  // Platform fees from deposit metadata
+  const depositPlatformFees = deposits.reduce((sum: number, d: any) => {
+    return sum + (d.metadata?.platformFeeAmount || 0);
+  }, 0);
+  
+  // Bank fees from deposit metadata
+  const depositBankFees = deposits.reduce((sum: number, d: any) => {
+    return sum + (d.metadata?.bankFeeTotal || 0);
+  }, 0);
+
+  // VAT from deposit metadata
+  const totalVAT = deposits.reduce((sum: number, d: any) => {
+    return sum + (d.metadata?.vatAmount || d.metadata?.actualVatAmount || 0);
+  }, 0);
+
+  // Withdrawal totals
+  const totalWithdrawalsCredits = withdrawals.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
+  const totalWithdrawalsEUR = withdrawals.reduce((sum: number, w: any) => {
+    return sum + (w.metadata?.eurGross || (w.amount / (w.exchangeRate || 1)));
+  }, 0);
+
+  // Withdrawal fees collected
+  const withdrawalFeesCollected = withdrawalFees.reduce((sum: number, w: any) => Math.abs(sum + (w.amount || 0)), 0);
+  const withdrawalFeesEUR = withdrawals.reduce((sum: number, w: any) => {
+    return sum + (w.metadata?.platformFeeAmountEUR || 0);
+  }, 0);
+
+  // Platform fees from competition winnings
+  const competitionPlatformFees = platformFees.reduce((sum: number, p: any) => Math.abs(sum + (p.amount || 0)), 0);
+
+  // Total platform revenue (fees collected)
+  const totalPlatformRevenue = depositPlatformFees + withdrawalFeesEUR + competitionPlatformFees;
+  
+  // Net platform earning (after paying bank fees)
+  const netPlatformEarning = totalPlatformRevenue - depositBankFees;
 
   return {
     type: 'stats',
     title: `Financial Summary (${period})`,
     data: {
-      total_deposits: `€${totalDeposits.toFixed(2)}`,
+      // Deposits
+      total_deposits_eur: `€${totalDepositsEUR.toFixed(2)}`,
+      total_deposits_credits: `${totalDepositsCredits.toLocaleString()} credits`,
       deposit_count: deposits.length,
-      total_withdrawals: `€${totalWithdrawals.toFixed(2)}`,
+      // Withdrawals
+      total_withdrawals_eur: `€${totalWithdrawalsEUR.toFixed(2)}`,
       withdrawal_count: withdrawals.length,
-      platform_fees: `€${totalFees.toFixed(2)}`,
+      // Fees & Revenue
+      deposit_fees_collected: `€${depositPlatformFees.toFixed(2)}`,
+      withdrawal_fees_collected: `€${withdrawalFeesEUR.toFixed(2)}`,
+      bank_fees_paid: `€${depositBankFees.toFixed(2)}`,
       vat_collected: `€${totalVAT.toFixed(2)}`,
-      net_flow: `€${(totalDeposits - totalWithdrawals).toFixed(2)}`,
+      // Summary
+      total_platform_revenue: `€${totalPlatformRevenue.toFixed(2)}`,
+      net_platform_earning: `€${netPlatformEarning.toFixed(2)}`,
+      net_flow_eur: `€${(totalDepositsEUR - totalWithdrawalsEUR).toFixed(2)}`,
     }
   };
 }
@@ -768,37 +825,54 @@ async function executeGetTopTraders(args: any): Promise<AgentResult> {
 
 async function executeRunReconciliation(args: any): Promise<AgentResult> {
   const period = args.period || 'week';
+  const db = mongoose.connection.db!;
   
-  let dateFilter: any = {};
-  const now = new Date();
-  
-  switch (period) {
-    case 'today':
-      dateFilter = { $gte: new Date(now.setHours(0, 0, 0, 0)) };
-      break;
-    case 'week':
-      dateFilter = { $gte: new Date(now.setDate(now.getDate() - 7)) };
-      break;
-    case 'month':
-      dateFilter = { $gte: new Date(now.setMonth(now.getMonth() - 1)) };
-      break;
+  // Create date filter without mutation
+  const getDateFilter = () => {
+    switch (period) {
+      case 'today':
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return { $gte: today };
+      case 'week':
+        return { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+      case 'month':
+        return { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
+      default:
+        return {};
+    }
+  };
+
+  const dateFilter = getDateFilter();
+  const hasDateFilter = Object.keys(dateFilter).length > 0;
+
+  // Get all transactions in period (not just completed)
+  const allTransactionsQuery: any = {};
+  if (hasDateFilter) {
+    allTransactionsQuery.$or = [
+      { processedAt: dateFilter },
+      { createdAt: dateFilter }
+    ];
   }
 
-  // Get transactions
-  const transactions = await WalletTransaction.find({
-    processedAt: dateFilter,
-    status: 'completed'
-  }).lean();
+  const allTransactions = await WalletTransaction.find(allTransactionsQuery).lean();
 
-  const deposits = transactions.filter((t: any) => t.transactionType === 'deposit');
-  const withdrawals = transactions.filter((t: any) => t.transactionType === 'withdrawal');
+  // Categorize transactions
+  const deposits = allTransactions.filter((t: any) => t.transactionType === 'deposit');
+  const withdrawals = allTransactions.filter((t: any) => t.transactionType === 'withdrawal');
+  const completedDeposits = deposits.filter((t: any) => t.status === 'completed');
+  const completedWithdrawals = withdrawals.filter((t: any) => t.status === 'completed');
+  const pendingDeposits = deposits.filter((t: any) => t.status === 'pending');
+  const failedDeposits = deposits.filter((t: any) => t.status === 'failed');
+  const pendingWithdrawals = withdrawals.filter((t: any) => t.status === 'pending' || t.status === 'processing');
 
   // Check for discrepancies
   const discrepancies: any[] = [];
+  const issueDetails: string[] = [];
   
-  // Check for missing provider IDs
-  const missingProviderIds = transactions.filter((t: any) => 
-    !t.providerTransactionId && t.status === 'completed'
+  // 1. Check for missing provider transaction IDs on completed transactions
+  const missingProviderIds = completedDeposits.filter((t: any) => 
+    !t.providerTransactionId && t.provider !== 'manual'
   );
   
   if (missingProviderIds.length > 0) {
@@ -806,48 +880,93 @@ async function executeRunReconciliation(args: any): Promise<AgentResult> {
       type: 'missing_provider_id',
       count: missingProviderIds.length,
       severity: 'medium',
-      message: `${missingProviderIds.length} completed transactions missing provider IDs`
     });
+    issueDetails.push(`⚠️ ${missingProviderIds.length} deposits missing provider transaction IDs`);
   }
 
-  // Check wallet balances consistency
-  const wallets = await CreditWallet.find().lean();
-  let balanceIssues = 0;
+  // 2. Check for transactions requiring manual review
+  const requiresManualReview = allTransactions.filter((t: any) => 
+    t.metadata?.requiresManualReview === true
+  );
   
-  for (const wallet of wallets) {
-    const userDeposits = deposits.filter((d: any) => d.userId === wallet.userId);
-    const userWithdrawals = withdrawals.filter((w: any) => w.userId === wallet.userId);
-    
-    const calculatedDeposits = userDeposits.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
-    const calculatedWithdrawals = userWithdrawals.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
-    
-    // Check if totalDeposited matches sum of deposits (allowing small rounding errors)
-    if (Math.abs((wallet.totalDeposited || 0) - calculatedDeposits) > 0.01) {
-      balanceIssues++;
-    }
-  }
-  
-  if (balanceIssues > 0) {
+  if (requiresManualReview.length > 0) {
     discrepancies.push({
-      type: 'balance_mismatch',
-      count: balanceIssues,
+      type: 'manual_review_required',
+      count: requiresManualReview.length,
       severity: 'high',
-      message: `${balanceIssues} wallets have deposit totals that don't match transaction history`
     });
+    issueDetails.push(`🚨 ${requiresManualReview.length} transactions need manual review`);
   }
+
+  // 3. Check for stuck pending transactions (older than 1 hour)
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const stuckPending = allTransactions.filter((t: any) => 
+    t.status === 'pending' && new Date(t.createdAt) < oneHourAgo
+  );
+  
+  if (stuckPending.length > 0) {
+    discrepancies.push({
+      type: 'stuck_pending',
+      count: stuckPending.length,
+      severity: 'medium',
+    });
+    issueDetails.push(`⏳ ${stuckPending.length} transactions stuck in pending state`);
+  }
+
+  // 4. Calculate financial totals for reconciliation
+  const totalDepositsEUR = completedDeposits.reduce((sum: number, d: any) => {
+    return sum + (d.metadata?.totalCharged || d.metadata?.eurAmount || (d.amount / (d.exchangeRate || 1)));
+  }, 0);
+
+  const totalWithdrawalsEUR = completedWithdrawals.reduce((sum: number, w: any) => {
+    return sum + (w.metadata?.eurGross || (w.amount / (w.exchangeRate || 1)));
+  }, 0);
+
+  const totalFeesCollected = completedDeposits.reduce((sum: number, d: any) => {
+    return sum + (d.metadata?.platformFeeAmount || 0);
+  }, 0);
+
+  // 5. Check by provider for completeness
+  const byProvider: Record<string, { deposits: number; withdrawals: number; total: number }> = {};
+  allTransactions.forEach((t: any) => {
+    const provider = t.provider || 'unknown';
+    if (!byProvider[provider]) {
+      byProvider[provider] = { deposits: 0, withdrawals: 0, total: 0 };
+    }
+    if (t.transactionType === 'deposit' && t.status === 'completed') {
+      byProvider[provider].deposits++;
+      byProvider[provider].total += t.metadata?.totalCharged || (t.amount / (t.exchangeRate || 1));
+    }
+    if (t.transactionType === 'withdrawal' && t.status === 'completed') {
+      byProvider[provider].withdrawals++;
+    }
+  });
+
+  // Build provider breakdown string
+  const providerBreakdown = Object.entries(byProvider)
+    .map(([p, v]) => `${p}: ${v.deposits}D/${v.withdrawals}W (€${v.total.toFixed(2)})`)
+    .join(', ');
 
   return {
     type: 'stats',
     title: `Reconciliation Report (${period})`,
     data: {
-      total_transactions: transactions.length,
-      deposits: deposits.length,
-      withdrawals: withdrawals.length,
-      discrepancies_found: discrepancies.length,
+      // Transaction counts
+      total_transactions: allTransactions.length,
+      completed_deposits: `${completedDeposits.length} (€${totalDepositsEUR.toFixed(2)})`,
+      completed_withdrawals: `${completedWithdrawals.length} (€${totalWithdrawalsEUR.toFixed(2)})`,
+      pending_deposits: pendingDeposits.length,
+      pending_withdrawals: pendingWithdrawals.length,
+      failed_deposits: failedDeposits.length,
+      // Financial
+      fees_collected: `€${totalFeesCollected.toFixed(2)}`,
+      net_flow: `€${(totalDepositsEUR - totalWithdrawalsEUR).toFixed(2)}`,
+      // Provider breakdown
+      by_provider: providerBreakdown || 'No data',
+      // Issues
+      issues_found: discrepancies.length,
       status: discrepancies.length === 0 ? '✅ All Clear' : '⚠️ Issues Found',
-      issues: discrepancies.length > 0 
-        ? discrepancies.map(d => `${d.type}: ${d.message}`).join('; ')
-        : 'None'
+      issue_details: issueDetails.length > 0 ? issueDetails.join(' | ') : 'None'
     }
   };
 }
@@ -1085,14 +1204,22 @@ const SYSTEM_PROMPT = `You are an intelligent AI assistant for the ChartVolt adm
 
 When responding:
 - Be concise and professional
-- Use the available tools to fetch real data
+- Use the available tools to fetch real data from the database
 - Present data in appropriate formats (tables for lists, stats for summaries, alerts for warnings)
 - Highlight any potential issues or anomalies you find
 - Suggest follow-up actions when appropriate
+- When showing financial data, include specific transaction IDs or references when available
+- Always provide context about the data timeframe and scope
 
 You have access to the database through specialized tools. Always use these tools to get accurate, real-time data rather than making assumptions.
 
-IMPORTANT: When users ask for specific data, call the appropriate tool first, then explain the results.`;
+IMPORTANT GUIDELINES:
+1. When users ask for specific data, call the appropriate tool first, then explain the results
+2. Do not make up or hallucinate data - only report what the tools return
+3. If data seems incomplete or missing, mention it explicitly
+4. Always end your response with a brief note reminding the admin to cross-reference with the actual system
+
+DISCLAIMER TO INCLUDE: At the end of each data response, add: "⚠️ Note: Please verify this information against the actual system data. AI-generated reports should be cross-referenced for accuracy."`;
 
 export async function POST(request: NextRequest) {
   try {

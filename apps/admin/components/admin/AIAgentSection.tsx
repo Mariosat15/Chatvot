@@ -622,6 +622,18 @@ export default function AIAgentSection() {
                             </span>
                           )}
                         </div>
+
+                        {/* Disclaimer for assistant messages with results */}
+                        {message.role === 'assistant' && message.results && message.results.length > 0 && !message.isStreaming && (
+                          <div className="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                            <p className="text-[10px] text-amber-400/80 flex items-center gap-1.5">
+                              <AlertTriangle className="h-3 w-3 shrink-0" />
+                              <span>
+                                This data is AI-generated. Please cross-reference with actual system data for accuracy.
+                              </span>
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {message.role === 'user' && (
@@ -637,7 +649,18 @@ export default function AIAgentSection() {
             </ScrollArea>
 
             {/* Input Area */}
-            <div className="p-4 border-t border-gray-700">
+            <div className="p-4 border-t border-gray-700 space-y-3">
+              {/* Disclaimer Banner */}
+              <div className="px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                <p className="text-[11px] text-amber-400/70 flex items-start gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Important:</strong> AI-generated data should be considered complementary. 
+                    Always cross-reference with actual system data as AI may occasionally provide inaccurate information.
+                  </span>
+                </p>
+              </div>
+              
               <form 
                 onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                 className="flex gap-3"
