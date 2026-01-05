@@ -1,15 +1,14 @@
 /**
- * AI Agent Chat API
+ * AI Agent Chat API (BETA)
  * 
  * Uses OpenAI function calling to execute database queries and return structured results
  * 
  * SECURITY FEATURES:
+ * - HYBRID MASKING: Sensitive data (emails, names, IDs) are masked before sending to OpenAI
+ *   but real data is shown in tables for admin convenience
  * - Audit logging: All queries are logged for compliance and monitoring
  * - Rate limiting: Prevents abuse
  * - Disclaimers: Users warned about AI limitations and third-party data exposure
- * 
- * NOTE: Data is sent to OpenAI without masking for consistency between AI responses
- * and data tables displayed to admins. Admins already have access to all data.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -24,6 +23,13 @@ import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import UserLevel from '@/database/models/user-level.model';
 import AIAgentAudit from '@/database/models/ai-agent-audit.model';
+
+// Import data masking utilities for hybrid privacy approach
+import { 
+  resetMaskingMap, 
+  maskSensitiveData,
+  getMaskingSummary
+} from '@/lib/ai-agent/data-masking';
 
 // Import knowledge base for answering admin questions
 import { PLATFORM_KNOWLEDGE_BASE, QUICK_ANSWERS } from '@/lib/ai-agent/knowledge-base';
@@ -806,6 +812,89 @@ const TOOLS: OpenAI.ChatCompletionTool[] = [
           }
         },
         required: ['question']
+      }
+    }
+  },
+  // ==================== DEPOSITS ====================
+  {
+    type: 'function',
+    function: {
+      name: 'get_recent_deposits',
+      description: 'Get recent deposit transactions with optional filtering',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['pending', 'completed', 'failed', 'all'],
+            description: 'Filter by status'
+          },
+          days: {
+            type: 'number',
+            description: 'Number of days back to look (default: 7)'
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum results (default: 20)'
+          }
+        }
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_deposit_settings',
+      description: 'Get current deposit configuration including fees, limits, and VAT settings',
+      parameters: {
+        type: 'object',
+        properties: {}
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_withdrawal_settings',
+      description: 'Get current withdrawal configuration including fees, limits, and processing mode',
+      parameters: {
+        type: 'object',
+        properties: {}
+      }
+    }
+  },
+  // ==================== BADGES ====================
+  {
+    type: 'function',
+    function: {
+      name: 'get_all_badges',
+      description: 'List all available badges in the system with their requirements',
+      parameters: {
+        type: 'object',
+        properties: {}
+      }
+    }
+  },
+  // ==================== SETTINGS ====================
+  {
+    type: 'function',
+    function: {
+      name: 'get_fraud_settings',
+      description: 'Get current fraud detection and security settings',
+      parameters: {
+        type: 'object',
+        properties: {}
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_trading_settings',
+      description: 'Get trading risk settings including leverage limits, margin requirements',
+      parameters: {
+        type: 'object',
+        properties: {}
       }
     }
   }
@@ -3005,6 +3094,24 @@ async function executeTool(name: string, args: any): Promise<AgentResult> {
     case 'get_quick_answer':
       return executeGetQuickAnswer(args);
     
+    // Deposit tools
+    case 'get_recent_deposits':
+      return executeGetRecentDeposits(args);
+    case 'get_deposit_settings':
+      return executeGetDepositSettings(args);
+    case 'get_withdrawal_settings':
+      return executeGetWithdrawalSettings(args);
+    
+    // Badge tools
+    case 'get_all_badges':
+      return executeGetAllBadges(args);
+    
+    // Settings tools
+    case 'get_fraud_settings':
+      return executeGetFraudSettings(args);
+    case 'get_trading_settings':
+      return executeGetTradingSettings(args);
+    
     default:
       return {
         type: 'text',
@@ -3481,6 +3588,189 @@ function executeGetQuickAnswer(args: { question: string }): AgentResult {
   };
 }
 
+// ==================== NEW TOOLS IMPLEMENTATIONS ====================
+
+async function executeGetRecentDeposits(args: any): Promise<AgentResult> {
+  const db = mongoose.connection.db!;
+  const status = args.status || 'all';
+  const days = args.days || 7;
+  const limit = args.limit || 20;
+  
+  const dateThreshold = new Date();
+  dateThreshold.setDate(dateThreshold.getDate() - days);
+  
+  const query: any = {
+    type: 'deposit',
+    createdAt: { $gte: dateThreshold }
+  };
+  
+  if (status !== 'all') {
+    query.status = status;
+  }
+  
+  const deposits = await WalletTransaction.find(query)
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .lean();
+  
+  const data = deposits.map((d: any) => ({
+    id: d._id?.toString().slice(-8) || 'N/A',
+    userId: d.userId,
+    amount: `€${d.amountEUR?.toFixed(2) || 0}`,
+    credits: d.credits || 0,
+    status: d.status,
+    provider: d.paymentProvider || 'unknown',
+    date: new Date(d.createdAt).toLocaleDateString(),
+    time: new Date(d.createdAt).toLocaleTimeString(),
+  }));
+  
+  return {
+    type: 'table',
+    title: `Recent Deposits (${data.length})`,
+    data,
+    columns: [
+      { key: 'id', label: 'ID' },
+      { key: 'userId', label: 'User' },
+      { key: 'amount', label: 'Amount' },
+      { key: 'credits', label: 'Credits', type: 'number' },
+      { key: 'status', label: 'Status', type: 'status' },
+      { key: 'provider', label: 'Provider' },
+      { key: 'date', label: 'Date' },
+      { key: 'time', label: 'Time' },
+    ]
+  };
+}
+
+async function executeGetDepositSettings(args: any): Promise<AgentResult> {
+  const db = mongoose.connection.db!;
+  
+  const settings = await db.collection('whiteLabelSettings').findOne({}) ||
+                   await db.collection('whitelabelsettings').findOne({});
+  
+  return {
+    type: 'stats',
+    title: 'Deposit Settings',
+    data: {
+      min_deposit: settings?.depositSettings?.minDeposit || 10,
+      max_deposit: settings?.depositSettings?.maxDeposit || 10000,
+      deposit_fee_percent: `${settings?.depositSettings?.depositFeePercent || 0}%`,
+      vat_percent: `${settings?.depositSettings?.vatPercent || 0}%`,
+      vat_enabled: settings?.depositSettings?.vatEnabled || false,
+      credit_value: `€${settings?.creditValue || 1}`,
+      credit_exchange_rate: settings?.creditExchangeRate || 1,
+    },
+    columns: []
+  };
+}
+
+async function executeGetWithdrawalSettings(args: any): Promise<AgentResult> {
+  const db = mongoose.connection.db!;
+  
+  const settings = await db.collection('withdrawalsettings').findOne({}) ||
+                   await db.collection('withdrawalSettings').findOne({});
+  
+  return {
+    type: 'stats',
+    title: 'Withdrawal Settings',
+    data: {
+      min_withdrawal: settings?.minWithdrawal || 20,
+      max_withdrawal: settings?.maxWithdrawal || 10000,
+      daily_limit: settings?.dailyLimit || 5000,
+      weekly_limit: settings?.weeklyLimit || 25000,
+      monthly_limit: settings?.monthlyLimit || 50000,
+      withdrawal_fee_percent: `${settings?.withdrawalFeePercent || 0}%`,
+      processing_mode: settings?.automaticProcessing ? 'Automatic' : 'Manual',
+      processing_days: settings?.processingDays || 'N/A',
+    },
+    columns: []
+  };
+}
+
+async function executeGetAllBadges(args: any): Promise<AgentResult> {
+  const db = mongoose.connection.db!;
+  
+  const badges = await db.collection('badges').find({}).toArray();
+  
+  if (badges.length === 0) {
+    return {
+      type: 'text',
+      title: 'Badges',
+      data: { message: 'No badges configured in the system.' },
+      columns: []
+    };
+  }
+  
+  const data = badges.map((b: any) => ({
+    id: b._id?.toString().slice(-8) || 'N/A',
+    name: b.name,
+    description: b.description || 'N/A',
+    category: b.category || 'general',
+    xpReward: b.xpReward || 0,
+    requirement: b.requirement || 'N/A',
+    icon: b.icon || '🏆',
+  }));
+  
+  return {
+    type: 'table',
+    title: `All Badges (${data.length})`,
+    data,
+    columns: [
+      { key: 'icon', label: 'Icon' },
+      { key: 'name', label: 'Name' },
+      { key: 'description', label: 'Description' },
+      { key: 'category', label: 'Category' },
+      { key: 'xpReward', label: 'XP', type: 'number' },
+      { key: 'requirement', label: 'Requirement' },
+    ]
+  };
+}
+
+async function executeGetFraudSettings(args: any): Promise<AgentResult> {
+  const db = mongoose.connection.db!;
+  
+  const settings = await db.collection('fraudmonitorsettings').findOne({}) ||
+                   await db.collection('fraudMonitorSettings').findOne({});
+  
+  return {
+    type: 'stats',
+    title: 'Fraud Detection Settings',
+    data: {
+      enabled: settings?.enabled ?? true,
+      max_accounts_per_device: settings?.maxAccountsPerDevice || 3,
+      max_accounts_per_ip: settings?.maxAccountsPerIp || 5,
+      max_accounts_per_payment: settings?.maxAccountsPerPaymentMethod || 2,
+      brute_force_threshold: settings?.bruteForceAttempts || 5,
+      lockout_duration_minutes: settings?.lockoutDurationMinutes || 30,
+      suspicious_ip_check: settings?.checkSuspiciousIp ?? true,
+      device_fingerprint_enabled: settings?.deviceFingerprintEnabled ?? true,
+      velocity_check_enabled: settings?.velocityCheckEnabled ?? true,
+    },
+    columns: []
+  };
+}
+
+async function executeGetTradingSettings(args: any): Promise<AgentResult> {
+  const db = mongoose.connection.db!;
+  
+  const settings = await db.collection('tradingrisksettings').findOne({}) ||
+                   await db.collection('tradingRiskSettings').findOne({});
+  
+  return {
+    type: 'stats',
+    title: 'Trading Risk Settings',
+    data: {
+      max_leverage: settings?.maxLeverage || '1:100',
+      default_leverage: settings?.defaultLeverage || '1:30',
+      margin_call_level: `${settings?.marginCallLevel || 50}%`,
+      stop_out_level: `${settings?.stopOutLevel || 30}%`,
+      max_position_size_percent: `${settings?.maxPositionSizePercent || 100}%`,
+      max_open_positions: settings?.maxOpenPositions || 'Unlimited',
+      negative_balance_protection: settings?.negativeBalanceProtection ?? true,
+    },
+    columns: []
+  };
+}
+
 // Get AI configuration
 async function getAIConfig() {
   try {
@@ -3537,11 +3827,19 @@ You have 30+ tools to query live data:
 - Present results clearly (tables, stats)
 - Suggest follow-up actions if issues found
 
-### Important Notes:
-- You have access to real user data - handle with care
-- Always present data accurately as shown in tool results
-- Remind admins to verify critical decisions in the system
-- Data tables shown to admins will match your descriptions
+### Hybrid Data Privacy:
+IMPORTANT: You receive MASKED data (user_0001, J.D., etc.) for privacy protection.
+The admin sees REAL data in the tables below your responses.
+
+When describing results:
+- Reference users by their masked identifiers (e.g., "User user_0001" or "User 1")
+- DO NOT try to show actual emails or full names in your text responses
+- The data table automatically shows the real values for the admin
+- Say things like "The data table below shows the full details" or "See the table for actual user information"
+
+Example: Instead of "john@email.com has high risk", say "User 1 (see table) has high risk score of 85"
+
+Always remind admins to verify critical decisions in the system.
 
 ## EXAMPLES
 
@@ -3593,6 +3891,9 @@ export async function POST(request: NextRequest) {
     }
 
     await connectToDatabase();
+
+    // Reset masking map for this request (hybrid masking approach)
+    resetMaskingMap();
 
     const openai = new OpenAI({ apiKey: config.apiKey });
 
@@ -3668,18 +3969,20 @@ export async function POST(request: NextRequest) {
           // Execute tool and get raw result
           const rawResult = await executeTool(functionName, functionArgs);
           
-          // Store result for client display
+          // HYBRID MASKING: Store RAW result for client display (admin sees real data)
           results.push(rawResult);
           
           toolCalls[toolCalls.length - 1].status = 'completed';
           toolCalls[toolCalls.length - 1].result = rawResult;
 
-          // Send real data to OpenAI for consistency
-          // Admin already has access to this data, and we have third-party exposure disclaimers
+          // HYBRID MASKING: Send MASKED data to OpenAI for privacy
+          // AI will reference masked identifiers (User 1, User 2) in text
+          // But the data table shown to admin will have real emails/names
+          const maskedResult = maskSensitiveData(rawResult);
           toolResults.push({
             role: 'tool',
             tool_call_id: toolCall.id,
-            content: JSON.stringify(rawResult),
+            content: JSON.stringify(maskedResult),
           });
 
           // Audit log
@@ -3756,8 +4059,8 @@ export async function POST(request: NextRequest) {
         totalTokens: totalInputTokens + totalOutputTokens,
         estimatedCost: totalCost,
         model: config.model,
-        dataMasked: false, // Data sent to OpenAI in full for consistency
-        maskingSummary: { note: 'Masking disabled for consistency with data tables' },
+        dataMasked: true, // Hybrid masking: masked for OpenAI, raw for admin tables
+        maskingSummary: getMaskingSummary(),
         requestTimestamp,
         responseTimestamp,
         totalDurationMs: responseTimestamp.getTime() - requestTimestamp.getTime(),

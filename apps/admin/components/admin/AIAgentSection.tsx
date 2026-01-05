@@ -477,6 +477,9 @@ export default function AIAgentSection() {
           <div>
             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
               AI Agent
+              <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
+                BETA
+              </Badge>
               <Badge className="bg-violet-500/20 text-violet-400 border-violet-500/30">
                 <Sparkles className="h-3 w-3 mr-1" />
                 GPT-4
@@ -663,7 +666,7 @@ export default function AIAgentSection() {
                             <p className="text-[10px] text-amber-400/80 flex items-center gap-1.5">
                               <Shield className="h-3 w-3 shrink-0" />
                               <span>
-                                AI responses may contain inaccuracies. Always verify data in the system.
+                                Data is masked for AI privacy (User 1, User 2). Tables show real data. Always verify in system.
                               </span>
                             </p>
                           </div>
