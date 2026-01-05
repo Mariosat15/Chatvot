@@ -381,6 +381,23 @@ const TOOLS: OpenAI.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
+      name: 'get_competition_winner',
+      description: 'Get the winner of a specific competition - use this when asked "who won" a competition',
+      parameters: {
+        type: 'object',
+        properties: {
+          competitionId: {
+            type: 'string',
+            description: 'Competition ID (full or partial) or slug'
+          }
+        },
+        required: ['competitionId']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'get_competition_analytics',
       description: 'Get analytics and statistics across all competitions - win rates, popular assets, average returns',
       parameters: {
@@ -1719,22 +1736,102 @@ async function executeGetCompetitionLeaderboard(args: any): Promise<AgentResult>
   const db = mongoose.connection.db!;
   const limit = args.limit || 20;
   
-  let competitionId = args.competitionId;
-  if (mongoose.Types.ObjectId.isValid(competitionId)) {
-    competitionId = competitionId;
-  } else {
-    const comp = await db.collection('competitions').findOne({ slug: competitionId });
-    if (comp) competitionId = comp._id.toString();
+  let searchId = args.competitionId;
+  
+  // Find the competition - handle partial IDs, slugs, or full ObjectIds
+  let competition: any = null;
+  
+  // Try exact ObjectId match first
+  // Try exact ObjectId match first
+  if (mongoose.Types.ObjectId.isValid(searchId) && searchId.length === 24) {
+    competition = await db.collection('competitions').findOne({ 
+      _id: new mongoose.Types.ObjectId(searchId) 
+    });
   }
-
-  const participants = await db.collection('competitionparticipants')
-    .find({ competitionId: competitionId })
+  
+  // Try slug match
+  if (!competition) {
+    competition = await db.collection('competitions').findOne({ slug: searchId });
+  }
+  
+  // Try partial ID match (user might provide short form like "695b7444")
+  if (!competition) {
+    const allComps = await db.collection('competitions').find({}).toArray();
+    competition = allComps.find(c => c._id.toString().startsWith(searchId) || c._id.toString().includes(searchId));
+  }
+  
+  if (!competition) {
+    return {
+      type: 'text',
+      title: 'Competition Not Found',
+      data: { error: `No competition found with ID/slug: ${searchId}` },
+      columns: []
+    };
+  }
+  
+  const fullCompetitionId = competition._id.toString();
+  
+  // For completed competitions, check if we have winner data stored in the competition
+  if (competition.status === 'completed' && competition.finalLeaderboard?.length > 0) {
+    // Use the stored final leaderboard
+    const data = competition.finalLeaderboard.slice(0, limit).map((entry: any) => ({
+      rank: entry.rank,
+      username: entry.username || 'N/A',
+      email: entry.email || 'N/A',
+      userId: entry.userId,
+      capital: entry.finalCapital?.toFixed(2) || '0',
+      pnl: entry.pnl?.toFixed(2) || '0',
+      pnlPercent: `${entry.pnlPercentage?.toFixed(2) || 0}%`,
+      trades: entry.totalTrades || 0,
+      winRate: `${entry.winRate?.toFixed(1) || 0}%`,
+      isWinner: entry.rank === 1 ? '🏆 Winner' : '',
+    }));
+    
+    return {
+      type: 'table',
+      title: `Competition Final Results (${data.length} participants)`,
+      data,
+      columns: [
+        { key: 'rank', label: '#', type: 'number' },
+        { key: 'username', label: 'Username' },
+        { key: 'email', label: 'Email' },
+        { key: 'capital', label: 'Final Capital', type: 'number' },
+        { key: 'pnl', label: 'P&L', type: 'number' },
+        { key: 'pnlPercent', label: 'P&L %' },
+        { key: 'trades', label: 'Trades', type: 'number' },
+        { key: 'winRate', label: 'Win Rate' },
+        { key: 'isWinner', label: 'Result' },
+      ]
+    };
+  }
+  
+  // Query participants collection - try multiple ID formats
+  let participants = await db.collection('competitionparticipants')
+    .find({ competitionId: fullCompetitionId })
     .sort({ pnl: -1, currentCapital: -1 })
     .limit(limit)
     .toArray();
+  
+  // If no results, try with ObjectId
+  if (participants.length === 0) {
+    participants = await db.collection('competitionparticipants')
+      .find({ competitionId: new mongoose.Types.ObjectId(fullCompetitionId) })
+      .sort({ pnl: -1, currentCapital: -1 })
+      .limit(limit)
+      .toArray();
+  }
+  
+  // Also try regex match for partial IDs stored
+  if (participants.length === 0) {
+    participants = await db.collection('competitionparticipants')
+      .find({ competitionId: { $regex: new RegExp(searchId, 'i') } })
+      .sort({ pnl: -1, currentCapital: -1 })
+      .limit(limit)
+      .toArray();
+  }
 
   const data = participants.map((p: any, index: number) => ({
-    rank: index + 1,
+    rank: p.currentRank || index + 1,
     username: p.username,
     email: p.email,
     capital: p.currentCapital?.toFixed(2) || '0',
@@ -1744,6 +1841,23 @@ async function executeGetCompetitionLeaderboard(args: any): Promise<AgentResult>
     winRate: `${p.winRate?.toFixed(1) || 0}%`,
     status: p.status,
   }));
+
+  // If still no participants but competition shows participants count > 0
+  if (data.length === 0 && competition.currentParticipants > 0) {
+    return {
+      type: 'text',
+      title: `Competition ${competition.name}`,
+      data: {
+        message: `Competition has ${competition.currentParticipants} participants but detailed data not found in participants collection.`,
+        competitionId: fullCompetitionId,
+        winnerId: competition.winnerId || 'Not set',
+        winnerPnL: competition.winnerPnL || 'N/A',
+        status: competition.status,
+        suggestion: 'Check if finalLeaderboard was populated when competition ended.'
+      },
+      columns: []
+    };
+  }
 
   return {
     type: 'table',
@@ -1760,6 +1874,122 @@ async function executeGetCompetitionLeaderboard(args: any): Promise<AgentResult>
       { key: 'winRate', label: 'Win Rate' },
       { key: 'status', label: 'Status', type: 'status' },
     ]
+  };
+}
+
+async function executeGetCompetitionWinner(args: any): Promise<AgentResult> {
+  const db = mongoose.connection.db!;
+  const searchId = args.competitionId;
+  
+  // Find competition with flexible ID matching
+  let competition: any = null;
+  
+  // Try exact ObjectId
+  if (mongoose.Types.ObjectId.isValid(searchId) && searchId.length === 24) {
+    competition = await db.collection('competitions').findOne({ 
+      _id: new mongoose.Types.ObjectId(searchId) 
+    });
+  }
+  
+  // Try slug
+  if (!competition) {
+    competition = await db.collection('competitions').findOne({ slug: searchId });
+  }
+  
+  // Try partial ID match
+  if (!competition) {
+    const allComps = await db.collection('competitions').find({}).toArray();
+    competition = allComps.find(c => c._id.toString().startsWith(searchId) || c._id.toString().includes(searchId));
+  }
+  
+  if (!competition) {
+    return {
+      type: 'text',
+      title: 'Competition Not Found',
+      data: { error: `No competition found with ID: ${searchId}` },
+      columns: []
+    };
+  }
+  
+  // Get winner info
+  let winnerData: any = {
+    competitionId: competition._id.toString(),
+    competitionName: competition.name,
+    status: competition.status,
+    prizePool: competition.prizePool,
+    entryFee: competition.entryFee,
+    participants: competition.currentParticipants || 0,
+  };
+  
+  if (competition.status !== 'completed') {
+    return {
+      type: 'text',
+      title: `Competition Not Yet Completed`,
+      data: {
+        ...winnerData,
+        message: `This competition is still ${competition.status}. Winner will be determined when it completes.`,
+        endDate: competition.endDate,
+      },
+      columns: []
+    };
+  }
+  
+  // Get winner from competition document
+  if (competition.winnerId) {
+    // Build query conditions
+    const queryConditions: any[] = [{ id: competition.winnerId }];
+    if (mongoose.Types.ObjectId.isValid(competition.winnerId)) {
+      queryConditions.push({ _id: new mongoose.Types.ObjectId(competition.winnerId) });
+    }
+    
+    const winner = await db.collection('user').findOne({ $or: queryConditions });
+    
+    winnerData.winner = {
+      userId: competition.winnerId,
+      name: winner?.name || 'Unknown',
+      email: winner?.email || 'Unknown',
+      pnl: competition.winnerPnL || 0,
+    };
+  }
+  
+  // Also get from final leaderboard if available
+  if (competition.finalLeaderboard?.length > 0) {
+    const topThree = competition.finalLeaderboard.slice(0, 3);
+    winnerData.podium = topThree.map((entry: any, i: number) => ({
+      place: i + 1,
+      medal: i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉',
+      username: entry.username,
+      email: entry.email,
+      pnl: entry.pnl?.toFixed(2) || '0',
+      pnlPercent: `${entry.pnlPercentage?.toFixed(2) || 0}%`,
+    }));
+  }
+  
+  // If no winner data found, try participants collection
+  if (!winnerData.winner && !winnerData.podium) {
+    const topParticipant = await db.collection('competitionparticipants')
+      .find({ competitionId: competition._id.toString() })
+      .sort({ pnl: -1 })
+      .limit(1)
+      .toArray();
+    
+    if (topParticipant.length > 0) {
+      winnerData.winner = {
+        username: topParticipant[0].username,
+        email: topParticipant[0].email,
+        pnl: topParticipant[0].pnl,
+        pnlPercent: `${topParticipant[0].pnlPercentage?.toFixed(2) || 0}%`,
+      };
+    } else {
+      winnerData.message = 'Winner data not found. The finalLeaderboard may not have been populated when competition ended.';
+    }
+  }
+  
+  return {
+    type: 'text',
+    title: `🏆 Competition Winner: ${competition.name}`,
+    data: winnerData,
+    columns: []
   };
 }
 
@@ -2714,6 +2944,8 @@ async function executeTool(name: string, args: any): Promise<AgentResult> {
       return executeGetCompetitionDetails(args);
     case 'get_competition_leaderboard':
       return executeGetCompetitionLeaderboard(args);
+    case 'get_competition_winner':
+      return executeGetCompetitionWinner(args);
     case 'get_competition_analytics':
       return executeGetCompetitionAnalytics(args);
     
