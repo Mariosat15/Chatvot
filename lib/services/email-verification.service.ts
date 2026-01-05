@@ -416,19 +416,21 @@ export async function resendVerificationEmail(email: string): Promise<{ success:
 </body>
 </html>`;
 
-    // Send email
-    const { sendEmail } = await import('@/lib/nodemailer');
-    const sent = await sendEmail({
-      to: user.email,
-      subject,
-      html: htmlContent,
-      from: `${fromName} <${process.env.EMAIL_FROM || 'noreply@chartvolt.com'}>`,
-    });
+    // Send email using nodemailer transporter
+    const { getTransporter } = await import('@/lib/nodemailer');
+    const transporter = await getTransporter();
     
-    if (sent) {
+    try {
+      await transporter.sendMail({
+        to: user.email,
+        subject,
+        html: htmlContent,
+        from: `${fromName} <${process.env.NODEMAILER_EMAIL || 'noreply@chartvolt.com'}>`,
+      });
       console.log(`✅ Verification email sent to ${user.email}`);
       return { success: true };
-    } else {
+    } catch (emailError) {
+      console.error('❌ Failed to send verification email:', emailError);
       return { success: false, error: 'Failed to send verification email' };
     }
   } catch (error) {
