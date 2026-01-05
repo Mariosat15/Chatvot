@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Search, TrendingUp, ArrowLeftRight, Globe, Star, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, TrendingUp, ArrowLeftRight, Globe, Star, ChevronDown, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 
-// Categorize forex pairs
-const PAIR_CATEGORIES = {
+// Default categorized forex pairs (fallback)
+const DEFAULT_PAIR_CATEGORIES = {
   major: {
     name: 'Major Pairs',
     icon: TrendingUp,
@@ -34,7 +34,22 @@ const PAIR_CATEGORIES = {
     description: 'Emerging market currencies',
     pairs: ['USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK'] as ForexSymbol[],
   },
+  custom: {
+    name: 'Custom',
+    icon: Sparkles,
+    description: 'Custom added symbols',
+    pairs: [] as ForexSymbol[],
+  },
 };
+
+type PairCategoriesType = typeof DEFAULT_PAIR_CATEGORIES;
+
+interface TradingSymbolData {
+  symbol: ForexSymbol;
+  name: string;
+  category: 'major' | 'cross' | 'exotic' | 'custom';
+  enabled: boolean;
+}
 
 // Get pair info
 function getPairInfo(symbol: ForexSymbol) {
@@ -88,20 +103,69 @@ export function SymbolSelector({
     major: true,
     cross: true,
     exotic: true,
+    custom: true,
     favorites: true,
   });
+  const [isLoadingSymbols, setIsLoadingSymbols] = useState(true);
+  const [pairCategories, setPairCategories] = useState<PairCategoriesType>(DEFAULT_PAIR_CATEGORIES);
+
+  // Fetch enabled symbols from database
+  useEffect(() => {
+    const fetchSymbols = async () => {
+      try {
+        const res = await fetch('/api/trading/symbols');
+        if (res.ok) {
+          const data = await res.json();
+          
+          // Group symbols by category
+          const grouped: PairCategoriesType = {
+            major: { ...DEFAULT_PAIR_CATEGORIES.major, pairs: [] },
+            cross: { ...DEFAULT_PAIR_CATEGORIES.cross, pairs: [] },
+            exotic: { ...DEFAULT_PAIR_CATEGORIES.exotic, pairs: [] },
+            custom: { ...DEFAULT_PAIR_CATEGORIES.custom, pairs: [] },
+          };
+          
+          data.symbols.forEach((sym: TradingSymbolData) => {
+            if (sym.enabled && grouped[sym.category]) {
+              grouped[sym.category].pairs.push(sym.symbol);
+            }
+          });
+          
+          // Only update if we have symbols
+          const totalPairs = Object.values(grouped).reduce((sum, cat) => sum + cat.pairs.length, 0);
+          if (totalPairs > 0) {
+            setPairCategories(grouped);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch symbols, using defaults:', error);
+      }
+      setIsLoadingSymbols(false);
+    };
+    
+    if (open) {
+      fetchSymbols();
+    }
+  }, [open]);
 
   // Filter pairs based on search
   const filteredCategories = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     
     if (!query) {
-      return PAIR_CATEGORIES;
+      // Return only categories that have pairs
+      const result: Partial<PairCategoriesType> = {};
+      Object.entries(pairCategories).forEach(([key, category]) => {
+        if (category.pairs.length > 0) {
+          result[key as keyof PairCategoriesType] = category;
+        }
+      });
+      return result as PairCategoriesType;
     }
 
-    const filtered: typeof PAIR_CATEGORIES = {} as typeof PAIR_CATEGORIES;
+    const filtered: Partial<PairCategoriesType> = {};
     
-    Object.entries(PAIR_CATEGORIES).forEach(([key, category]) => {
+    Object.entries(pairCategories).forEach(([key, category]) => {
       const matchingPairs = category.pairs.filter((symbol) => {
         const info = getPairInfo(symbol);
         return (
@@ -114,15 +178,15 @@ export function SymbolSelector({
       });
 
       if (matchingPairs.length > 0) {
-        filtered[key as keyof typeof PAIR_CATEGORIES] = {
+        filtered[key as keyof PairCategoriesType] = {
           ...category,
           pairs: matchingPairs,
         };
       }
     });
 
-    return filtered;
-  }, [searchQuery]);
+    return filtered as PairCategoriesType;
+  }, [searchQuery, pairCategories]);
 
   // Favorites section
   const favoritePairs = useMemo(() => {
@@ -217,8 +281,16 @@ export function SymbolSelector({
             </div>
           )}
 
+          {/* Loading State */}
+          {isLoadingSymbols && (
+            <div className="py-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-[#787b86]" />
+            </div>
+          )}
+
           {/* Category Sections */}
-          {Object.entries(filteredCategories).map(([key, category]) => {
+          {!isLoadingSymbols && Object.entries(filteredCategories).map(([key, category]) => {
+            if (!category || category.pairs.length === 0) return null;
             const Icon = category.icon;
             const isExpanded = expandedCategories[key];
 
@@ -234,7 +306,8 @@ export function SymbolSelector({
                       "h-4 w-4",
                       key === 'major' && "text-green-500",
                       key === 'cross' && "text-blue-500",
-                      key === 'exotic' && "text-purple-500"
+                      key === 'exotic' && "text-purple-500",
+                      key === 'custom' && "text-yellow-500"
                     )} />
                     <span className="text-sm font-medium text-white">{category.name}</span>
                     <span className="text-xs text-[#787b86]">({category.pairs.length})</span>
@@ -267,7 +340,7 @@ export function SymbolSelector({
           })}
 
           {/* No Results */}
-          {Object.keys(filteredCategories).length === 0 && favoritePairs.length === 0 && (
+          {!isLoadingSymbols && Object.keys(filteredCategories).length === 0 && favoritePairs.length === 0 && (
             <div className="py-8 text-center">
               <Search className="h-8 w-8 text-[#787b86] mx-auto mb-2" />
               <p className="text-[#787b86] text-sm">No pairs found for "{searchQuery}"</p>

@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronRight, Search, TrendingUp, TrendingDown } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
-// All available pairs by category
-const PAIR_CATEGORIES = {
+// Default pairs (fallback if database is empty)
+const DEFAULT_PAIR_CATEGORIES = {
   major: {
     label: 'Major Pairs',
     icon: '🔷',
@@ -26,6 +26,14 @@ const PAIR_CATEGORIES = {
     pairs: ['USD/MXN', 'USD/ZAR', 'USD/TRY', 'USD/SEK', 'USD/NOK'] as ForexSymbol[],
   },
 };
+
+interface TradingSymbolData {
+  symbol: ForexSymbol;
+  name: string;
+  category: 'major' | 'cross' | 'exotic' | 'custom';
+  enabled: boolean;
+  icon?: string;
+}
 
 // Currency flag emojis
 const CURRENCY_FLAGS: Record<string, string> = {
@@ -47,21 +55,59 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
     major: true,
     cross: true,
     exotic: true,
+    custom: true,
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoadingSymbols, setIsLoadingSymbols] = useState(true);
+  const [pairCategories, setPairCategories] = useState(DEFAULT_PAIR_CATEGORIES);
 
-  // Subscribe to all pairs
+  // Fetch enabled symbols from database
   useEffect(() => {
-    const allPairs = [
-      ...PAIR_CATEGORIES.major.pairs,
-      ...PAIR_CATEGORIES.cross.pairs,
-      ...PAIR_CATEGORIES.exotic.pairs,
-    ];
+    const fetchSymbols = async () => {
+      try {
+        const res = await fetch('/api/trading/symbols');
+        if (res.ok) {
+          const data = await res.json();
+          
+          // Group symbols by category
+          const grouped: Record<string, { label: string; icon: string; pairs: ForexSymbol[] }> = {
+            major: { label: 'Major Pairs', icon: '🔷', pairs: [] },
+            cross: { label: 'Cross Pairs', icon: '🔶', pairs: [] },
+            exotic: { label: 'Exotic Pairs', icon: '💎', pairs: [] },
+            custom: { label: 'Custom', icon: '✨', pairs: [] },
+          };
+          
+          data.symbols.forEach((sym: TradingSymbolData) => {
+            if (sym.enabled && grouped[sym.category]) {
+              grouped[sym.category].pairs.push(sym.symbol);
+            }
+          });
+          
+          // Only update if we have symbols
+          const totalPairs = Object.values(grouped).reduce((sum, cat) => sum + cat.pairs.length, 0);
+          if (totalPairs > 0) {
+            setPairCategories(grouped as typeof DEFAULT_PAIR_CATEGORIES);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch symbols, using defaults:', error);
+      }
+      setIsLoadingSymbols(false);
+    };
+    
+    fetchSymbols();
+  }, []);
+
+  // Subscribe to all enabled pairs
+  useEffect(() => {
+    if (isLoadingSymbols) return;
+    
+    const allPairs = Object.values(pairCategories).flatMap(cat => cat.pairs);
     allPairs.forEach(pair => subscribe(pair));
     return () => {
       allPairs.forEach(pair => unsubscribe(pair));
     };
-  }, [subscribe, unsubscribe]);
+  }, [subscribe, unsubscribe, pairCategories, isLoadingSymbols]);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }));
@@ -74,22 +120,25 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
   // Filter pairs based on search
   const filteredCategories = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return PAIR_CATEGORIES;
+    if (!query) return pairCategories;
 
-    const filtered: typeof PAIR_CATEGORIES = {
-      major: { ...PAIR_CATEGORIES.major, pairs: [] },
-      cross: { ...PAIR_CATEGORIES.cross, pairs: [] },
-      exotic: { ...PAIR_CATEGORIES.exotic, pairs: [] },
+    const filtered: typeof pairCategories = {
+      major: { ...pairCategories.major, pairs: [] },
+      cross: { ...pairCategories.cross, pairs: [] },
+      exotic: { ...pairCategories.exotic, pairs: [] },
+      custom: { label: 'Custom', icon: '✨', pairs: [] },
     };
 
-    Object.entries(PAIR_CATEGORIES).forEach(([key, category]) => {
-      filtered[key as keyof typeof PAIR_CATEGORIES].pairs = category.pairs.filter(
-        pair => pair.toLowerCase().includes(query) || pair.replace('/', '').toLowerCase().includes(query)
-      );
+    Object.entries(pairCategories).forEach(([key, category]) => {
+      if (filtered[key as keyof typeof pairCategories]) {
+        filtered[key as keyof typeof pairCategories].pairs = category.pairs.filter(
+          pair => pair.toLowerCase().includes(query) || pair.replace('/', '').toLowerCase().includes(query)
+        );
+      }
     });
 
     return filtered;
-  }, [searchQuery]);
+  }, [searchQuery, pairCategories]);
 
   const getFlag = (symbol: ForexSymbol) => {
     const [base] = symbol.split('/');
@@ -179,8 +228,10 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
     );
   };
 
-  const renderCategory = (categoryKey: string, category: typeof PAIR_CATEGORIES.major) => {
-    const pairs = filteredCategories[categoryKey as keyof typeof PAIR_CATEGORIES].pairs;
+  const renderCategory = (categoryKey: string, category: typeof DEFAULT_PAIR_CATEGORIES.major) => {
+    const categoryData = filteredCategories[categoryKey as keyof typeof filteredCategories];
+    if (!categoryData) return null;
+    const pairs = categoryData.pairs;
     if (pairs.length === 0) return null;
     const isExpanded = expandedCategories[categoryKey];
 
@@ -218,7 +269,11 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
           <span className="text-sm font-bold text-white">Watchlist</span>
         </div>
         <span className="text-[10px] text-[#787b86] bg-[#1e222d] px-2 py-0.5 rounded">
-          {Object.values(PAIR_CATEGORIES).reduce((sum, cat) => sum + cat.pairs.length, 0)} pairs
+          {isLoadingSymbols ? (
+            <Loader2 className="w-3 h-3 animate-spin inline" />
+          ) : (
+            `${Object.values(pairCategories).reduce((sum, cat) => sum + cat.pairs.length, 0)} pairs`
+          )}
         </span>
       </div>
 
@@ -248,9 +303,18 @@ export default function Watchlist({ className, compact = false }: WatchlistProps
 
       {/* Pairs List */}
       <div className="flex-1 overflow-y-auto dark-scrollbar">
-        {renderCategory('major', PAIR_CATEGORIES.major)}
-        {renderCategory('cross', PAIR_CATEGORIES.cross)}
-        {renderCategory('exotic', PAIR_CATEGORIES.exotic)}
+        {isLoadingSymbols ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-[#787b86]" />
+          </div>
+        ) : (
+          <>
+            {renderCategory('major', pairCategories.major)}
+            {renderCategory('cross', pairCategories.cross)}
+            {renderCategory('exotic', pairCategories.exotic)}
+            {pairCategories.custom?.pairs.length > 0 && renderCategory('custom', pairCategories.custom)}
+          </>
+        )}
       </div>
     </div>
   );

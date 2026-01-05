@@ -59,6 +59,7 @@ import CredentialsSection from '@/components/admin/CredentialsSection';
 import EnvironmentSection from '@/components/admin/EnvironmentSection';
 import ImagesSection from '@/components/admin/ImagesSection';
 import TradingRiskSection from '@/components/admin/TradingRiskSection';
+import SymbolsSection from '@/components/admin/SymbolsSection';
 import CurrencySettingsSection from '@/components/admin/CurrencySettingsSection';
 import FinancialDashboard from '@/components/admin/FinancialDashboard';
 import CompetitionAnalytics from '@/components/admin/CompetitionAnalytics';
@@ -198,6 +199,13 @@ const menuGroups: MenuGroup[] = [
         icon: <Calendar className="h-5 w-5" />,
         color: 'text-green-400',
         bgColor: 'bg-green-500/10 hover:bg-green-500/20',
+      },
+      {
+        id: 'symbols',
+        label: 'Trading Symbols',
+        icon: <TrendingUp className="h-5 w-5" />,
+        color: 'text-violet-400',
+        bgColor: 'bg-violet-500/10 hover:bg-violet-500/20',
       },
     ],
   },
@@ -481,6 +489,8 @@ export default function AdminDashboard({
         return <CompetitionAnalytics />;
       case 'market':
         return <MarketSettingsSection />;
+      case 'symbols':
+        return <SymbolsSection />;
       case 'payments':
         return <PendingPaymentsSection />;
       case 'failed-deposits':
