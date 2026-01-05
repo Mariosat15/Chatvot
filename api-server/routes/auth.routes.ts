@@ -522,7 +522,8 @@ router.post('/register-batch', async (req: Request, res: Response) => {
           if (existingAccount) {
             results.push({ success: false, email: userData.email, error: 'Already exists' });
             failureCount++;
-            await session.endSession();
+            // Don't call session.endSession() here - finally block handles it
+            // Using continue in try-finally still executes finally first
             continue;
           }
           // User exists but no account - delete orphaned user and proceed
