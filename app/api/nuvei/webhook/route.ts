@@ -403,34 +403,25 @@ export async function POST(req: NextRequest) {
         
         console.log(`✅ Nuvei deposit completed via completeDeposit: ${transaction._id}`);
       } catch (completeError) {
-        console.error('❌ Error in completeDeposit for Nuvei:', completeError);
+        // CRITICAL: Do NOT credit wallet if completeDeposit fails
+        // Mark transaction as failed and log for manual investigation
+        console.error('❌ CRITICAL: completeDeposit failed for Nuvei:', completeError);
+        console.error(`❌ Transaction ${transaction._id} for user ${transaction.userId} needs manual review`);
+        console.error(`❌ Amount: ${transaction.amount} credits, Nuvei TX: ${nuveiTransactionId}`);
         
-        // Fallback: Direct wallet credit if completeDeposit fails
-        const wallet = await CreditWallet.findOne({ userId: transaction.userId });
-        if (wallet) {
-          wallet.creditBalance = (wallet.creditBalance || 0) + transaction.amount;
-          wallet.totalDeposited = (wallet.totalDeposited || 0) + transaction.amount;
-          await wallet.save();
-          console.log(`⚠️ Fallback: Credited ${transaction.amount} directly to wallet`);
-        }
-        
-        transaction.status = 'completed';
-        transaction.processedAt = new Date();
+        // Mark transaction as failed (not completed!) - requires manual intervention
+        transaction.status = 'failed';
+        transaction.failureReason = `completeDeposit error: ${completeError instanceof Error ? completeError.message : 'Unknown error'}`;
+        transaction.metadata = {
+          ...transaction.metadata,
+          processingError: completeError instanceof Error ? completeError.message : 'Unknown error',
+          requiresManualReview: true,
+          nuveiPaymentApproved: true, // Nuvei approved, but our processing failed
+        };
         await transaction.save();
         
-        // IMPORTANT: Still trigger badge evaluation in fallback path
-        console.log(`🏅 Triggering badge evaluation for user ${transaction.userId} (fallback path)...`);
-        try {
-          const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
-          const result = await evaluateUserBadges(transaction.userId);
-          if (result.newBadges.length > 0) {
-            console.log(`🏅 User earned ${result.newBadges.length} new badges after deposit (fallback)`);
-          } else {
-            console.log(`🏅 Badge evaluation complete (fallback) - no new badges earned`);
-          }
-        } catch (badgeError) {
-          console.error('❌ Error evaluating badges (fallback):', badgeError);
-        }
+        // TODO: Send admin notification about failed deposit that needs review
+        console.error(`🚨 ALERT: Deposit ${transaction._id} approved by Nuvei but failed to process. Manual review required!`);
       }
     } else if (status === 'DECLINED' || status === 'ERROR') {
       // Payment failed
