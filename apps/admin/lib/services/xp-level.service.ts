@@ -216,3 +216,98 @@ export async function getUsersWithTitles(userIds: string[]) {
   return levelMap;
 }
 
+/**
+ * Ensure a UserLevel document exists for a user
+ * Call this after registration or first deposit to ensure user appears in leaderboard
+ */
+export async function ensureUserLevel(userId: string): Promise<void> {
+  await connectToDatabase();
+  
+  const existing = await UserLevel.findOne({ userId });
+  if (!existing) {
+    console.log(`📝 [USER LEVEL] Creating UserLevel for user ${userId}`);
+    await UserLevel.create({
+      userId,
+      currentXP: 0,
+      currentLevel: 1,
+      currentTitle: 'Novice Trader',
+      totalBadgesEarned: 0,
+    });
+  }
+}
+
+/**
+ * Sync missing users - find all users with deposits but no UserLevel and create them
+ * Returns count of users synced
+ */
+export async function syncMissingUserLevels(): Promise<{
+  synced: number;
+  evaluated: number;
+  newBadgesAwarded: number;
+}> {
+  await connectToDatabase();
+  
+  const mongoose = await import('mongoose');
+  const db = mongoose.default.connection.db;
+  
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  
+  console.log('🔄 [SYNC] Starting sync of missing user levels...');
+  
+  // Get all users who have made deposits
+  const WalletTransaction = (await import('@/database/models/trading/wallet-transaction.model')).default;
+  const depositUserIds = await WalletTransaction.distinct('userId', { 
+    transactionType: 'deposit', 
+    status: 'completed' 
+  });
+  
+  console.log(`📊 [SYNC] Found ${depositUserIds.length} users with completed deposits`);
+  
+  // Get all users who already have UserLevel
+  const existingLevelUserIds = await UserLevel.distinct('userId');
+  const existingSet = new Set(existingLevelUserIds);
+  
+  // Find users missing UserLevel
+  const missingUserIds = depositUserIds.filter((id: string) => !existingSet.has(id));
+  console.log(`⚠️ [SYNC] Found ${missingUserIds.length} users missing UserLevel`);
+  
+  let synced = 0;
+  let evaluated = 0;
+  let newBadgesAwarded = 0;
+  
+  // Import badge evaluation
+  const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
+  
+  for (const userId of missingUserIds) {
+    try {
+      // Create UserLevel
+      await UserLevel.create({
+        userId,
+        currentXP: 0,
+        currentLevel: 1,
+        currentTitle: 'Novice Trader',
+        totalBadgesEarned: 0,
+      });
+      synced++;
+      console.log(`✅ [SYNC] Created UserLevel for user ${userId}`);
+      
+      // Run badge evaluation
+      const result = await evaluateUserBadges(userId);
+      evaluated++;
+      newBadgesAwarded += result.newBadges.length;
+      
+      if (result.newBadges.length > 0) {
+        console.log(`🏅 [SYNC] User ${userId} earned ${result.newBadges.length} badges`);
+      }
+    } catch (error) {
+      console.error(`❌ [SYNC] Error syncing user ${userId}:`, error);
+    }
+  }
+  
+  console.log(`✅ [SYNC] Complete: ${synced} users synced, ${evaluated} evaluated, ${newBadgesAwarded} badges awarded`);
+  
+  return { synced, evaluated, newBadgesAwarded };
+}
+
