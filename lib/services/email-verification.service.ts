@@ -281,6 +281,7 @@ export async function verifyEmailToken(token: string, userId: string): Promise<V
 
 /**
  * Resend verification email
+ * IMPORTANT: Reuses existing valid token to avoid invalidating emails user already received
  */
 export async function resendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -305,7 +306,6 @@ export async function resendVerificationEmail(email: string): Promise<{ success:
     }
     
     // Get user ID - better-auth may use 'id' field or '_id'
-    // Convert _id to string if id doesn't exist
     const userId = user.id || user._id?.toString();
     
     if (!userId) {
@@ -315,18 +315,122 @@ export async function resendVerificationEmail(email: string): Promise<{ success:
     
     console.log(`📧 Resending verification email to ${user.email} (userId: ${userId})`);
     
-    // Send new verification email
-    const sent = await sendVerificationEmail({
-      email: user.email,
-      name: user.name || 'User',
-      userId: userId,
-    });
+    // Check if user already has a valid (non-expired) token
+    // If so, reuse it instead of generating a new one (to avoid invalidating emails already sent)
+    let token = user.emailVerificationToken;
+    let tokenExpiry = user.emailVerificationTokenExpiry ? new Date(user.emailVerificationTokenExpiry) : null;
+    const now = new Date();
     
-    if (!sent) {
-      return { success: false, error: 'Failed to send verification email' };
+    // If no token or token is expired, generate a new one
+    if (!token || !tokenExpiry || tokenExpiry < now) {
+      console.log(`📧 Generating new token (old token expired or missing)`);
+      token = generateVerificationToken();
+      tokenExpiry = getTokenExpiry();
+      
+      // Update token in database
+      const userQueries = buildUserIdQuery(userId);
+      await db.collection('user').updateOne(
+        { $or: userQueries },
+        { 
+          $set: { 
+            emailVerificationToken: token,
+            emailVerificationTokenExpiry: tokenExpiry,
+            updatedAt: new Date()
+          } 
+        }
+      );
+      console.log(`📧 New token stored for user ${userId}`);
+    } else {
+      console.log(`📧 Reusing existing valid token (expires: ${tokenExpiry.toISOString()})`);
     }
     
-    return { success: true };
+    // Get settings for platform name and build email
+    const settings = await getSettings();
+    const platformName = settings.siteName || 'ChartVolt';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000';
+    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}&userId=${userId}`;
+    
+    // Get email template
+    const EmailTemplate = (await import('@/database/models/email-template.model')).default;
+    const template = await EmailTemplate.findOne({ templateType: 'email_verification' });
+    
+    // Build email content
+    const userName = user.name || 'User';
+    const subject = template?.subject?.replace('{{platformName}}', platformName) 
+      || `Verify your email - ${platformName}`;
+    const fromName = template?.fromName?.replace('{{platformName}}', platformName) 
+      || platformName;
+    const headingText = template?.headingText?.replace('{{name}}', userName) 
+      || `Hi ${userName}, please verify your email`;
+    const introText = template?.introText 
+      || `Thanks for signing up! Please click the button below to verify your email address and activate your account.`;
+    const ctaButtonText = template?.ctaButtonText || 'Verify Email';
+    
+    // Build HTML email (simplified version)
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 16px; overflow: hidden;">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center;">
+              <h1 style="color: #f5c518; margin: 0; font-size: 28px; font-weight: bold;">${platformName}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px;">
+              <h2 style="color: #ffffff; margin: 0 0 20px; font-size: 24px;">${headingText}</h2>
+              <p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin: 0 0 30px;">${introText}</p>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding: 20px 0;">
+                    <a href="${verificationUrl}" 
+                       style="display: inline-block; background: linear-gradient(135deg, #f5c518 0%, #d4a516 100%); 
+                              color: #000000; text-decoration: none; padding: 16px 48px; 
+                              border-radius: 8px; font-weight: bold; font-size: 16px;">
+                      ${ctaButtonText}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="color: #666666; font-size: 14px; margin-top: 30px;">
+                If you didn't create an account, you can safely ignore this email.
+              </p>
+              <p style="color: #666666; font-size: 12px; margin-top: 20px;">
+                This link will expire in 24 hours.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    // Send email
+    const { sendEmail } = await import('@/lib/nodemailer');
+    const sent = await sendEmail({
+      to: user.email,
+      subject,
+      html: htmlContent,
+      from: `${fromName} <${process.env.EMAIL_FROM || 'noreply@chartvolt.com'}>`,
+    });
+    
+    if (sent) {
+      console.log(`✅ Verification email sent to ${user.email}`);
+      return { success: true };
+    } else {
+      return { success: false, error: 'Failed to send verification email' };
+    }
   } catch (error) {
     console.error('❌ Resend verification failed:', error);
     return { success: false, error: 'Failed to resend verification email' };
