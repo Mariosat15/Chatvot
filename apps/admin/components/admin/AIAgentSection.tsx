@@ -86,15 +86,22 @@ interface AIConfig {
 }
 
 // Quick action suggestions - organized by category
-const QUICK_ACTIONS = [
-  // Dashboard & Overview
-  { icon: <LayoutGrid className="h-4 w-4" />, label: 'Dashboard overview', prompt: 'Give me a dashboard overview with all key metrics - users, revenue, active competitions, pending items' },
-  
-  // HOW-TO QUESTIONS (System Help)
+// INFORMATIONAL: How-to questions about the system
+const INFORMATIONAL_ACTIONS = [
   { icon: <Brain className="h-4 w-4" />, label: 'How to create competition', prompt: 'How do I create a new competition? Walk me through the process step by step.' },
   { icon: <Brain className="h-4 w-4" />, label: 'How VAT works', prompt: 'How does VAT work in the system? How do I change the VAT percentage?' },
   { icon: <Brain className="h-4 w-4" />, label: 'How winners evaluated', prompt: 'How does the system evaluate competition winners? What are the ranking methods and tie breakers?' },
   { icon: <Brain className="h-4 w-4" />, label: 'How withdrawals work', prompt: 'Explain how withdrawals work. What are automatic vs manual processing modes?' },
+  { icon: <Brain className="h-4 w-4" />, label: 'How fraud detection works', prompt: 'Explain how the fraud detection system works. What triggers alerts and how should I handle them?' },
+  { icon: <Brain className="h-4 w-4" />, label: 'Badge & XP system', prompt: 'How does the badge and XP system work? How can I configure it?' },
+  { icon: <Brain className="h-4 w-4" />, label: 'How deposits work', prompt: 'How do deposits work? Explain the flow from payment to wallet credit.' },
+  { icon: <Brain className="h-4 w-4" />, label: 'How KYC works', prompt: 'How does the KYC verification process work? What are the steps and requirements?' },
+];
+
+// COMMANDS: Actual data queries and actions
+const COMMAND_ACTIONS = [
+  // Dashboard
+  { icon: <LayoutGrid className="h-4 w-4" />, label: 'Dashboard overview', prompt: 'Give me a dashboard overview with all key metrics - users, revenue, active competitions, pending items' },
   
   // Fraud & Security
   { icon: <Users className="h-4 w-4" />, label: 'Shared payment methods', prompt: 'Show me all users who share the same payment method (potential fraud)' },
@@ -119,11 +126,10 @@ const QUICK_ACTIONS = [
   { icon: <Eye className="h-4 w-4" />, label: 'Online users', prompt: 'Who is currently online on the platform?' },
   { icon: <Shield className="h-4 w-4" />, label: 'KYC pending', prompt: 'List all users pending KYC verification' },
   { icon: <Wallet className="h-4 w-4" />, label: 'Pending withdrawals', prompt: 'List all pending withdrawal requests that need review' },
-  
-  // System Help
-  { icon: <Brain className="h-4 w-4" />, label: 'How fraud detection works', prompt: 'Explain how the fraud detection system works. What triggers alerts and how should I handle them?' },
-  { icon: <Brain className="h-4 w-4" />, label: 'Badge & XP system', prompt: 'How does the badge and XP system work? How can I configure it?' },
 ];
+
+// Combined for initial display
+const QUICK_ACTIONS = [...COMMAND_ACTIONS.slice(0, 4)];
 
 export default function AIAgentSection() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -733,7 +739,7 @@ export default function AIAgentSection() {
 
         {/* Sidebar */}
         <div className="space-y-4">
-          {/* Quick Actions */}
+          {/* Quick Actions - Scrollable with Categories */}
           <Card className="bg-gray-800/50 border-gray-700">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
@@ -741,22 +747,58 @@ export default function AIAgentSection() {
                 Quick Actions
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {QUICK_ACTIONS.map((action, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSend(action.prompt)}
-                  disabled={isLoading}
-                  className="w-full flex items-center gap-3 p-2.5 rounded-lg bg-gray-700/30 hover:bg-gray-700/50 border border-gray-700 hover:border-violet-500/30 transition-all text-left group disabled:opacity-50"
-                >
-                  <div className="h-8 w-8 rounded-lg bg-gray-700 flex items-center justify-center text-gray-400 group-hover:text-violet-400 transition-colors shrink-0">
-                    {action.icon}
+            <CardContent className="p-0">
+              <div className="max-h-[400px] overflow-y-auto px-4 pb-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+                {/* Informational - How-To Questions */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2 sticky top-0 bg-gray-800/90 py-2 -mx-1 px-1 backdrop-blur-sm">
+                    <Brain className="h-3.5 w-3.5 text-blue-400" />
+                    <span className="text-xs font-medium text-blue-400 uppercase tracking-wide">How-To Guides</span>
                   </div>
-                  <span className="text-sm text-gray-300 group-hover:text-white transition-colors">
-                    {action.label}
-                  </span>
-                </button>
-              ))}
+                  <div className="space-y-1.5">
+                    {INFORMATIONAL_ACTIONS.map((action, i) => (
+                      <button
+                        key={`info-${i}`}
+                        onClick={() => handleSend(action.prompt)}
+                        disabled={isLoading}
+                        className="w-full flex items-center gap-2.5 p-2 rounded-lg bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/40 transition-all text-left group disabled:opacity-50"
+                      >
+                        <div className="h-7 w-7 rounded-md bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:text-blue-300 transition-colors shrink-0">
+                          {action.icon}
+                        </div>
+                        <span className="text-xs text-gray-300 group-hover:text-white transition-colors">
+                          {action.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Commands - Data Queries */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2 sticky top-0 bg-gray-800/90 py-2 -mx-1 px-1 backdrop-blur-sm">
+                    <Activity className="h-3.5 w-3.5 text-violet-400" />
+                    <span className="text-xs font-medium text-violet-400 uppercase tracking-wide">Data Commands</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {COMMAND_ACTIONS.map((action, i) => (
+                      <button
+                        key={`cmd-${i}`}
+                        onClick={() => handleSend(action.prompt)}
+                        disabled={isLoading}
+                        className="w-full flex items-center gap-2.5 p-2 rounded-lg bg-violet-500/5 hover:bg-violet-500/10 border border-violet-500/20 hover:border-violet-500/40 transition-all text-left group disabled:opacity-50"
+                      >
+                        <div className="h-7 w-7 rounded-md bg-violet-500/20 flex items-center justify-center text-gray-400 group-hover:text-violet-400 transition-colors shrink-0">
+                          {action.icon}
+                        </div>
+                        <span className="text-xs text-gray-300 group-hover:text-white transition-colors">
+                          {action.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
