@@ -85,16 +85,38 @@ interface AIConfig {
   hasApiKey: boolean;
 }
 
-// Quick action suggestions
+// Quick action suggestions - organized by category
 const QUICK_ACTIONS = [
-  { icon: <Users className="h-4 w-4" />, label: 'Find shared payment methods', prompt: 'Show me all users who share the same payment method' },
-  { icon: <CreditCard className="h-4 w-4" />, label: 'Payment reconciliation', prompt: 'Run a reconciliation check on all deposits from the last 7 days' },
-  { icon: <AlertTriangle className="h-4 w-4" />, label: 'Fraud alerts', prompt: 'Show me all active fraud alerts with high risk scores' },
-  { icon: <Shield className="h-4 w-4" />, label: 'KYC status', prompt: 'List all users pending KYC verification' },
-  { icon: <DollarSign className="h-4 w-4" />, label: 'Financial summary', prompt: 'Generate a financial summary for this month including deposits, withdrawals, and fees' },
-  { icon: <TrendingUp className="h-4 w-4" />, label: 'User growth', prompt: 'Show me user registration trends for the last 30 days' },
-  { icon: <Activity className="h-4 w-4" />, label: 'Active users', prompt: 'Who are the most active traders this week?' },
-  { icon: <FileText className="h-4 w-4" />, label: 'Pending withdrawals', prompt: 'List all pending withdrawal requests that need review' },
+  // Dashboard & Overview
+  { icon: <LayoutGrid className="h-4 w-4" />, label: 'Dashboard overview', prompt: 'Give me a dashboard overview with all key metrics - users, revenue, active competitions, pending items' },
+  
+  // Fraud & Security
+  { icon: <Users className="h-4 w-4" />, label: 'Shared payment methods', prompt: 'Show me all users who share the same payment method (potential fraud)' },
+  { icon: <AlertTriangle className="h-4 w-4" />, label: 'Fraud alerts', prompt: 'Show me all active fraud alerts with high severity' },
+  { icon: <Shield className="h-4 w-4" />, label: 'High risk users', prompt: 'List all high risk users with suspicion scores above 50' },
+  
+  // Financial
+  { icon: <DollarSign className="h-4 w-4" />, label: 'Financial summary', prompt: 'Generate a detailed financial summary for this month including deposits, withdrawals, fees, VAT, and platform earnings' },
+  { icon: <CreditCard className="h-4 w-4" />, label: 'Reconciliation', prompt: 'Run a reconciliation check on all transactions from the last 7 days' },
+  { icon: <Coins className="h-4 w-4" />, label: 'Fee breakdown', prompt: 'Show me a detailed fee breakdown - platform fees, bank fees, and net earnings for this month' },
+  { icon: <FileText className="h-4 w-4" />, label: 'VAT report', prompt: 'Generate a VAT report for this quarter' },
+  
+  // Competitions & Challenges
+  { icon: <TrendingUp className="h-4 w-4" />, label: 'Active competitions', prompt: 'List all active competitions with their details and participant counts' },
+  { icon: <Zap className="h-4 w-4" />, label: '1v1 Challenges', prompt: 'Show me all active 1v1 challenges and their current status' },
+  
+  // Trading
+  { icon: <Activity className="h-4 w-4" />, label: 'Open positions', prompt: 'Show all currently open trading positions across all competitions' },
+  { icon: <AlertTriangle className="h-4 w-4" />, label: 'Margin at risk', prompt: 'Which users are at risk of margin call or liquidation?' },
+  
+  // Users
+  { icon: <Eye className="h-4 w-4" />, label: 'Online users', prompt: 'Who is currently online on the platform?' },
+  { icon: <Shield className="h-4 w-4" />, label: 'KYC pending', prompt: 'List all users pending KYC verification' },
+  { icon: <Wallet className="h-4 w-4" />, label: 'Pending withdrawals', prompt: 'List all pending withdrawal requests that need review' },
+  
+  // System
+  { icon: <Activity className="h-4 w-4" />, label: 'Payment providers', prompt: 'Show me the status of all payment providers' },
+  { icon: <FileText className="h-4 w-4" />, label: 'Audit logs', prompt: 'Show recent admin audit logs - who did what actions' },
 ];
 
 export default function AIAgentSection() {
