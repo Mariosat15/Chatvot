@@ -302,13 +302,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'OK', message: 'Transaction not found' });
     }
 
+    // Log the user we're processing for
+    console.log(`📦 Processing DMN for transaction ${transaction._id}, user: ${transaction.userId}, amount: ${transaction.amount} credits`);
+
     // Update transaction based on status
     if (status === 'APPROVED' && errCode === 0) {
-      // Check if already processed to prevent duplicate processing
-      if (transaction.status === 'completed') {
-        console.log(`Transaction ${transaction._id} already completed, skipping`);
-        return NextResponse.json({ status: 'OK', message: 'Already processed' });
+      // ATOMIC check and claim: Update status from 'pending' to 'processing' 
+      // This prevents duplicate processing if two webhooks arrive at the same time
+      const claimed = await WalletTransaction.findOneAndUpdate(
+        { 
+          _id: transaction._id, 
+          status: { $in: ['pending', 'awaiting_payment'] } 
+        },
+        { $set: { status: 'processing' } },
+        { new: false } // Return the old document to check if we claimed it
+      );
+      
+      if (!claimed) {
+        // Check if already completed or being processed by another request
+        const currentTxn = await WalletTransaction.findById(transaction._id);
+        if (currentTxn?.status === 'completed') {
+          console.log(`✅ Transaction ${transaction._id} already completed, skipping (duplicate DMN)`);
+          return NextResponse.json({ status: 'OK', message: 'Already processed' });
+        }
+        if (currentTxn?.status === 'processing') {
+          console.log(`⏳ Transaction ${transaction._id} already being processed, skipping (concurrent DMN)`);
+          return NextResponse.json({ status: 'OK', message: 'Already processing' });
+        }
+        console.log(`⚠️ Transaction ${transaction._id} status: ${currentTxn?.status}, cannot process`);
+        return NextResponse.json({ status: 'OK', message: 'Transaction not in pending state' });
       }
+      
+      console.log(`🔒 Claimed transaction ${transaction._id} for processing (user: ${transaction.userId})`);
 
       // Update transaction with Nuvei details before completing
       transaction.paymentId = nuveiTransactionId;
@@ -392,6 +417,20 @@ export async function POST(req: NextRequest) {
         transaction.status = 'completed';
         transaction.processedAt = new Date();
         await transaction.save();
+        
+        // IMPORTANT: Still trigger badge evaluation in fallback path
+        console.log(`🏅 Triggering badge evaluation for user ${transaction.userId} (fallback path)...`);
+        try {
+          const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
+          const result = await evaluateUserBadges(transaction.userId);
+          if (result.newBadges.length > 0) {
+            console.log(`🏅 User earned ${result.newBadges.length} new badges after deposit (fallback)`);
+          } else {
+            console.log(`🏅 Badge evaluation complete (fallback) - no new badges earned`);
+          }
+        } catch (badgeError) {
+          console.error('❌ Error evaluating badges (fallback):', badgeError);
+        }
       }
     } else if (status === 'DECLINED' || status === 'ERROR') {
       // Payment failed

@@ -84,6 +84,18 @@ export async function POST(request: NextRequest) {
       await mongoSession.commitTransaction();
       mongoSession.endSession();
 
+      // Trigger badge evaluation after deposit
+      console.log(`🏅 Triggering badge evaluation for user ${userId} after simulator deposit...`);
+      try {
+        const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
+        const result = await evaluateUserBadges(userId);
+        if (result.newBadges.length > 0) {
+          console.log(`🏅 User earned ${result.newBadges.length} new badges after simulator deposit`);
+        }
+      } catch (badgeError) {
+        console.error('❌ Error evaluating badges after simulator deposit:', badgeError);
+      }
+
       return NextResponse.json({
         success: true,
         wallet: {

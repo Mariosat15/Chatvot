@@ -67,6 +67,14 @@ export async function POST(request: NextRequest) {
         await mongoSession.commitTransaction();
         mongoSession.endSession();
 
+        // Trigger badge evaluation for the depositing user
+        try {
+          const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
+          await evaluateUserBadges(transaction.userId);
+        } catch (badgeError) {
+          console.error('Error evaluating badges:', badgeError);
+        }
+
         return NextResponse.json({
           success: true,
           transactionId: transaction._id.toString(),
@@ -118,6 +126,14 @@ export async function POST(request: NextRequest) {
         await mongoSession.commitTransaction();
         mongoSession.endSession();
 
+        // Trigger badge evaluation
+        try {
+          const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
+          await evaluateUserBadges(userId);
+        } catch (badgeError) {
+          console.error('Error evaluating badges:', badgeError);
+        }
+
         return NextResponse.json({
           success: true,
           transactionId: transaction._id.toString(),
@@ -145,6 +161,17 @@ export async function POST(request: NextRequest) {
 
       await mongoSession.commitTransaction();
       mongoSession.endSession();
+
+      // Trigger badge evaluation for all users who had transactions approved
+      const uniqueUserIds = [...new Set(pendingTransactions.map(t => t.userId))];
+      for (const uid of uniqueUserIds) {
+        try {
+          const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
+          await evaluateUserBadges(uid);
+        } catch (badgeError) {
+          console.error(`Error evaluating badges for user ${uid}:`, badgeError);
+        }
+      }
 
       return NextResponse.json({
         success: true,

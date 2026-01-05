@@ -130,6 +130,18 @@ export async function POST(req: NextRequest) {
           transaction.status = 'completed';
           transaction.processedAt = new Date();
           await transaction.save();
+          
+          // IMPORTANT: Still trigger badge evaluation in fallback path
+          console.log(`🏅 Triggering badge evaluation for user ${userId} (payment-status fallback)...`);
+          try {
+            const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
+            const result = await evaluateUserBadges(userId);
+            if (result.newBadges.length > 0) {
+              console.log(`🏅 User earned ${result.newBadges.length} new badges after deposit`);
+            }
+          } catch (badgeError) {
+            console.error('❌ Error evaluating badges (fallback):', badgeError);
+          }
         }
       }
 

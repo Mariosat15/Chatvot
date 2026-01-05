@@ -355,16 +355,19 @@ export const completeDeposit = async (
         console.log(`ℹ️ No platform fee to record (fee is 0%)`);
       }
 
-      // Evaluate badges for the user (fire and forget - don't wait)
+      // Evaluate badges for the user (MUST complete - not fire and forget)
+      console.log(`🏅 Starting badge evaluation for user ${transaction.userId} after deposit...`);
       try {
         const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
-        evaluateUserBadges(transaction.userId).then(result => {
-          if (result.newBadges.length > 0) {
-            console.log(`🏅 User earned ${result.newBadges.length} new badges after deposit`);
-          }
-        }).catch(err => console.error('Error evaluating badges:', err));
+        const result = await evaluateUserBadges(transaction.userId);
+        if (result.newBadges.length > 0) {
+          console.log(`🏅 User earned ${result.newBadges.length} new badges after deposit`);
+        } else {
+          console.log(`🏅 Badge evaluation complete - no new badges earned`);
+        }
       } catch (error) {
-        console.error('Error importing badge service:', error);
+        console.error('❌ Error evaluating badges for user:', transaction.userId, error);
+        // Don't fail the deposit if badge evaluation fails, but log prominently
       }
 
       // Create and send invoice (fire and forget)
