@@ -663,7 +663,7 @@ export default function AIAgentSection() {
                             <p className="text-[10px] text-amber-400/80 flex items-center gap-1.5">
                               <Shield className="h-3 w-3 shrink-0" />
                               <span>
-                                Data is anonymized (masked identifiers/amounts). Cross-reference with actual system for accuracy.
+                                AI responses may contain inaccuracies. Always verify data in the system.
                               </span>
                             </p>
                           </div>

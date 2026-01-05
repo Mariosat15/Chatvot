@@ -4,9 +4,12 @@
  * Uses OpenAI function calling to execute database queries and return structured results
  * 
  * SECURITY FEATURES:
- * - Data masking: Sensitive data (emails, amounts, IDs) are anonymized before sending to OpenAI
  * - Audit logging: All queries are logged for compliance and monitoring
  * - Rate limiting: Prevents abuse
+ * - Disclaimers: Users warned about AI limitations and third-party data exposure
+ * 
+ * NOTE: Data is sent to OpenAI without masking for consistency between AI responses
+ * and data tables displayed to admins. Admins already have access to all data.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,22 +24,6 @@ import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import UserLevel from '@/database/models/user-level.model';
 import AIAgentAudit from '@/database/models/ai-agent-audit.model';
-
-// Import data masking utilities
-import { 
-  resetMaskingMap, 
-  maskEmail, 
-  maskName, 
-  maskUserId,
-  maskAmount,
-  maskTotalAmount,
-  maskFingerprint,
-  maskCardLast4,
-  maskTransactionId,
-  maskDate,
-  getMaskingSummary,
-  maskSensitiveData
-} from '@/lib/ai-agent/data-masking';
 
 // Import knowledge base for answering admin questions
 import { PLATFORM_KNOWLEDGE_BASE, QUICK_ANSWERS } from '@/lib/ai-agent/knowledge-base';
@@ -3318,10 +3305,11 @@ You have 30+ tools to query live data:
 - Present results clearly (tables, stats)
 - Suggest follow-up actions if issues found
 
-### Data Privacy:
-- User identifiers are masked (emails → "user_0001", IDs → "uid_0001")
-- Individual amounts shown as ranges, totals are rounded
-- This protects privacy while providing insights
+### Important Notes:
+- You have access to real user data - handle with care
+- Always present data accurately as shown in tool results
+- Remind admins to verify critical decisions in the system
+- Data tables shown to admins will match your descriptions
 
 ## EXAMPLES
 
@@ -3373,9 +3361,6 @@ export async function POST(request: NextRequest) {
     }
 
     await connectToDatabase();
-
-    // Reset masking map for this request
-    resetMaskingMap();
 
     const openai = new OpenAI({ apiKey: config.apiKey });
 
@@ -3451,20 +3436,18 @@ export async function POST(request: NextRequest) {
           // Execute tool and get raw result
           const rawResult = await executeTool(functionName, functionArgs);
           
-          // IMPORTANT: Mask sensitive data before sending to OpenAI
-          const maskedResult = maskSensitiveData(rawResult);
-          
-          // Store original result for client (they have access to raw data anyway)
+          // Store result for client display
           results.push(rawResult);
           
           toolCalls[toolCalls.length - 1].status = 'completed';
           toolCalls[toolCalls.length - 1].result = rawResult;
 
-          // Send MASKED result to OpenAI
+          // Send real data to OpenAI for consistency
+          // Admin already has access to this data, and we have third-party exposure disclaimers
           toolResults.push({
             role: 'tool',
             tool_call_id: toolCall.id,
-            content: JSON.stringify(maskedResult),
+            content: JSON.stringify(rawResult),
           });
 
           // Audit log
@@ -3525,9 +3508,6 @@ export async function POST(request: NextRequest) {
 
     console.log(`🤖 AI Agent usage: ${totalInputTokens} input + ${totalOutputTokens} output tokens = $${totalCost.toFixed(6)}`);
 
-    // Get masking summary for audit
-    const maskingSummary = getMaskingSummary();
-
     // Create audit log entry
     const responseTimestamp = new Date();
     try {
@@ -3544,8 +3524,8 @@ export async function POST(request: NextRequest) {
         totalTokens: totalInputTokens + totalOutputTokens,
         estimatedCost: totalCost,
         model: config.model,
-        dataMasked: true,
-        maskingSummary,
+        dataMasked: false, // Data sent to OpenAI in full for consistency
+        maskingSummary: { note: 'Masking disabled for consistency with data tables' },
         requestTimestamp,
         responseTimestamp,
         totalDurationMs: responseTimestamp.getTime() - requestTimestamp.getTime(),
@@ -3569,8 +3549,6 @@ export async function POST(request: NextRequest) {
         cost: totalCost,
         model: config.model,
       },
-      dataMasked: true,
-      maskingSummary
     });
 
   } catch (error) {
