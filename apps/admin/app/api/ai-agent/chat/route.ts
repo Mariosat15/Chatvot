@@ -1119,6 +1119,19 @@ export async function POST(request: NextRequest) {
 
     const openai = new OpenAI({ apiKey: config.apiKey });
 
+    // Token pricing per 1M tokens (as of 2024)
+    const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+      'gpt-4o-mini': { input: 0.15, output: 0.60 },
+      'gpt-4o': { input: 2.50, output: 10.00 },
+      'gpt-4-turbo': { input: 10.00, output: 30.00 },
+      'gpt-4': { input: 30.00, output: 60.00 },
+      'gpt-3.5-turbo': { input: 0.50, output: 1.50 },
+    };
+
+    // Track total token usage
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+
     // Build messages with system prompt
     const chatMessages: OpenAI.ChatCompletionMessageParam[] = [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -1137,6 +1150,12 @@ export async function POST(request: NextRequest) {
       temperature: 0.7,
       max_tokens: 2000,
     });
+
+    // Track tokens from initial completion
+    if (completion.usage) {
+      totalInputTokens += completion.usage.prompt_tokens;
+      totalOutputTokens += completion.usage.completion_tokens;
+    }
 
     let response = completion.choices[0]?.message;
     const toolCalls: ToolCall[] = [];
@@ -1198,13 +1217,34 @@ export async function POST(request: NextRequest) {
         max_tokens: 2000,
       });
 
+      // Track tokens from follow-up completions
+      if (completion.usage) {
+        totalInputTokens += completion.usage.prompt_tokens;
+        totalOutputTokens += completion.usage.completion_tokens;
+      }
+
       response = completion.choices[0]?.message;
     }
+
+    // Calculate cost
+    const pricing = MODEL_PRICING[config.model] || MODEL_PRICING['gpt-4o-mini'];
+    const inputCost = (totalInputTokens / 1_000_000) * pricing.input;
+    const outputCost = (totalOutputTokens / 1_000_000) * pricing.output;
+    const totalCost = inputCost + outputCost;
+
+    console.log(`🤖 AI Agent usage: ${totalInputTokens} input + ${totalOutputTokens} output tokens = $${totalCost.toFixed(6)}`);
 
     return NextResponse.json({
       content: response?.content || 'I apologize, but I was unable to generate a response.',
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       results: results.length > 0 ? results : undefined,
+      usage: {
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        totalTokens: totalInputTokens + totalOutputTokens,
+        cost: totalCost,
+        model: config.model,
+      }
     });
 
   } catch (error) {

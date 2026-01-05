@@ -40,7 +40,17 @@ import {
   Eye,
   TrendingUp,
   Activity,
+  Coins,
+  Wallet,
 } from 'lucide-react';
+
+interface MessageUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cost: number;
+  model: string;
+}
 
 interface Message {
   id: string;
@@ -50,6 +60,7 @@ interface Message {
   toolCalls?: ToolCall[];
   results?: AgentResult[];
   isStreaming?: boolean;
+  usage?: MessageUsage;
 }
 
 interface ToolCall {
@@ -94,6 +105,8 @@ export default function AIAgentSection() {
   const [configLoading, setConfigLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'chat' | 'settings'>('chat');
   const [resultViewMode, setResultViewMode] = useState<'table' | 'cards' | 'list'>('table');
+  const [sessionCost, setSessionCost] = useState(0);
+  const [sessionTokens, setSessionTokens] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -165,6 +178,12 @@ export default function AIAgentSection() {
 
       const data = await res.json();
 
+      // Update session cost tracking
+      if (data.usage) {
+        setSessionCost(prev => prev + data.usage.cost);
+        setSessionTokens(prev => prev + data.usage.totalTokens);
+      }
+
       // Update assistant message with response
       setMessages(prev => prev.map(m => 
         m.id === assistantMessageId 
@@ -173,6 +192,7 @@ export default function AIAgentSection() {
               content: data.content,
               toolCalls: data.toolCalls,
               results: data.results,
+              usage: data.usage,
               isStreaming: false,
             }
           : m
@@ -192,6 +212,8 @@ export default function AIAgentSection() {
 
   const clearChat = () => {
     setMessages([]);
+    setSessionCost(0);
+    setSessionTokens(0);
     toast.success('Chat cleared');
   };
 
@@ -431,7 +453,19 @@ export default function AIAgentSection() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Session Cost Display */}
+          {sessionCost > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+              <Coins className="h-4 w-4 text-emerald-400" />
+              <div className="flex flex-col">
+                <span className="text-[10px] text-emerald-400/80 uppercase tracking-wider">Session Cost</span>
+                <span className="text-sm font-mono font-bold text-emerald-300">
+                  ${sessionCost.toFixed(4)}
+                </span>
+              </div>
+            </div>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -573,10 +607,21 @@ export default function AIAgentSection() {
                           </div>
                         )}
 
-                        {/* Timestamp */}
-                        <span className="text-xs text-gray-500">
-                          {message.timestamp.toLocaleTimeString()}
-                        </span>
+                        {/* Timestamp and Cost */}
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-500">
+                            {message.timestamp.toLocaleTimeString()}
+                          </span>
+                          {message.role === 'assistant' && message.usage && (
+                            <span className="text-xs text-emerald-400/80 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                              <Coins className="h-3 w-3" />
+                              ${message.usage.cost.toFixed(4)}
+                              <span className="text-gray-500 ml-1">
+                                ({message.usage.totalTokens.toLocaleString()} tokens)
+                              </span>
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {message.role === 'user' && (
@@ -687,6 +732,41 @@ export default function AIAgentSection() {
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
                   <span>Accounting summaries</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Session Usage */}
+          <Card className="bg-gray-800/50 border-gray-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-emerald-400" />
+                Session Usage
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Total Cost</span>
+                <span className="text-sm font-mono font-bold text-emerald-400">
+                  ${sessionCost.toFixed(4)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Tokens Used</span>
+                <span className="text-sm font-mono text-gray-300">
+                  {sessionTokens.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Questions</span>
+                <span className="text-sm font-mono text-gray-300">
+                  {messages.filter(m => m.role === 'user').length}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-gray-700">
+                <div className="text-[10px] text-gray-500">
+                  Pricing: ~$0.15/1M input, ~$0.60/1M output (gpt-4o-mini)
                 </div>
               </div>
             </CardContent>
