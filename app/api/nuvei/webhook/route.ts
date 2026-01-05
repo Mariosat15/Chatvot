@@ -18,6 +18,7 @@ import WalletTransaction from '@/database/models/trading/wallet-transaction.mode
 import WithdrawalRequest from '@/database/models/withdrawal-request.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import PaymentProvider from '@/database/models/payment-provider.model';
+import { PaymentFraudService } from '@/lib/services/fraud/payment-fraud.service';
 import crypto from 'crypto';
 
 interface NuveiDmnParams {
@@ -402,6 +403,42 @@ export async function POST(req: NextRequest) {
         );
         
         console.log(`✅ Nuvei deposit completed via completeDeposit: ${transaction._id}`);
+        
+        // Track payment fingerprint for fraud detection (same as Stripe)
+        // uniqueCC is Nuvei's unique card identifier (hash of card number)
+        const cardFingerprint = params.uniqueCC;
+        if (cardFingerprint && transaction.userId) {
+          try {
+            console.log(`🔍 Tracking Nuvei payment fingerprint: ${cardFingerprint.substring(0, 12)}...`);
+            
+            const fraudResult = await PaymentFraudService.trackPaymentFingerprint({
+              userId: transaction.userId,
+              paymentProvider: 'nuvei',
+              paymentFingerprint: cardFingerprint,
+              cardLast4: params.cardNumber?.replace(/\*+/g, '').slice(-4),
+              cardBrand: params.cardCompany || undefined,
+              cardCountry: params.cardIssuerCountry || undefined,
+              cardFunding: params.cardType || undefined,
+              providerAccountId: params.userPaymentOptionId || undefined,
+              transactionId: nuveiTransactionId,
+              amount: transaction.amount,
+              currency: params.currency || 'EUR',
+              providerMetadata: {
+                tokenId: params.tokenId,
+                bin: params.bin,
+                upoId: params.userPaymentOptionId,
+              }
+            });
+            
+            if (fraudResult.fraudDetected) {
+              console.log(`🚨 FRAUD DETECTED: Payment method shared across ${fraudResult.linkedUsers.length + 1} accounts!`);
+              console.log(`   Linked users: ${fraudResult.linkedUsers.join(', ')}`);
+            }
+          } catch (fraudError) {
+            console.error('❌ Error tracking payment fingerprint:', fraudError);
+            // Don't fail the deposit if fraud tracking fails
+          }
+        }
       } catch (completeError) {
         // CRITICAL: Do NOT credit wallet if completeDeposit fails
         // Mark transaction as failed and log for manual investigation
