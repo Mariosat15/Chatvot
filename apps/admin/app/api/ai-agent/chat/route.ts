@@ -38,6 +38,9 @@ import {
   maskSensitiveData
 } from '@/lib/ai-agent/data-masking';
 
+// Import knowledge base for answering admin questions
+import { PLATFORM_KNOWLEDGE_BASE, QUICK_ANSWERS } from '@/lib/ai-agent/knowledge-base';
+
 // Note: Fraud-related models (PaymentFingerprint, FraudAlert, SuspicionScore) 
 // are queried via raw MongoDB to avoid schema registration issues
 
@@ -745,6 +748,60 @@ const TOOLS: OpenAI.ChatCompletionTool[] = [
       parameters: {
         type: 'object',
         properties: {}
+      }
+    }
+  },
+  // ==================== HELP & DOCUMENTATION ====================
+  {
+    type: 'function',
+    function: {
+      name: 'get_system_help',
+      description: 'Get help documentation for a specific topic about how the ChartVolt system works. Use this for "how to" questions about competitions, challenges, withdrawals, fees, VAT, KYC, badges, fraud detection, etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          topic: {
+            type: 'string',
+            enum: [
+              'competitions', 
+              'challenges', 
+              'deposits', 
+              'withdrawals', 
+              'vat', 
+              'fees', 
+              'kyc', 
+              'fraud_detection',
+              'badges_xp',
+              'trading_risk',
+              'payment_providers',
+              'user_management',
+              'invoices',
+              'settings',
+              'winner_evaluation',
+              'reconciliation',
+              'all'
+            ],
+            description: 'The topic to get help for'
+          }
+        },
+        required: ['topic']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_quick_answer',
+      description: 'Get a quick answer for common admin questions like "how to change VAT", "how to create competition", etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          question: {
+            type: 'string',
+            description: 'The question to answer (e.g., "how to change vat", "how to create competition")'
+          }
+        },
+        required: ['question']
       }
     }
   }
@@ -2723,6 +2780,12 @@ async function executeTool(name: string, args: any): Promise<AgentResult> {
     case 'get_dashboard_overview':
       return executeGetDashboardOverview(args);
     
+    // Help & documentation tools
+    case 'get_system_help':
+      return executeGetSystemHelp(args);
+    case 'get_quick_answer':
+      return executeGetQuickAnswer(args);
+    
     default:
       return {
         type: 'text',
@@ -2730,6 +2793,473 @@ async function executeTool(name: string, args: any): Promise<AgentResult> {
         data: `Tool '${name}' not found`
       };
   }
+}
+
+// ==================== HELP & DOCUMENTATION EXECUTION FUNCTIONS ====================
+
+function executeGetSystemHelp(args: { topic: string }): AgentResult {
+  const topic = args.topic.toLowerCase();
+  
+  const helpTopics: Record<string, { title: string; content: string }> = {
+    competitions: {
+      title: 'Competitions Guide',
+      content: `## COMPETITIONS
+
+### What are Competitions?
+Trading events where multiple users compete using virtual capital. Users pay entry fees (credits), receive virtual trading capital, and try to achieve the highest return. Winners receive prizes from the prize pool.
+
+### How to Create a Competition
+**Location**: Admin Panel → Competitions → Create New
+
+**Required Settings**:
+1. **Basic Info**: Name, description, slug (URL-friendly), image
+2. **Entry Fee**: Credits required (e.g., 50 credits = €0.50)
+3. **Starting Capital**: Virtual capital each participant gets (e.g., 10,000 points)
+4. **Timing**: Start time, end time, registration deadline
+5. **Participants**: Minimum (2+) and maximum
+
+**Prize Distribution**:
+- Prize Pool = Sum of all entry fees
+- Platform takes configurable fee (default 20%)
+- Rest distributed to winners by rank (e.g., 1st: 70%, 2nd: 20%, 3rd: 10%)
+
+**Competition Types**:
+- Time-based: Runs for set duration, highest P&L wins
+- Goal-based: First to reach target wins
+- Hybrid: Both time and goal
+
+**Ranking Methods**: PnL, ROI, Total Capital, Win Rate, Profit Factor
+
+**Status Flow**: Draft → Upcoming → Active → Completed (or Cancelled)
+
+**Auto-cancellation**: If minimum participants not reached by deadline, competition is cancelled and fees refunded.`
+    },
+    challenges: {
+      title: '1v1 Challenges Guide',
+      content: `## 1v1 CHALLENGES
+
+### What are Challenges?
+Direct head-to-head trading battles between two users. One user challenges another, both stake credits, and compete.
+
+### Challenge Flow
+1. **Creation**: User A creates challenge, sets entry fee & duration
+2. **Invite**: Challenge sent to User B
+3. **Accept/Decline**: User B has time to accept (configurable deadline)
+4. **Active**: Both trade with virtual capital
+5. **Completed**: Higher P&L wins, takes prize pool minus platform fee
+
+### Settings Location
+Admin Panel → Settings → Challenge Settings
+
+**Configurable**:
+- Platform fee percentage
+- Min/max entry fee
+- Min/max duration
+- Accept deadline (default 24h)`
+    },
+    deposits: {
+      title: 'Deposits & Credits Guide',
+      content: `## CREDITS & DEPOSITS
+
+### Credit System
+- Default: 100 credits = €1 EUR (configurable)
+- Users buy credits → Use in competitions → Win more → Withdraw
+
+### Settings Location
+Admin Panel → Settings → Credit Conversion
+
+**Configurable**:
+- EUR to Credits rate
+- Minimum deposit amount
+- Platform deposit fee %
+- Bank fee % (what Stripe/Nuvei charges)
+
+### Fee Calculation
+When user deposits €100:
+1. User pays: €100 + VAT (if applicable) + Platform fee
+2. Platform fee: e.g., 5% = €5
+3. Bank fee: What provider charges (e.g., 2.9% + €0.30)
+4. Net platform earning: Platform fee - Bank fee
+5. User receives: Credits for €100`
+    },
+    withdrawals: {
+      title: 'Withdrawals Guide',
+      content: `## WITHDRAWALS
+
+### How Withdrawals Work
+1. User requests withdrawal (credits → EUR)
+2. System checks requirements (KYC, balance, limits)
+3. Processing based on mode:
+   - **Automatic**: Processed via payment provider immediately
+   - **Manual**: Admin reviews and processes
+
+### Settings Location
+Admin Panel → Settings → Withdrawal Settings
+
+**Key Settings**:
+- Processing Mode: Automatic or Manual
+- Limits: Min/max per withdrawal, daily/monthly limits
+- Requirements: KYC required? Email verified? Min account age?
+- Fees: Platform fee %, fixed fee
+- Fraud Prevention: Hold period after deposit, max per day
+- Payout Methods: Card refund, bank transfer
+
+### Processing Withdrawals (Manual Mode)
+Admin Panel → Withdrawals → Pending → [Select] → Approve or Reject`
+    },
+    vat: {
+      title: 'VAT Configuration Guide',
+      content: `## VAT (Value Added Tax)
+
+### How to Change VAT %
+**Location**: Admin Panel → Settings → Company Settings
+
+The VAT rate is in the tax configuration section. Default is 19% (Cyprus).
+
+### How VAT Works
+- VAT is added ON TOP of the deposit amount
+- User wants €100 credits + 19% VAT = User pays €119
+- VAT amount (€19) tracked separately for tax reporting
+
+### VAT Reports
+**Location**: Admin Panel → Financials → VAT Payments
+- View VAT collected by period
+- Track pending VAT payments
+- Mark VAT as paid to tax authority
+- Export for accounting`
+    },
+    fees: {
+      title: 'Platform Fees Guide',
+      content: `## FEES & FINANCIALS
+
+### Platform Fee Structure
+1. **Deposit Fees**: What users pay when depositing (platform fee + VAT)
+2. **Withdrawal Fees**: What users pay when withdrawing
+3. **Competition Fees**: % taken from prize pools
+4. **Challenge Fees**: % taken from challenge stakes
+
+### How to Change Fees
+- **Deposit/Withdrawal fees**: Admin Panel → Settings → Credit Conversion
+- **Competition fees**: Set per competition when creating
+- **Challenge fees**: Admin Panel → Settings → Challenge Settings
+
+### Net Earnings Calculation
+Net Earning = Platform Fee - Bank Fee
+
+Example €100 deposit:
+- Platform fee (5%): €5
+- Bank fee (2.9% + €0.30): €3.20
+- Net earning: €1.80`
+    },
+    kyc: {
+      title: 'KYC Settings Guide',
+      content: `## KYC (Know Your Customer)
+
+### How to Enable/Configure KYC
+**Location**: Admin Panel → Settings → KYC Settings
+
+**Settings**:
+- Enable/disable KYC requirement
+- Required for withdrawals? (yes/no)
+- Required for deposits? (yes/no)
+- Threshold amount (require KYC above X EUR)
+- Provider: Veriff (requires API credentials)
+
+### KYC Flow
+1. User initiates action requiring KYC
+2. System prompts for verification
+3. User completes Veriff flow (ID + selfie)
+4. Auto-approve on success or manual review on decline
+
+### Duplicate KYC Detection
+**Location**: Fraud Settings
+Detects same ID document used by multiple accounts:
+- Auto-suspend option
+- Block deposits/trading/competitions`
+    },
+    fraud_detection: {
+      title: 'Fraud Detection Guide',
+      content: `## FRAUD DETECTION
+
+### Overview
+- Device fingerprinting (same device = same user)
+- Payment method sharing (same card across accounts)
+- VPN/Proxy detection
+- Multi-account detection
+- Suspicious behavior analysis
+
+### Settings Location
+Admin Panel → Security → Fraud Settings
+
+**Key Settings**:
+- Risk Thresholds: Alert (40), Block (70), Auto-suspend (90)
+- VPN/Proxy: Block or just flag
+- Multi-account: Max accounts per device
+- Rate Limiting: Max signups/hour, max login attempts
+
+### Fraud Alerts
+**Location**: Admin Panel → Security → Fraud Alerts
+
+Actions: Investigate, Dismiss, Suspend, Ban
+
+### Suspicion Scores
+Risk scores based on:
+- Device sharing (+10-30)
+- Payment sharing (+20-40)
+- VPN usage (+30)
+- Failed verification (+25)`
+    },
+    badges_xp: {
+      title: 'Badges & XP System Guide',
+      content: `## BADGES & XP SYSTEM
+
+### How Badges Work
+Users earn badges for achievements:
+- Competition wins
+- Trade milestones
+- Profit achievements
+
+### Badge Rarities & XP
+- Common: Easy (10 XP)
+- Rare: Moderate (50 XP)
+- Epic: Hard (150 XP)
+- Legendary: Very rare (500 XP)
+
+### Configuration
+**Location**: Admin Panel → Gamification → Badges & XP
+
+### Level Progression
+- Level 1: Novice (0-99 XP)
+- Level 2: Apprentice (100-499 XP)
+- ...up to Level 10: Trading God
+
+### Auto-Evaluation
+Badges evaluated when:
+- User completes trade
+- User wins competition
+- User deposits
+- Milestones reached`
+    },
+    trading_risk: {
+      title: 'Trading Risk Settings Guide',
+      content: `## TRADING RISK SETTINGS
+
+### Margin System
+**Location**: Admin Panel → Settings → Trading Risk
+
+**Margin Levels**:
+- Safe (200%+): Healthy margin
+- Warning (150%): User notified
+- Margin Call (100%): Warning, may restrict positions
+- Liquidation (50%): Positions auto-closed
+
+### Position Limits
+- Max open positions per user
+- Max position size (lot size)
+- Leverage limits (min/max)
+- Max drawdown % before restrictions
+
+### Competition Margin
+Each competition can have own margin settings or use global defaults.`
+    },
+    payment_providers: {
+      title: 'Payment Providers Guide',
+      content: `## PAYMENT PROVIDERS
+
+### Supported Providers
+- Stripe: Card payments, Apple Pay, Google Pay
+- Nuvei: Card payments, alternative methods, payouts
+
+### Configuration
+**Location**: Admin Panel → Settings → Payment Providers
+
+Or via environment variables:
+- STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET
+- NUVEI_MERCHANT_ID, NUVEI_MERCHANT_SITE_ID, NUVEI_SECRET_KEY
+
+### Test vs Live Mode
+Set via STRIPE_TEST_MODE=true or NUVEI_TEST_MODE=true`
+    },
+    user_management: {
+      title: 'User Management Guide',
+      content: `## USER MANAGEMENT
+
+### User Restrictions
+**Location**: Admin Panel → Users → [User] → Restrictions
+
+Types:
+- Deposit blocked: Cannot deposit
+- Withdrawal blocked: Cannot withdraw
+- Trading blocked: Cannot trade
+- Login blocked: Cannot access account
+
+### Manual Actions
+- Edit user details
+- Reset password
+- Verify email manually
+- Adjust credit balance
+- Add notes
+
+### How to Ban a User
+Admin Panel → Users → [Find User] → Restrictions → Add Login Block (permanent)`
+    },
+    invoices: {
+      title: 'Invoices Guide',
+      content: `## INVOICES
+
+### Auto-Generated
+System generates invoices for deposits (with VAT breakdown)
+
+### Settings
+**Location**: Admin Panel → Settings → Invoice Settings
+- Invoice number prefix
+- Company details (name, address, VAT number)
+- Logo
+- Footer text
+
+### Viewing/Managing
+**Location**: Admin Panel → Financials → Invoices
+- Search by user, date, status
+- Download PDF
+- Resend to user`
+    },
+    settings: {
+      title: 'System Settings Guide',
+      content: `## SYSTEM SETTINGS
+
+### Company Settings
+Admin Panel → Settings → Company Settings
+- Company name, address, registration
+- VAT number and rate
+- Support email
+- Logo
+
+### Email Templates
+Admin Panel → Settings → Email Templates
+- Welcome, verification, password reset emails
+- Deposit/withdrawal confirmations
+- Competition notifications
+
+### White Label
+Admin Panel → Settings → White Label
+- Site name
+- Logo, colors
+- Custom domains`
+    },
+    winner_evaluation: {
+      title: 'Competition Winner Evaluation',
+      content: `## WINNER EVALUATION
+
+### How Winners Are Evaluated
+When competition ends, system automatically:
+
+1. **Calculate Final P&L**
+   - Sum of all realized profits/losses
+   - Include unrealized P&L from open positions
+
+2. **Check Disqualifications**
+   - Liquidated users
+   - Users not meeting minimum trades
+   - Users violating rules
+
+3. **Rank by Method**
+   - As set in competition (PnL, ROI, Win Rate, etc.)
+
+4. **Apply Tie Breakers**
+   - Primary: e.g., trades count
+   - Secondary: e.g., win rate
+   - Tertiary: join time (first in wins)
+   - Or split prize equally
+
+5. **Distribute Prizes**
+   - Calculate each position's share
+   - Deduct platform fee
+   - Credit winners' wallets
+
+6. **Update Stats**
+   - Record in user history
+   - Award badges/XP if applicable`
+    },
+    reconciliation: {
+      title: 'Reconciliation Guide',
+      content: `## RECONCILIATION
+
+### What It Checks
+- Completed transactions match provider records
+- All deposits credited properly
+- All withdrawals paid
+- Fees calculated correctly
+
+### Running Reconciliation
+Ask AI: "Run reconciliation for this week"
+
+Or: Admin Panel → Financials → Reconciliation
+
+### Discrepancies Found?
+- Missing provider IDs
+- Transactions stuck pending
+- Amount mismatches
+- Failed completions`
+    },
+    all: {
+      title: 'Complete System Overview',
+      content: PLATFORM_KNOWLEDGE_BASE
+    }
+  };
+
+  const help = helpTopics[topic];
+  
+  if (!help) {
+    return {
+      type: 'text',
+      title: 'Help Topic Not Found',
+      data: `Topic "${topic}" not found. Available topics: ${Object.keys(helpTopics).join(', ')}`
+    };
+  }
+
+  return {
+    type: 'text',
+    title: help.title,
+    data: help.content
+  };
+}
+
+function executeGetQuickAnswer(args: { question: string }): AgentResult {
+  const question = args.question.toLowerCase();
+  
+  // Try to find a matching quick answer
+  let bestMatch: { key: string; answer: string } | null = null;
+  let bestScore = 0;
+  
+  for (const [key, answer] of Object.entries(QUICK_ANSWERS)) {
+    const keyWords = key.split(' ');
+    const questionWords = question.split(' ');
+    let score = 0;
+    
+    for (const keyWord of keyWords) {
+      if (question.includes(keyWord)) score++;
+    }
+    
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = { key, answer };
+    }
+  }
+  
+  if (bestMatch && bestScore >= 2) {
+    return {
+      type: 'text',
+      title: 'Quick Answer',
+      data: bestMatch.answer
+    };
+  }
+  
+  // If no good match, provide guidance
+  return {
+    type: 'text',
+    title: 'No Quick Answer',
+    data: `No quick answer found for "${args.question}". Try using get_system_help with a topic like: competitions, challenges, withdrawals, vat, fees, kyc, fraud_detection, badges_xp, trading_risk, etc.`
+  };
 }
 
 // Get AI configuration
@@ -2755,71 +3285,68 @@ async function getAIConfig() {
   };
 }
 
-// System prompt for the AI agent
-const SYSTEM_PROMPT = `You are an intelligent AI assistant for the ChartVolt admin panel. You have comprehensive access to all system data and can help administrators with:
+// System prompt for the AI agent - combines capabilities with knowledge base
+const SYSTEM_PROMPT = `You are an intelligent AI assistant for the ChartVolt admin panel. You can:
+1. **Query live data** using database tools (fraud alerts, users, transactions, competitions, etc.)
+2. **Answer questions** about how the system works using your knowledge base
 
-## CAPABILITIES
+## YOUR KNOWLEDGE BASE
+You have comprehensive knowledge of the ChartVolt platform:
 
-### 1. Fraud Detection & Security
-- Find shared payment methods across users (potential fraud)
-- Review fraud alerts by severity and status
-- Check user suspicion scores and high-risk users
-- View account lockouts and restrictions
+${PLATFORM_KNOWLEDGE_BASE}
 
-### 2. User Management
-- Search and lookup user details
-- Check KYC verification status
-- View user badges, levels, and XP distribution
-- Monitor online users in real-time
-- Review user restrictions (deposit/withdraw/trade blocks)
-
-### 3. Financial Operations
-- Run reconciliation checks on deposits/withdrawals
-- Generate financial summaries (deposits, withdrawals, fees, VAT)
-- View platform earnings breakdown
-- Get detailed fee breakdowns (platform fees, bank fees, net earnings)
-- Invoice management and summaries
-- VAT collection reports
-
-### 4. Competitions & Challenges
-- List all competitions by status (draft, upcoming, active, completed)
-- View competition details, rules, and settings
-- Get live leaderboards and participant rankings
-- Competition analytics across the platform
-- 1v1 challenge management and results
-
-### 5. Trading Activity
-- View all open positions across competitions
-- Monitor recent trading activity
-- Track margin status and users at risk of liquidation
-- Analyze trading patterns
-
-### 6. System Status
-- Payment provider status (Stripe, Nuvei, etc.)
-- System notifications
-- Admin audit logs (who did what)
-- Dashboard overview with key metrics
-
-## DATA PRIVACY
-- User identifiers (emails, IDs) are masked (e.g., "user_0001")
-- Transaction amounts may be shown as ranges
-- This protects user privacy while providing insights
+## DATA QUERY CAPABILITIES
+You have 30+ tools to query live data:
+- Fraud Detection: shared payment methods, fraud alerts, high-risk users, suspicion scores
+- User Management: search users, view details, KYC status, restrictions, badges, levels, online users
+- Financials: reconciliation, summaries, platform earnings, VAT reports, fee breakdowns, invoices
+- Competitions: list, details, leaderboards, analytics
+- Challenges: list 1v1 challenges, details
+- Trading: open positions, activity, margin status
+- System: payment providers, notifications, audit logs, lockouts, dashboard overview
 
 ## RESPONSE GUIDELINES
-- Be concise and professional
-- Always use tools to fetch real data - never make assumptions
-- Present data in appropriate formats (tables, stats, alerts)
-- Highlight anomalies and suggest follow-up actions
-- If data is incomplete, mention it explicitly
-- End data responses with verification reminder
+
+### For "How to" Questions:
+- Use your knowledge base to explain step-by-step
+- Include the location in admin panel (e.g., "Admin Panel → Settings → Company Settings")
+- Explain the concept if needed, then the steps
+
+### For Data Queries:
+- ALWAYS use the appropriate tool to fetch real data
+- Never make up or assume data
+- Present results clearly (tables, stats)
+- Suggest follow-up actions if issues found
+
+### Data Privacy:
+- User identifiers are masked (emails → "user_0001", IDs → "uid_0001")
+- Individual amounts shown as ranges, totals are rounded
+- This protects privacy while providing insights
+
+## EXAMPLES
+
+**Q: "How do I change VAT percentage?"**
+A: Go to Admin Panel → Settings → Company Settings. The VAT rate is in the tax configuration section. Current default is 19% (Cyprus VAT). Simply update the percentage and save.
+
+**Q: "Show me pending withdrawals"**
+A: [Call get_pending_withdrawals tool first, then present results]
+
+**Q: "How are competition winners evaluated?"**
+A: Winners are automatically evaluated when competition ends:
+1. System calculates final P&L for each participant
+2. Checks for disqualifications (liquidated users, minimum trade requirements)
+3. Ranks by chosen method (PnL, ROI, etc.) as set when creating competition
+4. Applies tie breakers in order
+5. Distributes prizes to winners
+6. Awards badges and updates statistics
 
 ## IMPORTANT
-1. Call appropriate tools first, then explain results
-2. Never hallucinate or make up data
-3. User identities are masked for privacy
-4. Always recommend cross-referencing with actual system
+1. For data queries: Always call the tool first, explain results after
+2. For how-to questions: Use your knowledge base, be specific with locations
+3. Never hallucinate data - if unsure, say so
+4. End data responses with verification reminder
 
-⚠️ DISCLAIMER: Data is anonymized. Always verify against actual system data for accuracy.`;
+⚠️ DISCLAIMER: Data shown is anonymized. Always verify against actual system data for accuracy.`;
 
 export async function POST(request: NextRequest) {
   const requestTimestamp = new Date();

@@ -90,6 +90,12 @@ const QUICK_ACTIONS = [
   // Dashboard & Overview
   { icon: <LayoutGrid className="h-4 w-4" />, label: 'Dashboard overview', prompt: 'Give me a dashboard overview with all key metrics - users, revenue, active competitions, pending items' },
   
+  // HOW-TO QUESTIONS (System Help)
+  { icon: <Brain className="h-4 w-4" />, label: 'How to create competition', prompt: 'How do I create a new competition? Walk me through the process step by step.' },
+  { icon: <Brain className="h-4 w-4" />, label: 'How VAT works', prompt: 'How does VAT work in the system? How do I change the VAT percentage?' },
+  { icon: <Brain className="h-4 w-4" />, label: 'How winners evaluated', prompt: 'How does the system evaluate competition winners? What are the ranking methods and tie breakers?' },
+  { icon: <Brain className="h-4 w-4" />, label: 'How withdrawals work', prompt: 'Explain how withdrawals work. What are automatic vs manual processing modes?' },
+  
   // Fraud & Security
   { icon: <Users className="h-4 w-4" />, label: 'Shared payment methods', prompt: 'Show me all users who share the same payment method (potential fraud)' },
   { icon: <AlertTriangle className="h-4 w-4" />, label: 'Fraud alerts', prompt: 'Show me all active fraud alerts with high severity' },
@@ -114,9 +120,9 @@ const QUICK_ACTIONS = [
   { icon: <Shield className="h-4 w-4" />, label: 'KYC pending', prompt: 'List all users pending KYC verification' },
   { icon: <Wallet className="h-4 w-4" />, label: 'Pending withdrawals', prompt: 'List all pending withdrawal requests that need review' },
   
-  // System
-  { icon: <Activity className="h-4 w-4" />, label: 'Payment providers', prompt: 'Show me the status of all payment providers' },
-  { icon: <FileText className="h-4 w-4" />, label: 'Audit logs', prompt: 'Show recent admin audit logs - who did what actions' },
+  // System Help
+  { icon: <Brain className="h-4 w-4" />, label: 'How fraud detection works', prompt: 'Explain how the fraud detection system works. What triggers alerts and how should I handle them?' },
+  { icon: <Brain className="h-4 w-4" />, label: 'Badge & XP system', prompt: 'How does the badge and XP system work? How can I configure it?' },
 ];
 
 export default function AIAgentSection() {
