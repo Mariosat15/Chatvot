@@ -627,9 +627,9 @@ export default function AIAgentSection() {
                         {message.role === 'assistant' && message.results && message.results.length > 0 && !message.isStreaming && (
                           <div className="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
                             <p className="text-[10px] text-amber-400/80 flex items-center gap-1.5">
-                              <AlertTriangle className="h-3 w-3 shrink-0" />
+                              <Shield className="h-3 w-3 shrink-0" />
                               <span>
-                                This data is AI-generated. Please cross-reference with actual system data for accuracy.
+                                Data is anonymized (masked identifiers/amounts). Cross-reference with actual system for accuracy.
                               </span>
                             </p>
                           </div>
@@ -650,13 +650,27 @@ export default function AIAgentSection() {
 
             {/* Input Area */}
             <div className="p-4 border-t border-gray-700 space-y-3">
-              {/* Disclaimer Banner */}
-              <div className="px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+              {/* Privacy & Disclaimer Banner */}
+              <div className="px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500/5 to-red-500/5 border border-amber-500/20 space-y-1.5">
                 <p className="text-[11px] text-amber-400/70 flex items-start gap-2">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <Shield className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   <span>
-                    <strong>Important:</strong> AI-generated data should be considered complementary. 
-                    Always cross-reference with actual system data as AI may occasionally provide inaccurate information.
+                    <strong>Data Privacy:</strong> Sensitive data (emails, IDs, amounts) is masked before sending to AI. 
+                    Individual users appear as &quot;user_0001&quot;, amounts as ranges.
+                  </span>
+                </p>
+                <p className="text-[11px] text-amber-400/70 flex items-start gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-red-400" />
+                  <span className="text-red-400/80">
+                    <strong>⚠️ Third-Party Warning:</strong> Use at your own discretion. Data queries are processed by OpenAI. 
+                    Despite masking, exercise caution with sensitive operations.
+                  </span>
+                </p>
+                <p className="text-[11px] text-gray-500 flex items-start gap-2 pt-1 border-t border-gray-700/50">
+                  <Activity className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    AI-generated reports are complementary. Always verify with actual system data. 
+                    All queries are logged for compliance.
                   </span>
                 </p>
               </div>

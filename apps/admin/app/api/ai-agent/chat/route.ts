@@ -2,6 +2,11 @@
  * AI Agent Chat API
  * 
  * Uses OpenAI function calling to execute database queries and return structured results
+ * 
+ * SECURITY FEATURES:
+ * - Data masking: Sensitive data (emails, amounts, IDs) are anonymized before sending to OpenAI
+ * - Audit logging: All queries are logged for compliance and monitoring
+ * - Rate limiting: Prevents abuse
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -15,6 +20,24 @@ import mongoose from 'mongoose';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import UserLevel from '@/database/models/user-level.model';
+import AIAgentAudit from '@/database/models/ai-agent-audit.model';
+
+// Import data masking utilities
+import { 
+  resetMaskingMap, 
+  maskEmail, 
+  maskName, 
+  maskUserId,
+  maskAmount,
+  maskTotalAmount,
+  maskFingerprint,
+  maskCardLast4,
+  maskTransactionId,
+  maskDate,
+  getMaskingSummary,
+  maskSensitiveData
+} from '@/lib/ai-agent/data-masking';
+
 // Note: Fraud-related models (PaymentFingerprint, FraudAlert, SuspicionScore) 
 // are queried via raw MongoDB to avoid schema registration issues
 
@@ -1202,13 +1225,19 @@ const SYSTEM_PROMPT = `You are an intelligent AI assistant for the ChartVolt adm
 4. **Compliance**: KYC verification status, user restrictions, audit trails
 5. **Analytics**: Top traders, user statistics, growth metrics
 
+IMPORTANT - DATA PRIVACY:
+- User identifiers (emails, IDs) are masked for privacy (e.g., "user_0001" instead of actual emails)
+- Transaction amounts may be shown as ranges for individual transactions
+- Aggregate totals are shown with approximate values
+- This protects user privacy while still providing useful insights
+
 When responding:
 - Be concise and professional
 - Use the available tools to fetch real data from the database
 - Present data in appropriate formats (tables for lists, stats for summaries, alerts for warnings)
 - Highlight any potential issues or anomalies you find
 - Suggest follow-up actions when appropriate
-- When showing financial data, include specific transaction IDs or references when available
+- Note that individual data points are anonymized for privacy
 - Always provide context about the data timeframe and scope
 
 You have access to the database through specialized tools. Always use these tools to get accurate, real-time data rather than making assumptions.
@@ -1217,11 +1246,15 @@ IMPORTANT GUIDELINES:
 1. When users ask for specific data, call the appropriate tool first, then explain the results
 2. Do not make up or hallucinate data - only report what the tools return
 3. If data seems incomplete or missing, mention it explicitly
-4. Always end your response with a brief note reminding the admin to cross-reference with the actual system
+4. Remember that user identities are masked - you cannot identify specific individuals
+5. Always end your response with a brief note reminding the admin to cross-reference with the actual system
 
-DISCLAIMER TO INCLUDE: At the end of each data response, add: "⚠️ Note: Please verify this information against the actual system data. AI-generated reports should be cross-referenced for accuracy."`;
+DISCLAIMER TO INCLUDE: At the end of each data response, add: "⚠️ Note: Data is anonymized. Please verify against actual system data for accuracy."`;
 
 export async function POST(request: NextRequest) {
+  const requestTimestamp = new Date();
+  let auditData: any = null;
+  
   try {
     const admin = await verifyAdminAuth();
     if (!admin.isAuthenticated) {
@@ -1244,6 +1277,9 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
+    // Reset masking map for this request
+    resetMaskingMap();
+
     const openai = new OpenAI({ apiKey: config.apiKey });
 
     // Token pricing per 1M tokens (as of 2024)
@@ -1258,6 +1294,12 @@ export async function POST(request: NextRequest) {
     // Track total token usage
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+
+    // Track tools called for audit
+    const auditToolsCalled: any[] = [];
+
+    // Get the last user message for audit logging
+    const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
 
     // Build messages with system prompt
     const chatMessages: OpenAI.ChatCompletionMessageParam[] = [
@@ -1297,6 +1339,7 @@ export async function POST(request: NextRequest) {
         if (toolCall.type !== 'function') continue;
         const functionName = toolCall.function.name;
         const functionArgs = JSON.parse(toolCall.function.arguments);
+        const toolStartTime = Date.now();
 
         console.log(`🤖 AI Agent calling tool: ${functionName}`, functionArgs);
 
@@ -1308,16 +1351,31 @@ export async function POST(request: NextRequest) {
         });
 
         try {
-          const result = await executeTool(functionName, functionArgs);
-          results.push(result);
+          // Execute tool and get raw result
+          const rawResult = await executeTool(functionName, functionArgs);
+          
+          // IMPORTANT: Mask sensitive data before sending to OpenAI
+          const maskedResult = maskSensitiveData(rawResult);
+          
+          // Store original result for client (they have access to raw data anyway)
+          results.push(rawResult);
           
           toolCalls[toolCalls.length - 1].status = 'completed';
-          toolCalls[toolCalls.length - 1].result = result;
+          toolCalls[toolCalls.length - 1].result = rawResult;
 
+          // Send MASKED result to OpenAI
           toolResults.push({
             role: 'tool',
             tool_call_id: toolCall.id,
-            content: JSON.stringify(result),
+            content: JSON.stringify(maskedResult),
+          });
+
+          // Audit log
+          auditToolsCalled.push({
+            name: functionName,
+            arguments: functionArgs, // Already safe (just filter params)
+            executionTimeMs: Date.now() - toolStartTime,
+            success: true
           });
         } catch (error) {
           console.error(`Tool execution error (${functionName}):`, error);
@@ -1327,6 +1385,15 @@ export async function POST(request: NextRequest) {
             role: 'tool',
             tool_call_id: toolCall.id,
             content: JSON.stringify({ error: error instanceof Error ? error.message : 'Tool execution failed' }),
+          });
+
+          // Audit log error
+          auditToolsCalled.push({
+            name: functionName,
+            arguments: functionArgs,
+            executionTimeMs: Date.now() - toolStartTime,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
           });
         }
       }
@@ -1361,6 +1428,39 @@ export async function POST(request: NextRequest) {
 
     console.log(`🤖 AI Agent usage: ${totalInputTokens} input + ${totalOutputTokens} output tokens = $${totalCost.toFixed(6)}`);
 
+    // Get masking summary for audit
+    const maskingSummary = getMaskingSummary();
+
+    // Create audit log entry
+    const responseTimestamp = new Date();
+    try {
+      await AIAgentAudit.create({
+        adminEmail: admin.email || 'unknown',
+        adminId: admin.adminId,
+        query: lastUserMessage.substring(0, 500), // Limit query length
+        messageCount: messages.length,
+        toolsCalled: auditToolsCalled,
+        responseLength: response?.content?.length || 0,
+        resultCount: results.length,
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        totalTokens: totalInputTokens + totalOutputTokens,
+        estimatedCost: totalCost,
+        model: config.model,
+        dataMasked: true,
+        maskingSummary,
+        requestTimestamp,
+        responseTimestamp,
+        totalDurationMs: responseTimestamp.getTime() - requestTimestamp.getTime(),
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        userAgent: request.headers.get('user-agent') || 'unknown',
+      });
+      console.log(`📝 AI Agent audit log created for ${admin.email}`);
+    } catch (auditError) {
+      console.error('Failed to create audit log:', auditError);
+      // Don't fail the request if audit logging fails
+    }
+
     return NextResponse.json({
       content: response?.content || 'I apologize, but I was unable to generate a response.',
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
@@ -1371,7 +1471,9 @@ export async function POST(request: NextRequest) {
         totalTokens: totalInputTokens + totalOutputTokens,
         cost: totalCost,
         model: config.model,
-      }
+      },
+      dataMasked: true,
+      maskingSummary
     });
 
   } catch (error) {
