@@ -14,7 +14,7 @@ import mongoose from 'mongoose';
 
 export interface PaymentData {
   userId: string;
-  paymentProvider: 'stripe' | 'paypal' | 'custom' | string;
+  paymentProvider: 'stripe' | 'paypal' | 'nuvei' | 'custom' | string;
   
   // Payment Method Fingerprint
   paymentFingerprint: string; // Unique identifier (card hash, PayPal ID, etc.)
