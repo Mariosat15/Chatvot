@@ -166,6 +166,15 @@ export async function evaluateUserBadges(userId: string): Promise<{
 
     console.log(`🎉 [BADGE EVAL] Evaluation complete: ${newlyEarnedBadges.length} new badges earned`);
 
+    // IMPORTANT: Ensure UserLevel exists so user appears in leaderboard
+    // Even if no badges earned, we create the record for tracking
+    try {
+      const { ensureUserLevel } = await import('@/lib/services/xp-level.service');
+      await ensureUserLevel(userId);
+    } catch (levelError) {
+      console.error('❌ [BADGE EVAL] Error ensuring user level:', levelError);
+    }
+
     return {
       newBadges: newlyEarnedBadges,
       totalBadges: existingBadges.length + newlyEarnedBadges.length,
