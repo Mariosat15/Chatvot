@@ -317,6 +317,21 @@ router.post('/login', async (req: Request, res: Response) => {
       return;
     }
 
+    // SECURITY: Check email verification BEFORE password validation
+    // This prevents credential oracle attacks where attackers can determine
+    // if a password is correct by observing different error responses.
+    // Must be checked before password to match main app behavior in auth.actions.ts
+    // Uses strict equality (=== false) to allow legacy users without the field
+    if (user.emailVerified === false) {
+      console.log(`⚠️ Login blocked for unverified user: ${email}`);
+      res.status(403).json({ 
+        error: 'Email not verified',
+        message: 'Please verify your email address before signing in. Check your inbox for the verification link.',
+        code: 'EMAIL_NOT_VERIFIED'
+      });
+      return;
+    }
+
     // Find credential account for this user (better-auth stores password here)
     const account = await Account.findOne({ 
       userId: user.id, 
@@ -338,20 +353,6 @@ router.post('/login', async (req: Request, res: Response) => {
 
     if (!isValid) {
       res.status(401).json({ error: 'Invalid credentials' });
-      return;
-    }
-
-    // SECURITY: Enforce email verification before allowing login
-    // Uses strict equality (=== false) to match main app behavior in auth.actions.ts
-    // This allows legacy users without emailVerified field (undefined) to still login
-    // Only blocks users who explicitly have emailVerified: false (new registrations)
-    if (user.emailVerified === false) {
-      console.log(`⚠️ Login blocked for unverified user: ${email}`);
-      res.status(403).json({ 
-        error: 'Email not verified',
-        message: 'Please verify your email address before signing in. Check your inbox for the verification link.',
-        code: 'EMAIL_NOT_VERIFIED'
-      });
       return;
     }
 
