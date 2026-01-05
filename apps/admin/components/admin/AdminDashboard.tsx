@@ -51,6 +51,8 @@ import {
   Calendar,
   Clock,
   Package,
+  Bot,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -89,6 +91,7 @@ import KYCHistorySection from '@/components/admin/KYCHistorySection';
 import MarketSettingsSection from '@/components/admin/MarketSettingsSection';
 import DependencyUpdatesSection from '@/components/admin/DependencyUpdatesSection';
 import AdminOverviewDashboard from '@/components/admin/AdminOverviewDashboard';
+import AIAgentSection from '@/components/admin/AIAgentSection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -311,6 +314,22 @@ const menuGroups: MenuGroup[] = [
       },
     ],
   },
+  // AI & Automation
+  {
+    id: 'ai-automation',
+    label: 'AI & Automation',
+    icon: <Bot className="h-4 w-4" />,
+    color: 'text-violet-400',
+    items: [
+      {
+        id: 'ai-agent',
+        label: 'AI Agent',
+        icon: <Bot className="h-5 w-5" />,
+        color: 'text-violet-400',
+        bgColor: 'bg-violet-500/10 hover:bg-violet-500/20',
+      },
+    ],
+  },
   // Settings
   {
     id: 'settings-group',
@@ -514,6 +533,8 @@ export default function AdminDashboard({
         return <PerformanceSimulatorSection />;
       case 'dependency-updates':
         return <DependencyUpdatesSection />;
+      case 'ai-agent':
+        return <AIAgentSection />;
       default:
         return <CompetitionsListSection />;
     }
