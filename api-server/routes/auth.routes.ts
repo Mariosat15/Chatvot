@@ -324,10 +324,11 @@ router.post('/login', async (req: Request, res: Response) => {
     // SECURITY: Check email verification BEFORE password validation
     // This prevents credential oracle attacks where attackers can determine
     // if a password is correct by observing different error responses.
-    // Must be checked before password to match main app behavior in auth.actions.ts
-    // Uses strict equality (=== false) to allow legacy users without the field
-    if (user.emailVerified === false) {
-      console.log(`⚠️ Login blocked for unverified user: ${email}`);
+    // Must be checked before password to match main app behavior in app/(root)/layout.tsx
+    // Uses !== true to block users with emailVerified: false, null, or undefined
+    // This matches the main app's check: user.emailVerified !== true
+    if (user.emailVerified !== true) {
+      console.log(`⚠️ Login blocked for unverified user: ${email} (emailVerified: ${user.emailVerified})`);
       res.status(403).json({ 
         error: 'Email not verified',
         message: 'Please verify your email address before signing in. Check your inbox for the verification link.',

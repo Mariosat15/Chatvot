@@ -175,7 +175,10 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
         if (db) {
             const user = await db.collection('user').findOne({ email });
             
-            if (user && user.emailVerified === false) {
+            // Block if user exists and email is NOT verified
+            // emailVerified can be false, null, or undefined - all mean not verified
+            // This matches the check in app/(root)/layout.tsx
+            if (user && user.emailVerified !== true) {
                 return { 
                     success: false, 
                     error: 'Please verify your email before signing in. Check your inbox for the verification link.',
