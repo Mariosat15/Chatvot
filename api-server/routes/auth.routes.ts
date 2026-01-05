@@ -333,8 +333,10 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // SECURITY: Enforce email verification before allowing login
-    // This matches the behavior of the main app's signInWithEmail
-    if (!user.emailVerified) {
+    // Uses strict equality (=== false) to match main app behavior in auth.actions.ts
+    // This allows legacy users without emailVerified field (undefined) to still login
+    // Only blocks users who explicitly have emailVerified: false (new registrations)
+    if (user.emailVerified === false) {
       console.log(`⚠️ Login blocked for unverified user: ${email}`);
       res.status(403).json({ 
         error: 'Email not verified',
