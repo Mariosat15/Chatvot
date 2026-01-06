@@ -583,16 +583,7 @@ export default function WithdrawalSettingsSection() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="text-gray-300">Require KYC Verification</Label>
-                <p className="text-xs text-gray-500">Must complete identity verification</p>
-              </div>
-              <Switch
-                checked={settings.requireKYC}
-                onCheckedChange={(checked) => updateSetting('requireKYC', checked)}
-              />
-            </div>
+            {/* Note: KYC requirement is now managed in KYC Settings section */}
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-gray-300">Require Email Verification</Label>
