@@ -438,11 +438,16 @@ router.post('/register-batch', async (req: Request, res: Response) => {
     }
     
     // Verify the provided key matches using timing-safe comparison
-    // This prevents timing attacks that could reveal the key character by character
+    // Hash both keys first to produce fixed-length outputs - this prevents
+    // timing attacks that could leak the API key length through response times.
+    // Without hashing, the length check would reject wrong-length keys faster.
+    const hashKey = (key: string | undefined): Buffer => {
+      return crypto.createHash('sha256').update(key || '').digest();
+    };
+    
     const isValidKey = providedKey && 
       typeof providedKey === 'string' &&
-      providedKey.length === internalApiKey.length &&
-      crypto.timingSafeEqual(Buffer.from(providedKey), Buffer.from(internalApiKey));
+      crypto.timingSafeEqual(hashKey(providedKey), hashKey(internalApiKey));
     
     if (!isValidKey) {
       console.warn(`⚠️ Unauthorized batch registration attempt from ${req.ip}`);
