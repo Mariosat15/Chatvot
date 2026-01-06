@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { Zap, Loader2, CheckCircle2, XCircle, ArrowRight, CreditCard, Globe, Gem } from 'lucide-react';
+import { Zap, Loader2, CheckCircle2, XCircle, ArrowRight, CreditCard, Globe, Gem, Shield } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import Script from 'next/script';
@@ -110,6 +110,9 @@ export default function DepositModal({ children }: DepositModalProps) {
   const [vatEnabled, setVatEnabled] = useState(false);
   const [vatPercentage, setVatPercentage] = useState(0);
   
+  // KYC requirement for deposits
+  const [kycBlocksDeposit, setKycBlocksDeposit] = useState(false);
+  
   // Multi-provider support
   const [providers, setProviders] = useState<PaymentProviders | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<PaymentProvider>('stripe');
@@ -156,6 +159,7 @@ export default function DepositModal({ children }: DepositModalProps) {
         setVatEnabled(config.vatEnabled || false);
         setVatPercentage(config.vatPercentage || 0);
         setProviders(config.providers || null);
+        setKycBlocksDeposit(config.kycBlocksDeposit || false);
         
         // Determine default provider
         if (config.providers) {
@@ -521,6 +525,29 @@ export default function DepositModal({ children }: DepositModalProps) {
               <p className="text-sm text-gray-400 mt-2">
                 No payment provider is set up. Please contact the administrator.
               </p>
+            </div>
+          </div>
+        ) : kycBlocksDeposit ? (
+          <div className="py-8 text-center space-y-4">
+            <div className="mx-auto w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center">
+              <Shield className="h-8 w-8 text-amber-500" />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-gray-100">Identity Verification Required</h3>
+              <p className="text-sm text-gray-400 mt-2">
+                You need to complete identity verification (KYC) before making deposits.
+              </p>
+              <Button 
+                variant="default" 
+                className="mt-4 bg-amber-600 hover:bg-amber-700"
+                onClick={() => {
+                  setOpen(false);
+                  window.location.href = '/profile?tab=kyc';
+                }}
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Verify Identity
+              </Button>
             </div>
             <Button onClick={() => setOpen(false)} variant="outline" className="mt-4">
               Close

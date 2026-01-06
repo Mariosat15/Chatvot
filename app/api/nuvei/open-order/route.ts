@@ -13,6 +13,7 @@ import { nuveiService } from '@/lib/services/nuvei.service';
 import { connectToDatabase } from '@/database/mongoose';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import KYCSettings from '@/database/models/kyc-settings.model';
 import { RateLimiters, getRateLimitHeaders } from '@/lib/utils/rate-limiter';
 import { createSecurityLogger } from '@/lib/utils/security-logger';
 
@@ -47,6 +48,21 @@ export async function POST(req: NextRequest) {
           headers: getRateLimitHeaders(rateLimitResult),
         }
       );
+    }
+
+    await connectToDatabase();
+
+    // Check if KYC is required for deposits
+    const kycSettings = await KYCSettings.findOne();
+    if (kycSettings?.enabled && kycSettings?.requiredForDeposit) {
+      const wallet = await CreditWallet.findOne({ userId });
+      if (!wallet?.kycVerified) {
+        console.log(`🛡️ KYC required for deposit - user ${userId} not verified`);
+        return NextResponse.json(
+          { error: 'KYC verification required before depositing. Please complete identity verification first.' },
+          { status: 403 }
+        );
+      }
     }
 
     const body = await req.json();

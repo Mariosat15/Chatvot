@@ -5,6 +5,8 @@ import PaymentProvider from '@/database/models/payment-provider.model';
 import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
 import InvoiceSettings from '@/database/models/invoice-settings.model';
 import CompanySettings from '@/database/models/company-settings.model';
+import KYCSettings from '@/database/models/kyc-settings.model';
+import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { isEUCountry } from '@/lib/utils/country-vat';
@@ -90,6 +92,24 @@ export async function GET() {
     
     console.log(`💳 Payment config - VAT enabled: ${vatEnabled}, User country: ${userCountry} (EU: ${userIsInEU}), Company country: ${companyCountry} (EU: ${companyIsInEU}), VAT applicable: ${vatApplicable}`);
 
+    // Check KYC requirements for deposits
+    const kycSettings = await KYCSettings.findOne();
+    const kycRequiredForDeposit = kycSettings?.enabled && kycSettings?.requiredForDeposit;
+    let userKycVerified = false;
+    
+    try {
+      const session = await auth.api.getSession({ headers: await headers() });
+      if (session?.user?.id) {
+        const wallet = await CreditWallet.findOne({ userId: session.user.id });
+        userKycVerified = wallet?.kycVerified || false;
+      }
+    } catch (e) {
+      // User not logged in or wallet not found
+    }
+    
+    const kycBlocksDeposit = kycRequiredForDeposit && !userKycVerified;
+    console.log(`💳 Payment config - KYC required for deposit: ${kycRequiredForDeposit}, User KYC verified: ${userKycVerified}, Blocks deposit: ${kycBlocksDeposit}`);
+
     // Check Stripe availability
     let stripeAvailable = false;
     let stripeConfig: any = null;
@@ -168,6 +188,10 @@ export async function GET() {
       vatEnabled: vatApplicable, // True only if admin enabled AND user is EU
       vatPercentage: vatApplicable ? vatPercentage : 0,
       userCountry,
+      // KYC info for deposits
+      kycRequiredForDeposit,
+      userKycVerified,
+      kycBlocksDeposit, // True if user needs to complete KYC before depositing
       // Available payment providers
       providers: {
         stripe: {
