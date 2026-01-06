@@ -897,11 +897,6 @@ export default function ReconciliationSection() {
                             {user.transactionBreakdown.withdrawals} Withdrawals
                           </Badge>
                         )}
-                        {user.transactionBreakdown.refunds > 0 && (
-                          <Badge variant="outline" className="text-xs border-blue-500/50 text-blue-400">
-                            {user.transactionBreakdown.refunds} Refunds
-                          </Badge>
-                        )}
                         {user.transactionBreakdown.competitionJoins > 0 && (
                           <Badge variant="outline" className="text-xs border-purple-500/50 text-purple-400">
                             {user.transactionBreakdown.competitionJoins} Competition Joins
@@ -910,6 +905,11 @@ export default function ReconciliationSection() {
                         {user.transactionBreakdown.competitionWins > 0 && (
                           <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">
                             {user.transactionBreakdown.competitionWins} Competition Wins
+                          </Badge>
+                        )}
+                        {(user.transactionBreakdown.competitionRefunds || 0) > 0 && (
+                          <Badge variant="outline" className="text-xs border-teal-500/50 text-teal-400">
+                            {user.transactionBreakdown.competitionRefunds} Competition Refunds
                           </Badge>
                         )}
                         {user.transactionBreakdown.challengeJoins > 0 && (
@@ -922,6 +922,16 @@ export default function ReconciliationSection() {
                             {user.transactionBreakdown.challengeWins} Challenge Wins
                           </Badge>
                         )}
+                        {(user.transactionBreakdown.challengeRefunds || 0) > 0 && (
+                          <Badge variant="outline" className="text-xs border-sky-500/50 text-sky-400">
+                            {user.transactionBreakdown.challengeRefunds} Challenge Refunds
+                          </Badge>
+                        )}
+                        {(user.transactionBreakdown.withdrawalRefunds || 0) > 0 && (
+                          <Badge variant="outline" className="text-xs border-emerald-500/50 text-emerald-400">
+                            {user.transactionBreakdown.withdrawalRefunds} Withdrawal Refunds
+                          </Badge>
+                        )}
                         {(user.transactionBreakdown.marketplacePurchases || 0) > 0 && (
                           <Badge variant="outline" className="text-xs border-pink-500/50 text-pink-400">
                             {user.transactionBreakdown.marketplacePurchases} Marketplace Purchases
@@ -930,6 +940,16 @@ export default function ReconciliationSection() {
                         {user.transactionBreakdown.adminAdjustments > 0 && (
                           <Badge variant="outline" className="text-xs border-orange-500/50 text-orange-400">
                             {user.transactionBreakdown.adminAdjustments} Admin Adjustments
+                          </Badge>
+                        )}
+                        {(user.transactionBreakdown.manualCredits || 0) > 0 && (
+                          <Badge variant="outline" className="text-xs border-lime-500/50 text-lime-400">
+                            {user.transactionBreakdown.manualCredits} Manual Credits
+                          </Badge>
+                        )}
+                        {(user.transactionBreakdown.platformFees || 0) > 0 && (
+                          <Badge variant="outline" className="text-xs border-red-500/50 text-red-400">
+                            {user.transactionBreakdown.platformFees} Platform Fees
                           </Badge>
                         )}
                         {user.transactionBreakdown.other > 0 && (

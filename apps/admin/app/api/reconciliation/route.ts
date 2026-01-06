@@ -58,11 +58,16 @@ interface UserReconciliationDetail {
     withdrawals: number;
     competitionJoins: number;
     competitionWins: number;
+    competitionRefunds: number;
     challengeJoins: number;
     challengeWins: number;
+    challengeRefunds: number;
     marketplacePurchases: number;
     adminAdjustments: number;
-    refunds: number;
+    withdrawalRefunds: number;
+    manualCredits: number;
+    platformFees: number;
+    refunds: number;  // Legacy: sum of all refunds
     other: number;
   };
   issues: ReconciliationIssue[];
@@ -599,8 +604,27 @@ async function checkDuplicateTransactions() {
  * Get detailed reconciliation for a single user
  * Returns actual values for comparison
  * 
- * CORRECT BALANCE FORMULA:
- * Balance = Deposits - Withdrawals + Competition Wins + Challenge Wins - Competition Joins - Challenge Joins
+ * CORRECT BALANCE CALCULATION:
+ * The TRUE expected balance is the SUM of all completed transaction amounts.
+ * Each transaction has a signed amount (+/-) that reflects credits in/out.
+ * 
+ * Transaction Types and their effect:
+ * - deposit: +credits (user deposits)
+ * - manual_deposit_credit: +credits (admin credits for failed deposit)
+ * - withdrawal: -credits (user withdraws)
+ * - withdrawal_fee: -credits (fee charged)
+ * - withdrawal_refund: +credits (withdrawal failed/cancelled)
+ * - competition_entry: -credits (entry fee deducted)
+ * - competition_win: +credits (prize awarded)
+ * - competition_refund: +credits (competition cancelled, entry fee returned)
+ * - challenge_entry: -credits (entry fee deducted)
+ * - challenge_win: +credits (prize awarded)
+ * - challenge_refund: +credits (challenge cancelled/declined)
+ * - admin_adjustment: +/- credits (manual adjustment)
+ * - marketplace_purchase: -credits (item purchased)
+ * - platform_fee: -credits (fee deducted from winnings)
+ * 
+ * Future: chargeback: -credits (bank reversed the payment)
  */
 async function getDetailedUserReconciliation(
   userId: string,
@@ -648,14 +672,16 @@ async function getDetailedUserReconciliation(
     (sum, tx) => sum + Math.abs(tx.amount || 0), 0
   );
 
-  // Calculate totals from transactions
-  let depositTotal = 0;
-  let withdrawalTxTotal = 0; // From wallet transactions
-  let competitionWinTotal = 0;
-  let challengeWinTotal = 0;
-  let competitionSpentTotal = 0;
-  let challengeSpentTotal = 0;
+  // Calculate totals from transactions - IMPORTANT: Use signed amounts for accurate balance
+  let depositTotal = 0;           // All deposit-type credits
+  let withdrawalTxTotal = 0;      // Withdrawal debits
+  let competitionWinTotal = 0;    // Includes wins AND refunds (both are credits)
+  let challengeWinTotal = 0;      // Includes wins AND refunds (both are credits)
+  let competitionSpentTotal = 0;  // Entry fees (NET of refunds)
+  let challengeSpentTotal = 0;    // Entry fees (NET of refunds)
   let marketplaceSpentTotal = 0;
+  let adminAdjustmentTotal = 0;   // Track admin adjustments separately
+  let otherCreditsTotal = 0;      // withdrawal_refund, manual_deposit_credit, etc.
 
   // Transaction breakdown by type
   const breakdown = {
@@ -663,59 +689,107 @@ async function getDetailedUserReconciliation(
     withdrawals: 0,
     competitionJoins: 0,
     competitionWins: 0,
+    competitionRefunds: 0,        // NEW: Track refunds separately
     challengeJoins: 0,
     challengeWins: 0,
+    challengeRefunds: 0,          // NEW: Track refunds separately
     marketplacePurchases: 0,
     adminAdjustments: 0,
-    refunds: 0,
+    withdrawalRefunds: 0,         // NEW: Track withdrawal refunds
+    manualCredits: 0,             // NEW: Track manual credits
+    platformFees: 0,              // NEW: Track platform fees
     other: 0,
   };
+
+  // Calculate the ACTUAL expected balance from all transactions (the truth!)
+  let balanceFromAllTransactions = 0;
 
   for (const tx of transactions) {
     const amount = tx.amount || 0;
     const type = tx.transactionType;
+
+    // Add to running balance (transactions already have +/- signs)
+    balanceFromAllTransactions += amount;
 
     switch (type) {
       case 'deposit':
         depositTotal += Math.abs(amount);
         breakdown.deposits++;
         break;
+        
+      case 'manual_deposit_credit':
+        // Admin credited user for failed deposit - this is like a deposit
+        depositTotal += Math.abs(amount);
+        otherCreditsTotal += Math.abs(amount);
+        breakdown.manualCredits++;
+        break;
+        
       case 'withdrawal':
         withdrawalTxTotal += Math.abs(amount);
         breakdown.withdrawals++;
         break;
-      case 'competition_join':
+        
+      case 'withdrawal_fee':
+        // Fee charged on withdrawal - already deducted
+        breakdown.platformFees++;
+        break;
+        
+      case 'withdrawal_refund':
+        // Withdrawal failed/cancelled - credits returned
+        otherCreditsTotal += Math.abs(amount);
+        breakdown.withdrawalRefunds++;
+        break;
+        
       case 'competition_entry':
         competitionSpentTotal += Math.abs(amount);
         breakdown.competitionJoins++;
         break;
+        
       case 'competition_win':
-      case 'competition_prize':
-      case 'competition_refund':
         competitionWinTotal += Math.abs(amount);
         breakdown.competitionWins++;
         break;
-      case 'challenge_join':
+        
+      case 'competition_refund':
+        // Competition cancelled - entry fee returned
+        // This REDUCES the net spent on competitions
+        competitionWinTotal += Math.abs(amount); // Count as "win" for display (credits received)
+        breakdown.competitionRefunds++;
+        break;
+        
       case 'challenge_entry':
         challengeSpentTotal += Math.abs(amount);
         breakdown.challengeJoins++;
         break;
+        
       case 'challenge_win':
-      case 'challenge_prize':
         challengeWinTotal += Math.abs(amount);
         breakdown.challengeWins++;
         break;
+        
+      case 'challenge_refund':
+        // Challenge cancelled/declined - entry fee returned
+        // This REDUCES the net spent on challenges
+        challengeWinTotal += Math.abs(amount); // Count as "win" for display (credits received)
+        breakdown.challengeRefunds++;
+        break;
+        
       case 'marketplace_purchase':
         marketplaceSpentTotal += Math.abs(amount);
         breakdown.marketplacePurchases++;
         break;
-      case 'refund':
-      case 'challenge_refund':
-        breakdown.refunds++;
-        break;
+        
       case 'admin_adjustment':
+        // Can be positive or negative
+        adminAdjustmentTotal += amount; // Keep sign for net adjustment
         breakdown.adminAdjustments++;
         break;
+        
+      case 'platform_fee':
+        // Fee deducted from winnings
+        breakdown.platformFees++;
+        break;
+        
       default:
         breakdown.other++;
     }
@@ -728,42 +802,52 @@ async function getDetailedUserReconciliation(
   }).lean();
   const withdrawalFromRequests = completedWithdrawals.reduce((sum, w) => sum + (w.amountCredits || 0), 0);
 
-  // Calculate EXPECTED balance using wallet fields (most reliable):
-  // Balance = Deposits - Withdrawals + Wins - Spends - Marketplace - Pending
-  const expectedFromFields = 
-    walletData.totalDeposited - 
-    walletData.totalWithdrawn + 
-    walletData.totalWonFromCompetitions + 
-    walletData.totalWonFromChallenges - 
-    walletData.totalSpentOnCompetitions - 
-    walletData.totalSpentOnChallenges -
-    walletData.totalSpentOnMarketplace;
-  
-  // The expected balance should account for pending withdrawals (credits already deducted)
-  const expectedWalletBalance = expectedFromFields - pendingWithdrawalCredits;
+  // The TRUE expected balance is the sum of all completed transaction amounts
+  // This accounts for EVERYTHING: deposits, withdrawals, wins, refunds, admin adjustments, etc.
+  const expectedFromTransactions = Math.round(balanceFromAllTransactions * 100) / 100;
 
-  // Check for issues - compare stored balance with expected balance
-  const balanceDiff = Math.abs(walletData.creditBalance - expectedWalletBalance);
+  // Check for balance mismatch - CRITICAL CHECK
+  // Compare actual wallet balance with what transactions say it should be
+  const balanceDiff = Math.abs(walletData.creditBalance - expectedFromTransactions);
   
-  // Only flag as issue if there's a real mismatch
   if (balanceDiff > 0.01) {
+    // Build explanation of what might be causing the mismatch
+    let explanation = `Balance mismatch: stored ${walletData.creditBalance}, calculated from transactions ${expectedFromTransactions}.`;
+    
+    if (pendingWithdrawalCredits > 0) {
+      explanation += ` Note: ${pendingWithdrawalCredits} credits in pending withdrawals.`;
+    }
+    if (pendingDepositCredits > 0) {
+      explanation += ` Note: ${pendingDepositCredits} credits in pending deposits.`;
+    }
+    if (adminAdjustmentTotal !== 0) {
+      explanation += ` Admin adjustments: ${adminAdjustmentTotal > 0 ? '+' : ''}${adminAdjustmentTotal}.`;
+    }
+    if (breakdown.competitionRefunds > 0) {
+      explanation += ` Competition refunds: ${breakdown.competitionRefunds}.`;
+    }
+    if (breakdown.challengeRefunds > 0) {
+      explanation += ` Challenge refunds: ${breakdown.challengeRefunds}.`;
+    }
+    if (breakdown.withdrawalRefunds > 0) {
+      explanation += ` Withdrawal refunds: ${breakdown.withdrawalRefunds}.`;
+    }
+    
     issues.push({
       type: 'balance_mismatch',
       severity: 'critical',
       userId,
       userEmail,
       details: {
-        expected: Math.round(expectedWalletBalance * 100) / 100,
+        expected: expectedFromTransactions,
         actual: walletData.creditBalance,
-        difference: Math.round((walletData.creditBalance - expectedWalletBalance) * 100) / 100,
-        description: `Balance mismatch: stored ${walletData.creditBalance}, expected ${Math.round(expectedWalletBalance * 100) / 100}` +
-          (pendingWithdrawalCredits > 0 ? ` (includes ${pendingWithdrawalCredits} credits in pending withdrawals)` : '') +
-          (pendingDepositCredits > 0 ? ` (${pendingDepositCredits} credits in pending deposits not yet credited)` : ''),
+        difference: Math.round((walletData.creditBalance - expectedFromTransactions) * 100) / 100,
+        description: explanation,
       },
     });
   }
 
-  // Check deposit total
+  // Check deposit total (should include manual_deposit_credit)
   const depositDiff = Math.abs(walletData.totalDeposited - depositTotal);
   if (depositDiff > 0.01) {
     issues.push({
@@ -775,7 +859,8 @@ async function getDetailedUserReconciliation(
         expected: Math.round(depositTotal * 100) / 100,
         actual: walletData.totalDeposited,
         difference: Math.round((walletData.totalDeposited - depositTotal) * 100) / 100,
-        description: `Deposit total mismatch: stored ${walletData.totalDeposited}, calculated ${Math.round(depositTotal * 100) / 100}`,
+        description: `Deposit total mismatch: stored ${walletData.totalDeposited}, calculated ${Math.round(depositTotal * 100) / 100}` +
+          (breakdown.manualCredits > 0 ? ` (includes ${breakdown.manualCredits} manual credits)` : ''),
       },
     });
   }
@@ -797,7 +882,8 @@ async function getDetailedUserReconciliation(
     });
   }
 
-  // Check competition wins
+  // Check competition wins (includes refunds - both are credits received)
+  // Note: The wallet's totalWonFromCompetitions should include refunds if properly tracked
   const compWinDiff = Math.abs(walletData.totalWonFromCompetitions - competitionWinTotal);
   if (compWinDiff > 0.01) {
     issues.push({
@@ -809,12 +895,13 @@ async function getDetailedUserReconciliation(
         expected: Math.round(competitionWinTotal * 100) / 100,
         actual: walletData.totalWonFromCompetitions,
         difference: Math.round((walletData.totalWonFromCompetitions - competitionWinTotal) * 100) / 100,
-        description: `Competition wins mismatch: stored ${walletData.totalWonFromCompetitions}, calculated ${Math.round(competitionWinTotal * 100) / 100}`,
+        description: `Competition credits mismatch: stored ${walletData.totalWonFromCompetitions}, calculated ${Math.round(competitionWinTotal * 100) / 100}` +
+          (breakdown.competitionRefunds > 0 ? ` (includes ${breakdown.competitionRefunds} refunds from cancelled competitions)` : ''),
       },
     });
   }
 
-  // Check challenge wins
+  // Check challenge wins (includes refunds)
   const chalWinDiff = Math.abs(walletData.totalWonFromChallenges - challengeWinTotal);
   if (chalWinDiff > 0.01) {
     issues.push({
@@ -826,12 +913,13 @@ async function getDetailedUserReconciliation(
         expected: Math.round(challengeWinTotal * 100) / 100,
         actual: walletData.totalWonFromChallenges,
         difference: Math.round((walletData.totalWonFromChallenges - challengeWinTotal) * 100) / 100,
-        description: `Challenge wins mismatch: stored ${walletData.totalWonFromChallenges}, calculated ${Math.round(challengeWinTotal * 100) / 100}`,
+        description: `Challenge credits mismatch: stored ${walletData.totalWonFromChallenges}, calculated ${Math.round(challengeWinTotal * 100) / 100}` +
+          (breakdown.challengeRefunds > 0 ? ` (includes ${breakdown.challengeRefunds} refunds)` : ''),
       },
     });
   }
 
-  // Check competition spent
+  // Check competition spent (entry fees only, not affected by refunds in this field)
   const compSpentDiff = Math.abs(walletData.totalSpentOnCompetitions - competitionSpentTotal);
   if (compSpentDiff > 0.01) {
     issues.push({
@@ -888,9 +976,9 @@ async function getDetailedUserReconciliation(
     userName,
     wallet: walletData,
     calculated: {
-      // Expected balance from wallet fields (Deposits - Withdrawals + Wins - Spends - Pending)
-      expectedBalance: Math.round(expectedWalletBalance * 100) / 100,
-      balanceFromTransactions: Math.round(expectedWalletBalance * 100) / 100,
+      // Expected balance calculated from ALL transactions (the source of truth)
+      expectedBalance: expectedFromTransactions,
+      balanceFromTransactions: expectedFromTransactions,
       depositTotal: Math.round(depositTotal * 100) / 100,
       withdrawalTotal: Math.round(withdrawalFromRequests * 100) / 100,
       competitionWinTotal: Math.round(competitionWinTotal * 100) / 100,
@@ -901,7 +989,11 @@ async function getDetailedUserReconciliation(
       pendingWithdrawalCredits: Math.round(pendingWithdrawalCredits * 100) / 100,
       pendingDepositCredits: Math.round(pendingDepositCredits * 100) / 100,
     },
-    transactionBreakdown: breakdown,
+    transactionBreakdown: {
+      ...breakdown,
+      // Legacy fields for backwards compatibility
+      refunds: breakdown.competitionRefunds + breakdown.challengeRefunds + breakdown.withdrawalRefunds,
+    },
     issues,
     healthy: issues.filter(i => i.severity === 'critical').length === 0,
   };
