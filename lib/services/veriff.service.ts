@@ -104,18 +104,24 @@ class VeriffService {
       const isBanned = restriction.restrictionType === 'banned';
       const reasonText = restriction.reason?.replace(/_/g, ' ') || 'policy violation';
       
-      let message = `Unable to start identity verification. Your account has been ${isBanned ? 'banned' : 'suspended'} due to: ${reasonText}.`;
+      // Build a clean, user-friendly message
+      let message = `Unable to start identity verification. Your account has been ${isBanned ? 'banned' : 'suspended'}`;
       
+      // Use custom reason if available, otherwise use the reason code
       if (restriction.customReason) {
-        message += ` ${restriction.customReason}`;
+        message += `: ${restriction.customReason}`;
+      } else {
+        message += ` due to ${reasonText}`;
       }
       
+      // Add expiry date for suspensions
       if (!isBanned && restriction.expiresAt) {
-        message += ` Suspension ends: ${new Date(restriction.expiresAt).toLocaleDateString()}.`;
+        message += `. Suspension ends: ${new Date(restriction.expiresAt).toLocaleDateString()}`;
       }
       
-      message += ' Please contact support for assistance.';
+      message += '. Please contact support for assistance.';
       
+      console.log(`🚫 KYC blocked for restricted user ${userId}: ${restriction.restrictionType} - ${restriction.reason}`);
       throw new Error(message);
     }
 
