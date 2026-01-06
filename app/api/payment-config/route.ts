@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import PaymentProvider from '@/database/models/payment-provider.model';
 import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
 import InvoiceSettings from '@/database/models/invoice-settings.model';
+import CompanySettings from '@/database/models/company-settings.model';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { isEUCountry } from '@/lib/utils/country-vat';
@@ -52,6 +53,11 @@ export async function GET() {
     const vatEnabled = invoiceSettings.vatEnabled;
     const vatPercentage = invoiceSettings.vatPercentage || 0;
 
+    // Get company country to determine VAT applicability
+    const companySettings = await CompanySettings.getSingleton();
+    const companyCountry = companySettings.country;
+    const companyIsInEU = isEUCountry(companyCountry);
+
     // Get user's country to determine if VAT applies
     let userCountry: string | null = null;
     let vatApplicable = false;
@@ -73,10 +79,16 @@ export async function GET() {
       // User not logged in, that's okay
     }
 
-    // VAT applies only if: admin enabled VAT AND user is in EU
-    vatApplicable = vatEnabled && isEUCountry(userCountry);
+    // VAT RULES:
+    // - User in EU + Company in EU = VAT APPLIES
+    // - User in EU + Company NOT in EU = NO VAT
+    // - User NOT in EU + Company in EU = NO VAT
+    // - User NOT in EU + Company NOT in EU = NO VAT
+    // Summary: VAT applies ONLY when BOTH user AND company are in the EU
+    const userIsInEU = isEUCountry(userCountry);
+    vatApplicable = vatEnabled && userIsInEU && companyIsInEU;
     
-    console.log(`💳 Payment config - VAT enabled by admin: ${vatEnabled}, User country: ${userCountry}, Is EU: ${isEUCountry(userCountry)}, VAT applicable: ${vatApplicable}`);
+    console.log(`💳 Payment config - VAT enabled: ${vatEnabled}, User country: ${userCountry} (EU: ${userIsInEU}), Company country: ${companyCountry} (EU: ${companyIsInEU}), VAT applicable: ${vatApplicable}`);
 
     // Check Stripe availability
     let stripeAvailable = false;
