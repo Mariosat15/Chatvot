@@ -3,7 +3,7 @@ import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { connectToDatabase } from '@/database/mongoose';
 import KYCSession from '@/database/models/kyc-session.model';
-import CreditWallet from '@/database/models/credit-wallet.model';
+import CreditWallet from '@/database/models/trading/credit-wallet.model';
 
 /**
  * POST /api/kyc/cancel
