@@ -46,10 +46,17 @@ interface KYCStatus {
   };
 }
 
-// Helper to check if session is stale (older than 5 minutes - allows quick retry if interrupted)
+// Helper to check if session is stale (older than 2 minutes - allows quick retry if interrupted)
 const isSessionStale = (createdAt: string): boolean => {
-  const fiveMinutes = 5 * 60 * 1000;
-  return Date.now() - new Date(createdAt).getTime() > fiveMinutes;
+  const twoMinutes = 2 * 60 * 1000;
+  return Date.now() - new Date(createdAt).getTime() > twoMinutes;
+};
+
+// Helper to get remaining time until session becomes stale
+const getTimeUntilStale = (createdAt: string): number => {
+  const twoMinutes = 2 * 60 * 1000;
+  const elapsed = Date.now() - new Date(createdAt).getTime();
+  return Math.max(0, Math.ceil((twoMinutes - elapsed) / 1000));
 };
 
 const STATUS_CONFIG = {
@@ -101,6 +108,8 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const fetchStatus = async (showToast = false) => {
     if (showToast) setChecking(true);
@@ -162,6 +171,48 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
 
     return () => clearInterval(interval);
   }, [status?.userStatus?.status]);
+
+  // Countdown timer for pending sessions
+  useEffect(() => {
+    if (status?.userStatus?.status === 'pending' && status?.latestSession?.createdAt) {
+      const updateCountdown = () => {
+        const remaining = getTimeUntilStale(status.latestSession!.createdAt);
+        setCountdown(remaining);
+      };
+      
+      updateCountdown();
+      const timer = setInterval(updateCountdown, 1000);
+      
+      return () => clearInterval(timer);
+    } else {
+      setCountdown(null);
+    }
+  }, [status?.userStatus?.status, status?.latestSession?.createdAt]);
+
+  const cancelVerification = async () => {
+    setCancelling(true);
+    try {
+      const response = await fetch('/api/kyc/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Verification cancelled. You can now start again.');
+        // Refresh status
+        await fetchStatus(false);
+      } else {
+        toast.error(data.error || 'Failed to cancel verification');
+      }
+    } catch (error) {
+      console.error('Error cancelling verification:', error);
+      toast.error('Failed to cancel verification');
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const startVerification = async () => {
     setStarting(true);
@@ -400,9 +451,9 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
               </div>
             )}
 
-            {/* Pending state - refresh button */}
+            {/* Pending state - refresh and cancel buttons */}
             {userStatus.status === 'pending' && (
-              <>
+              <div className="space-y-3">
                 <Button
                   variant="outline"
                   onClick={() => fetchStatus(true)}
@@ -412,12 +463,53 @@ export default function KYCVerification({ onVerificationComplete, compact = fals
                   <RefreshCw className={`h-4 w-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
                   {checking ? 'Checking...' : 'Check Verification Status'}
                 </Button>
+                
                 {status.latestSession && isSessionStale(status.latestSession.createdAt) && (
-                  <p className="text-xs text-orange-400 text-center mt-2">
+                  <p className="text-xs text-orange-400 text-center">
                     Your previous verification session has expired. You can retry above.
                   </p>
                 )}
-              </>
+
+                {/* Cancel/Reset option for users who closed the window */}
+                {status.latestSession && !isSessionStale(status.latestSession.createdAt) && (
+                  <div className="p-4 bg-gray-900/50 border border-gray-700 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <Info className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-300">
+                          <strong>Closed the verification window?</strong>
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          If you cancelled or closed the verification window, you can either wait for the automatic reset 
+                          {countdown !== null && countdown > 0 && (
+                            <span className="text-yellow-400"> ({Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')} remaining)</span>
+                          )}
+                          , or cancel manually to start over immediately.
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={cancelVerification}
+                          disabled={cancelling}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10 mt-1"
+                        >
+                          {cancelling ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Cancelling...
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Cancel & Start Over
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
