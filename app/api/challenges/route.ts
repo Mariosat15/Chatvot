@@ -147,6 +147,20 @@ export async function POST(request: NextRequest) {
     // Skip most validation in simulator mode
     const isInSimulatorMode = allowSimulatorMode;
 
+    // ✅ CHECK USER RESTRICTIONS - Blocked users cannot create challenges
+    if (!isInSimulatorMode) {
+      const { canUserPerformAction } = await import('@/lib/services/user-restriction.service');
+      const restrictionCheck = await canUserPerformAction(challengerId, 'enterCompetition');
+      
+      if (!restrictionCheck.allowed) {
+        console.log(`❌ Challenge creation blocked for user ${challengerId}: ${restrictionCheck.reason}`);
+        return errorResponse(
+          restrictionCheck.reason || 'Your account is restricted and cannot create challenges. Please contact support.',
+          403
+        );
+      }
+    }
+
     // ⏰ CHECK MARKET STATUS - Challenges require open market
     // Skip check in simulator mode for testing
     if (!isInSimulatorMode) {

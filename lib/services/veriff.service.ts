@@ -95,6 +95,30 @@ class VeriffService {
       throw new Error('Veriff API credentials not configured');
     }
 
+    // Check if user is restricted/banned - blocked users cannot verify KYC
+    const { getUserRestrictions } = await import('@/lib/services/user-restriction.service');
+    const restrictions = await getUserRestrictions(userId);
+    
+    if (restrictions.length > 0) {
+      const restriction = restrictions[0]; // Get the most recent active restriction
+      const isBanned = restriction.restrictionType === 'banned';
+      const reasonText = restriction.reason?.replace(/_/g, ' ') || 'policy violation';
+      
+      let message = `Unable to start identity verification. Your account has been ${isBanned ? 'banned' : 'suspended'} due to: ${reasonText}.`;
+      
+      if (restriction.customReason) {
+        message += ` ${restriction.customReason}`;
+      }
+      
+      if (!isBanned && restriction.expiresAt) {
+        message += ` Suspension ends: ${new Date(restriction.expiresAt).toLocaleDateString()}.`;
+      }
+      
+      message += ' Please contact support for assistance.';
+      
+      throw new Error(message);
+    }
+
     // Check if user has pending session
     const existingSession = await KYCSession.findOne({
       userId,

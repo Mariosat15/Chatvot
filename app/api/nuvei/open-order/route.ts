@@ -65,6 +65,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ✅ CHECK USER RESTRICTIONS - Blocked users cannot deposit
+    const { canUserPerformAction } = await import('@/lib/services/user-restriction.service');
+    const restrictionCheck = await canUserPerformAction(userId, 'deposit');
+    
+    if (!restrictionCheck.allowed) {
+      console.log(`❌ Deposit blocked for user ${userId}: ${restrictionCheck.reason}`);
+      await securityLogger.log({ statusCode: 403, success: false, errorMessage: 'User restricted from deposits' });
+      return NextResponse.json(
+        { error: restrictionCheck.reason || 'Your account is restricted and cannot make deposits. Please contact support.' },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const { 
       amount, // Total amount to charge (includes VAT + platform fee)
