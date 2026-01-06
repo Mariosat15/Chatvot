@@ -170,7 +170,9 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     // Fetch REAL prices from API
     const fetchPrices = async () => {
       // Skip if tab is hidden - save resources
-      if (document.hidden) {
+      // BUT continue if we're in fullscreen mode (fullscreen can cause document.hidden to be true)
+      const isInFullscreen = !!document.fullscreenElement;
+      if (document.hidden && !isInFullscreen) {
         log('⏸️ Skipping fetch - tab is hidden');
         return;
       }
@@ -282,13 +284,28 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Handle visibility change - pause/resume polling
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      const isInFullscreen = !!document.fullscreenElement;
+      
+      // If we're in fullscreen mode, don't pause - fullscreen can trigger visibility change
+      if (document.hidden && !isInFullscreen) {
         log('👁️ Tab hidden - pausing price updates');
       } else {
         log('👁️ Tab visible - resuming price updates');
         // Reset stale state when tab becomes visible
         errorCountRef.current = 0;
         fetchPrices(); // Fetch immediately when tab becomes visible
+      }
+    };
+    
+    // Handle fullscreen change - ensure prices continue updating
+    const handleFullscreenChange = () => {
+      const isInFullscreen = !!document.fullscreenElement;
+      log(isInFullscreen ? '📺 Entered fullscreen - keeping prices active' : '📺 Exited fullscreen');
+      
+      // If entering fullscreen and prices are stale, force refresh
+      if (isInFullscreen) {
+        errorCountRef.current = 0;
+        fetchPrices();
       }
     };
 
@@ -298,12 +315,14 @@ export const PriceProvider = ({ children }: { children: React.ReactNode }) => {
     // Update prices at polling interval (pauses when tab hidden)
     intervalId = setInterval(fetchPrices, POLLING_INTERVAL);
 
-    // Listen for visibility changes
+    // Listen for visibility and fullscreen changes
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
 
     return () => {
       if (intervalId) clearInterval(intervalId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, [subscriptions]);
 
