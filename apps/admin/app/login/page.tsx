@@ -20,6 +20,8 @@ export default function AdminLogin() {
     e.preventDefault();
     setIsLoading(true);
 
+    console.log('🔐 [CLIENT] Login attempt:', { email: formData.email, passwordLength: formData.password.length });
+
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -27,7 +29,9 @@ export default function AdminLogin() {
         body: JSON.stringify(formData),
       });
 
+      console.log('🔐 [CLIENT] Response status:', response.status);
       const data = await response.json();
+      console.log('🔐 [CLIENT] Response data:', data);
 
       if (response.ok) {
         toast.success('Login successful!');
@@ -38,9 +42,11 @@ export default function AdminLogin() {
           router.push('/dashboard');
         }
       } else {
+        console.error('🔐 [CLIENT] Login failed:', data.error, data.details);
         toast.error(data.error || 'Login failed');
       }
-    } catch {
+    } catch (error) {
+      console.error('🔐 [CLIENT] Network/fetch error:', error);
       toast.error('An error occurred');
     } finally {
       setIsLoading(false);

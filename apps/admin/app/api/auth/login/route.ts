@@ -4,6 +4,9 @@ import { Admin } from '@/database/models/admin.model';
 import { SignJWT } from 'jose';
 import { auditLogService } from '@/lib/services/audit-log.service';
 
+// Log when this module loads
+console.log('🔐 Admin login route module loaded at:', new Date().toISOString());
+
 const SECRET_KEY = new TextEncoder().encode(
   process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production'
 );
