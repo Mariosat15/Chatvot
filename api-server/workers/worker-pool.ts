@@ -49,38 +49,50 @@ class BcryptWorkerPool {
     
     console.log(`🔧 Initializing bcrypt worker pool with ${this.poolSize} workers...`);
 
+    let successCount = 0;
     for (let i = 0; i < this.poolSize; i++) {
-      this.createWorker();
+      if (this.createWorker()) {
+        successCount++;
+      }
     }
 
     this.initialized = true;
-    console.log(`✅ Bcrypt worker pool ready (${this.poolSize} workers)`);
+    
+    if (successCount === 0) {
+      console.error(`❌ Bcrypt worker pool failed to create any workers! Password operations will fail.`);
+    } else if (successCount < this.poolSize) {
+      console.warn(`⚠️ Bcrypt worker pool partially initialized (${successCount}/${this.poolSize} workers)`);
+    } else {
+      console.log(`✅ Bcrypt worker pool ready (${this.poolSize} workers)`);
+    }
   }
 
   /**
    * Create a new worker
+   * Returns true if worker was created successfully, false otherwise
    */
-  private createWorker(): void {
+  private createWorker(): boolean {
     // Don't create workers during shutdown
-    if (this.isShuttingDown) return;
+    if (this.isShuttingDown) return false;
     
-    // Detect if running from compiled dist/ folder (same method as index.ts)
-    // Use path.sep to check for exact 'dist' folder (not substring like 'distributed')
-    const isCompiledBuild = __dirname.split(path.sep).includes('dist');
-    
-    // Use compiled JS in dist/, TS in source
-    const workerPath = isCompiledBuild
-      ? path.join(__dirname, 'bcrypt.worker.js')
-      : path.join(__dirname, 'bcrypt.worker.ts');
+    try {
+      // Detect if running from compiled dist/ folder (same method as index.ts)
+      // Use path.sep to check for exact 'dist' folder (not substring like 'distributed')
+      const isCompiledBuild = __dirname.split(path.sep).includes('dist');
+      
+      // Use compiled JS in dist/, TS in source
+      const workerPath = isCompiledBuild
+        ? path.join(__dirname, 'bcrypt.worker.js')
+        : path.join(__dirname, 'bcrypt.worker.ts');
 
-    const worker = new Worker(workerPath, {
-      // Use tsx for TypeScript in development (non-compiled)
-      execArgv: isCompiledBuild 
-        ? undefined
-        : ['--require', 'tsx/cjs'],
-    });
+      const worker = new Worker(workerPath, {
+        // Use tsx for TypeScript in development (non-compiled)
+        execArgv: isCompiledBuild 
+          ? undefined
+          : ['--require', 'tsx/cjs'],
+      });
 
-    const workerInfo: WorkerInfo = { worker, busy: false, currentTaskId: null };
+      const workerInfo: WorkerInfo = { worker, busy: false, currentTaskId: null };
 
     worker.on('message', (result: { id: string; success: boolean; result?: any; error?: string }) => {
       const task = this.pendingTasks.get(result.id);
@@ -120,9 +132,14 @@ class BcryptWorkerPool {
       if (index !== -1) {
         this.workers.splice(index, 1);
         if (!this.isShuttingDown) {
-          this.createWorker();
-          // Process any queued tasks with the new worker
-          this.processQueue();
+          try {
+            this.createWorker();
+            // Process any queued tasks with the new worker
+            this.processQueue();
+          } catch (recreateError) {
+            console.error('❌ Failed to recreate worker after error:', recreateError);
+            // Don't crash the server - gracefully degrade with fewer workers
+          }
         }
       }
     });
@@ -151,13 +168,25 @@ class BcryptWorkerPool {
       const index = this.workers.indexOf(workerInfo);
       if (index !== -1) {
         this.workers.splice(index, 1);
-        this.createWorker();
-        // Process any queued tasks with the new worker
-        this.processQueue();
+        try {
+          this.createWorker();
+          // Process any queued tasks with the new worker
+          this.processQueue();
+        } catch (recreateError) {
+          console.error('❌ Failed to recreate worker after exit:', recreateError);
+          // Don't crash the server - gracefully degrade with fewer workers
+        }
       }
     });
 
     this.workers.push(workerInfo);
+    return true;
+    
+    } catch (error) {
+      console.error('❌ Failed to create worker:', error);
+      // Don't crash the server - gracefully degrade
+      return false;
+    }
   }
 
   /**
