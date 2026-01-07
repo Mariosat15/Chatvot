@@ -143,6 +143,12 @@ router.post('/register', async (req: Request, res: Response) => {
       return;
     }
     
+    // Password must be at least 6 characters (matches batch registration requirement)
+    if (password.length < 6) {
+      res.status(400).json({ error: 'Password must be at least 6 characters' });
+      return;
+    }
+    
     // Optional name must also be string if provided
     if (name !== undefined && typeof name !== 'string') {
       res.status(400).json({ error: 'Name must be a string' });
@@ -499,7 +505,20 @@ router.post('/register-batch', async (req: Request, res: Response) => {
     const validUsers: Array<{ email: string; password: string; name?: string }> = [];
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     
-    for (const userData of users) {
+    for (let i = 0; i < users.length; i++) {
+      const userData = users[i];
+      
+      // Validate that element is an object (not null, undefined, or primitive)
+      if (!userData || typeof userData !== 'object' || Array.isArray(userData)) {
+        results.push({ 
+          success: false, 
+          email: 'unknown', 
+          error: `Invalid user data at index ${i}: expected an object` 
+        });
+        failureCount++;
+        continue;
+      }
+      
       // Validate email
       if (!userData.email || typeof userData.email !== 'string' || !emailRegex.test(userData.email)) {
         results.push({ 
