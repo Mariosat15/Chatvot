@@ -51,9 +51,11 @@ export async function POST(
       await notificationService.send({
         userId: challenge.challengerId,
         templateId: 'challenge_declined',
-        metadata: {
+        variables: {  // Changed from 'metadata' to 'variables'
           challengeId: challenge._id.toString(),
+          challengeSlug: challenge.slug,  // For actionUrl
           challengedName: challenge.challengedName,
+          opponentName: challenge.challengedName,  // Alias for template compatibility
           entryFee: challenge.entryFee,
         },
       });

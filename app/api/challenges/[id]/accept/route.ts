@@ -193,8 +193,9 @@ export async function POST(
       await notificationService.send({
         userId: challenge.challengerId,
         templateId: 'challenge_accepted',
-        metadata: {
+        variables: {  // Changed from 'metadata' to 'variables'
           challengeId: challenge._id.toString(),
+          challengeSlug: challenge.slug,  // Added for actionUrl
           challengedName: challenge.challengedName,
           opponentName: challenge.challengedName, // Alias for template compatibility
           entryFee: challenge.entryFee,
@@ -208,8 +209,9 @@ export async function POST(
       await notificationService.send({
         userId: challenge.challengedId,
         templateId: 'challenge_started',
-        metadata: {
+        variables: {  // Changed from 'metadata' to 'variables'
           challengeId: challenge._id.toString(),
+          challengeSlug: challenge.slug,  // Added for actionUrl
           challengerName: challenge.challengerName,
           opponentName: challenge.challengerName, // Alias for template compatibility
           duration: challenge.duration,

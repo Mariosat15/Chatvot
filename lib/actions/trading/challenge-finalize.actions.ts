@@ -677,6 +677,7 @@ export async function finalizeChallenge(challengeId: string) {
           templateId: 'challenge_won',
           variables: {
             challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,  // For actionUrl
             opponentName: loserName || 'opponent',
             prize: winnerPrize,
             pnl: winnerPnL?.toFixed(2) || '0',
@@ -690,6 +691,7 @@ export async function finalizeChallenge(challengeId: string) {
             templateId: 'challenge_lost',
             variables: {
               challengeId: challenge._id.toString(),
+              challengeSlug: challenge.slug,  // For actionUrl
               opponentName: winnerName || 'opponent',
               pnl: loserPnL?.toFixed(2) || '0',
             },
@@ -709,6 +711,7 @@ export async function finalizeChallenge(challengeId: string) {
           templateId: 'challenge_tie',
           variables: {
             challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,  // For actionUrl
             opponentName: challenged.username || 'opponent',
             tieResolution,
           },
@@ -719,6 +722,7 @@ export async function finalizeChallenge(challengeId: string) {
           templateId: 'challenge_tie',
           variables: {
             challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,  // For actionUrl
             opponentName: challenger.username || 'opponent',
             tieResolution,
           },
@@ -732,6 +736,7 @@ export async function finalizeChallenge(challengeId: string) {
           templateId: 'challenge_disqualified',
           variables: {
             challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,  // For actionUrl
             opponentName: challenged.username || 'opponent',
             reason: challenger.disqualificationReason || 'Did not meet minimum trade requirement',
           },
@@ -744,6 +749,7 @@ export async function finalizeChallenge(challengeId: string) {
           templateId: 'challenge_disqualified',
           variables: {
             challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,  // For actionUrl
             opponentName: challenger.username || 'opponent',
             reason: challenged.disqualificationReason || 'Did not meet minimum trade requirement',
           },

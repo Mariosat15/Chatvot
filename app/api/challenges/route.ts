@@ -384,9 +384,11 @@ export async function POST(request: NextRequest) {
         await notificationService.send({
           userId: challengedId,
           templateId: 'challenge_received',
-          metadata: {
+          variables: {  // Changed from 'metadata' to 'variables'
             challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,  // For actionUrl
             challengerName: challenge.challengerName,
+            opponentName: challenge.challengerName,  // Alias for template compatibility
             entryFee: actualEntryFee,
             duration,
             winnerPrize,
