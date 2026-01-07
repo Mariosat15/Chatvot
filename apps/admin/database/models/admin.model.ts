@@ -1,6 +1,5 @@
 import { Schema, model, models, type Document, type Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { ADMIN_SECTIONS, type AdminSection } from './admin-employee.model';
 
 export interface AdminDocument extends Document {
   email: string;
@@ -10,7 +9,7 @@ export interface AdminDocument extends Document {
   isSuperAdmin: boolean;
   role?: string;
   roleTemplateId?: string;
-  allowedSections?: AdminSection[];
+  allowedSections?: string[];
   lastLogin?: Date;
   lastActivity?: Date;
   isOnline: boolean;
@@ -54,7 +53,6 @@ const AdminSchema = new Schema<AdminDocument>(
     },
     allowedSections: [{
       type: String,
-      enum: ADMIN_SECTIONS,
     }],
     lastLogin: {
       type: Date,

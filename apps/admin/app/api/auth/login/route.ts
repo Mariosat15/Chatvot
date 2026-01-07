@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import { Admin } from '@/database/models/admin.model';
-import { ADMIN_SECTIONS } from '@/database/models/admin-employee.model';
 import { SignJWT } from 'jose';
 import { auditLogService } from '@/lib/services/audit-log.service';
+
+// All available admin sections - defined here to avoid circular import issues
+const ALL_ADMIN_SECTIONS = [
+  'overview', 'hero-page', 'marketplace', 'competitions', 'challenges',
+  'trading-history', 'analytics', 'market', 'symbols', 'users', 'badges',
+  'financial', 'payments', 'failed-deposits', 'withdrawals', 'pending-withdrawals',
+  'kyc-settings', 'kyc-history', 'fraud', 'wiki', 'credentials', 'email-templates',
+  'notifications', 'payment-providers', 'fee', 'invoicing', 'reconciliation',
+  'database', 'ai-agent', 'whitelabel', 'audit-logs', 'employees',
+];
 
 const SECRET_KEY = new TextEncoder().encode(
   process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production'
@@ -41,7 +50,7 @@ export async function POST(request: NextRequest) {
           isFirstLogin: true,
           isSuperAdmin: adminCount === 0, // First admin is always super admin
           role: 'Super Admin',
-          allowedSections: [...ADMIN_SECTIONS], // Super admin has access to everything
+          allowedSections: [...ALL_ADMIN_SECTIONS], // Super admin has access to everything
         });
         await admin.save();
         isNewSuperAdmin = adminCount === 0;
@@ -62,7 +71,7 @@ export async function POST(request: NextRequest) {
         // This is the first admin ever - mark as super admin
         admin.isSuperAdmin = true;
         admin.role = 'Super Admin';
-        admin.allowedSections = [...ADMIN_SECTIONS];
+        admin.allowedSections = [...ALL_ADMIN_SECTIONS];
         await admin.save();
         console.log(`🔐 Migrated existing admin to Super Admin: ${admin.email}`);
       }
@@ -105,7 +114,7 @@ export async function POST(request: NextRequest) {
         name: admin.name,
         isSuperAdmin: admin.isSuperAdmin,
         role: admin.role || 'admin',
-        allowedSections: admin.isSuperAdmin ? ADMIN_SECTIONS : (admin.allowedSections || []),
+        allowedSections: admin.isSuperAdmin ? ALL_ADMIN_SECTIONS : (admin.allowedSections || []),
       },
     });
 
