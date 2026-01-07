@@ -16,14 +16,11 @@ interface UseAdminEventsOptions {
 }
 
 /**
- * Hook for subscribing to real-time admin events
- * 
- * Uses a global singleton SSE client to avoid reconnection loops.
+ * Hook for subscribing to admin events via polling
  */
 export function useAdminEvents(options: UseAdminEventsOptions = {}) {
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true); // Polling is always "connected"
   const [lastEvent, setLastEvent] = useState<AdminEvent | null>(null);
-  const [subscriberCount, setSubscriberCount] = useState(0);
   
   // Store options in ref to avoid re-subscriptions
   const optionsRef = useRef(options);
@@ -31,15 +28,7 @@ export function useAdminEvents(options: UseAdminEventsOptions = {}) {
 
   useEffect(() => {
     const client = getAdminEventsClient();
-    
-    // Update connection state
-    const updateState = () => {
-      setIsConnected(client.isConnected);
-      setSubscriberCount(client.subscriberCount);
-    };
-    
-    // Initial state
-    updateState();
+    setIsConnected(client.isConnected);
     
     // Subscribe to events
     const unsubscribe = client.addListener((event: AdminEvent) => {
@@ -52,7 +41,6 @@ export function useAdminEvents(options: UseAdminEventsOptions = {}) {
       }
 
       setLastEvent(event);
-      updateState();
 
       // Show toast notification
       if (opts.showToasts !== false && event.adminEmail) {
@@ -69,14 +57,10 @@ export function useAdminEvents(options: UseAdminEventsOptions = {}) {
       }
     });
 
-    // Poll connection state every 5 seconds
-    const stateInterval = setInterval(updateState, 5000);
-
     return () => {
       unsubscribe();
-      clearInterval(stateInterval);
     };
-  }, []); // Empty deps - singleton handles everything
+  }, []);
 
   const reconnect = useCallback(() => {
     getAdminEventsClient().reconnect();
@@ -85,7 +69,7 @@ export function useAdminEvents(options: UseAdminEventsOptions = {}) {
   return {
     isConnected,
     lastEvent,
-    subscriberCount,
+    subscriberCount: 1, // Not applicable for polling
     reconnect,
   };
 }

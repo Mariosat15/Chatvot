@@ -56,7 +56,6 @@ import {
   Sparkles,
   Crown,
   Wifi,
-  WifiOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -464,8 +463,8 @@ export default function AdminDashboard({
     }));
   }, []);
 
-  // Real-time admin events subscription
-  const { isConnected: isEventConnected, subscriberCount } = useAdminEvents({
+  // Admin events subscription (polls every 30s)
+  const { isConnected: isEventConnected } = useAdminEvents({
     onEvent: (event) => {
       console.log('📡 Received event for section:', event.section);
       // Trigger refresh for the affected section
@@ -929,37 +928,15 @@ export default function AdminDashboard({
 
             {/* Right */}
             <div className="flex items-center gap-3">
-              {/* Live Sync Indicator */}
+              {/* Auto Sync Indicator */}
               <div 
-                className={cn(
-                  "hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl border transition-all",
-                  isEventConnected 
-                    ? "bg-emerald-500/10 border-emerald-500/30" 
-                    : "bg-red-500/10 border-red-500/30"
-                )}
-                title={isEventConnected 
-                  ? `Live sync active - ${subscriberCount} admin${subscriberCount !== 1 ? 's' : ''} online` 
-                  : "Disconnected - changes won't sync"
-                }
+                className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl border bg-emerald-500/10 border-emerald-500/30"
+                title="Auto-sync active - data refreshes every 30 seconds"
               >
-                {isEventConnected ? (
-                  <Wifi className="h-4 w-4 text-emerald-400" />
-                ) : (
-                  <WifiOff className="h-4 w-4 text-red-400 animate-pulse" />
-                )}
-                <div className="flex flex-col">
-                  <span className={cn(
-                    "text-[10px] uppercase tracking-wider",
-                    isEventConnected ? "text-emerald-400/80" : "text-red-400/80"
-                  )}>
-                    {isEventConnected ? "Live Sync" : "Offline"}
-                  </span>
-                  {isEventConnected && subscriberCount > 0 && (
-                    <span className="text-xs font-medium text-emerald-300">
-                      {subscriberCount} online
-                    </span>
-                  )}
-                </div>
+                <Wifi className="h-4 w-4 text-emerald-400" />
+                <span className="text-[10px] uppercase tracking-wider text-emerald-400/80">
+                  Auto Sync
+                </span>
               </div>
 
               {/* Live Server Clock */}

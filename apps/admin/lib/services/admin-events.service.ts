@@ -1,11 +1,9 @@
 /**
  * Admin Events Service
  * 
- * Manages real-time event broadcasting between admin users.
- * When one admin makes a change, all other connected admins are notified.
+ * Stores events in memory for polling clients.
+ * Clients poll every 30 seconds to check for new events.
  */
-
-type EventCallback = (event: AdminEvent) => void;
 
 export interface AdminEvent {
   type: AdminEventType;
@@ -41,32 +39,14 @@ export type AdminEventType =
   | 'symbol_updated'
   | 'general_refresh';
 
-// In-memory subscribers (works for single server)
-// For multi-server, use Redis pub/sub
-const subscribers = new Map<string, EventCallback>();
-
-// Event history for new connections (last 50 events, max 5 minutes old)
+// Event history for polling (last 100 events, max 5 minutes old)
 const eventHistory: AdminEvent[] = [];
-const MAX_HISTORY = 50;
+const MAX_HISTORY = 100;
 const MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
 
 class AdminEventsService {
   /**
-   * Subscribe to admin events
-   * Returns an unsubscribe function
-   */
-  subscribe(clientId: string, callback: EventCallback): () => void {
-    subscribers.set(clientId, callback);
-    console.log(`📡 Admin event subscriber connected: ${clientId} (total: ${subscribers.size})`);
-    
-    return () => {
-      subscribers.delete(clientId);
-      console.log(`📡 Admin event subscriber disconnected: ${clientId} (total: ${subscribers.size})`);
-    };
-  }
-
-  /**
-   * Broadcast an event to all connected admins
+   * Broadcast an event - stores in history for polling clients
    */
   broadcast(event: Omit<AdminEvent, 'timestamp'>): void {
     const fullEvent: AdminEvent = {
@@ -87,16 +67,6 @@ class AdminEventsService {
     while (eventHistory.length > 0 && eventHistory[0].timestamp < cutoff) {
       eventHistory.shift();
     }
-
-    // Broadcast to all subscribers
-    console.log(`📡 Broadcasting admin event: ${event.type} to ${subscribers.size} subscribers`);
-    subscribers.forEach((callback, clientId) => {
-      try {
-        callback(fullEvent);
-      } catch (error) {
-        console.error(`Failed to send event to ${clientId}:`, error);
-      }
-    });
   }
 
   /**
@@ -105,13 +75,6 @@ class AdminEventsService {
   getRecentEvents(since?: number): AdminEvent[] {
     if (!since) return eventHistory.slice(-10); // Last 10 events
     return eventHistory.filter(e => e.timestamp > since);
-  }
-
-  /**
-   * Get subscriber count
-   */
-  getSubscriberCount(): number {
-    return subscribers.size;
   }
 
   // ============================================
