@@ -110,12 +110,12 @@ export async function GET(request: NextRequest) {
       },
     ]);
 
-    // Get unique users for filter
+    // Get unique users for filter - group by email to avoid duplicates from role changes
     const uniqueUsers = await AuditLog.aggregate([
       {
         $group: {
-          _id: '$userId',
-          userName: { $first: '$userName' },
+          _id: '$userEmail', // Group by email, not userId, to avoid duplicates
+          userName: { $last: '$userName' }, // Use latest name
           userEmail: { $first: '$userEmail' },
           count: { $sum: 1 },
         },

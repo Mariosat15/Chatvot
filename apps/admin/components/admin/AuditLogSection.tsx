@@ -127,7 +127,7 @@ export default function AuditLogSection() {
       if (search) params.append('search', search);
       if (category !== 'all') params.append('category', category);
       if (status !== 'all') params.append('status', status);
-      if (selectedUser !== 'all') params.append('userId', selectedUser);
+      if (selectedUser !== 'all') params.append('userEmail', selectedUser); // Filter by email, not userId
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
       

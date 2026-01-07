@@ -5,7 +5,7 @@ export interface IAuditLog extends Document {
   userId: string;
   userName: string;
   userEmail: string;
-  userRole: 'admin' | 'superadmin' | 'moderator' | 'user';
+  userRole: string; // Flexible to support custom employee roles
   
   // What action was performed
   action: string;
@@ -50,7 +50,7 @@ export interface IAuditLogModel extends Model<IAuditLog> {
     userId: string;
     userName: string;
     userEmail: string;
-    userRole?: 'admin' | 'superadmin' | 'moderator' | 'user';
+    userRole?: string; // Flexible to support custom employee roles
     action: string;
     actionCategory: IAuditLog['actionCategory'];
     description: string;
@@ -86,7 +86,6 @@ const AuditLogSchema = new Schema<IAuditLog>(
     },
     userRole: {
       type: String,
-      enum: ['admin', 'superadmin', 'moderator', 'user'],
       default: 'admin',
     },
     action: {

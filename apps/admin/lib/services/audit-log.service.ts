@@ -1,6 +1,7 @@
 import AuditLog, { IAuditLog } from '@/database/models/audit-log.model';
 import { connectToDatabase } from '@/database/mongoose';
 import { headers } from 'next/headers';
+import { adminEventsService } from './admin-events.service';
 
 type ActionCategory = IAuditLog['actionCategory'];
 type TargetType = IAuditLog['targetType'];
@@ -9,8 +10,77 @@ interface AdminInfo {
   id: string;
   email: string;
   name?: string;
-  role?: 'admin' | 'superadmin' | 'moderator';
+  role?: string; // Flexible to support custom roles like "Backoffice"
 }
+
+// Map action categories to admin sections for real-time updates
+const categoryToSection: Record<string, string> = {
+  user_management: 'users',
+  financial: 'financial',
+  competition: 'competitions',
+  settings: 'settings',
+  content: 'hero-page',
+  security: 'fraud',
+  system: 'overview',
+  data: 'database',
+  other: 'overview',
+};
+
+// Map specific actions to more precise sections
+const actionToSection: Record<string, string> = {
+  // Users
+  user_created: 'users',
+  user_updated: 'users',
+  user_deleted: 'users',
+  user_suspended: 'users',
+  user_unsuspended: 'users',
+  user_restricted: 'users',
+  // Employees
+  employee_created: 'employees',
+  employee_updated: 'employees',
+  employee_deleted: 'employees',
+  employee_suspended: 'employees',
+  employee_unsuspended: 'employees',
+  employee_password_reset: 'employees',
+  employee_role_changed: 'employees',
+  employee_force_logout: 'employees',
+  // KYC
+  kyc_verified: 'kyc-history',
+  kyc_rejected: 'kyc-history',
+  kyc_reset: 'kyc-history',
+  kyc_settings_updated: 'kyc-settings',
+  // Withdrawals
+  withdrawal_approved: 'pending-withdrawals',
+  withdrawal_rejected: 'pending-withdrawals',
+  withdrawal_completed: 'pending-withdrawals',
+  withdrawal_settings_updated: 'withdrawals',
+  // Fraud
+  fraud_alert_updated: 'fraud',
+  fraud_alert_dismissed: 'fraud',
+  fraud_settings_updated: 'fraud',
+  user_banned: 'fraud',
+  // Badges
+  badge_created: 'badges',
+  badge_updated: 'badges',
+  badge_deleted: 'badges',
+  badge_awarded: 'badges',
+  // Competitions
+  competition_created: 'competitions',
+  competition_updated: 'competitions',
+  competition_deleted: 'competitions',
+  competition_finalized: 'competitions',
+  // Challenges
+  challenge_updated: 'challenges',
+  // Settings
+  settings_updated: 'settings',
+  trading_risk_updated: 'trading',
+  fee_settings_updated: 'fees',
+  payment_provider_updated: 'payment-providers',
+  // Symbols
+  symbol_created: 'symbols',
+  symbol_updated: 'symbols',
+  symbol_deleted: 'symbols',
+};
 
 interface LogActionParams {
   admin: AdminInfo;
@@ -73,6 +143,27 @@ export const auditLogService = {
         status: params.status || 'success',
         errorMessage: params.errorMessage,
       });
+
+      // Broadcast real-time event to all connected admins
+      // This enables live data sync across all admin sessions
+      try {
+        // Use action-specific section first, then fall back to category
+        const section = actionToSection[params.action] || categoryToSection[params.category] || 'overview';
+        adminEventsService.broadcast({
+          type: params.action as any,
+          section,
+          action: 'update',
+          data: {
+            targetId: params.targetId,
+            targetName: params.targetName,
+            description: params.description,
+          },
+          adminId: params.admin.id,
+          adminEmail: params.admin.email,
+        });
+      } catch {
+        // SSE broadcast failure should not break the flow
+      }
     } catch (error) {
       console.error('Failed to log audit action:', error);
       // Don't throw - audit logging should not break the main flow
