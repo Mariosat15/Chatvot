@@ -691,6 +691,7 @@ export default function AdminDashboard({
       case 'notifications':
         return <NotificationSystemSection key={currentRefreshKey} />;
       case 'trading':
+      case 'trading-risk':
         return <TradingRiskSection key={currentRefreshKey} />;
       case 'currency':
         return <CurrencySettingsSection key={currentRefreshKey} />;
