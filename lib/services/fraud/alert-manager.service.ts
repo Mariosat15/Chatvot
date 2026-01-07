@@ -64,45 +64,60 @@ export class AlertManagerService {
       console.log(`   Competition ID: ${competitionId}`);
     }
 
-    // Convert userIds to ObjectIds for query
-    const userObjectIds = userIds.map(id => {
-      try {
-        return new mongoose.Types.ObjectId(id.toString());
-      } catch (e) {
-        console.error(`   ⚠️ Invalid ObjectId: ${id}`);
-        return id;
-      }
-    });
-    console.log(`   Converted to ObjectIds: ${userObjectIds.map(id => id.toString())}`);
+    // Convert userIds to strings for query (schema stores strings, not ObjectIds)
+    const userIdStrings = userIds.map(id => id.toString());
+    console.log(`   User ID strings: ${userIdStrings.join(', ')}`);
 
     // Build the query to find existing alerts for these users
+    // NOTE: suspiciousUserIds and primaryUserId are stored as STRINGS in the schema
     const userQuery = {
       $or: [
-        { suspiciousUserIds: { $in: userObjectIds } },
-        { primaryUserId: { $in: userObjectIds } }
+        { suspiciousUserIds: { $in: userIdStrings } },
+        { primaryUserId: { $in: userIdStrings } }
       ]
     };
 
-    // ALWAYS check if there's a resolved/dismissed alert with the SAME evidence type
+    // ALWAYS check if there's a resolved/dismissed alert with the SAME alert type
     // (to prevent recreating dismissed alerts of the same type)
-    const evidenceTypeCheck = competitionId 
-      ? { 'evidence.data.competitionId': competitionId, 'evidence.type': alertType }
-      : { 'evidence.type': alertType };
+    // IMPORTANT: If the user was CLEARED (investigationClearedAt is set) and this is NEW fraud
+    // activity (detected AFTER clearance), we SHOULD create a new alert
+    // NOTE: We check `alertType` field directly, NOT `evidence.type` (which is the evidence category)
+    const alertTypeCheck = competitionId 
+      ? { alertType, competitionId }
+      : { alertType };
 
     const resolvedAlertOfSameType = await FraudAlert.findOne({
       ...userQuery,
-      ...evidenceTypeCheck,
+      ...alertTypeCheck,
       status: { $in: ['dismissed', 'resolved'] }
-    });
+    }).sort({ resolvedAt: -1 }); // Get most recent resolution
+
+    let shouldBlockNewAlert = false;
 
     if (resolvedAlertOfSameType) {
-      console.log(`⏭️ [ALERT] Found resolved/dismissed alert with same evidence type`);
+      console.log(`⏭️ [ALERT] Found resolved/dismissed alert with same alert type`);
       console.log(`   Previous alert ID: ${resolvedAlertOfSameType._id}`);
       console.log(`   Status: ${resolvedAlertOfSameType.status}`);
-      console.log(`   BUT continuing to check for active alerts...`);
-      // Continue - we should still check if there's an active alert to add OTHER evidence types
+      console.log(`   Investigation cleared at: ${resolvedAlertOfSameType.investigationClearedAt || 'Not set'}`);
+      
+      // Check if user was CLEARED (unbanned/unsuspended) after this investigation
+      // If investigationClearedAt is set, it means the user was unbanned/unsuspended
+      // In that case, NEW fraud activity should create a NEW alert
+      if (resolvedAlertOfSameType.investigationClearedAt) {
+        const clearanceDate = new Date(resolvedAlertOfSameType.investigationClearedAt);
+        console.log(`   ✅ User was CLEARED on: ${clearanceDate.toISOString()}`);
+        console.log(`   → NEW fraud activity after clearance will create a NEW alert`);
+        shouldBlockNewAlert = false; // Allow new alert since user was cleared
+      } else {
+        // User was NOT cleared (still banned/suspended or alert was just dismissed)
+        // Don't create new alert for the same type of fraud
+        console.log(`   ⚠️ User was NOT cleared - blocking new alert of same type`);
+        shouldBlockNewAlert = true;
+      }
+      
+      console.log(`   Continuing to check for active alerts...`);
     } else {
-      console.log(`   No resolved/dismissed alert found with this evidence type - continuing`);
+      console.log(`   No resolved/dismissed alert found with this alert type - continuing`);
     }
 
     // ALWAYS find ANY existing ACTIVE alert for these users (regardless of type)
@@ -148,13 +163,14 @@ export class AlertManagerService {
       return;
     }
 
-    // If the same evidence type was already dismissed, don't create new alert
-    if (resolvedAlertOfSameType) {
-      console.log(`⏭️ [ALERT] No active alert exists and this type was dismissed - NOT creating`);
+    // If the same alert type was already dismissed AND user was NOT cleared, don't create new alert
+    if (shouldBlockNewAlert) {
+      console.log(`⏭️ [ALERT] No active alert exists and this type was dismissed (user NOT cleared) - NOT creating`);
       return;
     }
 
     // No existing alert found - create new one
+    // (Either no previous alert, or user was cleared after previous dismissal)
     console.log(`🆕 [ALERT] Creating NEW alert for these users`);
     await this.createNewAlert(params);
   }
@@ -319,8 +335,8 @@ export class AlertManagerService {
       alertType,
       severity,
       status: 'pending',
-      primaryUserId: new mongoose.Types.ObjectId(userIds[0]),
-      suspiciousUserIds: userIds.map(id => new mongoose.Types.ObjectId(id)),
+      primaryUserId: userIds[0].toString(), // Schema stores strings, not ObjectIds
+      suspiciousUserIds: userIds.map(id => id.toString()), // Schema stores strings, not ObjectIds
       confidence,
       title,
       description,
@@ -347,10 +363,13 @@ export class AlertManagerService {
   ): Promise<boolean> {
     await connectToDatabase();
     
+    // Use strings for query (schema stores strings, not ObjectIds)
+    const userIdStrings = userIds.map(id => id.toString());
+    
     const userQuery = {
       $or: [
-        { suspiciousUserIds: { $in: userIds.map(id => new mongoose.Types.ObjectId(id)) } },
-        { primaryUserId: { $in: userIds.map(id => new mongoose.Types.ObjectId(id)) } }
+        { suspiciousUserIds: { $in: userIdStrings } },
+        { primaryUserId: { $in: userIdStrings } }
       ]
     };
 
@@ -359,9 +378,13 @@ export class AlertManagerService {
       const existingAlert = await FraudAlert.findOne({
         ...userQuery,
         alertType,
-        'evidence.data.competitionId': competitionId,
+        competitionId, // Use direct field, not evidence.data
         status: { $in: ['dismissed', 'resolved'] }
       });
+      // Allow new alert if user was cleared
+      if (existingAlert?.investigationClearedAt) {
+        return true;
+      }
       return !existingAlert;
     }
 
@@ -371,6 +394,11 @@ export class AlertManagerService {
       alertType,
       status: { $in: ['dismissed', 'resolved'] }
     });
+    
+    // Allow new alert if user was cleared
+    if (existingAlert?.investigationClearedAt) {
+      return true;
+    }
     
     return !existingAlert;
   }
