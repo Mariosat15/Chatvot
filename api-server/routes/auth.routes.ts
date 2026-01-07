@@ -310,9 +310,22 @@ router.post('/register', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('❌ Registration error:', error);
+    
+    // Handle MongoDB duplicate key error (race condition)
+    // This occurs when concurrent requests for the same email both pass the initial check
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('E11000') || errorMessage.includes('duplicate key')) {
+      res.status(409).json({ 
+        error: 'User already exists',
+        message: 'An account with this email address already exists.',
+      });
+      return;
+    }
+    
+    // For other errors, return a generic message to avoid exposing internal details
     res.status(500).json({ 
       error: 'Registration failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message: 'An unexpected error occurred during registration. Please try again.',
     });
   } finally {
     // Always end the session
@@ -419,19 +432,23 @@ router.post('/login', async (req: Request, res: Response) => {
           // FIXED: Use userId instead of email - the /api/auth/verify-email endpoint expects userId
           const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}&userId=${user.id}`;
           
+          // Use consistent SMTP configuration with registration route
           const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || 'smtp.gmail.com',
-            port: parseInt(process.env.SMTP_PORT || '587'),
-            secure: process.env.SMTP_SECURE === 'true',
+            host: process.env.SMTP_HOST || process.env.NODEMAILER_HOST,
+            port: parseInt(process.env.SMTP_PORT || process.env.NODEMAILER_PORT || '587'),
+            secure: (process.env.SMTP_SECURE || process.env.NODEMAILER_SECURE) === 'true',
             auth: {
-              user: process.env.SMTP_USER,
-              pass: process.env.SMTP_PASS
+              user: process.env.SMTP_USER || process.env.NODEMAILER_EMAIL,
+              pass: process.env.SMTP_PASS || process.env.NODEMAILER_PASSWORD
             }
           });
           
+          const platformName = process.env.PLATFORM_NAME || 'ChartVolt';
+          const senderEmail = process.env.SMTP_USER || process.env.NODEMAILER_EMAIL || 'noreply@chartvolt.com';
+          
           // Fire and forget - don't await
           transporter.sendMail({
-            from: process.env.EMAIL_FROM || 'noreply@chartvolt.com',
+            from: `"${platformName}" <${senderEmail}>`,
             to: email,
             subject: 'Verify Your Email - ChartVolt',
             html: `
@@ -703,10 +720,16 @@ router.post('/register-batch', async (req: Request, res: Response) => {
         results.push({ success: true, email: userData.email, userId: createdUserId || userId });
         successCount++;
       } catch (error) {
+        // Handle MongoDB duplicate key error (race condition) with clean message
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const cleanError = (errorMessage.includes('E11000') || errorMessage.includes('duplicate key'))
+          ? 'User already exists'
+          : 'Registration failed';
+        
         results.push({ 
           success: false, 
           email: userData.email, 
-          error: error instanceof Error ? error.message : 'Unknown error' 
+          error: cleanError
         });
         failureCount++;
       } finally {
@@ -734,9 +757,11 @@ router.post('/register-batch', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('❌ Batch registration error:', error);
+    
+    // Don't expose internal error details
     res.status(500).json({ 
       error: 'Batch registration failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message: 'An unexpected error occurred during batch registration. Please try again.',
     });
   }
 });

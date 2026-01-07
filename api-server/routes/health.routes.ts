@@ -28,7 +28,9 @@ router.get('/detailed', (req: Request, res: Response) => {
   const workerStats = bcryptPool.getStats();
   const dbConnected = getConnectionStatus();
 
-  const status = dbConnected && workerStats.initialized ? 'healthy' : 'degraded';
+  // Use isReady instead of initialized - isReady verifies workers.length > 0
+  // initialized can be true even when zero workers were created
+  const status = dbConnected && workerStats.isReady ? 'healthy' : 'degraded';
 
   res.json({
     status,
@@ -54,13 +56,17 @@ router.get('/ready', (req: Request, res: Response) => {
   const dbConnected = getConnectionStatus();
   const workerStats = bcryptPool.getStats();
 
-  if (dbConnected && workerStats.initialized) {
+  // Use isReady instead of initialized - isReady verifies workers.length > 0
+  // initialized can be true even when zero workers were created
+  if (dbConnected && workerStats.isReady) {
     res.status(200).json({ ready: true });
   } else {
     res.status(503).json({ 
       ready: false,
       database: dbConnected,
-      workers: workerStats.initialized,
+      workers: workerStats.isReady,
+      workersInitialized: workerStats.initialized,
+      totalWorkers: workerStats.totalWorkers,
     });
   }
 });
