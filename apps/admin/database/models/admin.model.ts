@@ -6,13 +6,6 @@ export interface AdminDocument extends Document {
   password: string;
   name: string;
   isFirstLogin: boolean;
-  isSuperAdmin: boolean;
-  role?: string;
-  roleTemplateId?: string;
-  allowedSections?: string[];
-  lastLogin?: Date;
-  lastActivity?: Date;
-  isOnline: boolean;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -39,30 +32,6 @@ const AdminSchema = new Schema<AdminDocument>(
     isFirstLogin: { 
       type: Boolean, 
       default: true 
-    },
-    isSuperAdmin: {
-      type: Boolean,
-      default: false,
-    },
-    role: {
-      type: String,
-      default: 'admin',
-    },
-    roleTemplateId: {
-      type: String,
-    },
-    allowedSections: [{
-      type: String,
-    }],
-    lastLogin: {
-      type: Date,
-    },
-    lastActivity: {
-      type: Date,
-    },
-    isOnline: {
-      type: Boolean,
-      default: false,
     },
   },
   { 
