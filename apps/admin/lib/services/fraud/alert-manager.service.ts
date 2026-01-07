@@ -69,22 +69,16 @@ export class AlertManagerService {
       console.log(`   Competition ID: ${competitionId}`);
     }
 
-    // Convert userIds to ObjectIds for query
-    const userObjectIds = userIds.map(id => {
-      try {
-        return new mongoose.Types.ObjectId(id.toString());
-      } catch (e) {
-        console.error(`   ⚠️ Invalid ObjectId: ${id}`);
-        return id;
-      }
-    });
-    console.log(`   Converted to ObjectIds: ${userObjectIds.map(id => id.toString())}`);
+    // Convert userIds to strings for query (schema stores strings, not ObjectIds)
+    const userIdStrings = userIds.map(id => id.toString());
+    console.log(`   User ID strings: ${userIdStrings.join(', ')}`);
 
     // Build the query to find existing alerts for these users
+    // NOTE: suspiciousUserIds and primaryUserId are stored as STRINGS in the schema
     const userQuery = {
       $or: [
-        { suspiciousUserIds: { $in: userObjectIds } },
-        { primaryUserId: { $in: userObjectIds } }
+        { suspiciousUserIds: { $in: userIdStrings } },
+        { primaryUserId: { $in: userIdStrings } }
       ]
     };
 
