@@ -30,17 +30,26 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
 
     // Update fraud alert to dismissed
+    // IMPORTANT: Set investigationClearedAt immediately since user was NOT banned/suspended
+    // This allows new fraud activity to generate NEW alerts
+    const clearanceTimestamp = new Date();
     const updatedAlert = await FraudAlert.findByIdAndUpdate(
       alertId,
       {
         status: 'dismissed',
-        resolvedAt: new Date(),
+        resolvedAt: clearanceTimestamp,
         resolvedBy: adminUser.adminId || adminUser.email || 'system',
         actionTaken: 'none',
-        resolution: `Investigation dismissed - Marked as false positive. After investigation, this alert was determined to be a false positive or acceptable use case (e.g., family members, shared device).`
+        resolution: `Investigation dismissed - Marked as false positive. After investigation, this alert was determined to be a false positive or acceptable use case (e.g., family members, shared device).`,
+        // Mark as cleared so user can trigger NEW alerts if they commit fraud again
+        investigationClearedAt: clearanceTimestamp,
+        clearanceNote: `Dismissed by ${adminUser.email || 'admin'} - User cleared without restrictions`
       },
       { new: true }
     );
+    
+    console.log(`📝 Alert ${alertId} dismissed and marked as cleared`);
+    console.log(`   → Future fraud by these users will generate NEW alerts`);
 
     if (!updatedAlert) {
       return NextResponse.json(

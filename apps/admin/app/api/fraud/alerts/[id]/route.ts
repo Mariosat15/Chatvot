@@ -37,8 +37,17 @@ export async function PUT(
     if (actionTaken) alert.actionTaken = actionTaken;
 
     if (status === 'resolved' || status === 'dismissed') {
-      alert.resolvedAt = new Date();
+      const resolvedTimestamp = new Date();
+      alert.resolvedAt = resolvedTimestamp;
       alert.resolvedBy = auth.adminId || auth.email || 'system';
+      
+      // IMPORTANT: If dismissed (no action taken), mark as cleared immediately
+      // so users can trigger NEW alerts if they commit fraud again
+      if (status === 'dismissed') {
+        alert.investigationClearedAt = resolvedTimestamp;
+        alert.clearanceNote = `Dismissed by ${auth.email || 'admin'} - User cleared without restrictions`;
+        console.log(`📝 Alert ${id} dismissed and marked as cleared - future fraud will generate NEW alerts`);
+      }
     }
 
     await alert.save();

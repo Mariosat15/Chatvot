@@ -763,13 +763,35 @@ export default function FraudMonitoringSection() {
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-3 mb-2 flex-wrap">
+                          {/* Status Badge */}
+                          <Badge className={
+                            alert.status === 'pending' 
+                              ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                              : alert.status === 'investigating'
+                              ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                              : alert.status === 'resolved'
+                              ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                              : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                          }>
+                            {alert.status === 'pending' ? '⏳ Pending' 
+                              : alert.status === 'investigating' ? '🔍 Investigating'
+                              : alert.status === 'resolved' ? '✓ Resolved'
+                              : '✕ Dismissed'}
+                          </Badge>
                           <Badge className={getSeverityColor(alert.severity)}>
                             {alert.severity.toUpperCase()}
                           </Badge>
                           <Badge variant="outline" className="border-gray-600 text-gray-400">
                             {getAlertTypeLabel(alert.alertType)}
                           </Badge>
+                          {/* Show Cleared badge if user can trigger new alerts */}
+                          {alert.investigationClearedAt && (
+                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                              <Unlock className="h-3 w-3 mr-1" />
+                              Cleared
+                            </Badge>
+                          )}
                           <span className="text-xs text-gray-500">
                             {new Date(alert.detectedAt).toLocaleString()}
                           </span>
