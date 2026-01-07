@@ -1,17 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { getAdminEventsClient, AdminEvent } from '@/lib/admin-events-client';
 
-export interface AdminEvent {
-  type: string;
-  section: string;
-  action: 'create' | 'update' | 'delete' | 'refresh';
-  data?: any;
-  adminId?: string;
-  adminEmail?: string;
-  timestamp: number;
-}
+export type { AdminEvent };
 
 interface UseAdminEventsOptions {
   // Sections to listen to (empty = all sections)
@@ -20,238 +13,80 @@ interface UseAdminEventsOptions {
   onEvent?: (event: AdminEvent) => void;
   // Whether to show toast notifications
   showToasts?: boolean;
-  // Auto-reconnect on disconnect
-  autoReconnect?: boolean;
 }
 
 /**
  * Hook for subscribing to real-time admin events
  * 
- * IMPORTANT: This hook maintains a SINGLE stable SSE connection.
- * It uses refs to avoid reconnection loops caused by React re-renders.
+ * Uses a global singleton SSE client to avoid reconnection loops.
  */
 export function useAdminEvents(options: UseAdminEventsOptions = {}) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastEvent, setLastEvent] = useState<AdminEvent | null>(null);
   const [subscriberCount, setSubscriberCount] = useState(0);
   
-  // Use refs to store mutable values that shouldn't trigger re-renders
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastEventTimeRef = useRef<number>(0);
-  const isConnectingRef = useRef(false);
-  const isMountedRef = useRef(true);
-  
-  // Store options in refs to avoid useEffect re-runs
+  // Store options in ref to avoid re-subscriptions
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  // Connect on mount, disconnect on unmount - ONLY ONCE
   useEffect(() => {
-    isMountedRef.current = true;
+    const client = getAdminEventsClient();
     
-    const connect = () => {
-      // Prevent multiple simultaneous connection attempts
-      if (isConnectingRef.current) {
-        return;
-      }
-      
-      // Don't connect if already connected
-      if (eventSourceRef.current?.readyState === EventSource.OPEN) {
-        return;
-      }
-      
-      // Don't connect if component unmounted
-      if (!isMountedRef.current) {
-        return;
-      }
-
-      isConnectingRef.current = true;
-
-      // Build URL with last event time for reconnection
-      let url = '/api/admin/events';
-      if (lastEventTimeRef.current > 0) {
-        url += `?since=${lastEventTimeRef.current}`;
-      }
-
-      console.log('📡 Connecting to admin events SSE...');
-      const eventSource = new EventSource(url);
-      eventSourceRef.current = eventSource;
-
-      eventSource.onopen = () => {
-        if (!isMountedRef.current) {
-          eventSource.close();
-          return;
-        }
-        console.log('📡 SSE connection opened');
-        isConnectingRef.current = false;
-        setIsConnected(true);
-      };
-
-      eventSource.onmessage = (e) => {
-        if (!isMountedRef.current) return;
-        
-        try {
-          const event = JSON.parse(e.data);
-          const opts = optionsRef.current;
-          
-          // Handle special events
-          if (event.type === 'connected') {
-            setSubscriberCount(event.subscriberCount);
-            return;
-          }
-          
-          if (event.type === 'ping') {
-            // Heartbeat - ignore
-            return;
-          }
-
-          // Update last event time for reconnection
-          if (event.timestamp) {
-            lastEventTimeRef.current = event.timestamp;
-          }
-
-          // Filter by section if specified
-          const sections = opts.sections || [];
-          if (sections.length > 0 && !sections.includes(event.section)) {
-            return;
-          }
-
-          console.log('📡 Received admin event:', event);
-          setLastEvent(event);
-
-          // Show toast notification
-          if (opts.showToasts !== false && event.adminEmail) {
-            const actionText = getActionText(event.type, event.action);
-            toast.info(`${event.adminEmail} ${actionText}`, {
-              description: `Section: ${event.section}`,
-              duration: 3000,
-            });
-          }
-
-          // Call callback
-          if (opts.onEvent) {
-            opts.onEvent(event);
-          }
-        } catch (error) {
-          console.error('Failed to parse SSE event:', error);
-        }
-      };
-
-      eventSource.onerror = () => {
-        console.error('📡 SSE connection error');
-        isConnectingRef.current = false;
-        
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
-        
-        if (!isMountedRef.current) return;
-        
-        setIsConnected(false);
-
-        // Auto-reconnect after 5 seconds (only if still mounted)
-        const opts = optionsRef.current;
-        if (opts.autoReconnect !== false && isMountedRef.current) {
-          console.log('📡 Reconnecting in 5 seconds...');
-          reconnectTimeoutRef.current = setTimeout(() => {
-            if (isMountedRef.current) {
-              connect();
-            }
-          }, 5000);
-        }
-      };
+    // Update connection state
+    const updateState = () => {
+      setIsConnected(client.isConnected);
+      setSubscriberCount(client.subscriberCount);
     };
+    
+    // Initial state
+    updateState();
+    
+    // Subscribe to events
+    const unsubscribe = client.addListener((event: AdminEvent) => {
+      const opts = optionsRef.current;
+      
+      // Filter by section if specified
+      const sections = opts.sections || [];
+      if (sections.length > 0 && !sections.includes(event.section)) {
+        return;
+      }
 
-    // Initial connection
-    connect();
+      setLastEvent(event);
+      updateState();
 
-    // Cleanup on unmount
+      // Show toast notification
+      if (opts.showToasts !== false && event.adminEmail) {
+        const actionText = getActionText(event.type, event.action);
+        toast.info(`${event.adminEmail} ${actionText}`, {
+          description: `Section: ${event.section}`,
+          duration: 3000,
+        });
+      }
+
+      // Call callback
+      if (opts.onEvent) {
+        opts.onEvent(event);
+      }
+    });
+
+    // Poll connection state every 5 seconds
+    const stateInterval = setInterval(updateState, 5000);
+
     return () => {
-      isMountedRef.current = false;
-      isConnectingRef.current = false;
-      
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-      
-      if (eventSourceRef.current) {
-        console.log('📡 Closing SSE connection (unmount)');
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
+      unsubscribe();
+      clearInterval(stateInterval);
     };
-  }, []); // Empty dependency array - run ONLY on mount/unmount
+  }, []); // Empty deps - singleton handles everything
 
-  // Manual reconnect function
-  const reconnect = () => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-    
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    
-    isConnectingRef.current = false;
-    
-    // Trigger reconnect
-    let url = '/api/admin/events';
-    if (lastEventTimeRef.current > 0) {
-      url += `?since=${lastEventTimeRef.current}`;
-    }
-
-    console.log('📡 Manual reconnect to admin events SSE...');
-    const eventSource = new EventSource(url);
-    eventSourceRef.current = eventSource;
-    
-    eventSource.onopen = () => {
-      console.log('📡 SSE connection reopened');
-      setIsConnected(true);
-    };
-    
-    eventSource.onmessage = (e) => {
-      try {
-        const event = JSON.parse(e.data);
-        if (event.type === 'connected') {
-          setSubscriberCount(event.subscriberCount);
-        } else if (event.type !== 'ping') {
-          setLastEvent(event);
-          if (optionsRef.current.onEvent) {
-            optionsRef.current.onEvent(event);
-          }
-        }
-      } catch {}
-    };
-    
-    eventSource.onerror = () => {
-      setIsConnected(false);
-    };
-  };
-
-  const disconnect = () => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-    
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-      setIsConnected(false);
-    }
-  };
+  const reconnect = useCallback(() => {
+    getAdminEventsClient().reconnect();
+  }, []);
 
   return {
     isConnected,
     lastEvent,
     subscriberCount,
     reconnect,
-    disconnect,
   };
 }
 
