@@ -971,14 +971,14 @@ export default function EmployeesSection() {
             <div className="space-y-2">
               <Label className="text-gray-300">Role Template</Label>
               <Select
-                value={newEmployee.roleTemplateId}
-                onValueChange={(value) => setNewEmployee({ ...newEmployee, roleTemplateId: value })}
+                value={newEmployee.roleTemplateId || "custom"}
+                onValueChange={(value) => setNewEmployee({ ...newEmployee, roleTemplateId: value === "custom" ? "" : value })}
               >
                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                   <SelectValue placeholder="Select a role template or use custom permissions" />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="">Custom Permissions</SelectItem>
+                  <SelectItem value="custom">Custom Permissions</SelectItem>
                   {roleTemplates.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       {template.name} - {template.allowedSections.length} sections
@@ -1134,14 +1134,14 @@ export default function EmployeesSection() {
             <div className="space-y-2">
               <Label className="text-gray-300">Role Template</Label>
               <Select
-                value={editForm.roleTemplateId}
-                onValueChange={(value) => setEditForm({ ...editForm, roleTemplateId: value })}
+                value={editForm.roleTemplateId || "custom"}
+                onValueChange={(value) => setEditForm({ ...editForm, roleTemplateId: value === "custom" ? "" : value })}
               >
                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                   <SelectValue placeholder="Select a role template" />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="">Custom Permissions</SelectItem>
+                  <SelectItem value="custom">Custom Permissions</SelectItem>
                   {roleTemplates.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       {template.name}

@@ -82,6 +82,10 @@ export async function GET(request: NextRequest) {
       .sort({ createdAt: -1 })
       .lean();
 
+    // Determine which is the original admin
+    const defaultAdminEmail = (process.env.ADMIN_EMAIL || 'admin@email.com').toLowerCase();
+    const oldestAdmin = await Admin.findOne({}).sort({ createdAt: 1 }).select('_id');
+    
     // Get all role templates
     const templates = await AdminRoleTemplate.find({ isActive: true }).lean();
 
@@ -90,10 +94,15 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      employees: employees.map(emp => ({
-        ...emp,
-        id: emp._id.toString(),
-      })),
+      employees: employees.map(emp => {
+        const isSuper = emp.email.toLowerCase() === defaultAdminEmail || 
+          (oldestAdmin && oldestAdmin._id.toString() === emp._id.toString());
+        return {
+          ...emp,
+          id: emp._id.toString(),
+          isSuperAdmin: isSuper,
+        };
+      }),
       roleTemplates: templates.map(t => ({
         ...t,
         id: t._id.toString(),
@@ -184,16 +193,16 @@ export async function POST(request: NextRequest) {
       // Generate or use manual password
       const password = manualPassword || generatePassword();
 
-      // Create employee
+      // Create employee (new employees are never super admin - that's determined by original admin status)
       const newEmployee = new Admin({
         email: email.toLowerCase(),
         name,
         password,
         role: roleName,
-        roleTemplateId,
+        roleTemplateId: roleTemplateId || undefined,
         allowedSections,
-        isSuperAdmin: false,
         isFirstLogin: true,
+        status: 'active',
       });
 
       await newEmployee.save();
