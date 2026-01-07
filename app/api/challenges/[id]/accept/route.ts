@@ -189,13 +189,14 @@ export async function POST(
     try {
       const { notificationService } = await import('@/lib/services/notification.service');
       
-      // Notify challenger
+      // Notify challenger that their challenge was accepted
       await notificationService.send({
         userId: challenge.challengerId,
         templateId: 'challenge_accepted',
         metadata: {
           challengeId: challenge._id.toString(),
           challengedName: challenge.challengedName,
+          opponentName: challenge.challengedName, // Alias for template compatibility
           entryFee: challenge.entryFee,
           duration: challenge.duration,
           winnerPrize: challenge.winnerPrize,
@@ -203,13 +204,14 @@ export async function POST(
         },
       });
 
-      // Notify challenged (confirmation)
+      // Notify challenged (confirmation) that the challenge started
       await notificationService.send({
         userId: challenge.challengedId,
         templateId: 'challenge_started',
         metadata: {
           challengeId: challenge._id.toString(),
           challengerName: challenge.challengerName,
+          opponentName: challenge.challengerName, // Alias for template compatibility
           duration: challenge.duration,
           winnerPrize: challenge.winnerPrize,
           endTime: endTime.toISOString(),

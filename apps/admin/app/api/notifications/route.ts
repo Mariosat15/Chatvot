@@ -235,6 +235,68 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (action === 'reset_template') {
+      // Reset a specific template to its default values
+      const { templateId } = body;
+      
+      if (!templateId) {
+        return NextResponse.json(
+          { error: 'Template ID is required' },
+          { status: 400 }
+        );
+      }
+
+      // Get default templates
+      const { getDefaultTemplates } = await import('@/database/models/notification-template.model');
+      const defaults = getDefaultTemplates();
+      const defaultTemplate = defaults.find((t: any) => t.templateId === templateId);
+      
+      if (!defaultTemplate) {
+        return NextResponse.json(
+          { error: 'No default template found for this ID' },
+          { status: 404 }
+        );
+      }
+
+      // Update with default values (overwrite)
+      const updated = await NotificationTemplate.findOneAndUpdate(
+        { templateId },
+        { 
+          $set: {
+            name: defaultTemplate.name,
+            description: defaultTemplate.description,
+            category: defaultTemplate.category,
+            type: defaultTemplate.type,
+            title: defaultTemplate.title,
+            message: defaultTemplate.message,
+            icon: defaultTemplate.icon,
+            priority: defaultTemplate.priority,
+            color: defaultTemplate.color,
+            channels: defaultTemplate.channels,
+            actionUrl: defaultTemplate.actionUrl,
+            actionText: defaultTemplate.actionText,
+          }
+        },
+        { new: true, upsert: true }
+      );
+
+      // Log action
+      if (admin) {
+        await auditLogService.logSettingsUpdated(
+          { id: admin.id, email: admin.email || 'admin', name: admin.name },
+          'notification_template_reset',
+          null,
+          { templateId }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Template '${templateId}' has been reset to default`,
+        template: updated,
+      });
+    }
+
     return NextResponse.json(
       { error: 'Invalid action' },
       { status: 400 }
