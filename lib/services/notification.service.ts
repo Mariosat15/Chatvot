@@ -339,6 +339,36 @@ class NotificationService {
       },
     });
   }
+
+  /**
+   * Send stop loss triggered notification
+   */
+  async notifyStopLossTriggered(userId: string, symbol: string, exitPrice: number, realizedPnl: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'stop_loss_triggered',
+      variables: {
+        symbol,
+        exitPrice: exitPrice.toFixed(5),
+        pnl: realizedPnl >= 0 ? `+€${realizedPnl.toFixed(2)}` : `-€${Math.abs(realizedPnl).toFixed(2)}`,
+      },
+    });
+  }
+
+  /**
+   * Send take profit triggered notification
+   */
+  async notifyTakeProfitTriggered(userId: string, symbol: string, exitPrice: number, realizedPnl: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'take_profit_triggered',
+      variables: {
+        symbol,
+        exitPrice: exitPrice.toFixed(5),
+        pnl: realizedPnl >= 0 ? `+€${realizedPnl.toFixed(2)}` : `-€${Math.abs(realizedPnl).toFixed(2)}`,
+      },
+    });
+  }
 }
 
 // Create singleton instance
