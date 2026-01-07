@@ -60,6 +60,15 @@ interface FraudAlert {
   resolvedBy?: string;
   investigationClearedAt?: string; // When users were unbanned/unsuspended
   clearanceNote?: string; // Admin notes when clearing
+  // Detection tracking
+  detectionCount?: number; // Times this alert type triggered
+  detectionHistory?: Array<{
+    timestamp: string;
+    triggeredBy: string;
+    ipAddress?: string;
+    details?: string;
+  }>;
+  previousAlertCount?: number; // Previous alerts for same users
 }
 
 interface DeviceFingerprint {
@@ -792,6 +801,18 @@ export default function FraudMonitoringSection() {
                               Cleared
                             </Badge>
                           )}
+                          {/* Detection count badge */}
+                          {(alert.detectionCount || 1) > 1 && (
+                            <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">
+                              🔄 {alert.detectionCount}x detected
+                            </Badge>
+                          )}
+                          {/* Previous alerts badge */}
+                          {(alert.previousAlertCount || 0) > 0 && (
+                            <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+                              📜 {alert.previousAlertCount} prev alerts
+                            </Badge>
+                          )}
                           <span className="text-xs text-gray-500">
                             {new Date(alert.detectedAt).toLocaleString()}
                           </span>
@@ -814,6 +835,11 @@ export default function FraudMonitoringSection() {
                             <TrendingUp className="h-3 w-3" />
                             {Math.round(alert.confidence * 100)}% confidence
                           </span>
+                          {(alert.detectionCount || 1) > 1 && (
+                            <span className="flex items-center gap-1 text-orange-400">
+                              🔄 Detected {alert.detectionCount} times
+                            </span>
+                          )}
                           {alert.evidence?.[0]?.data?.totalActivities && (
                             <span className="flex items-center gap-1 text-blue-400">
                               <TrendingUp className="h-3 w-3" />
@@ -1208,6 +1234,77 @@ export default function FraudMonitoringSection() {
                     <p className="text-gray-100 mt-1">{new Date(selectedAlert.detectedAt).toLocaleString()}</p>
                   </div>
                 </div>
+
+                {/* Detection Count Stats */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-4 bg-gradient-to-r from-orange-900/30 to-yellow-900/30 rounded-lg border border-orange-500/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-orange-400 uppercase font-semibold">Times Detected</p>
+                        <p className="text-3xl font-bold text-orange-300">{selectedAlert.detectionCount || 1}</p>
+                        <p className="text-xs text-gray-500">for this alert</p>
+                      </div>
+                      <div className="text-orange-400 text-4xl">🔄</div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-lg border border-purple-500/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-purple-400 uppercase font-semibold">Previous Alerts</p>
+                        <p className="text-3xl font-bold text-purple-300">{selectedAlert.previousAlertCount || 0}</p>
+                        <p className="text-xs text-gray-500">dismissed/resolved</p>
+                      </div>
+                      <div className="text-purple-400 text-4xl">📜</div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-gradient-to-r from-red-900/30 to-pink-900/30 rounded-lg border border-red-500/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-red-400 uppercase font-semibold">Total Alerts Ever</p>
+                        <p className="text-3xl font-bold text-red-300">{(selectedAlert.previousAlertCount || 0) + 1}</p>
+                        <p className="text-xs text-gray-500">for these users</p>
+                      </div>
+                      <div className="text-red-400 text-4xl">⚠️</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detection History */}
+                {selectedAlert.detectionHistory && selectedAlert.detectionHistory.length > 0 && (
+                  <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                    <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Detection History ({selectedAlert.detectionHistory.length} entries)
+                    </h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {selectedAlert.detectionHistory.slice().reverse().map((entry, idx) => (
+                        <div key={idx} className="flex items-center gap-3 text-xs p-2 bg-gray-900/50 rounded">
+                          <span className="bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded">
+                            #{selectedAlert.detectionHistory!.length - idx}
+                          </span>
+                          <span className="text-gray-400">
+                            {new Date(entry.timestamp).toLocaleString()}
+                          </span>
+                          <span className="text-gray-300">
+                            by <span className="font-mono text-blue-400">{entry.triggeredBy?.substring(0, 8)}...</span>
+                          </span>
+                          {entry.ipAddress && (
+                            <span className="text-gray-500">
+                              IP: {entry.ipAddress}
+                            </span>
+                          )}
+                          {entry.details && (
+                            <span className="text-gray-500 italic">
+                              {entry.details}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Detection Methods Summary */}
                 <div className="p-4 bg-gradient-to-r from-red-900/30 to-orange-900/30 rounded-lg border border-red-500/30">
