@@ -2,10 +2,30 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import { getAdminSession } from '@/lib/admin/auth';
 import { auditLogService } from '@/lib/services/audit-log.service';
+import { ObjectId } from 'mongodb';
 
 // Valid user roles
 const VALID_ROLES = ['trader', 'admin', 'backoffice'] as const;
 type UserRole = typeof VALID_ROLES[number];
+
+/**
+ * Build a query that matches user by various ID formats
+ * Better-auth uses 'id' field, but MongoDB also has '_id'
+ */
+function buildUserQuery(userId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const queries: any[] = [{ id: userId }];
+  
+  // Try as ObjectId if valid
+  if (ObjectId.isValid(userId)) {
+    queries.push({ _id: new ObjectId(userId) });
+  }
+  
+  // Also try as string _id
+  queries.push({ _id: userId });
+  
+  return { $or: queries };
+}
 
 /**
  * PATCH /api/admin/users/edit
@@ -80,13 +100,17 @@ export async function PATCH(request: Request) {
     
     updateData.updatedAt = new Date();
 
-    // Update user in Better Auth collection
+    // Update user in Better Auth collection (try multiple ID formats)
+    const query = buildUserQuery(userId);
+    console.log(`🔍 Searching for user with query:`, JSON.stringify(query));
+    
     const result = await db.collection('user').updateOne(
-      { id: userId },
+      query,
       { $set: updateData }
     );
 
     if (result.matchedCount === 0) {
+      console.error(`❌ User not found with ID: ${userId}`);
       return NextResponse.json(
         { success: false, message: 'User not found' },
         { status: 404 }
