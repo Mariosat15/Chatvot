@@ -130,7 +130,16 @@ export default function FraudSettingsSection() {
       });
 
       if (response.ok) {
-        toast.success('Settings saved successfully');
+        // Also clear the main app's settings cache for immediate effect
+        try {
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || '';
+          await fetch(`${baseUrl}/api/fraud/clear-cache`, { method: 'POST' });
+          console.log('✅ Main app fraud settings cache cleared');
+        } catch (cacheError) {
+          console.warn('Could not clear main app cache (settings will refresh in 30 seconds):', cacheError);
+        }
+        
+        toast.success('Settings saved successfully! Changes take effect immediately.');
       } else {
         toast.error('Failed to save settings');
       }

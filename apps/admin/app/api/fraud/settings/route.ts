@@ -66,13 +66,17 @@ export async function PUT(request: Request) {
     console.log('✅ Fraud settings updated:', {
       deviceFingerprinting: settings.deviceFingerprintingEnabled,
       vpnDetection: settings.vpnDetectionEnabled,
+      multiAccountDetectionEnabled: settings.multiAccountDetectionEnabled,
+      maxAccountsPerDevice: settings.maxAccountsPerDevice, // Log this important setting
       entryBlockThreshold: settings.entryBlockThreshold
     });
 
+    // Note: The main app has a 30-second cache, so changes may take up to 30 seconds to take effect
     return NextResponse.json({
       success: true,
       settings: JSON.parse(JSON.stringify(settings)),
-      message: 'Settings updated successfully'
+      message: 'Settings updated successfully. Changes will take effect within 30 seconds.',
+      cacheNote: 'Main app refreshes settings cache every 30 seconds'
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
