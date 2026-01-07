@@ -407,6 +407,104 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case 'competition_win_mismatch': {
+        // Include competition_win and competition_refund (both are credits received)
+        const competitionWinTx = await WalletTransaction.find({
+          userId,
+          transactionType: { $in: ['competition_win', 'competition_refund'] },
+          status: 'completed',
+        }).session(session);
+
+        const correctTotal = competitionWinTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+        const wallet = await CreditWallet.findOne({ userId }).session(session);
+        const previousValue = wallet?.totalWonFromCompetitions || 0;
+
+        await CreditWallet.updateOne(
+          { userId },
+          { $set: { totalWonFromCompetitions: Math.round(correctTotal * 100) / 100 } },
+          { session }
+        );
+
+        result = {
+          success: true,
+          message: `Competition wins corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits (includes refunds)`,
+        };
+        break;
+      }
+
+      case 'challenge_win_mismatch': {
+        // Include challenge_win and challenge_refund (both are credits received)
+        const challengeWinTx = await WalletTransaction.find({
+          userId,
+          transactionType: { $in: ['challenge_win', 'challenge_refund'] },
+          status: 'completed',
+        }).session(session);
+
+        const correctTotal = challengeWinTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+        const wallet = await CreditWallet.findOne({ userId }).session(session);
+        const previousValue = wallet?.totalWonFromChallenges || 0;
+
+        await CreditWallet.updateOne(
+          { userId },
+          { $set: { totalWonFromChallenges: Math.round(correctTotal * 100) / 100 } },
+          { session }
+        );
+
+        result = {
+          success: true,
+          message: `Challenge wins corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits (includes refunds)`,
+        };
+        break;
+      }
+
+      case 'competition_spent_mismatch': {
+        const competitionSpentTx = await WalletTransaction.find({
+          userId,
+          transactionType: { $in: ['competition_entry'] },
+          status: 'completed',
+        }).session(session);
+
+        const correctTotal = competitionSpentTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+        const wallet = await CreditWallet.findOne({ userId }).session(session);
+        const previousValue = wallet?.totalSpentOnCompetitions || 0;
+
+        await CreditWallet.updateOne(
+          { userId },
+          { $set: { totalSpentOnCompetitions: Math.round(correctTotal * 100) / 100 } },
+          { session }
+        );
+
+        result = {
+          success: true,
+          message: `Competition spent corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits`,
+        };
+        break;
+      }
+
+      case 'challenge_spent_mismatch': {
+        const challengeSpentTx = await WalletTransaction.find({
+          userId,
+          transactionType: { $in: ['challenge_entry'] },
+          status: 'completed',
+        }).session(session);
+
+        const correctTotal = challengeSpentTx.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
+        const wallet = await CreditWallet.findOne({ userId }).session(session);
+        const previousValue = wallet?.totalSpentOnChallenges || 0;
+
+        await CreditWallet.updateOne(
+          { userId },
+          { $set: { totalSpentOnChallenges: Math.round(correctTotal * 100) / 100 } },
+          { session }
+        );
+
+        result = {
+          success: true,
+          message: `Challenge spent corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits`,
+        };
+        break;
+      }
+
       default:
         await session.abortTransaction();
         return NextResponse.json(

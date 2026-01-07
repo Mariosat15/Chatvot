@@ -193,23 +193,23 @@ const ISSUE_TYPES: Record<string, { label: string; description: string; fixable:
   },
   competition_win_mismatch: {
     label: 'Competition Win Mismatch',
-    description: 'Competition winnings counter is incorrect',
-    fixable: false,
+    description: 'Competition winnings counter is incorrect (includes refunds)',
+    fixable: true,
   },
   challenge_win_mismatch: {
     label: 'Challenge Win Mismatch',
-    description: 'Challenge winnings counter is incorrect',
-    fixable: false,
+    description: 'Challenge winnings counter is incorrect (includes refunds)',
+    fixable: true,
   },
   competition_spent_mismatch: {
     label: 'Competition Spent Mismatch',
     description: 'Competition spent counter is incorrect',
-    fixable: false,
+    fixable: true,
   },
   challenge_spent_mismatch: {
     label: 'Challenge Spent Mismatch',
     description: 'Challenge spent counter is incorrect',
-    fixable: false,
+    fixable: true,
   },
 };
 
