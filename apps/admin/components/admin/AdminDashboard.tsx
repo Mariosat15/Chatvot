@@ -53,6 +53,7 @@ import {
   Package,
   Bot,
   Sparkles,
+  Crown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -93,6 +94,7 @@ import MarketSettingsSection from '@/components/admin/MarketSettingsSection';
 import DependencyUpdatesSection from '@/components/admin/DependencyUpdatesSection';
 import AdminOverviewDashboard from '@/components/admin/AdminOverviewDashboard';
 import AIAgentSection from '@/components/admin/AIAgentSection';
+import EmployeesSection from '@/components/admin/EmployeesSection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -391,6 +393,22 @@ const menuGroups: MenuGroup[] = [
       },
     ],
   },
+  // Employee Management (Super Admin Only)
+  {
+    id: 'admin-management',
+    label: 'Admin',
+    icon: <Crown className="h-4 w-4" />,
+    color: 'text-yellow-400',
+    items: [
+      {
+        id: 'employees',
+        label: 'Employees',
+        icon: <Users className="h-5 w-5" />,
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-500/10 hover:bg-yellow-500/20',
+      },
+    ],
+  },
 ];
 
 // Flat menuItems for backward compatibility
@@ -545,6 +563,8 @@ export default function AdminDashboard({
         return <DependencyUpdatesSection />;
       case 'ai-agent':
         return <AIAgentSection />;
+      case 'employees':
+        return <EmployeesSection />;
       default:
         return <CompetitionsListSection />;
     }

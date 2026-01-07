@@ -2,17 +2,23 @@ import { jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { connectToDatabase } from '@/database/mongoose';
 import { Admin } from '@/database/models/admin.model';
+import { ADMIN_SECTIONS, type AdminSection } from '@/database/models/admin-employee.model';
 
 const SECRET_KEY = new TextEncoder().encode(
   process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production'
 );
 
-export async function verifyAdminAuth(): Promise<{
+export interface AdminAuthResult {
   isAuthenticated: boolean;
   adminId?: string;
   email?: string;
   name?: string;
-}> {
+  isSuperAdmin?: boolean;
+  role?: string;
+  allowedSections?: AdminSection[];
+}
+
+export async function verifyAdminAuth(): Promise<AdminAuthResult> {
   try {
     // Try cookie-based auth first
     const cookieStore = await cookies();
@@ -33,16 +39,27 @@ export async function verifyAdminAuth(): Promise<{
 
     const { payload } = await jwtVerify(token, SECRET_KEY);
     
-    // Fetch admin name from database
+    // Fetch admin details from database for fresh data
     let adminName = 'Admin';
+    let isSuperAdmin = payload.isSuperAdmin as boolean || false;
+    let role = payload.role as string || 'admin';
+    let allowedSections = payload.allowedSections as AdminSection[] || [];
+    
     try {
       await connectToDatabase();
-      const admin = await Admin.findById(payload.adminId).select('name').lean();
-      if (admin?.name) {
-        adminName = admin.name;
+      const admin = await Admin.findById(payload.adminId)
+        .select('name isSuperAdmin role allowedSections')
+        .lean();
+      
+      if (admin) {
+        adminName = admin.name || 'Admin';
+        isSuperAdmin = admin.isSuperAdmin || false;
+        role = admin.role || 'admin';
+        // Super admins have access to all sections
+        allowedSections = isSuperAdmin ? [...ADMIN_SECTIONS] : (admin.allowedSections || []);
       }
     } catch (dbError) {
-      console.error('Error fetching admin name:', dbError);
+      console.error('Error fetching admin details:', dbError);
     }
 
     return {
@@ -50,6 +67,9 @@ export async function verifyAdminAuth(): Promise<{
       adminId: payload.adminId as string,
       email: payload.email as string,
       name: adminName,
+      isSuperAdmin,
+      role,
+      allowedSections,
     };
   } catch {
     return { isAuthenticated: false };
@@ -67,12 +87,41 @@ export async function requireAdminAuth() {
 }
 
 /**
+ * Check if admin has access to a specific section
+ */
+export function hasAccessToSection(auth: AdminAuthResult, section: AdminSection): boolean {
+  if (!auth.isAuthenticated) return false;
+  if (auth.isSuperAdmin) return true;
+  return auth.allowedSections?.includes(section) || false;
+}
+
+/**
+ * Require admin to have access to specific section
+ */
+export async function requireSectionAccess(section: AdminSection): Promise<AdminAuthResult> {
+  const auth = await verifyAdminAuth();
+  
+  if (!auth.isAuthenticated) {
+    throw new Error('Unauthorized');
+  }
+  
+  if (!hasAccessToSection(auth, section)) {
+    throw new Error(`Access denied to section: ${section}`);
+  }
+  
+  return auth;
+}
+
+/**
  * Get current admin session info (returns null if not authenticated)
  */
 export async function getAdminSession(): Promise<{
   id: string;
   email: string;
   name?: string;
+  isSuperAdmin?: boolean;
+  role?: string;
+  allowedSections?: AdminSection[];
 } | null> {
   try {
     const auth = await verifyAdminAuth();
@@ -85,6 +134,9 @@ export async function getAdminSession(): Promise<{
       id: auth.adminId,
       email: auth.email,
       name: auth.name,
+      isSuperAdmin: auth.isSuperAdmin,
+      role: auth.role,
+      allowedSections: auth.allowedSections,
     };
   } catch {
     return null;

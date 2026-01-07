@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import { Admin } from '@/database/models/admin.model';
+import { ADMIN_SECTIONS } from '@/database/models/admin-employee.model';
 import { SignJWT } from 'jose';
 import { auditLogService } from '@/lib/services/audit-log.service';
 
@@ -23,24 +24,47 @@ export async function POST(request: NextRequest) {
 
     // Find admin
     let admin = await Admin.findOne({ email: email.toLowerCase() });
+    let isNewSuperAdmin = false;
 
-    // If no admin exists, create default admin (first time setup)
+    // If no admin exists, create default admin (first time setup - this is the SUPER ADMIN)
     if (!admin) {
       const defaultEmail = process.env.ADMIN_EMAIL || 'admin@email.com';
       const defaultPassword = process.env.ADMIN_PASSWORD || 'admin123';
 
       if (email === defaultEmail && password === defaultPassword) {
+        // Count existing admins to determine if this is the first one
+        const adminCount = await Admin.countDocuments();
+        
         admin = new Admin({
           email: defaultEmail,
           password: defaultPassword,
           isFirstLogin: true,
+          isSuperAdmin: adminCount === 0, // First admin is always super admin
+          role: 'Super Admin',
+          allowedSections: [...ADMIN_SECTIONS], // Super admin has access to everything
         });
         await admin.save();
+        isNewSuperAdmin = adminCount === 0;
+        
+        console.log(`🔐 ${isNewSuperAdmin ? 'Super Admin' : 'Admin'} created: ${defaultEmail}`);
       } else {
         return NextResponse.json(
           { error: 'Invalid credentials' },
           { status: 401 }
         );
+      }
+    }
+
+    // Check if this existing admin needs to be marked as super admin (migration)
+    if (!admin.isSuperAdmin) {
+      const superAdminExists = await Admin.exists({ isSuperAdmin: true });
+      if (!superAdminExists) {
+        // This is the first admin ever - mark as super admin
+        admin.isSuperAdmin = true;
+        admin.role = 'Super Admin';
+        admin.allowedSections = [...ADMIN_SECTIONS];
+        await admin.save();
+        console.log(`🔐 Migrated existing admin to Super Admin: ${admin.email}`);
       }
     }
 
@@ -53,11 +77,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate JWT
+    // Update last login and online status
+    admin.lastLogin = new Date();
+    admin.lastActivity = new Date();
+    admin.isOnline = true;
+    await admin.save();
+
+    // Generate JWT with role information
     const adminId = (admin._id as any).toString();
     const token = await new SignJWT({ 
       adminId, 
-      email: admin.email 
+      email: admin.email,
+      isSuperAdmin: admin.isSuperAdmin,
+      role: admin.role || 'admin',
+      allowedSections: admin.allowedSections || [],
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('7d')
@@ -69,6 +102,10 @@ export async function POST(request: NextRequest) {
       admin: {
         id: adminId,
         email: admin.email,
+        name: admin.name,
+        isSuperAdmin: admin.isSuperAdmin,
+        role: admin.role || 'admin',
+        allowedSections: admin.isSuperAdmin ? ADMIN_SECTIONS : (admin.allowedSections || []),
       },
     });
 
@@ -87,7 +124,7 @@ export async function POST(request: NextRequest) {
         id: adminId,
         email: admin.email,
         name: admin.name || admin.email.split('@')[0],
-        role: 'admin',
+        role: admin.role || 'admin',
       });
     } catch (auditError) {
       console.error('Failed to log admin login:', auditError);

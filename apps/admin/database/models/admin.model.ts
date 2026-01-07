@@ -1,11 +1,19 @@
 import { Schema, model, models, type Document, type Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { ADMIN_SECTIONS, type AdminSection } from './admin-employee.model';
 
 export interface AdminDocument extends Document {
   email: string;
   password: string;
   name: string;
   isFirstLogin: boolean;
+  isSuperAdmin: boolean;
+  role?: string;
+  roleTemplateId?: string;
+  allowedSections?: AdminSection[];
+  lastLogin?: Date;
+  lastActivity?: Date;
+  isOnline: boolean;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -32,6 +40,31 @@ const AdminSchema = new Schema<AdminDocument>(
     isFirstLogin: { 
       type: Boolean, 
       default: true 
+    },
+    isSuperAdmin: {
+      type: Boolean,
+      default: false,
+    },
+    role: {
+      type: String,
+      default: 'admin',
+    },
+    roleTemplateId: {
+      type: String,
+    },
+    allowedSections: [{
+      type: String,
+      enum: ADMIN_SECTIONS,
+    }],
+    lastLogin: {
+      type: Date,
+    },
+    lastActivity: {
+      type: Date,
+    },
+    isOnline: {
+      type: Boolean,
+      default: false,
     },
   },
   { 
