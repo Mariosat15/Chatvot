@@ -783,30 +783,38 @@ router.get('/benchmark', async (req: Request, res: Response) => {
     return;
   }
 
-  const iterations = 5;
-  const times: number[] = [];
+  try {
+    const iterations = 5;
+    const times: number[] = [];
 
-  for (let i = 0; i < iterations; i++) {
-    const start = Date.now();
-    await hashPassword('test-password-123', 12);
-    times.push(Date.now() - start);
+    for (let i = 0; i < iterations; i++) {
+      const start = Date.now();
+      await hashPassword('test-password-123', 12);
+      times.push(Date.now() - start);
+    }
+
+    const avg = times.reduce((a, b) => a + b, 0) / times.length;
+    const min = Math.min(...times);
+    const max = Math.max(...times);
+
+    res.json({
+      message: 'Bcrypt benchmark (using worker threads - NON-BLOCKING)',
+      iterations,
+      times,
+      stats: {
+        average: `${avg.toFixed(2)}ms`,
+        min: `${min}ms`,
+        max: `${max}ms`,
+      },
+      note: 'Main thread was NOT blocked during these operations',
+    });
+  } catch (error) {
+    console.error('❌ Benchmark error:', error);
+    res.status(500).json({
+      error: 'Benchmark failed',
+      message: 'An error occurred during the benchmark. The worker pool may be unavailable.',
+    });
   }
-
-  const avg = times.reduce((a, b) => a + b, 0) / times.length;
-  const min = Math.min(...times);
-  const max = Math.max(...times);
-
-  res.json({
-    message: 'Bcrypt benchmark (using worker threads - NON-BLOCKING)',
-    iterations,
-    times,
-    stats: {
-      average: `${avg.toFixed(2)}ms`,
-      min: `${min}ms`,
-      max: `${max}ms`,
-    },
-    note: 'Main thread was NOT blocked during these operations',
-  });
 });
 
 export default router;
