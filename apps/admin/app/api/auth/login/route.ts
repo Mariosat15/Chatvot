@@ -73,6 +73,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if temporary password has expired
+    if (admin.tempPasswordExpiresAt && new Date() > new Date(admin.tempPasswordExpiresAt)) {
+      return NextResponse.json(
+        { error: 'Your temporary password has expired. Please contact the administrator to reset your password.' },
+        { status: 403 }
+      );
+    }
+
     // Verify password
     console.log(`🔐 Verifying password for ${admin.email}`);
     console.log(`🔐 Input password length: ${password.length}`);

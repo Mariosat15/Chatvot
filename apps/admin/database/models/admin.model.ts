@@ -14,6 +14,10 @@ export interface AdminDocument extends Document {
   lastLogin?: Date;
   lastActivity?: Date;
   status?: 'active' | 'disabled';
+  // Force logout tracking
+  forceLogoutAt?: Date;
+  // Temporary password tracking
+  tempPasswordExpiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -71,6 +75,16 @@ const AdminSchema = new Schema<AdminDocument>(
       type: String,
       enum: ['active', 'disabled'],
       default: 'active',
+    },
+    // Force logout - if set, tokens issued before this time are invalid
+    forceLogoutAt: {
+      type: Date,
+      default: undefined,
+    },
+    // Temporary password expiry (for auto-generated passwords)
+    tempPasswordExpiresAt: {
+      type: Date,
+      default: undefined,
     },
   },
   { 

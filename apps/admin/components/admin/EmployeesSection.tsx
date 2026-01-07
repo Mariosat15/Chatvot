@@ -59,6 +59,7 @@ import {
   Scale,
   Ban,
   UserCheck,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -473,6 +474,28 @@ export default function EmployeesSection() {
     }
   };
 
+  const handleForceLogout = async (employee: Employee) => {
+    try {
+      const response = await fetch(`/api/employees/${employee.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'force_logout' }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success(`${employee.name} has been logged out`);
+        fetchData();
+      } else {
+        toast.error(data.error || 'Failed to log out employee');
+      }
+    } catch (error) {
+      console.error('Error logging out employee:', error);
+      toast.error('Failed to log out employee');
+    }
+  };
+
   const handleSendCredentials = async (employee: Employee) => {
     try {
       const response = await fetch('/api/employees', {
@@ -855,6 +878,17 @@ export default function EmployeesSection() {
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
+                              {employee.isOnline && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-blue-400 hover:text-blue-300"
+                                  onClick={() => handleForceLogout(employee)}
+                                  title="Force log out employee"
+                                >
+                                  <LogOut className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"

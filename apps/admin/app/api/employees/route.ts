@@ -207,6 +207,11 @@ export async function POST(request: NextRequest) {
       console.log(`📝 Password type: ${isManualPassword ? 'manual' : 'auto-generated'}`);
       console.log(`📝 Password length: ${password.length}`);
 
+      // Set temp password expiry for auto-generated passwords (24 hours)
+      const tempPasswordExpiresAt = !isManualPassword 
+        ? new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
+        : undefined;
+
       // Create employee (new employees are never super admin - that's determined by original admin status)
       const newEmployee = new Admin({
         email: email.toLowerCase(),
@@ -217,6 +222,7 @@ export async function POST(request: NextRequest) {
         allowedSections,
         isFirstLogin: true,
         status: 'active',
+        tempPasswordExpiresAt,
       });
 
       await newEmployee.save();

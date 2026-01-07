@@ -196,6 +196,16 @@ export async function DELETE(
     const deletedName = employee.name;
     const deletedEmail = employee.email;
     
+    // Force logout before deletion (in case there's any caching)
+    await Admin.updateOne(
+      { _id: id },
+      { forceLogoutAt: new Date(), isOnline: false, status: 'disabled' }
+    );
+    
+    // Small delay to ensure the force logout is propagated
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Now delete the employee
     await Admin.findByIdAndDelete(id);
 
     // Audit log
@@ -206,6 +216,8 @@ export async function DELETE(
       role: auth.isSuperAdmin ? 'superadmin' as const : 'admin' as const,
     };
     await auditLogService.logEmployeeDeleted(adminInfo, id, deletedName, deletedEmail);
+
+    console.log(`✅ Employee deleted: ${deletedEmail} (was force logged out first)`);
 
     return NextResponse.json({
       success: true,
@@ -316,15 +328,48 @@ export async function PATCH(
         return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
       }
 
+      // Set the password - it will be hashed by the pre-save hook
       employee.password = password;
       employee.isFirstLogin = true;
+      // Clear temp password expiry when manually resetting
+      employee.tempPasswordExpiresAt = undefined;
+      
+      // Force existing sessions to be invalidated
+      employee.forceLogoutAt = new Date();
+      
       await employee.save();
 
       await auditLogService.logEmployeePasswordReset(adminInfo, id, employee.name);
 
+      console.log(`✅ Password reset for ${employee.email}, forceLogoutAt set to invalidate old sessions`);
+
       return NextResponse.json({
         success: true,
-        message: 'Password reset successfully',
+        message: 'Password reset successfully. Employee will need to log in again.',
+      });
+    }
+
+    if (action === 'force_logout') {
+      // Set forceLogoutAt to now - any tokens issued before this are invalid
+      employee.forceLogoutAt = new Date();
+      employee.isOnline = false;
+      await employee.save();
+
+      await auditLogService.log({
+        admin: adminInfo,
+        action: 'employee_force_logout',
+        category: 'system',
+        description: `Force logged out employee: ${employee.name}`,
+        targetType: 'user',
+        targetId: id,
+        targetName: employee.name,
+      });
+
+      console.log(`✅ Force logout for ${employee.email}`);
+
+      return NextResponse.json({
+        success: true,
+        message: `${employee.name} has been logged out`,
       });
     }
 
