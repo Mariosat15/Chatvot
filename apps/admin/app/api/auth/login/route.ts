@@ -30,12 +30,15 @@ async function isOriginalAdmin(admin: any): Promise<boolean> {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🔐 ========== ADMIN LOGIN ATTEMPT ==========');
   try {
     await connectToDatabase();
     
     const { email, password } = await request.json();
+    console.log(`🔐 Login attempt for: ${email}`);
 
     if (!email || !password) {
+      console.log('❌ Missing email or password');
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
@@ -43,7 +46,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Find admin
+    console.log(`🔐 Looking up admin: ${email.toLowerCase()}`);
     let admin = await Admin.findOne({ email: email.toLowerCase() });
+    console.log(`🔐 Admin found: ${admin ? 'YES' : 'NO'}`);
 
     // If no admin exists, create default admin (first time setup)
     if (!admin) {
@@ -66,7 +71,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if employee account is disabled
+    console.log(`🔐 Admin status: ${admin.status || 'active (default)'}`);
     if (admin.status === 'disabled') {
+      console.log('❌ Account is disabled');
       return NextResponse.json(
         { error: 'Your account has been disabled. Contact the administrator.' },
         { status: 403 }
@@ -74,7 +81,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if temporary password has expired
+    console.log(`🔐 Temp password expires: ${admin.tempPasswordExpiresAt || 'N/A'}`);
     if (admin.tempPasswordExpiresAt && new Date() > new Date(admin.tempPasswordExpiresAt)) {
+      console.log('❌ Temporary password expired');
       return NextResponse.json(
         { error: 'Your temporary password has expired. Please contact the administrator to reset your password.' },
         { status: 403 }
@@ -83,8 +92,17 @@ export async function POST(request: NextRequest) {
 
     // Verify password
     console.log(`🔐 Verifying password for ${admin.email}`);
-    console.log(`🔐 Input password length: ${password.length}`);
-    console.log(`🔐 Stored hash starts with: ${admin.password.substring(0, 10)}...`);
+    console.log(`🔐 Input password: "${password}" (length: ${password.length})`);
+    console.log(`🔐 Stored hash: ${admin.password}`);
+    console.log(`🔐 Hash length: ${admin.password.length}`);
+    
+    // Check if the stored password looks like a bcrypt hash
+    const isBcryptHash = admin.password.startsWith('$2a$') || admin.password.startsWith('$2b$');
+    console.log(`🔐 Is bcrypt hash: ${isBcryptHash}`);
+    
+    if (!isBcryptHash) {
+      console.error('❌ ERROR: Password in database is NOT a bcrypt hash! This means password was not hashed on save.');
+    }
     
     const isValidPassword = await admin.comparePassword(password);
     console.log(`🔐 Password valid: ${isValidPassword}`);
@@ -159,9 +177,10 @@ export async function POST(request: NextRequest) {
     console.log(`✅ Admin logged in: ${admin.email} (${role}) - Sections: ${allowedSections.length}`);
     return response;
   } catch (error) {
-    console.error('Admin login error:', error);
+    console.error('❌ Admin login error:', error);
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
     return NextResponse.json(
-      { error: 'Login failed' },
+      { error: 'Login failed', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

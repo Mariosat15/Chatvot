@@ -227,6 +227,14 @@ export async function POST(request: NextRequest) {
 
       await newEmployee.save();
       console.log(`✅ Employee created: ${newEmployee.email}, role: ${roleName}, sections: ${allowedSections.length}`);
+      console.log(`✅ Password hash stored (first 20 chars): ${newEmployee.password.substring(0, 20)}...`);
+      
+      // Verify password was hashed correctly by testing it
+      const passwordVerify = await newEmployee.comparePassword(password);
+      console.log(`✅ Password verification test: ${passwordVerify ? 'PASSED' : 'FAILED'}`);
+      if (!passwordVerify) {
+        console.error('❌ WARNING: Password verification failed immediately after save!')
+      }
 
       // Audit log
       const adminInfo = {
