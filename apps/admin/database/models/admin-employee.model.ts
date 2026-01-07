@@ -30,20 +30,30 @@ export const ADMIN_SECTIONS = [
   'fraud',
   // Help
   'wiki',
-  // Settings
+  // AI & Automation
+  'ai-agent',
+  // Settings (main + subsections)
+  'settings',
   'credentials',
+  'environment',
+  'branding',
+  'company',
+  'invoices',
   'email-templates',
   'notifications',
+  'trading-risk',
+  'currency',
+  'fees',
   'payment-providers',
-  'fee',
-  'invoicing',
-  'reconciliation',
   'database',
-  // Developer Zone
-  'ai-agent',
-  'whitelabel',
   'audit-logs',
-  // Employees (Super Admin only)
+  // Dev Zone (main + subsections)
+  'dev-zone-menu',
+  'redis',
+  'dev-settings',
+  'performance-simulator',
+  'dependency-updates',
+  // Admin (Super Admin only)
   'employees',
 ] as const;
 

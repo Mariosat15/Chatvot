@@ -96,38 +96,58 @@ interface EmailTemplate {
 }
 
 const SECTION_LABELS: Record<string, string> = {
-  'overview': 'Dashboard Overview',
+  // Dashboard
+  'overview': 'Overview',
+  // Content
   'hero-page': 'Hero Page',
   'marketplace': 'Marketplace',
+  // Trading
   'competitions': 'Competitions',
   'challenges': '1v1 Challenges',
   'trading-history': 'Trading History',
   'analytics': 'Analytics',
   'market': 'Market Hours',
   'symbols': 'Trading Symbols',
-  'users': 'User Management',
+  // User Management
+  'users': 'Users',
   'badges': 'Badges & XP',
+  // Finance
   'financial': 'Financial Dashboard',
   'payments': 'Pending Payments',
   'failed-deposits': 'Failed Deposits',
   'withdrawals': 'Withdrawal Settings',
   'pending-withdrawals': 'Pending Withdrawals',
+  // Security
   'kyc-settings': 'KYC Settings',
   'kyc-history': 'KYC History',
   'fraud': 'Fraud Detection',
+  // Help
   'wiki': 'Documentation',
-  'credentials': 'Admin Credentials',
+  // AI & Automation
+  'ai-agent': 'AI Agent',
+  // Settings
+  'settings': 'Settings',
+  'credentials': 'Credentials',
+  'environment': 'Environment',
+  'branding': 'Branding',
+  'company': 'Company',
+  'invoices': 'Invoices',
   'email-templates': 'Email Templates',
   'notifications': 'Notifications',
+  'trading-risk': 'Trading Risk',
+  'currency': 'Currency',
+  'fees': 'Fees',
   'payment-providers': 'Payment Providers',
-  'fee': 'Fee Settings',
-  'invoicing': 'Invoicing',
-  'reconciliation': 'Reconciliation',
   'database': 'Database',
-  'ai-agent': 'AI Agent',
-  'whitelabel': 'Whitelabel',
   'audit-logs': 'Audit Logs',
-  'employees': 'Employee Management',
+  // Dev Zone
+  'dev-zone-menu': 'Dev Zone',
+  'redis': 'Redis Cache',
+  'dev-settings': 'Test',
+  'performance-simulator': 'Performance Simulator',
+  'dependency-updates': 'Dependency Updates',
+  // Admin
+  'employees': 'Employees',
 };
 
 const SECTION_GROUPS = {
@@ -138,8 +158,9 @@ const SECTION_GROUPS = {
   'Finance': ['financial', 'payments', 'failed-deposits', 'withdrawals', 'pending-withdrawals'],
   'Security': ['kyc-settings', 'kyc-history', 'fraud'],
   'Help': ['wiki'],
-  'Settings': ['credentials', 'email-templates', 'notifications', 'payment-providers', 'fee', 'invoicing', 'reconciliation', 'database'],
-  'Developer': ['ai-agent', 'whitelabel', 'audit-logs'],
+  'AI & Automation': ['ai-agent'],
+  'Settings': ['settings', 'credentials', 'environment', 'branding', 'company', 'invoices', 'email-templates', 'notifications', 'trading-risk', 'currency', 'fees', 'payment-providers', 'database', 'audit-logs'],
+  'Dev Zone': ['dev-zone-menu', 'redis', 'dev-settings', 'performance-simulator', 'dependency-updates'],
   'Admin': ['employees'],
 };
 
