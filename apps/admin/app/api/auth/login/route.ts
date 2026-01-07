@@ -8,6 +8,27 @@ const SECRET_KEY = new TextEncoder().encode(
   process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production'
 );
 
+// All available admin sections for super admin
+const ALL_ADMIN_SECTIONS = [
+  'overview', 'hero-page', 'marketplace', 'competitions', 'challenges',
+  'trading-history', 'analytics', 'market', 'symbols', 'users', 'badges',
+  'financial', 'payments', 'failed-deposits', 'withdrawals', 'pending-withdrawals',
+  'kyc-settings', 'kyc-history', 'fraud', 'wiki', 'credentials', 'email-templates',
+  'notifications', 'payment-providers', 'fee', 'invoicing', 'reconciliation',
+  'database', 'ai-agent', 'whitelabel', 'audit-logs', 'employees'
+];
+
+// Check if admin is the original/super admin
+async function isOriginalAdmin(admin: any): Promise<boolean> {
+  const defaultAdminEmail = (process.env.ADMIN_EMAIL || 'admin@email.com').toLowerCase();
+  const isDefaultEmail = admin.email.toLowerCase() === defaultAdminEmail;
+  
+  const oldestAdmin = await Admin.findOne({}).sort({ createdAt: 1 }).select('_id');
+  const isFirstAdmin = oldestAdmin && oldestAdmin._id.toString() === admin._id.toString();
+  
+  return isDefaultEmail || isFirstAdmin;
+}
+
 export async function POST(request: NextRequest) {
   try {
     await connectToDatabase();
@@ -44,20 +65,50 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Check if employee account is disabled
+    if (admin.status === 'disabled') {
+      return NextResponse.json(
+        { error: 'Your account has been disabled. Contact the administrator.' },
+        { status: 403 }
+      );
+    }
+
     // Verify password
+    console.log(`🔐 Verifying password for ${admin.email}`);
+    console.log(`🔐 Input password length: ${password.length}`);
+    console.log(`🔐 Stored hash starts with: ${admin.password.substring(0, 10)}...`);
+    
     const isValidPassword = await admin.comparePassword(password);
+    console.log(`🔐 Password valid: ${isValidPassword}`);
+    
     if (!isValidPassword) {
+      console.log(`❌ Invalid password for ${admin.email}`);
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
       );
     }
 
-    // Generate JWT
+    // Determine if this is the super admin
+    const isSuperAdmin = await isOriginalAdmin(admin);
+    
+    // Get allowed sections - super admin gets all, others get their assigned sections
+    const allowedSections = isSuperAdmin ? ALL_ADMIN_SECTIONS : (admin.allowedSections || []);
+    const role = isSuperAdmin ? 'Super Admin' : (admin.role || 'Employee');
+
+    // Update last login
+    admin.lastLogin = new Date();
+    admin.isOnline = true;
+    await Admin.updateOne({ _id: admin._id }, { lastLogin: new Date(), isOnline: true });
+
+    // Generate JWT with role and sections
     const adminId = (admin._id as any).toString();
     const token = await new SignJWT({ 
       adminId, 
-      email: admin.email 
+      email: admin.email,
+      role,
+      isSuperAdmin,
+      allowedSections,
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('7d')
@@ -69,6 +120,10 @@ export async function POST(request: NextRequest) {
       admin: {
         id: adminId,
         email: admin.email,
+        name: admin.name,
+        role,
+        isSuperAdmin,
+        allowedSections,
       },
     });
 
@@ -87,12 +142,13 @@ export async function POST(request: NextRequest) {
         id: adminId,
         email: admin.email,
         name: admin.name || admin.email.split('@')[0],
-        role: 'admin',
+        role,
       });
     } catch (auditError) {
       console.error('Failed to log admin login:', auditError);
     }
 
+    console.log(`✅ Admin logged in: ${admin.email} (${role}) - Sections: ${allowedSections.length}`);
     return response;
   } catch (error) {
     console.error('Admin login error:', error);

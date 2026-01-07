@@ -100,6 +100,9 @@ interface AdminDashboardProps {
   isFirstLogin: boolean;
   adminEmail: string;
   adminName?: string;
+  isSuperAdmin?: boolean;
+  role?: string;
+  allowedSections?: string[];
 }
 
 interface MenuItem {
@@ -418,13 +421,58 @@ export default function AdminDashboard({
   isFirstLogin,
   adminEmail,
   adminName = 'Admin',
+  isSuperAdmin = false,
+  role = 'Employee',
+  allowedSections = [],
 }: AdminDashboardProps) {
   const router = useRouter();
-  const [activeSection, setActiveSection] = useState(isFirstLogin ? 'credentials' : 'overview');
+  
+  // Check if user has access to a section
+  const hasAccessToSection = (sectionId: string): boolean => {
+    if (isSuperAdmin) return true;
+    return allowedSections.includes(sectionId);
+  };
+
+  // Determine the initial section - use first allowed section if user doesn't have access to overview
+  const getInitialSection = () => {
+    if (isFirstLogin && hasAccessToSection('credentials')) return 'credentials';
+    if (hasAccessToSection('overview')) return 'overview';
+    // Find first accessible section
+    return allowedSections[0] || 'overview';
+  };
+
+  const [activeSection, setActiveSection] = useState(getInitialSection());
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['settings', 'dev-zone-menu']);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [serverTime, setServerTime] = useState(new Date());
+
+  // Alias for backward compatibility
+  const hasAccess = hasAccessToSection;
+
+  // Filter menu groups based on allowed sections
+  const filteredMenuGroups = menuGroups.map(group => ({
+    ...group,
+    items: group.items
+      .filter(item => {
+        // If item has children, check if any child is accessible
+        if (item.children) {
+          return item.children.some(child => hasAccess(child.id));
+        }
+        // Otherwise check if the item itself is accessible
+        return hasAccess(item.id);
+      })
+      .map(item => {
+        // Filter children if they exist
+        if (item.children) {
+          return {
+            ...item,
+            children: item.children.filter(child => hasAccess(child.id)),
+          };
+        }
+        return item;
+      }),
+  })).filter(group => group.items.length > 0);
 
   // Live server clock
   useEffect(() => {
@@ -456,7 +504,13 @@ export default function AdminDashboard({
     if (item.children && !childId) {
       toggleMenu(item.id);
     } else {
-      setActiveSection(childId || item.id);
+      const targetSection = childId || item.id;
+      // Check access before navigating
+      if (!hasAccess(targetSection)) {
+        toast.error('You do not have access to this section');
+        return;
+      }
+      setActiveSection(targetSection);
       setMobileMenuOpen(false);
     }
   };
@@ -486,9 +540,27 @@ export default function AdminDashboard({
   };
 
   const renderContent = () => {
+    // Check access before rendering content
+    if (!hasAccess(activeSection)) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <Shield className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+            <p className="text-gray-400 mb-4">
+              You do not have permission to access this section.
+            </p>
+            <p className="text-sm text-gray-500">
+              Contact your administrator if you believe this is an error.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     switch (activeSection) {
       case 'overview':
-        return <AdminOverviewDashboard onNavigate={setActiveSection} />;
+        return <AdminOverviewDashboard onNavigate={(section) => hasAccess(section) && setActiveSection(section)} />;
       case 'hero-page':
         return <LandingPageBuilder />;
       case 'competitions':
@@ -588,7 +660,16 @@ export default function AdminDashboard({
           <div className="overflow-hidden">
             <h1 className="text-lg font-bold text-white truncate">Admin Panel</h1>
             <p className="text-xs text-gray-500 truncate">{adminName}</p>
-            <p className="text-[10px] text-gray-600 truncate">{adminEmail}</p>
+            <div className="flex items-center gap-1">
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.5 rounded font-medium",
+                isSuperAdmin 
+                  ? "bg-yellow-500/20 text-yellow-400" 
+                  : "bg-purple-500/20 text-purple-400"
+              )}>
+                {role}
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -607,7 +688,7 @@ export default function AdminDashboard({
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4">
-        {menuGroups.map((group) => (
+        {filteredMenuGroups.map((group) => (
           <div key={group.id}>
             {/* Group Header */}
             {!sidebarCollapsed && (

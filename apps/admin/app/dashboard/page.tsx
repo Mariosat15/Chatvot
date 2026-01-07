@@ -16,6 +16,15 @@ export default async function AdminDashboardPage({
   const params = await searchParams;
   const isFirstLogin = params.firstLogin === 'true';
 
-  return <AdminDashboard isFirstLogin={isFirstLogin} adminEmail={auth.email!} adminName={auth.name} />;
+  return (
+    <AdminDashboard 
+      isFirstLogin={isFirstLogin} 
+      adminEmail={auth.email!} 
+      adminName={auth.name}
+      isSuperAdmin={auth.isSuperAdmin || false}
+      role={auth.role || 'Employee'}
+      allowedSections={auth.allowedSections || []}
+    />
+  );
 }
 

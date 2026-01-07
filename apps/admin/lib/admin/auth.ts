@@ -48,15 +48,23 @@ export async function verifyAdminAuth(): Promise<AdminAuthResult> {
     try {
       await connectToDatabase();
       const admin = await Admin.findById(payload.adminId)
-        .select('name isSuperAdmin role allowedSections')
+        .select('name email role allowedSections status createdAt')
         .lean();
       
       if (admin) {
         adminName = admin.name || 'Admin';
-        isSuperAdmin = admin.isSuperAdmin || false;
-        role = admin.role || 'admin';
-        // Super admins have access to all sections
-        allowedSections = isSuperAdmin ? [...ADMIN_SECTIONS] : (admin.allowedSections || []);
+        
+        // Determine if this is the original/super admin (check by email or first created)
+        const defaultAdminEmail = (process.env.ADMIN_EMAIL || 'admin@email.com').toLowerCase();
+        const oldestAdmin = await Admin.findOne({}).sort({ createdAt: 1 }).select('_id');
+        const isOriginalAdmin = admin.email.toLowerCase() === defaultAdminEmail || 
+          (oldestAdmin && oldestAdmin._id.toString() === (admin._id as any).toString());
+        
+        isSuperAdmin = isOriginalAdmin;
+        role = isOriginalAdmin ? 'Super Admin' : (admin.role || 'Employee');
+        
+        // Super admins have access to all sections, others get their assigned sections
+        allowedSections = isOriginalAdmin ? [...ADMIN_SECTIONS] : (admin.allowedSections as AdminSection[] || []);
       }
     } catch (dbError) {
       console.error('Error fetching admin details:', dbError);

@@ -192,6 +192,11 @@ export async function POST(request: NextRequest) {
 
       // Generate or use manual password
       const password = manualPassword || generatePassword();
+      const isManualPassword = !!manualPassword;
+
+      console.log(`📝 Creating employee: ${email}`);
+      console.log(`📝 Password type: ${isManualPassword ? 'manual' : 'auto-generated'}`);
+      console.log(`📝 Password length: ${password.length}`);
 
       // Create employee (new employees are never super admin - that's determined by original admin status)
       const newEmployee = new Admin({
@@ -206,6 +211,7 @@ export async function POST(request: NextRequest) {
       });
 
       await newEmployee.save();
+      console.log(`✅ Employee created: ${newEmployee.email}, role: ${roleName}, sections: ${allowedSections.length}`);
 
       // Send email if requested
       let emailSent = false;
