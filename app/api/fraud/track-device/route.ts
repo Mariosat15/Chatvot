@@ -194,9 +194,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // Handle case where this user already has a fingerprint - just update it
+    // Handle case where this user already has a fingerprint - update it
     if (existingFingerprint) {
-      // Same user, same device - just update THEIR fingerprint
+      // Same user, same device - update THEIR fingerprint
       existingFingerprint.lastSeen = new Date();
       existingFingerprint.timesUsed += 1;
       existingFingerprint.ipAddress = ipAddress;
@@ -217,10 +217,92 @@ export async function POST(request: Request) {
       
       await existingFingerprint.save();
 
+      // 🔥 IMPORTANT: Even if this user is known, check if they're linked to other accounts
+      // This ensures fraud alerts are created EVERY TIME a known multi-account user logs in
+      if (existingFingerprint.linkedUserIds && existingFingerprint.linkedUserIds.length > 0 && fraudSettings.multiAccountDetectionEnabled) {
+        const allLinkedUsers = [existingFingerprint.userId, ...existingFingerprint.linkedUserIds];
+        console.log(`🔍 Known device with linked accounts detected: ${allLinkedUsers.length} accounts`);
+        
+        if (allLinkedUsers.length >= 2) {
+          // Get all devices for evidence
+          const allDevices = await DeviceFingerprint.find({
+            userId: { $in: allLinkedUsers }
+          }).lean();
+          
+          const accountsEvidence = allLinkedUsers.map(linkedUserId => {
+            const userDevices = allDevices.filter(d => d.userId === linkedUserId);
+            return {
+              userId: linkedUserId,
+              devicesUsed: userDevices.map(d => ({
+                fingerprintId: d.fingerprintId,
+                browser: `${d.browser} ${d.browserVersion}`,
+                os: `${d.os} ${d.osVersion}`,
+                deviceType: d.deviceType,
+                screenResolution: d.screenResolution,
+                ipAddress: d.ipAddress,
+                timezone: d.timezone,
+                language: d.language,
+                firstSeen: d.firstSeen,
+                lastSeen: d.lastSeen,
+                timesUsed: d.timesUsed
+              }))
+            };
+          });
+          
+          let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+          if (allLinkedUsers.length >= fraudSettings.maxAccountsPerDevice + 2) {
+            severity = 'critical';
+          } else if (allLinkedUsers.length > fraudSettings.maxAccountsPerDevice) {
+            severity = 'high';
+          }
+          
+          // Call AlertManagerService - it will handle checking for cleared/dismissed alerts
+          await AlertManagerService.createOrUpdateAlert({
+            alertType: 'same_device',
+            userIds: allLinkedUsers,
+            title: 'Multiple Accounts on Same Device',
+            description: `${allLinkedUsers.length} accounts detected using the same device (${existingFingerprint.deviceType}, ${existingFingerprint.browser} on ${existingFingerprint.os})`,
+            severity,
+            confidence: 0.85,
+            evidence: [
+              {
+                type: 'device_fingerprint',
+                description: 'Known multi-account device - user login detected',
+                data: {
+                  matchedFingerprintId: existingFingerprint.fingerprintId,
+                  fingerprintId: existingFingerprint.fingerprintId,
+                  linkedAccounts: allLinkedUsers.length,
+                  maxAllowed: fraudSettings.maxAccountsPerDevice,
+                  accountsDetails: accountsEvidence,
+                  lastActivity: {
+                    timestamp: new Date(),
+                    userId: userId,
+                    browser: fingerprintData.browser,
+                    action: 'known_device_login',
+                    ipAddress: ipAddress
+                  }
+                }
+              }
+            ]
+          });
+          
+          // Update suspicion scores
+          await SuspicionScoringService.scoreDeviceMatch(
+            allLinkedUsers,
+            existingFingerprint.fingerprintId,
+            `${existingFingerprint.browser} on ${existingFingerprint.os}`
+          );
+          
+          console.log(`🚨 FRAUD ALERT: Known multi-account user ${userId} logged in`);
+        }
+      }
+
       return NextResponse.json({
         success: true,
-        suspicious: false,
-        message: 'Device recognized for this user'
+        suspicious: existingFingerprint.linkedUserIds && existingFingerprint.linkedUserIds.length > 0,
+        message: existingFingerprint.linkedUserIds && existingFingerprint.linkedUserIds.length > 0 
+          ? 'Device recognized - linked to other accounts' 
+          : 'Device recognized for this user'
       });
     }
     
