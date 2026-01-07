@@ -338,26 +338,16 @@ router.post('/login', async (req: Request, res: Response) => {
     const User = getUserModel();
     const Account = getAccountModel();
 
+    // SECURITY: Use consistent error responses to prevent account enumeration
+    // All authentication failures return the same generic error message.
+    // This prevents attackers from determining if an account exists or its state.
+    const GENERIC_AUTH_ERROR = { error: 'Invalid credentials' };
+    
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
-    }
-
-    // SECURITY: Check email verification BEFORE password validation
-    // This prevents credential oracle attacks where attackers can determine
-    // if a password is correct by observing different error responses.
-    // Must be checked before password to match main app behavior in app/(root)/layout.tsx
-    // Uses !== true to block users with emailVerified: false, null, or undefined
-    // This matches the main app's check: user.emailVerified !== true
-    if (user.emailVerified !== true) {
-      console.log(`⚠️ Login blocked for unverified user: ${email} (emailVerified: ${user.emailVerified})`);
-      res.status(403).json({ 
-        error: 'Email not verified',
-        message: 'Please verify your email address before signing in. Check your inbox for the verification link.',
-        code: 'EMAIL_NOT_VERIFIED'
-      });
+      // User doesn't exist - return generic error
+      res.status(401).json(GENERIC_AUTH_ERROR);
       return;
     }
 
@@ -369,7 +359,7 @@ router.post('/login', async (req: Request, res: Response) => {
     
     if (!account || !account.password) {
       // No credential account - user may have registered via OAuth only
-      res.status(401).json({ error: 'Invalid credentials' });
+      res.status(401).json(GENERIC_AUTH_ERROR);
       return;
     }
 
@@ -381,7 +371,84 @@ router.post('/login', async (req: Request, res: Response) => {
     console.log(`🔐 Password compared in ${compareDuration}ms (non-blocking)`);
 
     if (!isValid) {
-      res.status(401).json({ error: 'Invalid credentials' });
+      // Wrong password - return generic error
+      res.status(401).json(GENERIC_AUTH_ERROR);
+      return;
+    }
+    
+    // SECURITY: Check email verification AFTER password validation
+    // Only reveal verification status to users who prove they own the account
+    // by providing the correct password. This prevents account enumeration
+    // while still providing helpful feedback to legitimate users.
+    if (user.emailVerified !== true) {
+      console.log(`⚠️ Login blocked for unverified user: ${email} (emailVerified: ${user.emailVerified})`);
+      
+      // Silently attempt to resend verification email for legitimate users
+      try {
+        const nodemailer = await import('nodemailer');
+        const crypto = await import('crypto');
+        
+        // Only resend if no recent token or token expired
+        const needsNewToken = !user.emailVerificationToken || 
+          !user.emailVerificationTokenExpiry ||
+          new Date(user.emailVerificationTokenExpiry) < new Date();
+          
+        if (needsNewToken) {
+          const verificationToken = crypto.randomBytes(32).toString('hex');
+          const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+          
+          await User.updateOne(
+            { _id: user._id },
+            { 
+              $set: { 
+                emailVerificationToken: verificationToken,
+                emailVerificationTokenExpiry: tokenExpiry
+              } 
+            }
+          );
+          
+          // Send verification email in background (don't block response)
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://chartvolt.com';
+          const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
+          
+          const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.SMTP_PORT || '587'),
+            secure: process.env.SMTP_SECURE === 'true',
+            auth: {
+              user: process.env.SMTP_USER,
+              pass: process.env.SMTP_PASS
+            }
+          });
+          
+          // Fire and forget - don't await
+          transporter.sendMail({
+            from: process.env.EMAIL_FROM || 'noreply@chartvolt.com',
+            to: email,
+            subject: 'Verify Your Email - ChartVolt',
+            html: `
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2>Email Verification Required</h2>
+                <p>You attempted to log in but your email is not yet verified.</p>
+                <p>Please click the link below to verify your email address:</p>
+                <p><a href="${verificationUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Verify Email</a></p>
+                <p style="color: #666; font-size: 12px; margin-top: 20px;">This link expires in 24 hours.</p>
+              </div>
+            `
+          }).catch(err => console.error('Failed to send verification reminder:', err));
+        }
+      } catch (emailError) {
+        // Don't fail login flow due to email error, just log it
+        console.error('Error sending verification reminder:', emailError);
+      }
+      
+      // Return specific error only after password is validated
+      // This is safe because the user has proven account ownership
+      res.status(403).json({ 
+        error: 'Email not verified',
+        message: 'Please verify your email address before signing in. Check your inbox for the verification link.',
+        code: 'EMAIL_NOT_VERIFIED'
+      });
       return;
     }
 
