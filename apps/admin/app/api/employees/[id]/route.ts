@@ -5,6 +5,7 @@ import { AdminRoleTemplate } from '@/database/models/admin-role-template.model';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { ADMIN_SECTIONS, type AdminSection } from '@/database/models/admin-employee.model';
 import { auditLogService } from '@/lib/services/audit-log.service';
+import { adminEventsService } from '@/lib/services/admin-events.service';
 
 // Check if an admin is the original/super admin
 async function isOriginalAdmin(admin: any): Promise<boolean> {
@@ -138,6 +139,9 @@ export async function PUT(
       await auditLogService.logEmployeeRoleChanged(adminInfo, id, employee.name, previousRole || 'None', employee.role || 'Custom');
     }
 
+    // Broadcast real-time event
+    adminEventsService.employeeUpdated(id, { id: auth.adminId!, email: auth.email! });
+
     return NextResponse.json({
       success: true,
       employee: {
@@ -217,6 +221,9 @@ export async function DELETE(
     };
     await auditLogService.logEmployeeDeleted(adminInfo, id, deletedName, deletedEmail);
 
+    // Broadcast real-time event
+    adminEventsService.employeeDeleted(id, { id: auth.adminId!, email: auth.email! });
+
     console.log(`✅ Employee deleted: ${deletedEmail} (was force logged out first)`);
 
     return NextResponse.json({
@@ -279,6 +286,7 @@ export async function PATCH(
       await employee.save();
       
       await auditLogService.logEmployeeSuspended(adminInfo, id, employee.name, reason);
+      adminEventsService.employeeStatusChanged(id, 'disabled', { id: auth.adminId!, email: auth.email! });
       
       return NextResponse.json({
         success: true,
@@ -293,6 +301,7 @@ export async function PATCH(
       await employee.save();
       
       await auditLogService.logEmployeeUnsuspended(adminInfo, id, employee.name);
+      adminEventsService.employeeStatusChanged(id, 'active', { id: auth.adminId!, email: auth.email! });
       
       return NextResponse.json({
         success: true,
@@ -315,6 +324,8 @@ export async function PATCH(
       } else {
         await auditLogService.logEmployeeUnsuspended(adminInfo, id, employee.name);
       }
+      
+      adminEventsService.employeeStatusChanged(id, newStatus, { id: auth.adminId!, email: auth.email! });
       
       return NextResponse.json({
         success: true,
@@ -340,6 +351,7 @@ export async function PATCH(
       await employee.save();
 
       await auditLogService.logEmployeePasswordReset(adminInfo, id, employee.name);
+      adminEventsService.employeeUpdated(id, { id: auth.adminId!, email: auth.email! });
 
       console.log(`✅ Password reset for ${employee.email}, forceLogoutAt set to invalidate old sessions`);
 
@@ -364,6 +376,8 @@ export async function PATCH(
         targetId: id,
         targetName: employee.name,
       });
+      
+      adminEventsService.employeeStatusChanged(id, 'logged_out', { id: auth.adminId!, email: auth.email! });
 
       console.log(`✅ Force logout for ${employee.email}`);
 

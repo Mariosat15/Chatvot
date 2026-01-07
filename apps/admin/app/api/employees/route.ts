@@ -10,6 +10,7 @@ import nodemailer from 'nodemailer';
 import CompanySettings from '@/database/models/company-settings.model';
 import { WhiteLabel } from '@/database/models/whitelabel.model';
 import { auditLogService } from '@/lib/services/audit-log.service';
+import { adminEventsService } from '@/lib/services/admin-events.service';
 
 // Check if an admin is the original/super admin
 async function isOriginalAdmin(admin: any): Promise<boolean> {
@@ -249,6 +250,12 @@ export async function POST(request: NextRequest) {
         newEmployee.email, 
         newEmployee.name, 
         roleName
+      );
+
+      // Broadcast real-time event to all connected admins
+      adminEventsService.employeeCreated(
+        newEmployee._id.toString(),
+        { id: auth.adminId!, email: auth.email! }
       );
 
       // Send email if requested

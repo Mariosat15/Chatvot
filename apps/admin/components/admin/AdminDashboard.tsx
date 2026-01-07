@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAdminEvents } from '@/hooks/useAdminEvents';
 import { 
   Shield, 
   LogOut, 
@@ -54,6 +55,8 @@ import {
   Bot,
   Sparkles,
   Crown,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -446,6 +449,39 @@ export default function AdminDashboard({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [serverTime, setServerTime] = useState(new Date());
+  
+  // Refresh keys for each section - increment to force refresh
+  const [refreshKeys, setRefreshKeys] = useState<Record<string, number>>({});
+  
+  // Get current refresh key for active section
+  const currentRefreshKey = refreshKeys[activeSection] || 0;
+  
+  // Trigger refresh for a specific section
+  const triggerSectionRefresh = useCallback((section: string) => {
+    setRefreshKeys(prev => ({
+      ...prev,
+      [section]: (prev[section] || 0) + 1,
+    }));
+  }, []);
+
+  // Real-time admin events subscription
+  const { isConnected: isEventConnected, subscriberCount } = useAdminEvents({
+    onEvent: (event) => {
+      console.log('📡 Received event for section:', event.section);
+      // Trigger refresh for the affected section
+      triggerSectionRefresh(event.section);
+      
+      // Also refresh related sections
+      if (event.section === 'users') {
+        triggerSectionRefresh('badges');
+      }
+      if (event.section === 'financial' || event.section === 'pending-withdrawals') {
+        triggerSectionRefresh('financial');
+        triggerSectionRefresh('pending-withdrawals');
+      }
+    },
+    showToasts: true,
+  });
 
   // Alias for backward compatibility
   const hasAccess = hasAccessToSection;
@@ -598,87 +634,88 @@ export default function AdminDashboard({
       );
     }
 
+    // Pass key={currentRefreshKey} to force re-render when data changes
     switch (activeSection) {
       case 'overview':
-        return <AdminOverviewDashboard onNavigate={(section) => hasAccess(section) && setActiveSection(section)} />;
+        return <AdminOverviewDashboard key={currentRefreshKey} onNavigate={(section) => hasAccess(section) && setActiveSection(section)} />;
       case 'hero-page':
-        return <LandingPageBuilder />;
+        return <LandingPageBuilder key={currentRefreshKey} />;
       case 'competitions':
-        return <CompetitionsListSection />;
+        return <CompetitionsListSection key={currentRefreshKey} />;
       case 'challenges':
-        return <ChallengeSettingsSection />;
+        return <ChallengeSettingsSection key={currentRefreshKey} />;
       case 'marketplace':
-        return <MarketplaceSection />;
+        return <MarketplaceSection key={currentRefreshKey} />;
       case 'users':
-        return <UsersSection />;
+        return <UsersSection key={currentRefreshKey} />;
       case 'trading-history':
-        return <TradingHistorySection />;
+        return <TradingHistorySection key={currentRefreshKey} />;
       case 'financial':
-        return <FinancialDashboard />;
+        return <FinancialDashboard key={currentRefreshKey} />;
       case 'analytics':
-        return <CompetitionAnalytics />;
+        return <CompetitionAnalytics key={currentRefreshKey} />;
       case 'market':
-        return <MarketSettingsSection />;
+        return <MarketSettingsSection key={currentRefreshKey} />;
       case 'symbols':
-        return <SymbolsSection />;
+        return <SymbolsSection key={currentRefreshKey} />;
       case 'payments':
-        return <PendingPaymentsSection />;
+        return <PendingPaymentsSection key={currentRefreshKey} />;
       case 'failed-deposits':
-        return <FailedDepositsSection />;
+        return <FailedDepositsSection key={currentRefreshKey} />;
       case 'withdrawals':
-        return <WithdrawalSettingsSection />;
+        return <WithdrawalSettingsSection key={currentRefreshKey} />;
       case 'pending-withdrawals':
-        return <PendingWithdrawalsSection />;
+        return <PendingWithdrawalsSection key={currentRefreshKey} />;
       case 'kyc-settings':
-        return <KYCSettingsSection />;
+        return <KYCSettingsSection key={currentRefreshKey} />;
       case 'kyc-history':
-        return <KYCHistorySection />;
+        return <KYCHistorySection key={currentRefreshKey} />;
       case 'fraud':
-        return <FraudMonitoringSection />;
+        return <FraudMonitoringSection key={currentRefreshKey} />;
       case 'badges':
-        return <BadgeXPManagementSection />;
+        return <BadgeXPManagementSection key={currentRefreshKey} />;
       case 'wiki':
-        return <AdminWikiSection />;
+        return <AdminWikiSection key={currentRefreshKey} />;
       case 'credentials':
-        return <CredentialsSection currentEmail={adminEmail} currentName={adminName} />;
+        return <CredentialsSection key={currentRefreshKey} currentEmail={adminEmail} currentName={adminName} />;
       case 'environment':
-        return <EnvironmentSection />;
+        return <EnvironmentSection key={currentRefreshKey} />;
       case 'branding':
-        return <ImagesSection />;
+        return <ImagesSection key={currentRefreshKey} />;
       case 'company':
-        return <CompanyDetailsSection />;
+        return <CompanyDetailsSection key={currentRefreshKey} />;
       case 'invoices':
-        return <InvoiceTemplateSection />;
+        return <InvoiceTemplateSection key={currentRefreshKey} />;
       case 'email-templates':
-        return <EmailTemplatesSection />;
+        return <EmailTemplatesSection key={currentRefreshKey} />;
       case 'notifications':
-        return <NotificationSystemSection />;
+        return <NotificationSystemSection key={currentRefreshKey} />;
       case 'trading':
-        return <TradingRiskSection />;
+        return <TradingRiskSection key={currentRefreshKey} />;
       case 'currency':
-        return <CurrencySettingsSection />;
+        return <CurrencySettingsSection key={currentRefreshKey} />;
       case 'fees':
-        return <FeeSettingsSection />;
+        return <FeeSettingsSection key={currentRefreshKey} />;
       case 'payment-providers':
-        return <PaymentProvidersSection />;
+        return <PaymentProvidersSection key={currentRefreshKey} />;
       case 'redis':
-        return <RedisSettingsSection />;
+        return <RedisSettingsSection key={currentRefreshKey} />;
       case 'database':
-        return <DatabaseSection />;
+        return <DatabaseSection key={currentRefreshKey} />;
       case 'audit-logs':
-        return <AuditLogSection />;
+        return <AuditLogSection key={currentRefreshKey} />;
       case 'dev-settings':
-        return <DevSettingsSection />;
+        return <DevSettingsSection key={currentRefreshKey} />;
       case 'performance-simulator':
-        return <PerformanceSimulatorSection />;
+        return <PerformanceSimulatorSection key={currentRefreshKey} />;
       case 'dependency-updates':
-        return <DependencyUpdatesSection />;
+        return <DependencyUpdatesSection key={currentRefreshKey} />;
       case 'ai-agent':
-        return <AIAgentSection />;
+        return <AIAgentSection key={currentRefreshKey} />;
       case 'employees':
-        return <EmployeesSection />;
+        return <EmployeesSection key={currentRefreshKey} />;
       default:
-        return <CompetitionsListSection />;
+        return <CompetitionsListSection key={currentRefreshKey} />;
     }
   };
 
@@ -891,6 +928,39 @@ export default function AdminDashboard({
 
             {/* Right */}
             <div className="flex items-center gap-3">
+              {/* Live Sync Indicator */}
+              <div 
+                className={cn(
+                  "hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl border transition-all",
+                  isEventConnected 
+                    ? "bg-emerald-500/10 border-emerald-500/30" 
+                    : "bg-red-500/10 border-red-500/30"
+                )}
+                title={isEventConnected 
+                  ? `Live sync active - ${subscriberCount} admin${subscriberCount !== 1 ? 's' : ''} online` 
+                  : "Disconnected - changes won't sync"
+                }
+              >
+                {isEventConnected ? (
+                  <Wifi className="h-4 w-4 text-emerald-400" />
+                ) : (
+                  <WifiOff className="h-4 w-4 text-red-400 animate-pulse" />
+                )}
+                <div className="flex flex-col">
+                  <span className={cn(
+                    "text-[10px] uppercase tracking-wider",
+                    isEventConnected ? "text-emerald-400/80" : "text-red-400/80"
+                  )}>
+                    {isEventConnected ? "Live Sync" : "Offline"}
+                  </span>
+                  {isEventConnected && subscriberCount > 0 && (
+                    <span className="text-xs font-medium text-emerald-300">
+                      {subscriberCount} online
+                    </span>
+                  )}
+                </div>
+              </div>
+
               {/* Live Server Clock */}
               <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30">
                 <Clock className="h-4 w-4 text-cyan-400" />
