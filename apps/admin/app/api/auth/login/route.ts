@@ -122,8 +122,14 @@ export async function POST(request: NextRequest) {
     const isSuperAdmin = await isOriginalAdmin(admin);
     
     // Get allowed sections - super admin gets all, others get their assigned sections
-    const allowedSections = isSuperAdmin ? ALL_ADMIN_SECTIONS : (admin.allowedSections || []);
+    // IMPORTANT: Convert Mongoose array to plain JS array for JWT serialization
+    const allowedSections = isSuperAdmin 
+      ? [...ALL_ADMIN_SECTIONS] 
+      : (admin.allowedSections ? [...admin.allowedSections] : []);
     const role = isSuperAdmin ? 'Super Admin' : (admin.role || 'Employee');
+    
+    console.log(`🔐 Is super admin: ${isSuperAdmin}`);
+    console.log(`🔐 Allowed sections (${allowedSections.length}):`, allowedSections);
 
     // Update last login
     admin.lastLogin = new Date();
