@@ -141,6 +141,34 @@ interface Invoice {
   lineItems?: { description: string }[];
 }
 
+interface HistoryItem {
+  id: string;
+  type: string;
+  category: string;
+  description: string;
+  details?: Record<string, any>;
+  status?: string;
+  amount?: number;
+  createdAt: string;
+  metadata?: Record<string, any>;
+}
+
+const HISTORY_TYPE_CONFIG: Record<string, { color: string; bgColor: string; icon: React.ElementType }> = {
+  transaction: { color: 'text-green-400', bgColor: 'bg-green-500/20', icon: Coins },
+  competition: { color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', icon: Trophy },
+  challenge: { color: 'text-purple-400', bgColor: 'bg-purple-500/20', icon: Swords },
+  trade: { color: 'text-cyan-400', bgColor: 'bg-cyan-500/20', icon: TrendingUp },
+  kyc: { color: 'text-blue-400', bgColor: 'bg-blue-500/20', icon: Shield },
+  restriction: { color: 'text-red-400', bgColor: 'bg-red-500/20', icon: Ban },
+  lockout: { color: 'text-orange-400', bgColor: 'bg-orange-500/20', icon: Lock },
+  note: { color: 'text-gray-400', bgColor: 'bg-gray-500/20', icon: MessageSquare },
+  invoice: { color: 'text-emerald-400', bgColor: 'bg-emerald-500/20', icon: FileText },
+  fraud_alert: { color: 'text-red-500', bgColor: 'bg-red-500/20', icon: AlertTriangle },
+  security_log: { color: 'text-amber-400', bgColor: 'bg-amber-500/20', icon: Shield },
+  marketplace: { color: 'text-pink-400', bgColor: 'bg-pink-500/20', icon: ShoppingBag },
+  notification: { color: 'text-indigo-400', bgColor: 'bg-indigo-500/20', icon: Activity },
+};
+
 const KYC_STATUS_CONFIG: Record<string, { color: string; bgColor: string; icon: React.ComponentType<any> }> = {
   none: { color: 'text-gray-400', bgColor: 'bg-gray-500/20', icon: Shield },
   pending: { color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', icon: Clock },
@@ -237,6 +265,24 @@ export default function UserFullDetailPanel({
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [resendingInvoice, setResendingInvoice] = useState<string | null>(null);
   
+  // History State
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyFilters, setHistoryFilters] = useState<{
+    type: string;
+    status: string;
+    dateFrom: string;
+    dateTo: string;
+    search: string;
+  }>({
+    type: 'all',
+    status: 'all',
+    dateFrom: '',
+    dateTo: '',
+    search: '',
+  });
+  const [availableHistoryTypes, setAvailableHistoryTypes] = useState<string[]>([]);
+  
   // Account Lockout State
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutInfo, setLockoutInfo] = useState<{
@@ -324,6 +370,24 @@ export default function UserFullDetailPanel({
     }
   }, [user.id]);
 
+  // Fetch user history (called lazily when tab is opened)
+  const fetchHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const response = await fetch(`/api/users/${user.id}/history`);
+      if (response.ok) {
+        const data = await response.json();
+        setHistory(data.history || []);
+        setAvailableHistoryTypes(data.filters?.types || []);
+      }
+    } catch (error) {
+      console.error('Error fetching user history:', error);
+      toast.error('Failed to load user history');
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [user.id]);
+
   useEffect(() => {
     if (open && user.id) {
       fetchUserData();
@@ -338,6 +402,13 @@ export default function UserFullDetailPanel({
       setEditPhone(user.phone || '');
     }
   }, [open, user, fetchUserData]);
+
+  // Fetch history when tab is selected (lazy loading)
+  useEffect(() => {
+    if (activeTab === 'history' && history.length === 0 && !loadingHistory) {
+      fetchHistory();
+    }
+  }, [activeTab, history.length, loadingHistory, fetchHistory]);
 
   // Verify password before sensitive actions
   const handleVerifyPassword = async () => {
@@ -770,6 +841,7 @@ export default function UserFullDetailPanel({
     { id: 'edit', label: 'Edit User', icon: Edit },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
     { id: 'kyc', label: 'KYC', icon: Shield },
+    { id: 'history', label: `History (${history.length})`, icon: History },
     { id: 'notes', label: `Notes (${notes.length})`, icon: MessageSquare },
     { id: 'restrictions', label: 'Restrictions', icon: Ban },
     { id: 'invoices', label: `Invoices (${invoices.length})`, icon: FileText },
@@ -1731,6 +1803,282 @@ export default function UserFullDetailPanel({
                         </CardContent>
                       </Card>
                     )}
+                  </div>
+                )}
+
+                {/* History Tab */}
+                {activeTab === 'history' && (
+                  <div className="space-y-6">
+                    {/* Filters */}
+                    <Card className="bg-gray-800/50 border-gray-700">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-white text-lg flex items-center gap-2">
+                          <History className="h-5 w-5 text-cyan-400" />
+                          Activity History
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={fetchHistory}
+                            disabled={loadingHistory}
+                            className="ml-auto border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
+                          >
+                            <RefreshCw className={`h-4 w-4 mr-1 ${loadingHistory ? 'animate-spin' : ''}`} />
+                            Refresh
+                          </Button>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                          {/* Type Filter */}
+                          <div>
+                            <Label className="text-gray-400 text-xs mb-1 block">Type</Label>
+                            <Select
+                              value={historyFilters.type}
+                              onValueChange={(value) => setHistoryFilters(prev => ({ ...prev, type: value }))}
+                            >
+                              <SelectTrigger className="bg-gray-900 border-gray-600 text-white h-9">
+                                <SelectValue placeholder="All Types" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-gray-800 border-gray-600">
+                                <SelectItem value="all" className="text-gray-300 focus:bg-gray-700 focus:text-white">All Types</SelectItem>
+                                {availableHistoryTypes.map(type => (
+                                  <SelectItem key={type} value={type} className="text-gray-300 focus:bg-gray-700 focus:text-white">
+                                    {type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ')}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          {/* Status Filter */}
+                          <div>
+                            <Label className="text-gray-400 text-xs mb-1 block">Status</Label>
+                            <Select
+                              value={historyFilters.status}
+                              onValueChange={(value) => setHistoryFilters(prev => ({ ...prev, status: value }))}
+                            >
+                              <SelectTrigger className="bg-gray-900 border-gray-600 text-white h-9">
+                                <SelectValue placeholder="All Status" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-gray-800 border-gray-600">
+                                <SelectItem value="all" className="text-gray-300 focus:bg-gray-700 focus:text-white">All Status</SelectItem>
+                                <SelectItem value="completed" className="text-gray-300 focus:bg-gray-700 focus:text-white">Completed</SelectItem>
+                                <SelectItem value="pending" className="text-gray-300 focus:bg-gray-700 focus:text-white">Pending</SelectItem>
+                                <SelectItem value="failed" className="text-gray-300 focus:bg-gray-700 focus:text-white">Failed</SelectItem>
+                                <SelectItem value="active" className="text-gray-300 focus:bg-gray-700 focus:text-white">Active</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          {/* Date From */}
+                          <div>
+                            <Label className="text-gray-400 text-xs mb-1 block">From Date</Label>
+                            <Input
+                              type="date"
+                              value={historyFilters.dateFrom}
+                              onChange={(e) => setHistoryFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                              className="bg-gray-900 border-gray-600 text-white h-9"
+                            />
+                          </div>
+                          
+                          {/* Date To */}
+                          <div>
+                            <Label className="text-gray-400 text-xs mb-1 block">To Date</Label>
+                            <Input
+                              type="date"
+                              value={historyFilters.dateTo}
+                              onChange={(e) => setHistoryFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                              className="bg-gray-900 border-gray-600 text-white h-9"
+                            />
+                          </div>
+                          
+                          {/* Search */}
+                          <div>
+                            <Label className="text-gray-400 text-xs mb-1 block">Search</Label>
+                            <Input
+                              type="text"
+                              placeholder="Search..."
+                              value={historyFilters.search}
+                              onChange={(e) => setHistoryFilters(prev => ({ ...prev, search: e.target.value }))}
+                              className="bg-gray-900 border-gray-600 text-white h-9"
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Clear Filters */}
+                        {(historyFilters.type !== 'all' || historyFilters.status !== 'all' || historyFilters.dateFrom || historyFilters.dateTo || historyFilters.search) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setHistoryFilters({ type: 'all', status: 'all', dateFrom: '', dateTo: '', search: '' })}
+                            className="text-gray-400 hover:text-white mt-2"
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Clear Filters
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* History List */}
+                    <Card className="bg-gray-800/50 border-gray-700">
+                      <CardContent className="pt-6">
+                        {loadingHistory ? (
+                          <div className="flex items-center justify-center py-12">
+                            <RefreshCw className="h-8 w-8 text-cyan-400 animate-spin" />
+                          </div>
+                        ) : history.length === 0 ? (
+                          <p className="text-gray-400 text-center py-12">No activity history found</p>
+                        ) : (
+                          <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
+                            {history
+                              // Apply filters
+                              .filter(item => {
+                                // Type filter
+                                if (historyFilters.type !== 'all' && item.type !== historyFilters.type) return false;
+                                
+                                // Status filter
+                                if (historyFilters.status !== 'all' && item.status !== historyFilters.status) return false;
+                                
+                                // Date from filter
+                                if (historyFilters.dateFrom) {
+                                  const itemDate = new Date(item.createdAt);
+                                  const fromDate = new Date(historyFilters.dateFrom);
+                                  if (itemDate < fromDate) return false;
+                                }
+                                
+                                // Date to filter
+                                if (historyFilters.dateTo) {
+                                  const itemDate = new Date(item.createdAt);
+                                  const toDate = new Date(historyFilters.dateTo);
+                                  toDate.setHours(23, 59, 59, 999);
+                                  if (itemDate > toDate) return false;
+                                }
+                                
+                                // Search filter
+                                if (historyFilters.search) {
+                                  const searchLower = historyFilters.search.toLowerCase();
+                                  const matchesDescription = item.description.toLowerCase().includes(searchLower);
+                                  const matchesCategory = item.category.toLowerCase().includes(searchLower);
+                                  const matchesType = item.type.toLowerCase().includes(searchLower);
+                                  const matchesDetails = item.details ? 
+                                    JSON.stringify(item.details).toLowerCase().includes(searchLower) : false;
+                                  if (!matchesDescription && !matchesCategory && !matchesType && !matchesDetails) return false;
+                                }
+                                
+                                return true;
+                              })
+                              .map((item) => {
+                                const config = HISTORY_TYPE_CONFIG[item.type] || { 
+                                  color: 'text-gray-400', 
+                                  bgColor: 'bg-gray-500/20', 
+                                  icon: Activity 
+                                };
+                                const IconComponent = config.icon;
+                                
+                                return (
+                                  <div 
+                                    key={item.id} 
+                                    className="p-3 bg-gray-900/50 border border-gray-700 rounded-lg hover:border-gray-600 transition-colors group"
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      {/* Icon */}
+                                      <div className={`p-2 rounded-lg ${config.bgColor} flex-shrink-0`}>
+                                        <IconComponent className={`h-4 w-4 ${config.color}`} />
+                                      </div>
+                                      
+                                      {/* Content */}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <p className="text-sm font-medium text-white">{item.description}</p>
+                                          <Badge className={`text-[10px] ${config.bgColor} ${config.color} capitalize`}>
+                                            {item.type.replace(/_/g, ' ')}
+                                          </Badge>
+                                          {item.status && (
+                                            <Badge className={`text-[10px] ${
+                                              item.status === 'completed' || item.status === 'success' || item.status === 'approved'
+                                                ? 'bg-green-500/20 text-green-400'
+                                                : item.status === 'pending' || item.status === 'started'
+                                                ? 'bg-yellow-500/20 text-yellow-400'
+                                                : item.status === 'failed' || item.status === 'declined'
+                                                ? 'bg-red-500/20 text-red-400'
+                                                : item.status === 'active'
+                                                ? 'bg-blue-500/20 text-blue-400'
+                                                : 'bg-gray-500/20 text-gray-400'
+                                            } capitalize`}>
+                                              {item.status.replace(/_/g, ' ')}
+                                            </Badge>
+                                          )}
+                                          {item.amount !== undefined && item.amount !== null && (
+                                            <span className={`text-xs font-mono ${
+                                              item.amount >= 0 ? 'text-green-400' : 'text-red-400'
+                                            }`}>
+                                              {item.amount >= 0 ? '+' : ''}{typeof item.amount === 'number' ? item.amount.toFixed(2) : item.amount}
+                                            </span>
+                                          )}
+                                        </div>
+                                        
+                                        {/* Details (expandable on hover) */}
+                                        {item.details && Object.keys(item.details).length > 0 && (
+                                          <div className="mt-2 text-xs text-gray-500 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity max-h-0 group-hover:max-h-40 overflow-hidden">
+                                            {Object.entries(item.details)
+                                              .filter(([_, v]) => v !== null && v !== undefined && v !== '')
+                                              .slice(0, 8)
+                                              .map(([key, value]) => (
+                                                <div key={key}>
+                                                  <span className="text-gray-600">{key.replace(/([A-Z])/g, ' $1').trim()}: </span>
+                                                  <span className="text-gray-400">
+                                                    {typeof value === 'boolean' 
+                                                      ? (value ? 'Yes' : 'No')
+                                                      : typeof value === 'number'
+                                                      ? value.toLocaleString()
+                                                      : String(value).substring(0, 30)}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                          </div>
+                                        )}
+                                        
+                                        {/* Timestamp */}
+                                        <p className="text-[10px] text-gray-500 mt-1">
+                                          {new Date(item.createdAt).toLocaleString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            
+                            {/* Show count */}
+                            <div className="text-center text-xs text-gray-500 pt-2">
+                              Showing {history.filter(item => {
+                                if (historyFilters.type !== 'all' && item.type !== historyFilters.type) return false;
+                                if (historyFilters.status !== 'all' && item.status !== historyFilters.status) return false;
+                                if (historyFilters.dateFrom) {
+                                  const itemDate = new Date(item.createdAt);
+                                  const fromDate = new Date(historyFilters.dateFrom);
+                                  if (itemDate < fromDate) return false;
+                                }
+                                if (historyFilters.dateTo) {
+                                  const itemDate = new Date(item.createdAt);
+                                  const toDate = new Date(historyFilters.dateTo);
+                                  toDate.setHours(23, 59, 59, 999);
+                                  if (itemDate > toDate) return false;
+                                }
+                                if (historyFilters.search) {
+                                  const searchLower = historyFilters.search.toLowerCase();
+                                  const matchesDescription = item.description.toLowerCase().includes(searchLower);
+                                  const matchesCategory = item.category.toLowerCase().includes(searchLower);
+                                  const matchesType = item.type.toLowerCase().includes(searchLower);
+                                  if (!matchesDescription && !matchesCategory && !matchesType) return false;
+                                }
+                                return true;
+                              }).length} of {history.length} activities
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
 
