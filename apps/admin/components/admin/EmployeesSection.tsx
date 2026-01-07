@@ -161,6 +161,9 @@ export default function EmployeesSection() {
   const [availableSections, setAvailableSections] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('employees');
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [needsUpgrade, setNeedsUpgrade] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
 
   // Create employee dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -216,6 +219,23 @@ export default function EmployeesSection() {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setAccessError(null);
+      
+      // First check super admin status
+      const statusResponse = await fetch('/api/employees/upgrade-super-admin');
+      const statusData = await statusResponse.json();
+      
+      if (statusData.needsUpgrade) {
+        setNeedsUpgrade(true);
+        setLoading(false);
+        return;
+      }
+      
+      if (!statusData.currentAdmin?.isSuperAdmin) {
+        setAccessError('Only super admins can access employee management.');
+        setLoading(false);
+        return;
+      }
       
       // Initialize templates first
       await fetch('/api/employees', {
@@ -232,12 +252,38 @@ export default function EmployeesSection() {
         setRoleTemplates(data.roleTemplates || []);
         setEmailTemplates(data.emailTemplates || []);
         setAvailableSections(data.availableSections || []);
+      } else if (data.error) {
+        setAccessError(data.error);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load employees');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpgradeToSuperAdmin = async () => {
+    try {
+      setUpgrading(true);
+      const response = await fetch('/api/employees/upgrade-super-admin', {
+        method: 'POST',
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success(data.message);
+        setNeedsUpgrade(false);
+        // Reload the page to get fresh session
+        window.location.reload();
+      } else {
+        toast.error(data.error || 'Failed to upgrade');
+      }
+    } catch (error) {
+      console.error('Error upgrading:', error);
+      toast.error('Failed to upgrade to super admin');
+    } finally {
+      setUpgrading(false);
     }
   };
 
@@ -477,6 +523,64 @@ export default function EmployeesSection() {
     return (
       <div className="flex items-center justify-center h-64">
         <RefreshCw className="h-8 w-8 animate-spin text-purple-500" />
+      </div>
+    );
+  }
+
+  // Show upgrade option if no super admin exists
+  if (needsUpgrade) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Card className="bg-gray-800/50 border-gray-700 max-w-md">
+          <CardHeader className="text-center">
+            <Crown className="h-12 w-12 text-yellow-400 mx-auto mb-2" />
+            <CardTitle className="text-white">Become Super Admin</CardTitle>
+            <CardDescription className="text-gray-400">
+              No super admin exists yet. As the first admin, you can upgrade yourself to Super Admin to manage employees.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <Button 
+              onClick={handleUpgradeToSuperAdmin}
+              disabled={upgrading}
+              className="bg-yellow-600 hover:bg-yellow-700"
+            >
+              {upgrading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Upgrading...
+                </>
+              ) : (
+                <>
+                  <Crown className="h-4 w-4 mr-2" />
+                  Upgrade to Super Admin
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show access error
+  if (accessError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Card className="bg-gray-800/50 border-gray-700 max-w-md">
+          <CardHeader className="text-center">
+            <Shield className="h-12 w-12 text-red-400 mx-auto mb-2" />
+            <CardTitle className="text-white">Access Denied</CardTitle>
+            <CardDescription className="text-gray-400">
+              {accessError}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-sm text-gray-500">
+              Contact your super admin to gain access to this section.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
