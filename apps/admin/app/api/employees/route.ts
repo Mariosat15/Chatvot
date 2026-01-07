@@ -8,6 +8,7 @@ import { ADMIN_SECTIONS, type AdminSection } from '@/database/models/admin-emplo
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import CompanySettings from '@/database/models/company-settings.model';
+import { WhiteLabel } from '@/database/models/whitelabel.model';
 
 // Check if an admin is the original/super admin
 async function isOriginalAdmin(admin: any): Promise<boolean> {
@@ -97,10 +98,17 @@ export async function GET(request: NextRequest) {
       employees: employees.map(emp => {
         const isSuper = emp.email.toLowerCase() === defaultAdminEmail || 
           (oldestAdmin && oldestAdmin._id.toString() === emp._id.toString());
+        
+        // Consider online if isOnline flag is true OR lastLogin was within the last 30 minutes
+        const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+        const recentlyActive = emp.lastLogin && new Date(emp.lastLogin) > thirtyMinutesAgo;
+        const isOnline = emp.isOnline === true || recentlyActive;
+        
         return {
           ...emp,
           id: emp._id.toString(),
           isSuperAdmin: isSuper,
+          isOnline: isOnline,
         };
       }),
       roleTemplates: templates.map(t => ({
@@ -285,6 +293,32 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Get email transporter - same approach as main app
+async function getEmailTransporter() {
+  try {
+    // Get email settings from database (same as main app)
+    const settings = await WhiteLabel.findOne();
+    
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: settings?.nodemailerEmail || process.env.NODEMAILER_EMAIL!,
+        pass: settings?.nodemailerPassword || process.env.NODEMAILER_PASSWORD!,
+      }
+    });
+  } catch (error) {
+    console.error('⚠️ Error getting email settings from database, using environment variables:', error);
+    // Fallback to environment variables
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.NODEMAILER_EMAIL!,
+        pass: process.env.NODEMAILER_PASSWORD!,
+      }
+    });
+  }
+}
+
 // Helper function to send credentials email
 async function sendEmployeeCredentialsEmail(
   employee: any,
@@ -317,10 +351,15 @@ async function sendEmployeeCredentialsEmail(
     
     console.log(`📧 Template found: ${template.name}`);
 
-    // Get company settings
-    const companySettings = await CompanySettings.findOne({});
-    const companyName = companySettings?.companyName || 'Chartvolt';
+    // Get company settings and whitelabel settings
+    const [companySettings, whiteLabelSettings] = await Promise.all([
+      CompanySettings.findOne({}),
+      WhiteLabel.findOne(),
+    ]);
+    
+    const companyName = companySettings?.companyName || whiteLabelSettings?.appName || 'Chartvolt';
     const adminUrl = process.env.ADMIN_URL || process.env.NEXT_PUBLIC_ADMIN_URL || 'https://admin.chartvolt.com';
+    const fromEmail = whiteLabelSettings?.nodemailerEmail || process.env.NODEMAILER_EMAIL;
 
     // Prepare variables
     const sectionLabels: Record<string, string> = {
@@ -378,35 +417,19 @@ async function sendEmployeeCredentialsEmail(
     const htmlBody = replaceTemplateVariables(template.htmlBody, variables);
     const textBody = replaceTemplateVariables(template.textBody, variables);
 
-    // Send email
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || process.env.NODEMAILER_HOST,
-      port: parseInt(process.env.SMTP_PORT || process.env.NODEMAILER_PORT || '587'),
-      secure: (process.env.SMTP_SECURE || process.env.NODEMAILER_SECURE) === 'true',
-      auth: {
-        user: process.env.SMTP_USER || process.env.NODEMAILER_EMAIL,
-        pass: process.env.SMTP_PASS || process.env.NODEMAILER_PASSWORD,
-      },
-    });
-
-    // Check SMTP configuration
-    const smtpHost = process.env.SMTP_HOST || process.env.NODEMAILER_HOST;
-    const smtpUser = process.env.SMTP_USER || process.env.NODEMAILER_EMAIL;
-    const smtpPass = process.env.SMTP_PASS || process.env.NODEMAILER_PASSWORD;
-    
-    if (!smtpHost || !smtpUser || !smtpPass) {
-      console.error('❌ SMTP configuration is incomplete:', {
-        host: smtpHost ? 'configured' : 'missing',
-        user: smtpUser ? 'configured' : 'missing',
-        pass: smtpPass ? 'configured' : 'missing',
-      });
+    // Check email configuration
+    if (!fromEmail) {
+      console.error('❌ Email not configured - check nodemailerEmail in WhiteLabel settings or NODEMAILER_EMAIL env');
       return false;
     }
     
-    console.log(`📧 SMTP configured: ${smtpHost}`);
+    console.log(`📧 Using email: ${fromEmail}`);
+    
+    // Get transporter using same method as main app
+    const transporter = await getEmailTransporter();
     
     await transporter.sendMail({
-      from: `"${companyName}" <${process.env.SMTP_FROM || process.env.NODEMAILER_EMAIL}>`,
+      from: `"${companyName}" <${fromEmail}>`,
       to: employee.email,
       subject,
       text: textBody,
