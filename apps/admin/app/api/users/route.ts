@@ -149,6 +149,13 @@ export async function GET(request: NextRequest) {
         createdAt: user.createdAt,
         emailVerified: user.emailVerified || false,
         
+        // Address fields
+        country: user.country || '',
+        city: user.city || '',
+        address: user.address || '',
+        postalCode: user.postalCode || '',
+        phone: user.phone || '',
+        
         // Wallet data
         wallet: wallet ? {
           balance: wallet.creditBalance || 0,

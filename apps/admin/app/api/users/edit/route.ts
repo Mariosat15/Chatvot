@@ -9,11 +9,21 @@ type UserRole = typeof VALID_ROLES[number];
 
 /**
  * PATCH /api/admin/users/edit
- * Edit user information including role
+ * Edit user information including role and address details
  */
 export async function PATCH(request: Request) {
   try {
-    const { userId, name, email, role } = await request.json();
+    const { 
+      userId, 
+      name, 
+      email, 
+      role,
+      country,
+      city,
+      address,
+      postalCode,
+      phone,
+    } = await request.json();
 
     if (!userId) {
       return NextResponse.json(
@@ -22,9 +32,15 @@ export async function PATCH(request: Request) {
       );
     }
 
-    if (!name && !email && !role) {
+    // Check if at least one field is being updated
+    const hasBasicFields = name || email || role;
+    const hasAddressFields = country !== undefined || city !== undefined || 
+                            address !== undefined || postalCode !== undefined || 
+                            phone !== undefined;
+
+    if (!hasBasicFields && !hasAddressFields) {
       return NextResponse.json(
-        { success: false, message: 'At least one field (name, email, or role) is required' },
+        { success: false, message: 'At least one field is required to update' },
         { status: 400 }
       );
     }
@@ -47,11 +63,21 @@ export async function PATCH(request: Request) {
       throw new Error('Database connection not found');
     }
 
-    // Build update object
-    const updateData: any = {};
+    // Build update object - only include fields that were explicitly provided
+    const updateData: Record<string, any> = {};
+    
+    // Basic fields
     if (name) updateData.name = name;
     if (email) updateData.email = email;
     if (role) updateData.role = role;
+    
+    // Address fields - allow empty strings to clear values
+    if (country !== undefined) updateData.country = country;
+    if (city !== undefined) updateData.city = city;
+    if (address !== undefined) updateData.address = address;
+    if (postalCode !== undefined) updateData.postalCode = postalCode;
+    if (phone !== undefined) updateData.phone = phone;
+    
     updateData.updatedAt = new Date();
 
     // Update user in Better Auth collection
@@ -106,4 +132,3 @@ export async function PATCH(request: Request) {
     );
   }
 }
-

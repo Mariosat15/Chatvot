@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { User, MapPin, Building2, Mail, Save, Loader2, CheckCircle2, Globe, Lock, Eye, EyeOff, Camera, FileText } from 'lucide-react';
+import { User, MapPin, Building2, Mail, Save, Loader2, CheckCircle2, Globe, Lock, Eye, EyeOff, Camera, FileText, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +28,7 @@ interface UserProfile {
   address?: string;
   city?: string;
   postalCode?: string;
+  phone?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -41,7 +42,7 @@ export default function ProfileSettingsSection() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Track original values to detect changes
-  const originalValues = useRef<{ name: string; bio: string; country: string; address: string; city: string; postalCode: string } | null>(null);
+  const originalValues = useRef<{ name: string; bio: string; country: string; address: string; city: string; postalCode: string; phone: string } | null>(null);
 
   // Form fields
   const [name, setName] = useState('');
@@ -51,6 +52,7 @@ export default function ProfileSettingsSection() {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [postalCode, setPostalCode] = useState('');
+  const [phone, setPhone] = useState('');
 
   // Password change fields
   const [currentPassword, setCurrentPassword] = useState('');
@@ -81,7 +83,8 @@ export default function ProfileSettingsSection() {
       country !== originalValues.current.country ||
       address !== originalValues.current.address ||
       city !== originalValues.current.city ||
-      postalCode !== originalValues.current.postalCode
+      postalCode !== originalValues.current.postalCode ||
+      phone !== originalValues.current.phone
     );
   };
 
@@ -108,6 +111,7 @@ export default function ProfileSettingsSection() {
         setAddress(userData.address || '');
         setCity(userData.city || '');
         setPostalCode(userData.postalCode || '');
+        setPhone(userData.phone || '');
         
         // Store original values
         originalValues.current = {
@@ -117,6 +121,7 @@ export default function ProfileSettingsSection() {
           address: userData.address || '',
           city: userData.city || '',
           postalCode: userData.postalCode || '',
+          phone: userData.phone || '',
         };
       } else {
         toast.error('Failed to load profile');
@@ -142,6 +147,7 @@ export default function ProfileSettingsSection() {
           address,
           city,
           postalCode,
+          phone,
         }),
       });
 
@@ -158,6 +164,7 @@ export default function ProfileSettingsSection() {
           address: updatedProfile.address || '',
           city: updatedProfile.city || '',
           postalCode: updatedProfile.postalCode || '',
+          phone: updatedProfile.phone || '',
         };
         
         toast.success('Profile updated successfully!');
@@ -481,6 +488,23 @@ export default function ProfileSettingsSection() {
                 className="bg-dark-800 border-dark-600 text-white"
               />
             </div>
+          </div>
+
+          {/* Phone */}
+          <div className="space-y-2">
+            <Label htmlFor="phone" className="text-gray-300 flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              Phone Number
+            </Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+1 234 567 8900"
+              className="bg-dark-800 border-dark-600 text-white"
+            />
+            <p className="text-xs text-gray-500">Include country code for international numbers</p>
           </div>
         </div>
 

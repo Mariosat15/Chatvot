@@ -14,6 +14,7 @@ export interface UserProfile {
   address?: string;
   city?: string;
   postalCode?: string;
+  phone?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -94,6 +95,7 @@ export async function GET() {
       address: user.address,
       city: user.city,
       postalCode: user.postalCode,
+      phone: user.phone,
       allKeys: Object.keys(user),
     });
 
@@ -110,6 +112,7 @@ export async function GET() {
       address: user.address || '',
       city: user.city || '',
       postalCode: user.postalCode || '',
+      phone: user.phone || '',
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
@@ -134,7 +137,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, profileImage, bio, country, address, city, postalCode } = body;
+    const { name, profileImage, bio, country, address, city, postalCode, phone } = body;
 
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
@@ -156,6 +159,7 @@ export async function PUT(req: NextRequest) {
     if (address !== undefined) updateFields.address = address.trim();
     if (city !== undefined) updateFields.city = city.trim();
     if (postalCode !== undefined) updateFields.postalCode = postalCode.trim();
+    if (phone !== undefined) updateFields.phone = phone.trim();
 
     console.log(`📝 Profile Update - Fields to update:`, updateFields);
 
@@ -176,6 +180,7 @@ export async function PUT(req: NextRequest) {
       address: result.address,
       city: result.city,
       postalCode: result.postalCode,
+      phone: result.phone,
     });
 
     // Check both 'profileImage' (custom) and 'image' (better-auth default) fields
@@ -191,6 +196,7 @@ export async function PUT(req: NextRequest) {
       address: result.address || '',
       city: result.city || '',
       postalCode: result.postalCode || '',
+      phone: result.phone || '',
       createdAt: result.createdAt,
       updatedAt: result.updatedAt,
     };
