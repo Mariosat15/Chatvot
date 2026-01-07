@@ -161,7 +161,7 @@ AdminEmployeeSchema.methods.comparePassword = async function (
 };
 
 // Index for efficient lookups
-AdminEmployeeSchema.index({ email: 1 });
+// Note: email already has unique index from schema definition (unique: true)
 AdminEmployeeSchema.index({ status: 1 });
 AdminEmployeeSchema.index({ role: 1 });
 AdminEmployeeSchema.index({ isOnline: 1 });

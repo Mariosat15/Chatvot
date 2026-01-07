@@ -129,7 +129,7 @@ const TradingSymbolSchema = new Schema<ITradingSymbol>(
 );
 
 // Indexes
-TradingSymbolSchema.index({ symbol: 1 }, { unique: true });
+// Note: symbol already has unique index from schema definition (unique: true)
 TradingSymbolSchema.index({ enabled: 1, category: 1 });
 TradingSymbolSchema.index({ category: 1, sortOrder: 1 });
 TradingSymbolSchema.index({ popular: 1, enabled: 1 });

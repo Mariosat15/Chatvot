@@ -47,7 +47,7 @@ const AdminRoleTemplateSchema = new Schema<IAdminRoleTemplate>(
 );
 
 // Index
-AdminRoleTemplateSchema.index({ name: 1 });
+// Note: name already has unique index from schema definition (unique: true)
 AdminRoleTemplateSchema.index({ isDefault: 1 });
 
 export const AdminRoleTemplate: Model<IAdminRoleTemplate> =
