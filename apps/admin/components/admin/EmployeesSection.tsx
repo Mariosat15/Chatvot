@@ -57,6 +57,8 @@ import {
   DollarSign,
   HeadphonesIcon,
   Scale,
+  Ban,
+  UserCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -69,6 +71,7 @@ interface Employee {
   allowedSections?: string[];
   isSuperAdmin: boolean;
   isOnline: boolean;
+  status?: 'active' | 'disabled';
   lastLogin?: string;
   lastActivity?: string;
   createdAt: string;
@@ -445,6 +448,31 @@ export default function EmployeesSection() {
     }
   };
 
+  const handleSuspendToggle = async (employee: Employee) => {
+    const action = employee.status === 'disabled' ? 'unsuspend' : 'suspend';
+    const actionLabel = action === 'suspend' ? 'Suspend' : 'Unsuspend';
+
+    try {
+      const response = await fetch(`/api/employees/${employee.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success(`Employee ${actionLabel.toLowerCase()}ed successfully`);
+        fetchData();
+      } else {
+        toast.error(data.error || `Failed to ${actionLabel.toLowerCase()} employee`);
+      }
+    } catch (error) {
+      console.error(`Error ${actionLabel.toLowerCase()}ing employee:`, error);
+      toast.error(`Failed to ${actionLabel.toLowerCase()} employee`);
+    }
+  };
+
   const handleSendCredentials = async (employee: Employee) => {
     try {
       const response = await fetch('/api/employees', {
@@ -758,14 +786,34 @@ export default function EmployeesSection() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className={cn(
-                            "w-2 h-2 rounded-full",
-                            employee.isOnline ? "bg-green-500" : "bg-gray-500"
-                          )} />
-                          <span className={employee.isOnline ? "text-green-400" : "text-gray-400"}>
-                            {employee.isOnline ? 'Online' : 'Offline'}
-                          </span>
+                        <div className="flex flex-col gap-1">
+                          {/* Account Status */}
+                          <div className="flex items-center gap-2">
+                            {employee.status === 'disabled' ? (
+                              <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                                <Ban className="h-3 w-3 mr-1" />
+                                Suspended
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
+                                <UserCheck className="h-3 w-3 mr-1" />
+                                Active
+                              </Badge>
+                            )}
+                          </div>
+                          {/* Online Status */}
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "w-2 h-2 rounded-full",
+                              employee.isOnline ? "bg-green-500" : "bg-gray-500"
+                            )} />
+                            <span className={cn(
+                              "text-xs",
+                              employee.isOnline ? "text-green-400" : "text-gray-500"
+                            )}>
+                              {employee.isOnline ? 'Online' : 'Offline'}
+                            </span>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-gray-400">
@@ -806,6 +854,19 @@ export default function EmployeesSection() {
                                 title="Edit employee"
                               >
                                 <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={employee.status === 'disabled' ? "text-green-400 hover:text-green-300" : "text-orange-400 hover:text-orange-300"}
+                                onClick={() => handleSuspendToggle(employee)}
+                                title={employee.status === 'disabled' ? 'Unsuspend employee' : 'Suspend employee'}
+                              >
+                                {employee.status === 'disabled' ? (
+                                  <UserCheck className="h-4 w-4" />
+                                ) : (
+                                  <Ban className="h-4 w-4" />
+                                )}
                               </Button>
                               <Button
                                 variant="ghost"

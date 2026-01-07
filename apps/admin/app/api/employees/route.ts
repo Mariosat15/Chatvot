@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import CompanySettings from '@/database/models/company-settings.model';
 import { WhiteLabel } from '@/database/models/whitelabel.model';
+import { auditLogService } from '@/lib/services/audit-log.service';
 
 // Check if an admin is the original/super admin
 async function isOriginalAdmin(admin: any): Promise<boolean> {
@@ -221,6 +222,21 @@ export async function POST(request: NextRequest) {
       await newEmployee.save();
       console.log(`✅ Employee created: ${newEmployee.email}, role: ${roleName}, sections: ${allowedSections.length}`);
 
+      // Audit log
+      const adminInfo = {
+        id: auth.adminId!,
+        email: auth.email!,
+        name: auth.name,
+        role: auth.isSuperAdmin ? 'superadmin' as const : 'admin' as const,
+      };
+      await auditLogService.logEmployeeCreated(
+        adminInfo, 
+        newEmployee._id.toString(), 
+        newEmployee.email, 
+        newEmployee.name, 
+        roleName
+      );
+
       // Send email if requested
       let emailSent = false;
       if (sendEmail) {
@@ -239,6 +255,7 @@ export async function POST(request: NextRequest) {
           name: newEmployee.name,
           role: newEmployee.role,
           allowedSections: newEmployee.allowedSections,
+          status: newEmployee.status,
         },
         generatedPassword: sendEmail ? undefined : password, // Only return password if not emailed
         emailSent,

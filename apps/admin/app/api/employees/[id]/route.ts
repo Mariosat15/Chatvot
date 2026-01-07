@@ -4,6 +4,7 @@ import { Admin } from '@/database/models/admin.model';
 import { AdminRoleTemplate } from '@/database/models/admin-role-template.model';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { ADMIN_SECTIONS, type AdminSection } from '@/database/models/admin-employee.model';
+import { auditLogService } from '@/lib/services/audit-log.service';
 
 // Check if an admin is the original/super admin
 async function isOriginalAdmin(admin: any): Promise<boolean> {
@@ -115,7 +116,27 @@ export async function PUT(
       employee.isOnline = isOnline;
     }
 
+    const previousRole = employee.role;
     await employee.save();
+
+    // Audit log
+    const adminInfo = {
+      id: auth.adminId!,
+      email: auth.email!,
+      name: auth.name,
+      role: auth.isSuperAdmin ? 'superadmin' as const : 'admin' as const,
+    };
+
+    const changes: Record<string, any> = {};
+    if (name) changes.name = name;
+    if (email && email !== employee.email) changes.email = email;
+    if (roleTemplateId || customSections) changes.role = employee.role;
+
+    await auditLogService.logEmployeeUpdated(adminInfo, id, employee.name, changes);
+
+    if (previousRole !== employee.role) {
+      await auditLogService.logEmployeeRoleChanged(adminInfo, id, employee.name, previousRole || 'None', employee.role || 'Custom');
+    }
 
     return NextResponse.json({
       success: true,
@@ -127,6 +148,7 @@ export async function PUT(
         allowedSections: employee.allowedSections,
         isOnline: employee.isOnline,
         lastLogin: employee.lastLogin,
+        status: employee.status,
       },
     });
   } catch (error) {
@@ -171,7 +193,19 @@ export async function DELETE(
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 403 });
     }
 
+    const deletedName = employee.name;
+    const deletedEmail = employee.email;
+    
     await Admin.findByIdAndDelete(id);
+
+    // Audit log
+    const adminInfo = {
+      id: auth.adminId!,
+      email: auth.email!,
+      name: auth.name,
+      role: auth.isSuperAdmin ? 'superadmin' as const : 'admin' as const,
+    };
+    await auditLogService.logEmployeeDeleted(adminInfo, id, deletedName, deletedEmail);
 
     return NextResponse.json({
       success: true,
@@ -216,19 +250,64 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { action, password } = body;
+    const { action, password, reason } = body;
 
-    if (action === 'toggle_status') {
-      // Toggle isOnline status (enable/disable)
-      // For now, we'll use a simple flag approach
-      // In production, you might want a separate 'status' field
-      employee.isOnline = !employee.isOnline;
+    // Admin info for audit logging
+    const adminInfo = {
+      id: auth.adminId!,
+      email: auth.email!,
+      name: auth.name,
+      role: auth.isSuperAdmin ? 'superadmin' as const : 'admin' as const,
+    };
+
+    if (action === 'suspend') {
+      // Suspend the employee - they can no longer log in
+      employee.status = 'disabled';
+      employee.isOnline = false; // Force offline
       await employee.save();
+      
+      await auditLogService.logEmployeeSuspended(adminInfo, id, employee.name, reason);
       
       return NextResponse.json({
         success: true,
-        isOnline: employee.isOnline,
-        message: employee.isOnline ? 'Employee enabled' : 'Employee disabled',
+        status: 'disabled',
+        message: `Employee ${employee.name} has been suspended`,
+      });
+    }
+
+    if (action === 'unsuspend') {
+      // Unsuspend the employee - they can log in again
+      employee.status = 'active';
+      await employee.save();
+      
+      await auditLogService.logEmployeeUnsuspended(adminInfo, id, employee.name);
+      
+      return NextResponse.json({
+        success: true,
+        status: 'active',
+        message: `Employee ${employee.name} has been unsuspended`,
+      });
+    }
+
+    if (action === 'toggle_status') {
+      // Toggle between active and disabled
+      const newStatus = employee.status === 'disabled' ? 'active' : 'disabled';
+      employee.status = newStatus;
+      if (newStatus === 'disabled') {
+        employee.isOnline = false; // Force offline when suspending
+      }
+      await employee.save();
+      
+      if (newStatus === 'disabled') {
+        await auditLogService.logEmployeeSuspended(adminInfo, id, employee.name);
+      } else {
+        await auditLogService.logEmployeeUnsuspended(adminInfo, id, employee.name);
+      }
+      
+      return NextResponse.json({
+        success: true,
+        status: newStatus,
+        message: newStatus === 'active' ? 'Employee unsuspended' : 'Employee suspended',
       });
     }
 
@@ -240,6 +319,8 @@ export async function PATCH(
       employee.password = password;
       employee.isFirstLogin = true;
       await employee.save();
+
+      await auditLogService.logEmployeePasswordReset(adminInfo, id, employee.name);
 
       return NextResponse.json({
         success: true,

@@ -485,6 +485,134 @@ export const auditLogService = {
     });
   },
 
+  // ==================== EMPLOYEE MANAGEMENT ====================
+
+  async logEmployeeCreated(admin: AdminInfo, employeeId: string, employeeEmail: string, employeeName: string, role: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'employee_created',
+      category: 'system',
+      description: `Created employee: ${employeeName} (${employeeEmail}) with role: ${role}`,
+      targetType: 'user',
+      targetId: employeeId,
+      targetName: employeeName,
+      metadata: { employeeEmail, role },
+    });
+  },
+
+  async logEmployeeUpdated(admin: AdminInfo, employeeId: string, employeeName: string, changes: Record<string, any>): Promise<void> {
+    await this.log({
+      admin,
+      action: 'employee_updated',
+      category: 'system',
+      description: `Updated employee: ${employeeName}`,
+      targetType: 'user',
+      targetId: employeeId,
+      targetName: employeeName,
+      metadata: { changes },
+    });
+  },
+
+  async logEmployeeDeleted(admin: AdminInfo, employeeId: string, employeeName: string, employeeEmail: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'employee_deleted',
+      category: 'system',
+      description: `Deleted employee: ${employeeName} (${employeeEmail})`,
+      targetType: 'user',
+      targetId: employeeId,
+      targetName: employeeName,
+      metadata: { employeeEmail },
+    });
+  },
+
+  async logEmployeeSuspended(admin: AdminInfo, employeeId: string, employeeName: string, reason?: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'employee_suspended',
+      category: 'system',
+      description: `Suspended employee: ${employeeName}${reason ? ` - Reason: ${reason}` : ''}`,
+      targetType: 'user',
+      targetId: employeeId,
+      targetName: employeeName,
+      metadata: { reason },
+    });
+  },
+
+  async logEmployeeUnsuspended(admin: AdminInfo, employeeId: string, employeeName: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'employee_unsuspended',
+      category: 'system',
+      description: `Unsuspended employee: ${employeeName}`,
+      targetType: 'user',
+      targetId: employeeId,
+      targetName: employeeName,
+    });
+  },
+
+  async logEmployeePasswordReset(admin: AdminInfo, employeeId: string, employeeName: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'employee_password_reset',
+      category: 'system',
+      description: `Reset password for employee: ${employeeName}`,
+      targetType: 'user',
+      targetId: employeeId,
+      targetName: employeeName,
+    });
+  },
+
+  async logEmployeeRoleChanged(admin: AdminInfo, employeeId: string, employeeName: string, previousRole: string, newRole: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'employee_role_changed',
+      category: 'system',
+      description: `Changed role for ${employeeName}: ${previousRole} → ${newRole}`,
+      targetType: 'user',
+      targetId: employeeId,
+      targetName: employeeName,
+      previousValue: previousRole,
+      newValue: newRole,
+    });
+  },
+
+  async logRoleTemplateCreated(admin: AdminInfo, templateId: string, templateName: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'role_template_created',
+      category: 'system',
+      description: `Created role template: ${templateName}`,
+      targetType: 'settings',
+      targetId: templateId,
+      targetName: templateName,
+    });
+  },
+
+  async logRoleTemplateUpdated(admin: AdminInfo, templateId: string, templateName: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'role_template_updated',
+      category: 'system',
+      description: `Updated role template: ${templateName}`,
+      targetType: 'settings',
+      targetId: templateId,
+      targetName: templateName,
+    });
+  },
+
+  async logRoleTemplateDeleted(admin: AdminInfo, templateId: string, templateName: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'role_template_deleted',
+      category: 'system',
+      description: `Deleted role template: ${templateName}`,
+      targetType: 'settings',
+      targetId: templateId,
+      targetName: templateName,
+    });
+  },
+
   // ==================== SYSTEM ====================
 
   async logAdminLogin(admin: AdminInfo): Promise<void> {
