@@ -88,17 +88,18 @@ export class AlertManagerService {
       ]
     };
 
-    // ALWAYS check if there's a resolved/dismissed alert with the SAME evidence type
+    // ALWAYS check if there's a resolved/dismissed alert with the SAME alert type
     // (to prevent recreating dismissed alerts of the same type)
     // IMPORTANT: If the user was CLEARED (investigationClearedAt is set) and this is NEW fraud
     // activity (detected AFTER clearance), we SHOULD create a new alert
-    const evidenceTypeCheck = competitionId 
-      ? { 'evidence.data.competitionId': competitionId, 'evidence.type': alertType }
-      : { 'evidence.type': alertType };
+    // NOTE: We check `alertType` field directly, NOT `evidence.type` (which is the evidence category)
+    const alertTypeCheck = competitionId 
+      ? { alertType, competitionId }
+      : { alertType };
 
     const resolvedAlertOfSameType = await FraudAlert.findOne({
       ...userQuery,
-      ...evidenceTypeCheck,
+      ...alertTypeCheck,
       status: { $in: ['dismissed', 'resolved'] }
     }).sort({ resolvedAt: -1 }); // Get most recent resolution
 
@@ -390,7 +391,7 @@ export class AlertManagerService {
       const existingAlert = await FraudAlert.findOne({
         ...userQuery,
         alertType,
-        'evidence.data.competitionId': competitionId,
+        competitionId, // Use direct field, not evidence.data
         status: { $in: ['dismissed', 'resolved'] }
       });
       return !existingAlert;
