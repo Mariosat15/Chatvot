@@ -132,8 +132,20 @@ router.post('/register', async (req: Request, res: Response) => {
   try {
     const { email, password, name } = req.body;
 
-    if (!email || !password) {
-      res.status(400).json({ error: 'Email and password are required' });
+    // Type validation - ensure email and password are strings
+    if (!email || typeof email !== 'string') {
+      res.status(400).json({ error: 'Valid email is required' });
+      return;
+    }
+    
+    if (!password || typeof password !== 'string') {
+      res.status(400).json({ error: 'Valid password is required' });
+      return;
+    }
+    
+    // Optional name must also be string if provided
+    if (name !== undefined && typeof name !== 'string') {
+      res.status(400).json({ error: 'Name must be a string' });
       return;
     }
 
@@ -306,8 +318,14 @@ router.post('/login', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      res.status(400).json({ error: 'Email and password are required' });
+    // Type validation - ensure email and password are strings
+    if (!email || typeof email !== 'string') {
+      res.status(400).json({ error: 'Valid email is required' });
+      return;
+    }
+    
+    if (!password || typeof password !== 'string') {
+      res.status(400).json({ error: 'Valid password is required' });
       return;
     }
 
