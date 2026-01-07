@@ -1,7 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Trophy,
   Medal,
@@ -14,6 +23,16 @@ import {
   TrendingUp,
   Target,
   Award,
+  Search,
+  Filter,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Users,
+  BarChart3,
+  Percent,
+  Activity,
+  SlidersHorizontal,
 } from 'lucide-react';
 import Link from 'next/link';
 import LeaderboardChallengeButton from '@/components/leaderboard/LeaderboardChallengeButton';
@@ -21,6 +40,21 @@ import MatchmakingCards from '@/components/leaderboard/MatchmakingCards';
 import ProfileCard from '@/components/profile/ProfileCard';
 import ChallengeCreateDialog from '@/components/challenges/ChallengeCreateDialog';
 import { cn } from '@/lib/utils';
+
+// Filter types
+interface LeaderboardFilters {
+  search: string;
+  rankRange: string;
+  winRateRange: string;
+  tradesRange: string;
+  levelRange: string;
+  pnlRange: string;
+  hasCompetitions: string;
+  hasChallenges: string;
+  hasBadges: string;
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+}
 
 interface LeaderboardEntry {
   userId: string;
@@ -60,6 +94,21 @@ interface LeaderboardContentProps {
   currentUserId: string;
 }
 
+// Default filter values
+const defaultFilters: LeaderboardFilters = {
+  search: '',
+  rankRange: 'all',
+  winRateRange: 'all',
+  tradesRange: 'all',
+  levelRange: 'all',
+  pnlRange: 'all',
+  hasCompetitions: 'all',
+  hasChallenges: 'all',
+  hasBadges: 'all',
+  sortBy: 'score',
+  sortOrder: 'desc',
+};
+
 export default function LeaderboardContent({
   leaderboard,
   myPosition,
@@ -69,6 +118,262 @@ export default function LeaderboardContent({
   const [selectedUser, setSelectedUser] = useState<LeaderboardEntry | null>(null);
   const [showProfileCard, setShowProfileCard] = useState(false);
   const [showChallengeDialog, setShowChallengeDialog] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<LeaderboardFilters>(defaultFilters);
+
+  // Filter and sort the leaderboard
+  const filteredLeaderboard = useMemo(() => {
+    let result = [...leaderboard];
+
+    // Search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      result = result.filter(entry => 
+        entry.username.toLowerCase().includes(searchLower) ||
+        entry.email.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Rank range filter
+    if (filters.rankRange !== 'all') {
+      switch (filters.rankRange) {
+        case 'top10':
+          result = result.filter(e => e.rank <= 10);
+          break;
+        case 'top25':
+          result = result.filter(e => e.rank <= 25);
+          break;
+        case 'top50':
+          result = result.filter(e => e.rank <= 50);
+          break;
+        case 'top100':
+          result = result.filter(e => e.rank <= 100);
+          break;
+        case '11-50':
+          result = result.filter(e => e.rank > 10 && e.rank <= 50);
+          break;
+        case '51-100':
+          result = result.filter(e => e.rank > 50 && e.rank <= 100);
+          break;
+        case '100+':
+          result = result.filter(e => e.rank > 100);
+          break;
+      }
+    }
+
+    // Win rate filter
+    if (filters.winRateRange !== 'all') {
+      switch (filters.winRateRange) {
+        case 'elite':
+          result = result.filter(e => e.winRate >= 70);
+          break;
+        case 'high':
+          result = result.filter(e => e.winRate >= 55 && e.winRate < 70);
+          break;
+        case 'average':
+          result = result.filter(e => e.winRate >= 40 && e.winRate < 55);
+          break;
+        case 'learning':
+          result = result.filter(e => e.winRate < 40);
+          break;
+        case 'any_active':
+          result = result.filter(e => e.winRate > 0);
+          break;
+      }
+    }
+
+    // Trades range filter
+    if (filters.tradesRange !== 'all') {
+      switch (filters.tradesRange) {
+        case 'veteran':
+          result = result.filter(e => e.totalTrades >= 100);
+          break;
+        case 'experienced':
+          result = result.filter(e => e.totalTrades >= 50 && e.totalTrades < 100);
+          break;
+        case 'intermediate':
+          result = result.filter(e => e.totalTrades >= 20 && e.totalTrades < 50);
+          break;
+        case 'beginner':
+          result = result.filter(e => e.totalTrades >= 1 && e.totalTrades < 20);
+          break;
+        case 'new':
+          result = result.filter(e => e.totalTrades === 0);
+          break;
+        case 'has_trades':
+          result = result.filter(e => e.totalTrades > 0);
+          break;
+      }
+    }
+
+    // Level/Title filter
+    if (filters.levelRange !== 'all') {
+      switch (filters.levelRange) {
+        case 'legend':
+          result = result.filter(e => 
+            e.userTitle?.toLowerCase().includes('legend') ||
+            e.userTitle?.toLowerCase().includes('champion') ||
+            e.userTitle?.toLowerCase().includes('grandmaster')
+          );
+          break;
+        case 'master':
+          result = result.filter(e => 
+            e.userTitle?.toLowerCase().includes('master') ||
+            e.userTitle?.toLowerCase().includes('elite')
+          );
+          break;
+        case 'expert':
+          result = result.filter(e => 
+            e.userTitle?.toLowerCase().includes('expert') ||
+            e.userTitle?.toLowerCase().includes('veteran') ||
+            e.userTitle?.toLowerCase().includes('skilled')
+          );
+          break;
+        case 'intermediate':
+          result = result.filter(e => 
+            e.userTitle?.toLowerCase().includes('intermediate') ||
+            e.userTitle?.toLowerCase().includes('trader')
+          );
+          break;
+        case 'beginner':
+          result = result.filter(e => 
+            e.userTitle?.toLowerCase().includes('beginner') ||
+            e.userTitle?.toLowerCase().includes('novice') ||
+            e.userTitle?.toLowerCase().includes('apprentice') ||
+            !e.userTitle
+          );
+          break;
+      }
+    }
+
+    // P&L filter
+    if (filters.pnlRange !== 'all') {
+      switch (filters.pnlRange) {
+        case 'profitable':
+          result = result.filter(e => e.totalPnl > 0);
+          break;
+        case 'highly_profitable':
+          result = result.filter(e => e.totalPnl >= 1000);
+          break;
+        case 'breakeven':
+          result = result.filter(e => e.totalPnl >= -100 && e.totalPnl <= 100);
+          break;
+        case 'losing':
+          result = result.filter(e => e.totalPnl < 0);
+          break;
+      }
+    }
+
+    // Competition filter
+    if (filters.hasCompetitions !== 'all') {
+      switch (filters.hasCompetitions) {
+        case 'champion':
+          result = result.filter(e => e.competitionsWon > 0);
+          break;
+        case 'podium':
+          result = result.filter(e => e.podiumFinishes > 0);
+          break;
+        case 'active':
+          result = result.filter(e => e.competitionsEntered > 0);
+          break;
+        case 'veteran':
+          result = result.filter(e => e.competitionsEntered >= 5);
+          break;
+        case 'none':
+          result = result.filter(e => e.competitionsEntered === 0);
+          break;
+      }
+    }
+
+    // Challenge filter
+    if (filters.hasChallenges !== 'all') {
+      switch (filters.hasChallenges) {
+        case 'champion':
+          result = result.filter(e => (e.challengesWon || 0) > 0);
+          break;
+        case 'active':
+          result = result.filter(e => (e.challengesEntered || 0) > 0);
+          break;
+        case 'veteran':
+          result = result.filter(e => (e.challengesEntered || 0) >= 5);
+          break;
+        case 'none':
+          result = result.filter(e => (e.challengesEntered || 0) === 0);
+          break;
+      }
+    }
+
+    // Badge filter
+    if (filters.hasBadges !== 'all') {
+      switch (filters.hasBadges) {
+        case 'legendary':
+          result = result.filter(e => e.legendaryBadges > 0);
+          break;
+        case 'collector':
+          result = result.filter(e => e.totalBadges >= 10);
+          break;
+        case 'some':
+          result = result.filter(e => e.totalBadges > 0);
+          break;
+        case 'none':
+          result = result.filter(e => e.totalBadges === 0);
+          break;
+      }
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (filters.sortBy) {
+        case 'score':
+          comparison = a.overallScore - b.overallScore;
+          break;
+        case 'rank':
+          comparison = a.rank - b.rank;
+          break;
+        case 'pnl':
+          comparison = a.totalPnl - b.totalPnl;
+          break;
+        case 'roi':
+          comparison = a.totalPnlPercentage - b.totalPnlPercentage;
+          break;
+        case 'winrate':
+          comparison = a.winRate - b.winRate;
+          break;
+        case 'trades':
+          comparison = a.totalTrades - b.totalTrades;
+          break;
+        case 'competitions':
+          comparison = a.competitionsEntered - b.competitionsEntered;
+          break;
+        case 'challenges':
+          comparison = (a.challengesEntered || 0) - (b.challengesEntered || 0);
+          break;
+        case 'badges':
+          comparison = a.totalBadges - b.totalBadges;
+          break;
+        default:
+          comparison = a.overallScore - b.overallScore;
+      }
+      return filters.sortOrder === 'desc' ? -comparison : comparison;
+    });
+
+    return result;
+  }, [leaderboard, filters]);
+
+  // Check if any filter is active
+  const hasActiveFilters = useMemo(() => {
+    return Object.keys(filters).some(key => {
+      if (key === 'sortBy') return filters.sortBy !== 'score';
+      if (key === 'sortOrder') return filters.sortOrder !== 'desc';
+      return filters[key as keyof LeaderboardFilters] !== defaultFilters[key as keyof LeaderboardFilters];
+    });
+  }, [filters]);
+
+  // Reset all filters
+  const resetFilters = () => {
+    setFilters(defaultFilters);
+  };
 
   const getRankIcon = (rank: number, isTied?: boolean, size: 'sm' | 'md' = 'md') => {
     const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-6 w-6';
@@ -193,6 +498,327 @@ export default function LeaderboardContent({
             </div>
           </div>
         )}
+
+        {/* Search & Filter Section */}
+        {viewMode === 'table' && (
+          <div className="rounded-xl bg-gray-800/50 border border-gray-700 overflow-hidden">
+            {/* Search Bar & Filter Toggle */}
+            <div className="p-3 sm:p-4 flex flex-col sm:flex-row gap-3">
+              {/* Search */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <Input
+                  type="text"
+                  placeholder="Search by username or email..."
+                  value={filters.search}
+                  onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  className="pl-10 bg-gray-900 border-gray-600 text-white placeholder-gray-500 h-10"
+                />
+                {filters.search && (
+                  <button
+                    onClick={() => setFilters(prev => ({ ...prev, search: '' }))}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Toggle & Sort */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={cn(
+                    "border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700 gap-2",
+                    showFilters && "bg-gray-700 text-white",
+                    hasActiveFilters && "border-primary-500 text-primary-400"
+                  )}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline">Filters</span>
+                  {hasActiveFilters && (
+                    <span className="px-1.5 py-0.5 text-xs bg-primary-500 text-white rounded-full">
+                      !
+                    </span>
+                  )}
+                  {showFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+
+                {/* Quick Sort */}
+                <Select
+                  value={filters.sortBy}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, sortBy: value }))}
+                >
+                  <SelectTrigger className="w-[140px] sm:w-[160px] bg-gray-900 border-gray-600 text-white">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-600">
+                    <SelectItem value="score" className="text-gray-300 focus:bg-gray-700 focus:text-white">🏆 Score</SelectItem>
+                    <SelectItem value="rank" className="text-gray-300 focus:bg-gray-700 focus:text-white">📊 Rank</SelectItem>
+                    <SelectItem value="pnl" className="text-gray-300 focus:bg-gray-700 focus:text-white">💰 P&L</SelectItem>
+                    <SelectItem value="roi" className="text-gray-300 focus:bg-gray-700 focus:text-white">📈 ROI %</SelectItem>
+                    <SelectItem value="winrate" className="text-gray-300 focus:bg-gray-700 focus:text-white">🎯 Win Rate</SelectItem>
+                    <SelectItem value="trades" className="text-gray-300 focus:bg-gray-700 focus:text-white">📊 Trades</SelectItem>
+                    <SelectItem value="competitions" className="text-gray-300 focus:bg-gray-700 focus:text-white">🏅 Competitions</SelectItem>
+                    <SelectItem value="challenges" className="text-gray-300 focus:bg-gray-700 focus:text-white">⚔️ Challenges</SelectItem>
+                    <SelectItem value="badges" className="text-gray-300 focus:bg-gray-700 focus:text-white">🎖️ Badges</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setFilters(prev => ({ 
+                    ...prev, 
+                    sortOrder: prev.sortOrder === 'desc' ? 'asc' : 'desc' 
+                  }))}
+                  className="border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
+                >
+                  {filters.sortOrder === 'desc' ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronUp className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Expanded Filters */}
+            {showFilters && (
+              <div className="px-3 sm:px-4 pb-4 border-t border-gray-700 pt-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  {/* Rank Range */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-400 flex items-center gap-1">
+                      <Trophy className="h-3 w-3" /> Rank
+                    </Label>
+                    <Select
+                      value={filters.rankRange}
+                      onValueChange={(value) => setFilters(prev => ({ ...prev, rankRange: value }))}
+                    >
+                      <SelectTrigger className="bg-gray-900 border-gray-600 text-white h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="all" className="text-gray-300 focus:bg-gray-700 focus:text-white">All Ranks</SelectItem>
+                        <SelectItem value="top10" className="text-gray-300 focus:bg-gray-700 focus:text-white">🥇 Top 10</SelectItem>
+                        <SelectItem value="top25" className="text-gray-300 focus:bg-gray-700 focus:text-white">🏅 Top 25</SelectItem>
+                        <SelectItem value="top50" className="text-gray-300 focus:bg-gray-700 focus:text-white">📊 Top 50</SelectItem>
+                        <SelectItem value="top100" className="text-gray-300 focus:bg-gray-700 focus:text-white">📈 Top 100</SelectItem>
+                        <SelectItem value="11-50" className="text-gray-300 focus:bg-gray-700 focus:text-white">Rank 11-50</SelectItem>
+                        <SelectItem value="51-100" className="text-gray-300 focus:bg-gray-700 focus:text-white">Rank 51-100</SelectItem>
+                        <SelectItem value="100+" className="text-gray-300 focus:bg-gray-700 focus:text-white">Rank 100+</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Win Rate */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-400 flex items-center gap-1">
+                      <Target className="h-3 w-3" /> Win Rate
+                    </Label>
+                    <Select
+                      value={filters.winRateRange}
+                      onValueChange={(value) => setFilters(prev => ({ ...prev, winRateRange: value }))}
+                    >
+                      <SelectTrigger className="bg-gray-900 border-gray-600 text-white h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="all" className="text-gray-300 focus:bg-gray-700 focus:text-white">Any Win Rate</SelectItem>
+                        <SelectItem value="elite" className="text-gray-300 focus:bg-gray-700 focus:text-white">🔥 Elite (70%+)</SelectItem>
+                        <SelectItem value="high" className="text-gray-300 focus:bg-gray-700 focus:text-white">⭐ High (55-70%)</SelectItem>
+                        <SelectItem value="average" className="text-gray-300 focus:bg-gray-700 focus:text-white">📊 Average (40-55%)</SelectItem>
+                        <SelectItem value="learning" className="text-gray-300 focus:bg-gray-700 focus:text-white">📚 Learning (&lt;40%)</SelectItem>
+                        <SelectItem value="any_active" className="text-gray-300 focus:bg-gray-700 focus:text-white">✅ Has Trades</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Experience (Trades) */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-400 flex items-center gap-1">
+                      <Activity className="h-3 w-3" /> Experience
+                    </Label>
+                    <Select
+                      value={filters.tradesRange}
+                      onValueChange={(value) => setFilters(prev => ({ ...prev, tradesRange: value }))}
+                    >
+                      <SelectTrigger className="bg-gray-900 border-gray-600 text-white h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="all" className="text-gray-300 focus:bg-gray-700 focus:text-white">Any Experience</SelectItem>
+                        <SelectItem value="veteran" className="text-gray-300 focus:bg-gray-700 focus:text-white">🏆 Veteran (100+)</SelectItem>
+                        <SelectItem value="experienced" className="text-gray-300 focus:bg-gray-700 focus:text-white">⭐ Experienced (50-100)</SelectItem>
+                        <SelectItem value="intermediate" className="text-gray-300 focus:bg-gray-700 focus:text-white">📈 Intermediate (20-50)</SelectItem>
+                        <SelectItem value="beginner" className="text-gray-300 focus:bg-gray-700 focus:text-white">🌱 Beginner (1-20)</SelectItem>
+                        <SelectItem value="new" className="text-gray-300 focus:bg-gray-700 focus:text-white">✨ New (0 trades)</SelectItem>
+                        <SelectItem value="has_trades" className="text-gray-300 focus:bg-gray-700 focus:text-white">✅ Has Trades</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Level/Title */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-400 flex items-center gap-1">
+                      <Star className="h-3 w-3" /> Level
+                    </Label>
+                    <Select
+                      value={filters.levelRange}
+                      onValueChange={(value) => setFilters(prev => ({ ...prev, levelRange: value }))}
+                    >
+                      <SelectTrigger className="bg-gray-900 border-gray-600 text-white h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="all" className="text-gray-300 focus:bg-gray-700 focus:text-white">Any Level</SelectItem>
+                        <SelectItem value="legend" className="text-gray-300 focus:bg-gray-700 focus:text-white">👑 Legend/Champion</SelectItem>
+                        <SelectItem value="master" className="text-gray-300 focus:bg-gray-700 focus:text-white">🏆 Master/Elite</SelectItem>
+                        <SelectItem value="expert" className="text-gray-300 focus:bg-gray-700 focus:text-white">⭐ Expert/Veteran</SelectItem>
+                        <SelectItem value="intermediate" className="text-gray-300 focus:bg-gray-700 focus:text-white">📊 Intermediate</SelectItem>
+                        <SelectItem value="beginner" className="text-gray-300 focus:bg-gray-700 focus:text-white">🌱 Beginner/Novice</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* P&L */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-400 flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3" /> P&L
+                    </Label>
+                    <Select
+                      value={filters.pnlRange}
+                      onValueChange={(value) => setFilters(prev => ({ ...prev, pnlRange: value }))}
+                    >
+                      <SelectTrigger className="bg-gray-900 border-gray-600 text-white h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="all" className="text-gray-300 focus:bg-gray-700 focus:text-white">Any P&L</SelectItem>
+                        <SelectItem value="highly_profitable" className="text-gray-300 focus:bg-gray-700 focus:text-white">🚀 High Profit (1000+)</SelectItem>
+                        <SelectItem value="profitable" className="text-gray-300 focus:bg-gray-700 focus:text-white">💰 Profitable</SelectItem>
+                        <SelectItem value="breakeven" className="text-gray-300 focus:bg-gray-700 focus:text-white">⚖️ Break Even</SelectItem>
+                        <SelectItem value="losing" className="text-gray-300 focus:bg-gray-700 focus:text-white">📉 In Loss</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Competitions */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-400 flex items-center gap-1">
+                      <Trophy className="h-3 w-3" /> Competitions
+                    </Label>
+                    <Select
+                      value={filters.hasCompetitions}
+                      onValueChange={(value) => setFilters(prev => ({ ...prev, hasCompetitions: value }))}
+                    >
+                      <SelectTrigger className="bg-gray-900 border-gray-600 text-white h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="all" className="text-gray-300 focus:bg-gray-700 focus:text-white">Any</SelectItem>
+                        <SelectItem value="champion" className="text-gray-300 focus:bg-gray-700 focus:text-white">🏆 Has Wins</SelectItem>
+                        <SelectItem value="podium" className="text-gray-300 focus:bg-gray-700 focus:text-white">🥇 Has Podiums</SelectItem>
+                        <SelectItem value="veteran" className="text-gray-300 focus:bg-gray-700 focus:text-white">⭐ 5+ Entered</SelectItem>
+                        <SelectItem value="active" className="text-gray-300 focus:bg-gray-700 focus:text-white">✅ Has Entered</SelectItem>
+                        <SelectItem value="none" className="text-gray-300 focus:bg-gray-700 focus:text-white">🆕 None Yet</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Challenges */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-400 flex items-center gap-1">
+                      <Swords className="h-3 w-3" /> Challenges
+                    </Label>
+                    <Select
+                      value={filters.hasChallenges}
+                      onValueChange={(value) => setFilters(prev => ({ ...prev, hasChallenges: value }))}
+                    >
+                      <SelectTrigger className="bg-gray-900 border-gray-600 text-white h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="all" className="text-gray-300 focus:bg-gray-700 focus:text-white">Any</SelectItem>
+                        <SelectItem value="champion" className="text-gray-300 focus:bg-gray-700 focus:text-white">🏆 Has Wins</SelectItem>
+                        <SelectItem value="veteran" className="text-gray-300 focus:bg-gray-700 focus:text-white">⭐ 5+ Battles</SelectItem>
+                        <SelectItem value="active" className="text-gray-300 focus:bg-gray-700 focus:text-white">✅ Has Battled</SelectItem>
+                        <SelectItem value="none" className="text-gray-300 focus:bg-gray-700 focus:text-white">🆕 None Yet</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Badges */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-400 flex items-center gap-1">
+                      <Award className="h-3 w-3" /> Badges
+                    </Label>
+                    <Select
+                      value={filters.hasBadges}
+                      onValueChange={(value) => setFilters(prev => ({ ...prev, hasBadges: value }))}
+                    >
+                      <SelectTrigger className="bg-gray-900 border-gray-600 text-white h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="all" className="text-gray-300 focus:bg-gray-700 focus:text-white">Any</SelectItem>
+                        <SelectItem value="legendary" className="text-gray-300 focus:bg-gray-700 focus:text-white">⚡ Has Legendary</SelectItem>
+                        <SelectItem value="collector" className="text-gray-300 focus:bg-gray-700 focus:text-white">🏅 10+ Badges</SelectItem>
+                        <SelectItem value="some" className="text-gray-300 focus:bg-gray-700 focus:text-white">✅ Has Badges</SelectItem>
+                        <SelectItem value="none" className="text-gray-300 focus:bg-gray-700 focus:text-white">🆕 None Yet</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Reset Button */}
+                  <div className="space-y-1.5 flex items-end">
+                    <Button
+                      variant="outline"
+                      onClick={resetFilters}
+                      disabled={!hasActiveFilters}
+                      className="w-full h-9 border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700 disabled:opacity-50"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Reset All
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Active filter count */}
+                {hasActiveFilters && (
+                  <div className="mt-3 pt-3 border-t border-gray-700/50 flex items-center justify-between">
+                    <p className="text-xs text-gray-400">
+                      Showing <span className="text-white font-medium">{filteredLeaderboard.length}</span> of{' '}
+                      <span className="text-gray-300">{leaderboard.length}</span> traders
+                    </p>
+                    <div className="flex gap-2 flex-wrap">
+                      {filters.search && (
+                        <span className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded-full flex items-center gap-1">
+                          Search: {filters.search}
+                          <X className="h-3 w-3 cursor-pointer hover:text-white" onClick={() => setFilters(prev => ({ ...prev, search: '' }))} />
+                        </span>
+                      )}
+                      {filters.rankRange !== 'all' && (
+                        <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-400 rounded-full flex items-center gap-1">
+                          Rank: {filters.rankRange}
+                          <X className="h-3 w-3 cursor-pointer hover:text-white" onClick={() => setFilters(prev => ({ ...prev, rankRange: 'all' }))} />
+                        </span>
+                      )}
+                      {filters.winRateRange !== 'all' && (
+                        <span className="px-2 py-1 text-xs bg-green-500/20 text-green-400 rounded-full flex items-center gap-1">
+                          Win Rate: {filters.winRateRange}
+                          <X className="h-3 w-3 cursor-pointer hover:text-white" onClick={() => setFilters(prev => ({ ...prev, winRateRange: 'all' }))} />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Content based on view mode */}
@@ -204,7 +830,15 @@ export default function LeaderboardContent({
         <>
           {/* Mobile: Card-based view */}
           <div className="lg:hidden space-y-2">
-            {leaderboard.map((entry) => {
+            {filteredLeaderboard.length === 0 ? (
+              <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-8 text-center">
+                <Users className="h-12 w-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-400 mb-2">No traders match your filters</p>
+                <Button variant="outline" size="sm" onClick={resetFilters} className="border-gray-600 text-gray-300">
+                  Reset Filters
+                </Button>
+              </div>
+            ) : filteredLeaderboard.map((entry) => {
               const isCurrentUser = entry.userId === currentUserId;
               
               return (
@@ -292,10 +926,10 @@ export default function LeaderboardContent({
                       profileImage={entry.profileImage}
                       compact
                     />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
 
           {/* Desktop: Table view */}
@@ -304,7 +938,11 @@ export default function LeaderboardContent({
             <div className="bg-gray-900/80 px-6 py-4 border-b border-gray-700">
               <h2 className="text-xl font-semibold text-gray-100 flex items-center gap-2">
                 <Star className="h-5 w-5 text-yellow-500" />
-                All Traders ({leaderboard.length})
+                {hasActiveFilters ? (
+                  <>Filtered Traders ({filteredLeaderboard.length} of {leaderboard.length})</>
+                ) : (
+                  <>All Traders ({leaderboard.length})</>
+                )}
               </h2>
               <p className="text-sm text-gray-400 mt-1">
                 Challenge anyone online to a 1v1 battle!
@@ -335,7 +973,15 @@ export default function LeaderboardContent({
 
                 {/* Table Body */}
                 <div className="divide-y divide-gray-700/50">
-                  {leaderboard.map((entry) => {
+                  {filteredLeaderboard.length === 0 ? (
+                    <div className="px-6 py-12 text-center">
+                      <Users className="h-12 w-12 text-gray-600 mx-auto mb-3" />
+                      <p className="text-gray-400 mb-2">No traders match your filters</p>
+                      <Button variant="outline" size="sm" onClick={resetFilters} className="border-gray-600 text-gray-300">
+                        Reset Filters
+                      </Button>
+                    </div>
+                  ) : filteredLeaderboard.map((entry) => {
                     const isCurrentUser = entry.userId === currentUserId;
                     
                     return (
