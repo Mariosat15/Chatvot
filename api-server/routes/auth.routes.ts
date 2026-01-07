@@ -518,9 +518,11 @@ router.post('/login', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('❌ Login error:', error);
+    
+    // Don't expose internal error details to clients
     res.status(500).json({ 
       error: 'Login failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message: 'An unexpected error occurred during login. Please try again.',
     });
   }
 });
