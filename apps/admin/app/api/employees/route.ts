@@ -251,10 +251,24 @@ export async function POST(request: NextRequest) {
       // Send email
       const emailSent = await sendEmployeeCredentialsEmail(employee, password, employee.allowedSections || []);
 
+      if (!emailSent) {
+        // Check if SMTP is configured
+        const smtpHost = process.env.SMTP_HOST || process.env.NODEMAILER_HOST;
+        if (!smtpHost) {
+          return NextResponse.json({
+            success: true,
+            emailSent: false,
+            message: 'Password updated but email could not be sent. SMTP is not configured.',
+            generatedPassword: password, // Return password since email couldn't be sent
+          });
+        }
+      }
+
       return NextResponse.json({
         success: true,
         emailSent,
-        message: emailSent ? 'Credentials sent successfully' : 'Password updated but email failed to send',
+        message: emailSent ? 'Credentials sent successfully' : 'Password updated but email failed to send. Check server logs.',
+        generatedPassword: emailSent ? undefined : password, // Return password if email failed
       });
     }
 
@@ -272,12 +286,30 @@ async function sendEmployeeCredentialsEmail(
   allowedSections: AdminSection[]
 ): Promise<boolean> {
   try {
+    console.log(`📧 Attempting to send credentials email to ${employee.email}...`);
+    
     // Get email template
-    const template = await EmployeeEmailTemplate.findOne({ templateId: 'employee_welcome', isActive: true });
+    let template = await EmployeeEmailTemplate.findOne({ templateId: 'employee_welcome', isActive: true });
+    
+    // If no template found, try to initialize them
     if (!template) {
-      console.error('Employee welcome email template not found');
+      console.log('📧 Email template not found, initializing templates...');
+      for (const defaultTemplate of DEFAULT_EMPLOYEE_EMAIL_TEMPLATES) {
+        await EmployeeEmailTemplate.findOneAndUpdate(
+          { templateId: defaultTemplate.templateId },
+          defaultTemplate,
+          { upsert: true }
+        );
+      }
+      template = await EmployeeEmailTemplate.findOne({ templateId: 'employee_welcome', isActive: true });
+    }
+    
+    if (!template) {
+      console.error('❌ Employee welcome email template not found even after initialization');
       return false;
     }
+    
+    console.log(`📧 Template found: ${template.name}`);
 
     // Get company settings
     const companySettings = await CompanySettings.findOne({});
@@ -351,6 +383,22 @@ async function sendEmployeeCredentialsEmail(
       },
     });
 
+    // Check SMTP configuration
+    const smtpHost = process.env.SMTP_HOST || process.env.NODEMAILER_HOST;
+    const smtpUser = process.env.SMTP_USER || process.env.NODEMAILER_EMAIL;
+    const smtpPass = process.env.SMTP_PASS || process.env.NODEMAILER_PASSWORD;
+    
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      console.error('❌ SMTP configuration is incomplete:', {
+        host: smtpHost ? 'configured' : 'missing',
+        user: smtpUser ? 'configured' : 'missing',
+        pass: smtpPass ? 'configured' : 'missing',
+      });
+      return false;
+    }
+    
+    console.log(`📧 SMTP configured: ${smtpHost}`);
+    
     await transporter.sendMail({
       from: `"${companyName}" <${process.env.SMTP_FROM || process.env.NODEMAILER_EMAIL}>`,
       to: employee.email,
@@ -361,8 +409,9 @@ async function sendEmployeeCredentialsEmail(
 
     console.log(`✅ Credentials email sent to ${employee.email}`);
     return true;
-  } catch (error) {
-    console.error('Error sending credentials email:', error);
+  } catch (error: any) {
+    console.error('❌ Error sending credentials email:', error?.message || error);
+    console.error('❌ Full error:', error);
     return false;
   }
 }

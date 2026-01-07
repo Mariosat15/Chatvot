@@ -437,10 +437,18 @@ export default function EmployeesSection() {
 
       const data = await response.json();
       
-      if (data.success && data.emailSent) {
-        toast.success('Credentials sent to ' + employee.email);
+      if (data.success) {
+        if (data.emailSent) {
+          toast.success('Credentials sent to ' + employee.email);
+        } else {
+          // Email failed but password was reset
+          toast.warning(data.message || 'Email could not be sent');
+          if (data.generatedPassword) {
+            setGeneratedPassword(data.generatedPassword);
+          }
+        }
       } else {
-        toast.error('Failed to send credentials email');
+        toast.error(data.error || 'Failed to send credentials');
       }
     } catch (error) {
       console.error('Error sending credentials:', error);
