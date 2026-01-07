@@ -223,8 +223,18 @@ export async function POST(request: Request) {
         const allLinkedUsers = [existingFingerprint.userId, ...existingFingerprint.linkedUserIds];
         console.log(`🔍 Known device with linked accounts detected: ${allLinkedUsers.length} accounts (max allowed: ${fraudSettings.maxAccountsPerDevice})`);
         
+        // Check if accounts exceed the max allowed
+        const exceedsMaxAllowed = allLinkedUsers.length > fraudSettings.maxAccountsPerDevice;
+        
+        // ALWAYS log for debugging
+        if (exceedsMaxAllowed) {
+          console.log(`🚨 EXCEEDS LIMIT: ${allLinkedUsers.length} accounts > max ${fraudSettings.maxAccountsPerDevice} - CREATING ALERT`);
+        } else {
+          console.log(`ℹ️ Within limits: ${allLinkedUsers.length} accounts ≤ max ${fraudSettings.maxAccountsPerDevice} - No alert needed`);
+        }
+        
         // Only alert if accounts EXCEED the max allowed setting
-        if (allLinkedUsers.length > fraudSettings.maxAccountsPerDevice) {
+        if (exceedsMaxAllowed) {
           // Get all devices for evidence
           const allDevices = await DeviceFingerprint.find({
             userId: { $in: allLinkedUsers }
@@ -378,10 +388,22 @@ export async function POST(request: Request) {
         // Only alert when accounts EXCEED the max allowed setting
         const allLinkedUsers = [existingDeviceAnyUser.userId, ...existingDeviceAnyUser.linkedUserIds];
         
+        // Include current user in the count - they were just added to linkedUserIds
+        // allLinkedUsers = owner + all linked users (including the new user)
         console.log(`🔍 Multi-account detected: ${allLinkedUsers.length} accounts on same device (max allowed: ${fraudSettings.maxAccountsPerDevice})`);
         
-        // Only alert if accounts EXCEED the max allowed setting
-        if (allLinkedUsers.length > fraudSettings.maxAccountsPerDevice) {
+        // Check if accounts exceed the max allowed
+        const exceedsMaxAllowed = allLinkedUsers.length > fraudSettings.maxAccountsPerDevice;
+        
+        // ALWAYS log for debugging
+        if (exceedsMaxAllowed) {
+          console.log(`🚨 EXCEEDS LIMIT: ${allLinkedUsers.length} accounts > max ${fraudSettings.maxAccountsPerDevice} - CREATING ALERT`);
+        } else {
+          console.log(`ℹ️ Within limits: ${allLinkedUsers.length} accounts ≤ max ${fraudSettings.maxAccountsPerDevice} - No alert needed`);
+        }
+        
+        // Only create alert if accounts EXCEED the max allowed setting
+        if (exceedsMaxAllowed) {
           let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
           if (allLinkedUsers.length >= fraudSettings.maxAccountsPerDevice + 2) {
             severity = 'critical';
