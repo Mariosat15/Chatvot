@@ -5,6 +5,17 @@ import { AdminRoleTemplate, DEFAULT_ROLE_TEMPLATES } from '@/database/models/adm
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { ADMIN_SECTIONS, type AdminSection } from '@/database/models/admin-employee.model';
 
+// Check if an admin is the original/super admin
+async function isOriginalAdmin(admin: any): Promise<boolean> {
+  const defaultAdminEmail = (process.env.ADMIN_EMAIL || 'admin@email.com').toLowerCase();
+  const isDefaultEmail = admin.email.toLowerCase() === defaultAdminEmail;
+  
+  const oldestAdmin = await Admin.findOne({}).sort({ createdAt: 1 }).select('_id');
+  const isFirstAdmin = oldestAdmin && oldestAdmin._id.toString() === admin._id.toString();
+  
+  return isDefaultEmail || isFirstAdmin;
+}
+
 // GET - List all role templates
 export async function GET(request: NextRequest) {
   try {
@@ -49,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin?.isSuperAdmin) {
+    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
       return NextResponse.json({ error: 'Only super admin can manage role templates' }, { status: 403 });
     }
 
@@ -107,7 +118,7 @@ export async function PUT(request: NextRequest) {
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin?.isSuperAdmin) {
+    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
       return NextResponse.json({ error: 'Only super admin can manage role templates' }, { status: 403 });
     }
 
@@ -172,7 +183,7 @@ export async function DELETE(request: NextRequest) {
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin?.isSuperAdmin) {
+    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
       return NextResponse.json({ error: 'Only super admin can manage role templates' }, { status: 403 });
     }
 

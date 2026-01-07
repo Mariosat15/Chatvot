@@ -9,6 +9,18 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import CompanySettings from '@/database/models/company-settings.model';
 
+// Check if an admin is the original/super admin
+async function isOriginalAdmin(admin: any): Promise<boolean> {
+  const defaultAdminEmail = (process.env.ADMIN_EMAIL || 'admin@email.com').toLowerCase();
+  const isDefaultEmail = admin.email.toLowerCase() === defaultAdminEmail;
+  
+  // Also check if they're the first admin (oldest by creation date)
+  const oldestAdmin = await Admin.findOne({}).sort({ createdAt: 1 }).select('_id');
+  const isFirstAdmin = oldestAdmin && oldestAdmin._id.toString() === admin._id.toString();
+  
+  return isDefaultEmail || isFirstAdmin;
+}
+
 // Generate random password
 function generatePassword(length = 12): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*';
@@ -53,9 +65,14 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    // Get current admin to check if super admin
+    // Get current admin to check if they're the original/super admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin?.isSuperAdmin) {
+    if (!currentAdmin) {
+      return NextResponse.json({ error: 'Admin not found' }, { status: 404 });
+    }
+    
+    const isSuperAdmin = await isOriginalAdmin(currentAdmin);
+    if (!isSuperAdmin) {
       return NextResponse.json({ error: 'Only super admin can manage employees' }, { status: 403 });
     }
 
@@ -103,9 +120,14 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
-    // Get current admin
+    // Get current admin to check if they're the original/super admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin?.isSuperAdmin) {
+    if (!currentAdmin) {
+      return NextResponse.json({ error: 'Admin not found' }, { status: 404 });
+    }
+    
+    const isSuperAdmin = await isOriginalAdmin(currentAdmin);
+    if (!isSuperAdmin) {
       return NextResponse.json({ error: 'Only super admin can manage employees' }, { status: 403 });
     }
 

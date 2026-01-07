@@ -5,6 +5,17 @@ import { AdminRoleTemplate } from '@/database/models/admin-role-template.model';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { ADMIN_SECTIONS, type AdminSection } from '@/database/models/admin-employee.model';
 
+// Check if an admin is the original/super admin
+async function isOriginalAdmin(admin: any): Promise<boolean> {
+  const defaultAdminEmail = (process.env.ADMIN_EMAIL || 'admin@email.com').toLowerCase();
+  const isDefaultEmail = admin.email.toLowerCase() === defaultAdminEmail;
+  
+  const oldestAdmin = await Admin.findOne({}).sort({ createdAt: 1 }).select('_id');
+  const isFirstAdmin = oldestAdmin && oldestAdmin._id.toString() === admin._id.toString();
+  
+  return isDefaultEmail || isFirstAdmin;
+}
+
 // GET - Get single employee
 export async function GET(
   request: NextRequest,
@@ -55,7 +66,7 @@ export async function PUT(
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin?.isSuperAdmin) {
+    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
       return NextResponse.json({ error: 'Only super admin can manage employees' }, { status: 403 });
     }
 
@@ -64,8 +75,9 @@ export async function PUT(
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
 
-    // Prevent modifying super admin
-    if (employee.isSuperAdmin && employee._id.toString() !== currentAdmin._id.toString()) {
+    // Prevent modifying the original/super admin
+    const isEmployeeOriginal = await isOriginalAdmin(employee);
+    if (isEmployeeOriginal && employee._id.toString() !== currentAdmin._id.toString()) {
       return NextResponse.json({ error: 'Cannot modify super admin' }, { status: 403 });
     }
 
@@ -140,7 +152,7 @@ export async function DELETE(
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin?.isSuperAdmin) {
+    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
       return NextResponse.json({ error: 'Only super admin can manage employees' }, { status: 403 });
     }
 
@@ -149,8 +161,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
 
-    // Prevent deleting super admin
-    if (employee.isSuperAdmin) {
+    // Prevent deleting the original/super admin
+    if (await isOriginalAdmin(employee)) {
       return NextResponse.json({ error: 'Cannot delete super admin' }, { status: 403 });
     }
 
@@ -188,7 +200,7 @@ export async function PATCH(
 
     // Get current admin
     const currentAdmin = await Admin.findById(auth.adminId);
-    if (!currentAdmin?.isSuperAdmin) {
+    if (!currentAdmin || !(await isOriginalAdmin(currentAdmin))) {
       return NextResponse.json({ error: 'Only super admin can manage employees' }, { status: 403 });
     }
 
@@ -197,8 +209,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
 
-    // Prevent modifying super admin
-    if (employee.isSuperAdmin && employee._id.toString() !== currentAdmin._id.toString()) {
+    // Prevent modifying the original/super admin
+    const isEmployeeOriginal = await isOriginalAdmin(employee);
+    if (isEmployeeOriginal && employee._id.toString() !== currentAdmin._id.toString()) {
       return NextResponse.json({ error: 'Cannot modify super admin' }, { status: 403 });
     }
 
