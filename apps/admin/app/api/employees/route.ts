@@ -7,7 +7,7 @@ import { verifyAdminAuth } from '@/lib/admin/auth';
 import { ADMIN_SECTIONS, type AdminSection } from '@/database/models/admin-employee.model';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
-import { CompanySettings } from '@/database/models/company-settings.model';
+import CompanySettings from '@/database/models/company-settings.model';
 
 // Generate random password
 function generatePassword(length = 12): string {
