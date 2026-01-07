@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import UserRestriction from '@/database/models/user-restriction.model';
+import FraudAlert from '@/database/models/fraud/fraud-alert.model';
 import { getUserById } from '@/lib/utils/user-lookup';
 import { FraudHistoryService } from '@/lib/services/fraud/fraud-history.service';
 import { auditLogService } from '@/lib/services/audit-log.service';
@@ -111,6 +112,35 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ Lifted ${liftedRestrictions.length} restriction(s)`);
+
+    // IMPORTANT: Mark the related fraud alert as "cleared" 
+    // This allows NEW fraud activity to generate NEW alerts
+    const relatedAlertIds = new Set<string>();
+    for (const restriction of restrictions) {
+      if (restriction.relatedFraudAlertId) {
+        relatedAlertIds.add(restriction.relatedFraudAlertId.toString());
+      }
+    }
+
+    if (relatedAlertIds.size > 0) {
+      const clearanceTimestamp = new Date();
+      const clearanceNote = `User cleared by admin: ${adminInfo.adminEmail || 'Unknown'}. Reason: ${reason}`;
+      
+      const updateResult = await FraudAlert.updateMany(
+        { _id: { $in: Array.from(relatedAlertIds) } },
+        {
+          $set: {
+            investigationClearedAt: clearanceTimestamp,
+            clearanceNote: clearanceNote,
+          }
+        }
+      );
+      
+      console.log(`📝 Marked ${updateResult.modifiedCount} fraud alert(s) as cleared`);
+      console.log(`   Alert IDs: ${Array.from(relatedAlertIds).join(', ')}`);
+      console.log(`   Cleared at: ${clearanceTimestamp.toISOString()}`);
+      console.log(`   → Future fraud activity by these users will generate NEW alerts`);
+    }
 
     // Send account restored notifications
     try {

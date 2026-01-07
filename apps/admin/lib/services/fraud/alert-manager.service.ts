@@ -9,9 +9,14 @@ import mongoose from 'mongoose';
  * Ensures all fraud findings are included in alert details
  * 
  * KEY BEHAVIORS:
- * 1. Dismissed/resolved alerts stay resolved - won't recreate for same issue
- * 2. Competition-specific alerts - separate alerts per competition
- * 3. New alerts only for NEW suspicious activity
+ * 1. Alerts elevated to "investigating" are removed from active alerts tab
+ * 2. When admin takes action (ban/suspend/dismiss), alert moves to "resolved" or "dismissed"
+ * 3. When user is unbanned/unsuspended, old alerts stay resolved (don't reappear)
+ * 4. If user commits NEW fraud AFTER investigation is cleared, a NEW alert is created
+ * 5. Competition-specific alerts - separate alerts per competition
+ * 
+ * IMPORTANT: The system tracks `investigationClearedAt` to determine if fraud 
+ * activity is NEW (detected after user was cleared) or OLD (part of original case)
  */
 
 export interface AlertEvidence {
@@ -85,6 +90,8 @@ export class AlertManagerService {
 
     // ALWAYS check if there's a resolved/dismissed alert with the SAME evidence type
     // (to prevent recreating dismissed alerts of the same type)
+    // IMPORTANT: If the user was CLEARED (investigationClearedAt is set) and this is NEW fraud
+    // activity (detected AFTER clearance), we SHOULD create a new alert
     const evidenceTypeCheck = competitionId 
       ? { 'evidence.data.competitionId': competitionId, 'evidence.type': alertType }
       : { 'evidence.type': alertType };
@@ -93,14 +100,33 @@ export class AlertManagerService {
       ...userQuery,
       ...evidenceTypeCheck,
       status: { $in: ['dismissed', 'resolved'] }
-    });
+    }).sort({ resolvedAt: -1 }); // Get most recent resolution
 
+    let shouldBlockNewAlert = false;
+    
     if (resolvedAlertOfSameType) {
       console.log(`⏭️ [ALERT] Found resolved/dismissed alert with same evidence type`);
       console.log(`   Previous alert ID: ${resolvedAlertOfSameType._id}`);
       console.log(`   Status: ${resolvedAlertOfSameType.status}`);
-      console.log(`   BUT continuing to check for active alerts...`);
-      // Continue - we should still check if there's an active alert to add OTHER evidence types
+      console.log(`   Resolved at: ${resolvedAlertOfSameType.resolvedAt}`);
+      console.log(`   Investigation cleared at: ${resolvedAlertOfSameType.investigationClearedAt || 'Not set'}`);
+      
+      // Check if user was CLEARED (unbanned/unsuspended) after this investigation
+      // If investigationClearedAt is set, it means the user was unbanned/unsuspended
+      // In that case, NEW fraud activity should create a NEW alert
+      if (resolvedAlertOfSameType.investigationClearedAt) {
+        const clearanceDate = new Date(resolvedAlertOfSameType.investigationClearedAt);
+        console.log(`   ✅ User was CLEARED on: ${clearanceDate.toISOString()}`);
+        console.log(`   → NEW fraud activity after clearance will create a NEW alert`);
+        shouldBlockNewAlert = false; // Allow new alert since user was cleared
+      } else {
+        // User was NOT cleared (still banned/suspended or alert was just dismissed)
+        // Don't create new alert for the same type of fraud
+        console.log(`   ⚠️ User was NOT cleared - blocking new alert of same type`);
+        shouldBlockNewAlert = true;
+      }
+      
+      console.log(`   Continuing to check for active alerts...`);
     } else {
       console.log(`   No resolved/dismissed alert found with this evidence type - continuing`);
     }
@@ -148,14 +174,19 @@ export class AlertManagerService {
       return;
     }
 
-    // If the same evidence type was already dismissed, don't create new alert
-    if (resolvedAlertOfSameType) {
-      console.log(`⏭️ [ALERT] No active alert exists and this type was dismissed - NOT creating`);
+    // If the same evidence type was already dismissed AND user was NOT cleared, don't create new alert
+    if (resolvedAlertOfSameType && shouldBlockNewAlert) {
+      console.log(`⏭️ [ALERT] No active alert exists and this type was dismissed (user NOT cleared) - NOT creating`);
       return;
     }
 
     // No existing alert found - create new one
-    console.log(`🆕 [ALERT] Creating NEW alert for these users`);
+    // Either: (1) no previous alert, OR (2) user was cleared and this is NEW fraud
+    if (resolvedAlertOfSameType && !shouldBlockNewAlert) {
+      console.log(`🆕 [ALERT] User was CLEARED - creating NEW alert for NEW fraud activity`);
+    } else {
+      console.log(`🆕 [ALERT] Creating NEW alert for these users`);
+    }
     await this.createNewAlert(params);
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import UserRestriction from '@/database/models/user-restriction.model';
+import FraudAlert from '@/database/models/fraud/fraud-alert.model';
 import AuditLog from '@/database/models/audit-log.model';
 import UserNote from '@/database/models/user-notes.model';
 import { getAdminSession } from '@/lib/admin/auth';
@@ -62,6 +63,21 @@ export async function DELETE(
       },
       status: 'success',
     });
+
+    // Mark related fraud alert as "cleared" so NEW fraud can generate NEW alerts
+    if (restriction.relatedFraudAlertId) {
+      const clearanceTimestamp = new Date();
+      await FraudAlert.findByIdAndUpdate(
+        restriction.relatedFraudAlertId,
+        {
+          $set: {
+            investigationClearedAt: clearanceTimestamp,
+            clearanceNote: `User cleared by admin: ${session.email || 'Unknown'}`,
+          }
+        }
+      );
+      console.log(`📝 Marked fraud alert ${restriction.relatedFraudAlertId} as cleared`);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

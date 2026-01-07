@@ -56,6 +56,10 @@ interface FraudAlert {
   }>;
   resolution?: string;
   actionTaken?: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  investigationClearedAt?: string; // When users were unbanned/unsuspended
+  clearanceNote?: string; // Admin notes when clearing
 }
 
 interface DeviceFingerprint {
@@ -1040,8 +1044,9 @@ export default function FraudMonitoringSection() {
               <h3 className="text-lg font-semibold text-green-400">Resolved & Dismissed Alerts</h3>
             </div>
             <p className="text-sm text-gray-400">
-              These alerts have been reviewed and handled. They will NOT generate new alerts for the same issue.
-              To re-enable monitoring for specific users, you need to manually delete the resolved alert.
+              These alerts have been reviewed and handled. <strong className="text-green-400">If users were later unbanned/unsuspended</strong>,{' '}
+              new fraud activity will generate <strong className="text-white">NEW alerts</strong>.{' '}
+              Look for the <span className="text-green-400">✓ Cleared</span> badge to see which users can trigger new alerts.
             </p>
           </div>
           
@@ -1059,7 +1064,7 @@ export default function FraudMonitoringSection() {
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-3 mb-2 flex-wrap">
                           <Badge className={alert.status === 'resolved' 
                             ? 'bg-green-500/20 text-green-400 border-green-500/30'
                             : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
@@ -1069,6 +1074,13 @@ export default function FraudMonitoringSection() {
                           <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 capitalize">
                             {alert.alertType.replace(/_/g, ' ')}
                           </Badge>
+                          {/* Show "Cleared" badge if users were unbanned/unsuspended */}
+                          {(alert as any).investigationClearedAt && (
+                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30" title={`Cleared on: ${new Date((alert as any).investigationClearedAt).toLocaleDateString()}`}>
+                              <Unlock className="h-3 w-3 mr-1" />
+                              Cleared - Can Alert Again
+                            </Badge>
+                          )}
                           {(alert as any).competitionId && (
                             <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
                               Competition: {((alert as any).competitionId as string).substring(0, 8)}...
@@ -1078,19 +1090,25 @@ export default function FraudMonitoringSection() {
                         <h4 className="text-lg font-semibold text-gray-100">{alert.title}</h4>
                         <p className="text-sm text-gray-400 mt-1">{alert.description}</p>
                         
-                        <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                        <div className="flex items-center gap-4 mt-3 text-xs text-gray-500 flex-wrap">
                           <span className="flex items-center gap-1">
                             <Users className="h-3 w-3" />
                             {alert.suspiciousUserIds.length} accounts
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            Resolved: {new Date((alert as any).resolvedAt || (alert as any).updatedAt).toLocaleDateString()}
+                            Resolved: {new Date(alert.resolvedAt || (alert as any).updatedAt).toLocaleDateString()}
                           </span>
                           {alert.actionTaken && (
                             <span className="flex items-center gap-1">
                               <Activity className="h-3 w-3" />
-                              Action: {alert.actionTaken}
+                              Action: {alert.actionTaken.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                          {alert.investigationClearedAt && (
+                            <span className="flex items-center gap-1 text-emerald-400">
+                              <Unlock className="h-3 w-3" />
+                              Cleared: {new Date(alert.investigationClearedAt).toLocaleDateString()}
                             </span>
                           )}
                         </div>
