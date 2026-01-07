@@ -22,7 +22,10 @@ export async function POST(request: NextRequest) {
   try {
     await connectToDatabase();
     
-    const { email, password } = await request.json();
+    const body = await request.json();
+    const { email, password } = body;
+
+    console.log('🔐 Login attempt for:', email);
 
     if (!email || !password) {
       return NextResponse.json(
@@ -31,32 +34,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find admin
-    let admin = await Admin.findOne({ email: email.toLowerCase() });
-    let isNewSuperAdmin = false;
+    const normalizedEmail = email.toLowerCase().trim();
 
-    // If no admin exists, create default admin (first time setup - this is the SUPER ADMIN)
+    // Find admin
+    let admin = await Admin.findOne({ email: normalizedEmail });
+
+    // If no admin exists, check if this is the default admin trying to login for the first time
     if (!admin) {
-      const defaultEmail = process.env.ADMIN_EMAIL || 'admin@email.com';
+      const defaultEmail = (process.env.ADMIN_EMAIL || 'admin@email.com').toLowerCase().trim();
       const defaultPassword = process.env.ADMIN_PASSWORD || 'admin123';
 
-      if (email === defaultEmail && password === defaultPassword) {
+      console.log('🔐 No admin found, checking default credentials...');
+      console.log('🔐 Default email:', defaultEmail);
+      console.log('🔐 Provided email:', normalizedEmail);
+
+      if (normalizedEmail === defaultEmail && password === defaultPassword) {
         // Count existing admins to determine if this is the first one
         const adminCount = await Admin.countDocuments();
         
         admin = new Admin({
-          email: defaultEmail,
+          email: normalizedEmail,
           password: defaultPassword,
+          name: 'Admin',
           isFirstLogin: true,
-          isSuperAdmin: adminCount === 0, // First admin is always super admin
+          isSuperAdmin: true, // First admin is always super admin
           role: 'Super Admin',
-          allowedSections: [...ALL_ADMIN_SECTIONS], // Super admin has access to everything
         });
         await admin.save();
-        isNewSuperAdmin = adminCount === 0;
         
-        console.log(`🔐 ${isNewSuperAdmin ? 'Super Admin' : 'Admin'} created: ${defaultEmail}`);
+        console.log(`🔐 Super Admin created: ${normalizedEmail}`);
       } else {
+        console.log('🔐 Credentials do not match default');
         return NextResponse.json(
           { error: 'Invalid credentials' },
           { status: 401 }
@@ -64,55 +72,79 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check if this existing admin needs to be marked as super admin (migration)
-    if (!admin.isSuperAdmin) {
-      const superAdminExists = await Admin.exists({ isSuperAdmin: true });
-      if (!superAdminExists) {
-        // This is the first admin ever - mark as super admin
-        admin.isSuperAdmin = true;
-        admin.role = 'Super Admin';
-        admin.allowedSections = [...ALL_ADMIN_SECTIONS];
-        await admin.save();
-        console.log(`🔐 Migrated existing admin to Super Admin: ${admin.email}`);
-      }
-    }
+    console.log('🔐 Admin found:', admin.email, 'isSuperAdmin:', admin.isSuperAdmin);
 
     // Verify password
     const isValidPassword = await admin.comparePassword(password);
     if (!isValidPassword) {
+      console.log('🔐 Password verification failed');
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
       );
     }
 
-    // Update last login and online status
-    admin.lastLogin = new Date();
-    admin.lastActivity = new Date();
-    admin.isOnline = true;
-    await admin.save();
+    console.log('🔐 Password verified successfully');
+
+    // Check if this existing admin needs to be marked as super admin (migration)
+    // Use updateOne to avoid schema validation issues with new fields
+    if (!admin.isSuperAdmin) {
+      const superAdminExists = await Admin.exists({ isSuperAdmin: true });
+      if (!superAdminExists) {
+        // This is the first admin ever - mark as super admin
+        await Admin.updateOne(
+          { _id: admin._id },
+          { 
+            $set: { 
+              isSuperAdmin: true, 
+              role: 'Super Admin' 
+            } 
+          }
+        );
+        admin.isSuperAdmin = true;
+        admin.role = 'Super Admin';
+        console.log(`🔐 Migrated existing admin to Super Admin: ${admin.email}`);
+      }
+    }
+
+    // Update last login using updateOne to avoid schema issues
+    try {
+      await Admin.updateOne(
+        { _id: admin._id },
+        { 
+          $set: { 
+            lastLogin: new Date(),
+            isOnline: true 
+          } 
+        }
+      );
+    } catch (updateError) {
+      // Non-critical, continue with login
+      console.warn('Could not update last login:', updateError);
+    }
 
     // Generate JWT with role information
     const adminId = (admin._id as any).toString();
     const token = await new SignJWT({ 
       adminId, 
       email: admin.email,
-      isSuperAdmin: admin.isSuperAdmin,
+      isSuperAdmin: admin.isSuperAdmin || false,
       role: admin.role || 'admin',
-      allowedSections: admin.allowedSections || [],
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('7d')
       .sign(SECRET_KEY);
 
+    console.log('🔐 JWT generated successfully');
+
     const response = NextResponse.json({
       success: true,
-      isFirstLogin: admin.isFirstLogin,
+      isFirstLogin: admin.isFirstLogin || false,
       admin: {
         id: adminId,
         email: admin.email,
-        name: admin.name,
-        isSuperAdmin: admin.isSuperAdmin,
+        name: admin.name || 'Admin',
+        isSuperAdmin: admin.isSuperAdmin || false,
         role: admin.role || 'admin',
         allowedSections: admin.isSuperAdmin ? ALL_ADMIN_SECTIONS : (admin.allowedSections || []),
       },
@@ -127,23 +159,22 @@ export async function POST(request: NextRequest) {
       path: '/',
     });
 
-    // Log admin login
-    try {
-      await auditLogService.logAdminLogin({
-        id: adminId,
-        email: admin.email,
-        name: admin.name || admin.email.split('@')[0],
-        role: admin.role || 'admin',
-      });
-    } catch (auditError) {
+    // Log admin login (non-blocking)
+    auditLogService.logAdminLogin({
+      id: adminId,
+      email: admin.email,
+      name: admin.name || admin.email.split('@')[0],
+      role: admin.role || 'admin',
+    }).catch(auditError => {
       console.error('Failed to log admin login:', auditError);
-    }
+    });
 
+    console.log('🔐 Login successful for:', admin.email);
     return response;
   } catch (error) {
-    console.error('Admin login error:', error);
+    console.error('❌ Admin login error:', error);
     return NextResponse.json(
-      { error: 'Login failed' },
+      { error: 'Login failed', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
