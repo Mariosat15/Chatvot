@@ -138,6 +138,13 @@ router.post('/register', async (req: Request, res: Response) => {
       return;
     }
     
+    // Email format validation (matches batch registration requirement)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({ error: 'Invalid email format' });
+      return;
+    }
+    
     if (!password || typeof password !== 'string') {
       res.status(400).json({ error: 'Valid password is required' });
       return;
@@ -409,7 +416,8 @@ router.post('/login', async (req: Request, res: Response) => {
           
           // Send verification email in background (don't block response)
           const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://chartvolt.com';
-          const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
+          // FIXED: Use userId instead of email - the /api/auth/verify-email endpoint expects userId
+          const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}&userId=${user.id}`;
           
           const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST || 'smtp.gmail.com',

@@ -55,14 +55,18 @@ class BcryptWorkerPool {
         successCount++;
       }
     }
-
-    this.initialized = true;
     
     if (successCount === 0) {
+      // CRITICAL: Don't set initialized=true if no workers were created
+      // This allows retry on next operation, or failing fast if workers can't be created
       console.error(`❌ Bcrypt worker pool failed to create any workers! Password operations will fail.`);
+      // Set initialized to true to prevent infinite retry loops, but we'll check workers.length in executeTask
+      this.initialized = true;
     } else if (successCount < this.poolSize) {
+      this.initialized = true;
       console.warn(`⚠️ Bcrypt worker pool partially initialized (${successCount}/${this.poolSize} workers)`);
     } else {
+      this.initialized = true;
       console.log(`✅ Bcrypt worker pool ready (${this.poolSize} workers)`);
     }
   }
@@ -209,6 +213,7 @@ class BcryptWorkerPool {
 
   /**
    * Execute a task on the worker pool
+   * Tasks have a 30-second timeout to prevent indefinite hanging
    */
   private async executeTask<T>(type: string, data: any): Promise<T> {
     // Reject immediately if shutting down
@@ -220,6 +225,11 @@ class BcryptWorkerPool {
     if (!this.initialized) {
       this.initialize();
     }
+    
+    // CRITICAL: Reject immediately if no workers are available (pool failed to initialize)
+    if (this.workers.length === 0) {
+      return Promise.reject(new Error('Worker pool has no available workers. Password operations cannot be performed.'));
+    }
 
     return new Promise<T>((resolve, reject) => {
       // Double-check shutdown state inside promise (race condition guard)
@@ -229,7 +239,34 @@ class BcryptWorkerPool {
       }
       
       const id = `${Date.now()}-${++this.taskIdCounter}`;
-      const task: PendingTask = { id, resolve, reject };
+      
+      // Set up timeout to prevent indefinite hanging
+      const TASK_TIMEOUT_MS = 30000; // 30 seconds
+      const timeoutId = setTimeout(() => {
+        // Clean up the task if it's still pending
+        if (this.pendingTasks.has(id)) {
+          this.pendingTasks.delete(id);
+          reject(new Error(`Worker task timed out after ${TASK_TIMEOUT_MS / 1000} seconds`));
+        }
+        // Also remove from queue if it's still there
+        const queueIndex = this.taskQueue.findIndex(t => t.task.id === id);
+        if (queueIndex !== -1) {
+          this.taskQueue.splice(queueIndex, 1);
+          reject(new Error(`Worker task timed out in queue after ${TASK_TIMEOUT_MS / 1000} seconds`));
+        }
+      }, TASK_TIMEOUT_MS);
+      
+      const task: PendingTask = { 
+        id, 
+        resolve: (result: T) => {
+          clearTimeout(timeoutId);
+          resolve(result);
+        }, 
+        reject: (error: Error) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        }
+      };
 
       const message = { type, id, ...data };
 
@@ -268,11 +305,21 @@ class BcryptWorkerPool {
     return {
       poolSize: this.poolSize,
       initialized: this.initialized,
+      totalWorkers: this.workers.length,
       activeWorkers: this.workers.filter(w => w.busy).length,
       idleWorkers: this.workers.filter(w => !w.busy).length,
       queuedTasks: this.taskQueue.length,
       pendingTasks: this.pendingTasks.size,
+      isReady: this.isReady(),
     };
+  }
+  
+  /**
+   * Check if the worker pool is ready to accept tasks
+   * Returns true only if initialized AND has at least one worker
+   */
+  public isReady(): boolean {
+    return this.initialized && this.workers.length > 0 && !this.isShuttingDown;
   }
 
   /**
