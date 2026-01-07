@@ -244,8 +244,8 @@ router.post('/register', async (req: Request, res: Response) => {
         }
       );
       
-      // Build verification URL
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000';
+      // Build verification URL (consistent with login flow)
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://chartvolt.com';
       const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}&userId=${userId}`;
       
       // Send email using nodemailer (if available in this environment)
