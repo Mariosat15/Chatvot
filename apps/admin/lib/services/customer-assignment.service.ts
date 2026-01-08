@@ -3,6 +3,8 @@ import { AssignmentSettings, IAssignmentSettings, AssignmentStrategy } from '@/d
 import { customerAuditService, PerformedBy, CustomerInfo } from './customer-audit.service';
 import { connectToDatabase } from '@/database/mongoose';
 import { Admin } from '@/database/models/admin.model';
+import { getTransporter } from '@/lib/nodemailer';
+import { getSettings } from '@/lib/services/settings.service';
 
 export interface AssignCustomerParams {
   customerId: string;
@@ -143,6 +145,15 @@ class CustomerAssignmentService {
     );
     
     console.log(`✅ [Assignment] Customer ${params.customerEmail} assigned to ${params.employeeEmail}`);
+    
+    // Send notifications if enabled
+    await this.sendAssignmentNotifications(
+      settings,
+      params.customerEmail,
+      params.customerName,
+      params.employeeEmail,
+      params.employeeName
+    );
     
     return assignment;
   }
@@ -549,6 +560,105 @@ class CustomerAssignmentService {
     }
     
     return { canEdit: true };
+  }
+  
+  /**
+   * Send assignment notifications if enabled
+   */
+  private async sendAssignmentNotifications(
+    settings: IAssignmentSettings,
+    customerEmail: string,
+    customerName: string,
+    employeeEmail: string,
+    employeeName: string
+  ): Promise<void> {
+    try {
+      const appSettings = await getSettings();
+      const companyName = appSettings?.appName || 'Our Platform';
+      const fromEmail = appSettings?.nodemailerEmail || process.env.NODEMAILER_EMAIL;
+      
+      const transporter = await getTransporter();
+      
+      // Send notification to employee if enabled
+      if (settings.notifyEmployeeOnAssignment && fromEmail) {
+        try {
+          await transporter.sendMail({
+            from: `"${companyName}" <${fromEmail}>`,
+            to: employeeEmail,
+            subject: `New Customer Assigned: ${customerName}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0a0a0a;">
+                <div style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+                  <h1 style="color: white; margin: 0; font-size: 24px;">👤 New Customer Assigned</h1>
+                </div>
+                <div style="background: #141414; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #30333A; border-top: none;">
+                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
+                    Hello ${employeeName},
+                  </p>
+                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
+                    A new customer has been assigned to you:
+                  </p>
+                  <div style="background: #1E1E1E; border: 1px solid #30333A; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <p style="margin: 8px 0; color: #CCDADC;"><strong style="color: #FDD458;">Name:</strong> ${customerName}</p>
+                    <p style="margin: 8px 0; color: #CCDADC;"><strong style="color: #FDD458;">Email:</strong> ${customerEmail}</p>
+                  </div>
+                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
+                    Please log in to the admin panel to view the customer's details and manage their account.
+                  </p>
+                  <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+                    Best regards,<br/>${companyName} Admin Team
+                  </p>
+                </div>
+              </div>
+            `,
+          });
+          console.log(`📧 [Notification] Employee notification sent to ${employeeEmail}`);
+        } catch (emailError) {
+          console.error(`❌ [Notification] Failed to send employee notification:`, emailError);
+        }
+      }
+      
+      // Send notification to customer if enabled
+      if (settings.notifyCustomerOnAssignment && fromEmail) {
+        try {
+          await transporter.sendMail({
+            from: `"${companyName}" <${fromEmail}>`,
+            to: customerEmail,
+            subject: `Your Dedicated Account Manager at ${companyName}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0a0a0a;">
+                <div style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+                  <h1 style="color: white; margin: 0; font-size: 24px;">🎉 Meet Your Account Manager</h1>
+                </div>
+                <div style="background: #141414; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #30333A; border-top: none;">
+                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
+                    Hello ${customerName},
+                  </p>
+                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
+                    We're pleased to inform you that a dedicated account manager has been assigned to assist you with your account.
+                  </p>
+                  <div style="background: #1E1E1E; border: 1px solid #30333A; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <p style="margin: 8px 0; color: #CCDADC;"><strong style="color: #FDD458;">Your Account Manager:</strong> ${employeeName}</p>
+                    <p style="margin: 8px 0; color: #CCDADC;"><strong style="color: #FDD458;">Contact:</strong> ${employeeEmail}</p>
+                  </div>
+                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
+                    ${employeeName} will be your primary point of contact for any questions or assistance you may need.
+                  </p>
+                  <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+                    Best regards,<br/>The ${companyName} Team
+                  </p>
+                </div>
+              </div>
+            `,
+          });
+          console.log(`📧 [Notification] Customer notification sent to ${customerEmail}`);
+        } catch (emailError) {
+          console.error(`❌ [Notification] Failed to send customer notification:`, emailError);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [Notification] Failed to send assignment notifications:', error);
+    }
   }
   
   /**

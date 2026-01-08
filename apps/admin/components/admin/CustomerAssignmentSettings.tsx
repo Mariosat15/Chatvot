@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -14,6 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   Users,
   Settings,
@@ -25,6 +32,15 @@ import {
   UserPlus,
   Shuffle,
   ArrowUpDown,
+  Shield,
+  Bell,
+  Eye,
+  Zap,
+  UserCheck,
+  Mail,
+  HelpCircle,
+  Trash2,
+  Lock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -52,12 +68,90 @@ interface AvailableRole {
 }
 
 const STRATEGIES = [
-  { value: 'least_customers', label: 'Least Customers First', description: 'Balance workload evenly' },
-  { value: 'round_robin', label: 'Round Robin', description: 'Rotate assignments A→B→C' },
-  { value: 'newest_employee', label: 'Newest Employee First', description: 'Good for training' },
-  { value: 'oldest_employee', label: 'Oldest Employee First', description: 'Experience priority' },
-  { value: 'random', label: 'Random', description: 'Random selection' },
+  { value: 'least_customers', label: 'Least Customers First', description: 'Balance workload evenly', icon: '⚖️' },
+  { value: 'round_robin', label: 'Round Robin', description: 'Rotate assignments A→B→C', icon: '🔄' },
+  { value: 'newest_employee', label: 'Newest Employee First', description: 'Good for training', icon: '🆕' },
+  { value: 'oldest_employee', label: 'Oldest Employee First', description: 'Experience priority', icon: '👴' },
+  { value: 'random', label: 'Random', description: 'Random selection', icon: '🎲' },
 ];
+
+// Toggle Setting Row Component
+function SettingToggle({
+  label,
+  description,
+  checked,
+  onCheckedChange,
+  icon: Icon,
+  iconColor = 'text-gray-400',
+  disabled = false,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  icon?: React.ElementType;
+  iconColor?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={`flex items-center justify-between py-3 px-4 rounded-lg bg-gray-800/50 border border-gray-700/50 ${disabled ? 'opacity-50' : ''}`}>
+      <div className="flex items-start gap-3">
+        {Icon && <Icon className={`h-5 w-5 mt-0.5 ${iconColor}`} />}
+        <div>
+          <Label className="text-white font-medium">{label}</Label>
+          <p className="text-sm text-gray-400 mt-0.5">{description}</p>
+        </div>
+      </div>
+      <Switch
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={disabled}
+        className="data-[state=checked]:bg-blue-600"
+      />
+    </div>
+  );
+}
+
+// Section Header Component
+function SectionHeader({
+  icon: Icon,
+  iconColor,
+  title,
+  description,
+  badge,
+}: {
+  icon: React.ElementType;
+  iconColor: string;
+  title: string;
+  description: string;
+  badge?: { text: string; variant: 'success' | 'warning' | 'info' };
+}) {
+  return (
+    <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start gap-4">
+        <div className={`p-3 rounded-xl ${iconColor.replace('text-', 'bg-').replace('400', '500/20')}`}>
+          <Icon className={`h-6 w-6 ${iconColor}`} />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <p className="text-sm text-gray-400 mt-1">{description}</p>
+        </div>
+      </div>
+      {badge && (
+        <Badge 
+          variant="outline" 
+          className={`
+            ${badge.variant === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : ''}
+            ${badge.variant === 'warning' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' : ''}
+            ${badge.variant === 'info' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : ''}
+          `}
+        >
+          {badge.text}
+        </Badge>
+      )}
+    </div>
+  );
+}
 
 export function CustomerAssignmentSettings() {
   const [settings, setSettings] = useState<AssignmentSettings | null>(null);
@@ -86,7 +180,6 @@ export function CustomerAssignmentSettings() {
       if (data.success) {
         setSettings(data.settings);
         setOriginalSettings(data.settings);
-        // Set available roles from API (dynamically from role templates)
         if (data.availableRoles) {
           setAvailableRoles(data.availableRoles);
         }
@@ -118,7 +211,6 @@ export function CustomerAssignmentSettings() {
         toast.success('Settings saved successfully');
         setOriginalSettings(data.settings);
         setHasChanges(false);
-        // Update available roles in case templates changed
         if (data.availableRoles) {
           setAvailableRoles(data.availableRoles);
         }
@@ -153,18 +245,22 @@ export function CustomerAssignmentSettings() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center">
+          <RefreshCw className="h-10 w-10 animate-spin text-blue-400 mx-auto mb-4" />
+          <p className="text-gray-400">Loading settings...</p>
+        </div>
       </div>
     );
   }
 
   if (!settings) {
     return (
-      <div className="text-center py-12 text-gray-400">
-        <AlertCircle className="h-12 w-12 mx-auto mb-3" />
-        <p>Failed to load settings</p>
-        <Button onClick={fetchSettings} className="mt-4">
+      <div className="text-center py-20">
+        <AlertCircle className="h-16 w-16 mx-auto mb-4 text-red-400" />
+        <p className="text-gray-300 text-lg mb-4">Failed to load settings</p>
+        <Button onClick={fetchSettings} variant="outline">
+          <RefreshCw className="h-4 w-4 mr-2" />
           Retry
         </Button>
       </div>
@@ -172,28 +268,457 @@ export function CustomerAssignmentSettings() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-blue-400" />
-            Customer Assignment Settings
-          </h2>
-          <p className="text-sm text-gray-400 mt-1">
-            Configure how customers are assigned to employees
-          </p>
+    <div className="max-w-5xl mx-auto space-y-8 pb-8">
+      {/* Page Header */}
+      <div className="bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-pink-600/20 rounded-2xl p-6 border border-gray-700/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-500/20 rounded-xl">
+              <UserPlus className="h-8 w-8 text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Customer Assignment Settings</h1>
+              <p className="text-gray-400 mt-1">Configure how customers are assigned to employees</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {hasChanges && (
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Unsaved Changes
+              </Badge>
+            )}
+            <Button
+              onClick={handleSave}
+              disabled={saving || !hasChanges}
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+            >
+              {saving ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Settings
+                </>
+              )}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {hasChanges && (
-            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-400 border-yellow-500/30">
-              Unsaved Changes
-            </Badge>
-          )}
+      </div>
+
+      {/* Main Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* LEFT COLUMN */}
+        <div className="space-y-6">
+          
+          {/* Auto-Assignment Section */}
+          <Card className="bg-gray-900/80 border-gray-700/50 overflow-hidden">
+            <CardContent className="p-6">
+              <SectionHeader
+                icon={Zap}
+                iconColor="text-emerald-400"
+                title="Auto-Assignment"
+                description="Automatically assign new customers"
+                badge={settings.autoAssignEnabled ? { text: 'Enabled', variant: 'success' } : { text: 'Disabled', variant: 'warning' }}
+              />
+              
+              <div className="space-y-4">
+                <SettingToggle
+                  icon={Shuffle}
+                  iconColor="text-emerald-400"
+                  label="Enable Auto-Assignment"
+                  description="Automatically assign new customers when they register"
+                  checked={settings.autoAssignEnabled}
+                  onCheckedChange={(checked) => updateSetting('autoAssignEnabled', checked)}
+                />
+
+                {settings.autoAssignEnabled && (
+                  <>
+                    <div className="ml-8 p-4 bg-gray-800/50 rounded-lg border border-gray-700/50 space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-gray-300 flex items-center gap-2">
+                          <Settings className="h-4 w-4" />
+                          Assignment Strategy
+                        </Label>
+                        <Select
+                          value={settings.assignmentStrategy}
+                          onValueChange={(value) => updateSetting('assignmentStrategy', value)}
+                        >
+                          <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-gray-800 border-gray-700">
+                            {STRATEGIES.map((strategy) => (
+                              <SelectItem key={strategy.value} value={strategy.value} className="text-white">
+                                <div className="flex items-center gap-2">
+                                  <span>{strategy.icon}</span>
+                                  <span>{strategy.label}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-gray-500">
+                          {STRATEGIES.find(s => s.value === settings.assignmentStrategy)?.description}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-gray-300 flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Max Customers Per Employee
+                        </Label>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            type="number"
+                            min="0"
+                            value={settings.maxCustomersPerEmployee}
+                            onChange={(e) => updateSetting('maxCustomersPerEmployee', parseInt(e.target.value) || 0)}
+                            className="bg-gray-800 border-gray-600 text-white w-24"
+                          />
+                          <span className="text-sm text-gray-400">
+                            {settings.maxCustomersPerEmployee === 0 ? '(Unlimited)' : 'customers max'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Assignable Roles */}
+                    <div className="space-y-3">
+                      <Label className="text-gray-300 flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Assignable Roles
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-gray-500" />
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-gray-800 border-gray-700">
+                              <p className="max-w-xs">Select which employee roles can be assigned customers. Roles come from your Employee Role Templates.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </Label>
+                      
+                      {availableRoles.length === 0 ? (
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 text-amber-400 mt-0.5" />
+                          <div>
+                            <p className="text-sm text-amber-400 font-medium">No role templates found</p>
+                            <p className="text-xs text-amber-400/70">Create role templates in the Employees section first.</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {availableRoles.map((role) => {
+                            const isSelected = settings.assignableRoles?.includes(role.name);
+                            return (
+                              <Badge
+                                key={role.name}
+                                variant="outline"
+                                className={`cursor-pointer transition-all duration-200 ${
+                                  isSelected
+                                    ? 'bg-blue-500/20 text-blue-400 border-blue-500/50 shadow-sm shadow-blue-500/20'
+                                    : 'bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-700 hover:border-gray-600'
+                                }`}
+                                onClick={() => toggleRole(role.name)}
+                                title={role.description}
+                              >
+                                {isSelected && <CheckCircle className="h-3 w-3 mr-1" />}
+                                {role.name}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )}
+                      
+                      {settings.assignableRoles?.length === 0 && availableRoles.length > 0 && (
+                        <p className="text-xs text-amber-400">
+                          ⚠️ No roles selected. Auto-assignment won't work.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Employee Deletion Handling */}
+          <Card className="bg-gray-900/80 border-gray-700/50 overflow-hidden">
+            <CardContent className="p-6">
+              <SectionHeader
+                icon={Trash2}
+                iconColor="text-orange-400"
+                title="Employee Deletion Handling"
+                description="What happens when an employee is deleted"
+              />
+              
+              <div className="space-y-4">
+                <SettingToggle
+                  icon={ArrowUpDown}
+                  iconColor="text-orange-400"
+                  label="Auto-Reassign Customers"
+                  description="Automatically reassign customers when their employee is deleted"
+                  checked={settings.autoReassignOnEmployeeDelete}
+                  onCheckedChange={(checked) => updateSetting('autoReassignOnEmployeeDelete', checked)}
+                />
+
+                {settings.autoReassignOnEmployeeDelete && (
+                  <div className="ml-8 p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                    <Label className="text-gray-300 flex items-center gap-2 mb-2">
+                      <Settings className="h-4 w-4" />
+                      Reassignment Strategy
+                    </Label>
+                    <Select
+                      value={settings.reassignmentStrategy}
+                      onValueChange={(value) => updateSetting('reassignmentStrategy', value)}
+                    >
+                      <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700">
+                        {STRATEGIES.map((strategy) => (
+                          <SelectItem key={strategy.value} value={strategy.value} className="text-white">
+                            <div className="flex items-center gap-2">
+                              <span>{strategy.icon}</span>
+                              <span>{strategy.label}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {!settings.autoReassignOnEmployeeDelete && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-400 mt-0.5" />
+                    <p className="text-sm text-amber-400">
+                      When disabled, customers will become unassigned when their employee is deleted
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Self-Assignment */}
+          <Card className="bg-gray-900/80 border-gray-700/50 overflow-hidden">
+            <CardContent className="p-6">
+              <SectionHeader
+                icon={UserCheck}
+                iconColor="text-cyan-400"
+                title="Self-Assignment"
+                description="Allow employees to claim customers themselves"
+              />
+              
+              <div className="space-y-4">
+                <SettingToggle
+                  icon={UserPlus}
+                  iconColor="text-cyan-400"
+                  label="Allow Self-Assignment"
+                  description="Employees can claim unassigned customers"
+                  checked={settings.allowSelfAssignment}
+                  onCheckedChange={(checked) => updateSetting('allowSelfAssignment', checked)}
+                />
+
+                {settings.allowSelfAssignment && (
+                  <div className="ml-8">
+                    <SettingToggle
+                      icon={CheckCircle}
+                      iconColor="text-cyan-400"
+                      label="Require Admin Approval"
+                      description="Self-assignments need admin approval before becoming active"
+                      checked={settings.requireApprovalForSelfAssign}
+                      onCheckedChange={(checked) => updateSetting('requireApprovalForSelfAssign', checked)}
+                    />
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* RIGHT COLUMN */}
+        <div className="space-y-6">
+          
+          {/* Notifications Section */}
+          <Card className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 border-blue-500/30 overflow-hidden">
+            <CardContent className="p-6">
+              <SectionHeader
+                icon={Bell}
+                iconColor="text-blue-400"
+                title="Notifications"
+                description="Configure assignment notifications"
+                badge={{ text: 'Important', variant: 'info' }}
+              />
+              
+              <div className="space-y-4">
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <Mail className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-white font-medium">Employee Notifications</h4>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Send email notification when a customer is assigned to an employee
+                          </p>
+                        </div>
+                        <Switch
+                          checked={settings.notifyEmployeeOnAssignment}
+                          onCheckedChange={(checked) => updateSetting('notifyEmployeeOnAssignment', checked)}
+                          className="data-[state=checked]:bg-blue-600"
+                        />
+                      </div>
+                      {settings.notifyEmployeeOnAssignment && (
+                        <div className="mt-3 flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-emerald-400" />
+                          <span className="text-xs text-emerald-400">Employees will receive email when assigned a customer</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-purple-500/20 rounded-lg">
+                      <Users className="h-5 w-5 text-purple-400" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-white font-medium">Customer Notifications</h4>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Send email to customer when they are assigned a dedicated agent
+                          </p>
+                        </div>
+                        <Switch
+                          checked={settings.notifyCustomerOnAssignment}
+                          onCheckedChange={(checked) => updateSetting('notifyCustomerOnAssignment', checked)}
+                          className="data-[state=checked]:bg-purple-600"
+                        />
+                      </div>
+                      {settings.notifyCustomerOnAssignment && (
+                        <div className="mt-3 flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-emerald-400" />
+                          <span className="text-xs text-emerald-400">Customers will receive email about their assigned agent</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-800/50 rounded-lg p-3 flex items-start gap-2">
+                  <Info className="h-4 w-4 text-gray-400 mt-0.5" />
+                  <p className="text-xs text-gray-400">
+                    Notification emails use the templates configured in Settings → Email Templates. 
+                    Make sure you have templates for "customer_assigned_employee" and "customer_assigned_customer".
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Access Control */}
+          <Card className="bg-gray-900/80 border-gray-700/50 overflow-hidden">
+            <CardContent className="p-6">
+              <SectionHeader
+                icon={Lock}
+                iconColor="text-purple-400"
+                title="Access Control"
+                description="Control who can access customer data"
+              />
+              
+              <div className="space-y-4">
+                <SettingToggle
+                  icon={Users}
+                  iconColor="text-purple-400"
+                  label="Backoffice: Edit Only Own Customers"
+                  description="Backoffice employees can only edit customers assigned to them"
+                  checked={settings.backofficeCanOnlyEditOwn}
+                  onCheckedChange={(checked) => updateSetting('backofficeCanOnlyEditOwn', checked)}
+                />
+
+                <Separator className="bg-gray-700/50" />
+
+                <div className="space-y-3">
+                  <Label className="text-gray-300 text-sm flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Department Bypass Rules
+                  </Label>
+                  <p className="text-xs text-gray-500 -mt-1">
+                    Allow certain departments to process any customer regardless of assignment
+                  </p>
+                  
+                  <SettingToggle
+                    label="Finance: Process Any Customer"
+                    description="Finance can process payments for any customer"
+                    checked={settings.financeBypassAssignment}
+                    onCheckedChange={(checked) => updateSetting('financeBypassAssignment', checked)}
+                  />
+
+                  <SettingToggle
+                    label="Compliance: Process Any Customer"
+                    description="Compliance can review KYC for any customer"
+                    checked={settings.complianceBypassAssignment}
+                    onCheckedChange={(checked) => updateSetting('complianceBypassAssignment', checked)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Display Settings */}
+          <Card className="bg-gray-900/80 border-gray-700/50 overflow-hidden">
+            <CardContent className="p-6">
+              <SectionHeader
+                icon={Eye}
+                iconColor="text-gray-400"
+                title="Display Settings"
+                description="Configure how assignments appear in the UI"
+              />
+              
+              <div className="space-y-4">
+                <SettingToggle
+                  icon={ArrowUpDown}
+                  iconColor="text-gray-400"
+                  label="Show Unassigned First"
+                  description="Display unassigned customers at the top of user lists"
+                  checked={settings.showUnassignedFirst}
+                  onCheckedChange={(checked) => updateSetting('showUnassignedFirst', checked)}
+                />
+
+                <SettingToggle
+                  icon={AlertCircle}
+                  iconColor="text-amber-400"
+                  label="Highlight Unassigned"
+                  description="Visually highlight customers who need to be assigned"
+                  checked={settings.highlightUnassigned}
+                  onCheckedChange={(checked) => updateSetting('highlightUnassigned', checked)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Floating Save Button for Mobile */}
+      {hasChanges && (
+        <div className="fixed bottom-6 right-6 lg:hidden">
           <Button
             onClick={handleSave}
-            disabled={saving || !hasChanges}
-            className="bg-blue-600 hover:bg-blue-700"
+            disabled={saving}
+            className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/30"
+            size="lg"
           >
             {saving ? (
               <>
@@ -203,351 +728,12 @@ export function CustomerAssignmentSettings() {
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                Save Settings
+                Save
               </>
             )}
           </Button>
         </div>
-      </div>
-
-      {/* Auto-Assignment Section */}
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Shuffle className="h-5 w-5 text-emerald-400" />
-            Auto-Assignment
-          </CardTitle>
-          <CardDescription className="text-gray-400">
-            Automatically assign new customers to employees
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-white">Enable Auto-Assignment</Label>
-              <p className="text-sm text-gray-400">
-                Automatically assign new customers when they register
-              </p>
-            </div>
-            <Switch
-              checked={settings.autoAssignEnabled}
-              onCheckedChange={(checked) => updateSetting('autoAssignEnabled', checked)}
-            />
-          </div>
-
-          {settings.autoAssignEnabled && (
-            <>
-              <div className="space-y-2">
-                <Label className="text-gray-300">Assignment Strategy</Label>
-                <Select
-                  value={settings.assignmentStrategy}
-                  onValueChange={(value) => updateSetting('assignmentStrategy', value)}
-                >
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    {STRATEGIES.map((strategy) => (
-                      <SelectItem key={strategy.value} value={strategy.value} className="text-white">
-                        <div>
-                          <p className="font-medium">{strategy.label}</p>
-                          <p className="text-xs text-gray-400">{strategy.description}</p>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-gray-300">Assignable Roles</Label>
-                <p className="text-xs text-gray-500">
-                  Select which employee roles can be assigned customers. 
-                  Roles are loaded from your Employee Role Templates.
-                </p>
-                {availableRoles.length === 0 ? (
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 text-yellow-400 mt-0.5" />
-                    <p className="text-sm text-yellow-400">
-                      No role templates found. Create role templates in the Employees section first.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {availableRoles.map((role) => (
-                      <Badge
-                        key={role.name}
-                        variant="outline"
-                        className={`cursor-pointer transition-colors ${
-                          settings.assignableRoles?.includes(role.name)
-                            ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
-                            : 'bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-700'
-                        }`}
-                        onClick={() => toggleRole(role.name)}
-                        title={role.description}
-                      >
-                        {settings.assignableRoles?.includes(role.name) && (
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                        )}
-                        {role.name}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {settings.assignableRoles?.length === 0 && availableRoles.length > 0 && (
-                  <p className="text-xs text-orange-400 mt-1">
-                    ⚠️ No roles selected. Auto-assignment won't work until at least one role is selected.
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-gray-300">Max Customers Per Employee</Label>
-                <p className="text-xs text-gray-500">Set to 0 for unlimited</p>
-                <Input
-                  type="number"
-                  min="0"
-                  value={settings.maxCustomersPerEmployee}
-                  onChange={(e) => updateSetting('maxCustomersPerEmployee', parseInt(e.target.value) || 0)}
-                  className="bg-gray-800 border-gray-700 text-white w-32"
-                />
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Reassignment on Delete Section */}
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <ArrowUpDown className="h-5 w-5 text-orange-400" />
-            Employee Deletion Handling
-          </CardTitle>
-          <CardDescription className="text-gray-400">
-            What happens when an employee is deleted
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-white">Auto-Reassign Customers</Label>
-              <p className="text-sm text-gray-400">
-                Automatically reassign customers to other employees when one is deleted
-              </p>
-            </div>
-            <Switch
-              checked={settings.autoReassignOnEmployeeDelete}
-              onCheckedChange={(checked) => updateSetting('autoReassignOnEmployeeDelete', checked)}
-            />
-          </div>
-
-          {settings.autoReassignOnEmployeeDelete && (
-            <div className="space-y-2">
-              <Label className="text-gray-300">Reassignment Strategy</Label>
-              <Select
-                value={settings.reassignmentStrategy}
-                onValueChange={(value) => updateSetting('reassignmentStrategy', value)}
-              >
-                <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  {STRATEGIES.map((strategy) => (
-                    <SelectItem key={strategy.value} value={strategy.value} className="text-white">
-                      <div>
-                        <p className="font-medium">{strategy.label}</p>
-                        <p className="text-xs text-gray-400">{strategy.description}</p>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {!settings.autoReassignOnEmployeeDelete && (
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-yellow-400 mt-0.5" />
-              <p className="text-sm text-yellow-400">
-                When disabled, customers will become unassigned when their employee is deleted
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Access Control Section */}
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Settings className="h-5 w-5 text-purple-400" />
-            Access Control
-          </CardTitle>
-          <CardDescription className="text-gray-400">
-            Control which departments can access customer data
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-white">Backoffice: Edit Only Own Customers</Label>
-              <p className="text-sm text-gray-400">
-                Backoffice employees can only edit customers assigned to them
-              </p>
-            </div>
-            <Switch
-              checked={settings.backofficeCanOnlyEditOwn}
-              onCheckedChange={(checked) => updateSetting('backofficeCanOnlyEditOwn', checked)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-white">Finance: Process Any Customer</Label>
-              <p className="text-sm text-gray-400">
-                Finance can process payments for any customer regardless of assignment
-              </p>
-            </div>
-            <Switch
-              checked={settings.financeBypassAssignment}
-              onCheckedChange={(checked) => updateSetting('financeBypassAssignment', checked)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-white">Compliance: Process Any Customer</Label>
-              <p className="text-sm text-gray-400">
-                Compliance can review KYC for any customer regardless of assignment
-              </p>
-            </div>
-            <Switch
-              checked={settings.complianceBypassAssignment}
-              onCheckedChange={(checked) => updateSetting('complianceBypassAssignment', checked)}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Self-Assignment Section */}
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Users className="h-5 w-5 text-cyan-400" />
-            Self-Assignment
-          </CardTitle>
-          <CardDescription className="text-gray-400">
-            Allow employees to assign themselves to customers
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-white">Allow Self-Assignment</Label>
-              <p className="text-sm text-gray-400">
-                Employees can claim unassigned customers
-              </p>
-            </div>
-            <Switch
-              checked={settings.allowSelfAssignment}
-              onCheckedChange={(checked) => updateSetting('allowSelfAssignment', checked)}
-            />
-          </div>
-
-          {settings.allowSelfAssignment && (
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-white">Require Admin Approval</Label>
-                <p className="text-sm text-gray-400">
-                  Self-assignments need admin approval before becoming active
-                </p>
-              </div>
-              <Switch
-                checked={settings.requireApprovalForSelfAssign}
-                onCheckedChange={(checked) => updateSetting('requireApprovalForSelfAssign', checked)}
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Notifications Section */}
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Info className="h-5 w-5 text-blue-400" />
-            Notifications
-          </CardTitle>
-          <CardDescription className="text-gray-400">
-            Configure assignment notifications
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-white">Notify Employee</Label>
-              <p className="text-sm text-gray-400">
-                Send notification when a customer is assigned to an employee
-              </p>
-            </div>
-            <Switch
-              checked={settings.notifyEmployeeOnAssignment}
-              onCheckedChange={(checked) => updateSetting('notifyEmployeeOnAssignment', checked)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-white">Notify Customer</Label>
-              <p className="text-sm text-gray-400">
-                Send email to customer when they are assigned an agent
-              </p>
-            </div>
-            <Switch
-              checked={settings.notifyCustomerOnAssignment}
-              onCheckedChange={(checked) => updateSetting('notifyCustomerOnAssignment', checked)}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* UI Settings Section */}
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white">Display Settings</CardTitle>
-          <CardDescription className="text-gray-400">
-            Configure how assignments are displayed
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-white">Show Unassigned First</Label>
-              <p className="text-sm text-gray-400">
-                Display unassigned customers at the top of the user list
-              </p>
-            </div>
-            <Switch
-              checked={settings.showUnassignedFirst}
-              onCheckedChange={(checked) => updateSetting('showUnassignedFirst', checked)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-white">Highlight Unassigned</Label>
-              <p className="text-sm text-gray-400">
-                Visually highlight customers who need to be assigned
-              </p>
-            </div>
-            <Switch
-              checked={settings.highlightUnassigned}
-              onCheckedChange={(checked) => updateSetting('highlightUnassigned', checked)}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      )}
     </div>
   );
 }
