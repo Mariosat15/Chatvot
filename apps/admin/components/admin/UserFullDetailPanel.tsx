@@ -45,6 +45,9 @@ import {
   Activity,
   Settings,
   BarChart3,
+  UserPlus,
+  ArrowUpDown,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,7 +63,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { UserData } from './UsersSection';
+import { UserData, Assignment } from './UsersSection';
+import { CustomerAssignmentCard } from './CustomerAssignmentBadge';
+import { CustomerAuditTrail } from './CustomerAuditTrail';
+import { TransferCustomerDialog } from './TransferCustomerDialog';
 
 interface UserFullDetailPanelProps {
   open: boolean;
@@ -208,7 +214,7 @@ const RESTRICTION_REASONS = [
   { value: 'other', label: 'Other' },
 ];
 
-type TabType = 'overview' | 'edit' | 'wallet' | 'kyc' | 'notes' | 'restrictions' | 'invoices' | 'activity';
+type TabType = 'overview' | 'edit' | 'wallet' | 'kyc' | 'notes' | 'restrictions' | 'invoices' | 'activity' | 'assignment' | 'audit';
 
 export default function UserFullDetailPanel({
   open,
@@ -304,6 +310,75 @@ export default function UserFullDetailPanel({
   const [verifyingPassword, setVerifyingPassword] = useState(false);
   const [pendingAction, setPendingAction] = useState<'credit' | 'edit' | 'delete' | null>(null);
 
+  // Assignment State
+  const [assignment, setAssignment] = useState<Assignment | null>(user.assignment || null);
+  const [loadingAssignment, setLoadingAssignment] = useState(false);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [assigningToSelf, setAssigningToSelf] = useState(false);
+
+  const fetchAssignment = useCallback(async () => {
+    if (!user.id) return;
+    
+    try {
+      setLoadingAssignment(true);
+      const response = await fetch(`/api/customer-assignments/${user.id}`);
+      const data = await response.json();
+      
+      if (data.success && data.assigned) {
+        setAssignment(data.assignment);
+      } else {
+        setAssignment(null);
+      }
+    } catch (error) {
+      console.error('Error fetching assignment:', error);
+    } finally {
+      setLoadingAssignment(false);
+    }
+  }, [user.id]);
+
+  const handleAssignToSelf = async () => {
+    try {
+      setAssigningToSelf(true);
+      const response = await fetch('/api/customer-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId: user.id }),
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Customer assigned to you');
+        fetchAssignment();
+        onRefresh?.();
+      } else {
+        toast.error(data.error || 'Failed to assign customer');
+      }
+    } catch (error) {
+      toast.error('Failed to assign customer');
+    } finally {
+      setAssigningToSelf(false);
+    }
+  };
+
+  const handleUnassign = async () => {
+    try {
+      const response = await fetch(`/api/customer-assignments/${user.id}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Customer unassigned');
+        setAssignment(null);
+        onRefresh?.();
+      } else {
+        toast.error(data.error || 'Failed to unassign customer');
+      }
+    } catch (error) {
+      toast.error('Failed to unassign customer');
+    }
+  };
+
   const fetchUserData = useCallback(async () => {
     if (!user.id) return;
     
@@ -391,6 +466,7 @@ export default function UserFullDetailPanel({
   useEffect(() => {
     if (open && user.id) {
       fetchUserData();
+      fetchAssignment();
       // Reset edit form
       setEditName(user.name);
       setEditEmail(user.email);
@@ -401,7 +477,7 @@ export default function UserFullDetailPanel({
       setEditPostalCode(user.postalCode || '');
       setEditPhone(user.phone || '');
     }
-  }, [open, user, fetchUserData]);
+  }, [open, user, fetchUserData, fetchAssignment]);
 
   // Fetch history when tab is selected (lazy loading)
   useEffect(() => {
@@ -839,9 +915,11 @@ export default function UserFullDetailPanel({
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'edit', label: 'Edit User', icon: Edit },
+    { id: 'assignment', label: assignment ? 'Assigned' : 'Unassigned', icon: UserPlus },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
     { id: 'kyc', label: 'KYC', icon: Shield },
     { id: 'history', label: `History (${history.length})`, icon: History },
+    { id: 'audit', label: 'Audit Trail', icon: ClipboardList },
     { id: 'notes', label: `Notes (${notes.length})`, icon: MessageSquare },
     { id: 'restrictions', label: 'Restrictions', icon: Ban },
     { id: 'invoices', label: `Invoices (${invoices.length})`, icon: FileText },
@@ -2160,11 +2238,113 @@ export default function UserFullDetailPanel({
                     </Card>
                   </div>
                 )}
+
+                {/* Assignment Tab */}
+                {activeTab === 'assignment' && (
+                  <div className="space-y-6">
+                    <Card className="bg-gray-800/50 border-gray-700">
+                      <CardHeader>
+                        <CardTitle className="text-white text-lg flex items-center gap-2">
+                          <UserPlus className="h-5 w-5 text-blue-400" />
+                          Customer Assignment
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {loadingAssignment ? (
+                          <div className="flex items-center justify-center py-8">
+                            <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                          </div>
+                        ) : (
+                          <>
+                            <CustomerAssignmentCard
+                              assignment={assignment}
+                              onTransfer={() => setShowTransferDialog(true)}
+                              onUnassign={handleUnassign}
+                              canManage={true}
+                            />
+                            
+                            {!assignment && (
+                              <div className="mt-4">
+                                <Button
+                                  onClick={handleAssignToSelf}
+                                  disabled={assigningToSelf}
+                                  className="bg-blue-600 hover:bg-blue-700"
+                                >
+                                  {assigningToSelf ? (
+                                    <>
+                                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                      Assigning...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserPlus className="h-4 w-4 mr-2" />
+                                      Assign to Me
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Assignment History */}
+                    {assignment?.assignedAt && (
+                      <Card className="bg-gray-800/50 border-gray-700">
+                        <CardHeader>
+                          <CardTitle className="text-white text-lg flex items-center gap-2">
+                            <ArrowUpDown className="h-5 w-5 text-purple-400" />
+                            Assignment History
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3 bg-gray-900/50 p-3 rounded-lg">
+                              <div className="w-2 h-2 bg-green-400 rounded-full" />
+                              <div>
+                                <p className="text-sm text-white">
+                                  Assigned to <span className="font-medium">{assignment.employeeName}</span>
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(assignment.assignedAt).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
+
+                {/* Audit Trail Tab */}
+                {activeTab === 'audit' && (
+                  <CustomerAuditTrail
+                    customerId={user.id}
+                    customerEmail={user.email}
+                    customerName={user.name}
+                  />
+                )}
               </>
             )}
           </div>
         </div>
       </div>
+
+      {/* Transfer Customer Dialog */}
+      <TransferCustomerDialog
+        open={showTransferDialog}
+        onOpenChange={setShowTransferDialog}
+        customerId={user.id}
+        customerName={user.name}
+        customerEmail={user.email}
+        currentAssignment={assignment}
+        onTransferComplete={() => {
+          fetchAssignment();
+          onRefresh?.();
+        }}
+      />
 
       {/* Password Verification Dialog */}
       {passwordDialogOpen && (

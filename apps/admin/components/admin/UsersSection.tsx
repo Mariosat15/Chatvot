@@ -25,9 +25,13 @@ import {
   Trophy,
   Swords,
   Download,
+  UserCheck,
+  UserPlus,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import UserFullDetailPanel from './UserFullDetailPanel';
+import { CustomerAssignmentBadge } from './CustomerAssignmentBadge';
 import {
   Select,
   SelectContent,
@@ -45,6 +49,14 @@ const USER_ROLES = [
 ] as const;
 
 type UserRole = typeof USER_ROLES[number]['value'];
+
+export interface Assignment {
+  employeeId: string;
+  employeeName: string;
+  employeeEmail: string;
+  employeeRole: string;
+  assignedAt: string;
+}
 
 export interface UserData {
   id: string;
@@ -83,6 +95,8 @@ export interface UserData {
     totalSpent: number;
     items: string[];
   };
+  // Assignment info
+  assignment?: Assignment | null;
   // Optional fields that may be present
   country?: string;
   city?: string;
@@ -110,6 +124,11 @@ export default function UsersSection() {
   // Filters
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [emailVerifiedFilter, setEmailVerifiedFilter] = useState<string>('all');
+  const [assignmentFilter, setAssignmentFilter] = useState<string>('all');
+  
+  // Assignments data
+  const [assignments, setAssignments] = useState<Map<string, Assignment>>(new Map());
+  const [employees, setEmployees] = useState<{ _id: string; name: string; email: string }[]>([]);
   
   // Detail panel state
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
@@ -117,6 +136,8 @@ export default function UsersSection() {
 
   useEffect(() => {
     fetchUsers();
+    fetchAssignments();
+    fetchEmployees();
   }, []);
 
   const fetchUsers = async () => {
@@ -138,9 +159,51 @@ export default function UsersSection() {
     }
   };
 
+  const fetchAssignments = async () => {
+    try {
+      const response = await fetch('/api/customer-assignments?limit=10000');
+      if (response.ok) {
+        const data = await response.json();
+        const assignmentMap = new Map<string, Assignment>();
+        (data.assignments || []).forEach((a: any) => {
+          assignmentMap.set(a.customerId, {
+            employeeId: a.employeeId,
+            employeeName: a.employeeName,
+            employeeEmail: a.employeeEmail,
+            employeeRole: a.employeeRole,
+            assignedAt: a.assignedAt,
+          });
+        });
+        setAssignments(assignmentMap);
+      }
+    } catch (error) {
+      console.error('Error fetching assignments:', error);
+    }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const response = await fetch('/api/employees');
+      if (response.ok) {
+        const data = await response.json();
+        setEmployees(data.employees || []);
+      }
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+    }
+  };
+
+  // Enrich users with assignment data
+  const enrichedUsers = useMemo(() => {
+    return users.map(user => ({
+      ...user,
+      assignment: assignments.get(user.id) || null,
+    }));
+  }, [users, assignments]);
+
   // Filter and sort users
   const filteredAndSortedUsers = useMemo(() => {
-    let result = [...users];
+    let result = [...enrichedUsers];
     
     // Apply search filter
     if (searchQuery.trim()) {
@@ -149,7 +212,8 @@ export default function UsersSection() {
         (user) =>
           user.name.toLowerCase().includes(query) ||
           user.email.toLowerCase().includes(query) ||
-          user.id.toLowerCase().includes(query)
+          user.id.toLowerCase().includes(query) ||
+          user.assignment?.employeeName?.toLowerCase().includes(query)
       );
     }
     
@@ -163,6 +227,18 @@ export default function UsersSection() {
       result = result.filter((user) => 
         emailVerifiedFilter === 'verified' ? user.emailVerified : !user.emailVerified
       );
+    }
+    
+    // Apply assignment filter
+    if (assignmentFilter !== 'all') {
+      if (assignmentFilter === 'assigned') {
+        result = result.filter((user) => user.assignment !== null);
+      } else if (assignmentFilter === 'unassigned') {
+        result = result.filter((user) => user.assignment === null);
+      } else {
+        // Filter by specific employee ID
+        result = result.filter((user) => user.assignment?.employeeId === assignmentFilter);
+      }
     }
     
     // Apply sorting
@@ -194,8 +270,15 @@ export default function UsersSection() {
       return sortDirection === 'asc' ? comparison : -comparison;
     });
     
+    // Sort unassigned first if enabled (can be controlled by settings)
+    result.sort((a, b) => {
+      if (!a.assignment && b.assignment) return -1;
+      if (a.assignment && !b.assignment) return 1;
+      return 0;
+    });
+    
     return result;
-  }, [users, searchQuery, roleFilter, emailVerifiedFilter, sortField, sortDirection]);
+  }, [enrichedUsers, searchQuery, roleFilter, emailVerifiedFilter, assignmentFilter, sortField, sortDirection]);
 
   // Paginated users
   const paginatedUsers = useMemo(() => {
@@ -244,7 +327,9 @@ export default function UsersSection() {
     totalTraders: users.filter(u => u.role === 'trader').length,
     verifiedEmails: users.filter(u => u.emailVerified).length,
     totalBalance: users.reduce((sum, u) => sum + u.wallet.balance, 0),
-  }), [users]);
+    assignedUsers: assignments.size,
+    unassignedUsers: users.length - assignments.size,
+  }), [users, assignments]);
 
   return (
     <div className="h-full flex flex-col">
@@ -262,7 +347,7 @@ export default function UsersSection() {
               <div>
                 <h2 className="text-2xl font-bold text-white">User Management</h2>
                 <p className="text-cyan-100 text-sm">
-                  {stats.totalUsers} users • {stats.verifiedEmails} verified • ${stats.totalBalance.toLocaleString()} total balance
+                  {stats.totalUsers} users • {stats.verifiedEmails} verified • {stats.assignedUsers} assigned • {stats.unassignedUsers} unassigned
                 </p>
               </div>
             </div>
@@ -335,6 +420,41 @@ export default function UsersSection() {
             </SelectContent>
           </Select>
           
+          {/* Assignment Filter */}
+          <Select value={assignmentFilter} onValueChange={(v) => { setAssignmentFilter(v); setCurrentPage(1); }}>
+            <SelectTrigger className="w-[180px] bg-gray-900 border-gray-700">
+              <UserCheck className="h-4 w-4 mr-2 text-gray-400" />
+              <SelectValue placeholder="Assignment" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Assignments</SelectItem>
+              <SelectItem value="assigned">
+                <span className="flex items-center gap-2">
+                  <UserCheck className="h-3 w-3 text-green-400" />
+                  Assigned
+                </span>
+              </SelectItem>
+              <SelectItem value="unassigned">
+                <span className="flex items-center gap-2">
+                  <AlertTriangle className="h-3 w-3 text-yellow-400" />
+                  Unassigned
+                </span>
+              </SelectItem>
+              {employees.length > 0 && (
+                <>
+                  <div className="px-2 py-1.5 text-xs text-gray-500 font-semibold uppercase">
+                    By Employee
+                  </div>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp._id} value={emp._id}>
+                      {emp.name}
+                    </SelectItem>
+                  ))}
+                </>
+              )}
+            </SelectContent>
+          </Select>
+          
           {/* Page Size */}
           <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
             <SelectTrigger className="w-[100px] bg-gray-900 border-gray-700">
@@ -389,6 +509,9 @@ export default function UsersSection() {
                   </th>
                   <th className="text-center p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     <SortableHeader field="challenges">Chal.</SortableHeader>
+                  </th>
+                  <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    Assigned To
                   </th>
                   <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     <SortableHeader field="createdAt">Joined</SortableHeader>
@@ -493,6 +616,14 @@ export default function UsersSection() {
                             ({user.challenges?.won || 0}W/{user.challenges?.lost || 0}L)
                           </span>
                         </div>
+                      </td>
+                      
+                      {/* Assignment */}
+                      <td className="p-4">
+                        <CustomerAssignmentBadge 
+                          assignment={user.assignment} 
+                          compact={true}
+                        />
                       </td>
                       
                       {/* Joined Date */}
@@ -605,7 +736,10 @@ export default function UsersSection() {
           open={detailPanelOpen}
           onOpenChange={setDetailPanelOpen}
           user={selectedUser}
-          onRefresh={fetchUsers}
+          onRefresh={() => {
+            fetchUsers();
+            fetchAssignments();
+          }}
         />
       )}
     </div>

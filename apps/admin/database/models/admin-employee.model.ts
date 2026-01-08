@@ -18,6 +18,7 @@ export const ADMIN_SECTIONS = [
   // User Management
   'users',
   'badges',
+  'customer-assignment',
   // Finance
   'financial',
   'payments',

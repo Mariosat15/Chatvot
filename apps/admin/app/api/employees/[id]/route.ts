@@ -6,6 +6,7 @@ import { verifyAdminAuth } from '@/lib/admin/auth';
 import { ADMIN_SECTIONS, type AdminSection } from '@/database/models/admin-employee.model';
 import { auditLogService } from '@/lib/services/audit-log.service';
 import { adminEventsService } from '@/lib/services/admin-events.service';
+import { customerAssignmentService } from '@/lib/services/customer-assignment.service';
 
 // Check if an admin is the original/super admin
 async function isOriginalAdmin(admin: any): Promise<boolean> {
@@ -199,6 +200,7 @@ export async function DELETE(
 
     const deletedName = employee.name;
     const deletedEmail = employee.email;
+    const deletedRole = employee.role || 'Employee';
     
     // Force logout before deletion (in case there's any caching)
     await Admin.updateOne(
@@ -208,6 +210,24 @@ export async function DELETE(
     
     // Small delay to ensure the force logout is propagated
     await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Reassign all customers assigned to this employee
+    const performedBy = {
+      employeeId: auth.adminId!,
+      employeeName: auth.name || 'Admin',
+      employeeEmail: auth.email!,
+      employeeRole: auth.isSuperAdmin ? 'Super Admin' : 'Admin',
+      isSuperAdmin: auth.isSuperAdmin,
+    };
+    
+    const reassignResult = await customerAssignmentService.reassignEmployeeCustomers(
+      id,
+      deletedName,
+      deletedEmail,
+      performedBy
+    );
+    
+    console.log(`🔄 Customer reassignment result for ${deletedEmail}: ${reassignResult.reassigned} reassigned, ${reassignResult.failed} failed/unassigned`);
     
     // Now delete the employee
     await Admin.findByIdAndDelete(id);
@@ -225,10 +245,17 @@ export async function DELETE(
     adminEventsService.employeeDeleted(id, { id: auth.adminId!, email: auth.email! });
 
     console.log(`✅ Employee deleted: ${deletedEmail} (was force logged out first)`);
+    
+    // Include reassignment info in response
+    const message = reassignResult.reassigned > 0 
+      ? `Employee deleted successfully. ${reassignResult.reassigned} customers reassigned.`
+      : 'Employee deleted successfully.';
 
     return NextResponse.json({
       success: true,
-      message: 'Employee deleted successfully',
+      message,
+      customersReassigned: reassignResult.reassigned,
+      customersUnassigned: reassignResult.failed,
     });
   } catch (error) {
     console.error('Error deleting employee:', error);

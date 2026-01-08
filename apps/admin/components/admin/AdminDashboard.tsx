@@ -56,6 +56,7 @@ import {
   Sparkles,
   Crown,
   Wifi,
+  UserPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -97,6 +98,7 @@ import DependencyUpdatesSection from '@/components/admin/DependencyUpdatesSectio
 import AdminOverviewDashboard from '@/components/admin/AdminOverviewDashboard';
 import AIAgentSection from '@/components/admin/AIAgentSection';
 import EmployeesSection from '@/components/admin/EmployeesSection';
+import CustomerAssignmentSettings from '@/components/admin/CustomerAssignmentSettings';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -236,6 +238,13 @@ const menuGroups: MenuGroup[] = [
         icon: <Award className="h-5 w-5" />,
         color: 'text-pink-400',
         bgColor: 'bg-pink-500/10 hover:bg-pink-500/20',
+      },
+      {
+        id: 'customer-assignment',
+        label: 'Customer Assignment',
+        icon: <UserPlus className="h-5 w-5" />,
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-500/10 hover:bg-blue-500/20',
       },
     ],
   },
@@ -714,6 +723,8 @@ export default function AdminDashboard({
         return <AIAgentSection key={currentRefreshKey} />;
       case 'employees':
         return <EmployeesSection key={currentRefreshKey} />;
+      case 'customer-assignment':
+        return <CustomerAssignmentSettings key={currentRefreshKey} />;
       default:
         return <CompetitionsListSection key={currentRefreshKey} />;
     }
