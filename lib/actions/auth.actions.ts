@@ -128,6 +128,32 @@ export const signUpWithEmail = async ({
                 console.error('⚠️ Failed to send welcome email:', emailError);
                 // Don't fail registration if email fails
             }
+            
+            // Auto-assign customer to employee (if enabled)
+            try {
+                const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+                const autoAssignResponse = await fetch(`${baseUrl}/api/customer-assignment/auto-assign`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId,
+                        userEmail: email,
+                        userName: fullName,
+                    }),
+                });
+                
+                if (autoAssignResponse.ok) {
+                    const result = await autoAssignResponse.json();
+                    if (result.assigned) {
+                        console.log(`✅ Customer auto-assigned to ${result.employee?.name}`);
+                    } else {
+                        console.log(`📋 Customer not auto-assigned: ${result.reason}`);
+                    }
+                }
+            } catch (autoAssignError) {
+                console.error('⚠️ Failed to auto-assign customer:', autoAssignError);
+                // Don't fail registration if auto-assign fails
+            }
         }
 
         return { success: true, data: response }
