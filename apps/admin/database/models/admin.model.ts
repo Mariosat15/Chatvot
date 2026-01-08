@@ -23,6 +23,16 @@ export interface AdminDocument extends Document {
   lockedOutReason?: string;
   // Temporary password tracking
   tempPasswordExpiresAt?: Date;
+  passwordChangedAt?: Date;
+  mustChangePassword?: boolean;
+  // Profile fields
+  avatar?: string;
+  phone?: string;
+  timezone?: string;
+  language?: string;
+  bio?: string;
+  department?: string;
+  title?: string;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -106,6 +116,43 @@ const AdminSchema = new Schema<AdminDocument>(
     // Temporary password expiry (for auto-generated passwords)
     tempPasswordExpiresAt: {
       type: Date,
+      default: undefined,
+    },
+    passwordChangedAt: {
+      type: Date,
+      default: undefined,
+    },
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
+    // Profile fields
+    avatar: {
+      type: String,
+      default: undefined,
+    },
+    phone: {
+      type: String,
+      default: undefined,
+    },
+    timezone: {
+      type: String,
+      default: 'UTC',
+    },
+    language: {
+      type: String,
+      default: 'en',
+    },
+    bio: {
+      type: String,
+      default: undefined,
+    },
+    department: {
+      type: String,
+      default: undefined,
+    },
+    title: {
+      type: String,
       default: undefined,
     },
   },

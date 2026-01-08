@@ -118,6 +118,7 @@ export async function POST(request: Request) {
     const customerAssignmentsCollection = mongoose.connection.collection('customer_assignments');
     const customerAuditTrailsCollection = mongoose.connection.collection('customer_audit_trail');
     const assignmentSettingsCollection = mongoose.connection.collection('assignment_settings');
+    const employeeNotificationsCollection = mongoose.connection.collection('employee_notifications');
     
     // Get all existing user IDs
     const existingUsers = await userCollection.find({}, { projection: { _id: 1 } }).toArray();
@@ -325,6 +326,10 @@ export async function POST(request: Request) {
     // Reset assignment settings to defaults
     await assignmentSettingsCollection.deleteMany({});
     console.log('✅ Reset assignment settings');
+
+    // Delete all employee notifications
+    const employeeNotificationsDeleted = await employeeNotificationsCollection.deleteMany({});
+    console.log(`✅ Deleted ${employeeNotificationsDeleted.deletedCount} employee notifications`);
 
     // Delete orphan credit wallets (where user no longer exists)
     if (orphanWalletIds.length > 0) {

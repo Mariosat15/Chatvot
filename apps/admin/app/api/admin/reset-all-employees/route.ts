@@ -117,7 +117,19 @@ export async function POST(request: NextRequest) {
       results['customerAuditTrails'] = 0;
     }
     
-    // 7. Reset assignment settings to defaults
+    // 7. Delete all employee notifications (collection name: employee_notifications)
+    try {
+      const employeeNotificationsCollection = db.collection('employee_notifications');
+      const notificationsResult = await employeeNotificationsCollection.deleteMany({});
+      results['employeeNotifications'] = notificationsResult.deletedCount;
+      if (notificationsResult.deletedCount > 0) {
+        console.log(`   ✅ Deleted ${notificationsResult.deletedCount} employee notifications`);
+      }
+    } catch (e) {
+      results['employeeNotifications'] = 0;
+    }
+    
+    // 8. Reset assignment settings to defaults
     try {
       const assignmentSettingsCollection = db.collection('assignment_settings');
       await assignmentSettingsCollection.deleteMany({});

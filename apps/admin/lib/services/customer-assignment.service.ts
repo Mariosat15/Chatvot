@@ -5,6 +5,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import { Admin } from '@/database/models/admin.model';
 import { getTransporter } from '@/lib/nodemailer';
 import { getSettings } from '@/lib/services/settings.service';
+import { employeeNotificationService } from './employee-notification.service';
 
 export interface AssignCustomerParams {
   customerId: string;
@@ -155,6 +156,21 @@ class CustomerAssignmentService {
       params.employeeName
     );
     
+    // Create in-app notification for employee
+    await employeeNotificationService.notifyCustomerAssigned(
+      {
+        employeeId: params.employeeId,
+        employeeName: params.employeeName,
+        employeeEmail: params.employeeEmail,
+      },
+      {
+        customerId: params.customerId,
+        customerName: params.customerName,
+        customerEmail: params.customerEmail,
+      },
+      params.assignedBy.employeeEmail || 'System'
+    );
+    
     return assignment;
   }
   
@@ -231,6 +247,47 @@ class CustomerAssignmentService {
     
     console.log(`🔄 [Transfer] Customer ${currentAssignment.customerEmail} transferred from ${previousEmployee.employeeEmail} to ${toEmployee.email}`);
     
+    // Send in-app notifications
+    const customerInfo = {
+      customerId: params.customerId,
+      customerName: currentAssignment.customerName,
+      customerEmail: currentAssignment.customerEmail,
+    };
+    
+    // Notify the new employee (receiving the customer)
+    await employeeNotificationService.notifyCustomerTransferredIn(
+      {
+        employeeId: toEmployee._id.toString(),
+        employeeName: toEmployee.name,
+        employeeEmail: toEmployee.email,
+      },
+      customerInfo,
+      {
+        employeeId: previousEmployee.employeeId.toString(),
+        employeeName: previousEmployee.employeeName,
+        employeeEmail: previousEmployee.employeeEmail,
+      },
+      params.performedBy.employeeEmail || 'System',
+      params.reason
+    );
+    
+    // Notify the old employee (losing the customer)
+    await employeeNotificationService.notifyCustomerTransferredOut(
+      {
+        employeeId: previousEmployee.employeeId.toString(),
+        employeeName: previousEmployee.employeeName,
+        employeeEmail: previousEmployee.employeeEmail,
+      },
+      customerInfo,
+      {
+        employeeId: toEmployee._id.toString(),
+        employeeName: toEmployee.name,
+        employeeEmail: toEmployee.email,
+      },
+      params.performedBy.employeeEmail || 'System',
+      params.reason
+    );
+    
     return currentAssignment;
   }
   
@@ -269,6 +326,22 @@ class CustomerAssignmentService {
     );
     
     console.log(`❌ [Unassign] Customer ${assignment.customerEmail} unassigned from ${previousEmployee.email}`);
+    
+    // Send in-app notification to the employee
+    await employeeNotificationService.notifyCustomerUnassigned(
+      {
+        employeeId: previousEmployee.id.toString(),
+        employeeName: previousEmployee.name,
+        employeeEmail: previousEmployee.email,
+      },
+      {
+        customerId,
+        customerName: assignment.customerName,
+        customerEmail: assignment.customerEmail,
+      },
+      performedBy.employeeEmail || 'System',
+      reason
+    );
   }
   
   /**

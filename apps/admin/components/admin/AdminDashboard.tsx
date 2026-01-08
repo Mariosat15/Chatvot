@@ -57,6 +57,7 @@ import {
   Crown,
   Wifi,
   UserPlus,
+  UserCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -99,6 +100,7 @@ import AdminOverviewDashboard from '@/components/admin/AdminOverviewDashboard';
 import AIAgentSection from '@/components/admin/AIAgentSection';
 import EmployeesSection from '@/components/admin/EmployeesSection';
 import CustomerAssignmentSettings from '@/components/admin/CustomerAssignmentSettings';
+import EmployeeProfileSection from '@/components/admin/EmployeeProfileSection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -423,6 +425,22 @@ const menuGroups: MenuGroup[] = [
       },
     ],
   },
+  // My Account (for employees only, not super admin)
+  {
+    id: 'my-account',
+    label: 'My Account',
+    icon: <UserCircle className="h-4 w-4" />,
+    color: 'text-indigo-400',
+    items: [
+      {
+        id: 'profile',
+        label: 'My Profile',
+        icon: <UserCircle className="h-5 w-5" />,
+        color: 'text-indigo-400',
+        bgColor: 'bg-indigo-500/10 hover:bg-indigo-500/20',
+      },
+    ],
+  },
 ];
 
 // Flat menuItems for backward compatibility
@@ -441,6 +459,8 @@ export default function AdminDashboard({
   // Check if user has access to a section
   const hasAccessToSection = (sectionId: string): boolean => {
     if (isSuperAdmin) return true;
+    // Profile is always accessible for non-super-admin employees
+    if (sectionId === 'profile' && !isSuperAdmin) return true;
     return allowedSections.includes(sectionId);
   };
 
@@ -498,28 +518,40 @@ export default function AdminDashboard({
   const hasAccess = hasAccessToSection;
 
   // Filter menu groups based on allowed sections
-  const filteredMenuGroups = menuGroups.map(group => ({
-    ...group,
-    items: group.items
-      .filter(item => {
-        // If item has children, check if any child is accessible
-        if (item.children) {
-          return item.children.some(child => hasAccess(child.id));
-        }
-        // Otherwise check if the item itself is accessible
-        return hasAccess(item.id);
-      })
-      .map(item => {
-        // Filter children if they exist
-        if (item.children) {
-          return {
-            ...item,
-            children: item.children.filter(child => hasAccess(child.id)),
-          };
-        }
-        return item;
-      }),
-  })).filter(group => group.items.length > 0);
+  const filteredMenuGroups = menuGroups
+    .filter(group => {
+      // My Account section: show for employees only, not super admin
+      if (group.id === 'my-account') {
+        return !isSuperAdmin;
+      }
+      return true;
+    })
+    .map(group => ({
+      ...group,
+      items: group.items
+        .filter(item => {
+          // Profile is always accessible for non-super-admin employees
+          if (item.id === 'profile') {
+            return !isSuperAdmin;
+          }
+          // If item has children, check if any child is accessible
+          if (item.children) {
+            return item.children.some(child => hasAccess(child.id));
+          }
+          // Otherwise check if the item itself is accessible
+          return hasAccess(item.id);
+        })
+        .map(item => {
+          // Filter children if they exist
+          if (item.children) {
+            return {
+              ...item,
+              children: item.children.filter(child => hasAccess(child.id)),
+            };
+          }
+          return item;
+        }),
+    })).filter(group => group.items.length > 0);
 
   // Live server clock
   useEffect(() => {
@@ -728,6 +760,8 @@ export default function AdminDashboard({
         return <EmployeesSection key={currentRefreshKey} />;
       case 'customer-assignment':
         return <CustomerAssignmentSettings key={currentRefreshKey} />;
+      case 'profile':
+        return <EmployeeProfileSection key={currentRefreshKey} />;
       default:
         return <CompetitionsListSection key={currentRefreshKey} />;
     }
