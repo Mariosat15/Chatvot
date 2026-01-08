@@ -28,6 +28,7 @@ import {
   Settings,
   Bell,
   Sparkles,
+  MessageCircle,
 } from 'lucide-react';
 
 interface SidebarUser {
@@ -85,6 +86,13 @@ const mainNavItems: NavItem[] = [
     icon: <Medal className="h-5 w-5" />,
     color: 'text-emerald-400',
     gradient: 'from-emerald-500/20 to-emerald-600/5',
+  },
+  {
+    href: '/messaging',
+    label: 'Messages',
+    icon: <MessageCircle className="h-5 w-5" />,
+    color: 'text-pink-400',
+    gradient: 'from-pink-500/20 to-pink-600/5',
   },
 ];
 

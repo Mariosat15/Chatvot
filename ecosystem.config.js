@@ -111,6 +111,29 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       kill_timeout: 5000,
     },
+
+    // ============================================
+    // WEBSOCKET SERVER (Real-time Messaging)
+    // Handles WebSocket connections for chat
+    // ============================================
+    {
+      name: 'chartvolt-websocket',
+      script: 'websocket-server/dist/index.js',
+      cwd: __dirname,
+      env: {
+        NODE_ENV: 'production',
+        WEBSOCKET_PORT: 3003,
+      },
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '256M',
+      error_file: './logs/websocket-error.log',
+      out_file: './logs/websocket-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      kill_timeout: 10000, // Longer timeout to close connections gracefully
+    },
   ],
 
   // ============================================
@@ -131,6 +154,7 @@ module.exports = {
         npm install &&
         cd apps/admin && npm install && cd ../.. &&
         cd api-server && npm install && cd .. &&
+        cd websocket-server && npm install && npm run build && cd .. &&
         npm run build &&
         npm run build:admin &&
         npm run build:api &&

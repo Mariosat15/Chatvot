@@ -58,6 +58,8 @@ import {
   Wifi,
   UserPlus,
   UserCircle,
+  MessageCircle,
+  Headphones,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -101,6 +103,8 @@ import AIAgentSection from '@/components/admin/AIAgentSection';
 import EmployeesSection from '@/components/admin/EmployeesSection';
 import CustomerAssignmentSettings from '@/components/admin/CustomerAssignmentSettings';
 import EmployeeProfileSection from '@/components/admin/EmployeeProfileSection';
+import MessagingSection from '@/components/admin/MessagingSection';
+import MessagingSettingsSection from '@/components/admin/MessagingSettingsSection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -337,6 +341,29 @@ const menuGroups: MenuGroup[] = [
         icon: <BookOpen className="h-5 w-5" />,
         color: 'text-indigo-400',
         bgColor: 'bg-indigo-500/10 hover:bg-indigo-500/20',
+      },
+    ],
+  },
+  // Messaging
+  {
+    id: 'messaging-group',
+    label: 'Messaging',
+    icon: <MessageCircle className="h-4 w-4" />,
+    color: 'text-pink-400',
+    items: [
+      {
+        id: 'messaging',
+        label: 'Support Center',
+        icon: <Headphones className="h-5 w-5" />,
+        color: 'text-pink-400',
+        bgColor: 'bg-pink-500/10 hover:bg-pink-500/20',
+      },
+      {
+        id: 'messaging-settings',
+        label: 'Messaging Settings',
+        icon: <MessageCircle className="h-5 w-5" />,
+        color: 'text-pink-400',
+        bgColor: 'bg-pink-500/10 hover:bg-pink-500/20',
       },
     ],
   },
@@ -762,6 +789,10 @@ export default function AdminDashboard({
         return <CustomerAssignmentSettings key={currentRefreshKey} />;
       case 'profile':
         return <EmployeeProfileSection key={currentRefreshKey} />;
+      case 'messaging':
+        return <MessagingSection key={currentRefreshKey} />;
+      case 'messaging-settings':
+        return <MessagingSettingsSection key={currentRefreshKey} />;
       default:
         return <CompetitionsListSection key={currentRefreshKey} />;
     }
