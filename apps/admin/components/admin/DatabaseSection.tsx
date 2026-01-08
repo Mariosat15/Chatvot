@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Search, RefreshCw, Trophy, Trash2, AlertTriangle, Shield, Download, UserX } from 'lucide-react';
+import { Search, RefreshCw, Trophy, Trash2, AlertTriangle, Shield, Download, UserX, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function DatabaseSection() {
@@ -28,6 +28,13 @@ export default function DatabaseSection() {
   const [resetConfirmation, setResetConfirmation] = useState('');
   const [resetUsersConfirmation, setResetUsersConfirmation] = useState('');
   const [resettingUsers, setResettingUsers] = useState(false);
+  // Employees reset state
+  const [showEmployeesPasswordDialog, setShowEmployeesPasswordDialog] = useState(false);
+  const [showResetEmployeesDialog, setShowResetEmployeesDialog] = useState(false);
+  const [employeesAdminPassword, setEmployeesAdminPassword] = useState('');
+  const [verifyingEmployeesPassword, setVerifyingEmployeesPassword] = useState(false);
+  const [resetEmployeesConfirmation, setResetEmployeesConfirmation] = useState('');
+  const [resettingEmployees, setResettingEmployees] = useState(false);
 
   const handleCheckDatabase = async () => {
     setChecking(true);
@@ -268,6 +275,74 @@ export default function DatabaseSection() {
     }
   };
 
+  const handleVerifyEmployeesPassword = async () => {
+    if (!employeesAdminPassword) {
+      toast.error('Please enter admin password');
+      return;
+    }
+
+    setVerifyingEmployeesPassword(true);
+    try {
+      const response = await fetch('/api/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: employeesAdminPassword }),
+      });
+
+      if (response.ok) {
+        toast.success('Password verified');
+        setShowEmployeesPasswordDialog(false);
+        setEmployeesAdminPassword('');
+        setShowResetEmployeesDialog(true);
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Invalid admin password');
+      }
+    } catch (error) {
+      console.error('Error verifying password:', error);
+      toast.error('Error verifying password');
+    } finally {
+      setVerifyingEmployeesPassword(false);
+    }
+  };
+
+  const handleResetEmployees = async () => {
+    if (resetEmployeesConfirmation !== 'DELETE_ALL_EMPLOYEES') {
+      toast.error('⚠️ You must type exactly: DELETE_ALL_EMPLOYEES');
+      return;
+    }
+
+    setResettingEmployees(true);
+    try {
+      toast.loading('🚨 Deleting all employees and their activity...', { id: 'reset-employees' });
+      
+      const response = await fetch('/api/admin/reset-all-employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation: 'DELETE_ALL_EMPLOYEES' }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(
+          `✅ ALL EMPLOYEES DELETED!\n\n${data.message}`,
+          { id: 'reset-employees', duration: 8000 }
+        );
+        setShowResetEmployeesDialog(false);
+        setResetEmployeesConfirmation('');
+        router.refresh();
+      } else {
+        toast.error(`Failed: ${data.error || data.message}`, { id: 'reset-employees' });
+      }
+    } catch (error) {
+      toast.error('Reset failed. Check console for details.', { id: 'reset-employees' });
+      console.error('Reset employees error:', error);
+    } finally {
+      setResettingEmployees(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Database Diagnostics */}
@@ -342,15 +417,19 @@ export default function DatabaseSection() {
         </div>
         <div className="p-6">
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4">
-            <p className="text-red-300 text-sm font-semibold mb-2">⚠️ Warning - Two Reset Options:</p>
+            <p className="text-red-300 text-sm font-semibold mb-2">⚠️ Warning - Three Reset Options:</p>
             <div className="text-gray-300 text-sm space-y-3">
               <div>
                 <span className="text-red-400 font-semibold">Reset All Data (Red):</span> Deletes ALL trading data, financial records, fraud data, 
-                notifications, sessions, worker jobs, security logs. Keeps user accounts.
+                notifications, sessions, customer assignments, audit trails. Keeps user accounts & employees.
               </div>
               <div>
                 <span className="text-orange-400 font-semibold">Reset All Users (Orange):</span> Deletes ONLY user accounts, 
-                login credentials, wallets, lockouts, online status, and restrictions. Keeps trading data.
+                login credentials, wallets, lockouts, online status, and restrictions. Keeps employees.
+              </div>
+              <div>
+                <span className="text-purple-400 font-semibold">Reset All Employees (Purple):</span> Deletes ALL employee accounts (except super admin), 
+                role templates, customer assignments, employee audit logs, and all employee-related activity.
               </div>
             </div>
           </div>
@@ -369,6 +448,14 @@ export default function DatabaseSection() {
           >
             <UserX className="h-5 w-5 mr-2" />
             Reset All Users
+          </Button>
+
+          <Button
+            onClick={() => setShowEmployeesPasswordDialog(true)}
+            className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white h-14 text-lg font-bold mt-4"
+          >
+            <Users className="h-5 w-5 mr-2" />
+            Reset All Employees
           </Button>
 
           <div className="space-y-3 mt-4">
@@ -674,6 +761,16 @@ export default function DatabaseSection() {
               </div>
             </div>
 
+            {/* Customer Assignments */}
+            <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3">
+              <p className="text-cyan-400 font-semibold text-sm mb-2">🔗 Customer Assignments</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All customer assignments</span>
+                <span>❌ All customer audit trails</span>
+                <span>❌ Assignment settings (reset)</span>
+              </div>
+            </div>
+
             {/* User Progress & Misc */}
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
               <p className="text-blue-400 font-semibold text-sm mb-2">📈 User Progress & Other</p>
@@ -718,6 +815,8 @@ export default function DatabaseSection() {
               <div className="grid grid-cols-2 gap-1 text-xs text-green-300">
                 <span>✅ User accounts</span>
                 <span>✅ Login credentials</span>
+                <span>✅ Employee accounts</span>
+                <span>✅ Role templates</span>
                 <span>✅ Admin settings</span>
                 <span>✅ Fee settings</span>
                 <span>✅ Payment providers</span>
@@ -903,6 +1002,196 @@ export default function DatabaseSection() {
                 <>
                   <UserX className="h-4 w-4 mr-2" />
                   Delete All Users
+                </>
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Employees Password Verification Dialog */}
+      <Dialog open={showEmployeesPasswordDialog} onOpenChange={setShowEmployeesPasswordDialog}>
+        <DialogContent className="bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-purple-700 text-gray-100">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-purple-500 flex items-center gap-2">
+              <Shield className="h-6 w-6" />
+              Admin Verification Required
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Enter your admin password to proceed with employee data reset
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-purple-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-purple-500">⚠️ CRITICAL ACTION</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    You are about to delete ALL employee accounts (except super admin) and their activity. This action requires admin authentication.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="employeesAdminPassword" className="text-gray-300">
+                Admin Password *
+              </Label>
+              <Input
+                id="employeesAdminPassword"
+                type="password"
+                placeholder="Enter admin password"
+                value={employeesAdminPassword}
+                onChange={(e) => setEmployeesAdminPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !verifyingEmployeesPassword) {
+                    handleVerifyEmployeesPassword();
+                  }
+                }}
+                className="bg-gray-900 border-gray-700 text-gray-100"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEmployeesPasswordDialog(false);
+                setEmployeesAdminPassword('');
+              }}
+              className="bg-gray-700 hover:bg-gray-600 text-gray-100 border-gray-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleVerifyEmployeesPassword}
+              disabled={verifyingEmployeesPassword || !employeesAdminPassword}
+              className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-bold"
+            >
+              {verifyingEmployeesPassword ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Verify & Continue
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Employees Confirmation Dialog */}
+      <AlertDialog open={showResetEmployeesDialog} onOpenChange={setShowResetEmployeesDialog}>
+        <AlertDialogContent className="bg-gray-900 border-2 border-purple-500 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-purple-500 flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6" />
+              ⚠️ DANGER: Reset ALL Employees
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-gray-400">
+              This action will permanently delete all employee accounts and their related data (except super admin).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="text-gray-300 space-y-4 px-2">
+            <p className="text-lg font-semibold">This will PERMANENTLY DELETE:</p>
+            
+            {/* Employee Accounts */}
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+              <p className="text-purple-400 font-semibold text-sm mb-2">👤 Employee Accounts</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All employee accounts</span>
+                <span>❌ All role templates (custom)</span>
+                <span>❌ Employee login credentials</span>
+                <span>❌ Employee sessions</span>
+              </div>
+            </div>
+
+            {/* Customer Assignment Data */}
+            <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3">
+              <p className="text-cyan-400 font-semibold text-sm mb-2">🔗 Customer Assignments</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All customer assignments</span>
+                <span>❌ All assignment history</span>
+                <span>❌ Assignment settings (reset)</span>
+              </div>
+            </div>
+
+            {/* Employee Activity Data */}
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+              <p className="text-blue-400 font-semibold text-sm mb-2">📋 Employee Activity</p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All customer audit trails</span>
+                <span>❌ Employee audit logs</span>
+                <span>❌ Employee last activity</span>
+                <span>❌ Employee online status</span>
+              </div>
+            </div>
+
+            {/* What's Preserved */}
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+              <p className="text-green-400 font-semibold text-sm mb-2">✅ KEEPS (will NOT delete):</p>
+              <div className="grid grid-cols-2 gap-1 text-xs text-green-300">
+                <span>✅ Super Admin account</span>
+                <span>✅ Default role templates</span>
+                <span>✅ User accounts</span>
+                <span>✅ Trading data</span>
+                <span>✅ Financial data</span>
+                <span>✅ Admin settings</span>
+              </div>
+            </div>
+
+            <p className="text-purple-400 font-bold text-center py-2 bg-purple-500/20 rounded-lg">
+              ⚠️ THIS CANNOT BE UNDONE!
+            </p>
+            
+            <div className="space-y-2">
+              <Label htmlFor="resetEmployeesConfirmation" className="text-white font-bold">
+                Type <span className="text-purple-400 font-mono">DELETE_ALL_EMPLOYEES</span> to confirm:
+              </Label>
+              <Input
+                id="resetEmployeesConfirmation"
+                value={resetEmployeesConfirmation}
+                onChange={(e) => setResetEmployeesConfirmation(e.target.value)}
+                placeholder="DELETE_ALL_EMPLOYEES"
+                className="bg-gray-800 border-purple-500 text-white font-mono"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              className="bg-gray-700 text-white hover:bg-gray-600"
+              onClick={() => {
+                setShowResetEmployeesDialog(false);
+                setResetEmployeesConfirmation('');
+              }}
+            >
+              Cancel (Safe)
+            </AlertDialogCancel>
+            <Button
+              onClick={handleResetEmployees}
+              disabled={resetEmployeesConfirmation !== 'DELETE_ALL_EMPLOYEES' || resettingEmployees}
+              className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {resettingEmployees ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Users className="h-4 w-4 mr-2" />
+                  Delete All Employees
                 </>
               )}
             </Button>

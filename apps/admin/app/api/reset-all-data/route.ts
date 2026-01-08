@@ -115,6 +115,9 @@ export async function POST(request: Request) {
     const alertsCollection = mongoose.connection.collection('alerts');
     const botExecutionsCollection = mongoose.connection.collection('botexecutions');
     const nuveiPaymentOptionsCollection = mongoose.connection.collection('nuveiuserpaymentoptions');
+    const customerAssignmentsCollection = mongoose.connection.collection('customerassignments');
+    const customerAuditTrailsCollection = mongoose.connection.collection('customeraudittrails');
+    const assignmentSettingsCollection = mongoose.connection.collection('assignment_settings');
     
     // Get all existing user IDs
     const existingUsers = await userCollection.find({}, { projection: { _id: 1 } }).toArray();
@@ -167,6 +170,8 @@ export async function POST(request: Request) {
       positionEvents: await PositionEvent.countDocuments(),
       notificationPreferences: await UserNotificationPreferences.countDocuments(),
       userPresence: await UserPresence.countDocuments(),
+      customerAssignments: await customerAssignmentsCollection.countDocuments(),
+      customerAuditTrails: await customerAuditTrailsCollection.countDocuments(),
     };
 
     console.log('📊 Before deletion:', before);
@@ -309,6 +314,18 @@ export async function POST(request: Request) {
     await UserPresence.deleteMany({});
     console.log('✅ Deleted all user presence data');
 
+    // Delete all customer assignments (employee-customer relationships)
+    const customerAssignmentsDeleted = await customerAssignmentsCollection.deleteMany({});
+    console.log(`✅ Deleted ${customerAssignmentsDeleted.deletedCount} customer assignments`);
+
+    // Delete all customer audit trails (employee actions on customers)
+    const customerAuditTrailsDeleted = await customerAuditTrailsCollection.deleteMany({});
+    console.log(`✅ Deleted ${customerAuditTrailsDeleted.deletedCount} customer audit trail entries`);
+
+    // Reset assignment settings to defaults
+    await assignmentSettingsCollection.deleteMany({});
+    console.log('✅ Reset assignment settings');
+
     // Delete orphan credit wallets (where user no longer exists)
     if (orphanWalletIds.length > 0) {
       const orphanDeleteResult = await CreditWallet.deleteMany({ _id: { $in: orphanWalletIds } });
@@ -395,6 +412,8 @@ export async function POST(request: Request) {
       positionEvents: await PositionEvent.countDocuments(),
       notificationPreferences: await UserNotificationPreferences.countDocuments(),
       userPresence: await UserPresence.countDocuments(),
+      customerAssignments: await customerAssignmentsCollection.countDocuments(),
+      customerAuditTrails: await customerAuditTrailsCollection.countDocuments(),
     };
 
     console.log('📊 After deletion:', after);
@@ -461,6 +480,8 @@ export async function POST(request: Request) {
         positionEvents: before.positionEvents,
         notificationPreferences: before.notificationPreferences,
         userPresence: before.userPresence,
+        customerAssignments: before.customerAssignments,
+        customerAuditTrails: before.customerAuditTrails,
       },
       walletsReset: walletResetResult.modifiedCount,
     });
