@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { customerAuditService } from '@/lib/services/customer-audit.service';
-import { dbConnect } from '@/database/connection';
+import { connectToDatabase } from '@/database/mongoose';
 
 /**
  * GET /api/customer-audit/stats
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await dbConnect();
+    await connectToDatabase();
 
     const stats = await customerAuditService.getCustomerAuditStats(customerId);
 

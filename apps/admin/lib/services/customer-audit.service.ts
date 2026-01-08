@@ -1,7 +1,7 @@
 import { CustomerAuditTrail, AuditActionCategory, AuditActionType, getActionDescription } from '@/database/models/customer-audit-trail.model';
 import { CustomerAssignment } from '@/database/models/customer-assignment.model';
 import { AssignmentSettings, AssignmentStrategy } from '@/database/models/assignment-settings.model';
-import { dbConnect } from '@/database/connection';
+import { connectToDatabase } from '@/database/mongoose';
 
 export interface PerformedBy {
   employeeId: string;
@@ -35,7 +35,7 @@ class CustomerAuditService {
    */
   async logAction(params: LogAuditParams): Promise<void> {
     try {
-      await dbConnect();
+      await connectToDatabase();
       
       const description = params.description || getActionDescription(params.action, params.metadata);
       
@@ -556,7 +556,7 @@ class CustomerAuditService {
       endDate?: Date;
     } = {}
   ) {
-    await dbConnect();
+    await connectToDatabase();
     
     const query: any = { customerId };
     
@@ -589,7 +589,7 @@ class CustomerAuditService {
     employeeId: string,
     options: { limit?: number; skip?: number } = {}
   ) {
-    await dbConnect();
+    await connectToDatabase();
     
     const [entries, total] = await Promise.all([
       CustomerAuditTrail.find({ 'performedBy.employeeId': employeeId })
@@ -607,7 +607,7 @@ class CustomerAuditService {
    * Get audit statistics for a customer
    */
   async getCustomerAuditStats(customerId: string) {
-    await dbConnect();
+    await connectToDatabase();
     
     const stats = await CustomerAuditTrail.aggregate([
       { $match: { customerId } },

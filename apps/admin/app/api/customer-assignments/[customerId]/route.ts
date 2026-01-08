@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { customerAssignmentService } from '@/lib/services/customer-assignment.service';
-import { dbConnect } from '@/database/connection';
+import { connectToDatabase } from '@/database/mongoose';
 
 interface RouteParams {
   params: Promise<{ customerId: string }>;
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { customerId } = await params;
 
-    await dbConnect();
+    await connectToDatabase();
     const assignment = await customerAssignmentService.getAssignment(customerId);
 
     if (!assignment) {
@@ -68,7 +68,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const { searchParams } = new URL(request.url);
     const reason = searchParams.get('reason') || undefined;
 
-    await dbConnect();
+    await connectToDatabase();
 
     await customerAssignmentService.unassignCustomer(
       customerId,

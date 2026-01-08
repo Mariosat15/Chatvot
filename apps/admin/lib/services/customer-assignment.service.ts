@@ -1,8 +1,8 @@
 import { CustomerAssignment, ICustomerAssignment } from '@/database/models/customer-assignment.model';
 import { AssignmentSettings, IAssignmentSettings, AssignmentStrategy } from '@/database/models/assignment-settings.model';
 import { customerAuditService, PerformedBy, CustomerInfo } from './customer-audit.service';
-import { dbConnect } from '@/database/connection';
-import Admin from '@/database/models/admin.model';
+import { connectToDatabase } from '@/database/mongoose';
+import { Admin } from '@/database/models/admin.model';
 
 export interface AssignCustomerParams {
   customerId: string;
@@ -30,7 +30,7 @@ class CustomerAssignmentService {
    * Get assignment settings (singleton)
    */
   async getSettings(): Promise<IAssignmentSettings> {
-    await dbConnect();
+    await connectToDatabase();
     return (AssignmentSettings as any).getSettings();
   }
   
@@ -41,7 +41,7 @@ class CustomerAssignmentService {
     updates: Partial<IAssignmentSettings>,
     updatedBy: { adminId: string; adminEmail: string; adminName: string }
   ): Promise<IAssignmentSettings> {
-    await dbConnect();
+    await connectToDatabase();
     return (AssignmentSettings as any).updateSettings(updates, updatedBy);
   }
   
@@ -49,7 +49,7 @@ class CustomerAssignmentService {
    * Get assignment for a customer
    */
   async getAssignment(customerId: string): Promise<ICustomerAssignment | null> {
-    await dbConnect();
+    await connectToDatabase();
     return CustomerAssignment.findOne({ customerId, isActive: true });
   }
   
@@ -57,7 +57,7 @@ class CustomerAssignmentService {
    * Get all assignments for an employee
    */
   async getEmployeeAssignments(employeeId: string): Promise<ICustomerAssignment[]> {
-    await dbConnect();
+    await connectToDatabase();
     return CustomerAssignment.find({ employeeId, isActive: true }).sort({ assignedAt: -1 });
   }
   
@@ -65,7 +65,7 @@ class CustomerAssignmentService {
    * Get employee customer count
    */
   async getEmployeeCustomerCount(employeeId: string): Promise<number> {
-    await dbConnect();
+    await connectToDatabase();
     return CustomerAssignment.countDocuments({ employeeId, isActive: true });
   }
   
@@ -73,7 +73,7 @@ class CustomerAssignmentService {
    * Get all active assignments
    */
   async getAllAssignments(options: { limit?: number; skip?: number } = {}): Promise<{ assignments: ICustomerAssignment[]; total: number }> {
-    await dbConnect();
+    await connectToDatabase();
     
     const [assignments, total] = await Promise.all([
       CustomerAssignment.find({ isActive: true })
@@ -91,7 +91,7 @@ class CustomerAssignmentService {
    * Assign customer to employee
    */
   async assignCustomer(params: AssignCustomerParams): Promise<ICustomerAssignment> {
-    await dbConnect();
+    await connectToDatabase();
     
     // Check if customer already has assignment
     const existingAssignment = await CustomerAssignment.findOne({ 
@@ -151,7 +151,7 @@ class CustomerAssignmentService {
    * Transfer customer to another employee
    */
   async transferCustomer(params: TransferCustomerParams): Promise<ICustomerAssignment> {
-    await dbConnect();
+    await connectToDatabase();
     
     // Get current assignment
     const currentAssignment = await CustomerAssignment.findOne({ 
@@ -231,7 +231,7 @@ class CustomerAssignmentService {
     performedBy: PerformedBy,
     reason?: string
   ): Promise<void> {
-    await dbConnect();
+    await connectToDatabase();
     
     const assignment = await CustomerAssignment.findOne({ customerId, isActive: true });
     
@@ -267,7 +267,7 @@ class CustomerAssignmentService {
     customer: CustomerInfo,
     performedBy: PerformedBy
   ): Promise<ICustomerAssignment | null> {
-    await dbConnect();
+    await connectToDatabase();
     
     const settings = await this.getSettings();
     
@@ -401,7 +401,7 @@ class CustomerAssignmentService {
     deletedEmployeeEmail: string,
     performedBy: PerformedBy
   ): Promise<{ reassigned: number; failed: number }> {
-    await dbConnect();
+    await connectToDatabase();
     
     const settings = await this.getSettings();
     
@@ -515,7 +515,7 @@ class CustomerAssignmentService {
     customerId: string,
     actionType: 'profile' | 'financial' | 'kyc' | 'fraud'
   ): Promise<{ canEdit: boolean; reason?: string }> {
-    await dbConnect();
+    await connectToDatabase();
     
     const settings = await this.getSettings();
     const assignment = await this.getAssignment(customerId);
@@ -555,7 +555,7 @@ class CustomerAssignmentService {
    * Get unassigned customers count
    */
   async getUnassignedCount(totalCustomers: number): Promise<number> {
-    await dbConnect();
+    await connectToDatabase();
     const assignedCount = await CustomerAssignment.countDocuments({ isActive: true });
     return Math.max(0, totalCustomers - assignedCount);
   }
@@ -568,7 +568,7 @@ class CustomerAssignmentService {
     byEmployee: { employeeId: string; employeeName: string; employeeEmail: string; count: number }[];
     byRole: { role: string; count: number }[];
   }> {
-    await dbConnect();
+    await connectToDatabase();
     
     const [totalAssigned, byEmployee, byRole] = await Promise.all([
       CustomerAssignment.countDocuments({ isActive: true }),

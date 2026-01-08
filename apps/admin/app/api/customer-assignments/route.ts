@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { customerAssignmentService } from '@/lib/services/customer-assignment.service';
-import { dbConnect } from '@/database/connection';
-import User from '@/database/models/user.model';
-import Admin from '@/database/models/admin.model';
+import { connectToDatabase } from '@/database/mongoose';
+import { Admin } from '@/database/models/admin.model';
+import mongoose from 'mongoose';
 
 /**
  * GET /api/customer-assignments
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const employeeId = searchParams.get('employeeId');
     const includeStats = searchParams.get('includeStats') === 'true';
 
-    await dbConnect();
+    await connectToDatabase();
 
     let result;
     
@@ -38,15 +38,18 @@ export async function GET(request: NextRequest) {
     // Get stats if requested
     let stats = null;
     if (includeStats) {
-      const totalCustomers = await User.countDocuments();
-      const assignmentStats = await customerAssignmentService.getAssignmentStats();
-      const unassignedCount = await customerAssignmentService.getUnassignedCount(totalCustomers);
-      
-      stats = {
-        ...assignmentStats,
-        totalCustomers,
-        unassignedCount,
-      };
+      const db = mongoose.connection.db;
+      if (db) {
+        const totalCustomers = await db.collection('user').countDocuments();
+        const assignmentStats = await customerAssignmentService.getAssignmentStats();
+        const unassignedCount = await customerAssignmentService.getUnassignedCount(totalCustomers);
+        
+        stats = {
+          ...assignmentStats,
+          totalCustomers,
+          unassignedCount,
+        };
+      }
     }
 
     return NextResponse.json({
@@ -84,10 +87,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await dbConnect();
+    await connectToDatabase();
 
-    // Get customer info
-    const customer = await User.findById(customerId);
+    // Get customer info from the user collection
+    const db = mongoose.connection.db;
+    if (!db) {
+      return NextResponse.json(
+        { error: 'Database connection failed' },
+        { status: 500 }
+      );
+    }
+
+    const customer = await db.collection('user').findOne({ 
+      _id: new mongoose.Types.ObjectId(customerId) 
+    });
+    
     if (!customer) {
       return NextResponse.json(
         { error: 'Customer not found' },
@@ -172,4 +186,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

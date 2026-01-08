@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { customerAssignmentService } from '@/lib/services/customer-assignment.service';
-import { dbConnect } from '@/database/connection';
+import { connectToDatabase } from '@/database/mongoose';
 
 /**
  * GET /api/customer-assignments/settings
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await dbConnect();
+    await connectToDatabase();
     const settings = await customerAssignmentService.getSettings();
 
     return NextResponse.json({
@@ -59,7 +59,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    await dbConnect();
+    await connectToDatabase();
     
     const settings = await customerAssignmentService.updateSettings(
       body,

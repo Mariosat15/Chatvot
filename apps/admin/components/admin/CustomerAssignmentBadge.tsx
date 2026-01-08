@@ -3,12 +3,6 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { User, AlertTriangle, UserCheck } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 
 interface Assignment {
   employeeId: string;
@@ -32,67 +26,32 @@ export function CustomerAssignmentBadge({
   className = '',
 }: CustomerAssignmentBadgeProps) {
   if (!assignment) {
-    const content = (
+    return (
       <Badge 
         variant="outline" 
         className={`bg-yellow-500/10 text-yellow-400 border-yellow-500/30 ${className}`}
+        title={showTooltip ? "This customer has not been assigned to any employee" : undefined}
       >
         <AlertTriangle className="h-3 w-3 mr-1" />
         {compact ? 'Unassigned' : 'No Agent Assigned'}
       </Badge>
     );
-
-    if (showTooltip) {
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              {content}
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>This customer has not been assigned to any employee</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    }
-
-    return content;
   }
 
-  const content = (
+  const tooltipText = showTooltip 
+    ? `${assignment.employeeName}\n${assignment.employeeEmail}\nRole: ${assignment.employeeRole}\nAssigned: ${new Date(assignment.assignedAt).toLocaleDateString()}`
+    : undefined;
+
+  return (
     <Badge 
       variant="outline" 
       className={`bg-emerald-500/10 text-emerald-400 border-emerald-500/30 ${className}`}
+      title={tooltipText}
     >
       <UserCheck className="h-3 w-3 mr-1" />
       {compact ? assignment.employeeName.split(' ')[0] : assignment.employeeName}
     </Badge>
   );
-
-  if (showTooltip) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {content}
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">
-            <div className="space-y-1">
-              <p className="font-medium">{assignment.employeeName}</p>
-              <p className="text-xs text-gray-400">{assignment.employeeEmail}</p>
-              <p className="text-xs text-gray-400">Role: {assignment.employeeRole}</p>
-              <p className="text-xs text-gray-400">
-                Assigned: {new Date(assignment.assignedAt).toLocaleDateString()}
-              </p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
-
-  return content;
 }
 
 // Full card version for detail views
@@ -170,4 +129,3 @@ export function CustomerAssignmentCard({
 }
 
 export default CustomerAssignmentBadge;
-

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { customerAssignmentService } from '@/lib/services/customer-assignment.service';
-import { dbConnect } from '@/database/connection';
+import { connectToDatabase } from '@/database/mongoose';
 
 /**
  * POST /api/customer-assignments/transfer
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await dbConnect();
+    await connectToDatabase();
 
     // Get current assignment to check permissions
     const currentAssignment = await customerAssignmentService.getAssignment(customerId);

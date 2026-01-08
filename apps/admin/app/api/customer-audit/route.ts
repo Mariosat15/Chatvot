@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { customerAuditService } from '@/lib/services/customer-audit.service';
 import { AuditActionCategory, AUDIT_CATEGORY_CONFIG } from '@/database/models/customer-audit-trail.model';
-import { dbConnect } from '@/database/connection';
+import { connectToDatabase } from '@/database/mongoose';
 
 /**
  * GET /api/customer-audit
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await dbConnect();
+    await connectToDatabase();
 
     let result;
 
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await dbConnect();
+    await connectToDatabase();
 
     await customerAuditService.logNoteAdded(
       { customerId, customerEmail, customerName },
