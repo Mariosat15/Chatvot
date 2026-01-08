@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const jwtSecret = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
     const decoded = verify(token, jwtSecret) as {
-      id: string;
+      adminId: string;
       email: string;
       role: string;
     };
@@ -32,9 +32,9 @@ export async function GET(request: NextRequest) {
     // Get all active employees except current user
     let currentUserId;
     try {
-      currentUserId = new mongoose.Types.ObjectId(decoded.id);
+      currentUserId = new mongoose.Types.ObjectId(decoded.adminId);
     } catch {
-      currentUserId = decoded.id;
+      currentUserId = decoded.adminId;
     }
 
     const employees = await Admin.find({

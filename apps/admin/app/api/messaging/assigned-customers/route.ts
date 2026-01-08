@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     }
 
     const decoded = verify(token, JWT_SECRET) as {
-      id: string;
+      adminId: string;
       email: string;
       isSuperAdmin?: boolean;
     };
@@ -32,14 +32,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ customers: [] });
     }
 
-    console.log(`🔍 [Messaging] Fetching assigned customers for employee: ${decoded.email} (ID: ${decoded.id})`);
+    console.log(`🔍 [Messaging] Fetching assigned customers for employee: ${decoded.email} (ID: ${decoded.adminId})`);
 
     // Get assignments for this employee (try both string and ObjectId formats)
     const assignments = await db.collection('customer_assignments')
       .find({ 
         $or: [
-          { employeeId: decoded.id },
-          { employeeId: decoded.id.toString() },
+          { employeeId: decoded.adminId },
+          { employeeId: decoded.adminId?.toString() },
         ]
       })
       .toArray();

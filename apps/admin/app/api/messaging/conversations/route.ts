@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const jwtSecret = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
     const decoded = verify(token, jwtSecret) as {
-      id: string;
+      adminId: string;
       email: string;
       role: string;
       isSuperAdmin?: boolean;
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by assignment
     if (assignedToMe) {
-      query.assignedEmployeeId = new Types.ObjectId(decoded.id);
+      query.assignedEmployeeId = new Types.ObjectId(decoded.adminId);
     }
 
     const conversations = await Conversation.find(query)
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         status: conv.status,
         participants: conv.participants?.filter((p: any) => p.isActive) || [],
         lastMessage: conv.lastMessage,
-        unreadCount: conv.unreadCounts?.get?.(decoded.id) || 0,
+        unreadCount: conv.unreadCounts?.get?.(decoded.adminId) || 0,
         isAIHandled: conv.isAIHandled,
         assignedEmployeeId: conv.assignedEmployeeId?.toString(),
         assignedEmployeeName: conv.assignedEmployeeName,
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
       const existingConv = await Conversation.findOne({
         type: 'employee-internal',
         status: { $ne: 'closed' },
-        'participants.id': { $all: [decoded.id, participantIds[0]] },
+        'participants.id': { $all: [decoded.adminId, participantIds[0]] },
         participants: { $size: 2 },
       });
 
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
     // Build participants array
     const participants = [
       {
-        id: decoded.id,
+        id: decoded.adminId,
         type: 'employee',
         name: decoded.name || decoded.email,
         joinedAt: new Date(),

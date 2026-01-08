@@ -22,9 +22,9 @@ export async function POST(
 
     const jwtSecret = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
     const decoded = verify(token, jwtSecret) as {
-      id: string;
+      adminId: string;
       email: string;
-      name: string;
+      name?: string;
       role: string;
     };
 
@@ -55,7 +55,7 @@ export async function POST(
     // Create message
     const message = await Message.create({
       conversationId: new Types.ObjectId(conversationId),
-      senderId: decoded.id,
+      senderId: decoded.adminId,
       senderType: 'employee',
       senderName: decoded.name || decoded.email,
       messageType: messageType || 'text',
@@ -75,7 +75,7 @@ export async function POST(
     conversation.lastMessage = {
       messageId: message._id,
       content: content?.substring(0, 100) || '[Attachment]',
-      senderId: decoded.id,
+      senderId: decoded.adminId,
       senderName: decoded.name || decoded.email,
       senderType: 'employee',
       timestamp: message.createdAt,
@@ -86,15 +86,15 @@ export async function POST(
     if (conversation.isAIHandled && conversation.type === 'user-to-support') {
       conversation.isAIHandled = false;
       conversation.aiHandledUntil = new Date();
-      conversation.assignedEmployeeId = new Types.ObjectId(decoded.id);
+      conversation.assignedEmployeeId = new Types.ObjectId(decoded.adminId);
       conversation.assignedEmployeeName = decoded.name || decoded.email;
       
       // Add employee to participants if not present
-      const existingParticipant = conversation.participants?.find((p: any) => p.id === decoded.id);
+      const existingParticipant = conversation.participants?.find((p: any) => p.id === decoded.adminId);
       if (!existingParticipant) {
         conversation.participants = conversation.participants || [];
         conversation.participants.push({
-          id: decoded.id,
+          id: decoded.adminId,
           type: 'employee',
           name: decoded.name || decoded.email,
           joinedAt: new Date(),
@@ -105,7 +105,7 @@ export async function POST(
 
     // Increment unread counts for other participants
     for (const participant of conversation.participants || []) {
-      if (participant.id !== decoded.id && participant.isActive) {
+      if (participant.id !== decoded.adminId && participant.isActive) {
         const currentCount = conversation.unreadCounts?.get?.(participant.id) || 0;
         if (conversation.unreadCounts?.set) {
           conversation.unreadCounts.set(participant.id, currentCount + 1);

@@ -22,9 +22,9 @@ export async function POST(
 
     const jwtSecret = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
     const decoded = verify(token, jwtSecret) as {
-      id: string;
+      adminId: string;
       email: string;
-      name: string;
+      name?: string;
       role: string;
     };
 
@@ -103,7 +103,7 @@ export async function POST(
     if (!conversation.metadata.transferHistory) conversation.metadata.transferHistory = [];
 
     conversation.metadata.transferHistory.push({
-      fromEmployeeId: previousEmployeeId || decoded.id,
+      fromEmployeeId: previousEmployeeId || decoded.adminId,
       fromEmployeeName: previousEmployeeName || decoded.name || decoded.email,
       toEmployeeId,
       toEmployeeName,

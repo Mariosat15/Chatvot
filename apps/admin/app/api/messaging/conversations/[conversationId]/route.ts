@@ -22,9 +22,9 @@ export async function GET(
 
     const jwtSecret = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
     const decoded = verify(token, jwtSecret) as {
-      id: string;
+      adminId: string;
       email: string;
-      name: string;
+      name?: string;
       role: string;
     };
 
@@ -64,13 +64,13 @@ export async function GET(
     await Message.updateMany(
       {
         conversationId: new Types.ObjectId(conversationId),
-        senderId: { $ne: decoded.id },
-        'readBy.participantId': { $ne: decoded.id },
+        senderId: { $ne: decoded.adminId },
+        'readBy.participantId': { $ne: decoded.adminId },
       },
       {
         $push: {
           readBy: {
-            participantId: decoded.id,
+            participantId: decoded.adminId,
             participantName: decoded.name || decoded.email,
             readAt: new Date(),
           },
@@ -81,7 +81,7 @@ export async function GET(
 
     // Reset unread count
     if (conversation.unreadCounts?.has) {
-      conversation.unreadCounts.set(decoded.id, 0);
+      conversation.unreadCounts.set(decoded.adminId, 0);
       await conversation.save();
     }
 
