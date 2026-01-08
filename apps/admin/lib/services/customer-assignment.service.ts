@@ -147,13 +147,20 @@ class CustomerAssignmentService {
     
     console.log(`✅ [Assignment] Customer ${params.customerEmail} assigned to ${params.employeeEmail}`);
     
-    // Send notifications if enabled
+    // Send notifications if enabled (email + in-app for customer)
     await this.sendAssignmentNotifications(
       settings,
-      params.customerEmail,
-      params.customerName,
-      params.employeeEmail,
-      params.employeeName
+      {
+        customerId: params.customerId,
+        customerEmail: params.customerEmail,
+        customerName: params.customerName,
+      },
+      {
+        employeeId: params.employeeId,
+        employeeEmail: params.employeeEmail,
+        employeeName: params.employeeName,
+        employeeRole: params.employeeRole,
+      }
     );
     
     // Create in-app notification for employee
@@ -636,15 +643,16 @@ class CustomerAssignmentService {
   }
   
   /**
-   * Send assignment notifications if enabled
+   * Send assignment notifications if enabled (email + in-app)
    */
   private async sendAssignmentNotifications(
     settings: IAssignmentSettings,
-    customerEmail: string,
-    customerName: string,
-    employeeEmail: string,
-    employeeName: string
+    customer: { customerId: string; customerEmail: string; customerName: string },
+    employee: { employeeId: string; employeeEmail: string; employeeName: string; employeeRole: string }
   ): Promise<void> {
+    const { customerId, customerEmail, customerName } = customer;
+    const { employeeId, employeeEmail, employeeName, employeeRole } = employee;
+    
     try {
       const appSettings = await getSettings();
       const companyName = appSettings?.appName || 'Our Platform';
@@ -652,7 +660,7 @@ class CustomerAssignmentService {
       
       const transporter = await getTransporter();
       
-      // Send notification to employee if enabled
+      // Send EMAIL notification to employee if enabled
       if (settings.notifyEmployeeOnAssignment && fromEmail) {
         try {
           await transporter.sendMail({
@@ -685,13 +693,13 @@ class CustomerAssignmentService {
               </div>
             `,
           });
-          console.log(`📧 [Notification] Employee notification sent to ${employeeEmail}`);
+          console.log(`📧 [Notification] Employee EMAIL sent to ${employeeEmail}`);
         } catch (emailError) {
-          console.error(`❌ [Notification] Failed to send employee notification:`, emailError);
+          console.error(`❌ [Notification] Failed to send employee email:`, emailError);
         }
       }
       
-      // Send notification to customer if enabled
+      // Send EMAIL notification to customer if enabled
       if (settings.notifyCustomerOnAssignment && fromEmail) {
         try {
           await transporter.sendMail({
@@ -724,9 +732,38 @@ class CustomerAssignmentService {
               </div>
             `,
           });
-          console.log(`📧 [Notification] Customer notification sent to ${customerEmail}`);
+          console.log(`📧 [Notification] Customer EMAIL sent to ${customerEmail}`);
         } catch (emailError) {
-          console.error(`❌ [Notification] Failed to send customer notification:`, emailError);
+          console.error(`❌ [Notification] Failed to send customer email:`, emailError);
+        }
+        
+        // Also create in-app notification for customer
+        try {
+          const mongoose = await import('mongoose');
+          const db = mongoose.default.connection.db;
+          if (db) {
+            const notificationsCollection = db.collection('notifications');
+            await notificationsCollection.insertOne({
+              userId: customerId,
+              templateId: 'customer_assigned_employee',
+              title: '👋 Welcome! Your Account Manager',
+              message: `You have been assigned a dedicated account manager: ${employeeName}. They will be your primary contact for any questions or assistance you may need.`,
+              type: 'info',
+              category: 'account',
+              isRead: false,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              metadata: {
+                employeeId,
+                employeeName,
+                employeeEmail,
+                employeeRole,
+              },
+            });
+            console.log(`📬 [Notification] Customer IN-APP notification created for ${customerEmail}`);
+          }
+        } catch (inAppError) {
+          console.error(`❌ [Notification] Failed to create customer in-app notification:`, inAppError);
         }
       }
     } catch (error) {

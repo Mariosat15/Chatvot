@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
-import mongoose from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 
 /**
  * POST /api/customer-assignment/auto-assign
@@ -270,6 +270,63 @@ export async function POST(request: NextRequest) {
       });
     } catch (auditError) {
       console.error('Failed to log audit trail:', auditError);
+    }
+
+    // Send in-app notification to employee if enabled
+    if (settings.notifyEmployeeOnAssignment) {
+      try {
+        const employeeNotificationsCollection = db.collection('employee_notifications');
+        const employeeObjId = typeof selectedEmployee._id === 'string' 
+          ? new Types.ObjectId(selectedEmployee._id) 
+          : selectedEmployee._id;
+        
+        await employeeNotificationsCollection.insertOne({
+          employeeId: employeeObjId,
+          type: 'customer_assigned',
+          title: '👤 New Customer Assigned',
+          message: `You have been assigned a new customer: ${userName || userEmail.split('@')[0]} (${userEmail})`,
+          metadata: {
+            customerId: userId,
+            customerName: userName || userEmail.split('@')[0],
+            customerEmail: userEmail,
+            assignedBy: 'System (Auto-Assign)',
+            strategy,
+          },
+          isRead: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        console.log(`📬 [AutoAssign] Employee notification created for ${selectedEmployee.email}`);
+      } catch (notifyError) {
+        console.error('Failed to send employee notification:', notifyError);
+      }
+    }
+
+    // Send notification to customer if enabled
+    if (settings.notifyCustomerOnAssignment) {
+      try {
+        // Create in-app notification for the customer
+        const notificationsCollection = db.collection('notifications');
+        await notificationsCollection.insertOne({
+          userId: userId,
+          templateId: 'customer_assigned_employee',
+          title: '👋 Welcome! Your Account Manager',
+          message: `You have been assigned a dedicated account manager: ${selectedEmployee.name}. They will be your primary contact for any questions or assistance you may need.`,
+          type: 'info',
+          category: 'account',
+          isRead: false,
+          createdAt: new Date(),
+          metadata: {
+            employeeId: selectedEmployee._id.toString(),
+            employeeName: selectedEmployee.name,
+            employeeEmail: selectedEmployee.email,
+            employeeRole: selectedEmployee.role,
+          },
+        });
+        console.log(`📬 [AutoAssign] Customer notification sent to ${userEmail}`);
+      } catch (customerNotifyError) {
+        console.error('Failed to send customer notification:', customerNotifyError);
+      }
     }
 
     return NextResponse.json({
