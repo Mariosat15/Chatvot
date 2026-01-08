@@ -42,8 +42,8 @@ export function useAdminEvents(options: UseAdminEventsOptions = {}) {
 
       setLastEvent(event);
 
-      // Show toast notification
-      if (opts.showToasts !== false && event.adminEmail) {
+      // Show toast notification (disabled by default - set showToasts: true to enable)
+      if (opts.showToasts === true && event.adminEmail) {
         const actionText = getActionText(event.type, event.action);
         toast.info(`${event.adminEmail} ${actionText}`, {
           description: `Section: ${event.section}`,

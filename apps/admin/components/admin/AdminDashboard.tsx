@@ -472,10 +472,13 @@ export default function AdminDashboard({
     }));
   }, []);
 
-  // Admin events subscription (polls every 30s)
+  // Admin events subscription (polls every 30s) - toasts disabled to prevent spam
   const { isConnected: isEventConnected } = useAdminEvents({
     onEvent: (event) => {
-      console.log('📡 Received event for section:', event.section);
+      // Only log significant events, not routine updates
+      if (event.type !== 'general_refresh') {
+        console.log('📡 Received event for section:', event.section);
+      }
       // Trigger refresh for the affected section
       triggerSectionRefresh(event.section);
       
@@ -488,7 +491,7 @@ export default function AdminDashboard({
         triggerSectionRefresh('pending-withdrawals');
       }
     },
-    showToasts: true,
+    showToasts: false, // Disabled - was causing spam notifications
   });
 
   // Alias for backward compatibility
