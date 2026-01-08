@@ -171,11 +171,17 @@ export default function MessagingSection() {
   // Fetch conversations
   const fetchConversations = useCallback(async () => {
     try {
-      const type = activeTab === 'support' ? 'support' : 'internal';
+      // Fetch all conversation types to handle both tabs
+      const type = activeTab === 'support' ? 'support' : activeTab === 'internal' ? 'internal' : 'all';
+      console.log(`📥 [UI] Fetching conversations for tab: ${activeTab}, type: ${type}`);
+      
       const response = await fetch(`/api/messaging/conversations?type=${type}&status=active`);
       if (response.ok) {
         const data = await response.json();
-        setConversations(data.conversations);
+        console.log(`📥 [UI] Received ${data.conversations?.length || 0} conversations`);
+        setConversations(data.conversations || []);
+      } else {
+        console.error('Failed to fetch conversations:', response.status);
       }
     } catch (error) {
       console.error('Error fetching conversations:', error);
@@ -358,6 +364,8 @@ export default function MessagingSection() {
   // Start internal chat
   const handleStartInternalChat = async (employee: Employee) => {
     try {
+      console.log(`💬 [UI] Starting internal chat with: ${employee.name} (${employee.id})`);
+      
       const response = await fetch('/api/messaging/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -369,10 +377,34 @@ export default function MessagingSection() {
 
       if (response.ok) {
         const data = await response.json();
-        setActiveTab('internal');
-        setSelectedConversation(data.conversation);
-        fetchMessages(data.conversation.id);
-        fetchConversations();
+        console.log(`💬 [UI] Conversation created/found:`, data.conversation);
+        
+        // Build a proper conversation object
+        const conv: Conversation = {
+          id: data.conversation.id,
+          type: data.conversation.type || 'employee-internal',
+          status: data.conversation.status || 'active',
+          participants: data.conversation.participants || [],
+          lastMessage: data.conversation.lastMessage,
+          unreadCount: 0,
+          isAIHandled: false,
+          createdAt: data.conversation.createdAt || new Date().toISOString(),
+          lastActivityAt: data.conversation.lastActivityAt || new Date().toISOString(),
+        };
+        
+        setSelectedConversation(conv);
+        await fetchMessages(conv.id);
+        
+        // Fetch internal conversations specifically
+        const convResponse = await fetch('/api/messaging/conversations?type=internal&status=active');
+        if (convResponse.ok) {
+          const convData = await convResponse.json();
+          console.log(`💬 [UI] Fetched ${convData.conversations?.length || 0} internal conversations`);
+          setConversations(convData.conversations || []);
+        }
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to start internal chat:', errorData);
       }
     } catch (error) {
       console.error('Error starting internal chat:', error);
@@ -621,6 +653,61 @@ export default function MessagingSection() {
 
             {activeTab === 'internal' && (
               <div className="p-2">
+                {/* Existing Internal Conversations */}
+                {filteredConversations.filter(c => c.type === 'employee-internal').length > 0 && (
+                  <>
+                    <p className="text-xs text-[#6b7280] px-2 py-1 mb-2">
+                      Recent Chats ({filteredConversations.filter(c => c.type === 'employee-internal').length})
+                    </p>
+                    {filteredConversations.filter(c => c.type === 'employee-internal').map((conversation) => {
+                      const otherParticipant = conversation.participants.find(p => p.type === 'employee');
+                      const isSelected = selectedConversation?.id === conversation.id;
+                      
+                      return (
+                        <motion.div
+                          key={conversation.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          onClick={() => {
+                            setSelectedConversation(conversation);
+                            fetchMessages(conversation.id);
+                          }}
+                          className={`flex items-center gap-3 p-2 cursor-pointer transition-all rounded-lg mb-1 ${
+                            isSelected
+                              ? 'bg-violet-500/10 border border-violet-500/30'
+                              : 'hover:bg-[#1E1E1E] border border-transparent hover:border-[#2A2A2A]'
+                          }`}
+                        >
+                          <div className="relative">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+                              <span className="text-white text-sm font-bold">
+                                {otherParticipant?.name?.charAt(0)?.toUpperCase() || 'E'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-white font-medium truncate">
+                                {otherParticipant?.name || 'Employee'}
+                              </p>
+                              {conversation.unreadCount > 0 && (
+                                <span className="bg-violet-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                                  {conversation.unreadCount}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[#6b7280] truncate">
+                              {conversation.lastMessage?.content || 'No messages'}
+                            </p>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                    <div className="border-t border-[#2A2A2A] my-3" />
+                  </>
+                )}
+                
+                {/* Team Members List */}
                 <p className="text-xs text-[#6b7280] px-2 py-1 mb-2">Team Members ({employees.length})</p>
                 {employees.length === 0 ? (
                   <div className="text-center py-8">

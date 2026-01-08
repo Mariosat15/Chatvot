@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     const token = cookieStore.get('admin_token')?.value;
 
     if (!token) {
+      console.log('❌ [Employees] No admin token found');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -24,58 +25,80 @@ export async function GET(request: NextRequest) {
       role: string;
     };
 
+    console.log(`📧 [Employees] Request from: ${decoded.email}, adminId: ${decoded.adminId}`);
+
     await connectToDatabase();
 
-    const Admin = mongoose.models.Admin || 
-      mongoose.model('Admin', new mongoose.Schema({}, { strict: false, collection: 'admins' }));
+    const db = mongoose.connection.db;
+    if (!db) {
+      console.log('❌ [Employees] Database not connected');
+      return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
+    }
 
     // Get all active employees except current user
-    let currentUserId;
+    let currentUserId: mongoose.Types.ObjectId;
     try {
       currentUserId = new mongoose.Types.ObjectId(decoded.adminId);
     } catch {
-      currentUserId = decoded.adminId;
+      console.log(`❌ [Employees] Invalid adminId: ${decoded.adminId}`);
+      return NextResponse.json({ error: 'Invalid admin ID' }, { status: 400 });
     }
 
-    const employees = await Admin.find({
+    console.log(`📧 [Employees] Current user ObjectId: ${currentUserId}`);
+
+    // Use raw collection for more reliable query
+    const allAdmins = await db.collection('admins').find({}).toArray();
+    console.log(`📧 [Employees] Total admins in DB: ${allAdmins.length}`);
+    allAdmins.forEach((admin: any) => {
+      console.log(`   - ${admin.email} (${admin._id}) status: ${admin.status}, role: ${admin.role}`);
+    });
+
+    const employees = await db.collection('admins').find({
       _id: { $ne: currentUserId },
       status: 'active',
       isLockedOut: { $ne: true },
-    }).select('_id name email role avatar lastLoginAt profileImage');
+    }).toArray();
     
-    console.log(`📧 [Messaging] Fetched ${employees.length} employees for internal chat (excluding ${decoded.email})`);
+    console.log(`📧 [Employees] Fetched ${employees.length} employees for internal chat (excluding ${decoded.email})`);
 
     // Get online status from presence collection
-    const UserPresence = mongoose.models.UserPresence || 
-      mongoose.model('UserPresence', new mongoose.Schema({}, { strict: false, collection: 'user_presence' }));
-
     const employeeIds = employees.map((e: any) => e._id.toString());
-    const presences = await UserPresence.find({
-      participantId: { $in: employeeIds },
-      participantType: 'employee',
-    }).select('participantId status lastSeen');
+    
+    let presenceMap = new Map();
+    try {
+      const presences = await db.collection('user_presence').find({
+        participantId: { $in: employeeIds },
+        participantType: 'employee',
+      }).toArray();
 
-    const presenceMap = new Map(
-      presences.map((p: any) => [p.participantId, { status: p.status, lastSeen: p.lastSeen }])
-    );
+      presenceMap = new Map(
+        presences.map((p: any) => [p.participantId, { status: p.status, lastSeen: p.lastSeen }])
+      );
+    } catch (e) {
+      console.log('📧 [Employees] No presence data found');
+    }
+
+    const result = employees.map((emp: any) => {
+      const presence = presenceMap.get(emp._id.toString());
+      return {
+        id: emp._id.toString(),
+        name: emp.name || emp.email?.split('@')[0] || 'Employee',
+        email: emp.email,
+        role: emp.role,
+        avatar: emp.profileImage || emp.avatar,
+        status: presence?.status || 'offline',
+        lastSeen: presence?.lastSeen,
+        lastLoginAt: emp.lastLoginAt,
+      };
+    });
+
+    console.log(`📧 [Employees] Returning ${result.length} employees:`, result.map(e => e.email));
 
     return NextResponse.json({
-      employees: employees.map((emp: any) => {
-        const presence = presenceMap.get(emp._id.toString());
-        return {
-          id: emp._id.toString(),
-          name: emp.name || emp.email?.split('@')[0] || 'Employee',
-          email: emp.email,
-          role: emp.role,
-          avatar: emp.profileImage || emp.avatar,
-          status: presence?.status || 'offline',
-          lastSeen: presence?.lastSeen,
-          lastLoginAt: emp.lastLoginAt,
-        };
-      }),
+      employees: result,
     });
   } catch (error) {
-    console.error('Error fetching employees:', error);
+    console.error('❌ [Employees] Error fetching employees:', error);
     return NextResponse.json(
       { error: 'Failed to fetch employees' },
       { status: 500 }

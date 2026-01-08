@@ -17,6 +17,7 @@ export async function POST(
     const token = cookieStore.get('admin_token')?.value;
 
     if (!token) {
+      console.log('❌ [SendMsg] No admin token');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -32,6 +33,9 @@ export async function POST(
     const body = await request.json();
     const { content, messageType, attachments, replyTo } = body;
 
+    console.log(`📤 [SendMsg] From: ${decoded.email} (${decoded.adminId}) to conv: ${conversationId}`);
+    console.log(`📤 [SendMsg] Content: "${content?.substring(0, 50)}..."`);
+
     if (!content && (!attachments || attachments.length === 0)) {
       return NextResponse.json(
         { error: 'Message content or attachments required' },
@@ -41,26 +45,38 @@ export async function POST(
 
     await connectToDatabase();
 
-    const Conversation = mongoose.models.Conversation || 
-      mongoose.model('Conversation', new mongoose.Schema({}, { strict: false, collection: 'conversations' }));
-    const Message = mongoose.models.Message || 
-      mongoose.model('Message', new mongoose.Schema({}, { strict: false, collection: 'messages' }));
+    const db = mongoose.connection.db;
+    if (!db) {
+      return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
+    }
 
-    const conversation = await Conversation.findById(conversationId);
+    // Find conversation
+    let convObjectId;
+    try {
+      convObjectId = new Types.ObjectId(conversationId);
+    } catch {
+      console.log(`❌ [SendMsg] Invalid conversationId: ${conversationId}`);
+      return NextResponse.json({ error: 'Invalid conversation ID' }, { status: 400 });
+    }
+
+    const conversation = await db.collection('conversations').findOne({ _id: convObjectId });
 
     if (!conversation) {
+      console.log(`❌ [SendMsg] Conversation not found: ${conversationId}`);
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
 
+    console.log(`📤 [SendMsg] Conversation type: ${conversation.type}, participants: ${conversation.participants?.length}`);
+
     // Create message
-    const message = await Message.create({
-      conversationId: new Types.ObjectId(conversationId),
+    const messageDoc = {
+      conversationId: convObjectId,
       senderId: decoded.adminId,
       senderType: 'employee',
       senderName: decoded.name || decoded.email,
       messageType: messageType || 'text',
       content: content || '',
-      attachments,
+      attachments: attachments || [],
       replyTo: replyTo ? {
         messageId: new Types.ObjectId(replyTo.messageId),
         content: replyTo.content,
@@ -69,70 +85,81 @@ export async function POST(
       status: 'sent',
       readBy: [],
       deliveredTo: [],
-    });
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const msgResult = await db.collection('messages').insertOne(messageDoc);
+    console.log(`📤 [SendMsg] Message created: ${msgResult.insertedId}`);
+
+    // Build unread counts update - use object notation for MongoDB
+    const unreadCountsUpdate: Record<string, number> = {};
+    for (const participant of conversation.participants || []) {
+      if (participant.id !== decoded.adminId && participant.isActive) {
+        const currentCount = conversation.unreadCounts?.[participant.id] || 0;
+        unreadCountsUpdate[`unreadCounts.${participant.id}`] = currentCount + 1;
+        console.log(`📤 [SendMsg] Incrementing unread for ${participant.name} (${participant.id}): ${currentCount} -> ${currentCount + 1}`);
+      }
+    }
 
     // Update conversation
-    conversation.lastMessage = {
-      messageId: message._id,
-      content: content?.substring(0, 100) || '[Attachment]',
-      senderId: decoded.adminId,
-      senderName: decoded.name || decoded.email,
-      senderType: 'employee',
-      timestamp: message.createdAt,
+    const updateDoc: any = {
+      $set: {
+        lastMessage: {
+          messageId: msgResult.insertedId,
+          content: content?.substring(0, 100) || '[Attachment]',
+          senderId: decoded.adminId,
+          senderName: decoded.name || decoded.email,
+          senderType: 'employee',
+          timestamp: new Date(),
+        },
+        lastActivityAt: new Date(),
+        updatedAt: new Date(),
+        ...unreadCountsUpdate,
+      },
     };
-    conversation.lastActivityAt = new Date();
-    
-    // If AI was handling, add employee as participant and disable AI
+
+    // If AI was handling support chat, take over
     if (conversation.isAIHandled && conversation.type === 'user-to-support') {
-      conversation.isAIHandled = false;
-      conversation.aiHandledUntil = new Date();
-      conversation.assignedEmployeeId = new Types.ObjectId(decoded.adminId);
-      conversation.assignedEmployeeName = decoded.name || decoded.email;
+      updateDoc.$set.isAIHandled = false;
+      updateDoc.$set.aiHandledUntil = new Date();
+      updateDoc.$set.assignedEmployeeId = new Types.ObjectId(decoded.adminId);
+      updateDoc.$set.assignedEmployeeName = decoded.name || decoded.email;
       
       // Add employee to participants if not present
       const existingParticipant = conversation.participants?.find((p: any) => p.id === decoded.adminId);
       if (!existingParticipant) {
-        conversation.participants = conversation.participants || [];
-        conversation.participants.push({
-          id: decoded.adminId,
-          type: 'employee',
-          name: decoded.name || decoded.email,
-          joinedAt: new Date(),
-          isActive: true,
-        });
+        updateDoc.$push = {
+          participants: {
+            id: decoded.adminId,
+            type: 'employee',
+            name: decoded.name || decoded.email,
+            joinedAt: new Date(),
+            isActive: true,
+          }
+        };
       }
     }
 
-    // Increment unread counts for other participants
-    for (const participant of conversation.participants || []) {
-      if (participant.id !== decoded.adminId && participant.isActive) {
-        const currentCount = conversation.unreadCounts?.get?.(participant.id) || 0;
-        if (conversation.unreadCounts?.set) {
-          conversation.unreadCounts.set(participant.id, currentCount + 1);
-        }
-      }
-    }
-
-    await conversation.save();
-
-    // TODO: Send notification to user if this is a support chat
+    await db.collection('conversations').updateOne({ _id: convObjectId }, updateDoc);
+    console.log(`📤 [SendMsg] Conversation updated successfully`);
 
     return NextResponse.json({
       message: {
-        id: message._id.toString(),
-        senderId: message.senderId,
-        senderType: message.senderType,
-        senderName: message.senderName,
-        content: message.content,
-        messageType: message.messageType,
-        attachments: message.attachments,
-        replyTo: message.replyTo,
-        status: message.status,
-        createdAt: message.createdAt,
+        id: msgResult.insertedId.toString(),
+        senderId: decoded.adminId,
+        senderType: 'employee',
+        senderName: decoded.name || decoded.email,
+        content: content || '',
+        messageType: messageType || 'text',
+        attachments: attachments || [],
+        replyTo: replyTo,
+        status: 'sent',
+        createdAt: new Date(),
       },
     });
   } catch (error) {
-    console.error('Error sending message:', error);
+    console.error('❌ [SendMsg] Error:', error);
     return NextResponse.json(
       { error: 'Failed to send message' },
       { status: 500 }
