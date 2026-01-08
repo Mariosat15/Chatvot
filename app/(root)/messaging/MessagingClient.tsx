@@ -26,8 +26,10 @@ import {
   File,
   UserCircle,
   Briefcase,
+  Loader2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Session {
   user: {
@@ -123,8 +125,122 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [assignedAgent, setAssignedAgent] = useState<AssignedAgent | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Map<string, { name: string; timestamp: number }>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // WebSocket for real-time messaging
+  const handleWebSocketMessage = useCallback((message: { type: string; data: any }) => {
+    console.log('📨 [WS] Received:', message.type);
+    
+    switch (message.type) {
+      case 'new_message':
+        // Add new message if it's for the current conversation
+        if (message.data.conversationId === selectedConversation?.id) {
+          // Don't add if it's from us (already added optimistically)
+          if (message.data.message.senderId !== session.user.id) {
+            setMessages(prev => {
+              // Check if message already exists
+              if (prev.some(m => m.id === message.data.message.id)) {
+                return prev;
+              }
+              return [...prev, message.data.message];
+            });
+            scrollToBottom();
+          }
+        }
+        // Update conversation list with new last message
+        fetchConversations();
+        break;
+        
+      case 'typing':
+        if (message.data.conversationId === selectedConversation?.id) {
+          if (message.data.isTyping && message.data.participantId !== session.user.id) {
+            setTypingUsers(prev => {
+              const newMap = new Map(prev);
+              newMap.set(message.data.participantId, {
+                name: message.data.participantName,
+                timestamp: Date.now(),
+              });
+              return newMap;
+            });
+          } else {
+            setTypingUsers(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(message.data.participantId);
+              return newMap;
+            });
+          }
+        }
+        break;
+        
+      case 'read_receipt':
+        // Update message read status
+        if (message.data.conversationId === selectedConversation?.id) {
+          setMessages(prev => prev.map(m => ({
+            ...m,
+            readBy: [...(m.readBy || []), { 
+              participantId: message.data.participantId, 
+              readAt: message.data.readAt 
+            }]
+          })));
+        }
+        break;
+        
+      case 'friend_request':
+        fetchFriendRequests();
+        break;
+        
+      case 'presence':
+        // Handle online/offline status updates
+        break;
+    }
+  }, [selectedConversation?.id, session.user.id]);
+
+  const { 
+    isConnected: wsConnected, 
+    subscribe: wsSubscribe, 
+    unsubscribe: wsUnsubscribe,
+    setTyping: wsSetTyping,
+  } = useWebSocket({
+    token: session.user.id, // Use user ID as token for now
+    onMessage: handleWebSocketMessage,
+    onConnect: () => console.log('✅ [WS] Connected'),
+    onDisconnect: () => console.log('❌ [WS] Disconnected'),
+  });
+
+  // Subscribe to conversation when selected
+  useEffect(() => {
+    if (selectedConversation?.id && wsConnected) {
+      wsSubscribe(selectedConversation.id);
+      return () => {
+        wsUnsubscribe(selectedConversation.id);
+      };
+    }
+  }, [selectedConversation?.id, wsConnected, wsSubscribe, wsUnsubscribe]);
+
+  // Clear stale typing indicators
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTypingUsers(prev => {
+        const now = Date.now();
+        const newMap = new Map(prev);
+        for (const [id, data] of newMap) {
+          if (now - data.timestamp > 5000) {
+            newMap.delete(id);
+          }
+        }
+        return newMap.size !== prev.size ? newMap : prev;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Scroll to bottom helper
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   // Fetch assigned account manager
   const fetchAssignedAgent = useCallback(async () => {
@@ -379,17 +495,21 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     }
   }, [selectedConversation, fetchMessages]);
 
-  // Poll for new messages
+  // Poll for new messages (fallback when WebSocket not connected, or slower refresh)
   useEffect(() => {
+    // Use longer interval when WebSocket is connected (30s), shorter when not (5s)
+    const pollInterval = wsConnected ? 30000 : 5000;
+    
     const interval = setInterval(() => {
       fetchConversations();
-      if (selectedConversation) {
+      // Only fetch messages if WebSocket is not connected
+      if (!wsConnected && selectedConversation) {
         fetchMessages(selectedConversation.id);
       }
-    }, 5000); // Poll every 5 seconds
+    }, pollInterval);
 
     return () => clearInterval(interval);
-  }, [selectedConversation, fetchConversations, fetchMessages]);
+  }, [selectedConversation, fetchConversations, fetchMessages, wsConnected]);
 
   // Search debounce
   useEffect(() => {
@@ -463,6 +583,11 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                   {unreadTotal}
                 </span>
               )}
+              {/* WebSocket Status */}
+              <span 
+                className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`}
+                title={wsConnected ? 'Live connection' : 'Connecting...'}
+              />
             </h1>
             <button
               onClick={startSupportConversation}
@@ -837,6 +962,20 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Typing Indicator */}
+            {typingUsers.size > 0 && (
+              <div className="px-4 py-2 text-sm text-gray-400 flex items-center gap-2">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span>
+                  {Array.from(typingUsers.values()).map(u => u.name).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
+                </span>
+              </div>
+            )}
+
             {/* Message Input */}
             <div className="p-4 border-t border-gray-700 bg-gray-800/50">
               <div className="flex items-center gap-2">
@@ -848,7 +987,22 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                   type="text"
                   placeholder="Type a message..."
                   value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
+                  onChange={(e) => {
+                    setMessageInput(e.target.value);
+                    // Send typing indicator
+                    if (selectedConversation && wsConnected) {
+                      wsSetTyping(selectedConversation.id, true);
+                      // Clear typing after 2 seconds of no input
+                      if (typingTimeoutRef.current) {
+                        clearTimeout(typingTimeoutRef.current);
+                      }
+                      typingTimeoutRef.current = setTimeout(() => {
+                        if (selectedConversation) {
+                          wsSetTyping(selectedConversation.id, false);
+                        }
+                      }, 2000);
+                    }
+                  }}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                   className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primary-500"
                 />

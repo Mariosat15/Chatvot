@@ -133,7 +133,7 @@ const server = createServer(async (req, res) => {
             // Broadcast new message
             if (data.conversationId && data.message) {
               broadcastToConversation(data.conversationId, {
-                type: 'message',
+                type: 'new_message',
                 data: { conversationId: data.conversationId, message: data.message },
               });
               console.log(`📤 Broadcast message to ${data.conversationId}`);
@@ -144,7 +144,7 @@ const server = createServer(async (req, res) => {
             // Broadcast read receipt
             if (data.conversationId) {
               broadcastToConversation(data.conversationId, {
-                type: 'read',
+                type: 'read_receipt',
                 data: {
                   conversationId: data.conversationId,
                   participantId: data.participantId,

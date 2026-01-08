@@ -18,6 +18,28 @@ import {
 // Rate limiting map (in production, use Redis)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
+// WebSocket server URL for internal API
+const WS_SERVER_URL = process.env.WEBSOCKET_INTERNAL_URL || 'http://localhost:3003';
+
+/**
+ * Broadcast message to WebSocket server for real-time delivery
+ */
+async function broadcastToWebSocket(endpoint: string, data: any): Promise<void> {
+  try {
+    const response = await fetch(`${WS_SERVER_URL}/internal/${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      console.warn(`[WS Broadcast] Failed to broadcast ${endpoint}:`, response.status);
+    }
+  } catch (error) {
+    // Don't throw - WebSocket is optional for message delivery
+    console.warn(`[WS Broadcast] Error broadcasting ${endpoint}:`, error instanceof Error ? error.message : error);
+  }
+}
+
 export class MessagingService {
   // ==========================================
   // CONVERSATIONS
@@ -391,6 +413,23 @@ export class MessagingService {
     
     // Stop typing indicator
     await UserPresence.stopTyping(params.senderId);
+    
+    // Broadcast message to WebSocket for real-time delivery
+    broadcastToWebSocket('message', {
+      conversationId: params.conversationId,
+      message: {
+        id: message._id.toString(),
+        senderId: message.senderId,
+        senderType: message.senderType,
+        senderName: message.senderName,
+        senderAvatar: message.senderAvatar,
+        content: message.content,
+        messageType: message.messageType,
+        attachments: message.attachments,
+        createdAt: message.createdAt,
+        readBy: message.readBy,
+      },
+    });
     
     return { message, conversation };
   }

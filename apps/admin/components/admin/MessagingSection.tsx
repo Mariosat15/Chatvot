@@ -25,8 +25,91 @@ import {
   ArrowLeftRight,
   RotateCcw,
   CircleDot,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
+
+// Simple WebSocket hook for admin
+function useAdminWebSocket(onMessage: (msg: any) => void) {
+  const [isConnected, setIsConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const connect = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    
+    try {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || `${wsProtocol}//${window.location.hostname}:3003`;
+      // Get admin ID from cookie for authentication
+      const adminId = document.cookie.split('; ').find(c => c.startsWith('admin_id='))?.split('=')[1] || 'admin';
+      const ws = new WebSocket(`${wsUrl}/ws?token=${encodeURIComponent(adminId)}&type=employee`);
+
+      ws.onopen = () => {
+        console.log('✅ [Admin WS] Connected');
+        setIsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          onMessage(message);
+        } catch (e) {
+          console.error('Failed to parse WS message:', e);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('❌ [Admin WS] Disconnected');
+        setIsConnected(false);
+        wsRef.current = null;
+        // Reconnect after 3 seconds
+        reconnectTimeoutRef.current = setTimeout(connect, 3000);
+      };
+
+      ws.onerror = (error) => {
+        console.error('[Admin WS] Error:', error);
+      };
+
+      wsRef.current = ws;
+    } catch (error) {
+      console.error('Failed to connect WS:', error);
+    }
+  }, [onMessage]);
+
+  const subscribe = useCallback((conversationId: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'subscribe', conversationId }));
+    }
+  }, []);
+
+  const unsubscribe = useCallback((conversationId: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'unsubscribe', conversationId }));
+    }
+  }, []);
+
+  const setTyping = useCallback((conversationId: string, isTyping: boolean) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'typing', conversationId, isTyping }));
+    }
+  }, []);
+
+  useEffect(() => {
+    connect();
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, [connect]);
+
+  return { isConnected, subscribe, unsubscribe, setTyping };
+}
 
 interface Conversation {
   id: string;
@@ -108,8 +191,93 @@ export default function MessagingSection() {
   const [transferReason, setTransferReason] = useState('');
   const [selectedEmployeeForTransfer, setSelectedEmployeeForTransfer] = useState<string>('');
   const [assignedCustomers, setAssignedCustomers] = useState<AssignedCustomer[]>([]);
+  const [typingUsers, setTypingUsers] = useState<Map<string, { name: string; timestamp: number }>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const selectedConvRef = useRef<string | null>(null);
+
+  // Keep selected conversation ID in ref for WebSocket callbacks
+  useEffect(() => {
+    selectedConvRef.current = selectedConversation?.id || null;
+  }, [selectedConversation?.id]);
+
+  // WebSocket message handler
+  const handleWebSocketMessage = useCallback((message: { type: string; data?: any; [key: string]: any }) => {
+    console.log('📨 [Admin WS] Received:', message.type);
+    
+    switch (message.type) {
+      case 'new_message':
+        // Add new message if it's for the current conversation
+        if (message.data?.conversationId === selectedConvRef.current) {
+          setMessages(prev => {
+            // Check if message already exists
+            if (prev.some(m => m.id === message.data.message?.id)) {
+              return prev;
+            }
+            return [...prev, message.data.message];
+          });
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+        // Always refresh conversation list for unread counts
+        fetchConversations();
+        break;
+        
+      case 'typing':
+        if (message.data?.conversationId === selectedConvRef.current) {
+          if (message.data.isTyping) {
+            setTypingUsers(prev => {
+              const newMap = new Map(prev);
+              newMap.set(message.data.participantId, {
+                name: message.data.participantName,
+                timestamp: Date.now(),
+              });
+              return newMap;
+            });
+          } else {
+            setTypingUsers(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(message.data.participantId);
+              return newMap;
+            });
+          }
+        }
+        break;
+        
+      case 'read_receipt':
+        break;
+    }
+  }, []);
+
+  // WebSocket connection
+  const { isConnected: wsConnected, subscribe: wsSubscribe, unsubscribe: wsUnsubscribe, setTyping: wsSetTyping } = useAdminWebSocket(handleWebSocketMessage);
+
+  // Subscribe to conversation when selected
+  useEffect(() => {
+    if (selectedConversation?.id && wsConnected) {
+      wsSubscribe(selectedConversation.id);
+      return () => {
+        wsUnsubscribe(selectedConversation.id);
+      };
+    }
+  }, [selectedConversation?.id, wsConnected, wsSubscribe, wsUnsubscribe]);
+
+  // Clear stale typing indicators
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTypingUsers(prev => {
+        const now = Date.now();
+        const newMap = new Map(prev);
+        for (const [id, data] of newMap) {
+          if (now - data.timestamp > 5000) {
+            newMap.delete(id);
+          }
+        }
+        return newMap.size !== prev.size ? newMap : prev;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch assigned customers
   const fetchAssignedCustomers = useCallback(async () => {
@@ -290,16 +458,20 @@ export default function MessagingSection() {
     loadData();
   }, [fetchConversations, fetchEmployees, fetchAssignedCustomers, fetchAvailability]);
 
-  // Poll for new messages
+  // Poll for new messages (fallback/slower when WebSocket connected)
   useEffect(() => {
+    // Use longer interval when WebSocket is connected (30s), shorter when not (5s)
+    const pollInterval = wsConnected ? 30000 : 5000;
+    
     const interval = setInterval(() => {
       fetchConversations();
-      if (selectedConversation) {
+      // Only fetch messages if WebSocket is not connected
+      if (!wsConnected && selectedConversation) {
         fetchMessages(selectedConversation.id);
       }
-    }, 5000);
+    }, pollInterval);
     return () => clearInterval(interval);
-  }, [fetchConversations, fetchMessages, selectedConversation]);
+  }, [fetchConversations, fetchMessages, selectedConversation, wsConnected]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -460,6 +632,21 @@ export default function MessagingSection() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* WebSocket Status */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-[#1E1E1E] rounded-lg">
+            {wsConnected ? (
+              <>
+                <Wifi className="w-4 h-4 text-emerald-500" />
+                <span className="text-xs text-emerald-500">Live</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-4 h-4 text-amber-500 animate-pulse" />
+                <span className="text-xs text-amber-500">Connecting...</span>
+              </>
+            )}
+          </div>
+          
           {/* Availability Toggle */}
           <div className="flex items-center gap-2 px-4 py-2 bg-[#1E1E1E] rounded-lg">
             <CircleDot className={`w-4 h-4 ${isAvailable ? 'text-emerald-500' : 'text-red-500'}`} />
@@ -1003,6 +1190,20 @@ export default function MessagingSection() {
                 <div ref={messagesEndRef} />
               </div>
 
+              {/* Typing Indicator */}
+              {typingUsers.size > 0 && (
+                <div className="px-4 py-2 text-sm text-[#6b7280] flex items-center gap-2 border-t border-[#2A2A2A]">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  <span>
+                    {Array.from(typingUsers.values()).map(u => u.name).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
+                  </span>
+                </div>
+              )}
+
               {/* Message Input */}
               <div className="p-4 border-t border-[#2A2A2A]">
                 <div className="flex items-center gap-3">
@@ -1011,7 +1212,21 @@ export default function MessagingSection() {
                     type="text"
                     placeholder="Type a message..."
                     value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
+                    onChange={(e) => {
+                      setMessageInput(e.target.value);
+                      // Send typing indicator
+                      if (selectedConversation && wsConnected) {
+                        wsSetTyping(selectedConversation.id, true);
+                        if (typingTimeoutRef.current) {
+                          clearTimeout(typingTimeoutRef.current);
+                        }
+                        typingTimeoutRef.current = setTimeout(() => {
+                          if (selectedConversation) {
+                            wsSetTyping(selectedConversation.id, false);
+                          }
+                        }, 2000);
+                      }
+                    }}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                     className="flex-1 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl px-4 py-2.5 text-white placeholder-[#6b7280] focus:outline-none focus:border-emerald-500/50"
                   />
