@@ -46,6 +46,11 @@ interface AssignmentSettings {
   highlightUnassigned: boolean;
 }
 
+interface AvailableRole {
+  name: string;
+  description: string;
+}
+
 const STRATEGIES = [
   { value: 'least_customers', label: 'Least Customers First', description: 'Balance workload evenly' },
   { value: 'round_robin', label: 'Round Robin', description: 'Rotate assignments A→B→C' },
@@ -54,16 +59,9 @@ const STRATEGIES = [
   { value: 'random', label: 'Random', description: 'Random selection' },
 ];
 
-const AVAILABLE_ROLES = [
-  'Backoffice',
-  'Financial Officer',
-  'Compliance Officer',
-  'Support',
-  'Manager',
-];
-
 export function CustomerAssignmentSettings() {
   const [settings, setSettings] = useState<AssignmentSettings | null>(null);
+  const [availableRoles, setAvailableRoles] = useState<AvailableRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -88,6 +86,10 @@ export function CustomerAssignmentSettings() {
       if (data.success) {
         setSettings(data.settings);
         setOriginalSettings(data.settings);
+        // Set available roles from API (dynamically from role templates)
+        if (data.availableRoles) {
+          setAvailableRoles(data.availableRoles);
+        }
       } else {
         toast.error(data.error || 'Failed to fetch settings');
       }
@@ -116,6 +118,10 @@ export function CustomerAssignmentSettings() {
         toast.success('Settings saved successfully');
         setOriginalSettings(data.settings);
         setHasChanges(false);
+        // Update available roles in case templates changed
+        if (data.availableRoles) {
+          setAvailableRoles(data.availableRoles);
+        }
       } else {
         toast.error(data.error || 'Failed to save settings');
       }
@@ -255,26 +261,44 @@ export function CustomerAssignmentSettings() {
 
               <div className="space-y-2">
                 <Label className="text-gray-300">Assignable Roles</Label>
-                <p className="text-xs text-gray-500">Select which roles can be assigned customers</p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {AVAILABLE_ROLES.map((role) => (
-                    <Badge
-                      key={role}
-                      variant="outline"
-                      className={`cursor-pointer transition-colors ${
-                        settings.assignableRoles?.includes(role)
-                          ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
-                          : 'bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-700'
-                      }`}
-                      onClick={() => toggleRole(role)}
-                    >
-                      {settings.assignableRoles?.includes(role) && (
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                      )}
-                      {role}
-                    </Badge>
-                  ))}
-                </div>
+                <p className="text-xs text-gray-500">
+                  Select which employee roles can be assigned customers. 
+                  Roles are loaded from your Employee Role Templates.
+                </p>
+                {availableRoles.length === 0 ? (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-yellow-400 mt-0.5" />
+                    <p className="text-sm text-yellow-400">
+                      No role templates found. Create role templates in the Employees section first.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {availableRoles.map((role) => (
+                      <Badge
+                        key={role.name}
+                        variant="outline"
+                        className={`cursor-pointer transition-colors ${
+                          settings.assignableRoles?.includes(role.name)
+                            ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                            : 'bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-700'
+                        }`}
+                        onClick={() => toggleRole(role.name)}
+                        title={role.description}
+                      >
+                        {settings.assignableRoles?.includes(role.name) && (
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                        )}
+                        {role.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {settings.assignableRoles?.length === 0 && availableRoles.length > 0 && (
+                  <p className="text-xs text-orange-400 mt-1">
+                    ⚠️ No roles selected. Auto-assignment won't work until at least one role is selected.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -529,4 +553,3 @@ export function CustomerAssignmentSettings() {
 }
 
 export default CustomerAssignmentSettings;
-

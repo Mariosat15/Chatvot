@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { customerAssignmentService } from '@/lib/services/customer-assignment.service';
 import { connectToDatabase } from '@/database/mongoose';
+import { AdminRoleTemplate } from '@/database/models/admin-role-template.model';
 
 /**
  * GET /api/customer-assignments/settings
- * Get assignment settings
+ * Get assignment settings and available roles from templates
  */
 export async function GET(request: NextRequest) {
   try {
@@ -17,9 +18,22 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
     const settings = await customerAssignmentService.getSettings();
 
+    // Fetch all active role templates to get available roles
+    const roleTemplates = await AdminRoleTemplate.find({ isActive: true })
+      .select('name description')
+      .sort({ name: 1 })
+      .lean();
+
+    // Extract unique role names
+    const availableRoles = roleTemplates.map(template => ({
+      name: template.name,
+      description: template.description,
+    }));
+
     return NextResponse.json({
       success: true,
       settings,
+      availableRoles,
     });
   } catch (error) {
     console.error('Error fetching assignment settings:', error);
@@ -70,12 +84,24 @@ export async function PUT(request: NextRequest) {
       }
     );
 
+    // Also return updated available roles
+    const roleTemplates = await AdminRoleTemplate.find({ isActive: true })
+      .select('name description')
+      .sort({ name: 1 })
+      .lean();
+
+    const availableRoles = roleTemplates.map(template => ({
+      name: template.name,
+      description: template.description,
+    }));
+
     console.log(`✅ [Settings] Assignment settings updated by ${auth.email}`);
 
     return NextResponse.json({
       success: true,
       message: 'Assignment settings updated successfully',
       settings,
+      availableRoles,
     });
   } catch (error) {
     console.error('Error updating assignment settings:', error);
@@ -85,4 +111,3 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
-
