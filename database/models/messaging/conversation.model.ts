@@ -40,7 +40,10 @@ export interface IConversation extends Document {
   // For support conversations
   assignedEmployeeId?: Types.ObjectId;
   assignedEmployeeName?: string;
-  originalEmployeeId?: Types.ObjectId; // For transfer tracking
+  originalEmployeeId?: Types.ObjectId; // For temporary redirection tracking
+  originalEmployeeName?: string;
+  temporarilyRedirected?: boolean;
+  redirectedAt?: Date;
   
   // AI handling
   isAIHandled: boolean;
@@ -127,6 +130,12 @@ const ConversationSchema = new Schema<IConversation>(
       type: Schema.Types.ObjectId,
       ref: 'Admin',
     },
+    originalEmployeeName: { type: String },
+    temporarilyRedirected: {
+      type: Boolean,
+      default: false,
+    },
+    redirectedAt: { type: Date },
     
     isAIHandled: {
       type: Boolean,

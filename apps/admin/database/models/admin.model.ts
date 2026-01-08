@@ -21,6 +21,11 @@ export interface AdminDocument extends Document {
   lockedOutAt?: Date;
   lockedOutBy?: string;
   lockedOutReason?: string;
+  // Chat availability
+  isAvailableForChat?: boolean;
+  unavailableReason?: string;
+  unavailableSince?: Date;
+  unavailableUntil?: Date;
   // Temporary password tracking
   tempPasswordExpiresAt?: Date;
   passwordChangedAt?: Date;
@@ -111,6 +116,23 @@ const AdminSchema = new Schema<AdminDocument>(
     },
     lockedOutReason: {
       type: String,
+      default: undefined,
+    },
+    // Chat availability
+    isAvailableForChat: {
+      type: Boolean,
+      default: true,
+    },
+    unavailableReason: {
+      type: String,
+      default: undefined,
+    },
+    unavailableSince: {
+      type: Date,
+      default: undefined,
+    },
+    unavailableUntil: {
+      type: Date,
       default: undefined,
     },
     // Temporary password expiry (for auto-generated passwords)

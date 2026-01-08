@@ -341,12 +341,15 @@ async function escalateToHuman(
     });
   }
   
-  // If no assigned employee, find any available backoffice/support employee
-  if (!assignedEmployee) {
+  // If no assigned employee or assigned employee is unavailable, find any available backoffice/support employee
+  if (!assignedEmployee || assignedEmployee.isAvailableForChat === false) {
+    const originalEmployee = assignedEmployee; // Store original for reference
+    
     assignedEmployee = await db.collection('admins').findOne({
       status: 'active',
       role: { $in: ['Backoffice', 'Support Agent', 'Full Admin'] },
-      isLockedOut: { $ne: true }
+      isLockedOut: { $ne: true },
+      isAvailableForChat: { $ne: false }
     });
   }
   

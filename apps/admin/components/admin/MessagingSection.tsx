@@ -23,6 +23,8 @@ import {
   AlertCircle,
   Inbox,
   ArrowLeftRight,
+  RotateCcw,
+  CircleDot,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
@@ -47,6 +49,9 @@ interface Conversation {
   isAIHandled: boolean;
   assignedEmployeeId?: string;
   assignedEmployeeName?: string;
+  originalEmployeeId?: string;
+  originalEmployeeName?: string;
+  temporarilyRedirected?: boolean;
   metadata?: any;
   createdAt: string;
   lastActivityAt: string;
@@ -98,6 +103,8 @@ export default function MessagingSection() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(true);
+  const [isTogglingAvailability, setIsTogglingAvailability] = useState(false);
   const [transferReason, setTransferReason] = useState('');
   const [selectedEmployeeForTransfer, setSelectedEmployeeForTransfer] = useState<string>('');
   const [assignedCustomers, setAssignedCustomers] = useState<AssignedCustomer[]>([]);
@@ -191,6 +198,59 @@ export default function MessagingSection() {
     }
   }, []);
 
+  // Fetch availability status
+  const fetchAvailability = useCallback(async () => {
+    try {
+      const response = await fetch('/api/employees/availability');
+      if (response.ok) {
+        const data = await response.json();
+        setIsAvailable(data.isAvailableForChat !== false);
+      }
+    } catch (error) {
+      console.error('Error fetching availability:', error);
+    }
+  }, []);
+
+  // Toggle availability
+  const toggleAvailability = async () => {
+    setIsTogglingAvailability(true);
+    try {
+      const response = await fetch('/api/employees/availability', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isAvailable: !isAvailable,
+          reason: !isAvailable ? undefined : 'Away',
+        }),
+      });
+
+      if (response.ok) {
+        setIsAvailable(!isAvailable);
+      }
+    } catch (error) {
+      console.error('Error toggling availability:', error);
+    }
+    setIsTogglingAvailability(false);
+  };
+
+  // Reassign conversation back to original employee
+  const handleReassignBack = async (conversationId: string) => {
+    try {
+      const response = await fetch(`/api/messaging/conversations/${conversationId}/reassign-back`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        await fetchConversations();
+        if (selectedConversation?.id === conversationId) {
+          fetchMessages(conversationId);
+        }
+      }
+    } catch (error) {
+      console.error('Error reassigning conversation:', error);
+    }
+  };
+
   // Fetch messages for selected conversation
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
@@ -218,11 +278,11 @@ export default function MessagingSection() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchConversations(), fetchEmployees(), fetchAssignedCustomers()]);
+      await Promise.all([fetchConversations(), fetchEmployees(), fetchAssignedCustomers(), fetchAvailability()]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchConversations, fetchEmployees, fetchAssignedCustomers]);
+  }, [fetchConversations, fetchEmployees, fetchAssignedCustomers, fetchAvailability]);
 
   // Poll for new messages
   useEffect(() => {
@@ -368,6 +428,22 @@ export default function MessagingSection() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Availability Toggle */}
+          <div className="flex items-center gap-2 px-4 py-2 bg-[#1E1E1E] rounded-lg">
+            <CircleDot className={`w-4 h-4 ${isAvailable ? 'text-emerald-500' : 'text-red-500'}`} />
+            <span className="text-sm text-[#6b7280]">Status:</span>
+            <button
+              onClick={toggleAvailability}
+              disabled={isTogglingAvailability}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                isAvailable
+                  ? 'bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30'
+                  : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
+              } ${isTogglingAvailability ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {isTogglingAvailability ? 'Updating...' : isAvailable ? 'Available' : 'Away'}
+            </button>
+          </div>
           <button
             onClick={() => fetchConversations()}
             className="px-4 py-2 bg-[#1E1E1E] text-white rounded-lg hover:bg-[#2A2A2A] transition-colors flex items-center gap-2"
@@ -656,6 +732,18 @@ export default function MessagingSection() {
                           → {conversation.assignedEmployeeName}
                         </p>
                       )}
+                      {conversation.temporarilyRedirected && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-xs bg-amber-500/20 text-amber-500 px-1.5 py-0.5 rounded">
+                            Redirected
+                          </span>
+                          {conversation.originalEmployeeName && (
+                            <span className="text-xs text-[#6b7280]">
+                              from {conversation.originalEmployeeName}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 );
@@ -698,10 +786,25 @@ export default function MessagingSection() {
                       {selectedConversation.assignedEmployeeName && (
                         <span>Assigned to {selectedConversation.assignedEmployeeName}</span>
                       )}
+                      {selectedConversation.temporarilyRedirected && (
+                        <span className="flex items-center gap-1 bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded">
+                          <RotateCcw className="w-3 h-3" />
+                          Redirected from {selectedConversation.originalEmployeeName}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {selectedConversation.temporarilyRedirected && selectedConversation.originalEmployeeId && (
+                    <button
+                      onClick={() => handleReassignBack(selectedConversation.id)}
+                      className="px-3 py-1.5 bg-amber-500/20 text-amber-500 text-sm rounded-lg hover:bg-amber-500/30 transition-colors flex items-center gap-2"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Reassign to {selectedConversation.originalEmployeeName}
+                    </button>
+                  )}
                   {selectedConversation.type === 'user-to-support' && (
                     <button
                       onClick={() => setShowTransferModal(true)}
