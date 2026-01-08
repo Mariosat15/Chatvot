@@ -11,11 +11,16 @@ import mongoose from 'mongoose';
  * Body: { userId, userEmail, userName }
  */
 export async function POST(request: NextRequest) {
+  console.log('🎯 [AutoAssign] API endpoint called');
+  
   try {
     const body = await request.json();
     const { userId, userEmail, userName } = body;
+    
+    console.log('🎯 [AutoAssign] Request body:', { userId, userEmail, userName });
 
     if (!userId || !userEmail) {
+      console.log('❌ [AutoAssign] Missing userId or userEmail');
       return NextResponse.json(
         { error: 'userId and userEmail are required' },
         { status: 400 }
@@ -26,11 +31,14 @@ export async function POST(request: NextRequest) {
     const db = mongoose.connection.db;
 
     if (!db) {
+      console.log('❌ [AutoAssign] Database connection failed');
       return NextResponse.json(
         { error: 'Database connection failed' },
         { status: 500 }
       );
     }
+    
+    console.log('✅ [AutoAssign] Database connected');
 
     // Get assignment settings
     const settingsCollection = db.collection('assignment_settings');
@@ -63,6 +71,8 @@ export async function POST(request: NextRequest) {
       notifyCustomerOnAssignment: false,
     };
 
+    console.log('🔧 [AutoAssign] Settings loaded:', JSON.stringify(settings, null, 2));
+
     // Check if auto-assign is enabled
     if (!settings.autoAssignEnabled) {
       console.log(`⏭️ [AutoAssign] Auto-assignment is disabled for ${userEmail}`);
@@ -72,6 +82,8 @@ export async function POST(request: NextRequest) {
         reason: 'Auto-assignment is disabled',
       });
     }
+    
+    console.log('✅ [AutoAssign] Auto-assignment is enabled');
 
     // Check if customer already has an assignment
     const assignmentsCollection = db.collection('customer_assignments');
@@ -93,13 +105,29 @@ export async function POST(request: NextRequest) {
     // Get eligible employees from admins collection
     const adminsCollection = db.collection('admins');
     const assignableRoles = settings.assignableRoles || ['Backoffice'];
+    
+    console.log('🔍 [AutoAssign] Looking for employees with roles:', assignableRoles);
+    
+    // First, let's see ALL admins in the database for debugging
+    const allAdmins = await adminsCollection.find({}).toArray();
+    console.log('📋 [AutoAssign] ALL admins in database:', allAdmins.map(a => ({
+      email: a.email,
+      role: a.role,
+      status: a.status,
+      isFirstLogin: a.isFirstLogin
+    })));
 
     const eligibleEmployeesQuery: any = {
       status: 'active',
       role: { $in: assignableRoles },
     };
+    
+    console.log('🔍 [AutoAssign] Query:', JSON.stringify(eligibleEmployeesQuery));
 
     const eligibleEmployees = await adminsCollection.find(eligibleEmployeesQuery).toArray();
+    
+    console.log('👥 [AutoAssign] Eligible employees found:', eligibleEmployees.length, 
+      eligibleEmployees.map(e => ({ email: e.email, role: e.role })));
 
     if (eligibleEmployees.length === 0) {
       console.log(`⚠️ [AutoAssign] No eligible employees found for ${userEmail}`);

@@ -132,6 +132,9 @@ export const signUpWithEmail = async ({
             // Auto-assign customer to employee (if enabled)
             try {
                 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+                console.log(`🎯 [AutoAssign] Calling auto-assign API at: ${baseUrl}/api/customer-assignment/auto-assign`);
+                console.log(`🎯 [AutoAssign] Payload: userId=${userId}, userEmail=${email}, userName=${fullName}`);
+                
                 const autoAssignResponse = await fetch(`${baseUrl}/api/customer-assignment/auto-assign`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -142,13 +145,19 @@ export const signUpWithEmail = async ({
                     }),
                 });
                 
+                console.log(`🎯 [AutoAssign] Response status: ${autoAssignResponse.status}`);
+                
                 if (autoAssignResponse.ok) {
                     const result = await autoAssignResponse.json();
+                    console.log(`🎯 [AutoAssign] Response data:`, JSON.stringify(result));
                     if (result.assigned) {
                         console.log(`✅ Customer auto-assigned to ${result.employee?.name}`);
                     } else {
                         console.log(`📋 Customer not auto-assigned: ${result.reason}`);
                     }
+                } else {
+                    const errorText = await autoAssignResponse.text();
+                    console.log(`❌ [AutoAssign] Error response: ${errorText}`);
                 }
             } catch (autoAssignError) {
                 console.error('⚠️ Failed to auto-assign customer:', autoAssignError);
