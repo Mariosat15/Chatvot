@@ -224,7 +224,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
     setIsSending(true);
     try {
-      const response = await fetch(`/api/messaging/conversations/${selectedConversation.id}/messages`, {
+      // Use support endpoint for support conversations
+      const endpoint = selectedConversation.type === 'user-to-support'
+        ? '/api/messaging/support'
+        : `/api/messaging/conversations/${selectedConversation.id}/messages`;
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: messageInput }),
@@ -236,6 +241,8 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         setMessageInput('');
         scrollToBottom();
         fetchConversations(); // Refresh conversation list
+      } else {
+        console.error('Failed to send message:', response.status);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -244,17 +251,20 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     }
   };
 
-  // Start support conversation
+  // Start support conversation - GET to create/get, then display
   const startSupportConversation = async () => {
     try {
-      const response = await fetch('/api/messaging/support', {
-        method: 'POST',
-      });
+      const response = await fetch('/api/messaging/support');
       if (response.ok) {
         const data = await response.json();
-        fetchConversations();
+        // Set the conversation and messages
         setSelectedConversation(data.conversation);
+        setMessages(data.messages || []);
         setShowMobileChat(true);
+        // Refresh conversation list
+        fetchConversations();
+      } else {
+        console.error('Failed to start support conversation:', response.status);
       }
     } catch (error) {
       console.error('Error starting support conversation:', error);

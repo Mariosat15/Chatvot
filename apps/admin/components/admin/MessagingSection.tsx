@@ -121,24 +121,41 @@ export default function MessagingSection() {
   }, []);
 
   // Start conversation with assigned customer
-  const startConversationWithCustomer = async (customerId: string, customerName: string) => {
+  const startConversationWithCustomer = async (customerId: string, customerName: string, customerAvatar?: string) => {
     try {
-      // First check if there's an existing support conversation
-      const response = await fetch(`/api/messaging/conversations?type=support&customerId=${customerId}`);
+      // Create or get existing conversation with customer
+      const response = await fetch('/api/messaging/conversations/create-with-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId, customerName, customerAvatar }),
+      });
+      
       if (response.ok) {
         const data = await response.json();
-        const existingConv = data.conversations?.find((c: Conversation) => 
-          c.participants.some(p => p.id === customerId)
-        );
-        if (existingConv) {
-          setSelectedConversation(existingConv);
-          setActiveTab('support');
-          return;
+        // Switch to support tab and select the conversation
+        setActiveTab('support');
+        await fetchConversations();
+        
+        // Fetch the full conversation with messages
+        const convResponse = await fetch(`/api/messaging/conversations/${data.conversation.id}`);
+        if (convResponse.ok) {
+          const convData = await convResponse.json();
+          setSelectedConversation({
+            id: data.conversation.id,
+            type: data.conversation.type,
+            status: data.conversation.status,
+            participants: data.conversation.participants,
+            lastMessage: convData.lastMessage,
+            unreadCount: 0,
+            isAIHandled: false,
+            createdAt: convData.createdAt,
+            lastActivityAt: convData.lastActivityAt,
+          });
+          setMessages(convData.messages || []);
         }
+      } else {
+        console.error('Failed to create conversation:', response.status);
       }
-      
-      // If no existing conversation, show info message
-      alert(`To chat with ${customerName}, they need to initiate a support conversation first, or you can reach out via email.`);
     } catch (error) {
       console.error('Error starting conversation:', error);
     }
@@ -482,7 +499,7 @@ export default function MessagingSection() {
                       <div
                         key={customer.id}
                         className="flex items-center gap-3 p-3 hover:bg-[#1E1E1E] rounded-lg cursor-pointer transition-colors border border-[#2A2A2A] mb-2"
-                        onClick={() => startConversationWithCustomer(customer.id, customer.name)}
+                        onClick={() => startConversationWithCustomer(customer.id, customer.name, customer.avatar)}
                       >
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
                           {customer.avatar ? (
@@ -558,11 +575,14 @@ export default function MessagingSection() {
               </div>
             )}
 
-            {activeTab !== 'my-customers' && (
+            {activeTab === 'support' && (
               filteredConversations.length === 0 ? (
                 <div className="text-center py-12">
                   <Inbox className="w-12 h-12 text-[#4b5563] mx-auto mb-4" />
-                  <p className="text-[#6b7280]">No conversations</p>
+                  <p className="text-[#6b7280]">No support conversations</p>
+                  <p className="text-xs text-[#4b5563] mt-2">
+                    Conversations will appear when customers contact support
+                  </p>
                 </div>
               ) : (
                 filteredConversations.map((conversation) => {
