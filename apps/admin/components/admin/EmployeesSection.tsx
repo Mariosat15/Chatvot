@@ -133,6 +133,9 @@ const SECTION_LABELS: Record<string, string> = {
   'kyc-settings': 'KYC Settings',
   'kyc-history': 'KYC History',
   'fraud': 'Fraud Detection',
+  // Messaging
+  'messaging': 'Support Center',
+  'messaging-settings': 'Messaging Settings',
   // Help
   'wiki': 'Documentation',
   // AI & Automation
@@ -169,6 +172,7 @@ const SECTION_GROUPS = {
   'User Management': ['users', 'badges'],
   'Finance': ['financial', 'payments', 'failed-deposits', 'withdrawals', 'pending-withdrawals'],
   'Security': ['kyc-settings', 'kyc-history', 'fraud'],
+  'Messaging': ['messaging', 'messaging-settings'],
   'Help': ['wiki'],
   'AI & Automation': ['ai-agent'],
   'Settings': ['settings', 'credentials', 'environment', 'branding', 'company', 'invoices', 'email-templates', 'notifications', 'trading-risk', 'currency', 'fees', 'payment-providers', 'database', 'audit-logs'],

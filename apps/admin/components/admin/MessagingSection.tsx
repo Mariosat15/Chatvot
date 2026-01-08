@@ -77,8 +77,17 @@ interface Employee {
   lastSeen?: string;
 }
 
+interface AssignedCustomer {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  assignedAt: string;
+  department?: string;
+}
+
 export default function MessagingSection() {
-  const [activeTab, setActiveTab] = useState<'support' | 'internal'>('support');
+  const [activeTab, setActiveTab] = useState<'support' | 'internal' | 'my-customers'>('support');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -91,8 +100,46 @@ export default function MessagingSection() {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferReason, setTransferReason] = useState('');
   const [selectedEmployeeForTransfer, setSelectedEmployeeForTransfer] = useState<string>('');
+  const [assignedCustomers, setAssignedCustomers] = useState<AssignedCustomer[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch assigned customers
+  const fetchAssignedCustomers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/messaging/assigned-customers');
+      if (response.ok) {
+        const data = await response.json();
+        setAssignedCustomers(data.customers || []);
+      }
+    } catch (error) {
+      console.error('Error fetching assigned customers:', error);
+    }
+  }, []);
+
+  // Start conversation with assigned customer
+  const startConversationWithCustomer = async (customerId: string, customerName: string) => {
+    try {
+      // First check if there's an existing support conversation
+      const response = await fetch(`/api/messaging/conversations?type=support&customerId=${customerId}`);
+      if (response.ok) {
+        const data = await response.json();
+        const existingConv = data.conversations?.find((c: Conversation) => 
+          c.participants.some(p => p.id === customerId)
+        );
+        if (existingConv) {
+          setSelectedConversation(existingConv);
+          setActiveTab('support');
+          return;
+        }
+      }
+      
+      // If no existing conversation, show info message
+      alert(`To chat with ${customerName}, they need to initiate a support conversation first, or you can reach out via email.`);
+    } catch (error) {
+      console.error('Error starting conversation:', error);
+    }
+  };
 
   // Fetch conversations
   const fetchConversations = useCallback(async () => {
@@ -142,11 +189,11 @@ export default function MessagingSection() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchConversations(), fetchEmployees()]);
+      await Promise.all([fetchConversations(), fetchEmployees(), fetchAssignedCustomers()]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchConversations, fetchEmployees]);
+  }, [fetchConversations, fetchEmployees, fetchAssignedCustomers]);
 
   // Poll for new messages
   useEffect(() => {
@@ -348,6 +395,22 @@ export default function MessagingSection() {
               Support
             </button>
             <button
+              onClick={() => { setActiveTab('my-customers'); setSelectedConversation(null); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'my-customers'
+                  ? 'text-emerald-500 border-b-2 border-emerald-500 bg-emerald-500/5'
+                  : 'text-[#6b7280] hover:text-white'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              My Customers
+              {assignedCustomers.length > 0 && (
+                <span className="bg-emerald-500/20 text-emerald-500 text-xs px-1.5 py-0.5 rounded-full">
+                  {assignedCustomers.length}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => { setActiveTab('internal'); setSelectedConversation(null); }}
               className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
                 activeTab === 'internal'
@@ -393,6 +456,64 @@ export default function MessagingSection() {
 
           {/* Conversation List */}
           <div className="flex-1 overflow-y-auto">
+            {/* My Customers Tab Content */}
+            {activeTab === 'my-customers' && (
+              <div className="p-2">
+                {assignedCustomers.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Users className="w-12 h-12 text-[#4b5563] mx-auto mb-4" />
+                    <p className="text-[#6b7280]">No customers assigned to you</p>
+                    <p className="text-xs text-[#4b5563] mt-2">
+                      Customers will appear here when assigned by an admin
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs text-[#6b7280] px-2 py-1 mb-2">
+                      Your Assigned Customers ({assignedCustomers.length})
+                    </p>
+                    {assignedCustomers.map((customer) => (
+                      <div
+                        key={customer.id}
+                        className="flex items-center gap-3 p-3 hover:bg-[#1E1E1E] rounded-lg cursor-pointer transition-colors border border-[#2A2A2A] mb-2"
+                        onClick={() => startConversationWithCustomer(customer.id, customer.name)}
+                      >
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
+                          {customer.avatar ? (
+                            <img src={customer.avatar} alt="" className="w-10 h-10 rounded-full" />
+                          ) : (
+                            <span className="text-white text-sm font-bold">
+                              {customer.name.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white font-medium truncate">{customer.name}</p>
+                          <p className="text-xs text-[#6b7280] truncate">{customer.email}</p>
+                          {customer.assignedAt && (
+                            <p className="text-xs text-emerald-500/70">
+                              Assigned {formatDistanceToNow(new Date(customer.assignedAt), { addSuffix: true })}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <a
+                            href={`mailto:${customer.email}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 hover:bg-emerald-500/20 rounded-lg text-[#6b7280] hover:text-emerald-500 transition-colors"
+                            title="Send email"
+                          >
+                            <Mail className="w-4 h-4" />
+                          </a>
+                          <MessageCircle className="w-4 h-4 text-[#6b7280]" />
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+
             {activeTab === 'internal' && (
               <div className="p-2 border-b border-[#2A2A2A]">
                 <p className="text-xs text-[#6b7280] px-2 py-1">Team Members</p>
@@ -421,13 +542,14 @@ export default function MessagingSection() {
               </div>
             )}
 
-            {filteredConversations.length === 0 ? (
-              <div className="text-center py-12">
-                <Inbox className="w-12 h-12 text-[#4b5563] mx-auto mb-4" />
-                <p className="text-[#6b7280]">No conversations</p>
-              </div>
-            ) : (
-              filteredConversations.map((conversation) => {
+            {activeTab !== 'my-customers' && (
+              filteredConversations.length === 0 ? (
+                <div className="text-center py-12">
+                  <Inbox className="w-12 h-12 text-[#4b5563] mx-auto mb-4" />
+                  <p className="text-[#6b7280]">No conversations</p>
+                </div>
+              ) : (
+                filteredConversations.map((conversation) => {
                 const customer = getCustomer(conversation);
                 const isSelected = selectedConversation?.id === conversation.id;
 
@@ -496,6 +618,7 @@ export default function MessagingSection() {
                   </motion.div>
                 );
               })
+              )
             )}
           </div>
         </div>

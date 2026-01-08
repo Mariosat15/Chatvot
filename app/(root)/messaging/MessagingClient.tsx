@@ -24,6 +24,8 @@ import {
   Settings,
   Image as ImageIcon,
   File,
+  UserCircle,
+  Briefcase,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -96,6 +98,15 @@ interface FriendRequest {
   createdAt: string;
 }
 
+interface AssignedAgent {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string;
+  assignedAt: string;
+}
+
 export default function MessagingClient({ session }: MessagingClientProps) {
   const [activeTab, setActiveTab] = useState<'chats' | 'friends' | 'requests'>('chats');
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -111,8 +122,22 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const [isSending, setIsSending] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [unreadTotal, setUnreadTotal] = useState(0);
+  const [assignedAgent, setAssignedAgent] = useState<AssignedAgent | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch assigned account manager
+  const fetchAssignedAgent = useCallback(async () => {
+    try {
+      const response = await fetch('/api/messaging/assigned-support');
+      if (response.ok) {
+        const data = await response.json();
+        setAssignedAgent(data.assignedAgent);
+      }
+    } catch (error) {
+      console.error('Error fetching assigned agent:', error);
+    }
+  }, []);
 
   // Fetch conversations
   const fetchConversations = useCallback(async () => {
@@ -320,11 +345,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         fetchConversations(),
         fetchFriends(),
         fetchFriendRequests(),
+        fetchAssignedAgent(),
       ]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchConversations, fetchFriends, fetchFriendRequests]);
+  }, [fetchConversations, fetchFriends, fetchFriendRequests, fetchAssignedAgent]);
 
   // Fetch messages when conversation is selected
   useEffect(() => {
@@ -426,6 +452,33 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               <Headphones className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Assigned Account Manager */}
+          {assignedAgent && (
+            <div className="mb-4 p-3 bg-gradient-to-r from-primary-500/10 to-purple-500/10 rounded-lg border border-primary-500/20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary-500/20 rounded-full flex items-center justify-center">
+                  {assignedAgent.avatar ? (
+                    <img src={assignedAgent.avatar} alt="" className="w-10 h-10 rounded-full" />
+                  ) : (
+                    <Briefcase className="w-5 h-5 text-primary-400" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-gray-400">Your Account Manager</p>
+                  <p className="font-medium text-white">{assignedAgent.name}</p>
+                  <p className="text-xs text-primary-400">{assignedAgent.role}</p>
+                </div>
+                <button
+                  onClick={startSupportConversation}
+                  className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+                  title="Chat with your account manager"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="flex gap-1 bg-gray-700/50 rounded-lg p-1">

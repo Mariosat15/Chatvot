@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const jwtSecret = process.env.JWT_SECRET || process.env.AUTH_SECRET || 'default-secret';
+    const jwtSecret = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
     verify(token, jwtSecret);
 
     await connectToDatabase();
@@ -123,7 +123,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const jwtSecret = process.env.JWT_SECRET || process.env.AUTH_SECRET || 'default-secret';
+    const jwtSecret = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
     const decoded = verify(token, jwtSecret) as {
       id: string;
       email: string;
