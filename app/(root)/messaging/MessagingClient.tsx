@@ -237,9 +237,19 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
       if (response.ok) {
         const data = await response.json();
+        // Add user's message
         setMessages(prev => [...prev, data.message]);
         setMessageInput('');
         scrollToBottom();
+        
+        // If there's an AI response, add it after a short delay for natural feel
+        if (data.aiResponse) {
+          setTimeout(() => {
+            setMessages(prev => [...prev, data.aiResponse]);
+            scrollToBottom();
+          }, 500);
+        }
+        
         fetchConversations(); // Refresh conversation list
       } else {
         console.error('Failed to send message:', response.status);
