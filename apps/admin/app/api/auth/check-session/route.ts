@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     // Get admin from database
     const admin = await Admin.findById(payload.adminId).select(
-      'status forceLogoutAt passwordChangedAt'
+      'status forceLogoutAt passwordChangedAt isLockedOut'
     );
 
     if (!admin) {
@@ -51,6 +51,15 @@ export async function GET(request: NextRequest) {
         valid: false, 
         reason: 'account_disabled',
         message: 'Your account has been suspended. Please contact the administrator.'
+      });
+    }
+
+    // Check if account is locked out (toggle-based)
+    if ((admin as any).isLockedOut) {
+      return NextResponse.json({ 
+        valid: false, 
+        reason: 'locked_out',
+        message: 'You have been logged out by an administrator. Contact the administrator to regain access.'
       });
     }
 

@@ -388,30 +388,71 @@ export async function PATCH(
       });
     }
 
-    if (action === 'force_logout') {
-      // Set forceLogoutAt to now - any tokens issued before this are invalid
-      employee.forceLogoutAt = new Date();
-      employee.isOnline = false;
-      await employee.save();
-
-      await auditLogService.log({
-        admin: adminInfo,
-        action: 'employee_force_logout',
-        category: 'system',
-        description: `Force logged out employee: ${employee.name}`,
-        targetType: 'user',
-        targetId: id,
-        targetName: employee.name,
-      });
+    if (action === 'force_logout' || action === 'toggle_lockout') {
+      // Toggle lockout state
+      const newLockedOutState = !employee.isLockedOut;
       
-      adminEventsService.employeeStatusChanged(id, 'logged_out', { id: auth.adminId!, email: auth.email! });
+      if (newLockedOutState) {
+        // Locking out - invalidate current session and prevent future logins
+        employee.isLockedOut = true;
+        employee.lockedOutAt = new Date();
+        employee.lockedOutBy = auth.email;
+        employee.lockedOutReason = reason || 'Locked out by administrator';
+        employee.forceLogoutAt = new Date(); // Also invalidate current session
+        employee.isOnline = false;
+        
+        await employee.save();
 
-      console.log(`✅ Force logout for ${employee.email}`);
+        await auditLogService.log({
+          admin: adminInfo,
+          action: 'employee_locked_out',
+          category: 'system',
+          description: `Locked out employee: ${employee.name}${reason ? ` - Reason: ${reason}` : ''}`,
+          targetType: 'user',
+          targetId: id,
+          targetName: employee.name,
+        });
+        
+        adminEventsService.employeeStatusChanged(id, 'locked_out', { id: auth.adminId!, email: auth.email! });
 
-      return NextResponse.json({
-        success: true,
-        message: `${employee.name} has been logged out`,
-      });
+        console.log(`🔒 Employee ${employee.email} locked out by ${auth.email}`);
+
+        return NextResponse.json({
+          success: true,
+          isLockedOut: true,
+          message: `${employee.name} has been locked out and cannot log in`,
+        });
+      } else {
+        // Unlocking - allow employee to log in again
+        employee.isLockedOut = false;
+        employee.lockedOutAt = undefined;
+        employee.lockedOutBy = undefined;
+        employee.lockedOutReason = undefined;
+        // Clear forceLogoutAt so new logins work
+        employee.forceLogoutAt = undefined;
+        
+        await employee.save();
+
+        await auditLogService.log({
+          admin: adminInfo,
+          action: 'employee_unlocked',
+          category: 'system',
+          description: `Unlocked employee: ${employee.name} - can now log in again`,
+          targetType: 'user',
+          targetId: id,
+          targetName: employee.name,
+        });
+        
+        adminEventsService.employeeStatusChanged(id, 'unlocked', { id: auth.adminId!, email: auth.email! });
+
+        console.log(`🔓 Employee ${employee.email} unlocked by ${auth.email}`);
+
+        return NextResponse.json({
+          success: true,
+          isLockedOut: false,
+          message: `${employee.name} can now log in again`,
+        });
+      }
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
 import { 
   Users, 
   UserPlus, 
@@ -60,6 +61,8 @@ import {
   Ban,
   UserCheck,
   LogOut,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -77,6 +80,11 @@ interface Employee {
   lastActivity?: string;
   createdAt: string;
   isFirstLogin?: boolean;
+  // Lockout fields
+  isLockedOut?: boolean;
+  lockedOutAt?: string;
+  lockedOutBy?: string;
+  lockedOutReason?: string;
 }
 
 interface RoleTemplate {
@@ -474,25 +482,29 @@ export default function EmployeesSection() {
     }
   };
 
-  const handleForceLogout = async (employee: Employee) => {
+  const handleToggleLockout = async (employee: Employee) => {
     try {
       const response = await fetch(`/api/employees/${employee.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'force_logout' }),
+        body: JSON.stringify({ action: 'toggle_lockout' }),
       });
 
       const data = await response.json();
       
       if (data.success) {
-        toast.success(`${employee.name} has been logged out`);
+        if (data.isLockedOut) {
+          toast.success(`${employee.name} has been locked out and cannot log in`);
+        } else {
+          toast.success(`${employee.name} can now log in again`);
+        }
         fetchData();
       } else {
-        toast.error(data.error || 'Failed to log out employee');
+        toast.error(data.error || 'Failed to toggle lockout');
       }
     } catch (error) {
-      console.error('Error logging out employee:', error);
-      toast.error('Failed to log out employee');
+      console.error('Error toggling lockout:', error);
+      toast.error('Failed to toggle lockout');
     }
   };
 
@@ -824,18 +836,27 @@ export default function EmployeesSection() {
                               </Badge>
                             )}
                           </div>
-                          {/* Online Status */}
+                          {/* Online Status / Lockout Status */}
                           <div className="flex items-center gap-2">
-                            <div className={cn(
-                              "w-2 h-2 rounded-full",
-                              employee.isOnline ? "bg-green-500" : "bg-gray-500"
-                            )} />
-                            <span className={cn(
-                              "text-xs",
-                              employee.isOnline ? "text-green-400" : "text-gray-500"
-                            )}>
-                              {employee.isOnline ? 'Online' : 'Offline'}
-                            </span>
+                            {employee.isLockedOut ? (
+                              <>
+                                <Lock className="h-3 w-3 text-red-400" />
+                                <span className="text-xs text-red-400">Locked Out</span>
+                              </>
+                            ) : (
+                              <>
+                                <div className={cn(
+                                  "w-2 h-2 rounded-full",
+                                  employee.isOnline ? "bg-green-500" : "bg-gray-500"
+                                )} />
+                                <span className={cn(
+                                  "text-xs",
+                                  employee.isOnline ? "text-green-400" : "text-gray-500"
+                                )}>
+                                  {employee.isOnline ? 'Online' : 'Offline'}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </TableCell>
@@ -878,17 +899,22 @@ export default function EmployeesSection() {
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              {employee.isOnline && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-blue-400 hover:text-blue-300"
-                                  onClick={() => handleForceLogout(employee)}
-                                  title="Force log out employee"
-                                >
-                                  <LogOut className="h-4 w-4" />
-                                </Button>
-                              )}
+                              {/* Lockout Toggle */}
+                              <div 
+                                className="flex items-center gap-1.5 px-2"
+                                title={employee.isLockedOut ? "Employee is locked out - Click to allow login" : "Click to lock out employee"}
+                              >
+                                {employee.isLockedOut ? (
+                                  <Lock className="h-3.5 w-3.5 text-red-400" />
+                                ) : (
+                                  <Unlock className="h-3.5 w-3.5 text-gray-400" />
+                                )}
+                                <Switch
+                                  checked={employee.isLockedOut || false}
+                                  onCheckedChange={() => handleToggleLockout(employee)}
+                                  className="data-[state=checked]:bg-red-600"
+                                />
+                              </div>
                               <Button
                                 variant="ghost"
                                 size="sm"

@@ -49,7 +49,7 @@ export async function verifyAdminAuth(): Promise<AdminAuthResult> {
     try {
       await connectToDatabase();
       const admin = await Admin.findById(payload.adminId)
-        .select('name email role allowedSections status createdAt forceLogoutAt tempPasswordExpiresAt')
+        .select('name email role allowedSections status createdAt forceLogoutAt isLockedOut tempPasswordExpiresAt')
         .lean();
       
       // If admin doesn't exist anymore (deleted), return unauthenticated
@@ -61,6 +61,12 @@ export async function verifyAdminAuth(): Promise<AdminAuthResult> {
       // If admin is disabled, return unauthenticated
       if (admin.status === 'disabled') {
         console.log(`❌ Admin ${admin.email} is disabled - session invalidated`);
+        return { isAuthenticated: false };
+      }
+      
+      // Check if admin is locked out (toggle-based lockout)
+      if ((admin as any).isLockedOut) {
+        console.log(`❌ Admin ${admin.email} is locked out - session invalidated`);
         return { isAuthenticated: false };
       }
       

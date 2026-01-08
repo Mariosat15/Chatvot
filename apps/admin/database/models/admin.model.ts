@@ -16,6 +16,11 @@ export interface AdminDocument extends Document {
   status?: 'active' | 'disabled';
   // Force logout tracking
   forceLogoutAt?: Date;
+  // Lockout - when true, employee cannot log in at all
+  isLockedOut?: boolean;
+  lockedOutAt?: Date;
+  lockedOutBy?: string;
+  lockedOutReason?: string;
   // Temporary password tracking
   tempPasswordExpiresAt?: Date;
   createdAt: Date;
@@ -79,6 +84,23 @@ const AdminSchema = new Schema<AdminDocument>(
     // Force logout - if set, tokens issued before this time are invalid
     forceLogoutAt: {
       type: Date,
+      default: undefined,
+    },
+    // Lockout - when true, employee cannot log in at all (toggle-based)
+    isLockedOut: {
+      type: Boolean,
+      default: false,
+    },
+    lockedOutAt: {
+      type: Date,
+      default: undefined,
+    },
+    lockedOutBy: {
+      type: String,
+      default: undefined,
+    },
+    lockedOutReason: {
+      type: String,
       default: undefined,
     },
     // Temporary password expiry (for auto-generated passwords)

@@ -83,6 +83,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if employee is locked out (force logout toggle)
+    console.log(`🔐 Is locked out: ${admin.isLockedOut || false}`);
+    if (admin.isLockedOut) {
+      console.log('❌ Account is locked out by admin');
+      return NextResponse.json(
+        { error: 'You have been logged out by an administrator. Contact the administrator to regain access.' },
+        { status: 403 }
+      );
+    }
+
     // Check if temporary password has expired
     console.log(`🔐 Temp password expires: ${admin.tempPasswordExpiresAt || 'N/A'}`);
     if (admin.tempPasswordExpiresAt && new Date() > new Date(admin.tempPasswordExpiresAt)) {
