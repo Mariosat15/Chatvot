@@ -132,14 +132,15 @@ export const signUpWithEmail = async ({
             // Auto-assign customer to employee (if enabled)
             try {
                 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+                const newUserId = response.user.id; // Get userId from response (available in this scope)
                 console.log(`🎯 [AutoAssign] Calling auto-assign API at: ${baseUrl}/api/customer-assignment/auto-assign`);
-                console.log(`🎯 [AutoAssign] Payload: userId=${userId}, userEmail=${email}, userName=${fullName}`);
+                console.log(`🎯 [AutoAssign] Payload: userId=${newUserId}, userEmail=${email}, userName=${fullName}`);
                 
                 const autoAssignResponse = await fetch(`${baseUrl}/api/customer-assignment/auto-assign`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        userId,
+                        userId: newUserId,
                         userEmail: email,
                         userName: fullName,
                     }),
