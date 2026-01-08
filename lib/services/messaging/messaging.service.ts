@@ -123,6 +123,42 @@ export class MessagingService {
     
     const settings = await MessagingSettings.getSettings();
     
+    console.log(`🔍 [MessagingService] getOrCreateSupportConversation for user: ${userName} (${userId})`);
+    
+    // First, check if user has an assigned employee (account manager)
+    let assignedEmployee: { id: string; name: string; avatar?: string } | null = null;
+    try {
+      const db = mongoose.connection.db;
+      if (db) {
+        const assignment = await db.collection('customer_assignments').findOne({
+          $or: [
+            { customerId: userId },
+            { customerId: userId.toString() },
+          ]
+        });
+        
+        console.log(`🔍 [MessagingService] Assignment found: ${assignment ? 'Yes' : 'No'}`);
+        
+        if (assignment?.employeeId) {
+          const employee = await db.collection('admins').findOne({
+            _id: new Types.ObjectId(assignment.employeeId),
+            status: 'active',
+          });
+          
+          if (employee) {
+            assignedEmployee = {
+              id: employee._id.toString(),
+              name: employee.name || employee.email.split('@')[0],
+              avatar: employee.profileImage,
+            };
+            console.log(`🔍 [MessagingService] Assigned employee: ${assignedEmployee.name}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ [MessagingService] Error checking customer assignment:', error);
+    }
+    
     // Find existing active support conversation
     let conversation = await Conversation.findOne({
       type: 'user-to-support',
@@ -131,92 +167,98 @@ export class MessagingService {
       'participants.type': 'user',
     });
     
-    if (!conversation) {
-      // Check if user has an assigned employee (account manager)
-      let assignedEmployee: { id: string; name: string; avatar?: string } | null = null;
-      try {
-        const db = mongoose.connection.db;
-        if (db) {
-          const assignment = await db.collection('customer_assignments').findOne({
-            customerId: userId,
+    if (conversation) {
+      console.log(`📦 [MessagingService] Found existing conversation: ${conversation._id}`);
+      
+      // Check if we need to add assigned employee to existing conversation
+      if (assignedEmployee) {
+        const hasEmployee = conversation.participants.some(p => p.id === assignedEmployee!.id && p.type === 'employee');
+        
+        if (!hasEmployee) {
+          console.log(`➕ [MessagingService] Adding assigned employee to existing conversation`);
+          
+          // Add employee as participant
+          conversation.participants.push({
+            id: assignedEmployee.id,
+            type: 'employee',
+            name: assignedEmployee.name,
+            avatar: assignedEmployee.avatar,
+            joinedAt: new Date(),
+            isActive: true,
           });
           
-          if (assignment?.employeeId) {
-            const employee = await db.collection('admins').findOne({
-              _id: new Types.ObjectId(assignment.employeeId),
-              status: 'active',
-            });
-            
-            if (employee) {
-              assignedEmployee = {
-                id: employee._id.toString(),
-                name: employee.name || employee.email.split('@')[0],
-                avatar: employee.profileImage,
-              };
-            }
-          }
+          // Update conversation with assignment
+          conversation.assignedEmployeeId = new Types.ObjectId(assignedEmployee.id);
+          conversation.assignedEmployeeName = assignedEmployee.name;
+          conversation.isAIHandled = false; // Disable AI when employee is assigned
+          
+          await conversation.save();
         }
-      } catch (error) {
-        console.error('Error checking customer assignment:', error);
       }
       
-      conversation = await this.createConversation({
-        type: 'user-to-support',
-        participants: [{
-          id: userId,
-          type: 'user',
-          name: userName,
-          avatar: userAvatar,
-        }],
-        isAIHandled: settings.enableAISupport && !assignedEmployee, // Don't use AI if has assigned employee
-        assignedEmployeeId: assignedEmployee?.id,
-        assignedEmployeeName: assignedEmployee?.name,
+      return conversation;
+    }
+    
+    console.log(`🆕 [MessagingService] Creating new support conversation`);
+    
+    conversation = await this.createConversation({
+      type: 'user-to-support',
+      participants: [{
+        id: userId,
+        type: 'user',
+        name: userName,
+        avatar: userAvatar,
+      }],
+      isAIHandled: settings.enableAISupport && !assignedEmployee, // Don't use AI if has assigned employee
+      assignedEmployeeId: assignedEmployee?.id,
+      assignedEmployeeName: assignedEmployee?.name,
+    });
+    
+    // If has assigned employee, add them as participant
+    if (assignedEmployee) {
+      conversation.participants.push({
+        id: assignedEmployee.id,
+        type: 'employee',
+        name: assignedEmployee.name,
+        avatar: assignedEmployee.avatar,
+        joinedAt: new Date(),
+        isActive: true,
       });
+      await conversation.save();
       
-      // If has assigned employee, add them as participant
-      if (assignedEmployee) {
-        conversation.participants.push({
-          id: assignedEmployee.id,
-          type: 'employee',
-          name: assignedEmployee.name,
-          avatar: assignedEmployee.avatar,
-          joinedAt: new Date(),
-          isActive: true,
-        });
-        await conversation.save();
-        
-        // Send welcome message from assigned employee
-        await this.sendMessage({
-          conversationId: conversation._id.toString(),
-          senderId: assignedEmployee.id,
-          senderType: 'employee',
-          senderName: assignedEmployee.name,
-          senderAvatar: assignedEmployee.avatar,
-          content: `Hello ${userName}! I'm ${assignedEmployee.name}, your dedicated account manager. How can I help you today?`,
-          messageType: 'system',
-        });
-      }
-      // If AI support is enabled and no assigned employee, add AI as participant
-      else if (settings.enableAISupport) {
-        conversation.participants.push({
-          id: 'ai-assistant',
-          type: 'ai',
-          name: 'AI Assistant',
-          joinedAt: new Date(),
-          isActive: true,
-        });
-        await conversation.save();
-        
-        // Send AI greeting
-        await this.sendMessage({
-          conversationId: conversation._id.toString(),
-          senderId: 'ai-assistant',
-          senderType: 'ai',
-          senderName: 'AI Assistant',
-          content: settings.aiGreetingMessage,
-          messageType: 'ai-response',
-        });
-      }
+      // Send welcome message from assigned employee
+      await this.sendMessage({
+        conversationId: conversation._id.toString(),
+        senderId: assignedEmployee.id,
+        senderType: 'employee',
+        senderName: assignedEmployee.name,
+        senderAvatar: assignedEmployee.avatar,
+        content: `Hello ${userName}! I'm ${assignedEmployee.name}, your dedicated account manager. How can I help you today?`,
+        messageType: 'system',
+      });
+      console.log(`✅ [MessagingService] Added assigned employee and sent welcome message`);
+    }
+    // If AI support is enabled and no assigned employee, add AI as participant
+    else if (settings.enableAISupport) {
+      conversation.participants.push({
+        id: 'ai-assistant',
+        type: 'ai',
+        name: 'AI Assistant',
+        joinedAt: new Date(),
+        isActive: true,
+      });
+      await conversation.save();
+      
+      // Send AI greeting
+      await this.sendMessage({
+        conversationId: conversation._id.toString(),
+        senderId: 'ai-assistant',
+        senderType: 'ai',
+        senderName: 'AI Assistant',
+        content: settings.aiGreetingMessage,
+        messageType: 'ai-response',
+      });
+      console.log(`✅ [MessagingService] Added AI assistant and sent greeting`);
     }
     
     return conversation;

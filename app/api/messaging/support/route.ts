@@ -11,8 +11,11 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
+      console.log('❌ [Support GET] No session');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    console.log(`📨 [Support GET] User: ${session.user.name} (${session.user.id})`);
 
     const conversation = await MessagingService.getOrCreateSupportConversation(
       session.user.id,
@@ -20,11 +23,16 @@ export async function GET(request: NextRequest) {
       session.user.image
     );
 
+    console.log(`📨 [Support GET] Conversation: ${conversation._id}, participants: ${conversation.participants?.length}`);
+    console.log(`📨 [Support GET] isAIHandled: ${conversation.isAIHandled}, assignedEmployee: ${conversation.assignedEmployeeName}`);
+
     // Get recent messages
     const messages = await MessagingService.getMessages(
       conversation._id.toString(),
       { limit: 50 }
     );
+
+    console.log(`📨 [Support GET] Messages: ${messages.length}`);
 
     // Mark as read
     await MessagingService.markMessagesAsRead(
@@ -43,6 +51,7 @@ export async function GET(request: NextRequest) {
         unreadCount: 0,
         isAIHandled: conversation.isAIHandled,
         assignedEmployeeName: conversation.assignedEmployeeName,
+        assignedEmployeeId: conversation.assignedEmployeeId?.toString(),
         createdAt: conversation.createdAt,
         lastActivityAt: conversation.lastActivityAt,
       },
@@ -63,7 +72,7 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error('Error getting support conversation:', error);
+    console.error('❌ [Support GET] Error:', error);
     return NextResponse.json(
       { error: 'Failed to get support conversation' },
       { status: 500 }
@@ -79,11 +88,15 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
+      console.log('❌ [Support POST] No session');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const { content, attachments } = body;
+
+    console.log(`📤 [Support POST] From: ${session.user.name} (${session.user.id})`);
+    console.log(`📤 [Support POST] Content: "${content?.substring(0, 50)}..."`);
 
     if (!content && (!attachments || attachments.length === 0)) {
       return NextResponse.json(
@@ -99,6 +112,8 @@ export async function POST(request: NextRequest) {
       session.user.image
     );
 
+    console.log(`📤 [Support POST] Conversation: ${conversation._id}, isAIHandled: ${conversation.isAIHandled}, assignedEmployee: ${conversation.assignedEmployeeName}`);
+
     const { message } = await MessagingService.sendMessage({
       conversationId: conversation._id.toString(),
       senderId: session.user.id,
@@ -110,6 +125,8 @@ export async function POST(request: NextRequest) {
       attachments,
     });
 
+    console.log(`📤 [Support POST] Message sent: ${message._id}`);
+
     // Broadcast via WebSocket
     const { wsNotifier } = await import('@/lib/services/messaging/websocket-notifier');
     wsNotifier.notifyNewMessage(conversation._id.toString(), message);
@@ -117,6 +134,7 @@ export async function POST(request: NextRequest) {
     // Handle AI response if conversation is AI-handled
     let aiResponse = null;
     if (conversation.isAIHandled) {
+      console.log(`🤖 [Support POST] AI is handling, generating response...`);
       try {
         aiResponse = await handleAIResponse(
           conversation._id.toString(),

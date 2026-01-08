@@ -34,17 +34,33 @@ export async function GET(request: NextRequest) {
 
     console.log(`🔍 [Messaging] Fetching assigned customers for employee: ${decoded.email} (ID: ${decoded.adminId})`);
 
+    // Convert adminId to ObjectId for comparison
+    let employeeObjectId;
+    try {
+      employeeObjectId = new mongoose.Types.ObjectId(decoded.adminId);
+    } catch {
+      console.log(`⚠️ [Messaging] Could not convert adminId to ObjectId: ${decoded.adminId}`);
+    }
+
     // Get assignments for this employee (try both string and ObjectId formats)
+    const query = {
+      $or: [
+        { employeeId: decoded.adminId },
+        { employeeId: decoded.adminId?.toString() },
+        ...(employeeObjectId ? [{ employeeId: employeeObjectId }] : []),
+      ]
+    };
+    
+    console.log(`🔍 [Messaging] Query:`, JSON.stringify(query));
+    
     const assignments = await db.collection('customer_assignments')
-      .find({ 
-        $or: [
-          { employeeId: decoded.adminId },
-          { employeeId: decoded.adminId?.toString() },
-        ]
-      })
+      .find(query)
       .toArray();
 
     console.log(`📋 [Messaging] Found ${assignments.length} customer assignments`);
+    if (assignments.length > 0) {
+      console.log(`📋 [Messaging] First assignment:`, JSON.stringify(assignments[0]));
+    }
 
     if (assignments.length === 0) {
       return NextResponse.json({ customers: [] });

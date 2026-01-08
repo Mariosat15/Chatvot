@@ -29,6 +29,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { customerId, customerName, customerAvatar } = body;
 
+    console.log(`💬 [CreateWithCustomer] Employee: ${decoded.email} (${decoded.adminId})`);
+    console.log(`💬 [CreateWithCustomer] Customer: ${customerName || 'Unknown'} (${customerId})`);
+
     if (!customerId) {
       return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
     }
