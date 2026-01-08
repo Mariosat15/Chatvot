@@ -29,6 +29,9 @@ export const ADMIN_SECTIONS = [
   'kyc-settings',
   'kyc-history',
   'fraud',
+  // Messaging
+  'messaging',
+  'messaging-settings',
   // Help
   'wiki',
   // AI & Automation

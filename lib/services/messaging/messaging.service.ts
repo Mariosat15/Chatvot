@@ -132,6 +132,34 @@ export class MessagingService {
     });
     
     if (!conversation) {
+      // Check if user has an assigned employee (account manager)
+      let assignedEmployee: { id: string; name: string; avatar?: string } | null = null;
+      try {
+        const db = mongoose.connection.db;
+        if (db) {
+          const assignment = await db.collection('customer_assignments').findOne({
+            customerId: userId,
+          });
+          
+          if (assignment?.employeeId) {
+            const employee = await db.collection('admins').findOne({
+              _id: new Types.ObjectId(assignment.employeeId),
+              status: 'active',
+            });
+            
+            if (employee) {
+              assignedEmployee = {
+                id: employee._id.toString(),
+                name: employee.name || employee.email.split('@')[0],
+                avatar: employee.profileImage,
+              };
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking customer assignment:', error);
+      }
+      
       conversation = await this.createConversation({
         type: 'user-to-support',
         participants: [{
@@ -140,11 +168,36 @@ export class MessagingService {
           name: userName,
           avatar: userAvatar,
         }],
-        isAIHandled: settings.enableAISupport,
+        isAIHandled: settings.enableAISupport && !assignedEmployee, // Don't use AI if has assigned employee
+        assignedEmployeeId: assignedEmployee?.id,
+        assignedEmployeeName: assignedEmployee?.name,
       });
       
-      // If AI support is enabled, add AI as participant
-      if (settings.enableAISupport) {
+      // If has assigned employee, add them as participant
+      if (assignedEmployee) {
+        conversation.participants.push({
+          id: assignedEmployee.id,
+          type: 'employee',
+          name: assignedEmployee.name,
+          avatar: assignedEmployee.avatar,
+          joinedAt: new Date(),
+          isActive: true,
+        });
+        await conversation.save();
+        
+        // Send welcome message from assigned employee
+        await this.sendMessage({
+          conversationId: conversation._id.toString(),
+          senderId: assignedEmployee.id,
+          senderType: 'employee',
+          senderName: assignedEmployee.name,
+          senderAvatar: assignedEmployee.avatar,
+          content: `Hello ${userName}! I'm ${assignedEmployee.name}, your dedicated account manager. How can I help you today?`,
+          messageType: 'system',
+        });
+      }
+      // If AI support is enabled and no assigned employee, add AI as participant
+      else if (settings.enableAISupport) {
         conversation.participants.push({
           id: 'ai-assistant',
           type: 'ai',
