@@ -22,10 +22,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ assignedAgent: null });
     }
 
-    // Check if user has an assigned employee
+    console.log(`🔍 [Support] Looking for assignment for user: ${session.user.id}`);
+
+    // Check if user has an assigned employee (try both string and ObjectId formats)
     const assignment = await db.collection('customer_assignments').findOne({
-      customerId: session.user.id,
+      $or: [
+        { customerId: session.user.id },
+        { customerId: session.user.id.toString() },
+      ]
     });
+
+    console.log(`📋 [Support] Assignment found:`, assignment ? 'Yes' : 'No');
 
     if (!assignment || !assignment.employeeId) {
       return NextResponse.json({ assignedAgent: null });

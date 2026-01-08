@@ -30,11 +30,20 @@ export async function GET(request: NextRequest) {
       mongoose.model('Admin', new mongoose.Schema({}, { strict: false, collection: 'admins' }));
 
     // Get all active employees except current user
+    let currentUserId;
+    try {
+      currentUserId = new mongoose.Types.ObjectId(decoded.id);
+    } catch {
+      currentUserId = decoded.id;
+    }
+
     const employees = await Admin.find({
-      _id: { $ne: decoded.id },
+      _id: { $ne: currentUserId },
       status: 'active',
       isLockedOut: { $ne: true },
-    }).select('_id name email role avatar lastLoginAt');
+    }).select('_id name email role avatar lastLoginAt profileImage');
+    
+    console.log(`📧 [Messaging] Fetched ${employees.length} employees for internal chat (excluding ${decoded.email})`);
 
     // Get online status from presence collection
     const UserPresence = mongoose.models.UserPresence || 
@@ -55,10 +64,10 @@ export async function GET(request: NextRequest) {
         const presence = presenceMap.get(emp._id.toString());
         return {
           id: emp._id.toString(),
-          name: emp.name || emp.email,
+          name: emp.name || emp.email?.split('@')[0] || 'Employee',
           email: emp.email,
           role: emp.role,
-          avatar: emp.avatar,
+          avatar: emp.profileImage || emp.avatar,
           status: presence?.status || 'offline',
           lastSeen: presence?.lastSeen,
           lastLoginAt: emp.lastLoginAt,

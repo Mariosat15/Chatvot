@@ -110,7 +110,10 @@ export default function MessagingSection() {
       const response = await fetch('/api/messaging/assigned-customers');
       if (response.ok) {
         const data = await response.json();
+        console.log('👥 Fetched assigned customers:', data.customers?.length || 0);
         setAssignedCustomers(data.customers || []);
+      } else {
+        console.error('Failed to fetch assigned customers:', response.status);
       }
     } catch (error) {
       console.error('Error fetching assigned customers:', error);
@@ -161,7 +164,10 @@ export default function MessagingSection() {
       const response = await fetch('/api/messaging/employees');
       if (response.ok) {
         const data = await response.json();
-        setEmployees(data.employees);
+        console.log('📧 Fetched employees:', data.employees?.length || 0);
+        setEmployees(data.employees || []);
+      } else {
+        console.error('Failed to fetch employees:', response.status);
       }
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -515,30 +521,40 @@ export default function MessagingSection() {
             )}
 
             {activeTab === 'internal' && (
-              <div className="p-2 border-b border-[#2A2A2A]">
-                <p className="text-xs text-[#6b7280] px-2 py-1">Team Members</p>
-                {employees.map((employee) => (
-                  <div
-                    key={employee.id}
-                    onClick={() => handleStartInternalChat(employee)}
-                    className="flex items-center gap-3 p-2 hover:bg-[#1E1E1E] rounded-lg cursor-pointer transition-colors"
-                  >
-                    <div className="relative">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
-                        <span className="text-white text-sm font-bold">
-                          {employee.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#111111] ${
-                        employee.status === 'online' ? 'bg-emerald-500' : 'bg-[#6b7280]'
-                      }`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white font-medium truncate">{employee.name}</p>
-                      <p className="text-xs text-[#6b7280] truncate">{employee.role}</p>
-                    </div>
+              <div className="p-2">
+                <p className="text-xs text-[#6b7280] px-2 py-1 mb-2">Team Members ({employees.length})</p>
+                {employees.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="w-10 h-10 text-[#4b5563] mx-auto mb-3" />
+                    <p className="text-[#6b7280] text-sm">No other team members</p>
+                    <p className="text-xs text-[#4b5563] mt-1">
+                      Other employees will appear here
+                    </p>
                   </div>
-                ))}
+                ) : (
+                  employees.map((employee) => (
+                    <div
+                      key={employee.id}
+                      onClick={() => handleStartInternalChat(employee)}
+                      className="flex items-center gap-3 p-2 hover:bg-[#1E1E1E] rounded-lg cursor-pointer transition-colors border border-transparent hover:border-[#2A2A2A]"
+                    >
+                      <div className="relative">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+                          <span className="text-white text-sm font-bold">
+                            {employee.name?.charAt(0)?.toUpperCase() || 'E'}
+                          </span>
+                        </div>
+                        <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#111111] ${
+                          employee.status === 'online' ? 'bg-emerald-500' : 'bg-[#6b7280]'
+                        }`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white font-medium truncate">{employee.name}</p>
+                        <p className="text-xs text-[#6b7280] truncate">{employee.role}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
 

@@ -32,10 +32,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ customers: [] });
     }
 
-    // Get assignments for this employee
+    console.log(`🔍 [Messaging] Fetching assigned customers for employee: ${decoded.email} (ID: ${decoded.id})`);
+
+    // Get assignments for this employee (try both string and ObjectId formats)
     const assignments = await db.collection('customer_assignments')
-      .find({ employeeId: decoded.id })
+      .find({ 
+        $or: [
+          { employeeId: decoded.id },
+          { employeeId: decoded.id.toString() },
+        ]
+      })
       .toArray();
+
+    console.log(`📋 [Messaging] Found ${assignments.length} customer assignments`);
 
     if (assignments.length === 0) {
       return NextResponse.json({ customers: [] });
