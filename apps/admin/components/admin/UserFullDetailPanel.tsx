@@ -77,9 +77,9 @@ interface UserFullDetailPanelProps {
 
 // Valid user roles
 const USER_ROLES = [
-  { value: 'trader', label: 'Trader', color: 'bg-cyan-500', icon: '📈' },
-  { value: 'admin', label: 'Admin', color: 'bg-yellow-500', icon: '👑' },
-  { value: 'backoffice', label: 'Back Office', color: 'bg-purple-500', icon: '🏢' },
+  { value: 'trader', label: 'Trader', color: 'bg-cyan-500', icon: '📈', disabled: false },
+  { value: 'affiliate', label: 'Affiliate', color: 'bg-emerald-500', icon: '🤝', disabled: true, comingSoon: true },
+  { value: 'gamemaster', label: 'Gamemaster', color: 'bg-orange-500', icon: '🎮', disabled: true, comingSoon: true },
 ] as const;
 
 type UserRole = typeof USER_ROLES[number]['value'];
@@ -1331,15 +1331,23 @@ export default function UserFullDetailPanel({
                             {USER_ROLES.map((role) => (
                               <button
                                 key={role.value}
-                                onClick={() => setEditRole(role.value)}
-                                className={`p-4 rounded-lg border-2 transition-all ${
-                                  editRole === role.value
-                                    ? `${role.color} border-current`
-                                    : 'bg-gray-800 border-gray-600 hover:border-gray-500'
+                                onClick={() => !role.disabled && setEditRole(role.value)}
+                                disabled={role.disabled}
+                                className={`p-4 rounded-lg border-2 transition-all relative ${
+                                  role.disabled
+                                    ? 'bg-gray-800/50 border-gray-700 cursor-not-allowed opacity-60'
+                                    : editRole === role.value
+                                      ? `${role.color} border-current`
+                                      : 'bg-gray-800 border-gray-600 hover:border-gray-500'
                                 }`}
                               >
+                                {role.comingSoon && (
+                                  <span className="absolute -top-2 -right-2 bg-yellow-500 text-black text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                                    Soon
+                                  </span>
+                                )}
                                 <span className="text-2xl">{role.icon}</span>
-                                <p className="text-sm font-medium text-white mt-1">{role.label}</p>
+                                <p className={`text-sm font-medium mt-1 ${role.disabled ? 'text-gray-500' : 'text-white'}`}>{role.label}</p>
                               </button>
                             ))}
                           </div>

@@ -4,8 +4,10 @@ import { getAdminSession } from '@/lib/admin/auth';
 import { auditLogService } from '@/lib/services/audit-log.service';
 import { ObjectId } from 'mongodb';
 
-// Valid user roles
-const VALID_ROLES = ['trader', 'admin', 'backoffice'] as const;
+// Valid user roles (includes legacy roles for backwards compatibility)
+// Active roles: trader, affiliate (coming soon), gamemaster (coming soon)
+// Legacy roles: admin, backoffice (kept for existing users but no longer assignable via UI)
+const VALID_ROLES = ['trader', 'affiliate', 'gamemaster', 'admin', 'backoffice'] as const;
 type UserRole = typeof VALID_ROLES[number];
 
 /**

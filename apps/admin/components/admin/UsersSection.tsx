@@ -44,8 +44,8 @@ import { Badge } from "@/components/ui/badge";
 // Valid user roles
 const USER_ROLES = [
   { value: 'trader', label: 'Trader', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
-  { value: 'admin', label: 'Admin', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-  { value: 'backoffice', label: 'Back Office', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+  { value: 'affiliate', label: 'Affiliate', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
+  { value: 'gamemaster', label: 'Gamemaster', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
 ] as const;
 
 type UserRole = typeof USER_ROLES[number]['value'];
