@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { auth } from '@/lib/better-auth/auth';
+import { headers } from 'next/headers';
 import MessagingService from '@/lib/services/messaging/messaging.service';
 import { UserPresence } from '@/database/models/messaging/user-presence.model';
-import { connectToDB } from '@/database/mongoose';
+import { connectToDatabase } from '@/database/mongoose';
 
 /**
  * POST /api/messaging/presence
@@ -10,7 +11,7 @@ import { connectToDB } from '@/database/mongoose';
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

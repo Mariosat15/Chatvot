@@ -1,5 +1,5 @@
-import { Types } from 'mongoose';
-import { connectToDB } from '@/database/mongoose';
+import mongoose, { Types } from 'mongoose';
+import { connectToDatabase } from '@/database/mongoose';
 import {
   Conversation,
   Message,
@@ -34,7 +34,7 @@ export class MessagingService {
     title?: string;
     isAIHandled?: boolean;
   }): Promise<IConversation> {
-    await connectToDB();
+    await connectToDatabase();
     
     const conversation = await Conversation.create({
       type: params.type,
@@ -56,7 +56,7 @@ export class MessagingService {
     userId: string,
     options: { type?: ConversationType; limit?: number; offset?: number } = {}
   ): Promise<IConversation[]> {
-    await connectToDB();
+    await connectToDatabase();
     
     const query: any = {
       'participants.id': userId,
@@ -78,7 +78,7 @@ export class MessagingService {
     conversationId: string,
     participantId: string
   ): Promise<IConversation | null> {
-    await connectToDB();
+    await connectToDatabase();
     
     return Conversation.findOne({
       _id: new Types.ObjectId(conversationId),
@@ -91,7 +91,7 @@ export class MessagingService {
     user1: { id: string; name: string; avatar?: string },
     user2: { id: string; name: string; avatar?: string }
   ): Promise<IConversation> {
-    await connectToDB();
+    await connectToDatabase();
     
     // Check if conversation already exists
     let conversation = await Conversation.findOne({
@@ -119,7 +119,7 @@ export class MessagingService {
     userName: string,
     userAvatar?: string
   ): Promise<IConversation> {
-    await connectToDB();
+    await connectToDatabase();
     
     const settings = await MessagingSettings.getSettings();
     
@@ -195,7 +195,7 @@ export class MessagingService {
       senderName: string;
     };
   }): Promise<{ message: IMessage; conversation: IConversation }> {
-    await connectToDB();
+    await connectToDatabase();
     
     const settings = await MessagingSettings.getSettings();
     
@@ -304,7 +304,7 @@ export class MessagingService {
     conversationId: string,
     options: { limit?: number; before?: Date; after?: Date } = {}
   ): Promise<IMessage[]> {
-    await connectToDB();
+    await connectToDatabase();
     
     const query: any = {
       conversationId: new Types.ObjectId(conversationId),
@@ -328,7 +328,7 @@ export class MessagingService {
     participantId: string,
     participantName: string
   ): Promise<void> {
-    await connectToDB();
+    await connectToDatabase();
     
     // Mark all unread messages as read
     await Message.updateMany(
@@ -366,7 +366,7 @@ export class MessagingService {
     toUser: { id: string; name: string; avatar?: string },
     message?: string
   ): Promise<IFriendRequest> {
-    await connectToDB();
+    await connectToDatabase();
     
     const settings = await MessagingSettings.getSettings();
     
@@ -413,7 +413,7 @@ export class MessagingService {
     response: 'accept' | 'decline',
     userId: string
   ): Promise<{ request: IFriendRequest; friendship?: IFriendship }> {
-    await connectToDB();
+    await connectToDatabase();
     
     const request = await FriendRequest.findById(requestId);
     if (!request) {
@@ -453,7 +453,7 @@ export class MessagingService {
   }
   
   static async cancelFriendRequest(requestId: string, userId: string): Promise<IFriendRequest> {
-    await connectToDB();
+    await connectToDatabase();
     
     const request = await FriendRequest.findById(requestId);
     if (!request) {
@@ -476,7 +476,7 @@ export class MessagingService {
   }
   
   static async getFriends(userId: string): Promise<IFriendship[]> {
-    await connectToDB();
+    await connectToDatabase();
     return Friendship.getUserFriends(userId);
   }
   
@@ -484,7 +484,7 @@ export class MessagingService {
     received: IFriendRequest[];
     sent: IFriendRequest[];
   }> {
-    await connectToDB();
+    await connectToDatabase();
     
     const [received, sent] = await Promise.all([
       FriendRequest.findPendingForUser(userId),
@@ -495,14 +495,14 @@ export class MessagingService {
   }
   
   static async removeFriend(userId: string, friendId: string): Promise<void> {
-    await connectToDB();
+    await connectToDatabase();
     
     const sortedUsers = [userId, friendId].sort();
     await Friendship.deleteOne({ users: sortedUsers });
   }
   
   static async blockUser(userId: string, blockedUserId: string): Promise<IFriendship | null> {
-    await connectToDB();
+    await connectToDatabase();
     
     let friendship = await Friendship.getFriendship(userId, blockedUserId);
     
@@ -526,7 +526,7 @@ export class MessagingService {
   }
   
   static async unblockUser(userId: string, blockedUserId: string): Promise<void> {
-    await connectToDB();
+    await connectToDatabase();
     
     const friendship = await Friendship.getFriendship(userId, blockedUserId);
     if (friendship && friendship.blockedBy === userId) {
@@ -546,7 +546,7 @@ export class MessagingService {
     reason?: string,
     transferredBy?: { id: string; name: string }
   ): Promise<IConversation> {
-    await connectToDB();
+    await connectToDatabase();
     
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
@@ -631,7 +631,7 @@ export class MessagingService {
     conversationId: string,
     reason: string
   ): Promise<IConversation> {
-    await connectToDB();
+    await connectToDatabase();
     
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
@@ -680,7 +680,7 @@ export class MessagingService {
     status: 'online' | 'away' | 'busy' | 'offline',
     deviceInfo?: { platform?: string; browser?: string; lastIp?: string }
   ): Promise<void> {
-    await connectToDB();
+    await connectToDatabase();
     
     if (status === 'offline') {
       await UserPresence.setOffline(participantId);
@@ -696,17 +696,17 @@ export class MessagingService {
   }
   
   static async setTyping(participantId: string, conversationId: string): Promise<void> {
-    await connectToDB();
+    await connectToDatabase();
     await UserPresence.setTyping(participantId, conversationId);
   }
   
   static async stopTyping(participantId: string): Promise<void> {
-    await connectToDB();
+    await connectToDatabase();
     await UserPresence.stopTyping(participantId);
   }
   
   static async heartbeat(participantId: string): Promise<void> {
-    await connectToDB();
+    await connectToDatabase();
     await UserPresence.heartbeat(participantId);
   }
   
@@ -715,14 +715,14 @@ export class MessagingService {
   // ==========================================
   
   static async getSettings(): Promise<IMessagingSettings> {
-    await connectToDB();
+    await connectToDatabase();
     return MessagingSettings.getSettings();
   }
   
   static async updateSettings(
     updates: Partial<IMessagingSettings>
   ): Promise<IMessagingSettings> {
-    await connectToDB();
+    await connectToDatabase();
     return MessagingSettings.updateSettings(updates);
   }
   
@@ -735,7 +735,7 @@ export class MessagingService {
     searchTerm: string,
     limit: number = 20
   ): Promise<IMessage[]> {
-    await connectToDB();
+    await connectToDatabase();
     return Message.searchMessages(participantId, searchTerm, { limit });
   }
   
@@ -744,21 +744,25 @@ export class MessagingService {
     excludeUserId: string,
     limit: number = 20
   ): Promise<Array<{ id: string; name: string; avatar?: string }>> {
-    await connectToDB();
+    await connectToDatabase();
     
-    // This would search the users collection
-    // For now, return empty - needs integration with user model
-    const User = (await import('@/database/models/user.model')).default;
+    // Query users collection directly (managed by better-auth)
+    const db = mongoose.connection.db;
+    if (!db) {
+      return [];
+    }
     
-    const users = await User.find({
-      _id: { $ne: excludeUserId },
+    const usersCollection = db.collection('user');
+    const users = await usersCollection.find({
+      _id: { $ne: new Types.ObjectId(excludeUserId) },
       $or: [
         { name: { $regex: query, $options: 'i' } },
         { email: { $regex: query, $options: 'i' } },
       ],
     })
-      .select('_id name image')
-      .limit(limit);
+      .project({ _id: 1, name: 1, email: 1, image: 1 })
+      .limit(limit)
+      .toArray();
     
     return users.map(u => ({
       id: u._id.toString(),
@@ -772,7 +776,7 @@ export class MessagingService {
   // ==========================================
   
   static async getUnreadCount(participantId: string): Promise<number> {
-    await connectToDB();
+    await connectToDatabase();
     
     const conversations = await Conversation.find({
       'participants.id': participantId,
@@ -793,7 +797,7 @@ export class MessagingService {
     totalMessages: number;
     avgResponseTime: number;
   }> {
-    await connectToDB();
+    await connectToDatabase();
     
     const activeChats = await Conversation.countDocuments({
       assignedEmployeeId: new Types.ObjectId(employeeId),
