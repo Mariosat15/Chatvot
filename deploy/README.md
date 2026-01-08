@@ -14,31 +14,43 @@ Complete guide for deploying Chartvolt to a Hostinger VPS.
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                HOSTINGER VPS (148.230.124.57)                   │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  NGINX (Reverse Proxy)                                   │  │
-│  │  - chartvolt.com → User App (3000)                      │  │
-│  │  - chartvolt.com/api/auth/* → API Server (4000)         │  │
-│  │  - admin.chartvolt.com → Admin App (3001)               │  │
-│  │  - SSL/TLS termination                                   │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                           │                                     │
-│    ┌──────────────────────┼──────────────────────┐             │
-│    │          │           │           │          │             │
-│  ┌─▼────┐  ┌──▼───┐  ┌────▼────┐  ┌───▼────┐                  │
-│  │ USER │  │ADMIN │  │   API   │  │ WORKER │                  │
-│  │ APP  │  │ APP  │  │ SERVER  │  │        │                  │
-│  │:3000 │  │:3001 │  │ :4000   │  │(no port│                  │
-│  └──┬───┘  └──┬───┘  └────┬────┘  └───┬────┘                  │
-│     └─────────┴───────────┴───────────┘                        │
-│                           │                                     │
-│                    ┌──────▼──────┐                              │
-│                    │   MongoDB   │                              │
-│                    │  (Atlas)    │                              │
-│                    └─────────────┘                              │
-└─────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────┐
+│                    HOSTINGER VPS (148.230.124.57)                     │
+│                                                                       │
+│  ┌─────────────────────────────────────────────────────────────────┐  │
+│  │  NGINX (Reverse Proxy)                                          │  │
+│  │  - chartvolt.com → User App (3000)                              │  │
+│  │  - chartvolt.com/ws → WebSocket Server (3003)                   │  │
+│  │  - chartvolt.com/api/auth/* → API Server (4000)                 │  │
+│  │  - admin.chartvolt.com → Admin App (3001)                       │  │
+│  │  - SSL/TLS termination                                          │  │
+│  └─────────────────────────────────────────────────────────────────┘  │
+│                              │                                        │
+│    ┌─────────────────────────┼────────────────────────────┐          │
+│    │          │           │         │           │         │          │
+│  ┌─▼────┐  ┌──▼───┐  ┌────▼────┐  ┌─▼───────┐  ┌─▼──────┐           │
+│  │ USER │  │ADMIN │  │   API   │  │WEBSOCKET│  │ WORKER │           │
+│  │ APP  │  │ APP  │  │ SERVER  │  │ SERVER  │  │        │           │
+│  │:3000 │  │:3001 │  │ :4000   │  │ :3003   │  │(no port│           │
+│  └──┬───┘  └──┬───┘  └────┬────┘  └────┬────┘  └───┬────┘           │
+│     └─────────┴───────────┴────────────┴───────────┘                 │
+│                              │                                        │
+│                       ┌──────▼──────┐                                 │
+│                       │   MongoDB   │                                 │
+│                       │  (Atlas)    │                                 │
+│                       └─────────────┘                                 │
+└───────────────────────────────────────────────────────────────────────┘
+
+PM2 Processes:
+┌─────────────────────┬──────┬─────────────────────────────────────┐
+│ Name                │ Port │ Description                         │
+├─────────────────────┼──────┼─────────────────────────────────────┤
+│ chartvolt-web       │ 3000 │ Main user application (Next.js)     │
+│ chartvolt-admin     │ 3001 │ Admin dashboard (Next.js)           │
+│ chartvolt-api       │ 4000 │ API server (auth, bcrypt)           │
+│ chartvolt-websocket │ 3003 │ WebSocket server (real-time chat)   │
+│ chartvolt-worker    │  -   │ Background worker (no HTTP port)    │
+└─────────────────────┴──────┴─────────────────────────────────────┘
 ```
 
 ## Prerequisites
@@ -98,6 +110,11 @@ ADMIN_PASSWORD=your-secure-password
 # API Server
 API_PORT=4000
 
+# WebSocket Server (Real-time Messaging)
+WEBSOCKET_PORT=3003
+NEXT_PUBLIC_WEBSOCKET_URL=wss://chartvolt.com/ws
+WEBSOCKET_INTERNAL_URL=http://localhost:3003
+
 # Stripe (optional)
 STRIPE_SECRET_KEY=sk_...
 STRIPE_PUBLISHABLE_KEY=pk_...
@@ -116,16 +133,18 @@ Ctrl + X  →  Exit
 ### 4. Install Dependencies
 
 ```bash
+# Main app
 npm install
-cd apps/admin && npm install && cd ../..
-```
-cd apps/admin
-npm install
-cd ../..
 
-cd api-server
-npm install
-cd ..
+# Admin app
+cd apps/admin && npm install && cd ../..
+
+# API server
+cd api-server && npm install && cd ..
+
+# WebSocket server (Real-time messaging)
+cd websocket-server && npm install && cd ..
+```
 
 I Recommend Option 1 id issue with files
 mv Chatvot/* .
@@ -137,12 +156,23 @@ get pull git pull origin main
 ### 5. Build All Apps
 
 ```bash
+# Build all apps
+npm run build          # Main app
+npm run build:admin    # Admin app
+npm run build:api      # API server
+npm run worker:build   # Worker
+
+# Build WebSocket server
+cd websocket-server && npm run build && cd ..
+```
+
+Or use the single command (if configured):
+```bash
 pm2 flush
 git pull origin main
 npm run build:all
 pm2 restart all
 pm2 logs --lines 30
-pm2 logs chartvolt-admin --lines 50
 ```
 
 ### 6. Configure NGINX
@@ -270,14 +300,17 @@ pm2 logs chartvolt-worker --lines 50
 pm2 status
 
 # View logs
-pm2 logs                    # All logs
-pm2 logs chartvolt-web      # User app only
-pm2 logs chartvolt-admin    # Admin app only
-pm2 logs chartvolt-worker   # Worker only
+pm2 logs                       # All logs
+pm2 logs chartvolt-web         # User app only
+pm2 logs chartvolt-admin       # Admin app only
+pm2 logs chartvolt-api         # API server only
+pm2 logs chartvolt-websocket   # WebSocket server only
+pm2 logs chartvolt-worker      # Worker only
 
 # Restart apps
-pm2 restart all             # Restart all
-pm2 restart chartvolt-web   # Restart specific app
+pm2 restart all                # Restart all
+pm2 restart chartvolt-web      # Restart specific app
+pm2 restart chartvolt-websocket # Restart WebSocket server
 
 # Monitor resources
 pm2 monit
@@ -328,9 +361,14 @@ curl http://localhost:3001/health
 # API server (local)
 curl http://localhost:4000/api/health
 
+# WebSocket server (local)
+curl http://localhost:3003/health
+curl http://localhost:3003/stats   # Connection stats
+
 # External (after SSL setup)
 curl https://chartvolt.com/health
 curl https://admin.chartvolt.com/health
+curl https://chartvolt.com/ws-health
 ```
 
 ### Resource Usage

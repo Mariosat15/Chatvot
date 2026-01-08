@@ -38,6 +38,10 @@ cd apps/admin && npm install && cd ../..
 echo "📦 Installing API server dependencies..."
 cd api-server && npm install && cd ..
 
+# Install WebSocket server dependencies
+echo "📦 Installing WebSocket server dependencies..."
+cd websocket-server && npm install && cd ..
+
 # Build all apps
 echo "🔨 Building main app..."
 npm run build
@@ -47,6 +51,9 @@ npm run build:admin
 
 echo "🔨 Building API server..."
 npm run build:api
+
+echo "🔨 Building WebSocket server..."
+cd websocket-server && npm run build && cd ..
 
 echo "🔨 Building worker..."
 npm run worker:build
@@ -68,5 +75,12 @@ echo "View logs:"
 echo "  pm2 logs chartvolt-web"
 echo "  pm2 logs chartvolt-admin"
 echo "  pm2 logs chartvolt-api"
+echo "  pm2 logs chartvolt-websocket"
 echo "  pm2 logs chartvolt-worker"
+echo ""
+echo "Health checks:"
+echo "  curl http://localhost:3000/health    # User app"
+echo "  curl http://localhost:3001/health    # Admin app"
+echo "  curl http://localhost:4000/api/health # API server"
+echo "  curl http://localhost:3003/health    # WebSocket server"
 

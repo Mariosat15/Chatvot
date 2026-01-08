@@ -98,6 +98,9 @@ deploy_to_server() {
     echo "📦 Installing API server dependencies..."
     cd api-server && npm install && cd ..
     
+    echo "📦 Installing WebSocket server dependencies..."
+    cd websocket-server && npm install && cd ..
+    
     echo "🔨 Building main app..."
     npm run build
     
@@ -106,6 +109,9 @@ deploy_to_server() {
     
     echo "🔨 Building API server..."
     npm run build:api
+    
+    echo "🔨 Building WebSocket server..."
+    cd websocket-server && npm run build && cd ..
     
     echo "🔨 Building worker..."
     npm run worker:build

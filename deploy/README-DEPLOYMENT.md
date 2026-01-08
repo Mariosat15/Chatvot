@@ -1,6 +1,6 @@
 # Chartvolt Deployment Guide
 
-Complete guide for deploying Chartvolt to production servers.
+Complete guide for deploying Chartvolt to a Hostinger VPS.
 
 ## 🌐 Production Details
 
@@ -11,163 +11,182 @@ Complete guide for deploying Chartvolt to production servers.
 | **VPS IP** | 148.230.124.57 |
 | **Provider** | Hostinger |
 
-## Table of Contents
+## Architecture
 
-1. [Architecture Overview](#architecture-overview)
-2. [Single VPS Deployment](#single-vps-deployment)
-3. [Multi-VPS Deployment (Scaling)](#multi-vps-deployment)
-4. [SSL Setup](#ssl-setup)
-5. [Monitoring](#monitoring)
-6. [Troubleshooting](#troubleshooting)
-
----
-
-## Architecture Overview
-
-### Single VPS Setup (148.230.124.57)
 ```
-┌─────────────────────────────────────────────────────────────┐
-│              HOSTINGER VPS (148.230.124.57)                 │
-│                                                              │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │  PM2 Process Manager                                │   │
-│   │  ├── chartvolt-web (Port 3000) - Next.js UI        │   │
-│   │  ├── chartvolt-api (Port 4000) - API Server        │   │
-│   │  ├── chartvolt-admin (Port 3001) - Admin Panel     │   │
-│   │  └── chartvolt-worker - Background Jobs            │   │
-│   └─────────────────────────────────────────────────────┘   │
-│                                                              │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │  Nginx Reverse Proxy                                │   │
-│   │  ├── chartvolt.com → Port 3000 (UI + most API)     │   │
-│   │  ├── chartvolt.com/api/auth/* → Port 4000 (bcrypt) │   │
-│   │  └── admin.chartvolt.com → Port 3001               │   │
-│   └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-              ┌─────────────────────────┐
-              │    MongoDB Atlas        │
-              └─────────────────────────┘
-```
+┌───────────────────────────────────────────────────────────────────────┐
+│                    HOSTINGER VPS (148.230.124.57)                     │
+│                                                                       │
+│  ┌─────────────────────────────────────────────────────────────────┐  │
+│  │  NGINX (Reverse Proxy)                                          │  │
+│  │  - chartvolt.com → User App (3000)                              │  │
+│  │  - chartvolt.com/ws → WebSocket Server (3003)                   │  │
+│  │  - chartvolt.com/api/auth/* → API Server (4000)                 │  │
+│  │  - admin.chartvolt.com → Admin App (3001)                       │  │
+│  │  - SSL/TLS termination                                          │  │
+│  └─────────────────────────────────────────────────────────────────┘  │
+│                              │                                        │
+│    ┌─────────────────────────┼────────────────────────────┐          │
+│    │          │           │         │           │         │          │
+│  ┌─▼────┐  ┌──▼───┐  ┌────▼────┐  ┌─▼───────┐  ┌─▼──────┐           │
+│  │ USER │  │ADMIN │  │   API   │  │WEBSOCKET│  │ WORKER │           │
+│  │ APP  │  │ APP  │  │ SERVER  │  │ SERVER  │  │        │           │
+│  │:3000 │  │:3001 │  │ :4000   │  │ :3003   │  │(no port│           │
+│  └──┬───┘  └──┬───┘  └────┬────┘  └────┬────┘  └───┬────┘           │
+│     └─────────┴───────────┴────────────┴───────────┘                 │
+│                              │                                        │
+│                       ┌──────▼──────┐                                 │
+│                       │   MongoDB   │                                 │
+│                       │  (Atlas)    │                                 │
+│                       └─────────────┘                                 │
+└───────────────────────────────────────────────────────────────────────┘
 
-### Multi-VPS Setup (Future Scaling)
-```
-                ┌─────────────────────┐
-                │   Cloudflare        │
-                │   (Load Balancer)   │
-                └──────────┬──────────┘
-                           │
-           ┌───────────────┼───────────────┐
-           ▼               ▼               ▼
-    ┌──────────┐    ┌──────────┐    ┌──────────┐
-    │  VPS 1   │    │  VPS 2   │    │  Redis   │
-    │  (Apps)  │    │  (Apps)  │    │ (Upstash)│
-    └──────────┘    └──────────┘    └──────────┘
-           │               │               │
-           └───────────────┼───────────────┘
-                           ▼
-                ┌─────────────────────┐
-                │    MongoDB Atlas    │
-                └─────────────────────┘
+PM2 Processes:
+┌─────────────────────┬──────┬─────────────────────────────────────┐
+│ Name                │ Port │ Description                         │
+├─────────────────────┼──────┼─────────────────────────────────────┤
+│ chartvolt-web       │ 3000 │ Main user application (Next.js)     │
+│ chartvolt-admin     │ 3001 │ Admin dashboard (Next.js)           │
+│ chartvolt-api       │ 4000 │ API server (auth, bcrypt)           │
+│ chartvolt-websocket │ 3003 │ WebSocket server (real-time chat)   │
+│ chartvolt-worker    │  -   │ Background worker (no HTTP port)    │
+└─────────────────────┴──────┴─────────────────────────────────────┘
 ```
 
----
+## Prerequisites
 
-## Single VPS Deployment
+- Hostinger VPS (4GB RAM minimum recommended)
+- Domain name configured with DNS pointing to VPS IP (148.230.124.57)
+- MongoDB Atlas account (or self-hosted MongoDB)
 
-### Step 1: Prepare Your VPS
+## Quick Start
 
-1. **VPS Details**
-   - Provider: Hostinger
-   - IP: 148.230.124.57
-   - Recommended: KVM 2 or KVM 4 (4GB+ RAM, 2+ CPU cores)
-   - OS: Ubuntu 22.04 LTS
+### 1. Initial Server Setup
 
-2. **SSH into your server**
-   ```bash
-   ssh root@148.230.124.57
-   ```
+```bash
+# Connect to your VPS
+ssh root@148.230.124.57
 
-3. **Run the setup script**
-   ```bash
-   # Download and run setup script
-   curl -fsSL https://raw.githubusercontent.com/Mariosat15/Chatvot/main/deploy/setup-server.sh | sudo bash
-   ```
+# Download and run setup script
+curl -O https://raw.githubusercontent.com/Mariosat15/Chatvot/main/deploy/setup-server.sh
+chmod +x setup-server.sh
+sudo ./setup-server.sh
+```
 
-   Or manually:
-   ```bash
-   # Clone repo first, then run setup
-   cd /var/www
-   git clone https://github.com/Mariosat15/Chatvot.git chartvolt
-   cd chartvolt
-   chmod +x deploy/setup-server.sh
-   sudo ./deploy/setup-server.sh
-   ```
-
-### Step 2: Configure Environment
-
-1. **Create .env file**
-   ```bash
-   cd /var/www/chartvolt
-   nano .env
-   ```
-
-2. **Add your environment variables**
-   ```env
-   # Database
-   MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/chartvolt
-
-   # Auth
-   BETTER_AUTH_SECRET=your-secret-key-min-32-chars
-   BETTER_AUTH_URL=https://chartvolt.com
-
-   # App URLs
-   NEXT_PUBLIC_APP_URL=https://chartvolt.com
-   ADMIN_URL=https://admin.chartvolt.com
-
-   # API Server
-   API_PORT=4000
-
-   # Admin Credentials
-   ADMIN_EMAIL=admin@chartvolt.com
-   ADMIN_PASSWORD=your-secure-password
-
-   # Payment Providers (optional)
-   STRIPE_SECRET_KEY=sk_...
-   STRIPE_PUBLISHABLE_KEY=pk_...
-   STRIPE_WEBHOOK_SECRET=whsec_...
-
-   # Optional: OpenAI for AI features
-   OPENAI_API_KEY=sk-...
-   OPENAI_ENABLED=true
-   ```
-
-### Step 3: Install Dependencies and Build
+### 2. Clone Repository
 
 ```bash
 cd /var/www/chartvolt
-
-# Install all dependencies
-npm run setup
-
-# Build all apps
-npm run build:all
+git clone https://github.com/Mariosat15/Chatvot.git .
 ```
 
-### Step 4: Configure Nginx
+### 3. Configure Environment
+
+```bash
+# Copy example env file
+cp env_minimal_example.txt .env
+
+# Edit with your values
+nano .env
+```
+
+Required environment variables:
+```env
+# MongoDB
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/chartvolt
+
+# Authentication
+BETTER_AUTH_SECRET=your-secret-key-min-32-chars
+BETTER_AUTH_URL=https://chartvolt.com
+
+# App URLs
+NEXT_PUBLIC_APP_URL=https://chartvolt.com
+ADMIN_URL=https://admin.chartvolt.com
+
+# Admin
+ADMIN_EMAIL=admin@chartvolt.com
+ADMIN_PASSWORD=your-secure-password
+
+# API Server
+API_PORT=4000
+
+# WebSocket Server (Real-time Messaging)
+WEBSOCKET_PORT=3003
+NEXT_PUBLIC_WEBSOCKET_URL=wss://chartvolt.com/ws
+WEBSOCKET_INTERNAL_URL=http://localhost:3003
+
+# Stripe (optional)
+STRIPE_SECRET_KEY=sk_...
+STRIPE_PUBLISHABLE_KEY=pk_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Paddle (optional)
+PADDLE_VENDOR_ID=...
+PADDLE_API_KEY=...
+```
+
+
+Ctrl + O  →  Save
+Enter     →  Confirm
+Ctrl + X  →  Exit
+
+### 4. Install Dependencies
+
+```bash
+# Main app
+npm install
+
+# Admin app
+cd apps/admin && npm install && cd ../..
+
+# API server
+cd api-server && npm install && cd ..
+
+# WebSocket server (Real-time messaging)
+cd websocket-server && npm install && cd ..
+```
+
+I Recommend Option 1 id issue with files
+mv Chatvot/* .
+mv Chatvot/.* . 2>/dev/null
+rm -rf Chatvot
+ls
+
+get pull git pull origin main
+### 5. Build All Apps
+
+```bash
+# Build all apps
+npm run build          # Main app
+npm run build:admin    # Admin app
+npm run build:api      # API server
+npm run worker:build   # Worker
+
+# Build WebSocket server
+cd websocket-server && npm run build && cd ..
+```
+
+Or use the single command (if configured):
+```bash
+pm2 flush
+git pull origin main
+npm run build:all
+pm2 restart all
+pm2 logs --lines 30
+```
+
+### 6. Configure NGINX
 
 > ⚠️ **IMPORTANT: Rate Limiting Must Be Added Manually**
 > 
 > Nginx requires rate limiting zones to be defined in the main config file BEFORE using them.
-> Without this step, nginx will fail to start!
 
 ```bash
 # STEP 1: Add rate limiting to main nginx.conf
 sudo nano /etc/nginx/nginx.conf
 ```
 
-**Add these lines inside the `http {}` block (REQUIRED!):**
+**Add these lines inside the `http {}` block (REQUIRED):**
 ```nginx
 http {
     # ... existing settings ...
@@ -185,14 +204,13 @@ http {
 # STEP 2: Copy site config
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
 
-# STEP 3: Verify domain names (already set to chartvolt.com)
+# STEP 3: The config already has chartvolt.com - verify it's correct
 sudo cat /etc/nginx/sites-available/chartvolt | grep server_name
-# Should show:
-#   server_name chartvolt.com www.chartvolt.com;
-#   server_name admin.chartvolt.com;
+# Should show: server_name chartvolt.com www.chartvolt.com;
+# And: server_name admin.chartvolt.com;
 
-# STEP 4: Enable the site
-sudo ln -sf /etc/nginx/sites-available/chartvolt /etc/nginx/sites-enabled/
+# STEP 4: Enable site and disable default
+sudo ln -s /etc/nginx/sites-available/chartvolt /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 
 # STEP 5: Test and reload
@@ -200,256 +218,276 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### Step 5: Start the Apps
+### 7. Start Applications
 
 ```bash
-cd /var/www/chartvolt
-
 # Start all apps with PM2
 pm2 start ecosystem.config.js
 
-# Save PM2 state (auto-restart on reboot)
+if │ 3  │ chartvolt-api       │ default     │ 1.0.0   │ fork    │ 0        │ 0      │ 30   │ errored   │ 0%       │ 0b       │ root     │ disabled 
+-------------
+then Generate secret put it in .env
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 
+sed -i "s/BETTER_AUTH_SECRET=.*/BETTER_AUTH_SECRET=$(openssl rand -hex 32)/" .env
+Verify it changed:
+grep BETTER_AUTH_SECRET .env
+
+Reload and restart:
+export $(grep -v '^#' .env | xargs)
+pm2 delete chartvolt-api 2>/dev/null
+pm2 start api-server/dist/index.js --name chartvolt-api
+pm2 save
+pm2 status
+
+# Save PM2 configuration
 pm2 save
 
-# Check status
+# View status
 pm2 status
 ```
 
-### Step 6: Verify Deployment
+### 8. SSL Certificate (Let's Encrypt)
 
 ```bash
-# Check if apps are running
-pm2 status
-
-# Check logs
-pm2 logs chartvolt-web
-pm2 logs chartvolt-api
-pm2 logs chartvolt-admin
-pm2 logs chartvolt-worker
-
-# Test health endpoint
-curl http://localhost:4000/api/health
-```
-
----
-
-## SSL Setup
-
-After your DNS is configured (chartvolt.com → 148.230.124.57):
-
-```bash
+# After DNS is propagated (chartvolt.com → 148.230.124.57)
 sudo certbot --nginx -d chartvolt.com -d www.chartvolt.com -d admin.chartvolt.com
-```
 
-Certbot will automatically:
-- Obtain SSL certificates
-- Configure Nginx for HTTPS
-- Set up auto-renewal
-
-**Test auto-renewal:**
-```bash
+# Auto-renewal is configured automatically
+# Test renewal with:
 sudo certbot renew --dry-run
 ```
 
----
+----------MongoDB Atlas IP Whitelist Issue!-------
+Go to MongoDB Atlas
+Select your cluster (Cluster0)
+SECURITY section → Database & Network Access
+Click on "Database & Network Access" - that's where you add the IP whitelist!
+Select the "Network Access" tab (or "IP Access List")
+Click "+ Add IP Address"
+Enter: 148.230.124.57 (your VPS IP)
+Click Confirm
+## Management Commands
 
-## Deploying Updates
+### PM2 Commands
 
-### Single VPS
+admin not log in -------------
+Quick Fix - Create Symlink:
+ln -sf /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
+Then restart:
+pm2 restart chartvolt-admin
 
-From your local machine:
-```bash
-# SSH into server and deploy
-ssh root@148.230.124.57 'cd /var/www/chartvolt && ./deploy/deploy.sh'
-```
-
-Or from the server:
-```bash
-ssh root@148.230.124.57
+Or Copy the .env:
+cp /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
+pm2 restart chartvolt-admin
+-------
+this is to update the server with latest git for admin
 cd /var/www/chartvolt
-./deploy/deploy.sh
+git pull origin main
+npm run build:admin
+pm2 restart chartvolt-admin
+
+
+----------------------this is to update the server with latest git for worker
+
+cd /var/www/chartvolt 
+git pull origin main
+npm run worker:build
+pm2 restart chartvolt-worker
+pm2 logs chartvolt-worker --lines 50
+
+```bash
+# View all apps status
+pm2 status
+
+# View logs
+pm2 logs                       # All logs
+pm2 logs chartvolt-web         # User app only
+pm2 logs chartvolt-admin       # Admin app only
+pm2 logs chartvolt-api         # API server only
+pm2 logs chartvolt-websocket   # WebSocket server only
+pm2 logs chartvolt-worker      # Worker only
+
+# Restart apps
+pm2 restart all                # Restart all
+pm2 restart chartvolt-web      # Restart specific app
+pm2 restart chartvolt-websocket # Restart WebSocket server
+
+# Monitor resources
+pm2 monit
+
+# Stop all
+pm2 stop all
 ```
 
-### Multi-VPS (Rolling Update)
+### Deployment Updates
 
-1. **Configure the script**
-   ```bash
-   nano deploy/deploy-multi.sh
-   # Edit VPS_SERVERS array with your IPs
-   ```
+```bash
+# Quick deploy
+./deploy/deploy.sh
 
-2. **Run deployment**
-   ```bash
-   ./deploy/deploy-multi.sh
-   ```
+# Or manually:
+git pull origin main
+npm run build:all
+pm2 reload ecosystem.config.js
+```
 
-The script will:
-1. Deploy to VPS 2 first (can fail without affecting users)
-2. Verify VPS 2 is healthy
-3. Deploy to VPS 1 (main server)
-4. Verify VPS 1 is healthy
+### Nginx Commands
 
----
+```bash
+# Test configuration
+sudo nginx -t
 
-## Multi-VPS Deployment
+# Reload without downtime
+sudo systemctl reload nginx
 
-### When to Scale
+# View access logs
+tail -f /var/log/nginx/chartvolt-access.log
 
-Scale to 2+ VPS when:
-- Consistent CPU usage > 80%
-- Response times increasing
-- 2000+ concurrent users
-
-### Steps to Scale
-
-1. **Set up VPS 2**
-   ```bash
-   # SSH into new VPS
-   ssh root@VPS2_IP
-   
-   # Run setup script
-   curl -fsSL https://raw.githubusercontent.com/YOUR_REPO/main/deploy/setup-server.sh | sudo bash
-   
-   # Clone and configure
-   cd /var/www
-   git clone https://github.com/YOUR_USERNAME/chartvolt.git
-   # Copy .env from VPS 1
-   # Build and start apps
-   ```
-
-2. **Enable Redis (Upstash)**
-   - Go to [upstash.com](https://upstash.com)
-   - Create a Redis database
-   - Copy credentials to Admin Panel → Dev Zone → Redis Cache
-
-3. **Configure Cloudflare Load Balancing**
-   - Add both VPS IPs to Cloudflare
-   - Enable Load Balancing
-   - Configure health checks
-
-4. **Update deploy script**
-   ```bash
-   nano deploy/deploy-multi.sh
-   # Add both VPS IPs
-   ```
-
----
+# View error logs
+tail -f /var/log/nginx/chartvolt-error.log
+```
 
 ## Monitoring
 
-### PM2 Monitoring
+### Check App Health
 
 ```bash
-# Real-time monitoring
-pm2 monit
+# User app (local)
+curl http://localhost:3000/health
 
-# Status
-pm2 status
+# Admin app (local)
+curl http://localhost:3001/health
 
-# Logs
-pm2 logs
-
-# Specific app logs
-pm2 logs chartvolt-api
-```
-
-### Check Server Health
-
-```bash
-# API health
+# API server (local)
 curl http://localhost:4000/api/health
 
-# Detailed health
-curl http://localhost:4000/api/health/detailed
+# WebSocket server (local)
+curl http://localhost:3003/health
+curl http://localhost:3003/stats   # Connection stats
+
+# External (after SSL setup)
+curl https://chartvolt.com/health
+curl https://admin.chartvolt.com/health
+curl https://chartvolt.com/ws-health
 ```
 
-### Check Resource Usage
+### Resource Usage
 
 ```bash
-# CPU and memory
+# PM2 monitoring dashboard
+pm2 monit
+
+# System resources
 htop
 
 # Disk usage
 df -h
 
-# PM2 metrics
-pm2 show chartvolt-api
+# Memory usage
+free -m
 ```
-
----
 
 ## Troubleshooting
 
-### App Won't Start
+### App Not Starting
 
 ```bash
-# Check logs
+# Check PM2 logs
 pm2 logs chartvolt-web --lines 100
 
-# Check if ports are in use
-sudo lsof -i :3000
-sudo lsof -i :4000
-sudo lsof -i :3001
+# Check if port is in use
+lsof -i :3000
+lsof -i :3001
 
-# Restart all
-pm2 restart all
+# Restart app
+pm2 restart chartvolt-web
 ```
 
-### Nginx Issues
+### NGINX 502 Bad Gateway
 
 ```bash
-# Test config
-sudo nginx -t
+# Check if apps are running
+pm2 status
 
-# Check logs
-sudo tail -f /var/log/nginx/chartvolt-error.log
+# Check nginx error log
+tail -100 /var/log/nginx/chartvolt-error.log
 
-# Reload
-sudo systemctl reload nginx
+# Verify upstream
+curl http://127.0.0.1:3000
 ```
 
 ### Database Connection Issues
 
 ```bash
-# Check if MongoDB URI is correct
-cat .env | grep MONGODB
+# Test connection manually
+node -e "require('mongoose').connect('your-mongodb-uri').then(() => console.log('OK'))"
 
-# Test connection
-node -e "require('mongoose').connect(process.env.MONGODB_URI).then(() => console.log('Connected!')).catch(console.error)"
+# Check worker logs
+pm2 logs chartvolt-worker
 ```
 
-### Out of Memory
+### SSL Certificate Issues
 
 ```bash
-# Check memory
-free -m
+# Renew certificates
+sudo certbot renew --dry-run
 
-# Add swap if needed
-sudo fallocate -l 2G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
+# Check certificate status
+sudo certbot certificates
 ```
 
----
+## Backup
 
-## Quick Reference
+### MongoDB
 
-| Command | Description |
-|---------|-------------|
-| `pm2 status` | Check app status |
-| `pm2 logs` | View all logs |
-| `pm2 restart all` | Restart all apps |
-| `pm2 reload ecosystem.config.js` | Zero-downtime reload |
-| `./deploy/deploy.sh` | Deploy updates |
-| `nginx -t` | Test Nginx config |
-| `systemctl reload nginx` | Reload Nginx |
+MongoDB Atlas provides automatic backups. For self-hosted:
 
----
+```bash
+# Backup
+mongodump --uri="your-mongodb-uri" --out=/backup/$(date +%Y%m%d)
 
-## Support
+# Restore
+mongorestore --uri="your-mongodb-uri" /backup/20231218
+```
 
-- Check the logs first: `pm2 logs`
-- Common issues are usually in Nginx config or .env file
-- For database issues, check MongoDB Atlas dashboard
+### PM2 Configuration
+
+```bash
+# Already saved with:
+pm2 save
+
+# To restore:
+pm2 resurrect
+```
+
+## Scaling
+
+### Vertical Scaling
+
+Upgrade Hostinger VPS plan for more resources.
+
+### Horizontal Scaling
+
+1. Increase PM2 instances:
+```javascript
+// ecosystem.config.js
+{
+  name: 'chartvolt-web',
+  instances: 2, // or 'max' for all CPUs
+  exec_mode: 'cluster',
+}
+```
+
+2. Load balancer with multiple servers (advanced)
+
+## Security Checklist
+
+- [ ] SSH key authentication enabled
+- [ ] Password authentication disabled
+- [ ] UFW firewall configured
+- [ ] Fail2ban installed (optional)
+- [ ] SSL/TLS enabled
+- [ ] Admin subdomain rate-limited
+- [ ] Environment variables secured
+- [ ] Regular security updates
 
