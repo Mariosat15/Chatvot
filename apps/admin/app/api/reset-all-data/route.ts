@@ -115,8 +115,8 @@ export async function POST(request: Request) {
     const alertsCollection = mongoose.connection.collection('alerts');
     const botExecutionsCollection = mongoose.connection.collection('botexecutions');
     const nuveiPaymentOptionsCollection = mongoose.connection.collection('nuveiuserpaymentoptions');
-    const customerAssignmentsCollection = mongoose.connection.collection('customerassignments');
-    const customerAuditTrailsCollection = mongoose.connection.collection('customeraudittrails');
+    const customerAssignmentsCollection = mongoose.connection.collection('customer_assignments');
+    const customerAuditTrailsCollection = mongoose.connection.collection('customer_audit_trail');
     const assignmentSettingsCollection = mongoose.connection.collection('assignment_settings');
     
     // Get all existing user IDs

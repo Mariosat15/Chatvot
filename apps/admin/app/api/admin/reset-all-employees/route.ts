@@ -93,9 +93,9 @@ export async function POST(request: NextRequest) {
     }
     console.log(`   ✅ Reset ${DEFAULT_ROLE_TEMPLATES.length} default role templates`);
     
-    // 5. Delete all customer assignments
+    // 5. Delete all customer assignments (collection name: customer_assignments)
     try {
-      const customerAssignmentsCollection = db.collection('customerassignments');
+      const customerAssignmentsCollection = db.collection('customer_assignments');
       const assignmentsResult = await customerAssignmentsCollection.deleteMany({});
       results['customerAssignments'] = assignmentsResult.deletedCount;
       if (assignmentsResult.deletedCount > 0) {
@@ -105,9 +105,9 @@ export async function POST(request: NextRequest) {
       results['customerAssignments'] = 0;
     }
     
-    // 6. Delete all customer audit trails (employee actions on customers)
+    // 6. Delete all customer audit trails (collection name: customer_audit_trail)
     try {
-      const customerAuditTrailCollection = db.collection('customeraudittrails');
+      const customerAuditTrailCollection = db.collection('customer_audit_trail');
       const auditTrailResult = await customerAuditTrailCollection.deleteMany({});
       results['customerAuditTrails'] = auditTrailResult.deletedCount;
       if (auditTrailResult.deletedCount > 0) {
