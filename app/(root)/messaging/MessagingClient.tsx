@@ -468,11 +468,6 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     }
   };
 
-  // Scroll to bottom of messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   // Initial data fetch
   useEffect(() => {
     const loadData = async () => {
