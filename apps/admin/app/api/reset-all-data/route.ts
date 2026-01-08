@@ -70,6 +70,10 @@ import { getAdminSession } from '@/lib/admin/auth';
  * - All position events
  * - All user notification preferences
  * - All user presence data
+ * - All chat conversations (support and user-to-user)
+ * - All chat messages
+ * - All friend requests
+ * - All friendships
  * 
  * ✅ PRESERVES (will NOT delete):
  * - User accounts (the actual users in 'user' collection)
@@ -119,6 +123,11 @@ export async function POST(request: Request) {
     const customerAuditTrailsCollection = mongoose.connection.collection('customer_audit_trail');
     const assignmentSettingsCollection = mongoose.connection.collection('assignment_settings');
     const employeeNotificationsCollection = mongoose.connection.collection('employee_notifications');
+    // Messaging collections
+    const conversationsCollection = mongoose.connection.collection('conversations');
+    const messagesCollection = mongoose.connection.collection('messages');
+    const friendRequestsCollection = mongoose.connection.collection('friend_requests');
+    const friendshipsCollection = mongoose.connection.collection('friendships');
     
     // Get all existing user IDs
     const existingUsers = await userCollection.find({}, { projection: { _id: 1 } }).toArray();
@@ -173,6 +182,11 @@ export async function POST(request: Request) {
       userPresence: await UserPresence.countDocuments(),
       customerAssignments: await customerAssignmentsCollection.countDocuments(),
       customerAuditTrails: await customerAuditTrailsCollection.countDocuments(),
+      // Messaging data
+      conversations: await conversationsCollection.countDocuments(),
+      messages: await messagesCollection.countDocuments(),
+      friendRequests: await friendRequestsCollection.countDocuments(),
+      friendships: await friendshipsCollection.countDocuments(),
     };
 
     console.log('📊 Before deletion:', before);
@@ -331,6 +345,19 @@ export async function POST(request: Request) {
     const employeeNotificationsDeleted = await employeeNotificationsCollection.deleteMany({});
     console.log(`✅ Deleted ${employeeNotificationsDeleted.deletedCount} employee notifications`);
 
+    // Delete all messaging data (conversations, messages, friends)
+    const conversationsDeleted = await conversationsCollection.deleteMany({});
+    console.log(`✅ Deleted ${conversationsDeleted.deletedCount} chat conversations`);
+
+    const messagesDeleted = await messagesCollection.deleteMany({});
+    console.log(`✅ Deleted ${messagesDeleted.deletedCount} chat messages`);
+
+    const friendRequestsDeleted = await friendRequestsCollection.deleteMany({});
+    console.log(`✅ Deleted ${friendRequestsDeleted.deletedCount} friend requests`);
+
+    const friendshipsDeleted = await friendshipsCollection.deleteMany({});
+    console.log(`✅ Deleted ${friendshipsDeleted.deletedCount} friendships`);
+
     // Delete orphan credit wallets (where user no longer exists)
     if (orphanWalletIds.length > 0) {
       const orphanDeleteResult = await CreditWallet.deleteMany({ _id: { $in: orphanWalletIds } });
@@ -419,6 +446,11 @@ export async function POST(request: Request) {
       userPresence: await UserPresence.countDocuments(),
       customerAssignments: await customerAssignmentsCollection.countDocuments(),
       customerAuditTrails: await customerAuditTrailsCollection.countDocuments(),
+      // Messaging data
+      conversations: await conversationsCollection.countDocuments(),
+      messages: await messagesCollection.countDocuments(),
+      friendRequests: await friendRequestsCollection.countDocuments(),
+      friendships: await friendshipsCollection.countDocuments(),
     };
 
     console.log('📊 After deletion:', after);
@@ -487,6 +519,11 @@ export async function POST(request: Request) {
         userPresence: before.userPresence,
         customerAssignments: before.customerAssignments,
         customerAuditTrails: before.customerAuditTrails,
+        // Messaging data
+        conversations: before.conversations,
+        messages: before.messages,
+        friendRequests: before.friendRequests,
+        friendships: before.friendships,
       },
       walletsReset: walletResetResult.modifiedCount,
     });
