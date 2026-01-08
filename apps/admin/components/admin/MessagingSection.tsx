@@ -194,17 +194,23 @@ export default function MessagingSection() {
   // Fetch messages for selected conversation
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
+      console.log('📩 Fetching messages for conversation:', conversationId);
       const response = await fetch(`/api/messaging/conversations/${conversationId}`);
       if (response.ok) {
         const data = await response.json();
-        setMessages(data.messages);
+        console.log('📩 Fetched', data.messages?.length || 0, 'messages');
+        setMessages(data.messages || []);
         // Update unread count
         setConversations(prev =>
           prev.map(c => c.id === conversationId ? { ...c, unreadCount: 0 } : c)
         );
+      } else {
+        console.error('Failed to fetch messages:', response.status);
+        setMessages([]);
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
+      setMessages([]);
     }
   }, []);
 
@@ -629,7 +635,7 @@ export default function MessagingSection() {
                             ? customer?.name || 'Customer'
                             : conversation.participants.filter(p => p.type === 'employee').map(p => p.name).join(', ')}
                         </p>
-                        {conversation.lastMessage && (
+                        {conversation.lastMessage?.timestamp && (
                           <span className="text-xs text-[#6b7280]">
                             {formatDistanceToNow(new Date(conversation.lastMessage.timestamp), { addSuffix: false })}
                           </span>
@@ -716,12 +722,14 @@ export default function MessagingSection() {
                 <div className="px-4 py-2 bg-[#0A0A0A] border-b border-[#2A2A2A] flex items-center gap-4 text-xs">
                   <span className="flex items-center gap-1 text-[#6b7280]">
                     <User className="w-3 h-3" />
-                    {getCustomer(selectedConversation)?.name}
+                    {getCustomer(selectedConversation)?.name || 'Customer'}
                   </span>
-                  <span className="flex items-center gap-1 text-[#6b7280]">
-                    <Clock className="w-3 h-3" />
-                    Started {formatDistanceToNow(new Date(selectedConversation.createdAt), { addSuffix: true })}
-                  </span>
+                  {selectedConversation.createdAt && (
+                    <span className="flex items-center gap-1 text-[#6b7280]">
+                      <Clock className="w-3 h-3" />
+                      Started {formatDistanceToNow(new Date(selectedConversation.createdAt), { addSuffix: true })}
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -785,7 +793,9 @@ export default function MessagingSection() {
                           )}
                         </div>
                         <div className={`flex items-center gap-1 mt-1 text-xs text-[#6b7280] ${isEmployee ? 'justify-end' : ''}`}>
-                          <span>{format(new Date(message.createdAt), 'HH:mm')}</span>
+                          {message.createdAt && (
+                            <span>{format(new Date(message.createdAt), 'HH:mm')}</span>
+                          )}
                           {isEmployee && (
                             <span className="text-emerald-500">
                               {message.readBy && message.readBy.length > 0 ? (
