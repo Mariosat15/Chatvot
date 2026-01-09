@@ -391,42 +391,49 @@ export default function MessagingSection() {
         return;
       }
       
-      // Switch to support tab first
-      setActiveTab('support');
-      
-      // Fetch conversations for support tab specifically
-      try {
-        const convListResponse = await fetch('/api/messaging/conversations?type=support&status=active');
-        if (convListResponse.ok) {
-          const convListData = await convListResponse.json();
-          setConversations(convListData.conversations || []);
-        }
-      } catch (err) {
-        console.error('Error fetching conversations list:', err);
-      }
-      
-      // Fetch the conversation details
+      // Fetch the conversation details FIRST (before switching tabs)
       const convResponse = await fetch(`/api/messaging/conversations/${data.conversation.id}`);
-      if (convResponse.ok) {
-        const convData = await convResponse.json();
-        console.log(`💬 [UI] Got conversation details, messages:`, convData.messages?.length || 0);
-        
-        setSelectedConversation({
-          id: data.conversation.id,
-          type: data.conversation.type || 'user-to-support',
-          status: data.conversation.status || 'active',
-          participants: convData.participants || data.conversation.participants || [],
-          lastMessage: convData.lastMessage,
-          unreadCount: 0,
-          isAIHandled: convData.isAIHandled || false,
-          createdAt: convData.createdAt || new Date().toISOString(),
-          lastActivityAt: convData.lastActivityAt || new Date().toISOString(),
-        });
-        setMessages(convData.messages || []);
-        setTimeout(() => scrollToBottom(), 100);
-      } else {
+      if (!convResponse.ok) {
         console.error('Failed to fetch conversation details:', convResponse.status);
+        return;
       }
+      
+      const convData = await convResponse.json();
+      console.log(`💬 [UI] Got conversation details, messages:`, convData.messages?.length || 0);
+      
+      // Set the selected conversation immediately
+      const newConversation = {
+        id: data.conversation.id,
+        type: data.conversation.type || 'user-to-support',
+        status: data.conversation.status || 'active',
+        participants: convData.participants || data.conversation.participants || [],
+        lastMessage: convData.lastMessage,
+        unreadCount: 0,
+        isAIHandled: convData.isAIHandled || false,
+        createdAt: convData.createdAt || new Date().toISOString(),
+        lastActivityAt: convData.lastActivityAt || new Date().toISOString(),
+        ticketNumber: convData.ticketNumber,
+        isArchived: convData.isArchived,
+        isResolved: convData.isResolved,
+      };
+      
+      setMessages(convData.messages || []);
+      setSelectedConversation(newConversation);
+      
+      // Switch to support tab and update status filter
+      setActiveTab('support');
+      setStatusFilter('active');
+      
+      // Add the conversation to the list if not already there
+      setConversations(prev => {
+        const exists = prev.some(c => c.id === data.conversation.id);
+        if (exists) {
+          return prev.map(c => c.id === data.conversation.id ? newConversation : c);
+        }
+        return [newConversation, ...prev];
+      });
+      
+      setTimeout(() => scrollToBottom(), 100);
     } catch (error) {
       console.error('Error starting conversation:', error);
     }
@@ -553,21 +560,31 @@ export default function MessagingSection() {
     }
   }, [scrollToBottom]);
 
+  // Initial load - only run once on mount
+  const initialLoadDone = useRef(false);
   useEffect(() => {
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
+    
     const loadData = async () => {
       setIsLoading(true);
       await Promise.all([fetchConversations(), fetchEmployees(), fetchAssignedCustomers(), fetchAvailability()]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchConversations, fetchEmployees, fetchAssignedCustomers, fetchAvailability]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Refetch conversations when tab or status filter changes (but don't reset loading state)
   useEffect(() => {
-    // When WebSocket is connected, poll much less frequently (just for consistency)
-    // When disconnected, poll more often as fallback
+    if (!initialLoadDone.current) return; // Don't run during initial load
+    fetchConversations();
+  }, [activeTab, statusFilter, fetchConversations]);
+
+  // Polling fallback (only when WebSocket is disconnected)
+  useEffect(() => {
     const pollInterval = wsConnected ? 60000 : 8000;
     const interval = setInterval(() => {
-      // Only fetch conversations on poll, not messages (avoids flicker)
       if (!wsConnected) {
         fetchConversations();
         if (selectedConversation) fetchMessages(selectedConversation.id);
