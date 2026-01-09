@@ -225,6 +225,7 @@ export default function MessagingSection() {
   const isUserAtBottomRef = useRef(true);
   const isInitialLoadRef = useRef(true); // Track if this is the first load of messages
   const chatMenuRef = useRef<HTMLDivElement>(null);
+  const initialLoadDone = useRef(false); // Track if initial data load completed
 
   // Get current admin info from cookie/session
   useEffect(() => {
@@ -561,7 +562,6 @@ export default function MessagingSection() {
   }, [scrollToBottom]);
 
   // Initial load - only run once on mount
-  const initialLoadDone = useRef(false);
   useEffect(() => {
     if (initialLoadDone.current) return;
     initialLoadDone.current = true;
