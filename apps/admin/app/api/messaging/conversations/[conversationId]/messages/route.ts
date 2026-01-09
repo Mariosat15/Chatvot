@@ -85,6 +85,7 @@ export async function POST(
       status: 'sent',
       readBy: [],
       deliveredTo: [],
+      isDeleted: false, // IMPORTANT: Required for message queries
       createdAt: new Date(),
       updatedAt: new Date(),
     };

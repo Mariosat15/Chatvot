@@ -487,7 +487,11 @@ export class MessagingService {
     
     const query: any = {
       conversationId: new Types.ObjectId(conversationId),
-      isDeleted: false,
+      // Include messages where isDeleted is false OR not set (for legacy messages)
+      $or: [
+        { isDeleted: false },
+        { isDeleted: { $exists: false } },
+      ],
     };
     
     if (options.before) {
