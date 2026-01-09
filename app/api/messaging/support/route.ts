@@ -237,10 +237,20 @@ async function handleAIResponse(
   if (!conversation) return null;
   
   // Count AI messages in this conversation
-  const aiMessageCount = await db.collection('messages').countDocuments({
+  // IMPORTANT: Only count messages AFTER lastResolvedAt to reset counter on resolve
+  const aiMessageQuery: any = {
     conversationId: new mongoose.default.Types.ObjectId(conversationId),
     senderType: 'ai'
-  });
+  };
+  
+  // If conversation was previously resolved, only count AI messages after that time
+  if (conversation.lastResolvedAt) {
+    aiMessageQuery.createdAt = { $gt: conversation.lastResolvedAt };
+    console.log(`🤖 [AI] Counting AI messages after lastResolvedAt: ${conversation.lastResolvedAt}`);
+  }
+  
+  const aiMessageCount = await db.collection('messages').countDocuments(aiMessageQuery);
+  console.log(`🤖 [AI] AI message count for this session: ${aiMessageCount}`);
   
   // Check for escalation keywords
   const escalationKeywords = settings.aiEscalationKeywords || ['human', 'agent', 'person', 'real person', 'talk to someone', 'representative'];

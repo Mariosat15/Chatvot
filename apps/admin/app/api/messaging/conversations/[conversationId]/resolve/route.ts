@@ -58,6 +58,7 @@ export async function POST(
     console.log(`✅ [Resolve] Marking conversation ${conversationId} as resolved by ${decoded.email}`);
 
     // Update conversation to resolved state
+    // IMPORTANT: lastResolvedAt is used to reset AI response count - only count AI messages AFTER this time
     await db.collection('conversations').updateOne(
       { _id: convObjectId },
       {
@@ -68,6 +69,8 @@ export async function POST(
           resolvedByName: decoded.name || decoded.email,
           // When resolved, AI should handle next message
           isAIHandled: true,
+          // This timestamp resets the AI response counter - messages before this don't count
+          lastResolvedAt: new Date(),
           updatedAt: new Date(),
         },
       }
