@@ -103,13 +103,19 @@ const server = createServer(async (req, res) => {
 
   // Stats endpoint
   if (req.url === '/stats') {
+    const memUsage = process.memoryUsage();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       totalConnections: connections.size,
       uniqueParticipants: participantConnections.size,
       activeConversations: conversationSubscribers.size,
-      memoryUsage: process.memoryUsage(),
-      uptime: process.uptime(),
+      presenceWatchers: presenceSubscribers.size,
+      memoryUsage: {
+        heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+        heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
+        rssMB: Math.round(memUsage.rss / 1024 / 1024),
+      },
+      uptime: Math.round(process.uptime()),
     }));
     return;
   }
@@ -385,6 +391,25 @@ function handleMessage(connectionId: string, message: any) {
       }
       break;
 
+    case 'watch_presence':
+      // Subscribe to presence updates for specific participants (friends/conversation partners)
+      if (data.participantIds && Array.isArray(data.participantIds)) {
+        for (const targetId of data.participantIds) {
+          subscribeToPresence(connectionId, targetId);
+        }
+        console.log(`👁️ ${connection.participantId} watching presence of ${data.participantIds.length} users`);
+      }
+      break;
+
+    case 'unwatch_presence':
+      // Unsubscribe from presence updates
+      if (data.participantIds && Array.isArray(data.participantIds)) {
+        for (const targetId of data.participantIds) {
+          unsubscribeFromPresence(connectionId, targetId);
+        }
+      }
+      break;
+
     case 'message':
       // Broadcast new message to conversation
       if (data.conversationId && data.message) {
@@ -410,6 +435,12 @@ function handleDisconnect(connectionId: string) {
   // Remove from all conversation subscribers
   for (const conversationId of connection.conversationIds) {
     removeSubscriber(conversationId, connectionId);
+  }
+
+  // Remove from presence subscribers (clean up any presence watches)
+  for (const [targetId, subs] of presenceSubscribers) {
+    subs.delete(connectionId);
+    if (subs.size === 0) presenceSubscribers.delete(targetId);
   }
 
   // Remove from participant connections
@@ -479,6 +510,24 @@ function broadcastToParticipant(participantId: string, event: any) {
   }
 }
 
+// Track who is interested in whose presence (friends/conversation partners only)
+const presenceSubscribers = new Map<string, Set<string>>(); // participantId -> Set of connectionIds watching them
+
+function subscribeToPresence(watcherConnectionId: string, targetParticipantId: string) {
+  if (!presenceSubscribers.has(targetParticipantId)) {
+    presenceSubscribers.set(targetParticipantId, new Set());
+  }
+  presenceSubscribers.get(targetParticipantId)!.add(watcherConnectionId);
+}
+
+function unsubscribeFromPresence(watcherConnectionId: string, targetParticipantId: string) {
+  const subs = presenceSubscribers.get(targetParticipantId);
+  if (subs) {
+    subs.delete(watcherConnectionId);
+    if (subs.size === 0) presenceSubscribers.delete(targetParticipantId);
+  }
+}
+
 function broadcastPresence(participantId: string, status: string) {
   const event = {
     type: 'presence',
@@ -489,10 +538,28 @@ function broadcastPresence(participantId: string, status: string) {
     },
   };
 
-  // Broadcast to all connected users (they'll filter relevant ones client-side)
-  for (const [_, connection] of connections) {
-    if (connection.ws.readyState === WebSocket.OPEN) {
-      send(connection.ws, event);
+  // OPTIMIZED: Only broadcast to users who are actively watching this participant
+  // (users in the same conversation or friends) instead of ALL users
+  const subscribers = presenceSubscribers.get(participantId);
+  
+  if (subscribers && subscribers.size > 0) {
+    for (const connectionId of subscribers) {
+      const connection = connections.get(connectionId);
+      if (connection && connection.ws.readyState === WebSocket.OPEN) {
+        send(connection.ws, event);
+      }
+    }
+    console.log(`📡 Presence ${status} for ${participantId} sent to ${subscribers.size} subscribers`);
+  }
+  
+  // Also notify the participant themselves (for multi-device sync)
+  const ownConnections = participantConnections.get(participantId);
+  if (ownConnections) {
+    for (const connId of ownConnections) {
+      const conn = connections.get(connId);
+      if (conn && conn.ws.readyState === WebSocket.OPEN) {
+        send(conn.ws, event);
+      }
     }
   }
 }
@@ -585,6 +652,7 @@ export function getStats() {
     totalConnections: connections.size,
     uniqueParticipants: participantConnections.size,
     activeConversations: conversationSubscribers.size,
+    presenceWatchers: presenceSubscribers.size,
   };
 }
 
