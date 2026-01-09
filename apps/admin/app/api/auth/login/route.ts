@@ -146,11 +146,13 @@ export async function POST(request: NextRequest) {
     admin.isOnline = true;
     await Admin.updateOne({ _id: admin._id }, { lastLogin: new Date(), isOnline: true });
 
-    // Generate JWT with role and sections
+    // Generate JWT with role, name, and sections
     const adminId = (admin._id as any).toString();
+    const adminName = admin.name || admin.email.split('@')[0];
     const token = await new SignJWT({ 
       adminId, 
       email: admin.email,
+      name: adminName,
       role,
       isSuperAdmin,
       allowedSections,
@@ -172,9 +174,26 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Set HTTP-only cookie
+    // Set HTTP-only cookie for auth
     response.cookies.set('admin_token', token, {
       httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    });
+    
+    // Set client-accessible cookies for admin info (used by UI components)
+    response.cookies.set('admin_id', adminId, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    });
+    
+    response.cookies.set('admin_name', encodeURIComponent(admin.name || admin.email.split('@')[0]), {
+      httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days

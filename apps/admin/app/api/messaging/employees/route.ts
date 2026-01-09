@@ -50,14 +50,23 @@ export async function GET(request: NextRequest) {
     const allAdmins = await db.collection('admins').find({}).toArray();
     console.log(`📧 [Employees] Total admins in DB: ${allAdmins.length}`);
     allAdmins.forEach((admin: any) => {
-      console.log(`   - ${admin.email} (${admin._id}) status: ${admin.status}, role: ${admin.role}`);
+      console.log(`   - ${admin.email} (${admin._id}) status: ${admin.status}, role: ${admin.role}, isSuperAdmin: ${admin.isSuperAdmin}`);
     });
 
+    // Get ALL active employees/admins (including super admin) - exclude only current user
     const employees = await db.collection('admins').find({
       _id: { $ne: currentUserId },
-      status: 'active',
+      $or: [
+        { status: 'active' },
+        { isSuperAdmin: true }, // Always include super admin
+      ],
       isLockedOut: { $ne: true },
     }).toArray();
+    
+    console.log(`📧 [Employees] Found ${employees.length} team members (excluding current user)`);
+    employees.forEach((emp: any) => {
+      console.log(`   ✓ ${emp.email} (${emp.role}${emp.isSuperAdmin ? ' - SUPER ADMIN' : ''})`);
+    });
     
     console.log(`📧 [Employees] Fetched ${employees.length} employees for internal chat (excluding ${decoded.email})`);
 
@@ -84,11 +93,13 @@ export async function GET(request: NextRequest) {
         id: emp._id.toString(),
         name: emp.name || emp.email?.split('@')[0] || 'Employee',
         email: emp.email,
-        role: emp.role,
+        role: emp.isSuperAdmin ? 'Super Admin' : (emp.role || 'Employee'),
+        isSuperAdmin: emp.isSuperAdmin || false,
         avatar: emp.profileImage || emp.avatar,
-        status: presence?.status || 'offline',
+        status: presence?.status || (emp.isOnline ? 'online' : 'offline'),
         lastSeen: presence?.lastSeen,
         lastLoginAt: emp.lastLoginAt,
+        isAvailableForChat: emp.isAvailableForChat !== false,
       };
     });
 

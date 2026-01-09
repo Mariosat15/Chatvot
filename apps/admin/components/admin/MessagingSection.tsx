@@ -161,8 +161,11 @@ interface Employee {
   name: string;
   email: string;
   role: string;
+  isSuperAdmin?: boolean;
+  avatar?: string;
   status: string;
   lastSeen?: string;
+  isAvailableForChat?: boolean;
 }
 
 interface AssignedCustomer {
@@ -192,10 +195,26 @@ export default function MessagingSection() {
   const [selectedEmployeeForTransfer, setSelectedEmployeeForTransfer] = useState<string>('');
   const [assignedCustomers, setAssignedCustomers] = useState<AssignedCustomer[]>([]);
   const [typingUsers, setTypingUsers] = useState<Map<string, { name: string; timestamp: number }>>(new Map());
+  const [currentAdminId, setCurrentAdminId] = useState<string>('');
+  const [currentAdminName, setCurrentAdminName] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectedConvRef = useRef<string | null>(null);
+
+  // Get current admin info from cookie/session
+  useEffect(() => {
+    // Get admin ID from cookie
+    const adminIdCookie = document.cookie.split('; ').find(c => c.startsWith('admin_id='))?.split('=')[1];
+    const adminNameCookie = document.cookie.split('; ').find(c => c.startsWith('admin_name='))?.split('=')[1];
+    if (adminIdCookie) {
+      setCurrentAdminId(decodeURIComponent(adminIdCookie));
+    }
+    if (adminNameCookie) {
+      setCurrentAdminName(decodeURIComponent(adminNameCookie));
+    }
+    console.log('📋 [Admin] Current admin ID:', adminIdCookie, 'Name:', adminNameCookie);
+  }, []);
 
   // Keep selected conversation ID in ref for WebSocket callbacks
   useEffect(() => {
@@ -857,15 +876,18 @@ export default function MessagingSection() {
             )}
 
             {activeTab === 'internal' && (
-              <div className="p-2">
+              <div className="p-2 space-y-1">
                 {/* Existing Internal Conversations */}
                 {filteredConversations.filter(c => c.type === 'employee-internal').length > 0 && (
                   <>
-                    <p className="text-xs text-[#6b7280] px-2 py-1 mb-2">
-                      Recent Chats ({filteredConversations.filter(c => c.type === 'employee-internal').length})
+                    <p className="text-xs text-[#6b7280] uppercase tracking-wider px-2 py-1 mb-2 font-semibold">
+                      Active Chats ({filteredConversations.filter(c => c.type === 'employee-internal').length})
                     </p>
                     {filteredConversations.filter(c => c.type === 'employee-internal').map((conversation) => {
-                      const otherParticipant = conversation.participants.find(p => p.type === 'employee');
+                      // Find the OTHER participant (not the current user)
+                      const otherParticipant = conversation.participants.find(p => 
+                        p.id !== currentAdminId && p.type === 'employee'
+                      ) || conversation.participants.find(p => p.type === 'employee');
                       const isSelected = selectedConversation?.id === conversation.id;
                       
                       return (
@@ -877,74 +899,97 @@ export default function MessagingSection() {
                             setSelectedConversation(conversation);
                             fetchMessages(conversation.id);
                           }}
-                          className={`flex items-center gap-3 p-2 cursor-pointer transition-all rounded-lg mb-1 ${
+                          className={`flex items-center gap-3 p-3 cursor-pointer transition-all rounded-xl ${
                             isSelected
-                              ? 'bg-violet-500/10 border border-violet-500/30'
+                              ? 'bg-violet-500/20 border border-violet-500/40'
                               : 'hover:bg-[#1E1E1E] border border-transparent hover:border-[#2A2A2A]'
                           }`}
                         >
                           <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
                               <span className="text-white text-sm font-bold">
                                 {otherParticipant?.name?.charAt(0)?.toUpperCase() || 'E'}
                               </span>
                             </div>
+                            <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#111111]" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <p className="text-sm text-white font-medium truncate">
-                                {otherParticipant?.name || 'Employee'}
+                                {otherParticipant?.name || 'Team Member'}
                               </p>
                               {conversation.unreadCount > 0 && (
-                                <span className="bg-violet-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                                <span className="bg-violet-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
                                   {conversation.unreadCount}
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-[#6b7280] truncate">
-                              {conversation.lastMessage?.content || 'No messages'}
+                            <p className="text-xs text-[#6b7280] truncate mt-0.5">
+                              {conversation.lastMessage?.content || 'Start a conversation'}
                             </p>
                           </div>
                         </motion.div>
                       );
                     })}
-                    <div className="border-t border-[#2A2A2A] my-3" />
+                    <div className="border-t border-[#2A2A2A] my-4" />
                   </>
                 )}
                 
                 {/* Team Members List */}
-                <p className="text-xs text-[#6b7280] px-2 py-1 mb-2">Team Members ({employees.length})</p>
+                <p className="text-xs text-[#6b7280] uppercase tracking-wider px-2 py-1 mb-2 font-semibold">
+                  Team Members ({employees.length})
+                </p>
                 {employees.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Users className="w-10 h-10 text-[#4b5563] mx-auto mb-3" />
-                    <p className="text-[#6b7280] text-sm">No other team members</p>
-                    <p className="text-xs text-[#4b5563] mt-1">
-                      Other employees will appear here
+                  <div className="text-center py-10 bg-[#1A1A1A] rounded-xl border border-[#2A2A2A]">
+                    <Users className="w-12 h-12 text-[#4b5563] mx-auto mb-3" />
+                    <p className="text-[#6b7280] text-sm font-medium">No team members found</p>
+                    <p className="text-xs text-[#4b5563] mt-1 px-4">
+                      Other employees and admins will appear here when available
                     </p>
                   </div>
                 ) : (
-                  employees.map((employee) => (
-                    <div
-                      key={employee.id}
-                      onClick={() => handleStartInternalChat(employee)}
-                      className="flex items-center gap-3 p-2 hover:bg-[#1E1E1E] rounded-lg cursor-pointer transition-colors border border-transparent hover:border-[#2A2A2A]"
-                    >
-                      <div className="relative">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
-                          <span className="text-white text-sm font-bold">
-                            {employee.name?.charAt(0)?.toUpperCase() || 'E'}
-                          </span>
+                  <div className="space-y-1">
+                    {employees.map((employee) => (
+                      <motion.div
+                        key={employee.id}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        onClick={() => handleStartInternalChat(employee)}
+                        className="flex items-center gap-3 p-3 hover:bg-[#1E1E1E] rounded-xl cursor-pointer transition-all border border-transparent hover:border-violet-500/30 group"
+                      >
+                        <div className="relative">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            employee.isSuperAdmin
+                              ? 'bg-gradient-to-br from-amber-500 to-orange-500'
+                              : 'bg-gradient-to-br from-violet-500 to-fuchsia-500'
+                          }`}>
+                            {employee.avatar ? (
+                              <img src={employee.avatar} alt="" className="w-10 h-10 rounded-full object-cover" />
+                            ) : (
+                              <span className="text-white text-sm font-bold">
+                                {employee.name?.charAt(0)?.toUpperCase() || 'E'}
+                              </span>
+                            )}
+                          </div>
+                          <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#111111] ${
+                            employee.status === 'online' ? 'bg-emerald-500' : 'bg-[#6b7280]'
+                          }`} />
                         </div>
-                        <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#111111] ${
-                          employee.status === 'online' ? 'bg-emerald-500' : 'bg-[#6b7280]'
-                        }`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white font-medium truncate">{employee.name}</p>
-                        <p className="text-xs text-[#6b7280] truncate">{employee.role}</p>
-                      </div>
-                    </div>
-                  ))
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-white font-medium truncate">{employee.name}</p>
+                            {employee.isSuperAdmin && (
+                              <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded font-semibold">
+                                ADMIN
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[#6b7280] truncate">{employee.role}</p>
+                        </div>
+                        <MessageCircle className="w-4 h-4 text-[#4b5563] opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </motion.div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -1067,15 +1112,27 @@ export default function MessagingSection() {
                     <h3 className="font-medium text-white">
                       {selectedConversation.type === 'user-to-support'
                         ? getCustomer(selectedConversation)?.name || 'Customer'
-                        : 'Internal Chat'}
+                        : (() => {
+                            // For internal chat, show the OTHER participant's name
+                            const otherPerson = selectedConversation.participants.find(
+                              p => p.id !== currentAdminId && p.type === 'employee'
+                            );
+                            return otherPerson?.name || 'Team Chat';
+                          })()
+                      }
                     </h3>
                     <div className="flex items-center gap-2 text-xs text-[#6b7280]">
+                      {selectedConversation.type === 'employee-internal' && (
+                        <span className="flex items-center gap-1 text-violet-400">
+                          <Users className="w-3 h-3" /> Internal Chat
+                        </span>
+                      )}
                       {selectedConversation.isAIHandled && (
                         <span className="flex items-center gap-1 text-cyan-500">
                           <Bot className="w-3 h-3" /> AI Handling
                         </span>
                       )}
-                      {selectedConversation.assignedEmployeeName && (
+                      {selectedConversation.assignedEmployeeName && selectedConversation.type === 'user-to-support' && (
                         <span>Assigned to {selectedConversation.assignedEmployeeName}</span>
                       )}
                       {selectedConversation.temporarilyRedirected && (
@@ -1131,9 +1188,10 @@ export default function MessagingSection() {
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#0A0A0A]">
                 {messages.map((message) => {
-                  const isEmployee = message.senderType === 'employee';
+                  // Check if message is from ME (current admin)
+                  const isOwnMessage = message.senderId === currentAdminId;
                   const isAI = message.senderType === 'ai';
-                  const isSystem = message.messageType === 'system';
+                  const isSystem = message.messageType === 'system' || message.senderType === 'system';
 
                   if (isSystem) {
                     return (
@@ -1150,14 +1208,17 @@ export default function MessagingSection() {
                       key={message.id}
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className={`flex ${isEmployee ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className={`max-w-[70%] ${isEmployee ? 'order-2' : 'order-1'}`}>
-                        {!isEmployee && (
+                      <div className={`max-w-[70%] ${isOwnMessage ? 'order-2' : 'order-1'}`}>
+                        {/* Show sender info for messages from others */}
+                        {!isOwnMessage && (
                           <div className="flex items-center gap-2 mb-1">
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
                               isAI
                                 ? 'bg-gradient-to-br from-cyan-500 to-emerald-500'
+                                : message.senderType === 'employee'
+                                ? 'bg-gradient-to-br from-purple-500 to-pink-500'
                                 : 'bg-gradient-to-br from-blue-500 to-indigo-500'
                             }`}>
                               {isAI ? (
@@ -1168,15 +1229,22 @@ export default function MessagingSection() {
                                 </span>
                               )}
                             </div>
-                            <span className="text-xs text-[#6b7280]">{message.senderName}</span>
+                            <span className="text-xs text-[#6b7280] font-medium">
+                              {message.senderName}
+                              {message.senderType === 'employee' && (
+                                <span className="ml-1 text-purple-400">(Staff)</span>
+                              )}
+                            </span>
                           </div>
                         )}
                         <div
                           className={`rounded-2xl px-4 py-2 ${
-                            isEmployee
+                            isOwnMessage
                               ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white rounded-tr-sm'
                               : isAI
                               ? 'bg-[#1E1E1E] text-white border border-cyan-500/30 rounded-tl-sm'
+                              : message.senderType === 'employee'
+                              ? 'bg-[#2A2A2A] text-white border border-purple-500/20 rounded-tl-sm'
                               : 'bg-[#1E1E1E] text-white rounded-tl-sm'
                           }`}
                         >
@@ -1187,11 +1255,11 @@ export default function MessagingSection() {
                             </p>
                           )}
                         </div>
-                        <div className={`flex items-center gap-1 mt-1 text-xs text-[#6b7280] ${isEmployee ? 'justify-end' : ''}`}>
+                        <div className={`flex items-center gap-1 mt-1 text-xs text-[#6b7280] ${isOwnMessage ? 'justify-end' : ''}`}>
                           {message.createdAt && (
                             <span>{format(new Date(message.createdAt), 'HH:mm')}</span>
                           )}
-                          {isEmployee && (
+                          {isOwnMessage && (
                             <span className="text-emerald-500">
                               {message.readBy && message.readBy.length > 0 ? (
                                 <CheckCheck className="w-4 h-4" />
