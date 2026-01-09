@@ -379,21 +379,34 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
   // Start support conversation - GET to create/get, then display
   const startSupportConversation = async () => {
+    console.log('📨 [Support] Starting support conversation...');
     try {
       const response = await fetch('/api/messaging/support');
+      console.log('📨 [Support] Response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('📨 [Support] Received conversation:', data.conversation?.id);
+        console.log('📨 [Support] Messages count:', data.messages?.length || 0);
+        console.log('📨 [Support] isAIHandled:', data.conversation?.isAIHandled);
+        console.log('📨 [Support] assignedEmployee:', data.conversation?.assignedEmployeeName);
+        
         // Set the conversation and messages
         setSelectedConversation(data.conversation);
         setMessages(data.messages || []);
         setShowMobileChat(true);
+        
         // Refresh conversation list
-        fetchConversations();
+        await fetchConversations();
+        console.log('📨 [Support] Conversation loaded successfully');
       } else {
-        console.error('Failed to start support conversation:', response.status);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ [Support] Failed:', response.status, errorData);
+        alert('Failed to start support conversation. Please try again.');
       }
     } catch (error) {
-      console.error('Error starting support conversation:', error);
+      console.error('❌ [Support] Error:', error);
+      alert('Error connecting to support. Please check your connection.');
     }
   };
 
