@@ -338,24 +338,35 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const sendMessage = async () => {
     if (!messageInput.trim() || !selectedConversation || isSending) return;
 
+    const messageContent = messageInput.trim();
     setIsSending(true);
+    
+    // Optimistically clear input immediately for better UX
+    setMessageInput('');
+    
     try {
       // Use support endpoint for support conversations
       const endpoint = selectedConversation.type === 'user-to-support'
         ? '/api/messaging/support'
         : `/api/messaging/conversations/${selectedConversation.id}/messages`;
       
+      console.log(`📤 [Send] Sending to: ${endpoint}`);
+      
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: messageInput }),
+        body: JSON.stringify({ content: messageContent }),
       });
 
+      const data = await response.json();
+      
       if (response.ok) {
-        const data = await response.json();
+        console.log(`📤 [Send] Success, hasAI: ${!!data.aiResponse}`);
+        
         // Add user's message
-        setMessages(prev => [...prev, data.message]);
-        setMessageInput('');
+        if (data.message) {
+          setMessages(prev => [...prev, data.message]);
+        }
         scrollToBottom();
         
         // If there's an AI response, add it after a short delay for natural feel
@@ -363,15 +374,21 @@ export default function MessagingClient({ session }: MessagingClientProps) {
           setTimeout(() => {
             setMessages(prev => [...prev, data.aiResponse]);
             scrollToBottom();
-          }, 500);
+          }, 800);
         }
         
         fetchConversations(); // Refresh conversation list
       } else {
-        console.error('Failed to send message:', response.status);
+        console.error('❌ [Send] Failed:', response.status, data);
+        // Restore the message if sending failed
+        setMessageInput(messageContent);
+        alert(data.error || 'Failed to send message. Please try again.');
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ [Send] Error:', error);
+      // Restore the message on error
+      setMessageInput(messageContent);
+      alert('Network error. Please check your connection.');
     } finally {
       setIsSending(false);
     }
@@ -606,31 +623,48 @@ export default function MessagingClient({ session }: MessagingClientProps) {
             </button>
           </div>
 
-          {/* Assigned Account Manager */}
+          {/* Assigned Account Manager - Click to Chat */}
           {assignedAgent && (
-            <div className="mb-4 p-3 bg-gradient-to-r from-primary-500/10 to-purple-500/10 rounded-lg border border-primary-500/20">
+            <button
+              onClick={startSupportConversation}
+              className="w-full mb-4 p-4 bg-gradient-to-r from-primary-500/20 to-purple-500/20 rounded-xl border border-primary-500/30 hover:border-primary-500/50 hover:from-primary-500/30 hover:to-purple-500/30 transition-all group"
+            >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary-500/20 rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 bg-primary-500/30 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform">
                   {assignedAgent.avatar ? (
-                    <img src={assignedAgent.avatar} alt="" className="w-10 h-10 rounded-full" />
+                    <img src={assignedAgent.avatar} alt="" className="w-12 h-12 rounded-full" />
                   ) : (
-                    <Briefcase className="w-5 h-5 text-primary-400" />
+                    <Briefcase className="w-6 h-6 text-primary-400" />
                   )}
                 </div>
-                <div className="flex-1">
-                  <p className="text-xs text-gray-400">Your Account Manager</p>
-                  <p className="font-medium text-white">{assignedAgent.name}</p>
-                  <p className="text-xs text-primary-400">{assignedAgent.role}</p>
+                <div className="flex-1 text-left">
+                  <p className="text-xs text-primary-400 font-medium">Your Account Manager</p>
+                  <p className="font-semibold text-white">{assignedAgent.name}</p>
+                  <p className="text-xs text-gray-400">{assignedAgent.role}</p>
                 </div>
-                <button
-                  onClick={startSupportConversation}
-                  className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
-                  title="Chat with your account manager"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                </button>
+                <div className="flex flex-col items-center gap-1 text-primary-400 group-hover:text-primary-300">
+                  <MessageCircle className="w-5 h-5" />
+                  <span className="text-[10px] font-medium">TAP TO CHAT</span>
+                </div>
               </div>
-            </div>
+            </button>
+          )}
+          
+          {/* No assigned agent - Show support button */}
+          {!assignedAgent && (
+            <button
+              onClick={startSupportConversation}
+              className="w-full mb-4 p-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-xl border border-emerald-500/30 hover:border-emerald-500/50 transition-all flex items-center gap-3"
+            >
+              <div className="w-12 h-12 bg-emerald-500/30 rounded-full flex items-center justify-center">
+                <Headphones className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-semibold text-white">Contact Support</p>
+                <p className="text-xs text-gray-400">Get help from our support team</p>
+              </div>
+              <MessageCircle className="w-5 h-5 text-emerald-400" />
+            </button>
           )}
 
           {/* Tabs */}

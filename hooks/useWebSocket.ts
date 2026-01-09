@@ -31,11 +31,17 @@ interface UseWebSocketReturn {
 function getWebSocketUrl(): string {
   // In production, use the configured WebSocket URL
   if (typeof window !== 'undefined') {
+    const envUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || process.env.NEXT_PUBLIC_WS_URL;
+    
+    // If env variable is set and already includes path, use as-is
+    if (envUrl) {
+      // Remove trailing slash and return
+      return envUrl.replace(/\/$/, '');
+    }
+    
+    // Default: construct from hostname
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = process.env.NEXT_PUBLIC_WEBSOCKET_URL || 
-                   process.env.NEXT_PUBLIC_WS_URL ||
-                   `${wsProtocol}//${window.location.hostname}:3003`;
-    return `${wsHost}/ws`;
+    return `${wsProtocol}//${window.location.hostname}:3003/ws`;
   }
   return 'ws://localhost:3003/ws';
 }
@@ -78,7 +84,9 @@ export function useWebSocket({
     cleanup();
 
     try {
-      const wsUrl = `${getWebSocketUrl()}?token=${encodeURIComponent(token)}`;
+      const baseUrl = getWebSocketUrl();
+      const wsUrl = `${baseUrl}?token=${encodeURIComponent(token)}&type=user`;
+      console.log('🔌 [WS] Connecting to:', wsUrl);
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
