@@ -299,15 +299,25 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Fetch messages for selected conversation
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
+      console.log(`📩 [FetchMsg] Fetching messages for: ${conversationId}`);
       const response = await fetch(`/api/messaging/conversations/${conversationId}`);
       if (response.ok) {
         const data = await response.json();
-        setMessages(data.messages);
+        console.log(`📩 [FetchMsg] Received ${data.messages?.length || 0} messages`);
+        
+        // Log each message's sender for debugging
+        data.messages?.forEach((msg: any, i: number) => {
+          console.log(`   ${i + 1}. ${msg.senderType}: "${msg.content?.slice(0, 30)}..." from ${msg.senderName}`);
+        });
+        
+        setMessages(data.messages || []);
         
         // Mark as read
         fetch(`/api/messaging/conversations/${conversationId}/read`, {
           method: 'POST',
         });
+      } else {
+        console.error(`📩 [FetchMsg] Failed: ${response.status}`);
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
