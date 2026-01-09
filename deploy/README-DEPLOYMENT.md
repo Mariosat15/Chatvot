@@ -23,6 +23,7 @@ Complete guide for deploying Chartvolt to a Hostinger VPS.
 │  │  - chartvolt.com/ws → WebSocket Server (3003)                   │  │
 │  │  - chartvolt.com/api/auth/* → API Server (4000)                 │  │
 │  │  - admin.chartvolt.com → Admin App (3001)                       │  │
+│  │  - admin.chartvolt.com/ws → WebSocket Server (3003)             │  │
 │  │  - SSL/TLS termination                                          │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                              │                                        │
@@ -51,6 +52,14 @@ PM2 Processes:
 │ chartvolt-websocket │ 3003 │ WebSocket server (real-time chat)   │
 │ chartvolt-worker    │  -   │ Background worker (no HTTP port)    │
 └─────────────────────┴──────┴─────────────────────────────────────┘
+
+WebSocket Routes:
+┌───────────────────────────┬───────────────────────────────────────┐
+│ URL                       │ Purpose                               │
+├───────────────────────────┼───────────────────────────────────────┤
+│ wss://chartvolt.com/ws    │ User real-time messaging & presence   │
+│ wss://admin.chartvolt.com/ws │ Admin real-time messaging & sync   │
+└───────────────────────────┴───────────────────────────────────────┘
 ```
 
 ## Prerequisites
@@ -111,6 +120,8 @@ ADMIN_PASSWORD=your-secure-password
 API_PORT=4000
 
 # WebSocket Server (Real-time Messaging)
+# Single WebSocket server handles both user and admin connections
+# Both chartvolt.com/ws and admin.chartvolt.com/ws route to same server
 WEBSOCKET_PORT=3003
 NEXT_PUBLIC_WEBSOCKET_URL=wss://chartvolt.com/ws
 WEBSOCKET_INTERNAL_URL=http://localhost:3003
@@ -369,6 +380,12 @@ curl http://localhost:3003/stats   # Connection stats
 curl https://chartvolt.com/health
 curl https://admin.chartvolt.com/health
 curl https://chartvolt.com/ws-health
+
+# WebSocket test (both domains share same WebSocket server)
+# User app WebSocket:
+wscat -c wss://chartvolt.com/ws
+# Admin app WebSocket:
+wscat -c wss://admin.chartvolt.com/ws
 ```
 
 ### Resource Usage
