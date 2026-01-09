@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { auth } from '@/lib/better-auth/auth';
 import mongoose, { Types } from 'mongoose';
 import { connectToDatabase } from '@/database/mongoose';
 
