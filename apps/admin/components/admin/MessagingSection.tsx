@@ -200,7 +200,7 @@ export default function MessagingSection() {
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'assigned' | 'unassigned'>('all');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Start with false - show UI immediately
   const [isSending, setIsSending] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
@@ -566,23 +566,11 @@ export default function MessagingSection() {
     if (initialLoadDone.current) return;
     initialLoadDone.current = true;
     
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        await Promise.all([
-          fetchConversations().catch(e => console.error('Error fetching conversations:', e)),
-          fetchEmployees().catch(e => console.error('Error fetching employees:', e)),
-          fetchAssignedCustomers().catch(e => console.error('Error fetching customers:', e)),
-          fetchAvailability().catch(e => console.error('Error fetching availability:', e)),
-        ]);
-      } catch (error) {
-        console.error('Error loading messaging data:', error);
-      } finally {
-        // Always set loading to false, even if there are errors
-        setIsLoading(false);
-      }
-    };
-    loadData();
+    // Load data in background - UI shows immediately
+    fetchConversations().catch(e => console.error('Error fetching conversations:', e));
+    fetchEmployees().catch(e => console.error('Error fetching employees:', e));
+    fetchAssignedCustomers().catch(e => console.error('Error fetching customers:', e));
+    fetchAvailability().catch(e => console.error('Error fetching availability:', e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -845,30 +833,7 @@ export default function MessagingSection() {
   const aiHandledCount = conversations.filter(c => c.isAIHandled).length;
   const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
 
-  // Safety timeout - if loading takes more than 5 seconds, show the UI anyway
-  useEffect(() => {
-    if (isLoading) {
-      const timeout = setTimeout(() => {
-        console.warn('⚠️ Messaging center loading timeout - showing UI anyway');
-        setIsLoading(false);
-      }, 5000);
-      return () => clearTimeout(timeout);
-    }
-  }, [isLoading]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-[600px] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
-            <MessageCircle className="w-6 h-6 text-emerald-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-          </div>
-          <p className="text-gray-400">Loading messaging center...</p>
-        </div>
-      </div>
-    );
-  }
+  // No loading state - UI shows immediately, data loads in background
 
   return (
     <div className="space-y-6">
