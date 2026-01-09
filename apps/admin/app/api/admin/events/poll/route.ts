@@ -11,7 +11,7 @@ import { verifyAdminAuth } from '@/lib/admin/auth';
 export async function GET(request: NextRequest) {
   try {
     // Verify admin authentication
-    const auth = await verifyAdminAuth(request);
+    const auth = await verifyAdminAuth();
     if (!auth.isAuthenticated) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
