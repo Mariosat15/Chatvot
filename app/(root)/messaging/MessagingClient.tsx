@@ -10,9 +10,6 @@ import {
   Send,
   Paperclip,
   Smile,
-  Phone,
-  Video,
-  MoreVertical,
   Check,
   CheckCheck,
   Clock,
@@ -20,15 +17,14 @@ import {
   Bot,
   ArrowLeft,
   X,
-  Bell,
-  Settings,
-  Image as ImageIcon,
-  File,
   UserCircle,
   Briefcase,
   Loader2,
+  ChevronDown,
+  Sparkles,
+  Shield,
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Session {
@@ -126,9 +122,13 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [assignedAgent, setAssignedAgent] = useState<AssignedAgent | null>(null);
   const [typingUsers, setTypingUsers] = useState<Map<string, { name: string; timestamp: number }>>(new Map());
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isUserAtBottomRef = useRef(true);
 
   // WebSocket for real-time messaging
   const handleWebSocketMessage = useCallback((message: { type: string; data: any }) => {
@@ -136,12 +136,10 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     
     switch (message.type) {
       case 'new_message':
-        // Add new message if it's for the current conversation
         if (message.data.conversationId === selectedConversation?.id) {
           console.log('📨 [WS] New message for current conv, senderId:', message.data.message?.senderId);
           
           setMessages(prev => {
-            // Check if message already exists (prevent duplicates)
             if (prev.some(m => m.id === message.data.message.id)) {
               console.log('📨 [WS] Message already exists, skipping');
               return prev;
@@ -149,9 +147,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
             console.log('📨 [WS] Adding message:', message.data.message.content?.slice(0, 30));
             return [...prev, message.data.message];
           });
-          scrollToBottom();
+          
+          // Only scroll if user is at bottom
+          if (isUserAtBottomRef.current) {
+            setTimeout(() => scrollToBottom(), 100);
+          }
         }
-        // Update conversation list (but don't refetch messages)
         fetchConversations();
         break;
         
@@ -177,7 +178,6 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         break;
         
       case 'read_receipt':
-        // Update message read status
         if (message.data.conversationId === selectedConversation?.id) {
           setMessages(prev => prev.map(m => ({
             ...m,
@@ -194,7 +194,6 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         break;
         
       case 'presence':
-        // Handle online/offline status updates
         break;
     }
   }, [selectedConversation?.id, session.user.id]);
@@ -205,7 +204,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     unsubscribe: wsUnsubscribe,
     setTyping: wsSetTyping,
   } = useWebSocket({
-    token: session.user.id, // Use user ID as token for now
+    token: session.user.id,
     onMessage: handleWebSocketMessage,
     onConnect: () => console.log('✅ [WS] Connected'),
     onDisconnect: () => console.log('❌ [WS] Disconnected'),
@@ -238,9 +237,22 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     return () => clearInterval(interval);
   }, []);
 
+  // Scroll handling - detect if user is at bottom
+  const handleScroll = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+    isUserAtBottomRef.current = isAtBottom;
+    setShowScrollButton(!isAtBottom && messages.length > 0);
+  }, [messages.length]);
+
   // Scroll to bottom helper
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    isUserAtBottomRef.current = true;
+    setShowScrollButton(false);
   }, []);
 
   // Fetch assigned account manager
@@ -249,7 +261,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       const response = await fetch('/api/messaging/assigned-support');
       if (response.ok) {
         const data = await response.json();
-        setAssignedAgent(data.assignedAgent);
+        setAssignedAgent(data.agent);
       }
     } catch (error) {
       console.error('Error fetching assigned agent:', error);
@@ -289,7 +301,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       const response = await fetch('/api/messaging/friends/requests');
       if (response.ok) {
         const data = await response.json();
-        setFriendRequests({ received: data.received, sent: data.sent });
+        setFriendRequests(data);
       }
     } catch (error) {
       console.error('Error fetching friend requests:', error);
@@ -304,25 +316,19 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       if (response.ok) {
         const data = await response.json();
         console.log(`📩 [FetchMsg] Received ${data.messages?.length || 0} messages`);
-        
-        // Log each message's sender for debugging
-        data.messages?.forEach((msg: any, i: number) => {
-          console.log(`   ${i + 1}. ${msg.senderType}: "${msg.content?.slice(0, 30)}..." from ${msg.senderName}`);
-        });
-        
         setMessages(data.messages || []);
         
-        // Mark as read
-        fetch(`/api/messaging/conversations/${conversationId}/read`, {
-          method: 'POST',
-        });
+        // Scroll to bottom on initial load
+        setTimeout(() => scrollToBottom(), 100);
+        
+        fetch(`/api/messaging/conversations/${conversationId}/read`, { method: 'POST' });
       } else {
         console.error(`📩 [FetchMsg] Failed: ${response.status}`);
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
     }
-  }, []);
+  }, [scrollToBottom]);
 
   // Search users
   const searchUsers = useCallback(async (query: string) => {
@@ -333,10 +339,10 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     
     setIsSearching(true);
     try {
-      const response = await fetch(`/api/messaging/search/users?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/messaging/users/search?q=${encodeURIComponent(query)}`);
       if (response.ok) {
         const data = await response.json();
-        setSearchResults(data.users);
+        setSearchResults(data.users || []);
       }
     } catch (error) {
       console.error('Error searching users:', error);
@@ -351,17 +357,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
     const messageContent = messageInput.trim();
     setIsSending(true);
-    
-    // Optimistically clear input immediately for better UX
     setMessageInput('');
     
     try {
-      // Use support endpoint for support conversations
       const endpoint = selectedConversation.type === 'user-to-support'
         ? '/api/messaging/support'
         : `/api/messaging/conversations/${selectedConversation.id}/messages`;
-      
-      console.log(`📤 [Send] Sending to: ${endpoint}`);
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -372,27 +373,17 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       const data = await response.json();
       
       if (response.ok) {
-        console.log(`📤 [Send] Success, hasAI: ${!!data.aiResponse}`);
-        
-        // Mark that we just added messages (prevent poll from overwriting)
-        lastMessageFetchRef.current = Date.now();
-        
-        // Add user's message
         if (data.message) {
           setMessages(prev => {
-            // Don't add if already exists
             if (prev.some(m => m.id === data.message.id)) return prev;
             return [...prev, data.message];
           });
         }
         scrollToBottom();
         
-        // If there's an AI response, add it after a short delay for natural feel
         if (data.aiResponse) {
           setTimeout(() => {
-            lastMessageFetchRef.current = Date.now(); // Extend protection
             setMessages(prev => {
-              // Don't add if already exists (might come via WebSocket)
               if (prev.some(m => m.id === data.aiResponse.id)) return prev;
               return [...prev, data.aiResponse];
             });
@@ -400,125 +391,35 @@ export default function MessagingClient({ session }: MessagingClientProps) {
           }, 800);
         }
         
-        // Refresh conversation list (but NOT messages)
         fetchConversations();
       } else {
-        console.error('❌ [Send] Failed:', response.status, data);
-        // Restore the message if sending failed
         setMessageInput(messageContent);
-        alert(data.error || 'Failed to send message. Please try again.');
+        alert(data.error || 'Failed to send message');
       }
     } catch (error) {
-      console.error('❌ [Send] Error:', error);
-      // Restore the message on error
       setMessageInput(messageContent);
-      alert('Network error. Please check your connection.');
+      alert('Network error');
     } finally {
       setIsSending(false);
     }
   };
 
-  // Start support conversation - GET to create/get, then display
+  // Start support conversation
   const startSupportConversation = async () => {
-    console.log('📨 [Support] Starting support conversation...');
     try {
       const response = await fetch('/api/messaging/support');
-      console.log('📨 [Support] Response status:', response.status);
-      
       if (response.ok) {
         const data = await response.json();
-        console.log('📨 [Support] Received conversation:', data.conversation?.id);
-        console.log('📨 [Support] Messages count:', data.messages?.length || 0);
-        console.log('📨 [Support] isAIHandled:', data.conversation?.isAIHandled);
-        console.log('📨 [Support] assignedEmployee:', data.conversation?.assignedEmployeeName);
-        
-        // Set the conversation and messages
         setSelectedConversation(data.conversation);
         setMessages(data.messages || []);
         setShowMobileChat(true);
-        
-        // Refresh conversation list
         await fetchConversations();
-        console.log('📨 [Support] Conversation loaded successfully');
+        setTimeout(() => scrollToBottom(), 100);
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('❌ [Support] Failed:', response.status, errorData);
-        alert('Failed to start support conversation. Please try again.');
+        alert('Failed to start support conversation');
       }
     } catch (error) {
-      console.error('❌ [Support] Error:', error);
-      alert('Error connecting to support. Please check your connection.');
-    }
-  };
-
-  // Send friend request
-  const sendFriendRequest = async (toUserId: string) => {
-    try {
-      const response = await fetch('/api/messaging/friends/requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toUserId }),
-      });
-      if (response.ok) {
-        fetchFriendRequests();
-        setSearchResults([]);
-        setSearchQuery('');
-      }
-    } catch (error) {
-      console.error('Error sending friend request:', error);
-    }
-  };
-
-  // Accept friend request
-  const acceptFriendRequest = async (requestId: string) => {
-    try {
-      const response = await fetch(`/api/messaging/friends/requests/${requestId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'accept' }),
-      });
-      if (response.ok) {
-        fetchFriendRequests();
-        fetchFriends();
-      }
-    } catch (error) {
-      console.error('Error accepting friend request:', error);
-    }
-  };
-
-  // Decline friend request
-  const declineFriendRequest = async (requestId: string) => {
-    try {
-      const response = await fetch(`/api/messaging/friends/requests/${requestId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'decline' }),
-      });
-      if (response.ok) {
-        fetchFriendRequests();
-      }
-    } catch (error) {
-      console.error('Error declining friend request:', error);
-    }
-  };
-
-  // Start conversation with friend
-  const startConversationWithFriend = async (friendId: string) => {
-    try {
-      const response = await fetch('/api/messaging/conversations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participantId: friendId, type: 'user-to-user' }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        fetchConversations();
-        setSelectedConversation(data.conversation);
-        setActiveTab('chats');
-        setShowMobileChat(true);
-      }
-    } catch (error) {
-      console.error('Error starting conversation:', error);
+      alert('Error connecting to support');
     }
   };
 
@@ -537,15 +438,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     loadData();
   }, [fetchConversations, fetchFriends, fetchFriendRequests, fetchAssignedAgent]);
 
-  // Track selected conversation ID to avoid re-fetching on object reference change
+  // Track selected conversation ID
   const selectedConversationIdRef = useRef<string | null>(null);
   const lastMessageFetchRef = useRef<number>(0);
   
-  // Fetch messages when conversation ID changes (not object reference)
   useEffect(() => {
     const conversationId = selectedConversation?.id;
-    
-    // Only fetch if ID actually changed
     if (conversationId && conversationId !== selectedConversationIdRef.current) {
       selectedConversationIdRef.current = conversationId;
       lastMessageFetchRef.current = Date.now();
@@ -555,25 +453,18 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
   // Poll for new messages (fallback when WebSocket not connected)
   useEffect(() => {
-    // Only poll when WebSocket is NOT connected
     if (wsConnected) return;
     
-    const pollInterval = 8000; // 8 seconds when not connected
-    
     const interval = setInterval(() => {
-      // Don't fetch messages if we just added some (avoid overwriting)
       const timeSinceLastFetch = Date.now() - lastMessageFetchRef.current;
-      if (timeSinceLastFetch < 3000) {
-        console.log('🔄 [Poll] Skipping - recent message activity');
-        return;
-      }
+      if (timeSinceLastFetch < 3000) return;
       
       fetchConversations();
       if (selectedConversation) {
         lastMessageFetchRef.current = Date.now();
         fetchMessages(selectedConversation.id);
       }
-    }, pollInterval);
+    }, 8000);
 
     return () => clearInterval(interval);
   }, [selectedConversation?.id, fetchConversations, fetchMessages, wsConnected]);
@@ -581,395 +472,332 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   // Search debounce
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchQuery) {
-        searchUsers(searchQuery);
-      }
+      if (searchQuery) searchUsers(searchQuery);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery, searchUsers]);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Get other participant name for display
+  // Helper functions
   const getConversationName = (conv: Conversation) => {
     if (conv.type === 'user-to-support') {
-      return conv.isAIHandled ? '🤖 AI Support' : `💬 ${conv.assignedEmployeeName || 'Support'}`;
+      return conv.isAIHandled ? 'AI Support' : conv.assignedEmployeeName || 'Support';
     }
     const other = conv.participants.find(p => p.id !== session.user.id);
     return other?.name || 'Unknown';
   };
 
-  // Get conversation avatar
   const getConversationAvatar = (conv: Conversation) => {
-    if (conv.type === 'user-to-support') {
-      return null;
-    }
+    if (conv.type === 'user-to-support') return null;
     const other = conv.participants.find(p => p.id !== session.user.id);
     return other?.avatar;
   };
 
-  // Check if message is from current user
-  const isOwnMessage = (msg: Message) => {
-    return msg.senderId === session.user.id;
-  };
+  const isOwnMessage = (msg: Message) => msg.senderId === session.user.id;
 
-  // Get message status icon
   const getMessageStatus = (msg: Message) => {
     if (msg.readBy && msg.readBy.some(r => r.participantId !== session.user.id)) {
-      return <CheckCheck className="w-4 h-4 text-blue-400" />;
+      return <CheckCheck className="w-3.5 h-3.5 text-cyan-400" />;
     }
-    return <Check className="w-4 h-4 text-gray-400" />;
+    return <Check className="w-3.5 h-3.5 text-gray-400" />;
+  };
+
+  const formatMessageTime = (date: string) => {
+    return format(new Date(date), 'HH:mm');
+  };
+
+  const formatConversationTime = (date: string) => {
+    const d = new Date(date);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    
+    if (diff < 60000) return 'now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
+    if (diff < 86400000) return format(d, 'HH:mm');
+    if (diff < 604800000) return format(d, 'EEE');
+    return format(d, 'dd/MM');
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <div className="flex items-center justify-center min-h-screen bg-[#0a0a0f]">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400">Loading messages...</p>
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+            <MessageCircle className="w-6 h-6 text-cyan-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+          </div>
+          <p className="text-gray-400 font-medium">Loading messages...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="flex h-[calc(100vh-4rem)] bg-[#0a0a0f]">
       {/* Sidebar */}
-      <div className={`w-full md:w-96 border-r border-gray-700 flex flex-col ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-[380px] bg-[#0d0d14] border-r border-white/5 flex flex-col ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
-        <div className="p-4 border-b border-gray-700 bg-gray-800/50">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-bold text-white flex items-center gap-2">
-              <MessageCircle className="w-6 h-6 text-primary-500" />
-              Messages
-              {unreadTotal > 0 && (
-                <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                  {unreadTotal}
-                </span>
-              )}
-              {/* WebSocket Status */}
-              <span 
-                className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`}
-                title={wsConnected ? 'Live connection' : 'Connecting...'}
-              />
-            </h1>
-            <button
-              onClick={startSupportConversation}
-              className="p-2 bg-primary-500/20 text-primary-400 rounded-lg hover:bg-primary-500/30 transition-colors"
-              title="Contact Support"
-            >
-              <Headphones className="w-5 h-5" />
-            </button>
+        <div className="p-5 border-b border-white/5">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center">
+                <MessageCircle className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-white">Messages</h1>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+                  {wsConnected ? 'Connected' : 'Connecting...'}
+                </div>
+              </div>
+            </div>
+            {unreadTotal > 0 && (
+              <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                {unreadTotal}
+              </span>
+            )}
           </div>
 
-          {/* Assigned Account Manager - Click to Chat */}
+          {/* Account Manager Card */}
           {assignedAgent && (
             <button
               onClick={startSupportConversation}
-              className="w-full mb-4 p-4 bg-gradient-to-r from-primary-500/20 to-purple-500/20 rounded-xl border border-primary-500/30 hover:border-primary-500/50 hover:from-primary-500/30 hover:to-purple-500/30 transition-all group"
+              className="w-full p-4 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 rounded-2xl border border-cyan-500/20 hover:border-cyan-500/40 transition-all duration-300 group mb-4"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-primary-500/30 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform">
-                  {assignedAgent.avatar ? (
-                    <img src={assignedAgent.avatar} alt="" className="w-12 h-12 rounded-full" />
-                  ) : (
-                    <Briefcase className="w-6 h-6 text-primary-400" />
-                  )}
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-shadow">
+                    {assignedAgent.avatar ? (
+                      <img src={assignedAgent.avatar} alt="" className="w-14 h-14 rounded-2xl object-cover" />
+                    ) : (
+                      <UserCircle className="w-8 h-8 text-white" />
+                    )}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-[#0d0d14] flex items-center justify-center">
+                    <Shield className="w-2.5 h-2.5 text-white" />
+                  </div>
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="text-xs text-primary-400 font-medium">Your Account Manager</p>
-                  <p className="font-semibold text-white">{assignedAgent.name}</p>
-                  <p className="text-xs text-gray-400">{assignedAgent.role}</p>
+                  <p className="text-[11px] uppercase tracking-wider text-cyan-400 font-semibold mb-0.5">Your Account Manager</p>
+                  <p className="text-white font-semibold text-base">{assignedAgent.name}</p>
+                  <p className="text-gray-400 text-xs">{assignedAgent.role}</p>
                 </div>
-                <div className="flex flex-col items-center gap-1 text-primary-400 group-hover:text-primary-300">
-                  <MessageCircle className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">TAP TO CHAT</span>
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center group-hover:bg-cyan-500/30 transition-colors">
+                    <MessageCircle className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <span className="text-[9px] text-cyan-400 font-medium">CHAT</span>
                 </div>
               </div>
             </button>
           )}
           
-          {/* No assigned agent - Show support button */}
+          {/* Support Button (no assigned agent) */}
           {!assignedAgent && (
             <button
               onClick={startSupportConversation}
-              className="w-full mb-4 p-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-xl border border-emerald-500/30 hover:border-emerald-500/50 transition-all flex items-center gap-3"
+              className="w-full p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-2xl border border-emerald-500/20 hover:border-emerald-500/40 transition-all flex items-center gap-4 mb-4"
             >
-              <div className="w-12 h-12 bg-emerald-500/30 rounded-full flex items-center justify-center">
-                <Headphones className="w-6 h-6 text-emerald-400" />
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <Headphones className="w-7 h-7 text-white" />
               </div>
               <div className="flex-1 text-left">
-                <p className="font-semibold text-white">Contact Support</p>
-                <p className="text-xs text-gray-400">Get help from our support team</p>
+                <p className="text-white font-semibold">Contact Support</p>
+                <p className="text-gray-400 text-sm">Get help from our team</p>
               </div>
-              <MessageCircle className="w-5 h-5 text-emerald-400" />
+              <Send className="w-5 h-5 text-emerald-400" />
             </button>
           )}
 
           {/* Tabs */}
-          <div className="flex gap-1 bg-gray-700/50 rounded-lg p-1">
-            <button
-              onClick={() => setActiveTab('chats')}
-              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'chats' ? 'bg-primary-500 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Chats
-            </button>
-            <button
-              onClick={() => setActiveTab('friends')}
-              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'friends' ? 'bg-primary-500 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Friends
-            </button>
-            <button
-              onClick={() => setActiveTab('requests')}
-              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors relative ${
-                activeTab === 'requests' ? 'bg-primary-500 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Requests
-              {friendRequests.received.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                  {friendRequests.received.length}
-                </span>
-              )}
-            </button>
+          <div className="flex bg-white/5 rounded-xl p-1">
+            {['chats', 'friends', 'requests'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as any)}
+                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all relative ${
+                  activeTab === tab 
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25' 
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === 'requests' && friendRequests.received.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+                    {friendRequests.received.length}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Search */}
-        {(activeTab === 'friends' || activeTab === 'requests') && (
-          <div className="p-4 border-b border-gray-700">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search users..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primary-500"
-              />
-            </div>
-            
-            {/* Search Results */}
-            {searchResults.length > 0 && (
-              <div className="mt-2 bg-gray-700 rounded-lg overflow-hidden">
-                {searchResults.map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-3 hover:bg-gray-600 border-b border-gray-600 last:border-0"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary-500/20 rounded-full flex items-center justify-center">
-                        {user.avatar ? (
-                          <img src={user.avatar} alt="" className="w-10 h-10 rounded-full" />
-                        ) : (
-                          <span className="text-primary-400 font-medium">
-                            {user.name?.charAt(0) || '?'}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-white">{user.name}</span>
-                    </div>
-                    <button
-                      onClick={() => sendFriendRequest(user.id)}
-                      className="p-2 bg-primary-500/20 text-primary-400 rounded-lg hover:bg-primary-500/30"
-                    >
-                      <UserPlus className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Content */}
+        {/* Conversations List */}
         <div className="flex-1 overflow-y-auto">
-          {/* Chats Tab */}
           {activeTab === 'chats' && (
-            <div>
-              {conversations.length === 0 ? (
-                <div className="p-8 text-center">
-                  <MessageCircle className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-400">No conversations yet</p>
-                  <button
-                    onClick={startSupportConversation}
-                    className="mt-4 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600"
-                  >
-                    Start with Support
-                  </button>
+            conversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-4">
+                  <MessageCircle className="w-10 h-10 text-gray-600" />
                 </div>
-              ) : (
-                conversations.map((conv) => (
+                <p className="text-gray-400 mb-4">No conversations yet</p>
+                <button
+                  onClick={startSupportConversation}
+                  className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
+                >
+                  Start with Support
+                </button>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {conversations.map((conv) => (
                   <button
                     key={conv.id}
                     onClick={async () => {
-                      console.log('📂 [Conv] Selecting conversation:', conv.id);
                       setSelectedConversation(conv);
                       setShowMobileChat(true);
-                      // Always fetch messages when clicking (handles re-selection of same conv)
                       lastMessageFetchRef.current = Date.now();
                       await fetchMessages(conv.id);
                     }}
-                    className={`w-full p-4 flex items-center gap-3 hover:bg-gray-700/50 border-b border-gray-700/50 transition-colors ${
-                      selectedConversation?.id === conv.id ? 'bg-gray-700/50' : ''
+                    className={`w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-colors ${
+                      selectedConversation?.id === conv.id ? 'bg-white/5' : ''
                     }`}
                   >
                     <div className="relative">
-                      <div className="w-12 h-12 bg-primary-500/20 rounded-full flex items-center justify-center">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                        conv.type === 'user-to-support' 
+                          ? conv.isAIHandled 
+                            ? 'bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30'
+                            : 'bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30'
+                          : 'bg-gradient-to-br from-gray-500/20 to-gray-600/20 border border-gray-500/30'
+                      }`}>
                         {getConversationAvatar(conv) ? (
-                          <img src={getConversationAvatar(conv)!} alt="" className="w-12 h-12 rounded-full" />
+                          <img src={getConversationAvatar(conv)!} alt="" className="w-12 h-12 rounded-2xl object-cover" />
                         ) : conv.type === 'user-to-support' ? (
                           conv.isAIHandled ? (
-                            <Bot className="w-6 h-6 text-primary-400" />
+                            <Sparkles className="w-6 h-6 text-purple-400" />
                           ) : (
-                            <Headphones className="w-6 h-6 text-primary-400" />
+                            <Headphones className="w-6 h-6 text-cyan-400" />
                           )
                         ) : (
-                          <span className="text-primary-400 font-medium text-lg">
+                          <span className="text-white font-semibold text-lg">
                             {getConversationName(conv).charAt(0)}
                           </span>
                         )}
                       </div>
-                      {conv.participants.some(p => p.isActive && p.id !== session.user.id) && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800" />
+                      {conv.unreadCount > 0 && (
+                        <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 rounded-full flex items-center justify-center px-1.5">
+                          <span className="text-white text-[10px] font-bold">{conv.unreadCount}</span>
+                        </div>
                       )}
                     </div>
-                    <div className="flex-1 text-left">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-white">{getConversationName(conv)}</span>
-                        {conv.lastMessage && (
-                          <span className="text-xs text-gray-400">
-                            {formatDistanceToNow(new Date(conv.lastMessage.timestamp), { addSuffix: true })}
-                          </span>
-                        )}
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`font-semibold truncate ${conv.unreadCount > 0 ? 'text-white' : 'text-gray-300'}`}>
+                          {getConversationName(conv)}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+                          {conv.lastMessage?.timestamp && formatConversationTime(conv.lastMessage.timestamp)}
+                        </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-gray-400 truncate max-w-[200px]">
-                          {conv.lastMessage?.content || 'No messages yet'}
-                        </p>
-                        {conv.unreadCount > 0 && (
-                          <span className="bg-primary-500 text-white text-xs px-2 py-0.5 rounded-full">
-                            {conv.unreadCount}
-                          </span>
-                        )}
-                      </div>
+                      <p className={`text-sm truncate ${conv.unreadCount > 0 ? 'text-gray-300' : 'text-gray-500'}`}>
+                        {conv.lastMessage?.content || 'No messages yet'}
+                      </p>
                     </div>
                   </button>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )
           )}
 
-          {/* Friends Tab */}
           {activeTab === 'friends' && (
-            <div>
+            <div className="p-4">
+              {/* Search */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                />
+              </div>
+              
               {friends.length === 0 ? (
-                <div className="p-8 text-center">
-                  <Users className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-400">No friends yet</p>
-                  <p className="text-sm text-gray-500 mt-2">Search for users to add friends</p>
+                <div className="text-center py-8">
+                  <Users className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-500">No friends yet</p>
                 </div>
               ) : (
-                friends.map((friend) => (
-                  <button
-                    key={friend.id}
-                    onClick={() => startConversationWithFriend(friend.friendId)}
-                    className="w-full p-4 flex items-center gap-3 hover:bg-gray-700/50 border-b border-gray-700/50"
-                  >
-                    <div className="w-12 h-12 bg-primary-500/20 rounded-full flex items-center justify-center">
-                      {friend.friendAvatar ? (
-                        <img src={friend.friendAvatar} alt="" className="w-12 h-12 rounded-full" />
-                      ) : (
-                        <span className="text-primary-400 font-medium text-lg">
-                          {friend.friendName?.charAt(0) || '?'}
-                        </span>
-                      )}
+                <div className="space-y-2">
+                  {friends.map((friend) => (
+                    <div key={friend.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl flex items-center justify-center">
+                        {friend.friendAvatar ? (
+                          <img src={friend.friendAvatar} alt="" className="w-10 h-10 rounded-xl" />
+                        ) : (
+                          <span className="text-cyan-400 font-medium">{friend.friendName?.charAt(0)}</span>
+                        )}
+                      </div>
+                      <span className="text-white font-medium flex-1">{friend.friendName}</span>
                     </div>
-                    <div className="flex-1 text-left">
-                      <span className="font-medium text-white">{friend.friendName}</span>
-                    </div>
-                    <MessageCircle className="w-5 h-5 text-gray-400" />
-                  </button>
-                ))
+                  ))}
+                </div>
               )}
             </div>
           )}
 
-          {/* Requests Tab */}
           {activeTab === 'requests' && (
-            <div>
-              {/* Received */}
-              <div className="p-3 bg-gray-800/50 border-b border-gray-700">
-                <h3 className="text-sm font-medium text-gray-400">Received ({friendRequests.received.length})</h3>
-              </div>
+            <div className="p-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                Received ({friendRequests.received.length})
+              </h3>
               {friendRequests.received.length === 0 ? (
-                <div className="p-4 text-center text-gray-500 text-sm">No pending requests</div>
+                <p className="text-gray-500 text-sm text-center py-4">No pending requests</p>
               ) : (
-                friendRequests.received.map((req) => (
-                  <div key={req.id} className="p-4 flex items-center gap-3 border-b border-gray-700/50">
-                    <div className="w-12 h-12 bg-primary-500/20 rounded-full flex items-center justify-center">
-                      {req.fromUserAvatar ? (
-                        <img src={req.fromUserAvatar} alt="" className="w-12 h-12 rounded-full" />
-                      ) : (
-                        <span className="text-primary-400 font-medium text-lg">
-                          {req.fromUserName?.charAt(0) || '?'}
-                        </span>
-                      )}
+                <div className="space-y-2 mb-6">
+                  {friendRequests.received.map((req) => (
+                    <div key={req.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-xl flex items-center justify-center">
+                        <span className="text-emerald-400 font-medium">{req.fromUserName?.charAt(0)}</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-medium">{req.fromUserName}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30">
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button className="w-8 h-8 bg-red-500/20 text-red-400 rounded-lg flex items-center justify-center hover:bg-red-500/30">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <span className="font-medium text-white">{req.fromUserName}</span>
-                      <p className="text-xs text-gray-400">
-                        {formatDistanceToNow(new Date(req.createdAt), { addSuffix: true })}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => acceptFriendRequest(req.id)}
-                        className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => declineFriendRequest(req.id)}
-                        className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
 
-              {/* Sent */}
-              <div className="p-3 bg-gray-800/50 border-b border-gray-700 mt-4">
-                <h3 className="text-sm font-medium text-gray-400">Sent ({friendRequests.sent.length})</h3>
-              </div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                Sent ({friendRequests.sent.length})
+              </h3>
               {friendRequests.sent.length === 0 ? (
-                <div className="p-4 text-center text-gray-500 text-sm">No sent requests</div>
+                <p className="text-gray-500 text-sm text-center py-4">No sent requests</p>
               ) : (
-                friendRequests.sent.map((req) => (
-                  <div key={req.id} className="p-4 flex items-center gap-3 border-b border-gray-700/50">
-                    <div className="w-12 h-12 bg-primary-500/20 rounded-full flex items-center justify-center">
-                      <span className="text-primary-400 font-medium text-lg">
-                        {req.toUserName?.charAt(0) || '?'}
-                      </span>
+                <div className="space-y-2">
+                  {friendRequests.sent.map((req) => (
+                    <div key={req.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+                        <span className="text-gray-400 font-medium">{req.toUserName?.charAt(0)}</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-medium">{req.toUserName}</p>
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Pending
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <span className="font-medium text-white">{req.toUserName}</span>
-                      <p className="text-xs text-gray-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> Pending
-                      </p>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -977,147 +805,213 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       </div>
 
       {/* Chat Area */}
-      <div className={`flex-1 flex flex-col ${!showMobileChat ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`flex-1 flex flex-col bg-[#08080c] ${!showMobileChat ? 'hidden md:flex' : 'flex'}`}>
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-700 bg-gray-800/50 flex items-center gap-3">
+            <div className="px-5 py-4 border-b border-white/5 bg-[#0d0d14] flex items-center gap-4">
               <button
                 onClick={() => setShowMobileChat(false)}
-                className="md:hidden p-2 hover:bg-gray-700 rounded-lg"
+                className="md:hidden w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-400" />
               </button>
-              <div className="w-10 h-10 bg-primary-500/20 rounded-full flex items-center justify-center">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                selectedConversation.type === 'user-to-support'
+                  ? selectedConversation.isAIHandled
+                    ? 'bg-gradient-to-br from-purple-500 to-pink-600'
+                    : 'bg-gradient-to-br from-cyan-500 to-blue-600'
+                  : 'bg-gradient-to-br from-gray-500 to-gray-600'
+              }`}>
                 {getConversationAvatar(selectedConversation) ? (
-                  <img src={getConversationAvatar(selectedConversation)!} alt="" className="w-10 h-10 rounded-full" />
+                  <img src={getConversationAvatar(selectedConversation)!} alt="" className="w-12 h-12 rounded-2xl object-cover" />
                 ) : selectedConversation.type === 'user-to-support' ? (
                   selectedConversation.isAIHandled ? (
-                    <Bot className="w-5 h-5 text-primary-400" />
+                    <Sparkles className="w-6 h-6 text-white" />
                   ) : (
-                    <Headphones className="w-5 h-5 text-primary-400" />
+                    <Headphones className="w-6 h-6 text-white" />
                   )
                 ) : (
-                  <span className="text-primary-400 font-medium">
+                  <span className="text-white font-semibold text-lg">
                     {getConversationName(selectedConversation).charAt(0)}
                   </span>
                 )}
               </div>
               <div className="flex-1">
-                <h2 className="font-medium text-white">{getConversationName(selectedConversation)}</h2>
-                <p className="text-xs text-gray-400">
+                <h2 className="font-semibold text-white text-lg">{getConversationName(selectedConversation)}</h2>
+                <p className="text-sm text-gray-400">
                   {selectedConversation.type === 'user-to-support'
-                    ? selectedConversation.isAIHandled ? 'AI Assistant' : 'Customer Support'
-                    : selectedConversation.participants.some(p => p.isActive && p.id !== session.user.id)
-                      ? 'Online'
-                      : 'Offline'}
+                    ? selectedConversation.isAIHandled ? 'AI-Powered Support' : 'Customer Support'
+                    : 'Direct Message'}
                 </p>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${isOwnMessage(msg) ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[70%] ${
-                      isOwnMessage(msg)
-                        ? 'bg-primary-500 text-white rounded-l-2xl rounded-tr-2xl'
-                        : msg.senderType === 'ai'
-                          ? 'bg-purple-500/20 text-white rounded-r-2xl rounded-tl-2xl'
-                          : 'bg-gray-700 text-white rounded-r-2xl rounded-tl-2xl'
-                    } px-4 py-2`}
-                  >
-                    {!isOwnMessage(msg) && (
-                      <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                        {msg.senderType === 'ai' && <Bot className="w-3 h-3" />}
-                        {msg.senderName}
-                      </p>
-                    )}
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                    <div className={`flex items-center justify-end gap-1 mt-1 ${isOwnMessage(msg) ? 'text-white/70' : 'text-gray-400'}`}>
-                      <span className="text-xs">
-                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      {isOwnMessage(msg) && getMessageStatus(msg)}
-                    </div>
+            <div 
+              ref={messagesContainerRef}
+              onScroll={handleScroll}
+              className="flex-1 overflow-y-auto p-5 space-y-4"
+              style={{ 
+                background: 'radial-gradient(ellipse at top, rgba(6,182,212,0.03) 0%, transparent 50%)',
+              }}
+            >
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-4">
+                    <MessageCircle className="w-10 h-10 text-gray-600" />
                   </div>
+                  <p className="text-gray-400">Start the conversation</p>
                 </div>
-              ))}
+              ) : (
+                messages.map((msg, index) => {
+                  const isOwn = isOwnMessage(msg);
+                  const isAI = msg.senderType === 'ai';
+                  const isSystem = msg.messageType === 'system' || msg.senderType === 'system';
+                  const showAvatar = !isOwn && (index === 0 || messages[index - 1].senderId !== msg.senderId);
+
+                  if (isSystem) {
+                    return (
+                      <div key={msg.id} className="flex justify-center my-4">
+                        <div className="px-4 py-2 bg-white/5 rounded-full text-xs text-gray-400 max-w-[80%] text-center">
+                          {msg.content}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} gap-2`}>
+                      {!isOwn && showAvatar && (
+                        <div className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center ${
+                          isAI ? 'bg-gradient-to-br from-purple-500 to-pink-600' : 'bg-gradient-to-br from-cyan-500 to-blue-600'
+                        }`}>
+                          {isAI ? (
+                            <Sparkles className="w-4 h-4 text-white" />
+                          ) : (
+                            <span className="text-white text-xs font-medium">{msg.senderName?.charAt(0)}</span>
+                          )}
+                        </div>
+                      )}
+                      {!isOwn && !showAvatar && <div className="w-8" />}
+                      
+                      <div className={`max-w-[70%] ${isOwn ? 'order-first' : ''}`}>
+                        {!isOwn && showAvatar && (
+                          <p className="text-xs text-gray-500 mb-1 ml-1 flex items-center gap-1">
+                            {isAI && <Sparkles className="w-3 h-3 text-purple-400" />}
+                            {msg.senderName}
+                          </p>
+                        )}
+                        <div
+                          className={`px-4 py-3 ${
+                            isOwn
+                              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-2xl rounded-br-md'
+                              : isAI
+                                ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white rounded-2xl rounded-bl-md border border-purple-500/20'
+                                : 'bg-white/10 text-white rounded-2xl rounded-bl-md'
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
+                          <div className={`flex items-center justify-end gap-1.5 mt-1 ${isOwn ? 'text-white/60' : 'text-gray-500'}`}>
+                            <span className="text-[11px]">{formatMessageTime(msg.createdAt)}</span>
+                            {isOwn && getMessageStatus(msg)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Scroll to Bottom Button */}
+            <AnimatePresence>
+              {showScrollButton && (
+                <motion.button
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  onClick={scrollToBottom}
+                  className="absolute bottom-24 right-6 w-10 h-10 bg-cyan-500 text-white rounded-full shadow-lg shadow-cyan-500/25 flex items-center justify-center hover:bg-cyan-400 transition-colors"
+                >
+                  <ChevronDown className="w-5 h-5" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+
             {/* Typing Indicator */}
             {typingUsers.size > 0 && (
-              <div className="px-4 py-2 text-sm text-gray-400 flex items-center gap-2">
+              <div className="px-5 py-2 text-sm text-gray-400 flex items-center gap-2">
                 <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  {[0, 1, 2].map((i) => (
+                    <span 
+                      key={i}
+                      className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" 
+                      style={{ animationDelay: `${i * 150}ms` }} 
+                    />
+                  ))}
                 </div>
-                <span>
-                  {Array.from(typingUsers.values()).map(u => u.name).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
-                </span>
+                <span>{Array.from(typingUsers.values()).map(u => u.name).join(', ')} is typing...</span>
               </div>
             )}
 
             {/* Message Input */}
-            <div className="p-4 border-t border-gray-700 bg-gray-800/50">
-              <div className="flex items-center gap-2">
-                <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg">
+            <div className="p-4 border-t border-white/5 bg-[#0d0d14]">
+              <div className="flex items-center gap-3">
+                <button className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
                   <Paperclip className="w-5 h-5" />
                 </button>
-                <input
-                  ref={messageInputRef}
-                  type="text"
-                  placeholder="Type a message..."
-                  value={messageInput}
-                  onChange={(e) => {
-                    setMessageInput(e.target.value);
-                    // Send typing indicator
-                    if (selectedConversation && wsConnected) {
-                      wsSetTyping(selectedConversation.id, true);
-                      // Clear typing after 2 seconds of no input
-                      if (typingTimeoutRef.current) {
-                        clearTimeout(typingTimeoutRef.current);
+                <div className="flex-1 relative">
+                  <input
+                    ref={messageInputRef}
+                    type="text"
+                    placeholder="Type a message..."
+                    value={messageInput}
+                    onChange={(e) => {
+                      setMessageInput(e.target.value);
+                      if (selectedConversation && wsConnected) {
+                        wsSetTyping(selectedConversation.id, true);
+                        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                        typingTimeoutRef.current = setTimeout(() => {
+                          if (selectedConversation) wsSetTyping(selectedConversation.id, false);
+                        }, 2000);
                       }
-                      typingTimeoutRef.current = setTimeout(() => {
-                        if (selectedConversation) {
-                          wsSetTyping(selectedConversation.id, false);
-                        }
-                      }, 2000);
-                    }
-                  }}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                  className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primary-500"
-                />
-                <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg">
-                  <Smile className="w-5 h-5" />
-                </button>
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                    className="w-full px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors pr-12"
+                  />
+                  <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
+                    <Smile className="w-5 h-5" />
+                  </button>
+                </div>
                 <button
                   onClick={sendMessage}
                   disabled={!messageInput.trim() || isSending}
-                  className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl flex items-center justify-center hover:shadow-lg hover:shadow-cyan-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
-                  <Send className="w-5 h-5" />
+                  {isSending ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-gray-800/30">
+          <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <MessageCircle className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <h2 className="text-xl font-medium text-white mb-2">Welcome to Messages</h2>
-              <p className="text-gray-400 max-w-md">
-                Select a conversation or start chatting with support
+              <div className="w-24 h-24 bg-white/5 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <MessageCircle className="w-12 h-12 text-gray-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Welcome to Messages</h2>
+              <p className="text-gray-400 max-w-md mb-6">
+                Select a conversation from the list or start chatting with our support team
               </p>
               <button
                 onClick={startSupportConversation}
-                className="mt-4 px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 flex items-center gap-2 mx-auto"
+                className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all flex items-center gap-2 mx-auto"
               >
                 <Headphones className="w-5 h-5" />
                 Contact Support
@@ -1129,4 +1023,3 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     </div>
   );
 }
-
