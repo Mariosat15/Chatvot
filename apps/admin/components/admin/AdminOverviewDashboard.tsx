@@ -273,17 +273,16 @@ export default function AdminOverviewDashboard({
 
   useEffect(() => {
     fetchStats();
-    fetchReconciliation(); // Run reconciliation check on load
-    
-    // Auto-refresh stats every 30 seconds
-    const interval = setInterval(fetchStats, 30000);
-    return () => clearInterval(interval);
+    // Don't auto-run reconciliation on load - it's expensive and creates audit logs
+    // User can manually refresh via the Refresh button
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);
     fetchStats();
-    fetchReconciliation(); // Also refresh reconciliation
+    // Reconciliation is only run from the dedicated Reconciliation section
+    // to avoid running expensive checks on every refresh
   };
 
   if (loading) {

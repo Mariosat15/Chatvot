@@ -274,9 +274,8 @@ export default function PendingPaymentsSection() {
 
   useEffect(() => {
     fetchPendingPayments();
-    
-    const interval = setInterval(fetchPendingPayments, 30000);
-    return () => clearInterval(interval);
+    // No auto-refresh - user can manually refresh when needed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   useEffect(() => {

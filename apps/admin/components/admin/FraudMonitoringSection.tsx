@@ -203,16 +203,8 @@ export default function FraudMonitoringSection() {
   useEffect(() => {
     fetchAlerts();
     fetchDevices();
-    
-    // Auto-refresh - optimized to 60 seconds (was 30)
-    const interval = setInterval(() => {
-      // Skip if tab is hidden
-      if (document.hidden) return;
-      fetchAlerts();
-      fetchDevices();
-    }, PERFORMANCE_INTERVALS.FRAUD_MONITORING);
-
-    return () => clearInterval(interval);
+    // No auto-refresh - user can manually refresh when needed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   // Adjust status filter for API call
