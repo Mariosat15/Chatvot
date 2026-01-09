@@ -326,7 +326,9 @@ suggest connecting them with a human agent. Keep responses concise but informati
       messageType: 'ai-response',
       status: 'sent',
       readBy: [],
+      isDeleted: false, // Required for message queries
       createdAt: new Date(),
+      updatedAt: new Date(),
     };
     
     const result = await db.collection('messages').insertOne(aiMessage);

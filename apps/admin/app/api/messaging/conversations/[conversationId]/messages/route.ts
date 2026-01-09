@@ -160,9 +160,9 @@ export async function POST(
     };
 
     // Notify via WebSocket so customer receives the message in real-time
+    // Use internal URL for server-to-server communication (not public wss:// URL)
     try {
-      const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || process.env.WS_INTERNAL_URL || 'http://localhost:3003';
-      const wsInternalUrl = wsUrl.replace('wss://', 'https://').replace('ws://', 'http://');
+      const wsInternalUrl = process.env.WS_INTERNAL_URL || 'http://localhost:3003';
       
       console.log(`📤 [SendMsg] Broadcasting via WebSocket: ${wsInternalUrl}/internal/message`);
       

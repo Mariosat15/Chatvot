@@ -12,8 +12,9 @@
  * - WebSocket server broadcasts to connected clients
  */
 
-const WEBSOCKET_SERVER_URL = process.env.WEBSOCKET_INTERNAL_URL || 
-                             process.env.NEXT_PUBLIC_WEBSOCKET_URL ||
+// For server-to-server communication, use internal HTTP URL (not public wss://)
+const WEBSOCKET_SERVER_URL = process.env.WS_INTERNAL_URL || 
+                             process.env.WEBSOCKET_INTERNAL_URL || 
                              'http://localhost:3003';
 
 interface WebSocketEvent {

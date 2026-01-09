@@ -107,10 +107,9 @@ export async function POST(
       }
     );
 
-    // Notify via WebSocket
+    // Notify via WebSocket (use internal URL for server-to-server)
     try {
-      const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || process.env.WS_INTERNAL_URL || 'http://localhost:3003';
-      const wsInternalUrl = wsUrl.replace('wss://', 'https://').replace('ws://', 'http://');
+      const wsInternalUrl = process.env.WS_INTERNAL_URL || 'http://localhost:3003';
       
       await fetch(`${wsInternalUrl}/internal/message`, {
         method: 'POST',
