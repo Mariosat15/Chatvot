@@ -162,7 +162,9 @@ export async function POST(request: NextRequest) {
         messageType: message.messageType,
         attachments: message.attachments,
         status: message.status,
-        createdAt: message.createdAt,
+        readBy: [],
+        isEdited: false,
+        createdAt: message.createdAt instanceof Date ? message.createdAt.toISOString() : message.createdAt,
       },
       aiResponse: aiResponse ? {
         id: aiResponse._id.toString(),
@@ -171,7 +173,9 @@ export async function POST(request: NextRequest) {
         senderName: aiResponse.senderName,
         content: aiResponse.content,
         messageType: aiResponse.messageType,
-        createdAt: aiResponse.createdAt,
+        readBy: [],
+        isEdited: false,
+        createdAt: aiResponse.createdAt instanceof Date ? aiResponse.createdAt.toISOString() : aiResponse.createdAt,
       } : null,
       conversationId: conversation._id.toString(),
     });
