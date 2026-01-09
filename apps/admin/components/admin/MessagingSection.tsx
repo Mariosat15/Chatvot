@@ -226,6 +226,7 @@ export default function MessagingSection() {
   const isInitialLoadRef = useRef(true); // Track if this is the first load of messages
   const chatMenuRef = useRef<HTMLDivElement>(null);
   const initialLoadDone = useRef(false); // Track if initial data load completed
+  const fetchConversationsRef = useRef<() => Promise<void>>();
 
   // Get current admin info from cookie/session
   useEffect(() => {
@@ -256,7 +257,7 @@ export default function MessagingSection() {
     setShowScrollButton(false);
   }, []);
 
-  // WebSocket message handler
+  // WebSocket message handler - uses refs to avoid circular dependency
   const handleWebSocketMessage = useCallback((message: { type: string; data?: any; [key: string]: any }) => {
     switch (message.type) {
       case 'new_message':
@@ -279,8 +280,8 @@ export default function MessagingSection() {
           setConversations(prev => {
             const convExists = prev.some(c => c.id === msgData.conversationId);
             if (!convExists) {
-              // New conversation - fetch all (rare case)
-              fetchConversations();
+              // New conversation - fetch all via ref (rare case)
+              fetchConversationsRef.current?.();
               return prev;
             }
             return prev.map(c => {
@@ -327,10 +328,10 @@ export default function MessagingSection() {
         
       case 'conversation_update':
         // Only fetch all when conversation metadata changes (not messages)
-        fetchConversations();
+        fetchConversationsRef.current?.();
         break;
     }
-  }, [scrollToBottom, fetchConversations]);
+  }, [scrollToBottom]);
 
   const { isConnected: wsConnected, subscribe: wsSubscribe, unsubscribe: wsUnsubscribe, setTyping: wsSetTyping } = useAdminWebSocket(handleWebSocketMessage);
 
@@ -452,6 +453,11 @@ export default function MessagingSection() {
       console.error('Error fetching conversations:', error);
     }
   }, [activeTab, statusFilter]);
+
+  // Keep ref updated for WebSocket handler
+  useEffect(() => {
+    fetchConversationsRef.current = fetchConversations;
+  }, [fetchConversations]);
 
   const fetchEmployees = useCallback(async () => {
     try {

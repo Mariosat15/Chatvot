@@ -165,10 +165,9 @@ const FriendshipSchema = new Schema<IFriendship>(
 );
 
 // Indexes
-FriendshipSchema.index({ users: 1 });
 FriendshipSchema.index({ 'userDetails.userId': 1 });
 
-// Ensure unique friendship (sorted users)
+// Ensure unique friendship (sorted users) - also provides lookup index
 FriendshipSchema.index({ users: 1 }, { unique: true });
 
 // Pre-save: Sort users array for consistent lookup
