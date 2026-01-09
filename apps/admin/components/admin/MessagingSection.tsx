@@ -226,7 +226,7 @@ export default function MessagingSection() {
   const isInitialLoadRef = useRef(true); // Track if this is the first load of messages
   const chatMenuRef = useRef<HTMLDivElement>(null);
   const initialLoadDone = useRef(false); // Track if initial data load completed
-  const fetchConversationsRef = useRef<() => Promise<void>>();
+  const fetchConversationsRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   // Get current admin info from cookie/session
   useEffect(() => {
