@@ -144,20 +144,47 @@ export async function POST(
     await db.collection('conversations').updateOne({ _id: convObjectId }, updateDoc);
     console.log(`📤 [SendMsg] Conversation updated successfully`);
 
-    return NextResponse.json({
-      message: {
-        id: msgResult.insertedId.toString(),
-        senderId: decoded.adminId,
-        senderType: 'employee',
-        senderName: decoded.name || decoded.email,
-        content: content || '',
-        messageType: messageType || 'text',
-        attachments: attachments || [],
-        replyTo: replyTo,
-        status: 'sent',
-        createdAt: new Date(),
-      },
-    });
+    // Build message object for response
+    const messageResponse = {
+      id: msgResult.insertedId.toString(),
+      senderId: decoded.adminId,
+      senderType: 'employee',
+      senderName: decoded.name || decoded.email,
+      content: content || '',
+      messageType: messageType || 'text',
+      attachments: attachments || [],
+      replyTo: replyTo,
+      status: 'sent',
+      createdAt: new Date(),
+    };
+
+    // Notify via WebSocket so customer receives the message in real-time
+    try {
+      const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || process.env.WS_INTERNAL_URL || 'http://localhost:3003';
+      const wsInternalUrl = wsUrl.replace('wss://', 'https://').replace('ws://', 'http://');
+      
+      console.log(`📤 [SendMsg] Broadcasting via WebSocket: ${wsInternalUrl}/internal/message`);
+      
+      const wsResponse = await fetch(`${wsInternalUrl}/internal/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          message: messageResponse,
+        }),
+      });
+      
+      if (wsResponse.ok) {
+        console.log(`✅ [SendMsg] WebSocket broadcast successful`);
+      } else {
+        console.warn(`⚠️ [SendMsg] WebSocket broadcast failed: ${wsResponse.status}`);
+      }
+    } catch (wsError) {
+      console.warn(`⚠️ [SendMsg] WebSocket notification failed:`, wsError);
+      // Don't fail the request if WebSocket fails - message is already saved
+    }
+
+    return NextResponse.json({ message: messageResponse });
   } catch (error) {
     console.error('❌ [SendMsg] Error:', error);
     return NextResponse.json(

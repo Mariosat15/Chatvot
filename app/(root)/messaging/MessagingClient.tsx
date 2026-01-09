@@ -132,25 +132,26 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
   // WebSocket for real-time messaging
   const handleWebSocketMessage = useCallback((message: { type: string; data: any }) => {
-    console.log('📨 [WS] Received:', message.type);
+    console.log('📨 [WS] Received:', message.type, message.data?.conversationId);
     
     switch (message.type) {
       case 'new_message':
         // Add new message if it's for the current conversation
         if (message.data.conversationId === selectedConversation?.id) {
-          // Don't add if it's from us (already added optimistically)
-          if (message.data.message.senderId !== session.user.id) {
-            setMessages(prev => {
-              // Check if message already exists
-              if (prev.some(m => m.id === message.data.message.id)) {
-                return prev;
-              }
-              return [...prev, message.data.message];
-            });
-            scrollToBottom();
-          }
+          console.log('📨 [WS] New message for current conv, senderId:', message.data.message?.senderId);
+          
+          setMessages(prev => {
+            // Check if message already exists (prevent duplicates)
+            if (prev.some(m => m.id === message.data.message.id)) {
+              console.log('📨 [WS] Message already exists, skipping');
+              return prev;
+            }
+            console.log('📨 [WS] Adding message:', message.data.message.content?.slice(0, 30));
+            return [...prev, message.data.message];
+          });
+          scrollToBottom();
         }
-        // Update conversation list with new last message
+        // Update conversation list (but don't refetch messages)
         fetchConversations();
         break;
         
@@ -363,21 +364,34 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       if (response.ok) {
         console.log(`📤 [Send] Success, hasAI: ${!!data.aiResponse}`);
         
+        // Mark that we just added messages (prevent poll from overwriting)
+        lastMessageFetchRef.current = Date.now();
+        
         // Add user's message
         if (data.message) {
-          setMessages(prev => [...prev, data.message]);
+          setMessages(prev => {
+            // Don't add if already exists
+            if (prev.some(m => m.id === data.message.id)) return prev;
+            return [...prev, data.message];
+          });
         }
         scrollToBottom();
         
         // If there's an AI response, add it after a short delay for natural feel
         if (data.aiResponse) {
           setTimeout(() => {
-            setMessages(prev => [...prev, data.aiResponse]);
+            lastMessageFetchRef.current = Date.now(); // Extend protection
+            setMessages(prev => {
+              // Don't add if already exists (might come via WebSocket)
+              if (prev.some(m => m.id === data.aiResponse.id)) return prev;
+              return [...prev, data.aiResponse];
+            });
             scrollToBottom();
           }, 800);
         }
         
-        fetchConversations(); // Refresh conversation list
+        // Refresh conversation list (but NOT messages)
+        fetchConversations();
       } else {
         console.error('❌ [Send] Failed:', response.status, data);
         // Restore the message if sending failed
@@ -513,28 +527,46 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     loadData();
   }, [fetchConversations, fetchFriends, fetchFriendRequests, fetchAssignedAgent]);
 
-  // Fetch messages when conversation is selected
+  // Track selected conversation ID to avoid re-fetching on object reference change
+  const selectedConversationIdRef = useRef<string | null>(null);
+  const lastMessageFetchRef = useRef<number>(0);
+  
+  // Fetch messages when conversation ID changes (not object reference)
   useEffect(() => {
-    if (selectedConversation) {
-      fetchMessages(selectedConversation.id);
+    const conversationId = selectedConversation?.id;
+    
+    // Only fetch if ID actually changed
+    if (conversationId && conversationId !== selectedConversationIdRef.current) {
+      selectedConversationIdRef.current = conversationId;
+      lastMessageFetchRef.current = Date.now();
+      fetchMessages(conversationId);
     }
-  }, [selectedConversation, fetchMessages]);
+  }, [selectedConversation?.id, fetchMessages]);
 
-  // Poll for new messages (fallback when WebSocket not connected, or slower refresh)
+  // Poll for new messages (fallback when WebSocket not connected)
   useEffect(() => {
-    // Use longer interval when WebSocket is connected (30s), shorter when not (5s)
-    const pollInterval = wsConnected ? 30000 : 5000;
+    // Only poll when WebSocket is NOT connected
+    if (wsConnected) return;
+    
+    const pollInterval = 8000; // 8 seconds when not connected
     
     const interval = setInterval(() => {
+      // Don't fetch messages if we just added some (avoid overwriting)
+      const timeSinceLastFetch = Date.now() - lastMessageFetchRef.current;
+      if (timeSinceLastFetch < 3000) {
+        console.log('🔄 [Poll] Skipping - recent message activity');
+        return;
+      }
+      
       fetchConversations();
-      // Only fetch messages if WebSocket is not connected
-      if (!wsConnected && selectedConversation) {
+      if (selectedConversation) {
+        lastMessageFetchRef.current = Date.now();
         fetchMessages(selectedConversation.id);
       }
     }, pollInterval);
 
     return () => clearInterval(interval);
-  }, [selectedConversation, fetchConversations, fetchMessages, wsConnected]);
+  }, [selectedConversation?.id, fetchConversations, fetchMessages, wsConnected]);
 
   // Search debounce
   useEffect(() => {
@@ -768,9 +800,13 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                 conversations.map((conv) => (
                   <button
                     key={conv.id}
-                    onClick={() => {
+                    onClick={async () => {
+                      console.log('📂 [Conv] Selecting conversation:', conv.id);
                       setSelectedConversation(conv);
                       setShowMobileChat(true);
+                      // Always fetch messages when clicking (handles re-selection of same conv)
+                      lastMessageFetchRef.current = Date.now();
+                      await fetchMessages(conv.id);
                     }}
                     className={`w-full p-4 flex items-center gap-3 hover:bg-gray-700/50 border-b border-gray-700/50 transition-colors ${
                       selectedConversation?.id === conv.id ? 'bg-gray-700/50' : ''
