@@ -299,15 +299,21 @@ export default function MessagingSection() {
   const startConversationWithCustomer = async (customerId: string, customerName: string, customerAvatar?: string) => {
     try {
       // Create or get existing conversation with customer
-      const response = await fetch('/api/messaging/conversations/create-with-customer', {
+      const response = await fetch('/api/messaging/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId, customerName, customerAvatar }),
+        body: JSON.stringify({ 
+          type: 'user-to-support',
+          customerId, 
+          customerName,
+        }),
       });
       
       if (response.ok) {
         const data = await response.json();
-        // Switch to support tab and select the conversation
+        console.log('💬 [UI] Created/found conversation:', data.conversation.id);
+        
+        // Switch to support tab and refresh conversations
         setActiveTab('support');
         await fetchConversations();
         
@@ -317,9 +323,9 @@ export default function MessagingSection() {
           const convData = await convResponse.json();
           setSelectedConversation({
             id: data.conversation.id,
-            type: data.conversation.type,
-            status: data.conversation.status,
-            participants: data.conversation.participants,
+            type: data.conversation.type || 'user-to-support',
+            status: data.conversation.status || 'active',
+            participants: convData.participants || data.conversation.participants || [],
             lastMessage: convData.lastMessage,
             unreadCount: 0,
             isAIHandled: false,
@@ -327,6 +333,18 @@ export default function MessagingSection() {
             lastActivityAt: convData.lastActivityAt,
           });
           setMessages(convData.messages || []);
+        } else {
+          // If fetching full conversation fails, just use what we have
+          setSelectedConversation({
+            id: data.conversation.id,
+            type: 'user-to-support',
+            status: 'active',
+            participants: data.conversation.participants || [],
+            unreadCount: 0,
+            isAIHandled: false,
+            createdAt: new Date().toISOString(),
+            lastActivityAt: new Date().toISOString(),
+          });
         }
       } else {
         console.error('Failed to create conversation:', response.status);

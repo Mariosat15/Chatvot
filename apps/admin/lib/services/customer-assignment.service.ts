@@ -295,6 +295,22 @@ class CustomerAssignmentService {
       params.reason
     );
     
+    // Transfer all chat conversations for this customer to the new employee
+    try {
+      await this.transferCustomerChats(
+        params.customerId,
+        toEmployee._id.toString(),
+        toEmployee.name || toEmployee.email.split('@')[0],
+        toEmployee.profileImage,
+        previousEmployee.employeeId.toString(),
+        previousEmployee.employeeName
+      );
+      console.log(`💬 [Transfer] Chat conversations transferred for customer ${currentAssignment.customerEmail}`);
+    } catch (chatError) {
+      console.error('Error transferring chat conversations:', chatError);
+      // Don't fail the whole transfer if chat transfer fails
+    }
+    
     return currentAssignment;
   }
   
@@ -822,6 +838,134 @@ class CustomerAssignmentService {
         count: r.count,
       })),
     };
+  }
+  
+  /**
+   * Transfer all chat conversations for a customer to a new employee
+   * Called when customer is reassigned
+   */
+  async transferCustomerChats(
+    customerId: string,
+    toEmployeeId: string,
+    toEmployeeName: string,
+    toEmployeeAvatar?: string,
+    fromEmployeeId?: string,
+    fromEmployeeName?: string
+  ): Promise<void> {
+    await connectToDatabase();
+    
+    const db = mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database not connected');
+    }
+    
+    // Find all active support conversations for this customer
+    const conversations = await db.collection('conversations').find({
+      type: 'user-to-support',
+      status: { $ne: 'closed' },
+      'participants.id': customerId,
+      'participants.type': 'user',
+    }).toArray();
+    
+    console.log(`💬 [TransferChats] Found ${conversations.length} conversations for customer ${customerId}`);
+    
+    for (const conv of conversations) {
+      // Update assignment
+      const updateData: any = {
+        assignedEmployeeId: new mongoose.Types.ObjectId(toEmployeeId),
+        assignedEmployeeName: toEmployeeName,
+        isAIHandled: false, // Disable AI when has assigned employee
+        lastActivityAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      // Track transfer in metadata
+      const transferRecord = {
+        fromEmployeeId: fromEmployeeId || conv.assignedEmployeeId?.toString(),
+        fromEmployeeName: fromEmployeeName || conv.assignedEmployeeName || 'Unassigned',
+        toEmployeeId,
+        toEmployeeName,
+        reason: 'Customer reassignment',
+        transferredAt: new Date(),
+      };
+      
+      // Check if new employee is already a participant
+      const hasNewEmployee = conv.participants?.some((p: any) => p.id === toEmployeeId);
+      
+      if (hasNewEmployee) {
+        // Just update assignment
+        await db.collection('conversations').updateOne(
+          { _id: conv._id },
+          {
+            $set: updateData,
+            $push: { 'metadata.transferHistory': transferRecord }
+          }
+        );
+      } else {
+        // Add new employee as participant and update assignment
+        await db.collection('conversations').updateOne(
+          { _id: conv._id },
+          {
+            $set: updateData,
+            $push: {
+              'metadata.transferHistory': transferRecord,
+              participants: {
+                id: toEmployeeId,
+                type: 'employee',
+                name: toEmployeeName,
+                avatar: toEmployeeAvatar,
+                joinedAt: new Date(),
+                isActive: true,
+              }
+            }
+          }
+        );
+      }
+      
+      // Optionally deactivate old employee as participant (but keep in history)
+      if (fromEmployeeId) {
+        await db.collection('conversations').updateOne(
+          { _id: conv._id, 'participants.id': fromEmployeeId },
+          {
+            $set: {
+              'participants.$.isActive': false,
+              'participants.$.leftAt': new Date(),
+            }
+          }
+        );
+      }
+      
+      // Add system message about the transfer
+      await db.collection('messages').insertOne({
+        conversationId: conv._id,
+        senderId: 'system',
+        senderType: 'system',
+        senderName: 'System',
+        content: `Your conversation has been transferred to ${toEmployeeName}.`,
+        messageType: 'system',
+        status: 'sent',
+        readBy: [],
+        createdAt: new Date(),
+      });
+      
+      // Update last message
+      await db.collection('conversations').updateOne(
+        { _id: conv._id },
+        {
+          $set: {
+            lastMessage: {
+              content: `Your conversation has been transferred to ${toEmployeeName}.`,
+              senderId: 'system',
+              senderName: 'System',
+              senderType: 'system',
+              timestamp: new Date(),
+            }
+          }
+        }
+      );
+      
+      console.log(`💬 [TransferChats] Conversation ${conv._id} transferred to ${toEmployeeName}`);
+    }
   }
 }
 

@@ -42,8 +42,9 @@ export async function GET(request: NextRequest) {
       console.log(`⚠️ [Messaging] Could not convert adminId to ObjectId: ${decoded.adminId}`);
     }
 
-    // Get assignments for this employee (try both string and ObjectId formats)
+    // Get active assignments for this employee (try both string and ObjectId formats)
     const query = {
+      isActive: true,
       $or: [
         { employeeId: decoded.adminId },
         { employeeId: decoded.adminId?.toString() },
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
     
     const assignments = await db.collection('customer_assignments')
       .find(query)
+      .sort({ assignedAt: -1 })
       .toArray();
 
     console.log(`📋 [Messaging] Found ${assignments.length} customer assignments`);
