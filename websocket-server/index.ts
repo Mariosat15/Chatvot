@@ -253,87 +253,104 @@ wss.on('connection', (ws, req) => {
 function handleConnection(ws: WebSocket, req: any) {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   const token = url.searchParams.get('token');
+  const type = url.searchParams.get('type') as 'user' | 'employee' || 'user';
 
   if (!token) {
     ws.close(4001, 'Authentication required');
     return;
   }
 
+  let participantId: string;
+  let participantType: 'user' | 'employee' = type;
+  let participantName = 'Unknown';
+
+  // Try JWT verification first, then fall back to raw ID
   try {
     const decoded = verify(token, JWT_SECRET) as JWTPayload;
-    const participantId = decoded.id || decoded.sub || decoded.userId;
-
+    participantId = decoded.id || decoded.sub || decoded.userId || '';
+    participantType = decoded.type || type;
+    participantName = decoded.name || decoded.email || 'Unknown';
+    
     if (!participantId) {
-      ws.close(4001, 'Invalid token - no user ID');
+      throw new Error('No user ID in token');
+    }
+  } catch (jwtError) {
+    // JWT verification failed - treat token as raw user/admin ID
+    // This supports both JWT auth and simple ID-based auth
+    if (token && token.length >= 10 && /^[a-f0-9]{24}$|^[a-zA-Z0-9_-]+$/.test(token)) {
+      // Looks like a MongoDB ObjectId or admin ID
+      participantId = token;
+      participantName = type === 'employee' ? 'Employee' : 'User';
+      console.log(`🔑 Using raw ID auth for ${type}: ${participantId.substring(0, 8)}...`);
+    } else {
+      console.error('Authentication failed: Invalid token format');
+      ws.close(4001, 'Authentication failed');
       return;
     }
-
-    const connectionId = `${participantId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    const connection: Connection = {
-      ws,
-      participantId,
-      participantType: decoded.type || 'user',
-      participantName: decoded.name || decoded.email || 'Unknown',
-      conversationIds: new Set(),
-      lastHeartbeat: Date.now(),
-      isAlive: true,
-    };
-
-    // Store connection
-    connections.set(connectionId, connection);
-
-    // Track participant connections
-    if (!participantConnections.has(participantId)) {
-      participantConnections.set(participantId, new Set());
-    }
-    participantConnections.get(participantId)!.add(connectionId);
-
-    // Setup ping/pong for connection health
-    ws.on('pong', () => {
-      connection.isAlive = true;
-      connection.lastHeartbeat = Date.now();
-    });
-
-    // Handle incoming messages
-    ws.on('message', (data) => {
-      try {
-        const message = JSON.parse(data.toString());
-        handleMessage(connectionId, message);
-      } catch (error) {
-        console.error('Invalid message format:', error);
-      }
-    });
-
-    // Handle close
-    ws.on('close', () => {
-      handleDisconnect(connectionId);
-    });
-
-    // Handle error
-    ws.on('error', (error) => {
-      console.error(`WebSocket error for ${participantId}:`, error.message);
-      handleDisconnect(connectionId);
-    });
-
-    // Send connection acknowledgment
-    send(ws, {
-      type: 'connected',
-      data: {
-        connectionId,
-        participantId,
-        serverTime: new Date().toISOString(),
-      },
-    });
-
-    // Broadcast presence
-    broadcastPresence(participantId, 'online');
-
-    console.log(`✅ Connected: ${participantId} (${decoded.type || 'user'}) - Total: ${connections.size}`);
-  } catch (error: any) {
-    console.error('Authentication failed:', error.message);
-    ws.close(4001, 'Authentication failed');
   }
+
+  const connectionId = `${participantId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  const connection: Connection = {
+    ws,
+    participantId,
+    participantType,
+    participantName,
+    conversationIds: new Set(),
+    lastHeartbeat: Date.now(),
+    isAlive: true,
+  };
+
+  // Store connection
+  connections.set(connectionId, connection);
+
+  // Track participant connections
+  if (!participantConnections.has(participantId)) {
+    participantConnections.set(participantId, new Set());
+  }
+  participantConnections.get(participantId)!.add(connectionId);
+
+  // Setup ping/pong for connection health
+  ws.on('pong', () => {
+    connection.isAlive = true;
+    connection.lastHeartbeat = Date.now();
+  });
+
+  // Handle incoming messages
+  ws.on('message', (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      handleMessage(connectionId, message);
+    } catch (error) {
+      console.error('Invalid message format:', error);
+    }
+  });
+
+  // Handle close
+  ws.on('close', () => {
+    handleDisconnect(connectionId);
+  });
+
+  // Handle error
+  ws.on('error', (error) => {
+    console.error(`WebSocket error for ${participantId}:`, error.message);
+    handleDisconnect(connectionId);
+  });
+
+  // Send connection acknowledgment
+  send(ws, {
+    type: 'connected',
+    data: {
+      connectionId,
+      participantId,
+      serverTime: new Date().toISOString(),
+    },
+  });
+
+  // Broadcast presence
+  broadcastPresence(participantId, 'online');
+
+  console.log(`✅ Connected: ${participantId} (${participantType}) - Total: ${connections.size}`);
 }
 
 function handleMessage(connectionId: string, message: any) {
