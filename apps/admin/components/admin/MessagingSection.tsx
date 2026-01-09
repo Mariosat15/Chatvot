@@ -568,8 +568,19 @@ export default function MessagingSection() {
     
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchConversations(), fetchEmployees(), fetchAssignedCustomers(), fetchAvailability()]);
-      setIsLoading(false);
+      try {
+        await Promise.all([
+          fetchConversations().catch(e => console.error('Error fetching conversations:', e)),
+          fetchEmployees().catch(e => console.error('Error fetching employees:', e)),
+          fetchAssignedCustomers().catch(e => console.error('Error fetching customers:', e)),
+          fetchAvailability().catch(e => console.error('Error fetching availability:', e)),
+        ]);
+      } catch (error) {
+        console.error('Error loading messaging data:', error);
+      } finally {
+        // Always set loading to false, even if there are errors
+        setIsLoading(false);
+      }
     };
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -833,6 +844,17 @@ export default function MessagingSection() {
   const unassignedCount = conversations.filter(c => !c.assignedEmployeeId && c.type === 'user-to-support').length;
   const aiHandledCount = conversations.filter(c => c.isAIHandled).length;
   const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+
+  // Safety timeout - if loading takes more than 5 seconds, show the UI anyway
+  useEffect(() => {
+    if (isLoading) {
+      const timeout = setTimeout(() => {
+        console.warn('⚠️ Messaging center loading timeout - showing UI anyway');
+        setIsLoading(false);
+      }, 5000);
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading]);
 
   if (isLoading) {
     return (
