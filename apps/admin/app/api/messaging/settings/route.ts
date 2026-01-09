@@ -146,6 +146,8 @@ export async function PUT(request: NextRequest) {
       mongoose.model('MessagingSettings', MessagingSettingsSchema);
 
     let settings = await MessagingSettings.findOne();
+    const previousAIEnabled = settings?.enableAISupport || false;
+    
     if (settings) {
       Object.assign(settings, body);
       await settings.save();
@@ -154,6 +156,42 @@ export async function PUT(request: NextRequest) {
     }
 
     console.log(`✅ [Messaging Settings] Updated by ${decoded.email}`);
+    
+    // Handle AI enable/disable toggle - update all active support conversations
+    const newAIEnabled = body.enableAISupport;
+    
+    if (newAIEnabled !== undefined && newAIEnabled !== previousAIEnabled) {
+      const db = mongoose.connection.db;
+      if (db) {
+        if (newAIEnabled) {
+          // AI RE-ENABLED: Set AI handling on non-resolved conversations
+          const result = await db.collection('conversations').updateMany(
+            {
+              type: 'user-to-support',
+              status: 'active',
+              isResolved: { $ne: true }, // Don't affect resolved conversations
+            },
+            {
+              $set: { isAIHandled: true }
+            }
+          );
+          console.log(`🤖 [AI Enabled] Updated ${result.modifiedCount} conversations to AI handling`);
+        } else {
+          // AI DISABLED: Remove AI handling from all conversations
+          const result = await db.collection('conversations').updateMany(
+            {
+              type: 'user-to-support',
+              status: 'active',
+              isAIHandled: true,
+            },
+            {
+              $set: { isAIHandled: false }
+            }
+          );
+          console.log(`👤 [AI Disabled] Updated ${result.modifiedCount} conversations to employee handling`);
+        }
+      }
+    }
 
     return NextResponse.json({ settings });
   } catch (error) {

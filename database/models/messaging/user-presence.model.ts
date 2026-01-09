@@ -210,8 +210,9 @@ interface UserPresenceModel extends Model<IUserPresence> {
   cleanupStalePresences(): Promise<any>;
 }
 
-export const UserPresence = mongoose.models.UserPresence ||
-  mongoose.model<IUserPresence, UserPresenceModel>('UserPresence', UserPresenceSchema);
+// Use a different model name to avoid conflict with the main UserPresence model
+export const UserPresence = mongoose.models.MessagingPresence ||
+  mongoose.model<IUserPresence, UserPresenceModel>('MessagingPresence', UserPresenceSchema);
 
 export default UserPresence;
 
