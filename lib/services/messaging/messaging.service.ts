@@ -196,7 +196,42 @@ export class MessagingService {
     });
     
     if (conversation) {
-      console.log(`📦 [MessagingService] Found existing conversation: ${conversation._id}, isAIHandled: ${conversation.isAIHandled}`);
+      console.log(`📦 [MessagingService] Found existing conversation: ${conversation._id}, isAIHandled: ${conversation.isAIHandled}, isResolved: ${(conversation as any).isResolved}`);
+      
+      // Handle resolved conversations - when customer sends new message, reopen with AI
+      if ((conversation as any).isResolved) {
+        console.log(`🔄 [MessagingService] Conversation was resolved, reopening with AI...`);
+        
+        // Reopen the conversation with AI handling (new request cycle)
+        conversation.isAIHandled = settings.enableAISupport;
+        (conversation as any).isResolved = false;
+        (conversation as any).reopenedAt = new Date();
+        await conversation.save();
+        
+        // Add system message about new request
+        await this.sendMessage({
+          conversationId: conversation._id.toString(),
+          senderId: 'system',
+          senderType: 'system',
+          senderName: 'System',
+          content: '🆕 New support request. Our AI assistant will help you first.',
+          messageType: 'system',
+        });
+        
+        // If AI is enabled, add AI greeting
+        if (settings.enableAISupport) {
+          await this.sendMessage({
+            conversationId: conversation._id.toString(),
+            senderId: 'ai',
+            senderType: 'ai',
+            senderName: 'AI Assistant',
+            content: settings.aiGreeting || 'Hello! I\'m here to help. How can I assist you today?',
+            messageType: 'text',
+          });
+        }
+        
+        console.log(`✅ [MessagingService] Conversation reopened, AI handling: ${conversation.isAIHandled}`);
+      }
       
       // Store assigned employee info on conversation (for escalation later)
       // But DON'T disable AI - let AI handle until escalation

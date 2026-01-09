@@ -13,6 +13,7 @@ import {
   Clock,
   CheckCheck,
   Check,
+  CheckCircle,
   Phone,
   Mail,
   MoreVertical,
@@ -130,6 +131,9 @@ interface Conversation {
   };
   unreadCount: number;
   isAIHandled: boolean;
+  isResolved?: boolean;
+  resolvedAt?: string;
+  resolvedByName?: string;
   assignedEmployeeId?: string;
   assignedEmployeeName?: string;
   originalEmployeeId?: string;
@@ -459,6 +463,52 @@ export default function MessagingSection() {
       }
     } catch (error) {
       console.error('Error reassigning conversation:', error);
+    }
+  };
+
+  // Mark conversation as resolved - AI will take over for next customer message
+  const handleResolve = async (conversationId: string) => {
+    if (!confirm('Mark this conversation as resolved? AI will handle the next customer message.')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/messaging/conversations/${conversationId}/resolve`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(data.message || 'Conversation marked as resolved');
+        await fetchConversations();
+        if (selectedConversation?.id === conversationId) {
+          fetchMessages(conversationId);
+        }
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to resolve conversation');
+      }
+    } catch (error) {
+      console.error('Error resolving conversation:', error);
+      alert('Failed to resolve conversation');
+    }
+  };
+
+  // Reopen a resolved conversation
+  const handleReopen = async (conversationId: string) => {
+    try {
+      const response = await fetch(`/api/messaging/conversations/${conversationId}/resolve`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        await fetchConversations();
+        if (selectedConversation?.id === conversationId) {
+          fetchMessages(conversationId);
+        }
+      }
+    } catch (error) {
+      console.error('Error reopening conversation:', error);
     }
   };
 
@@ -1050,7 +1100,11 @@ export default function MessagingSection() {
                           <Users className="w-5 h-5 text-white" />
                         )}
                       </div>
-                      {conversation.isAIHandled && (
+                      {conversation.isResolved ? (
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-[#111111]">
+                          <CheckCircle className="w-3 h-3 text-white" />
+                        </div>
+                      ) : conversation.isAIHandled && (
                         <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-cyan-500 rounded-full flex items-center justify-center border-2 border-[#111111]">
                           <Bot className="w-3 h-3 text-white" />
                         </div>
@@ -1142,7 +1196,12 @@ export default function MessagingSection() {
                           <Users className="w-3 h-3" /> Internal Chat
                         </span>
                       )}
-                      {selectedConversation.isAIHandled && (
+                      {selectedConversation.isResolved && (
+                        <span className="flex items-center gap-1 text-emerald-500">
+                          <CheckCircle className="w-3 h-3" /> Resolved
+                        </span>
+                      )}
+                      {selectedConversation.isAIHandled && !selectedConversation.isResolved && (
                         <span className="flex items-center gap-1 text-cyan-500">
                           <Bot className="w-3 h-3" /> AI Handling
                         </span>
@@ -1177,6 +1236,25 @@ export default function MessagingSection() {
                       <ArrowLeftRight className="w-4 h-4" />
                       Transfer
                     </button>
+                  )}
+                  {selectedConversation.type === 'user-to-support' && !selectedConversation.isAIHandled && (
+                    selectedConversation.isResolved ? (
+                      <button
+                        onClick={() => handleReopen(selectedConversation.id)}
+                        className="px-3 py-1.5 bg-violet-500/20 text-violet-400 text-sm rounded-lg hover:bg-violet-500/30 transition-colors flex items-center gap-2"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Reopen
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleResolve(selectedConversation.id)}
+                        className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-sm rounded-lg hover:bg-emerald-500/30 transition-colors flex items-center gap-2"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        Mark Resolved
+                      </button>
+                    )
                   )}
                   <button className="p-2 hover:bg-[#1E1E1E] rounded-lg transition-colors">
                     <MoreVertical className="w-5 h-5 text-[#6b7280]" />
