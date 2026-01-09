@@ -63,6 +63,13 @@ export async function GET(
         unreadCount: 0, // We just marked as read
         isAIHandled: conversation.isAIHandled,
         assignedEmployeeName: conversation.assignedEmployeeName,
+        // Include archived/resolved fields
+        isArchived: (conversation as any).isArchived || false,
+        isResolved: (conversation as any).isResolved || false,
+        archivedAt: (conversation as any).archivedAt,
+        resolvedAt: (conversation as any).resolvedAt,
+        resolvedByName: (conversation as any).resolvedByName,
+        ticketNumber: (conversation as any).ticketNumber,
         metadata: conversation.metadata,
         createdAt: conversation.createdAt,
         lastActivityAt: conversation.lastActivityAt,

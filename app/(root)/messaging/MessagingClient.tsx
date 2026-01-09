@@ -521,21 +521,27 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       const response = await fetch(`/api/messaging/conversations/${ticketId}`);
       if (response.ok) {
         const data = await response.json();
-        // Find the ticket in our list to get metadata
+        // Find the ticket in our list to get any local metadata (fallback)
         const ticket = supportTickets.find(t => t.id === ticketId);
+        
+        // Prefer API data, fallback to local ticket data
         setSelectedConversation({
           ...data.conversation,
-          ticketNumber: ticket?.ticketNumber,
-          isArchived: ticket?.isArchived,
-          archivedAt: ticket?.archivedAt,
-          resolvedByName: ticket?.resolvedByName,
+          ticketNumber: data.conversation.ticketNumber || ticket?.ticketNumber,
+          isArchived: data.conversation.isArchived || data.conversation.isResolved || ticket?.isArchived,
+          archivedAt: data.conversation.archivedAt || ticket?.archivedAt,
+          resolvedByName: data.conversation.resolvedByName || ticket?.resolvedByName,
         });
         setMessages(data.messages || []);
         setShowMobileChat(true);
         setTimeout(() => scrollToBottom(), 100);
+      } else {
+        console.error('Failed to load conversation:', response.status);
+        alert('Could not load conversation. Please try again.');
       }
     } catch (error) {
       console.error('Error viewing ticket:', error);
+      alert('Error loading conversation');
     }
   };
 

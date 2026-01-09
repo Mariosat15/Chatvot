@@ -105,15 +105,22 @@ export class MessagingService {
   
   static async getConversationById(
     conversationId: string,
-    participantId: string
+    participantId: string,
+    includeArchived: boolean = true // Allow viewing archived by default
   ): Promise<IConversation | null> {
     await connectToDatabase();
     
-    return Conversation.findOne({
+    const query: any = {
       _id: new Types.ObjectId(conversationId),
       'participants.id': participantId,
-      status: { $ne: 'closed' },
-    });
+    };
+    
+    // Only filter closed status if not including archived
+    if (!includeArchived) {
+      query.status = { $nin: ['closed', 'archived'] };
+    }
+    
+    return Conversation.findOne(query);
   }
   
   static async findOrCreateDirectConversation(
