@@ -133,6 +133,8 @@ export async function POST(request: NextRequest) {
 
     // Handle AI response if conversation is AI-handled
     let aiResponse = null;
+    console.log(`🤖 [Support POST] Checking AI handling... isAIHandled: ${conversation.isAIHandled}`);
+    
     if (conversation.isAIHandled) {
       console.log(`🤖 [Support POST] AI is handling, generating response...`);
       try {
@@ -143,12 +145,17 @@ export async function POST(request: NextRequest) {
           content
         );
         
+        console.log(`🤖 [Support POST] AI response result: ${aiResponse ? 'Generated' : 'NULL'}`);
+        
         if (aiResponse) {
           wsNotifier.notifyNewMessage(conversation._id.toString(), aiResponse);
+          console.log(`🤖 [Support POST] AI response sent via WebSocket`);
         }
       } catch (aiError) {
-        console.error('Error generating AI response:', aiError);
+        console.error('🤖 [Support POST] Error generating AI response:', aiError);
       }
+    } else {
+      console.log(`🤖 [Support POST] AI NOT handling this conversation`);
     }
 
     return NextResponse.json({
@@ -197,19 +204,28 @@ async function handleAIResponse(
   userName: string,
   userMessage: string
 ) {
+  console.log(`🤖 [AI] Starting AI response for conv: ${conversationId}`);
+  console.log(`🤖 [AI] User message: "${userMessage}"`);
+  
   const { connectToDatabase } = await import('@/database/mongoose');
   const mongoose = await import('mongoose');
   
   await connectToDatabase();
   
   const db = mongoose.default.connection.db;
-  if (!db) return null;
+  if (!db) {
+    console.log(`🤖 [AI] ERROR: Database not connected`);
+    return null;
+  }
   
   // Get messaging settings
   const settingsDoc = await db.collection('messaging_settings').findOne({});
   const settings = settingsDoc || {};
   
+  console.log(`🤖 [AI] Settings enableAISupport: ${settings.enableAISupport}`);
+  
   if (!settings.enableAISupport) {
+    console.log(`🤖 [AI] AI Support disabled in settings`);
     return null;
   }
   
@@ -243,8 +259,10 @@ async function handleAIResponse(
   // Generate AI response using OpenAI
   try {
     const openaiApiKey = process.env.OPENAI_API_KEY;
+    console.log(`🤖 [AI] OpenAI API key configured: ${openaiApiKey ? 'YES' : 'NO'}`);
+    
     if (!openaiApiKey) {
-      console.error('OpenAI API key not configured');
+      console.error('🤖 [AI] ERROR: OpenAI API key not configured');
       return null;
     }
     
@@ -283,14 +301,20 @@ suggest connecting them with a human agent. Keep responses concise but informati
     });
     
     if (!response.ok) {
-      console.error('OpenAI API error:', response.status);
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error(`🤖 [AI] OpenAI API error: ${response.status}`, errorText);
       return null;
     }
     
     const data = await response.json();
     const aiContent = data.choices?.[0]?.message?.content;
     
-    if (!aiContent) return null;
+    console.log(`🤖 [AI] OpenAI response received, content length: ${aiContent?.length || 0}`);
+    
+    if (!aiContent) {
+      console.log(`🤖 [AI] ERROR: No content in OpenAI response`);
+      return null;
+    }
     
     // Save AI message
     const aiMessage = {
