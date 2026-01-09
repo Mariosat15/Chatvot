@@ -18,6 +18,7 @@ import {
   Plus,
   X,
   Info,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -35,6 +36,10 @@ interface MessagingSettings {
   autoAssignToRoleIfUnassigned: string[];
   roundRobinEnabled: boolean;
   maxConcurrentChatsPerEmployee: number;
+
+  // Chat Transfer
+  allowChatTransfer: boolean;
+  requireReasonForTransfer: boolean;
 
   // Notifications
   notifyEmployeeOnNewMessage: boolean;
@@ -91,6 +96,8 @@ const defaultSettings: MessagingSettings = {
   autoAssignToRoleIfUnassigned: ['Backoffice', 'Support'],
   roundRobinEnabled: true,
   maxConcurrentChatsPerEmployee: 10,
+  allowChatTransfer: true,
+  requireReasonForTransfer: false,
   notifyEmployeeOnNewMessage: true,
   notifyEmployeeOnTransfer: true,
   notifyUserOnEmployeeReply: true,
@@ -494,6 +501,58 @@ export default function MessagingSettingsSection() {
                   onChange={(e) => updateSetting('maxConcurrentChatsPerEmployee', parseInt(e.target.value) || 10)}
                   className="w-32 bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500/50"
                 />
+              </div>
+
+              {/* Chat Transfer Settings */}
+              <div className="pt-6 mt-6 border-t border-[#2A2A2A]">
+                <div className="flex items-center gap-3 pb-4">
+                  <ArrowLeftRight className="w-5 h-5 text-cyan-500" />
+                  <h4 className="text-md font-semibold text-white">Chat Transfer Settings</h4>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg">
+                    <div>
+                      <p className="text-white font-medium">Allow Chat Transfers</p>
+                      <p className="text-sm text-[#6b7280]">
+                        Allow employees to transfer chats to other employees
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => toggleSetting('allowChatTransfer')}
+                      className={`w-12 h-6 rounded-full transition-colors relative ${
+                        settings.allowChatTransfer ? 'bg-emerald-500' : 'bg-[#2A2A2A]'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                          settings.allowChatTransfer ? 'left-7' : 'left-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg">
+                    <div>
+                      <p className="text-white font-medium">Require Reason for Transfer</p>
+                      <p className="text-sm text-[#6b7280]">
+                        Employees must provide a reason when transferring chats
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => toggleSetting('requireReasonForTransfer')}
+                      className={`w-12 h-6 rounded-full transition-colors relative ${
+                        settings.requireReasonForTransfer ? 'bg-emerald-500' : 'bg-[#2A2A2A]'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                          settings.requireReasonForTransfer ? 'left-7' : 'left-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

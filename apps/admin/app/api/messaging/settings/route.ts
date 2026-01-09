@@ -26,6 +26,10 @@ const MessagingSettingsSchema = new mongoose.Schema({
   roundRobinEnabled: { type: Boolean, default: true },
   maxConcurrentChatsPerEmployee: { type: Number, default: 10 },
   
+  // Chat Transfer
+  allowChatTransfer: { type: Boolean, default: true }, // Allow employees to transfer chats to other employees
+  requireReasonForTransfer: { type: Boolean, default: false }, // Require a reason when transferring
+  
   // Notifications
   notifyEmployeeOnNewMessage: { type: Boolean, default: true },
   notifyEmployeeOnTransfer: { type: Boolean, default: true },

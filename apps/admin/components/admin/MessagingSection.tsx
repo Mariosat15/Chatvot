@@ -136,6 +136,12 @@ interface Conversation {
   originalEmployeeId?: string;
   originalEmployeeName?: string;
   temporarilyRedirected?: boolean;
+  // Chat transfer fields
+  isChatTransferred?: boolean;
+  chatTransferredTo?: string;
+  chatTransferredToName?: string;
+  chatTransferredFrom?: string;
+  chatTransferredFromName?: string;
   metadata?: any;
   createdAt: string;
   lastActivityAt: string;
@@ -559,9 +565,50 @@ export default function MessagingSection() {
         setSelectedEmployeeForTransfer('');
         fetchConversations();
         fetchMessages(selectedConversation.id);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to transfer chat');
       }
     } catch (error) {
       console.error('Error transferring conversation:', error);
+      alert('Error transferring chat');
+    }
+  };
+
+  const handleTransferBack = async (conversationId: string) => {
+    const notes = prompt('Optional notes about resolution (leave empty to skip):');
+    
+    try {
+      const response = await fetch(`/api/messaging/conversations/${conversationId}/transfer-back`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: notes || undefined }),
+      });
+
+      if (response.ok) {
+        fetchConversations();
+        fetchMessages(conversationId);
+        // Update selected conversation to reflect transfer back
+        if (selectedConversation?.id === conversationId) {
+          const data = await response.json();
+          setSelectedConversation(prev => prev ? {
+            ...prev,
+            isChatTransferred: false,
+            chatTransferredTo: undefined,
+            chatTransferredToName: undefined,
+            chatTransferredFrom: undefined,
+            chatTransferredFromName: undefined,
+            assignedEmployeeId: data.conversation.assignedEmployeeId,
+            assignedEmployeeName: data.conversation.assignedEmployeeName,
+          } : null);
+        }
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to transfer back');
+      }
+    } catch (error) {
+      console.error('Error transferring back:', error);
+      alert('Error transferring chat back');
     }
   };
 
@@ -1294,38 +1341,101 @@ export default function MessagingSection() {
 
               {/* Message Input */}
               <div className="p-4 border-t border-white/5 bg-[#0d0d14]">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 relative">
-                    <input
-                      ref={messageInputRef}
-                      type="text"
-                      placeholder="Type a message..."
-                      value={messageInput}
-                      onChange={(e) => {
-                        setMessageInput(e.target.value);
-                        if (selectedConversation && wsConnected) {
-                          wsSetTyping(selectedConversation.id, true);
-                          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-                          typingTimeoutRef.current = setTimeout(() => {
-                            if (selectedConversation) wsSetTyping(selectedConversation.id, false);
-                          }, 2000);
-                        }
-                      }}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                {/* Check if chat is transferred and current user is the original employee (cannot send) */}
+                {selectedConversation.isChatTransferred && selectedConversation.chatTransferredFrom === currentAdminId ? (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">
+                    <p className="text-amber-400 text-sm">
+                      <AlertCircle className="w-4 h-4 inline mr-2" />
+                      This chat is being handled by <span className="font-semibold">{selectedConversation.chatTransferredToName}</span>
+                    </p>
+                    <p className="text-amber-400/70 text-xs mt-1">
+                      You will be notified when the chat is transferred back to you
+                    </p>
+                  </div>
+                ) : selectedConversation.isChatTransferred && selectedConversation.chatTransferredTo === currentAdminId ? (
+                  // Current user received the transfer - show input + transfer back button
+                  <div className="space-y-3">
+                    <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl px-4 py-2 flex items-center justify-between">
+                      <p className="text-cyan-400 text-sm">
+                        <RefreshCw className="w-4 h-4 inline mr-2" />
+                        Chat transferred from <span className="font-semibold">{selectedConversation.chatTransferredFromName}</span>
+                      </p>
+                      <button
+                        onClick={() => handleTransferBack(selectedConversation.id)}
+                        className="px-3 py-1 bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-sm rounded-lg hover:bg-cyan-500/30 transition-colors flex items-center gap-1"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Transfer Back
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 relative">
+                        <input
+                          ref={messageInputRef}
+                          type="text"
+                          placeholder="Type a message..."
+                          value={messageInput}
+                          onChange={(e) => {
+                            setMessageInput(e.target.value);
+                            if (selectedConversation && wsConnected) {
+                              wsSetTyping(selectedConversation.id, true);
+                              if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                              typingTimeoutRef.current = setTimeout(() => {
+                                if (selectedConversation) wsSetTyping(selectedConversation.id, false);
+                              }, 2000);
+                            }
+                          }}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleSendMessage}
+                        disabled={!messageInput.trim() || isSending}
+                        className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-cyan-600 rounded-xl text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
+                      >
+                        {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={!messageInput.trim() || isSending}
-                    className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-cyan-600 rounded-xl text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
-                  >
-                    {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                  </button>
-                </div>
+                ) : (
+                  // Normal input
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 relative">
+                      <input
+                        ref={messageInputRef}
+                        type="text"
+                        placeholder="Type a message..."
+                        value={messageInput}
+                        onChange={(e) => {
+                          setMessageInput(e.target.value);
+                          if (selectedConversation && wsConnected) {
+                            wsSetTyping(selectedConversation.id, true);
+                            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                            typingTimeoutRef.current = setTimeout(() => {
+                              if (selectedConversation) wsSetTyping(selectedConversation.id, false);
+                            }, 2000);
+                          }
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!messageInput.trim() || isSending}
+                      className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-cyan-600 rounded-xl text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
+                    >
+                      {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           ) : (

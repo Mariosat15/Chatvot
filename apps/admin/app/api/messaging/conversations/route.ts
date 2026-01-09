@@ -157,6 +157,12 @@ export async function GET(request: NextRequest) {
         assignedEmployeeName: conv.assignedEmployeeName,
         originalEmployeeId: conv.originalEmployeeId?.toString(),
         originalEmployeeName: conv.originalEmployeeName,
+        // Chat transfer fields
+        isChatTransferred: conv.isChatTransferred || false,
+        chatTransferredTo: conv.chatTransferredTo?.toString(),
+        chatTransferredToName: conv.chatTransferredToName,
+        chatTransferredFrom: conv.chatTransferredFrom?.toString(),
+        chatTransferredFromName: conv.chatTransferredFromName,
         temporarilyRedirected: conv.temporarilyRedirected || false,
         redirectedAt: conv.redirectedAt,
         metadata: conv.metadata,

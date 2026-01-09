@@ -2445,3 +2445,264 @@ export default function UserFullDetailPanel({
   );
 }
 
+// ========================================
+// User Conversations Tab Component
+// ========================================
+
+interface ConversationData {
+  id: string;
+  type: string;
+  status: string;
+  isResolved: boolean;
+  resolvedAt?: string;
+  resolvedByName?: string;
+  isAIHandled: boolean;
+  assignedEmployeeName?: string;
+  messageCount: number;
+  transfers: Array<{
+    fromEmployeeName: string;
+    toEmployeeName: string;
+    reason?: string;
+    transferredAt: string;
+  }>;
+  employeeParticipants: Array<{
+    id: string;
+    name: string;
+    joinedAt: string;
+    leftAt?: string;
+    isActive: boolean;
+  }>;
+  lastMessage?: {
+    content: string;
+    senderName: string;
+    timestamp: string;
+  };
+  createdAt: string;
+  lastActivityAt: string;
+}
+
+interface ConversationStats {
+  total: number;
+  resolved: number;
+  active: number;
+  withTransfers: number;
+}
+
+function UserConversationsTab({ userId, userName }: { userId: string; userName: string }) {
+  const [conversations, setConversations] = useState<ConversationData[]>([]);
+  const [stats, setStats] = useState<ConversationStats>({ total: 0, resolved: 0, active: 0, withTransfers: 0 });
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'resolved'>('all');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+
+  const fetchConversations = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/users/${userId}/conversations?status=${statusFilter}&page=${page}&limit=10`);
+      if (response.ok) {
+        const data = await response.json();
+        setConversations(data.conversations || []);
+        setStats(data.stats || { total: 0, resolved: 0, active: 0, withTransfers: 0 });
+        setHasMore(data.hasMore || false);
+      }
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, statusFilter, page]);
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card className="bg-gray-800/50 border-gray-700">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-white">{stats.total}</div>
+            <div className="text-sm text-gray-400">Total Conversations</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gray-800/50 border-gray-700">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-emerald-400">{stats.resolved}</div>
+            <div className="text-sm text-gray-400">Resolved</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gray-800/50 border-gray-700">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-cyan-400">{stats.active}</div>
+            <div className="text-sm text-gray-400">Active</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gray-800/50 border-gray-700">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-amber-400">{stats.withTransfers}</div>
+            <div className="text-sm text-gray-400">With Transfers</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-4">
+        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as any); setPage(1); }}>
+          <SelectTrigger className="w-40 bg-gray-800 border-gray-700 text-white">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="resolved">Resolved</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" onClick={fetchConversations} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Conversations List */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <RefreshCw className="h-8 w-8 animate-spin text-cyan-400" />
+        </div>
+      ) : conversations.length === 0 ? (
+        <Card className="bg-gray-800/50 border-gray-700">
+          <CardContent className="p-8 text-center">
+            <MessageSquare className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-400">No conversations found</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {conversations.map((conv) => (
+            <Card key={conv.id} className="bg-gray-800/50 border-gray-700 hover:border-gray-600 transition-colors">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      conv.isResolved ? 'bg-emerald-500/20 text-emerald-400' :
+                      conv.isAIHandled ? 'bg-purple-500/20 text-purple-400' :
+                      'bg-cyan-500/20 text-cyan-400'
+                    }`}>
+                      {conv.isResolved ? <CheckCircle className="w-5 h-5" /> :
+                       conv.isAIHandled ? <Activity className="w-5 h-5" /> :
+                       <MessageSquare className="w-5 h-5" />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-white">
+                          {conv.type === 'user-to-support' ? 'Support Conversation' : 'Direct Message'}
+                        </span>
+                        {conv.isResolved && (
+                          <Badge className="bg-emerald-500/20 text-emerald-400 text-xs">Resolved</Badge>
+                        )}
+                        {conv.isAIHandled && !conv.isResolved && (
+                          <Badge className="bg-purple-500/20 text-purple-400 text-xs">AI Handling</Badge>
+                        )}
+                        {conv.transfers.length > 0 && (
+                          <Badge className="bg-amber-500/20 text-amber-400 text-xs">
+                            {conv.transfers.length} Transfer{conv.transfers.length > 1 ? 's' : ''}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-400 mt-1">
+                        {conv.messageCount} messages · Started {formatDate(conv.createdAt)}
+                      </p>
+                      {conv.assignedEmployeeName && (
+                        <p className="text-sm text-cyan-400 mt-1">
+                          <User className="w-3 h-3 inline mr-1" />
+                          Handled by {conv.assignedEmployeeName}
+                        </p>
+                      )}
+                      {conv.lastMessage && (
+                        <p className="text-sm text-gray-500 mt-2 italic truncate max-w-md">
+                          "{conv.lastMessage.content}"
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right text-xs text-gray-500">
+                    <div>Last activity</div>
+                    <div className="text-gray-400">{formatDate(conv.lastActivityAt)}</div>
+                  </div>
+                </div>
+
+                {/* Transfer History */}
+                {conv.transfers.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-700">
+                    <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                      <ArrowUpDown className="w-3 h-3" /> Transfer History
+                    </p>
+                    <div className="space-y-2">
+                      {conv.transfers.map((transfer, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm">
+                          <span className="text-gray-400">{transfer.fromEmployeeName}</span>
+                          <ArrowUpDown className="w-3 h-3 text-amber-400" />
+                          <span className="text-cyan-400">{transfer.toEmployeeName}</span>
+                          {transfer.reason && (
+                            <span className="text-gray-500">({transfer.reason})</span>
+                          )}
+                          <span className="text-gray-600 text-xs ml-auto">
+                            {formatDate(transfer.transferredAt)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Resolution Info */}
+                {conv.isResolved && conv.resolvedByName && (
+                  <div className="mt-4 pt-4 border-t border-gray-700">
+                    <p className="text-sm text-emerald-400">
+                      <CheckCircle className="w-3 h-3 inline mr-1" />
+                      Resolved by {conv.resolvedByName}
+                      {conv.resolvedAt && ` on ${formatDate(conv.resolvedAt)}`}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Pagination */}
+          <div className="flex items-center justify-center gap-2 pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-gray-400">Page {page}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => p + 1)}
+              disabled={!hasMore}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

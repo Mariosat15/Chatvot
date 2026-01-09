@@ -1,17 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verify } from 'jsonwebtoken';
-import mongoose, { Types } from 'mongoose';
+import mongoose, { Types, ClientSession } from 'mongoose';
 import { connectToDatabase } from '@/database/mongoose';
+
+const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
+
+interface TransferResult {
+  success: boolean;
+  conversationId: string;
+  previousState?: any;
+  error?: string;
+}
 
 /**
  * POST /api/messaging/conversations/[conversationId]/transfer
- * Transfer conversation to another employee
+ * Transfer a conversation to another employee (chat-only transfer)
+ * 
+ * This is a TEMPORARY transfer - the chat is handled by another employee
+ * but the customer assignment remains the same.
+ * 
+ * The original employee sees "Handled by [employee]" and cannot reply
+ * until the chat is transferred back.
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
+  let session: ClientSession | null = null;
+  let previousState: any = null;
+
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get('admin_token')?.value;
@@ -20,33 +38,61 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const jwtSecret = process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production';
-    const decoded = verify(token, jwtSecret) as {
+    const decoded = verify(token, JWT_SECRET) as {
       adminId: string;
       email: string;
       name?: string;
       role: string;
+      isSuperAdmin?: boolean;
     };
 
     const { conversationId } = await params;
     const body = await request.json();
-    const { toEmployeeId, toEmployeeName, reason } = body;
+    const { toEmployeeId, toEmployeeName, reason, transferType = 'chat' } = body;
 
-    if (!toEmployeeId) {
+    // Validate required fields
+    if (!toEmployeeId || !toEmployeeName) {
       return NextResponse.json(
-        { error: 'Target employee ID is required' },
+        { error: 'Target employee ID and name are required' },
+        { status: 400 }
+      );
+    }
+
+    // Cannot transfer to self
+    if (toEmployeeId === decoded.adminId) {
+      return NextResponse.json(
+        { error: 'Cannot transfer to yourself' },
         { status: 400 }
       );
     }
 
     await connectToDatabase();
 
-    const Conversation = mongoose.models.Conversation || 
-      mongoose.model('Conversation', new mongoose.Schema({}, { strict: false, collection: 'conversations' }));
-    const Message = mongoose.models.Message || 
-      mongoose.model('Message', new mongoose.Schema({}, { strict: false, collection: 'messages' }));
+    const db = mongoose.connection.db;
+    if (!db) {
+      return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
+    }
 
-    const conversation = await Conversation.findById(conversationId);
+    // Check if chat transfers are enabled (unless super admin)
+    if (!decoded.isSuperAdmin) {
+      const settings = await db.collection('messaging_settings').findOne({});
+      if (settings?.allowChatTransfer === false) {
+        return NextResponse.json(
+          { error: 'Chat transfers are currently disabled by administrator' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Validate conversation exists
+    let convObjectId;
+    try {
+      convObjectId = new Types.ObjectId(conversationId);
+    } catch {
+      return NextResponse.json({ error: 'Invalid conversation ID' }, { status: 400 });
+    }
+
+    const conversation = await db.collection('conversations').findOne({ _id: convObjectId });
 
     if (!conversation) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
@@ -59,82 +105,153 @@ export async function POST(
       );
     }
 
-    const previousEmployeeId = conversation.assignedEmployeeId?.toString();
-    const previousEmployeeName = conversation.assignedEmployeeName;
+    // Verify target employee exists
+    const targetEmployee = await db.collection('admins').findOne({
+      _id: new Types.ObjectId(toEmployeeId),
+    });
 
-    // Store original employee if first transfer
-    if (!conversation.originalEmployeeId && conversation.assignedEmployeeId) {
-      conversation.originalEmployeeId = conversation.assignedEmployeeId;
+    if (!targetEmployee) {
+      return NextResponse.json({ error: 'Target employee not found' }, { status: 404 });
     }
 
-    // Update assignment
-    conversation.assignedEmployeeId = new Types.ObjectId(toEmployeeId);
-    conversation.assignedEmployeeName = toEmployeeName;
-    conversation.isAIHandled = false;
+    // Store previous state for potential rollback
+    previousState = {
+      assignedEmployeeId: conversation.assignedEmployeeId?.toString(),
+      assignedEmployeeName: conversation.assignedEmployeeName,
+      chatTransferredTo: conversation.chatTransferredTo,
+      chatTransferredToName: conversation.chatTransferredToName,
+      chatTransferredFrom: conversation.chatTransferredFrom,
+      chatTransferredFromName: conversation.chatTransferredFromName,
+      isChatTransferred: conversation.isChatTransferred,
+      participants: conversation.participants,
+    };
 
-    // Update participants
-    if (previousEmployeeId) {
-      const oldParticipant = conversation.participants?.find(
-        (p: any) => p.id === previousEmployeeId && p.type === 'employee'
+    console.log(`🔄 [Transfer] Starting chat transfer: ${conversationId}`);
+    console.log(`   From: ${decoded.email} (${decoded.adminId})`);
+    console.log(`   To: ${toEmployeeName} (${toEmployeeId})`);
+
+    // Start MongoDB session for atomic operations
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Determine the original handler
+      const originalEmployeeId = conversation.chatTransferredFrom || conversation.assignedEmployeeId?.toString() || decoded.adminId;
+      const originalEmployeeName = conversation.chatTransferredFromName || conversation.assignedEmployeeName || decoded.name || decoded.email;
+
+      // Update conversation with transfer info
+      const updateResult = await db.collection('conversations').updateOne(
+        { _id: convObjectId },
+        {
+          $set: {
+            // Mark as transferred
+            isChatTransferred: true,
+            chatTransferredTo: toEmployeeId,
+            chatTransferredToName: toEmployeeName,
+            // Store original handler for transfer-back
+            chatTransferredFrom: originalEmployeeId,
+            chatTransferredFromName: originalEmployeeName,
+            // Update assigned employee (for visibility)
+            assignedEmployeeId: new Types.ObjectId(toEmployeeId),
+            assignedEmployeeName: toEmployeeName,
+            isAIHandled: false,
+            lastActivityAt: new Date(),
+            updatedAt: new Date(),
+          },
+          $push: {
+            'metadata.transferHistory': {
+              type: transferType,
+              fromEmployeeId: decoded.adminId,
+              fromEmployeeName: decoded.name || decoded.email,
+              toEmployeeId,
+              toEmployeeName,
+              reason: reason || 'Chat transfer',
+              transferredAt: new Date(),
+            },
+          },
+        },
+        { session }
       );
-      if (oldParticipant) {
-        oldParticipant.isActive = false;
-        oldParticipant.leftAt = new Date();
+
+      if (updateResult.modifiedCount === 0) {
+        throw new Error('Failed to update conversation');
       }
-    }
 
-    const existingParticipant = conversation.participants?.find((p: any) => p.id === toEmployeeId);
-    if (existingParticipant) {
-      existingParticipant.isActive = true;
-      existingParticipant.leftAt = undefined;
-    } else {
-      conversation.participants = conversation.participants || [];
-      conversation.participants.push({
-        id: toEmployeeId,
-        type: 'employee',
-        name: toEmployeeName,
-        joinedAt: new Date(),
-        isActive: true,
-      });
-    }
+      // Update participants - add new employee, mark old as inactive
+      await db.collection('conversations').updateOne(
+        { 
+          _id: convObjectId,
+          'participants.id': decoded.adminId,
+          'participants.type': 'employee',
+        },
+        {
+          $set: {
+            'participants.$.isActive': false,
+            'participants.$.leftAt': new Date(),
+          },
+        },
+        { session }
+      );
 
-    // Add to transfer history
-    if (!conversation.metadata) conversation.metadata = {};
-    if (!conversation.metadata.transferHistory) conversation.metadata.transferHistory = [];
+      // Add new employee as participant if not already
+      const hasNewEmployee = conversation.participants?.some((p: any) => p.id === toEmployeeId);
+      if (!hasNewEmployee) {
+        await db.collection('conversations').updateOne(
+          { _id: convObjectId },
+          {
+            $push: {
+              participants: {
+                id: toEmployeeId,
+                type: 'employee',
+                name: toEmployeeName,
+                joinedAt: new Date(),
+                isActive: true,
+              },
+            },
+          },
+          { session }
+        );
+      } else {
+        // Reactivate existing participant
+        await db.collection('conversations').updateOne(
+          { 
+            _id: convObjectId,
+            'participants.id': toEmployeeId,
+          },
+          {
+            $set: {
+              'participants.$.isActive': true,
+              'participants.$.leftAt': null,
+            },
+          },
+          { session }
+        );
+      }
 
-    conversation.metadata.transferHistory.push({
-      fromEmployeeId: previousEmployeeId || decoded.adminId,
-      fromEmployeeName: previousEmployeeName || decoded.name || decoded.email,
-      toEmployeeId,
-      toEmployeeName,
-      reason,
-      transferredAt: new Date(),
-    });
+      // Create system message
+      const systemMessage = {
+        conversationId: convObjectId,
+        senderId: 'system',
+        senderType: 'system',
+        senderName: 'System',
+        content: `💬 Chat transferred from ${decoded.name || decoded.email} to ${toEmployeeName}${reason ? ` - ${reason}` : ''}`,
+        messageType: 'system',
+        status: 'sent',
+        readBy: [],
+        deliveredTo: [],
+        isDeleted: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
 
-    conversation.lastActivityAt = new Date();
-    await conversation.save();
+      await db.collection('messages').insertOne(systemMessage, { session });
 
-    // Create system message
-    await Message.create({
-      conversationId: new Types.ObjectId(conversationId),
-      senderId: 'system',
-      senderType: 'system',
-      senderName: 'System',
-      content: `Conversation transferred to ${toEmployeeName}${reason ? ` - Reason: ${reason}` : ''}`,
-      messageType: 'system',
-      status: 'sent',
-      readBy: [],
-      deliveredTo: [],
-    });
-
-    // Log to customer audit trail
-    const db = mongoose.connection.db;
-    if (db) {
+      // Log to audit trail
       const userParticipant = conversation.participants?.find((p: any) => p.type === 'user');
       if (userParticipant?.id) {
         await db.collection('customer_audit_trails').insertOne({
           customerId: userParticipant.id,
-          action: 'conversation_transferred',
+          action: 'chat_transferred',
           category: 'messaging',
           performedBy: {
             id: decoded.adminId,
@@ -144,55 +261,127 @@ export async function POST(
           },
           details: {
             conversationId,
-            fromEmployeeId: previousEmployeeId,
-            fromEmployeeName: previousEmployeeName,
+            transferType,
+            fromEmployeeId: decoded.adminId,
+            fromEmployeeName: decoded.name || decoded.email,
             toEmployeeId,
             toEmployeeName,
             reason,
+            originalEmployeeId,
+            originalEmployeeName,
           },
           timestamp: new Date(),
           createdAt: new Date(),
+        }, { session });
+      }
+
+      // Create notification for receiving employee
+      await db.collection('employee_notifications').insertOne({
+        employeeId: toEmployeeId,
+        type: 'chat_transfer_received',
+        title: 'New Chat Transferred',
+        message: `${decoded.name || decoded.email} transferred a chat to you${reason ? `: ${reason}` : ''}`,
+        data: {
+          conversationId,
+          fromEmployeeId: decoded.adminId,
+          fromEmployeeName: decoded.name || decoded.email,
+          customerName: userParticipant?.name || 'Customer',
+        },
+        isRead: false,
+        createdAt: new Date(),
+      }, { session });
+
+      // Commit transaction
+      await session.commitTransaction();
+      console.log(`✅ [Transfer] Chat transfer successful: ${conversationId}`);
+
+      // Notify via WebSocket (outside transaction)
+      try {
+        const wsInternalUrl = process.env.WS_INTERNAL_URL || 'http://localhost:3003';
+        
+        // Notify both employees and customer
+        await fetch(`${wsInternalUrl}/internal/broadcast`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'chat_transferred',
+            conversationId,
+            data: {
+              isChatTransferred: true,
+              chatTransferredTo: toEmployeeId,
+              chatTransferredToName: toEmployeeName,
+              chatTransferredFrom: originalEmployeeId,
+              chatTransferredFromName: originalEmployeeName,
+              assignedEmployeeId: toEmployeeId,
+              assignedEmployeeName: toEmployeeName,
+            },
+          }),
         });
+
+        // Send system message via WebSocket
+        await fetch(`${wsInternalUrl}/internal/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId,
+            message: {
+              id: systemMessage._id?.toString() || 'transfer-' + Date.now(),
+              ...systemMessage,
+              createdAt: systemMessage.createdAt.toISOString(),
+            },
+          }),
+        });
+      } catch (wsError) {
+        console.warn('⚠️ [Transfer] WebSocket notification failed:', wsError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Chat transferred to ${toEmployeeName}`,
+        conversation: {
+          id: conversationId,
+          isChatTransferred: true,
+          assignedEmployeeId: toEmployeeId,
+          assignedEmployeeName: toEmployeeName,
+          chatTransferredFrom: originalEmployeeId,
+          chatTransferredFromName: originalEmployeeName,
+        },
+      });
+
+    } catch (transactionError) {
+      // Rollback transaction
+      console.error('❌ [Transfer] Transaction error, rolling back:', transactionError);
+      await session.abortTransaction();
+      throw transactionError;
+    }
+
+  } catch (error) {
+    console.error('❌ [Transfer] Error:', error);
+    
+    // If we have previous state and session was aborted, attempt manual rollback
+    if (previousState && session?.transaction?.isActive === false) {
+      try {
+        const db = mongoose.connection.db;
+        if (db) {
+          const { conversationId } = await params;
+          await db.collection('conversations').updateOne(
+            { _id: new Types.ObjectId(conversationId) },
+            { $set: previousState }
+          );
+          console.log('🔙 [Transfer] Manual rollback completed');
+        }
+      } catch (rollbackError) {
+        console.error('❌ [Transfer] Rollback failed:', rollbackError);
       }
     }
 
-    // Notify via WebSocket
-    try {
-      const wsInternalUrl = process.env.WS_INTERNAL_URL || 'http://localhost:3003';
-      await fetch(`${wsInternalUrl}/internal/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId,
-          message: {
-            id: 'transfer-' + Date.now(),
-            senderId: 'system',
-            senderType: 'system',
-            senderName: 'System',
-            content: `Conversation transferred to ${toEmployeeName}`,
-            messageType: 'system',
-            createdAt: new Date().toISOString(),
-          },
-        }),
-      });
-    } catch (wsError) {
-      console.warn('WebSocket notification failed:', wsError);
-    }
-
-    return NextResponse.json({
-      success: true,
-      conversation: {
-        id: conversation._id.toString(),
-        assignedEmployeeId: toEmployeeId,
-        assignedEmployeeName: toEmployeeName,
-      },
-    });
-  } catch (error) {
-    console.error('Error transferring conversation:', error);
     return NextResponse.json(
-      { error: 'Failed to transfer conversation' },
+      { error: error instanceof Error ? error.message : 'Failed to transfer conversation' },
       { status: 500 }
     );
+  } finally {
+    if (session) {
+      await session.endSession();
+    }
   }
 }
-

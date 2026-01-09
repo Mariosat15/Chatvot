@@ -870,11 +870,17 @@ class CustomerAssignmentService {
     console.log(`💬 [TransferChats] Found ${conversations.length} conversations for customer ${customerId}`);
     
     for (const conv of conversations) {
-      // Update assignment
+      // Update assignment - this is a FULL transfer, not a temporary chat transfer
       const updateData: any = {
         assignedEmployeeId: new mongoose.Types.ObjectId(toEmployeeId),
         assignedEmployeeName: toEmployeeName,
         isAIHandled: false, // Disable AI when has assigned employee
+        // Clear any temporary chat transfer state - full transfer takes precedence
+        isChatTransferred: false,
+        chatTransferredTo: null,
+        chatTransferredToName: null,
+        chatTransferredFrom: null,
+        chatTransferredFromName: null,
         lastActivityAt: new Date(),
         updatedAt: new Date(),
       };
