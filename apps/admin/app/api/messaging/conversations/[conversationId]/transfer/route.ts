@@ -48,7 +48,7 @@ export async function POST(
 
     const { conversationId } = await params;
     const body = await request.json();
-    const { toEmployeeId, toEmployeeName, reason, transferType = 'chat' } = body;
+    const { toEmployeeId, toEmployeeName, reason, transferType = 'chat', transferAllConversations = false } = body;
 
     // Validate required fields
     if (!toEmployeeId || !toEmployeeName) {
@@ -126,9 +126,27 @@ export async function POST(
       participants: conversation.participants,
     };
 
-    console.log(`🔄 [Transfer] Starting chat transfer: ${conversationId}`);
+    console.log(`🔄 [Transfer] Starting ${transferAllConversations ? 'ALL conversations' : 'chat'} transfer: ${conversationId}`);
     console.log(`   From: ${decoded.email} (${decoded.adminId})`);
     console.log(`   To: ${toEmployeeName} (${toEmployeeId})`);
+    console.log(`   Transfer All: ${transferAllConversations}`);
+
+    // Get customer info from this conversation
+    const userParticipant = conversation.participants?.find((p: any) => p.type === 'user');
+    const customerId = userParticipant?.id;
+    const customerName = userParticipant?.name || 'Customer';
+
+    // If transferring all conversations, find them all
+    let conversationsToTransfer = [convObjectId];
+    if (transferAllConversations && customerId) {
+      const allConversations = await db.collection('conversations').find({
+        type: 'user-to-support',
+        'participants.id': customerId,
+        'participants.type': 'user',
+      }).toArray();
+      conversationsToTransfer = allConversations.map(c => c._id);
+      console.log(`📋 [Transfer] Found ${conversationsToTransfer.length} conversations to transfer for customer ${customerName}`);
+    }
 
     // Start MongoDB session for atomic operations
     session = await mongoose.startSession();
@@ -139,119 +157,138 @@ export async function POST(
       const originalEmployeeId = conversation.chatTransferredFrom || conversation.assignedEmployeeId?.toString() || decoded.adminId;
       const originalEmployeeName = conversation.chatTransferredFromName || conversation.assignedEmployeeName || decoded.name || decoded.email;
 
-      // Update conversation with transfer info
-      const updateResult = await db.collection('conversations').updateOne(
-        { _id: convObjectId },
-        {
-          $set: {
-            // Mark as transferred
-            isChatTransferred: true,
-            chatTransferredTo: toEmployeeId,
-            chatTransferredToName: toEmployeeName,
-            // Store original handler for transfer-back
-            chatTransferredFrom: originalEmployeeId,
-            chatTransferredFromName: originalEmployeeName,
-            // Update assigned employee (for visibility)
-            assignedEmployeeId: new Types.ObjectId(toEmployeeId),
-            assignedEmployeeName: toEmployeeName,
-            isAIHandled: false,
-            lastActivityAt: new Date(),
-            updatedAt: new Date(),
-          },
-          $push: {
-            'metadata.transferHistory': {
-              type: transferType,
-              fromEmployeeId: decoded.adminId,
-              fromEmployeeName: decoded.name || decoded.email,
-              toEmployeeId,
-              toEmployeeName,
-              reason: reason || 'Chat transfer',
-              transferredAt: new Date(),
-            },
-          },
-        },
-        { session }
-      );
+      // Transfer each conversation
+      const transferredConversations: Types.ObjectId[] = [];
+      const systemMessages: any[] = [];
 
-      if (updateResult.modifiedCount === 0) {
-        throw new Error('Failed to update conversation');
-      }
+      for (const convId of conversationsToTransfer) {
+        const conv = convId.equals(convObjectId) ? conversation : await db.collection('conversations').findOne({ _id: convId }, { session });
+        if (!conv) continue;
 
-      // Update participants - add new employee, mark old as inactive
-      await db.collection('conversations').updateOne(
-        { 
-          _id: convObjectId,
-          'participants.id': decoded.adminId,
-          'participants.type': 'employee',
-        },
-        {
-          $set: {
-            'participants.$.isActive': false,
-            'participants.$.leftAt': new Date(),
-          },
-        },
-        { session }
-      );
+        const ticketNumber = conv.ticketNumber || 1;
 
-      // Add new employee as participant if not already
-      const hasNewEmployee = conversation.participants?.some((p: any) => p.id === toEmployeeId);
-      if (!hasNewEmployee) {
-        await db.collection('conversations').updateOne(
-          { _id: convObjectId },
+        // Update conversation with transfer info
+        const updateResult = await db.collection('conversations').updateOne(
+          { _id: convId },
           {
+            $set: {
+              // Mark as transferred
+              isChatTransferred: true,
+              chatTransferredTo: toEmployeeId,
+              chatTransferredToName: toEmployeeName,
+              // Store original handler for transfer-back
+              chatTransferredFrom: originalEmployeeId,
+              chatTransferredFromName: originalEmployeeName,
+              // Update assigned employee (for visibility)
+              assignedEmployeeId: new Types.ObjectId(toEmployeeId),
+              assignedEmployeeName: toEmployeeName,
+              isAIHandled: false,
+              lastActivityAt: new Date(),
+              updatedAt: new Date(),
+            },
             $push: {
-              participants: {
-                id: toEmployeeId,
-                type: 'employee',
-                name: toEmployeeName,
-                joinedAt: new Date(),
-                isActive: true,
+              'metadata.transferHistory': {
+                type: transferAllConversations ? 'bulk_transfer' : transferType,
+                fromEmployeeId: decoded.adminId,
+                fromEmployeeName: decoded.name || decoded.email,
+                toEmployeeId,
+                toEmployeeName,
+                reason: reason || (transferAllConversations ? 'All conversations transferred' : 'Chat transfer'),
+                transferredAt: new Date(),
               },
             },
           },
           { session }
         );
-      } else {
-        // Reactivate existing participant
+
+        if (updateResult.modifiedCount === 0) {
+          console.warn(`⚠️ [Transfer] Could not update conversation ${convId}`);
+          continue;
+        }
+
+        transferredConversations.push(convId);
+
+        // Update participants - mark old employee as inactive
         await db.collection('conversations').updateOne(
           { 
-            _id: convObjectId,
-            'participants.id': toEmployeeId,
+            _id: convId,
+            'participants.id': decoded.adminId,
+            'participants.type': 'employee',
           },
           {
             $set: {
-              'participants.$.isActive': true,
-              'participants.$.leftAt': null,
+              'participants.$.isActive': false,
+              'participants.$.leftAt': new Date(),
             },
           },
           { session }
         );
+
+        // Add new employee as participant if not already
+        const hasNewEmployee = conv.participants?.some((p: any) => p.id === toEmployeeId);
+        if (!hasNewEmployee) {
+          await db.collection('conversations').updateOne(
+            { _id: convId },
+            {
+              $push: {
+                participants: {
+                  id: toEmployeeId,
+                  type: 'employee',
+                  name: toEmployeeName,
+                  joinedAt: new Date(),
+                  isActive: true,
+                },
+              },
+            },
+            { session }
+          );
+        } else {
+          // Reactivate existing participant
+          await db.collection('conversations').updateOne(
+            { 
+              _id: convId,
+              'participants.id': toEmployeeId,
+            },
+            {
+              $set: {
+                'participants.$.isActive': true,
+                'participants.$.leftAt': null,
+              },
+            },
+            { session }
+          );
+        }
+
+        // Create system message for this conversation
+        const sysMsg = {
+          conversationId: convId,
+          senderId: 'system',
+          senderType: 'system',
+          senderName: 'System',
+          content: transferAllConversations 
+            ? `📋 Ticket #${ticketNumber} transferred to ${toEmployeeName} (bulk transfer)${reason ? ` - ${reason}` : ''}`
+            : `💬 Ticket #${ticketNumber} transferred from ${decoded.name || decoded.email} to ${toEmployeeName}${reason ? ` - ${reason}` : ''}`,
+          messageType: 'system',
+          status: 'sent',
+          readBy: [],
+          deliveredTo: [],
+          isDeleted: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        await db.collection('messages').insertOne(sysMsg, { session });
+        systemMessages.push(sysMsg);
       }
 
-      // Create system message
-      const systemMessage = {
-        conversationId: convObjectId,
-        senderId: 'system',
-        senderType: 'system',
-        senderName: 'System',
-        content: `💬 Chat transferred from ${decoded.name || decoded.email} to ${toEmployeeName}${reason ? ` - ${reason}` : ''}`,
-        messageType: 'system',
-        status: 'sent',
-        readBy: [],
-        deliveredTo: [],
-        isDeleted: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      await db.collection('messages').insertOne(systemMessage, { session });
+      // Use the first system message for the primary conversation
+      const systemMessage = systemMessages.find(m => m.conversationId.equals(convObjectId)) || systemMessages[0];
 
       // Log to audit trail
-      const userParticipant = conversation.participants?.find((p: any) => p.type === 'user');
-      if (userParticipant?.id) {
+      if (customerId) {
         await db.collection('customer_audit_trails').insertOne({
-          customerId: userParticipant.id,
-          action: 'chat_transferred',
+          customerId,
+          action: transferAllConversations ? 'all_conversations_transferred' : 'chat_transferred',
           category: 'messaging',
           performedBy: {
             id: decoded.adminId,
@@ -261,7 +298,9 @@ export async function POST(
           },
           details: {
             conversationId,
-            transferType,
+            transferType: transferAllConversations ? 'bulk' : transferType,
+            conversationsTransferred: transferredConversations.length,
+            conversationIds: transferredConversations.map(id => id.toString()),
             fromEmployeeId: decoded.adminId,
             fromEmployeeName: decoded.name || decoded.email,
             toEmployeeId,
@@ -278,14 +317,17 @@ export async function POST(
       // Create notification for receiving employee
       await db.collection('employee_notifications').insertOne({
         employeeId: toEmployeeId,
-        type: 'chat_transfer_received',
-        title: 'New Chat Transferred',
-        message: `${decoded.name || decoded.email} transferred a chat to you${reason ? `: ${reason}` : ''}`,
+        type: transferAllConversations ? 'bulk_chat_transfer_received' : 'chat_transfer_received',
+        title: transferAllConversations ? 'Customer Chats Transferred' : 'New Chat Transferred',
+        message: transferAllConversations 
+          ? `${decoded.name || decoded.email} transferred all ${transferredConversations.length} conversation(s) with ${customerName} to you${reason ? `: ${reason}` : ''}`
+          : `${decoded.name || decoded.email} transferred a chat to you${reason ? `: ${reason}` : ''}`,
         data: {
           conversationId,
+          conversationsTransferred: transferredConversations.length,
           fromEmployeeId: decoded.adminId,
           fromEmployeeName: decoded.name || decoded.email,
-          customerName: userParticipant?.name || 'Customer',
+          customerName,
         },
         isRead: false,
         createdAt: new Date(),
@@ -337,7 +379,9 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
-        message: `Chat transferred to ${toEmployeeName}`,
+        message: transferAllConversations 
+          ? `All ${transferredConversations.length} conversation(s) transferred to ${toEmployeeName}`
+          : `Chat transferred to ${toEmployeeName}`,
         conversation: {
           id: conversationId,
           isChatTransferred: true,
@@ -346,6 +390,7 @@ export async function POST(
           chatTransferredFrom: originalEmployeeId,
           chatTransferredFromName: originalEmployeeName,
         },
+        transferredCount: transferredConversations.length,
       });
 
     } catch (transactionError) {

@@ -46,6 +46,12 @@ export async function GET(request: NextRequest) {
         id: conversation._id.toString(),
         type: conversation.type,
         status: conversation.status,
+        // Ticket system fields
+        ticketNumber: (conversation as any).ticketNumber || null,
+        isArchived: (conversation as any).isArchived || false,
+        archivedAt: (conversation as any).archivedAt || null,
+        resolvedByName: (conversation as any).resolvedByName || null,
+        // Participants
         participants: conversation.participants.filter(p => p.isActive),
         lastMessage: conversation.lastMessage,
         unreadCount: 0,

@@ -46,6 +46,12 @@ interface Conversation {
   id: string;
   type: 'user-to-user' | 'user-to-support';
   status: string;
+  // Ticket system fields
+  ticketNumber?: number;
+  isArchived?: boolean;
+  archivedAt?: string;
+  resolvedByName?: string;
+  // Participants
   participants: Array<{
     id: string;
     type: string;

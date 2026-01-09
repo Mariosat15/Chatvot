@@ -113,6 +113,13 @@ interface Conversation {
   id: string;
   type: 'user-to-support' | 'employee-internal';
   status: string;
+  // Ticket system fields
+  ticketNumber?: number;
+  customerId?: string;
+  customerName?: string;
+  isArchived?: boolean;
+  archivedAt?: string;
+  // Participants
   participants: Array<{
     id: string;
     type: string;
@@ -200,6 +207,8 @@ export default function MessagingSection() {
   const [isTogglingAvailability, setIsTogglingAvailability] = useState(false);
   const [transferReason, setTransferReason] = useState('');
   const [selectedEmployeeForTransfer, setSelectedEmployeeForTransfer] = useState<string>('');
+  const [transferAllConversations, setTransferAllConversations] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'archived'>('all');
   const [assignedCustomers, setAssignedCustomers] = useState<AssignedCustomer[]>([]);
   const [typingUsers, setTypingUsers] = useState<Map<string, { name: string; timestamp: number }>>(new Map());
   const [currentAdminId, setCurrentAdminId] = useState<string>('');
@@ -389,7 +398,7 @@ export default function MessagingSection() {
   const fetchConversations = useCallback(async () => {
     try {
       const type = activeTab === 'support' ? 'support' : activeTab === 'internal' ? 'internal' : 'all';
-      const response = await fetch(`/api/messaging/conversations?type=${type}&status=active`);
+      const response = await fetch(`/api/messaging/conversations?type=${type}&status=${statusFilter}`);
       if (response.ok) {
         const data = await response.json();
         setConversations(data.conversations || []);
@@ -397,7 +406,7 @@ export default function MessagingSection() {
     } catch (error) {
       console.error('Error fetching conversations:', error);
     }
-  }, [activeTab]);
+  }, [activeTab, statusFilter]);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -556,15 +565,25 @@ export default function MessagingSection() {
       const response = await fetch(`/api/messaging/conversations/${selectedConversation.id}/transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toEmployeeId: employee.id, toEmployeeName: employee.name, reason: transferReason }),
+        body: JSON.stringify({ 
+          toEmployeeId: employee.id, 
+          toEmployeeName: employee.name, 
+          reason: transferReason,
+          transferAllConversations 
+        }),
       });
 
       if (response.ok) {
+        const result = await response.json();
         setShowTransferModal(false);
         setTransferReason('');
         setSelectedEmployeeForTransfer('');
+        setTransferAllConversations(false);
         fetchConversations();
         fetchMessages(selectedConversation.id);
+        if (transferAllConversations && result.transferredCount > 1) {
+          alert(`Successfully transferred ${result.transferredCount} conversations to ${employee.name}`);
+        }
       } else {
         const error = await response.json();
         alert(error.error || 'Failed to transfer chat');
@@ -1017,74 +1036,124 @@ export default function MessagingSection() {
             )}
 
             {activeTab === 'support' && (
-              filteredConversations.filter(c => c.type === 'user-to-support').length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full py-12 text-center px-4">
-                  <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-4">
-                    <Inbox className="w-8 h-8 text-gray-600" />
+              <>
+                {/* Status Filter Tabs */}
+                <div className="flex gap-2 p-3 border-b border-white/5">
+                  {(['all', 'active', 'archived'] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setStatusFilter(s)}
+                      className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${
+                        statusFilter === s
+                          ? s === 'archived'
+                            ? 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
+                            : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-white/5 text-gray-500 border border-white/5 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                
+                {filteredConversations.filter(c => c.type === 'user-to-support').length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full py-12 text-center px-4">
+                    <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-4">
+                      <Inbox className="w-8 h-8 text-gray-600" />
+                    </div>
+                    <p className="text-gray-400 font-medium">No {statusFilter} conversations</p>
+                    <p className="text-gray-600 text-sm mt-1">Customer tickets will appear here</p>
                   </div>
-                  <p className="text-gray-400 font-medium">No support conversations</p>
-                  <p className="text-gray-600 text-sm mt-1">Customer chats will appear here</p>
-                </div>
-              ) : (
-                <div className="p-3 space-y-1">
-                  {filteredConversations.filter(c => c.type === 'user-to-support').map((conv) => {
-                    const customer = getCustomer(conv);
-                    const isSelected = selectedConversation?.id === conv.id;
-                    
-                    return (
-                      <button
-                        key={conv.id}
-                        onClick={() => { setSelectedConversation(conv); fetchMessages(conv.id, true); }}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
-                          isSelected
-                            ? 'bg-emerald-500/10 border border-emerald-500/30'
-                            : 'hover:bg-white/5 border border-transparent hover:border-white/10'
-                        }`}
-                      >
-                        <div className="relative">
-                          <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                            <span className="text-white font-bold">{customer?.name?.charAt(0) || '?'}</span>
-                          </div>
-                          {conv.isResolved ? (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-[#0d0d14] flex items-center justify-center">
-                              <Check className="w-2.5 h-2.5 text-white" />
+                ) : (
+                  <div className="p-3 space-y-1">
+                    {filteredConversations.filter(c => c.type === 'user-to-support').map((conv) => {
+                      const customer = getCustomer(conv);
+                      const isSelected = selectedConversation?.id === conv.id;
+                      const isArchived = conv.isArchived || conv.isResolved;
+                      
+                      return (
+                        <button
+                          key={conv.id}
+                          onClick={() => { setSelectedConversation(conv); fetchMessages(conv.id, true); }}
+                          className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+                            isSelected
+                              ? isArchived
+                                ? 'bg-gray-500/10 border border-gray-500/30'
+                                : 'bg-emerald-500/10 border border-emerald-500/30'
+                              : isArchived
+                                ? 'hover:bg-gray-500/5 border border-transparent hover:border-gray-500/20 opacity-60'
+                                : 'hover:bg-white/5 border border-transparent hover:border-white/10'
+                          }`}
+                        >
+                          <div className="relative">
+                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                              isArchived 
+                                ? 'bg-gradient-to-br from-gray-500 to-gray-600'
+                                : 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                            }`}>
+                              <span className="text-white font-bold">{customer?.name?.charAt(0) || '?'}</span>
                             </div>
-                          ) : conv.isAIHandled ? (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-cyan-500 rounded-full border-2 border-[#0d0d14] flex items-center justify-center">
-                              <Sparkles className="w-2.5 h-2.5 text-white" />
-                            </div>
-                          ) : null}
-                        </div>
-                        <div className="flex-1 min-w-0 text-left">
-                          <div className="flex items-center justify-between mb-0.5">
-                            <p className={`text-sm font-medium truncate ${conv.unreadCount > 0 ? 'text-white' : 'text-gray-300'}`}>
-                              {customer?.name || 'Customer'}
-                            </p>
-                            <span className="text-[10px] text-gray-500 ml-2">
-                              {conv.lastMessage?.timestamp && formatConversationTime(conv.lastMessage.timestamp)}
-                            </span>
+                            {isArchived ? (
+                              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-gray-500 rounded-full border-2 border-[#0d0d14] flex items-center justify-center">
+                                <Check className="w-2.5 h-2.5 text-white" />
+                              </div>
+                            ) : conv.isAIHandled ? (
+                              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-cyan-500 rounded-full border-2 border-[#0d0d14] flex items-center justify-center">
+                                <Sparkles className="w-2.5 h-2.5 text-white" />
+                              </div>
+                            ) : null}
                           </div>
-                          <div className="flex items-center gap-2">
-                            {conv.isAIHandled && !conv.isResolved && (
-                              <span className="text-[10px] text-cyan-400 flex items-center gap-0.5">
-                                <Bot className="w-3 h-3" />
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <p className={`text-sm font-medium truncate ${
+                                  isArchived ? 'text-gray-400' : conv.unreadCount > 0 ? 'text-white' : 'text-gray-300'
+                                }`}>
+                                  {customer?.name || 'Customer'}
+                                </p>
+                                {conv.ticketNumber && (
+                                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                                    isArchived
+                                      ? 'bg-gray-500/20 text-gray-500'
+                                      : 'bg-blue-500/20 text-blue-400'
+                                  }`}>
+                                    #{conv.ticketNumber}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">
+                                {conv.lastMessage?.timestamp && formatConversationTime(conv.lastMessage.timestamp)}
                               </span>
-                            )}
-                            <p className={`text-xs truncate ${conv.unreadCount > 0 ? 'text-gray-300' : 'text-gray-500'}`}>
-                              {conv.lastMessage?.content || 'No messages yet'}
-                            </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {conv.isAIHandled && !isArchived && (
+                                <span className="text-[10px] text-cyan-400 flex items-center gap-0.5">
+                                  <Bot className="w-3 h-3" />
+                                </span>
+                              )}
+                              {isArchived && (
+                                <span className="text-[9px] px-1.5 py-0.5 bg-gray-500/20 text-gray-400 rounded font-medium">
+                                  ARCHIVED
+                                </span>
+                              )}
+                              <p className={`text-xs truncate ${
+                                isArchived ? 'text-gray-500' : conv.unreadCount > 0 ? 'text-gray-300' : 'text-gray-500'
+                              }`}>
+                                {conv.lastMessage?.content || 'No messages yet'}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                        {conv.unreadCount > 0 && (
-                          <span className="bg-emerald-500 text-white text-xs font-bold min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center">
-                            {conv.unreadCount}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )
+                          {conv.unreadCount > 0 && !isArchived && (
+                            <span className="bg-emerald-500 text-white text-xs font-bold min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center">
+                              {conv.unreadCount}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1108,24 +1177,35 @@ export default function MessagingSection() {
                     )}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-white text-lg">
-                      {selectedConversation.type === 'user-to-support'
-                        ? getCustomer(selectedConversation)?.name || 'Customer'
-                        : selectedConversation.participants.find(p => p.id !== currentAdminId)?.name || 'Team Chat'
-                      }
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-white text-lg">
+                        {selectedConversation.type === 'user-to-support'
+                          ? getCustomer(selectedConversation)?.name || 'Customer'
+                          : selectedConversation.participants.find(p => p.id !== currentAdminId)?.name || 'Team Chat'
+                        }
+                      </h3>
+                      {selectedConversation.ticketNumber && (
+                        <span className={`text-xs px-2 py-0.5 rounded-lg font-medium ${
+                          selectedConversation.isArchived 
+                            ? 'bg-gray-500/20 text-gray-400' 
+                            : 'bg-blue-500/20 text-blue-400'
+                        }`}>
+                          Ticket #{selectedConversation.ticketNumber}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
                       {selectedConversation.type === 'employee-internal' && (
                         <span className="flex items-center gap-1 text-violet-400">
                           <Shield className="w-3 h-3" /> Internal
                         </span>
                       )}
-                      {selectedConversation.isResolved && (
-                        <span className="flex items-center gap-1 text-emerald-400">
-                          <CheckCircle className="w-3 h-3" /> Resolved
+                      {(selectedConversation.isArchived || selectedConversation.isResolved) && (
+                        <span className="flex items-center gap-1 text-gray-400">
+                          <CheckCircle className="w-3 h-3" /> Archived
                         </span>
                       )}
-                      {selectedConversation.isAIHandled && !selectedConversation.isResolved && (
+                      {selectedConversation.isAIHandled && !selectedConversation.isResolved && !selectedConversation.isArchived && (
                         <span className="flex items-center gap-1 text-cyan-400">
                           <Bot className="w-3 h-3" /> AI Handling
                         </span>
@@ -1341,8 +1421,26 @@ export default function MessagingSection() {
 
               {/* Message Input */}
               <div className="p-4 border-t border-white/5 bg-[#0d0d14]">
-                {/* Check if chat is transferred and current user is the original employee (cannot send) */}
-                {selectedConversation.isChatTransferred && selectedConversation.chatTransferredFrom === currentAdminId ? (
+                {/* Archived ticket - read only */}
+                {(selectedConversation.isArchived || selectedConversation.isResolved) ? (
+                  <div className="bg-gray-500/10 border border-gray-500/30 rounded-xl p-4 text-center">
+                    <p className="text-gray-400 text-sm">
+                      <CheckCircle className="w-4 h-4 inline mr-2" />
+                      This ticket has been resolved and archived
+                    </p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      {selectedConversation.resolvedByName && `Resolved by ${selectedConversation.resolvedByName}`}
+                      {selectedConversation.archivedAt && ` on ${format(new Date(selectedConversation.archivedAt), 'MMM d, yyyy')}`}
+                    </p>
+                    <button
+                      onClick={() => handleReopen(selectedConversation.id)}
+                      className="mt-3 px-4 py-2 bg-violet-500/20 border border-violet-500/30 text-violet-400 text-sm rounded-xl hover:bg-violet-500/30 transition-colors inline-flex items-center gap-2"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Reopen Ticket
+                    </button>
+                  </div>
+                ) : selectedConversation.isChatTransferred && selectedConversation.chatTransferredFrom === currentAdminId ? (
                   <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">
                     <p className="text-amber-400 text-sm">
                       <AlertCircle className="w-4 h-4 inline mr-2" />
@@ -1504,6 +1602,24 @@ export default function MessagingSection() {
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50"
                   />
                 </div>
+
+                {/* Transfer all conversations checkbox - only for support conversations */}
+                {selectedConversation?.type === 'user-to-support' && (
+                  <label className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl cursor-pointer hover:bg-amber-500/15 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={transferAllConversations}
+                      onChange={(e) => setTransferAllConversations(e.target.checked)}
+                      className="w-4 h-4 text-amber-500 bg-white/5 border-white/20 rounded focus:ring-amber-500"
+                    />
+                    <div>
+                      <span className="text-sm text-white font-medium">Transfer ALL conversations</span>
+                      <p className="text-xs text-amber-400/70 mt-0.5">
+                        Transfer all tickets with this customer (including archived)
+                      </p>
+                    </div>
+                  </label>
+                )}
 
                 <div className="flex gap-3 pt-2">
                   <button

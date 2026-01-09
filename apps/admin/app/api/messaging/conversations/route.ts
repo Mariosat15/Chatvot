@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'all'; // 'support', 'internal', 'all'
-    const status = searchParams.get('status') || 'active';
+    const status = searchParams.get('status') || 'all'; // 'active', 'archived', 'all'
+    const includeArchived = searchParams.get('includeArchived') !== 'false'; // Default: include archived
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
@@ -106,9 +107,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter by status
-    if (status !== 'all') {
-      query.status = status;
+    if (status === 'active') {
+      query.$and = query.$and || [];
+      query.$and.push({
+        $or: [
+          { status: 'active' },
+          { isArchived: { $ne: true } }
+        ]
+      });
+    } else if (status === 'archived') {
+      query.$and = query.$and || [];
+      query.$and.push({
+        $or: [
+          { status: 'archived' },
+          { isArchived: true }
+        ]
+      });
     }
+    // If status is 'all', no filter is applied
 
     console.log(`📥 [GetConv] Query:`, JSON.stringify(query, null, 2));
 
@@ -141,6 +157,13 @@ export async function GET(request: NextRequest) {
         id: conv._id.toString(),
         type: conv.type,
         status: conv.status,
+        // Ticket system fields
+        ticketNumber: conv.ticketNumber || null,
+        customerId: conv.customerId || customer?.id || null,
+        customerName: conv.customerName || customer?.name || null,
+        isArchived: conv.isArchived || false,
+        archivedAt: conv.archivedAt?.toISOString() || null,
+        // Participants
         participants: conv.participants?.filter((p: any) => p.isActive) || [],
         customer: customer ? {
           id: customer.id,
@@ -263,10 +286,21 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // Generate ticket number for this customer
+      const ticketCount = await db.collection('conversations').countDocuments({
+        type: 'user-to-support',
+        'participants.id': customerId,
+        'participants.type': 'user',
+      });
+      const ticketNumber = ticketCount + 1;
+
       // Create new support conversation
       const result = await db.collection('conversations').insertOne({
         type: 'user-to-support',
         status: 'active',
+        ticketNumber,
+        customerId,
+        customerName: customerName || 'Customer',
         participants: [
           {
             id: customerId,
@@ -286,6 +320,7 @@ export async function POST(request: NextRequest) {
         assignedEmployeeId: new Types.ObjectId(adminId),
         assignedEmployeeName: name || email.split('@')[0],
         isAIHandled: false,
+        isArchived: false,
         unreadCounts: {},
         lastActivityAt: new Date(),
         createdAt: new Date(),

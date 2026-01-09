@@ -151,6 +151,7 @@ export class MessagingService {
     await connectToDatabase();
     
     const settings = await MessagingSettings.getSettings();
+    const db = mongoose.connection.db;
     
     console.log(`🔍 [MessagingService] getOrCreateSupportConversation for user: ${userName} (${userId})`);
     console.log(`🔍 [MessagingService] AI Support enabled: ${settings.enableAISupport}`);
@@ -158,7 +159,6 @@ export class MessagingService {
     // First, check if user has an assigned employee (account manager)
     let assignedEmployee: { id: string; name: string; avatar?: string } | null = null;
     try {
-      const db = mongoose.connection.db;
       if (db) {
         const assignment = await db.collection('customer_assignments').findOne({
           customerId: userId,
@@ -187,58 +187,27 @@ export class MessagingService {
       console.error('❌ [MessagingService] Error checking customer assignment:', error);
     }
     
-    // Find existing active support conversation
+    // Find existing ACTIVE (non-resolved, non-archived) support conversation
     let conversation = await Conversation.findOne({
       type: 'user-to-support',
       status: 'active',
       'participants.id': userId,
       'participants.type': 'user',
+      // NEW: Only find conversations that are NOT resolved
+      $or: [
+        { isResolved: { $ne: true } },
+        { isResolved: { $exists: false } }
+      ]
     });
     
     if (conversation) {
-      console.log(`📦 [MessagingService] Found existing conversation: ${conversation._id}, isAIHandled: ${conversation.isAIHandled}, isResolved: ${(conversation as any).isResolved}`);
-      
-      // Handle resolved conversations - when customer sends new message, reopen with AI
-      if ((conversation as any).isResolved) {
-        console.log(`🔄 [MessagingService] Conversation was resolved, reopening with AI...`);
-        
-        // Reopen the conversation with AI handling (new request cycle)
-        conversation.isAIHandled = settings.enableAISupport;
-        (conversation as any).isResolved = false;
-        (conversation as any).reopenedAt = new Date();
-        await conversation.save();
-        
-        // Add system message about new request
-        await this.sendMessage({
-          conversationId: conversation._id.toString(),
-          senderId: 'system',
-          senderType: 'system',
-          senderName: 'System',
-          content: '🆕 New support request. Our AI assistant will help you first.',
-          messageType: 'system',
-        });
-        
-        // If AI is enabled, add AI greeting
-        if (settings.enableAISupport) {
-          await this.sendMessage({
-            conversationId: conversation._id.toString(),
-            senderId: 'ai',
-            senderType: 'ai',
-            senderName: 'AI Assistant',
-            content: settings.aiGreeting || 'Hello! I\'m here to help. How can I assist you today?',
-            messageType: 'text',
-          });
-        }
-        
-        console.log(`✅ [MessagingService] Conversation reopened, AI handling: ${conversation.isAIHandled}`);
-      }
+      console.log(`📦 [MessagingService] Found existing ACTIVE conversation: ${conversation._id}`);
       
       // Store assigned employee info on conversation (for escalation later)
       // But DON'T disable AI - let AI handle until escalation
       if (assignedEmployee && !conversation.assignedEmployeeId) {
         conversation.assignedEmployeeId = new Types.ObjectId(assignedEmployee.id);
         conversation.assignedEmployeeName = assignedEmployee.name;
-        // Keep isAIHandled as is - only change when escalated
         await conversation.save();
         console.log(`📦 [MessagingService] Updated assigned employee info (AI still handling)`);
       }
@@ -246,7 +215,21 @@ export class MessagingService {
       return conversation;
     }
     
-    console.log(`🆕 [MessagingService] Creating new support conversation`);
+    // No active conversation found - create a NEW ticket
+    // This handles both first-time users AND users whose previous ticket was resolved
+    
+    // Generate ticket number for this customer
+    let ticketNumber = 1;
+    if (db) {
+      const ticketCount = await db.collection('conversations').countDocuments({
+        type: 'user-to-support',
+        'participants.id': userId,
+        'participants.type': 'user',
+      });
+      ticketNumber = ticketCount + 1;
+    }
+    
+    console.log(`🆕 [MessagingService] Creating NEW support ticket #${ticketNumber} for user ${userName}`);
     
     // IMPORTANT: AI ALWAYS handles first if enabled, regardless of assigned employee
     // The assigned employee will take over when customer requests human assistance
@@ -264,6 +247,10 @@ export class MessagingService {
       // Store assigned employee info for later escalation
       assignedEmployeeId: assignedEmployee?.id,
       assignedEmployeeName: assignedEmployee?.name,
+      // NEW: Ticket system fields
+      ticketNumber,
+      customerId: userId,
+      customerName: userName,
     });
     
     // If AI support is enabled, add AI as participant and send greeting

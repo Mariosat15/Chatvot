@@ -859,10 +859,10 @@ class CustomerAssignmentService {
       throw new Error('Database not connected');
     }
     
-    // Find all active support conversations for this customer
+    // Find ALL support conversations for this customer (including archived)
+    // When a customer is fully transferred, ALL history should go with them
     const conversations = await db.collection('conversations').find({
       type: 'user-to-support',
-      status: { $ne: 'closed' },
       'participants.id': customerId,
       'participants.type': 'user',
     }).toArray();
@@ -942,15 +942,22 @@ class CustomerAssignmentService {
       }
       
       // Add system message about the transfer
+      const ticketNumber = conv.ticketNumber || 1;
+      const isArchived = conv.isArchived || conv.status === 'archived';
+      const systemContent = isArchived 
+        ? `📋 Ticket #${ticketNumber} (archived) transferred to ${toEmployeeName}.`
+        : `Your conversation has been transferred to ${toEmployeeName}.`;
+      
       await db.collection('messages').insertOne({
         conversationId: conv._id,
         senderId: 'system',
         senderType: 'system',
         senderName: 'System',
-        content: `Your conversation has been transferred to ${toEmployeeName}.`,
+        content: systemContent,
         messageType: 'system',
         status: 'sent',
         readBy: [],
+        isDeleted: false,
         createdAt: new Date(),
       });
       
@@ -960,7 +967,7 @@ class CustomerAssignmentService {
         {
           $set: {
             lastMessage: {
-              content: `Your conversation has been transferred to ${toEmployeeName}.`,
+              content: systemContent,
               senderId: 'system',
               senderName: 'System',
               senderType: 'system',
@@ -970,7 +977,7 @@ class CustomerAssignmentService {
         }
       );
       
-      console.log(`💬 [TransferChats] Conversation ${conv._id} transferred to ${toEmployeeName}`);
+      console.log(`💬 [TransferChats] Ticket #${ticketNumber} ${isArchived ? '(archived) ' : ''}transferred to ${toEmployeeName}`);
     }
   }
 }
