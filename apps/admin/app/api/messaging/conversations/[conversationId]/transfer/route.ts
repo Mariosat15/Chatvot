@@ -127,7 +127,57 @@ export async function POST(
       deliveredTo: [],
     });
 
-    // TODO: Notify the new employee
+    // Log to customer audit trail
+    const db = mongoose.connection.db;
+    if (db) {
+      const userParticipant = conversation.participants?.find((p: any) => p.type === 'user');
+      if (userParticipant?.id) {
+        await db.collection('customer_audit_trails').insertOne({
+          customerId: userParticipant.id,
+          action: 'conversation_transferred',
+          category: 'messaging',
+          performedBy: {
+            id: decoded.adminId,
+            email: decoded.email,
+            name: decoded.name || decoded.email,
+            type: 'employee',
+          },
+          details: {
+            conversationId,
+            fromEmployeeId: previousEmployeeId,
+            fromEmployeeName: previousEmployeeName,
+            toEmployeeId,
+            toEmployeeName,
+            reason,
+          },
+          timestamp: new Date(),
+          createdAt: new Date(),
+        });
+      }
+    }
+
+    // Notify via WebSocket
+    try {
+      const wsInternalUrl = process.env.WS_INTERNAL_URL || 'http://localhost:3003';
+      await fetch(`${wsInternalUrl}/internal/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          message: {
+            id: 'transfer-' + Date.now(),
+            senderId: 'system',
+            senderType: 'system',
+            senderName: 'System',
+            content: `Conversation transferred to ${toEmployeeName}`,
+            messageType: 'system',
+            createdAt: new Date().toISOString(),
+          },
+        }),
+      });
+    } catch (wsError) {
+      console.warn('WebSocket notification failed:', wsError);
+    }
 
     return NextResponse.json({
       success: true,

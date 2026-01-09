@@ -214,7 +214,7 @@ const RESTRICTION_REASONS = [
   { value: 'other', label: 'Other' },
 ];
 
-type TabType = 'overview' | 'edit' | 'wallet' | 'kyc' | 'notes' | 'restrictions' | 'invoices' | 'activity' | 'assignment' | 'audit';
+type TabType = 'overview' | 'edit' | 'wallet' | 'kyc' | 'notes' | 'restrictions' | 'invoices' | 'activity' | 'assignment' | 'audit' | 'conversations';
 
 export default function UserFullDetailPanel({
   open,
@@ -919,8 +919,9 @@ export default function UserFullDetailPanel({
     { id: 'wallet', label: 'Wallet', icon: Wallet },
     { id: 'kyc', label: 'KYC', icon: Shield },
     { id: 'history', label: `History (${history.length})`, icon: History },
+    { id: 'conversations', label: 'Conversations', icon: MessageSquare },
     { id: 'audit', label: 'Audit Trail', icon: ClipboardList },
-    { id: 'notes', label: `Notes (${notes.length})`, icon: MessageSquare },
+    { id: 'notes', label: `Notes (${notes.length})`, icon: Send },
     { id: 'restrictions', label: 'Restrictions', icon: Ban },
     { id: 'invoices', label: `Invoices (${invoices.length})`, icon: FileText },
   ];
@@ -2333,6 +2334,11 @@ export default function UserFullDetailPanel({
                     customerEmail={user.email}
                     customerName={user.name}
                   />
+                )}
+
+                {/* Conversations Tab */}
+                {activeTab === 'conversations' && (
+                  <UserConversationsTab userId={user.id} userName={user.name} />
                 )}
               </>
             )}

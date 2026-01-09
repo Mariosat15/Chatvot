@@ -9,7 +9,6 @@ import {
   Search,
   Send,
   Paperclip,
-  Smile,
   Check,
   CheckCheck,
   Clock,
@@ -23,7 +22,10 @@ import {
   ChevronDown,
   Sparkles,
   Shield,
+  Trash2,
+  MoreVertical,
 } from 'lucide-react';
+import EmojiPicker from '@/components/chat/EmojiPicker';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
@@ -123,8 +125,11 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const [assignedAgent, setAssignedAgent] = useState<AssignedAgent | null>(null);
   const [typingUsers, setTypingUsers] = useState<Map<string, { name: string; timestamp: number }>>(new Map());
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [showChatMenu, setShowChatMenu] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatMenuRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -425,6 +430,53 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       alert('Error connecting to support');
     }
   };
+
+  // Clear conversation history
+  const clearConversation = async () => {
+    if (!selectedConversation) return;
+    
+    if (!confirm('Are you sure you want to clear the chat history? This action cannot be undone.')) {
+      return;
+    }
+    
+    setIsClearing(true);
+    setShowChatMenu(false);
+    
+    try {
+      const response = await fetch(`/api/messaging/conversations/${selectedConversation.id}/clear`, {
+        method: 'POST',
+      });
+      
+      if (response.ok) {
+        // Refresh messages
+        await fetchMessages(selectedConversation.id, true);
+        await fetchConversations();
+      } else {
+        alert('Failed to clear conversation');
+      }
+    } catch (error) {
+      alert('Error clearing conversation');
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  // Handle emoji selection
+  const handleEmojiSelect = (emoji: string) => {
+    setMessageInput(prev => prev + emoji);
+    messageInputRef.current?.focus();
+  };
+
+  // Close chat menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (chatMenuRef.current && !chatMenuRef.current.contains(event.target as Node)) {
+        setShowChatMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Initial data fetch
   useEffect(() => {
@@ -848,6 +900,40 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                     : 'Direct Message'}
                 </p>
               </div>
+              
+              {/* Chat Menu */}
+              <div className="relative" ref={chatMenuRef}>
+                <button
+                  onClick={() => setShowChatMenu(!showChatMenu)}
+                  className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors"
+                >
+                  <MoreVertical className="w-5 h-5 text-gray-400" />
+                </button>
+                
+                <AnimatePresence>
+                  {showChatMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      className="absolute right-0 top-full mt-2 w-48 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50"
+                    >
+                      <button
+                        onClick={clearConversation}
+                        disabled={isClearing}
+                        className="w-full px-4 py-3 text-left text-sm text-red-400 hover:bg-white/5 flex items-center gap-3 disabled:opacity-50"
+                      >
+                        {isClearing ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                        Clear Chat History
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
             {/* Messages */}
@@ -984,9 +1070,9 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                     className="w-full px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors pr-12"
                   />
-                  <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
-                    <Smile className="w-5 h-5" />
-                  </button>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                  </div>
                 </div>
                 <button
                   onClick={sendMessage}

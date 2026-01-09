@@ -110,6 +110,27 @@ export async function POST(
       }
     );
 
+    // Log to customer audit trail
+    const userParticipant = conversation.participants?.find((p: any) => p.type === 'user');
+    if (userParticipant?.id) {
+      await db.collection('customer_audit_trails').insertOne({
+        customerId: userParticipant.id,
+        action: 'conversation_resolved',
+        category: 'messaging',
+        performedBy: {
+          id: decoded.adminId,
+          email: decoded.email,
+          name: decoded.name || decoded.email,
+          type: 'employee',
+        },
+        details: {
+          conversationId,
+        },
+        timestamp: new Date(),
+        createdAt: new Date(),
+      });
+    }
+
     // Notify via WebSocket (use internal URL for server-to-server)
     try {
       const wsInternalUrl = process.env.WS_INTERNAL_URL || 'http://localhost:3003';
