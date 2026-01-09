@@ -277,13 +277,14 @@ function handleConnection(ws: WebSocket, req: any) {
   } catch (jwtError) {
     // JWT verification failed - treat token as raw user/admin ID
     // This supports both JWT auth and simple ID-based auth
-    if (token && token.length >= 10 && /^[a-f0-9]{24}$|^[a-zA-Z0-9_-]+$/.test(token)) {
-      // Looks like a MongoDB ObjectId or admin ID
+    // Accept: MongoDB ObjectIds (24 hex), or any alphanumeric string (admin IDs, session IDs)
+    if (token && token.length >= 1 && /^[a-f0-9]{24}$|^[a-zA-Z0-9@._-]+$/.test(token)) {
+      // Looks like a MongoDB ObjectId, admin ID, or email
       participantId = token;
       participantName = type === 'employee' ? 'Employee' : 'User';
-      console.log(`🔑 Using raw ID auth for ${type}: ${participantId.substring(0, 8)}...`);
+      console.log(`🔑 Using raw ID auth for ${type}: ${token.length > 10 ? token.substring(0, 10) + '...' : token}`);
     } else {
-      console.error('Authentication failed: Invalid token format');
+      console.error('Authentication failed: Invalid token format:', token?.substring(0, 20));
       ws.close(4001, 'Authentication failed');
       return;
     }
