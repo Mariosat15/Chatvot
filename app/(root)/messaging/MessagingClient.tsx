@@ -129,6 +129,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const messageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUserAtBottomRef = useRef(true);
+  const isInitialLoadRef = useRef(true); // Track if this is the first load of messages
 
   // WebSocket for real-time messaging
   const handleWebSocketMessage = useCallback((message: { type: string; data: any }) => {
@@ -309,17 +310,19 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   }, []);
 
   // Fetch messages for selected conversation
-  const fetchMessages = useCallback(async (conversationId: string) => {
+  const fetchMessages = useCallback(async (conversationId: string, isInitial: boolean = false) => {
     try {
-      console.log(`📩 [FetchMsg] Fetching messages for: ${conversationId}`);
+      console.log(`📩 [FetchMsg] Fetching messages for: ${conversationId}, isInitial: ${isInitial}`);
       const response = await fetch(`/api/messaging/conversations/${conversationId}`);
       if (response.ok) {
         const data = await response.json();
         console.log(`📩 [FetchMsg] Received ${data.messages?.length || 0} messages`);
         setMessages(data.messages || []);
         
-        // Scroll to bottom on initial load
-        setTimeout(() => scrollToBottom(), 100);
+        // Only scroll to bottom on initial conversation load, not on refresh/poll
+        if (isInitial) {
+          setTimeout(() => scrollToBottom(), 100);
+        }
         
         fetch(`/api/messaging/conversations/${conversationId}/read`, { method: 'POST' });
       } else {
@@ -447,7 +450,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     if (conversationId && conversationId !== selectedConversationIdRef.current) {
       selectedConversationIdRef.current = conversationId;
       lastMessageFetchRef.current = Date.now();
-      fetchMessages(conversationId);
+      fetchMessages(conversationId, true); // Initial load - scroll to bottom
     }
   }, [selectedConversation?.id, fetchMessages]);
 
@@ -656,7 +659,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                       setSelectedConversation(conv);
                       setShowMobileChat(true);
                       lastMessageFetchRef.current = Date.now();
-                      await fetchMessages(conv.id);
+                      await fetchMessages(conv.id, true); // Initial load - scroll to bottom
                     }}
                     className={`w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-colors ${
                       selectedConversation?.id === conv.id ? 'bg-white/5' : ''

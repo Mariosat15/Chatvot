@@ -204,6 +204,7 @@ export default function MessagingSection() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectedConvRef = useRef<string | null>(null);
   const isUserAtBottomRef = useRef(true);
+  const isInitialLoadRef = useRef(true); // Track if this is the first load of messages
 
   // Get current admin info from cookie/session
   useEffect(() => {
@@ -438,14 +439,17 @@ export default function MessagingSection() {
     }
   };
 
-  const fetchMessages = useCallback(async (conversationId: string) => {
+  const fetchMessages = useCallback(async (conversationId: string, isInitial: boolean = false) => {
     try {
       const response = await fetch(`/api/messaging/conversations/${conversationId}`);
       if (response.ok) {
         const data = await response.json();
         setMessages(data.messages || []);
         setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, unreadCount: 0 } : c));
-        setTimeout(() => scrollToBottom(), 100);
+        // Only scroll to bottom on initial conversation load, not on refresh/poll
+        if (isInitial) {
+          setTimeout(() => scrollToBottom(), 100);
+        }
       } else {
         setMessages([]);
       }
@@ -535,7 +539,7 @@ export default function MessagingSection() {
       
       if (existingConv) {
         setSelectedConversation(existingConv);
-        await fetchMessages(existingConv.id);
+        await fetchMessages(existingConv.id, true); // Initial load - scroll to bottom
         return;
       }
       
@@ -565,7 +569,7 @@ export default function MessagingSection() {
         });
         
         setSelectedConversation(conv);
-        await fetchMessages(conv.id);
+        await fetchMessages(conv.id, true); // Initial load - scroll to bottom
       }
     } catch (error) {
       console.error('Error starting internal chat:', error);
@@ -806,7 +810,7 @@ export default function MessagingSection() {
                         return (
                           <button
                             key={conv.id}
-                            onClick={() => { setSelectedConversation(conv); fetchMessages(conv.id); }}
+                            onClick={() => { setSelectedConversation(conv); fetchMessages(conv.id, true); }}
                             className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
                               isSelected
                                 ? 'bg-violet-500/20 border border-violet-500/40'
@@ -903,7 +907,7 @@ export default function MessagingSection() {
                     return (
                       <button
                         key={conv.id}
-                        onClick={() => { setSelectedConversation(conv); fetchMessages(conv.id); }}
+                        onClick={() => { setSelectedConversation(conv); fetchMessages(conv.id, true); }}
                         className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
                           isSelected
                             ? 'bg-emerald-500/10 border border-emerald-500/30'
