@@ -150,19 +150,13 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
   // WebSocket for real-time messaging
   const handleWebSocketMessage = useCallback((message: { type: string; data: any }) => {
-    console.log('📨 [WS] Received:', message.type, message.data?.conversationId);
-    
     switch (message.type) {
       case 'new_message':
         if (message.data.conversationId === selectedConversation?.id) {
-          console.log('📨 [WS] New message for current conv, senderId:', message.data.message?.senderId);
-          
           setMessages(prev => {
             if (prev.some(m => m.id === message.data.message.id)) {
-              console.log('📨 [WS] Message already exists, skipping');
               return prev;
             }
-            console.log('📨 [WS] Adding message:', message.data.message.content?.slice(0, 30));
             return [...prev, message.data.message];
           });
           
@@ -224,8 +218,6 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   } = useWebSocket({
     token: session.user.id,
     onMessage: handleWebSocketMessage,
-    onConnect: () => console.log('✅ [WS] Connected'),
-    onDisconnect: () => console.log('❌ [WS] Disconnected'),
   });
 
   // Subscribe to conversation when selected
@@ -281,8 +273,8 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         const data = await response.json();
         setAssignedAgent(data.agent);
       }
-    } catch (error) {
-      console.error('Error fetching assigned agent:', error);
+    } catch {
+      // Silent fail
     }
   }, []);
 
@@ -310,8 +302,8 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         }));
         setSupportTickets(tickets);
       }
-    } catch (error) {
-      console.error('Error fetching support tickets:', error);
+    } catch {
+      // Silent fail
     }
   }, []);
 
@@ -324,8 +316,8 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         setConversations(data.conversations);
         setUnreadTotal(data.conversations.reduce((sum: number, c: Conversation) => sum + c.unreadCount, 0));
       }
-    } catch (error) {
-      console.error('Error fetching conversations:', error);
+    } catch {
+      // Silent fail
     }
   }, []);
 
@@ -337,8 +329,8 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         const data = await response.json();
         setFriends(data.friends);
       }
-    } catch (error) {
-      console.error('Error fetching friends:', error);
+    } catch {
+      // Silent fail
     }
   }, []);
 
@@ -350,19 +342,17 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         const data = await response.json();
         setFriendRequests(data);
       }
-    } catch (error) {
-      console.error('Error fetching friend requests:', error);
+    } catch {
+      // Silent fail
     }
   }, []);
 
   // Fetch messages for selected conversation
   const fetchMessages = useCallback(async (conversationId: string, isInitial: boolean = false) => {
     try {
-      console.log(`📩 [FetchMsg] Fetching messages for: ${conversationId}, isInitial: ${isInitial}`);
       const response = await fetch(`/api/messaging/conversations/${conversationId}`);
       if (response.ok) {
         const data = await response.json();
-        console.log(`📩 [FetchMsg] Received ${data.messages?.length || 0} messages`);
         setMessages(data.messages || []);
         
         // Only scroll to bottom on initial conversation load, not on refresh/poll
@@ -371,11 +361,9 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         }
         
         fetch(`/api/messaging/conversations/${conversationId}/read`, { method: 'POST' });
-      } else {
-        console.error(`📩 [FetchMsg] Failed: ${response.status}`);
       }
-    } catch (error) {
-      console.error('Error fetching messages:', error);
+    } catch {
+      // Silent fail
     }
   }, [scrollToBottom]);
 
@@ -393,8 +381,8 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         const data = await response.json();
         setSearchResults(data.users || []);
       }
-    } catch (error) {
-      console.error('Error searching users:', error);
+    } catch {
+      // Silent fail
     } finally {
       setIsSearching(false);
     }
@@ -536,11 +524,9 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         setShowMobileChat(true);
         setTimeout(() => scrollToBottom(), 100);
       } else {
-        console.error('Failed to load conversation:', response.status);
         alert('Could not load conversation. Please try again.');
       }
-    } catch (error) {
-      console.error('Error viewing ticket:', error);
+    } catch {
       alert('Error loading conversation');
     }
   };

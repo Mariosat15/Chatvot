@@ -29,21 +29,20 @@ interface UseWebSocketReturn {
 
 // Get WebSocket URL from environment or default
 function getWebSocketUrl(): string {
-  // In production, use the configured WebSocket URL
   if (typeof window !== 'undefined') {
+    // Check for explicit WebSocket URL in environment
     const envUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || process.env.NEXT_PUBLIC_WS_URL;
-    
-    // If env variable is set and already includes path, use as-is
     if (envUrl) {
-      // Remove trailing slash and return
       return envUrl.replace(/\/$/, '');
     }
     
-    // Default: construct from hostname
+    // Production: Use /ws path through Nginx (no port needed)
+    // Nginx proxies /ws to the WebSocket server on port 3003
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${wsProtocol}//${window.location.hostname}:3003/ws`;
+    const host = window.location.host; // Includes port if non-standard
+    return `${wsProtocol}//${host}/ws`;
   }
-  return 'ws://localhost:3003/ws';
+  return 'ws://localhost:3003';
 }
 
 export function useWebSocket({
@@ -94,7 +93,6 @@ export function useWebSocket({
     // Prevent multiple rapid connection attempts
     const now = Date.now();
     if (now - lastConnectAttemptRef.current < 2000) {
-      console.log('🛑 [WS] Throttling connection attempt');
       return;
     }
     lastConnectAttemptRef.current = now;
@@ -104,13 +102,8 @@ export function useWebSocket({
     }
     
     // Check if already connected or connecting
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('🔌 [WS] Already connected');
-      return;
-    }
-    
-    if (wsRef.current?.readyState === WebSocket.CONNECTING) {
-      console.log('🔌 [WS] Already connecting');
+    if (wsRef.current?.readyState === WebSocket.OPEN || 
+        wsRef.current?.readyState === WebSocket.CONNECTING) {
       return;
     }
 
@@ -120,7 +113,6 @@ export function useWebSocket({
     try {
       const baseUrl = getWebSocketUrl();
       const wsUrl = `${baseUrl}?token=${encodeURIComponent(token)}&type=user`;
-      console.log('🔌 [WS] Connecting to:', wsUrl);
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -128,7 +120,6 @@ export function useWebSocket({
           ws.close();
           return;
         }
-        console.log('✅ WebSocket connected');
         setIsConnected(true);
         setIsConnecting(false);
         reconnectCountRef.current = 0;
@@ -147,12 +138,11 @@ export function useWebSocket({
           const message = JSON.parse(event.data);
           onMessageRef.current?.(message);
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          // Silent fail on parse error
         }
       };
 
       ws.onclose = (event) => {
-        console.log('❌ WebSocket disconnected:', event.code);
         setIsConnected(false);
         setIsConnecting(false);
         wsRef.current = null;
@@ -170,25 +160,21 @@ export function useWebSocket({
           // Exponential backoff: 3s, 6s, 12s, 24s, 48s
           const delay = reconnectInterval * Math.pow(2, reconnectCountRef.current - 1);
           const cappedDelay = Math.min(delay, 60000); // Cap at 60 seconds
-          console.log(`🔄 Reconnecting in ${cappedDelay}ms (attempt ${reconnectCountRef.current}/${reconnectAttempts})`);
           reconnectTimeoutRef.current = setTimeout(() => {
             if (!isUnmountedRef.current) {
               connect();
             }
           }, cappedDelay);
-        } else {
-          console.log('❌ [WS] Max reconnect attempts reached');
         }
       };
 
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        onErrorRef.current?.(error);
+      ws.onerror = () => {
+        // Silent - errors will trigger onclose
+        onErrorRef.current?.(new Event('error'));
       };
 
       wsRef.current = ws;
-    } catch (error) {
-      console.error('Failed to create WebSocket:', error);
+    } catch {
       setIsConnecting(false);
     }
   }, [token, reconnectAttempts, reconnectInterval, cleanup]);
