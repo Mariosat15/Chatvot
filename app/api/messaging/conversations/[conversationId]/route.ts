@@ -34,9 +34,16 @@ export async function GET(
       );
     }
 
+    console.log(`📩 [ConvAPI] Fetching messages for conv: ${conversationId}, user: ${session.user.id}`);
+    
     const messages = await MessagingService.getMessages(conversationId, {
       limit,
       before: before ? new Date(before) : undefined,
+    });
+
+    console.log(`📩 [ConvAPI] Got ${messages.length} messages:`);
+    messages.forEach((m: any, i: number) => {
+      console.log(`   ${i+1}. ${m.senderType}/${m.senderId}: "${m.content?.slice(0, 30)}..."`);
     });
 
     // Mark messages as read
