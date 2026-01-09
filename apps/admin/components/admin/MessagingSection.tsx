@@ -256,22 +256,52 @@ export default function MessagingSection() {
     setShowScrollButton(false);
   }, []);
 
-  // WebSocket message handler - simple version
+  // WebSocket message handler
   const handleWebSocketMessage = useCallback((message: { type: string; data?: any; [key: string]: any }) => {
     switch (message.type) {
       case 'new_message':
-        // Add message to current conversation if it matches
-        if (message.data?.conversationId === selectedConvRef.current && message.data?.message) {
+        const msgData = message.data;
+        const isCurrentConv = msgData?.conversationId === selectedConvRef.current;
+        
+        // Add message to current conversation if it's selected
+        if (isCurrentConv && msgData?.message) {
           setMessages(prev => {
-            if (prev.some(m => m.id === message.data.message?.id)) return prev;
-            return [...prev, message.data.message];
+            if (prev.some(m => m.id === msgData.message?.id)) return prev;
+            return [...prev, msgData.message];
           });
           if (isUserAtBottomRef.current) {
             setTimeout(() => scrollToBottom(), 100);
           }
         }
-        // Refresh conversation list
-        fetchConversations();
+        
+        // Update only the specific conversation's last message (not full refetch)
+        if (msgData?.conversationId && msgData?.message) {
+          setConversations(prev => {
+            const convExists = prev.some(c => c.id === msgData.conversationId);
+            if (!convExists) {
+              // New conversation - fetch all (rare case)
+              fetchConversations();
+              return prev;
+            }
+            return prev.map(c => {
+              if (c.id === msgData.conversationId) {
+                return {
+                  ...c,
+                  lastMessage: {
+                    content: msgData.message.content,
+                    senderId: msgData.message.senderId,
+                    senderName: msgData.message.senderName,
+                    timestamp: msgData.message.createdAt,
+                  },
+                  lastActivityAt: msgData.message.createdAt,
+                  // Increment unread if not current conversation
+                  unreadCount: isCurrentConv ? 0 : (c.unreadCount || 0) + 1,
+                };
+              }
+              return c;
+            });
+          });
+        }
         break;
         
       case 'typing':
@@ -296,6 +326,7 @@ export default function MessagingSection() {
         break;
         
       case 'conversation_update':
+        // Only fetch all when conversation metadata changes (not messages)
         fetchConversations();
         break;
     }
@@ -508,11 +539,16 @@ export default function MessagingSection() {
       if (response.ok) {
         const data = await response.json();
         setMessages(data.messages || []);
-        // Mark conversation as read
-        setConversations(prev => prev.map(c => 
-          c.id === conversationId ? { ...c, unreadCount: 0 } : c
-        ));
-        // Scroll to bottom on initial load
+        // Mark as read - update unread count without triggering full re-render
+        // Only update if there was an unread count
+        setConversations(prev => {
+          const conv = prev.find(c => c.id === conversationId);
+          if (conv && conv.unreadCount > 0) {
+            return prev.map(c => c.id === conversationId ? { ...c, unreadCount: 0 } : c);
+          }
+          return prev; // Return same reference if no change needed
+        });
+        // Only scroll to bottom on initial conversation load, not on refresh/poll
         if (isInitial) {
           setTimeout(() => scrollToBottom(), 100);
         }
@@ -544,14 +580,17 @@ export default function MessagingSection() {
     fetchConversations();
   }, [activeTab, statusFilter, fetchConversations]);
 
-  // Polling - refresh data periodically
+  // Polling fallback (only when WebSocket is disconnected)
   useEffect(() => {
+    const pollInterval = wsConnected ? 60000 : 8000;
     const interval = setInterval(() => {
-      fetchConversations();
-      if (selectedConversation) fetchMessages(selectedConversation.id);
-    }, 30000); // Every 30 seconds
+      if (!wsConnected) {
+        fetchConversations();
+        if (selectedConversation) fetchMessages(selectedConversation.id);
+      }
+    }, pollInterval);
     return () => clearInterval(interval);
-  }, [fetchConversations, fetchMessages, selectedConversation]);
+  }, [fetchConversations, fetchMessages, selectedConversation, wsConnected]);
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() || !selectedConversation || isSending) return;
@@ -571,7 +610,22 @@ export default function MessagingSection() {
         const data = await response.json();
         setMessages(prev => [...prev, data.message]);
         messageInputRef.current?.focus();
-        fetchConversations(); // Refresh conversation list
+        // Update conversation's lastMessage locally instead of fetching all
+        setConversations(prev => prev.map(c => {
+          if (c.id === selectedConversation.id) {
+            return {
+              ...c,
+              lastMessage: {
+                content: data.message.content,
+                senderId: data.message.senderId,
+                senderName: data.message.senderName,
+                timestamp: data.message.createdAt,
+              },
+              lastActivityAt: data.message.createdAt,
+            };
+          }
+          return c;
+        }));
         scrollToBottom();
       } else {
         setMessageInput(content);
