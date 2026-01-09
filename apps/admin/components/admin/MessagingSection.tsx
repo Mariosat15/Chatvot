@@ -575,6 +575,19 @@ export default function MessagingSection() {
     try {
       console.log(`💬 [UI] Starting internal chat with: ${employee.name} (${employee.id})`);
       
+      // First check if conversation already exists in local state
+      const existingConv = conversations.find(c => 
+        c.type === 'employee-internal' && 
+        c.participants.some(p => p.id === employee.id)
+      );
+      
+      if (existingConv) {
+        console.log(`💬 [UI] Found existing conversation locally: ${existingConv.id}`);
+        setSelectedConversation(existingConv);
+        await fetchMessages(existingConv.id);
+        return;
+      }
+      
       const response = await fetch('/api/messaging/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -586,7 +599,7 @@ export default function MessagingSection() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log(`💬 [UI] Conversation created/found:`, data.conversation);
+        console.log(`💬 [UI] Conversation created/found:`, data.conversation?.id);
         
         // Build a proper conversation object
         const conv: Conversation = {
@@ -601,16 +614,18 @@ export default function MessagingSection() {
           lastActivityAt: data.conversation.lastActivityAt || new Date().toISOString(),
         };
         
+        // Add to conversations if not already there
+        setConversations(prev => {
+          const exists = prev.some(c => c.id === conv.id);
+          if (exists) return prev;
+          return [conv, ...prev];
+        });
+        
+        // Select and load messages
         setSelectedConversation(conv);
         await fetchMessages(conv.id);
         
-        // Fetch internal conversations specifically
-        const convResponse = await fetch('/api/messaging/conversations?type=internal&status=active');
-        if (convResponse.ok) {
-          const convData = await convResponse.json();
-          console.log(`💬 [UI] Fetched ${convData.conversations?.length || 0} internal conversations`);
-          setConversations(convData.conversations || []);
-        }
+        console.log(`💬 [UI] Chat ready with ${employee.name}`);
       } else {
         const errorData = await response.json();
         console.error('Failed to start internal chat:', errorData);
@@ -678,8 +693,8 @@ export default function MessagingSection() {
               </>
             ) : (
               <>
-                <WifiOff className="w-4 h-4 text-amber-500 animate-pulse" />
-                <span className="text-xs text-amber-500">Connecting...</span>
+                <WifiOff className="w-4 h-4 text-red-400" />
+                <span className="text-xs text-red-400">Offline</span>
               </>
             )}
           </div>

@@ -79,10 +79,13 @@ export async function GET(
       }
     );
 
-    // Reset unread count
-    if (conversation.unreadCounts?.has) {
-      conversation.unreadCounts.set(decoded.adminId, 0);
-      await conversation.save();
+    // Reset unread count - handle both Map and plain object
+    const db = mongoose.connection.db;
+    if (db) {
+      await db.collection('conversations').updateOne(
+        { _id: new Types.ObjectId(conversationId) },
+        { $set: { [`unreadCounts.${decoded.adminId}`]: 0 } }
+      );
     }
 
     return NextResponse.json({
