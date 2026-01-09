@@ -415,8 +415,14 @@ export class MessagingService {
     }
     await conversation.save();
     
-    // Stop typing indicator
-    await UserPresence.stopTyping(params.senderId);
+    // Stop typing indicator (wrapped in try-catch as this is non-critical)
+    try {
+      if (typeof UserPresence.stopTyping === 'function') {
+        await UserPresence.stopTyping(params.senderId);
+      }
+    } catch (err) {
+      console.warn('[MessagingService] Failed to stop typing indicator:', err instanceof Error ? err.message : err);
+    }
     
     // Broadcast message to WebSocket for real-time delivery
     broadcastToWebSocket('message', {
@@ -944,17 +950,35 @@ export class MessagingService {
   
   static async setTyping(participantId: string, conversationId: string): Promise<void> {
     await connectToDatabase();
-    await UserPresence.setTyping(participantId, conversationId);
+    try {
+      if (typeof UserPresence.setTyping === 'function') {
+        await UserPresence.setTyping(participantId, conversationId);
+      }
+    } catch (err) {
+      console.warn('[MessagingService] setTyping error:', err instanceof Error ? err.message : err);
+    }
   }
   
   static async stopTyping(participantId: string): Promise<void> {
     await connectToDatabase();
-    await UserPresence.stopTyping(participantId);
+    try {
+      if (typeof UserPresence.stopTyping === 'function') {
+        await UserPresence.stopTyping(participantId);
+      }
+    } catch (err) {
+      console.warn('[MessagingService] stopTyping error:', err instanceof Error ? err.message : err);
+    }
   }
   
   static async heartbeat(participantId: string): Promise<void> {
     await connectToDatabase();
-    await UserPresence.heartbeat(participantId);
+    try {
+      if (typeof UserPresence.heartbeat === 'function') {
+        await UserPresence.heartbeat(participantId);
+      }
+    } catch (err) {
+      console.warn('[MessagingService] heartbeat error:', err instanceof Error ? err.message : err);
+    }
   }
   
   // ==========================================
