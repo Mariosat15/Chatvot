@@ -312,34 +312,63 @@ export default function MessagingSection() {
 
   const startConversationWithCustomer = async (customerId: string, customerName: string, customerAvatar?: string) => {
     try {
+      console.log(`💬 [UI] Starting conversation with customer: ${customerName} (${customerId})`);
+      
       const response = await fetch('/api/messaging/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'user-to-support', customerId, customerName }),
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        setActiveTab('support');
-        await fetchConversations();
-        
-        const convResponse = await fetch(`/api/messaging/conversations/${data.conversation.id}`);
-        if (convResponse.ok) {
-          const convData = await convResponse.json();
-          setSelectedConversation({
-            id: data.conversation.id,
-            type: data.conversation.type || 'user-to-support',
-            status: data.conversation.status || 'active',
-            participants: convData.participants || data.conversation.participants || [],
-            lastMessage: convData.lastMessage,
-            unreadCount: 0,
-            isAIHandled: false,
-            createdAt: convData.createdAt,
-            lastActivityAt: convData.lastActivityAt,
-          });
-          setMessages(convData.messages || []);
-          setTimeout(() => scrollToBottom(), 100);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to create conversation:', response.status, errorData);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log(`💬 [UI] Conversation created/found:`, data.conversation?.id);
+      
+      if (!data.conversation?.id) {
+        console.error('No conversation ID returned');
+        return;
+      }
+      
+      // Switch to support tab first
+      setActiveTab('support');
+      
+      // Fetch conversations for support tab specifically
+      try {
+        const convListResponse = await fetch('/api/messaging/conversations?type=support&status=active');
+        if (convListResponse.ok) {
+          const convListData = await convListResponse.json();
+          setConversations(convListData.conversations || []);
         }
+      } catch (err) {
+        console.error('Error fetching conversations list:', err);
+      }
+      
+      // Fetch the conversation details
+      const convResponse = await fetch(`/api/messaging/conversations/${data.conversation.id}`);
+      if (convResponse.ok) {
+        const convData = await convResponse.json();
+        console.log(`💬 [UI] Got conversation details, messages:`, convData.messages?.length || 0);
+        
+        setSelectedConversation({
+          id: data.conversation.id,
+          type: data.conversation.type || 'user-to-support',
+          status: data.conversation.status || 'active',
+          participants: convData.participants || data.conversation.participants || [],
+          lastMessage: convData.lastMessage,
+          unreadCount: 0,
+          isAIHandled: convData.isAIHandled || false,
+          createdAt: convData.createdAt || new Date().toISOString(),
+          lastActivityAt: convData.lastActivityAt || new Date().toISOString(),
+        });
+        setMessages(convData.messages || []);
+        setTimeout(() => scrollToBottom(), 100);
+      } else {
+        console.error('Failed to fetch conversation details:', convResponse.status);
       }
     } catch (error) {
       console.error('Error starting conversation:', error);
