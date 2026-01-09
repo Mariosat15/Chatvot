@@ -61,6 +61,21 @@ export function useWebSocket({
   const reconnectCountRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isUnmountedRef = useRef(false);
+  const lastConnectAttemptRef = useRef(0);
+
+  // Store callbacks in refs to avoid dependency changes causing reconnects
+  const onMessageRef = useRef(onMessage);
+  const onConnectRef = useRef(onConnect);
+  const onDisconnectRef = useRef(onDisconnect);
+  const onErrorRef = useRef(onError);
+  
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+    onConnectRef.current = onConnect;
+    onDisconnectRef.current = onDisconnect;
+    onErrorRef.current = onError;
+  }, [onMessage, onConnect, onDisconnect, onError]);
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -76,7 +91,26 @@ export function useWebSocket({
 
   // Connect to WebSocket
   const connect = useCallback(() => {
-    if (!token || wsRef.current?.readyState === WebSocket.OPEN) {
+    // Prevent multiple rapid connection attempts
+    const now = Date.now();
+    if (now - lastConnectAttemptRef.current < 2000) {
+      console.log('🛑 [WS] Throttling connection attempt');
+      return;
+    }
+    lastConnectAttemptRef.current = now;
+    
+    if (!token || isUnmountedRef.current) {
+      return;
+    }
+    
+    // Check if already connected or connecting
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('🔌 [WS] Already connected');
+      return;
+    }
+    
+    if (wsRef.current?.readyState === WebSocket.CONNECTING) {
+      console.log('🔌 [WS] Already connecting');
       return;
     }
 
@@ -90,11 +124,15 @@ export function useWebSocket({
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
+        if (isUnmountedRef.current) {
+          ws.close();
+          return;
+        }
         console.log('✅ WebSocket connected');
         setIsConnected(true);
         setIsConnecting(false);
         reconnectCountRef.current = 0;
-        onConnect?.();
+        onConnectRef.current?.();
 
         // Start heartbeat
         heartbeatIntervalRef.current = setInterval(() => {
@@ -107,33 +145,45 @@ export function useWebSocket({
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          onMessage?.(message);
+          onMessageRef.current?.(message);
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error);
         }
       };
 
       ws.onclose = (event) => {
-        console.log('❌ WebSocket disconnected:', event.code, event.reason);
+        console.log('❌ WebSocket disconnected:', event.code);
         setIsConnected(false);
         setIsConnecting(false);
         wsRef.current = null;
         cleanup();
-        onDisconnect?.();
+        onDisconnectRef.current?.();
 
-        // Attempt reconnection if not a clean close
-        if (event.code !== 1000 && reconnectCountRef.current < reconnectAttempts) {
+        // Don't reconnect if unmounted or clean close
+        if (isUnmountedRef.current || event.code === 1000) {
+          return;
+        }
+
+        // Attempt reconnection with exponential backoff
+        if (reconnectCountRef.current < reconnectAttempts) {
           reconnectCountRef.current++;
-          console.log(`🔄 Reconnecting in ${reconnectInterval}ms (attempt ${reconnectCountRef.current}/${reconnectAttempts})`);
+          // Exponential backoff: 3s, 6s, 12s, 24s, 48s
+          const delay = reconnectInterval * Math.pow(2, reconnectCountRef.current - 1);
+          const cappedDelay = Math.min(delay, 60000); // Cap at 60 seconds
+          console.log(`🔄 Reconnecting in ${cappedDelay}ms (attempt ${reconnectCountRef.current}/${reconnectAttempts})`);
           reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
-          }, reconnectInterval);
+            if (!isUnmountedRef.current) {
+              connect();
+            }
+          }, cappedDelay);
+        } else {
+          console.log('❌ [WS] Max reconnect attempts reached');
         }
       };
 
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
-        onError?.(error);
+        onErrorRef.current?.(error);
       };
 
       wsRef.current = ws;
@@ -141,10 +191,11 @@ export function useWebSocket({
       console.error('Failed to create WebSocket:', error);
       setIsConnecting(false);
     }
-  }, [token, onConnect, onDisconnect, onMessage, onError, reconnectAttempts, reconnectInterval, cleanup]);
+  }, [token, reconnectAttempts, reconnectInterval, cleanup]);
 
   // Disconnect from WebSocket
   const disconnect = useCallback(() => {
+    reconnectCountRef.current = reconnectAttempts; // Prevent reconnection
     cleanup();
     if (wsRef.current) {
       wsRef.current.close(1000, 'User initiated disconnect');
@@ -152,7 +203,7 @@ export function useWebSocket({
     }
     setIsConnected(false);
     setIsConnecting(false);
-  }, [cleanup]);
+  }, [cleanup, reconnectAttempts]);
 
   // Send message
   const send = useCallback((message: any) => {
@@ -180,21 +231,34 @@ export function useWebSocket({
 
   // Connect when token is available
   useEffect(() => {
+    isUnmountedRef.current = false;
+    
     if (token) {
-      connect();
+      // Small delay to prevent double-connection on strict mode
+      const timeout = setTimeout(() => {
+        if (!isUnmountedRef.current) {
+          connect();
+        }
+      }, 100);
+      
+      return () => {
+        clearTimeout(timeout);
+        isUnmountedRef.current = true;
+        cleanup();
+        if (wsRef.current) {
+          wsRef.current.close(1000, 'Component unmounting');
+          wsRef.current = null;
+        }
+        setIsConnected(false);
+        setIsConnecting(false);
+      };
     }
-
+    
     return () => {
-      disconnect();
+      isUnmountedRef.current = true;
     };
-  }, [token, connect, disconnect]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cleanup();
-    };
-  }, [cleanup]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]); // Only reconnect when token changes
 
   return {
     isConnected,

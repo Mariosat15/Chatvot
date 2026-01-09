@@ -26,7 +26,7 @@ export interface ILastMessage {
   content: string;
   senderId: string;
   senderName: string;
-  senderType: 'user' | 'employee' | 'ai';
+  senderType: 'user' | 'employee' | 'ai' | 'system';
   timestamp: Date;
 }
 
@@ -97,7 +97,7 @@ const LastMessageSchema = new Schema<ILastMessage>(
     content: { type: String, required: true },
     senderId: { type: String, required: true },
     senderName: { type: String, required: true },
-    senderType: { type: String, enum: ['user', 'employee', 'ai'], required: true },
+    senderType: { type: String, enum: ['user', 'employee', 'ai', 'system'], required: true },
     timestamp: { type: Date, required: true },
   },
   { _id: false }
