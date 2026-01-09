@@ -24,15 +24,13 @@ export async function GET(request: NextRequest) {
 
     console.log(`🔍 [Support] Looking for assignment for user: ${session.user.id}`);
 
-    // Check if user has an assigned employee (try both string and ObjectId formats)
+    // Check if user has an ACTIVE assigned employee
     const assignment = await db.collection('customer_assignments').findOne({
-      $or: [
-        { customerId: session.user.id },
-        { customerId: session.user.id.toString() },
-      ]
+      customerId: session.user.id,
+      isActive: true,
     });
 
-    console.log(`📋 [Support] Assignment found:`, assignment ? 'Yes' : 'No');
+    console.log(`📋 [Support] Assignment found:`, assignment ? `Yes - ${assignment.employeeName}` : 'No');
 
     if (!assignment || !assignment.employeeId) {
       return NextResponse.json({ assignedAgent: null });

@@ -55,6 +55,8 @@ export class MessagingService {
     }>;
     title?: string;
     isAIHandled?: boolean;
+    assignedEmployeeId?: string;
+    assignedEmployeeName?: string;
   }): Promise<IConversation> {
     await connectToDatabase();
     
@@ -68,8 +70,13 @@ export class MessagingService {
       })),
       title: params.title,
       isAIHandled: params.isAIHandled || false,
+      assignedEmployeeId: params.assignedEmployeeId ? new Types.ObjectId(params.assignedEmployeeId) : undefined,
+      assignedEmployeeName: params.assignedEmployeeName,
       unreadCounts: new Map(),
+      lastActivityAt: new Date(),
     });
+    
+    console.log(`📝 [createConversation] Created: ${conversation._id}, type: ${params.type}, isAIHandled: ${params.isAIHandled}, assignedEmployee: ${params.assignedEmployeeName || 'none'}`);
     
     return conversation;
   }
