@@ -39,44 +39,62 @@ function useAdminWebSocket(onMessage: (msg: any) => void) {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectCountRef = useRef(0);
+  const lastConnectAttemptRef = useRef(0);
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    // Throttle connection attempts
+    const now = Date.now();
+    if (now - lastConnectAttemptRef.current < 2000) return;
+    lastConnectAttemptRef.current = now;
+    
+    if (wsRef.current?.readyState === WebSocket.OPEN || 
+        wsRef.current?.readyState === WebSocket.CONNECTING) return;
     
     try {
+      // Build WebSocket URL - use /ws path through Nginx (works for any domain/whitelabel)
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || `${wsProtocol}//${window.location.hostname}:3003`;
+      const host = window.location.host; // Includes port if non-standard
+      const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || `${wsProtocol}//${host}/ws`;
       const adminId = document.cookie.split('; ').find(c => c.startsWith('admin_id='))?.split('=')[1] || 'admin';
-      const ws = new WebSocket(`${wsUrl}/ws?token=${encodeURIComponent(adminId)}&type=employee`);
+      const ws = new WebSocket(`${wsUrl}?token=${encodeURIComponent(adminId)}&type=employee`);
 
       ws.onopen = () => {
-        console.log('✅ [Admin WS] Connected');
         setIsConnected(true);
+        reconnectCountRef.current = 0;
       };
 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
           onMessage(message);
-        } catch (e) {
-          console.error('Failed to parse WS message:', e);
+        } catch {
+          // Silent fail on parse error
         }
       };
 
-      ws.onclose = () => {
-        console.log('❌ [Admin WS] Disconnected');
+      ws.onclose = (event) => {
         setIsConnected(false);
         wsRef.current = null;
-        reconnectTimeoutRef.current = setTimeout(connect, 3000);
+        
+        // Don't reconnect on clean close
+        if (event.code === 1000) return;
+        
+        // Exponential backoff reconnection (max 5 attempts)
+        if (reconnectCountRef.current < 5) {
+          reconnectCountRef.current++;
+          const delay = Math.min(3000 * Math.pow(2, reconnectCountRef.current - 1), 60000);
+          reconnectTimeoutRef.current = setTimeout(connect, delay);
+        }
       };
 
-      ws.onerror = (error) => {
-        console.error('[Admin WS] Error:', error);
+      ws.onerror = () => {
+        // Silent - errors trigger onclose
       };
 
       wsRef.current = ws;
-    } catch (error) {
-      console.error('Failed to connect WS:', error);
+    } catch {
+      // Silent fail
     }
   }, [onMessage]);
 
