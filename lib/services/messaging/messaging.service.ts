@@ -146,6 +146,7 @@ export class MessagingService {
     const settings = await MessagingSettings.getSettings();
     
     console.log(`🔍 [MessagingService] getOrCreateSupportConversation for user: ${userName} (${userId})`);
+    console.log(`🔍 [MessagingService] AI Support enabled: ${settings.enableAISupport}`);
     
     // First, check if user has an assigned employee (account manager)
     let assignedEmployee: { id: string; name: string; avatar?: string } | null = null;
@@ -153,10 +154,8 @@ export class MessagingService {
       const db = mongoose.connection.db;
       if (db) {
         const assignment = await db.collection('customer_assignments').findOne({
-          $or: [
-            { customerId: userId },
-            { customerId: userId.toString() },
-          ]
+          customerId: userId,
+          isActive: true,
         });
         
         console.log(`🔍 [MessagingService] Assignment found: ${assignment ? 'Yes' : 'No'}`);
@@ -190,38 +189,26 @@ export class MessagingService {
     });
     
     if (conversation) {
-      console.log(`📦 [MessagingService] Found existing conversation: ${conversation._id}`);
+      console.log(`📦 [MessagingService] Found existing conversation: ${conversation._id}, isAIHandled: ${conversation.isAIHandled}`);
       
-      // Check if we need to add assigned employee to existing conversation
-      if (assignedEmployee) {
-        const hasEmployee = conversation.participants.some(p => p.id === assignedEmployee!.id && p.type === 'employee');
-        
-        if (!hasEmployee) {
-          console.log(`➕ [MessagingService] Adding assigned employee to existing conversation`);
-          
-          // Add employee as participant
-          conversation.participants.push({
-            id: assignedEmployee.id,
-            type: 'employee',
-            name: assignedEmployee.name,
-            avatar: assignedEmployee.avatar,
-            joinedAt: new Date(),
-            isActive: true,
-          });
-          
-          // Update conversation with assignment
-          conversation.assignedEmployeeId = new Types.ObjectId(assignedEmployee.id);
-          conversation.assignedEmployeeName = assignedEmployee.name;
-          conversation.isAIHandled = false; // Disable AI when employee is assigned
-          
-          await conversation.save();
-        }
+      // Store assigned employee info on conversation (for escalation later)
+      // But DON'T disable AI - let AI handle until escalation
+      if (assignedEmployee && !conversation.assignedEmployeeId) {
+        conversation.assignedEmployeeId = new Types.ObjectId(assignedEmployee.id);
+        conversation.assignedEmployeeName = assignedEmployee.name;
+        // Keep isAIHandled as is - only change when escalated
+        await conversation.save();
+        console.log(`📦 [MessagingService] Updated assigned employee info (AI still handling)`);
       }
       
       return conversation;
     }
     
     console.log(`🆕 [MessagingService] Creating new support conversation`);
+    
+    // IMPORTANT: AI ALWAYS handles first if enabled, regardless of assigned employee
+    // The assigned employee will take over when customer requests human assistance
+    const shouldUseAI = settings.enableAISupport;
     
     conversation = await this.createConversation({
       type: 'user-to-support',
@@ -231,13 +218,41 @@ export class MessagingService {
         name: userName,
         avatar: userAvatar,
       }],
-      isAIHandled: settings.enableAISupport && !assignedEmployee, // Don't use AI if has assigned employee
+      isAIHandled: shouldUseAI, // AI handles first if enabled
+      // Store assigned employee info for later escalation
       assignedEmployeeId: assignedEmployee?.id,
       assignedEmployeeName: assignedEmployee?.name,
     });
     
-    // If has assigned employee, add them as participant
-    if (assignedEmployee) {
+    // If AI support is enabled, add AI as participant and send greeting
+    if (shouldUseAI) {
+      conversation.participants.push({
+        id: 'ai-assistant',
+        type: 'ai',
+        name: 'AI Assistant',
+        joinedAt: new Date(),
+        isActive: true,
+      });
+      await conversation.save();
+      
+      // Send AI greeting
+      await this.sendMessage({
+        conversationId: conversation._id.toString(),
+        senderId: 'ai-assistant',
+        senderType: 'ai',
+        senderName: 'AI Assistant',
+        content: settings.aiGreetingMessage,
+        messageType: 'ai-response',
+      });
+      console.log(`✅ [MessagingService] AI Support enabled - AI greeting sent`);
+      
+      // If there's an assigned employee, mention they're available
+      if (assignedEmployee) {
+        console.log(`📝 [MessagingService] Assigned employee ${assignedEmployee.name} ready for escalation`);
+      }
+    }
+    // If AI is disabled but has assigned employee, add employee directly
+    else if (assignedEmployee) {
       conversation.participants.push({
         id: assignedEmployee.id,
         type: 'employee',
@@ -258,29 +273,11 @@ export class MessagingService {
         content: `Hello ${userName}! I'm ${assignedEmployee.name}, your dedicated account manager. How can I help you today?`,
         messageType: 'system',
       });
-      console.log(`✅ [MessagingService] Added assigned employee and sent welcome message`);
+      console.log(`✅ [MessagingService] AI disabled - Employee handling directly`);
     }
-    // If AI support is enabled and no assigned employee, add AI as participant
-    else if (settings.enableAISupport) {
-      conversation.participants.push({
-        id: 'ai-assistant',
-        type: 'ai',
-        name: 'AI Assistant',
-        joinedAt: new Date(),
-        isActive: true,
-      });
-      await conversation.save();
-      
-      // Send AI greeting
-      await this.sendMessage({
-        conversationId: conversation._id.toString(),
-        senderId: 'ai-assistant',
-        senderType: 'ai',
-        senderName: 'AI Assistant',
-        content: settings.aiGreetingMessage,
-        messageType: 'ai-response',
-      });
-      console.log(`✅ [MessagingService] Added AI assistant and sent greeting`);
+    // No AI and no employee - just create empty conversation (waiting for support)
+    else {
+      console.log(`⚠️ [MessagingService] No AI and no assigned employee - customer waiting for support`);
     }
     
     return conversation;
@@ -772,11 +769,105 @@ export class MessagingService {
       throw new Error('Conversation not found.');
     }
     
-    const settings = await MessagingSettings.getSettings();
+    console.log(`🤖→👤 [escalateFromAI] Conversation: ${conversationId}, Reason: ${reason}`);
+    
+    // Get the user from participants
+    const userParticipant = conversation.participants.find(p => p.type === 'user');
+    const userId = userParticipant?.id;
+    
+    // Find employee to assign - priority order:
+    // 1. Already assigned employee on conversation
+    // 2. Customer assignment record
+    // 3. Any available support staff
+    let assignedEmployee: { id: string; name: string; avatar?: string } | null = null;
+    
+    const db = mongoose.connection.db;
+    if (db && userId) {
+      // Priority 1: Use existing assigned employee on conversation
+      if (conversation.assignedEmployeeId) {
+        const emp = await db.collection('admins').findOne({
+          _id: conversation.assignedEmployeeId,
+          status: 'active',
+          isAvailableForChat: { $ne: false },
+        });
+        if (emp) {
+          assignedEmployee = {
+            id: emp._id.toString(),
+            name: emp.name || emp.email?.split('@')[0],
+            avatar: emp.profileImage,
+          };
+          console.log(`🤖→👤 [escalateFromAI] Using pre-assigned employee: ${assignedEmployee.name}`);
+        }
+      }
+      
+      // Priority 2: Check customer_assignments
+      if (!assignedEmployee) {
+        const assignment = await db.collection('customer_assignments').findOne({
+          customerId: userId,
+          isActive: true,
+        });
+        
+        if (assignment?.employeeId) {
+          const emp = await db.collection('admins').findOne({
+            _id: new Types.ObjectId(assignment.employeeId),
+            status: 'active',
+            isAvailableForChat: { $ne: false },
+          });
+          if (emp) {
+            assignedEmployee = {
+              id: emp._id.toString(),
+              name: emp.name || emp.email?.split('@')[0],
+              avatar: emp.profileImage,
+            };
+            console.log(`🤖→👤 [escalateFromAI] Using customer assignment: ${assignedEmployee.name}`);
+          }
+        }
+      }
+      
+      // Priority 3: Find any available support staff
+      if (!assignedEmployee) {
+        const emp = await db.collection('admins').findOne({
+          status: 'active',
+          role: { $in: ['Backoffice', 'Support Agent', 'Full Admin'] },
+          isLockedOut: { $ne: true },
+          isAvailableForChat: { $ne: false },
+        });
+        if (emp) {
+          assignedEmployee = {
+            id: emp._id.toString(),
+            name: emp.name || emp.email?.split('@')[0],
+            avatar: emp.profileImage,
+          };
+          console.log(`🤖→👤 [escalateFromAI] Using fallback support: ${assignedEmployee.name}`);
+        }
+      }
+    }
     
     // Mark AI as no longer handling
     conversation.isAIHandled = false;
     conversation.aiHandledUntil = new Date();
+    
+    // Assign employee
+    if (assignedEmployee) {
+      conversation.assignedEmployeeId = new Types.ObjectId(assignedEmployee.id);
+      conversation.assignedEmployeeName = assignedEmployee.name;
+      
+      // Add employee as participant if not already present
+      const isParticipant = conversation.participants.some(
+        p => p.id === assignedEmployee!.id && p.type === 'employee'
+      );
+      
+      if (!isParticipant) {
+        conversation.participants.push({
+          id: assignedEmployee.id,
+          type: 'employee',
+          name: assignedEmployee.name,
+          avatar: assignedEmployee.avatar,
+          joinedAt: new Date(),
+          isActive: true,
+        });
+      }
+    }
     
     // Remove AI from active participants
     const aiParticipant = conversation.participants.find(p => p.id === 'ai-assistant');
@@ -787,19 +878,34 @@ export class MessagingService {
     
     await conversation.save();
     
+    // Build transfer message
+    const employeeName = assignedEmployee?.name || 'our support team';
+    const transferMessage = reason === 'User requested'
+      ? `I'm connecting you with ${employeeName}. They'll be with you shortly!`
+      : `I'm transferring you to ${employeeName} who will be able to assist you further. They'll be with you shortly!`;
+    
     // Send AI farewell message
     await this.sendMessage({
       conversationId,
       senderId: 'ai-assistant',
       senderType: 'ai',
       senderName: 'AI Assistant',
-      content: "I'm transferring you to one of our support team members who will be able to assist you further. They'll be with you shortly!",
-      messageType: 'ai-response',
+      content: transferMessage,
+      messageType: 'system',
     });
     
-    // Find an employee to assign
-    // TODO: Implement round-robin or assignment logic
-    // For now, just mark as needing assignment
+    // Notify employee
+    if (assignedEmployee) {
+      const { wsNotifier } = await import('@/lib/services/messaging/websocket-notifier');
+      wsNotifier.notifyEmployeeNewChat(assignedEmployee.id, {
+        conversationId,
+        customerName: userParticipant?.name || 'Customer',
+        customerId: userId || '',
+        reason,
+      });
+    }
+    
+    console.log(`🤖→👤 [escalateFromAI] Escalated to ${employeeName}`);
     
     return conversation;
   }

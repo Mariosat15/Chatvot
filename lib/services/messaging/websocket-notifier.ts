@@ -157,6 +157,52 @@ class WebSocketNotifier {
   }
 
   /**
+   * Notify employee of new chat assignment / escalation
+   */
+  async notifyEmployeeNewChat(
+    employeeId: string,
+    chatInfo: {
+      conversationId: string;
+      customerName: string;
+      customerId: string;
+      reason: string;
+    }
+  ): Promise<void> {
+    await this.notify('/internal/employee-notification', {
+      employeeId,
+      type: 'new_chat',
+      data: {
+        conversationId: chatInfo.conversationId,
+        customerName: chatInfo.customerName,
+        customerId: chatInfo.customerId,
+        reason: chatInfo.reason,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  /**
+   * Notify employee of customer assignment
+   */
+  async notifyEmployeeAssignment(
+    employeeId: string,
+    customerId: string,
+    customerName: string,
+    assignmentType: 'assigned' | 'transferred' | 'unassigned'
+  ): Promise<void> {
+    await this.notify('/internal/employee-notification', {
+      employeeId,
+      type: 'customer_assignment',
+      data: {
+        customerId,
+        customerName,
+        assignmentType,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  /**
    * Get WebSocket server health status
    */
   async getHealth(): Promise<any> {
