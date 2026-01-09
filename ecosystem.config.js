@@ -83,8 +83,6 @@ module.exports = {
       error_file: './logs/worker-error.log',
       out_file: './logs/worker-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      // Restart every 6 hours to prevent memory leaks
-      cron_restart: '0 */6 * * *',
       // Graceful shutdown
       kill_timeout: 10000,
     },
