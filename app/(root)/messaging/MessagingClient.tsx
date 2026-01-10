@@ -405,7 +405,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     
     setIsSearching(true);
     try {
-      const response = await fetch(`/api/messaging/users/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/messaging/search/users?q=${encodeURIComponent(query)}`);
       if (response.ok) {
         const data = await response.json();
         setSearchResults(data.users || []);
@@ -416,6 +416,61 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       setIsSearching(false);
     }
   }, []);
+
+  // Send friend request
+  const sendFriendRequest = async (toUserId: string) => {
+    try {
+      const response = await fetch('/api/messaging/friends/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toUserId }),
+      });
+      
+      if (response.ok) {
+        // Refresh friend requests
+        fetchFriendRequests();
+        // Re-search to update UI
+        if (searchQuery) searchUsers(searchQuery);
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to send friend request');
+      }
+    } catch {
+      alert('Network error');
+    }
+  };
+
+  // Start conversation with a friend
+  const startConversationWithFriend = async (friendId: string) => {
+    try {
+      const response = await fetch('/api/messaging/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participantId: friendId }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Refresh conversations and select the new one
+        await fetchConversations();
+        if (data.conversation) {
+          const conv = {
+            ...data.conversation,
+            id: data.conversation.id || data.conversation._id,
+          };
+          setSelectedConversation(conv);
+          setActiveTab('chats');
+          setShowMobileChat(true);
+          fetchMessages(conv.id, true);
+        }
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to start conversation');
+      }
+    } catch {
+      alert('Network error');
+    }
+  };
 
   // Send message
   const sendMessage = async () => {
@@ -1000,30 +1055,96 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="Search users..."
+                  placeholder="Search users to add..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
                 />
               </div>
               
+              {/* Search Results */}
+              {searchQuery.trim() && (
+                <div className="mb-4">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                    Search Results {isSearching && <span className="text-cyan-400">...</span>}
+                  </h3>
+                  {searchResults.length === 0 && !isSearching ? (
+                    <p className="text-gray-500 text-sm text-center py-4">No users found</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {searchResults.map((user) => {
+                        // Use API flags if available, otherwise check local state
+                        const isFriend = user.isFriend || friends.some(f => f.friendId === user.id);
+                        const hasPendingRequest = user.hasPendingRequest || friendRequests.sent.some(r => r.toUserId === user.id);
+                        const hasReceivedRequest = friendRequests.received.some(r => r.fromUserId === user.id);
+                        
+                        return (
+                          <div key={user.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-colors">
+                            <div className="w-10 h-10 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-xl flex items-center justify-center overflow-hidden">
+                              {user.image ? (
+                                <img src={user.image} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                              ) : (
+                                <span className="text-violet-400 font-medium">{user.name?.charAt(0)}</span>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-white font-medium">{user.name}</p>
+                              {user.username && (
+                                <p className="text-xs text-gray-500">@{user.username}</p>
+                              )}
+                            </div>
+                            {isFriend ? (
+                              <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">Friends</span>
+                            ) : hasPendingRequest ? (
+                              <span className="text-xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded-lg">Pending</span>
+                            ) : hasReceivedRequest ? (
+                              <span className="text-xs text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded-lg">Accept in Requests</span>
+                            ) : (
+                              <button
+                                onClick={() => sendFriendRequest(user.id)}
+                                className="w-8 h-8 bg-cyan-500/20 text-cyan-400 rounded-lg flex items-center justify-center hover:bg-cyan-500/30 transition-colors"
+                                title="Send friend request"
+                              >
+                                <UserPlus className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Friends List */}
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                Your Friends ({friends.length})
+              </h3>
               {friends.length === 0 ? (
                 <div className="text-center py-8">
                   <Users className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                   <p className="text-gray-500">No friends yet</p>
+                  <p className="text-gray-600 text-sm mt-1">Search for users above to add friends</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {friends.map((friend) => (
-                    <div key={friend.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl flex items-center justify-center">
+                    <div key={friend.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-colors cursor-pointer">
+                      <div className="w-10 h-10 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl flex items-center justify-center overflow-hidden">
                         {friend.friendAvatar ? (
-                          <img src={friend.friendAvatar} alt="" className="w-10 h-10 rounded-xl" />
+                          <img src={friend.friendAvatar} alt="" className="w-10 h-10 rounded-xl object-cover" />
                         ) : (
                           <span className="text-cyan-400 font-medium">{friend.friendName?.charAt(0)}</span>
                         )}
                       </div>
                       <span className="text-white font-medium flex-1">{friend.friendName}</span>
+                      <button
+                        onClick={() => startConversationWithFriend(friend.friendId)}
+                        className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30 transition-colors"
+                        title="Send message"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
                     </div>
                   ))}
                 </div>
