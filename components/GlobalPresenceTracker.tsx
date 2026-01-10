@@ -6,17 +6,21 @@ import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 /**
  * Global presence tracker component that should be added to the root layout.
  * This tracks user online/offline status across all pages.
+ * 
+ * IMPORTANT: Users stay ONLINE as long as they are logged in, even if the 
+ * browser tab is in the background. They only go offline when:
+ * - They close the browser/tab completely
+ * - They log out
+ * - Session expires (server-side timeout)
  */
 export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
-  const isActiveRef = useRef(true);
 
   useEffect(() => {
     if (!userId) return;
 
     const sendHeartbeat = async () => {
-      if (!isActiveRef.current) return;
-      
+      // Always send heartbeat - user is online as long as they're logged in
       try {
         await fetch('/api/user/presence', {
           method: 'POST',
@@ -28,42 +32,18 @@ export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
       }
     };
 
-    // Send initial heartbeat
+    // Send initial heartbeat immediately
     sendHeartbeat();
 
-    // Set up interval for heartbeats - optimized to 30 seconds (was 10)
+    // Set up interval for heartbeats - keeps user online even in background tabs
+    // The heartbeat continues regardless of tab visibility
     heartbeatRef.current = setInterval(sendHeartbeat, PERFORMANCE_INTERVALS.PRESENCE_HEARTBEAT);
 
-    // Handle visibility change
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        isActiveRef.current = false;
-        // Send offline status when tab is hidden
-        navigator.sendBeacon('/api/user/presence', JSON.stringify({ status: 'offline' }));
-      } else {
-        isActiveRef.current = true;
-        sendHeartbeat();
-      }
-    };
-
-    // Handle window focus/blur
-    const handleFocus = () => {
-      isActiveRef.current = true;
-      sendHeartbeat();
-    };
-
-    const handleBlur = () => {
-      // Keep online but note window lost focus
-    };
-
-    // Handle page unload - mark as offline
+    // Handle page unload - mark as offline ONLY when browser/tab is closed
     const handleBeforeUnload = () => {
       navigator.sendBeacon('/api/user/presence', JSON.stringify({ status: 'offline' }));
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('blur', handleBlur);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     // Cleanup
@@ -71,12 +51,9 @@ export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
       }
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('blur', handleBlur);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       
-      // Try to send offline status on cleanup
+      // Send offline status on cleanup (component unmount = likely logout or navigation away)
       try {
         navigator.sendBeacon('/api/user/presence', JSON.stringify({ status: 'offline' }));
       } catch (e) {
