@@ -91,6 +91,8 @@ export class MessagingService {
       'participants.id': userId,
       'participants.isActive': true,
       status: { $ne: 'closed' },
+      // Exclude conversations deleted by this user
+      deletedByUsers: { $ne: userId },
     };
     
     if (options.type) {
@@ -106,7 +108,8 @@ export class MessagingService {
   static async getConversationById(
     conversationId: string,
     participantId: string,
-    includeArchived: boolean = true // Allow viewing archived by default
+    includeArchived: boolean = true, // Allow viewing archived by default
+    isAdmin: boolean = false // Admins bypass deletion filter
   ): Promise<IConversation | null> {
     await connectToDatabase();
     
@@ -118,6 +121,11 @@ export class MessagingService {
     // Only filter closed status if not including archived
     if (!includeArchived) {
       query.status = { $nin: ['closed', 'archived'] };
+    }
+    
+    // Exclude conversations deleted by this user (unless admin)
+    if (!isAdmin) {
+      query.deletedByUsers = { $ne: participantId };
     }
     
     return Conversation.findOne(query);
@@ -475,7 +483,7 @@ export class MessagingService {
   
   static async getMessages(
     conversationId: string,
-    options: { limit?: number; before?: Date; after?: Date } = {}
+    options: { limit?: number; before?: Date; after?: Date; userId?: string; isAdmin?: boolean } = {}
   ): Promise<IMessage[]> {
     await connectToDatabase();
     
@@ -487,6 +495,11 @@ export class MessagingService {
         { isDeleted: { $exists: false } },
       ],
     };
+    
+    // Filter out messages cleared by this user (unless admin)
+    if (options.userId && !options.isAdmin) {
+      query.clearedByUsers = { $ne: options.userId };
+    }
     
     if (options.before) {
       query.createdAt = { $lt: options.before };

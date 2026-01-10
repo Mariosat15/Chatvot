@@ -39,6 +39,7 @@ export async function GET(
     const messages = await MessagingService.getMessages(conversationId, {
       limit,
       before: before ? new Date(before) : undefined,
+      userId: session.user.id, // Filter out messages cleared by this user
     });
 
     console.log(`📩 [ConvAPI] Got ${messages.length} messages:`);

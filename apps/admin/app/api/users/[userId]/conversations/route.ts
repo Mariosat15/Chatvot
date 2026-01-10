@@ -38,10 +38,12 @@ export async function GET(
       return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
     }
 
-    // Build query
+    // Build query - only show support conversations (not user-to-user direct messages)
+    // Admins/employees should NOT see customer-to-customer private conversations
     const query: any = {
       'participants.id': userId,
       'participants.type': 'user',
+      type: 'user-to-support', // Only show support tickets, not DMs between customers
     };
 
     if (status === 'resolved') {
@@ -108,25 +110,29 @@ export async function GET(
       })
     );
 
-    // Get summary stats
+    // Get summary stats - only support conversations
     const stats = {
       total: await db.collection('conversations').countDocuments({
         'participants.id': userId,
         'participants.type': 'user',
+        type: 'user-to-support',
       }),
       resolved: await db.collection('conversations').countDocuments({
         'participants.id': userId,
         'participants.type': 'user',
+        type: 'user-to-support',
         isResolved: true,
       }),
       active: await db.collection('conversations').countDocuments({
         'participants.id': userId,
         'participants.type': 'user',
+        type: 'user-to-support',
         isResolved: { $ne: true },
       }),
       withTransfers: await db.collection('conversations').countDocuments({
         'participants.id': userId,
         'participants.type': 'user',
+        type: 'user-to-support',
         'metadata.transferHistory.0': { $exists: true },
       }),
     };

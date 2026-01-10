@@ -46,50 +46,26 @@ export async function POST(
 
     console.log(`🗑️ [Clear] User ${session.user.email} clearing conversation ${conversationId}`);
 
-    // Soft delete all messages in this conversation
+    // Mark this user's view of messages as cleared (add to clearedByUsers array)
+    // This preserves messages for admin/employee while hiding from the user
     const result = await db.collection('messages').updateMany(
       { conversationId: convObjectId },
       { 
-        $set: { 
-          isDeleted: true,
-          deletedAt: new Date(),
-          deletedBy: session.user.id,
+        $addToSet: { 
+          clearedByUsers: session.user.id 
         } 
       }
     );
 
-    // Add system message about clearing
-    const systemMessage = {
-      conversationId: convObjectId,
-      senderId: 'system',
-      senderType: 'system',
-      senderName: 'System',
-      messageType: 'system',
-      content: `🗑️ Chat history cleared`,
-      status: 'sent',
-      readBy: [],
-      deliveredTo: [],
-      isDeleted: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    await db.collection('messages').insertOne(systemMessage);
-
-    // Update conversation
+    // Mark conversation as cleared by this user (for tracking)
     await db.collection('conversations').updateOne(
       { _id: convObjectId },
       {
+        $addToSet: {
+          messagesClearedByUsers: session.user.id,
+        },
         $set: {
-          lastMessage: {
-            content: 'Chat history cleared',
-            senderId: 'system',
-            senderName: 'System',
-            senderType: 'system',
-            timestamp: new Date(),
-          },
-          lastActivityAt: new Date(),
-          lastResolvedAt: new Date(), // Reset AI counter
+          [`messagesClearedAt.${session.user.id}`]: new Date(),
         },
       }
     );
