@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { X, Swords } from 'lucide-react';
@@ -46,18 +45,10 @@ export default function VsScreen({
   onChallenge, 
   onClose 
 }: VsScreenProps) {
-  // All hooks must be called unconditionally (before any returns)
   const [player1ImageError, setPlayer1ImageError] = useState(false);
   const [opponentImageError, setOpponentImageError] = useState(false);
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   
   const levelInfo = LEVEL_INFO[opponent.level || 3];
-  
-  // Set portal root after mount (client-side only)
-  useEffect(() => {
-    setPortalRoot(document.body);
-    return () => setPortalRoot(null);
-  }, []);
   
   // Reset image errors when opponent changes
   useEffect(() => {
@@ -65,13 +56,19 @@ export default function VsScreen({
     setOpponentImageError(false);
   }, [opponent.username, player1Name]);
   
-  // Don't render portal on server or before mount
-  if (!portalRoot) {
-    return null;
-  }
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (show) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [show]);
   
-  // Use portal to render at document body level - avoids overflow:hidden issues
-  return createPortal(
+  return (
     <AnimatePresence>
       {show && (
         <motion.div
@@ -79,7 +76,7 @@ export default function VsScreen({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-md p-4"
           onClick={(e) => {
             // Only close if clicking directly on backdrop, not its children
             if (e.target === e.currentTarget) {
@@ -292,8 +289,7 @@ export default function VsScreen({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>,
-    document.body
+    </AnimatePresence>
   );
 }
 
