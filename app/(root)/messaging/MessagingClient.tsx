@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import EmojiPicker from '@/components/chat/EmojiPicker';
 import { formatDistanceToNow, format } from 'date-fns';
+import { toast } from 'sonner';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Session {
@@ -658,7 +659,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     }
   };
 
-  // Clear conversation history
+  // Clear conversation history (messages only)
   const clearConversation = async () => {
     if (!selectedConversation) return;
     
@@ -681,8 +682,40 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       } else {
         alert('Failed to clear conversation');
       }
-    } catch (error) {
+    } catch {
       alert('Error clearing conversation');
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  // Delete conversation (remove from user's view entirely)
+  const deleteConversation = async () => {
+    if (!selectedConversation) return;
+    
+    if (!confirm('Are you sure you want to delete this conversation? It will be removed from your list.')) {
+      return;
+    }
+    
+    setIsClearing(true);
+    setShowChatMenu(false);
+    
+    try {
+      const response = await fetch(`/api/messaging/conversations/${selectedConversation.id}/delete`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        toast.success('Conversation deleted');
+        setSelectedConversation(null);
+        setMessages([]);
+        await fetchConversations();
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to delete conversation');
+      }
+    } catch {
+      toast.error('Error deleting conversation');
     } finally {
       setIsClearing(false);
     }
@@ -1333,12 +1366,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                       initial={{ opacity: 0, y: -10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      className="absolute right-0 top-full mt-2 w-48 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50"
+                      className="absolute right-0 top-full mt-2 w-52 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50"
                     >
                       <button
                         onClick={clearConversation}
                         disabled={isClearing}
-                        className="w-full px-4 py-3 text-left text-sm text-red-400 hover:bg-white/5 flex items-center gap-3 disabled:opacity-50"
+                        className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-white/5 flex items-center gap-3 disabled:opacity-50 border-b border-white/5"
                       >
                         {isClearing ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -1346,6 +1379,18 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                           <Trash2 className="w-4 h-4" />
                         )}
                         Clear Chat History
+                      </button>
+                      <button
+                        onClick={deleteConversation}
+                        disabled={isClearing}
+                        className="w-full px-4 py-3 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-3 disabled:opacity-50"
+                      >
+                        {isClearing ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <X className="w-4 h-4" />
+                        )}
+                        Delete Conversation
                       </button>
                     </motion.div>
                   )}

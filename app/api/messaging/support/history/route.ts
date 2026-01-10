@@ -22,12 +22,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
     }
 
-    // Fetch all conversations for this user
+    // Fetch all conversations for this user (excluding those they deleted)
     const conversations = await db.collection('conversations')
       .find({
         type: 'user-to-support',
         'participants.id': session.user.id,
         'participants.type': 'user',
+        // Exclude conversations deleted by this user
+        deletedByUsers: { $ne: session.user.id },
       })
       .sort({ lastActivityAt: -1 })
       .toArray();
