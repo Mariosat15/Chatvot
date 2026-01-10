@@ -66,6 +66,7 @@ export default function ProfileCard({
   const [loading, setLoading] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [bio, setBio] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   // Derive level from title
   const getLevelFromTitle = (title?: string): number => {
@@ -88,6 +89,7 @@ export default function ProfileCard({
   // Fetch profile image and bio when shown
   useEffect(() => {
     if (show && userId) {
+      setImageError(false); // Reset error state when fetching new profile
       const fetchProfile = async () => {
         setLoading(true);
         try {
@@ -142,13 +144,15 @@ export default function ProfileCard({
                 <div className="w-full h-full rounded-full overflow-hidden bg-gray-900 flex items-center justify-center">
                   {loading ? (
                     <Loader2 className="h-8 w-8 text-gray-500 animate-spin" />
-                  ) : profileImage ? (
+                  ) : profileImage && !imageError ? (
                     <Image
                       src={profileImage}
-                      alt={username}
+                      alt=""
                       width={96}
                       height={96}
                       className="w-full h-full object-cover"
+                      onError={() => setImageError(true)}
+                      unoptimized
                     />
                   ) : (
                     <span className="text-3xl font-bold text-gray-400">

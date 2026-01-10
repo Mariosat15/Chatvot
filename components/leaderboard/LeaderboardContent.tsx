@@ -521,7 +521,7 @@ export default function LeaderboardContent({
           {/* Leaderboard Table */}
           <div className="rounded-2xl bg-gray-900/80 border border-gray-800 backdrop-blur-sm overflow-hidden shadow-2xl">
             {/* Table Header */}
-            <div className="hidden lg:grid grid-cols-[70px_minmax(200px,1fr)_90px_90px_90px_90px_90px_70px_90px_160px] gap-2 px-6 py-4 bg-gray-950/50 border-b border-gray-800">
+            <div className="hidden lg:grid grid-cols-[70px_minmax(180px,1fr)_80px_80px_80px_80px_80px_70px_80px_200px] gap-2 px-6 py-4 bg-gray-950/50 border-b border-gray-800">
               <SortHeader column="rank" label="Rank" />
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Trader</span>
               <SortHeader column="pnl" label="P&L" className="justify-end" />
@@ -557,7 +557,7 @@ export default function LeaderboardContent({
                   <div
                     key={entry.userId}
                     className={cn(
-                      "grid grid-cols-[70px_minmax(200px,1fr)_90px_90px_90px_90px_90px_70px_90px_160px] gap-2 px-6 py-4 items-center transition-all",
+                      "grid grid-cols-[70px_minmax(180px,1fr)_80px_80px_80px_80px_80px_70px_80px_200px] gap-2 px-6 py-4 items-center transition-all",
                       getRankGradient(entry.rank, isCurrentUser)
                     )}
                   >
@@ -684,7 +684,7 @@ export default function LeaderboardContent({
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-end gap-3 pr-2">
+                    <div className="flex items-center justify-center gap-4">
                       {!isCurrentUser ? (
                         <>
                           <LeaderboardFriendButton
