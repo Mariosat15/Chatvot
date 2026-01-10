@@ -52,13 +52,11 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
         <main className="auth-layout">
             <section className="auth-left-section scrollbar-hide-default">
                 <Link href="/" className="auth-logo">
-                    <Image 
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
                         src={authSettings.logo} 
                         alt="logo" 
-                        width={140} 
-                        height={32} 
                         className='h-8 w-auto' 
-                        unoptimized 
                     />
                 </Link>
 
@@ -84,13 +82,11 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
                 </div>
 
                 <div className="flex-1 relative">
-                    <Image 
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
                         src={authSettings.dashboardImage} 
                         alt="Dashboard Preview" 
-                        width={1440} 
-                        height={1150} 
-                        className="auth-dashboard-preview absolute top-0" 
-                        unoptimized
+                        className="auth-dashboard-preview absolute top-0 w-full max-w-[1440px]" 
                     />
                 </div>
             </section>

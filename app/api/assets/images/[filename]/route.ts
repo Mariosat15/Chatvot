@@ -19,12 +19,16 @@ export async function GET(
     const sanitizedFilename = path.basename(filename);
     
     // Try multiple possible locations for the file
-    // Include admin app's public folder since that's where admin uploads go
+    // Production path comes first for speed in production
     const possiblePaths = [
-      path.join(process.cwd(), 'public', 'assets', 'images', sanitizedFilename),
-      path.join(process.cwd(), 'apps', 'admin', 'public', 'assets', 'images', sanitizedFilename),
+      // Production: /var/www/chartvolt/public/assets/images
       path.join('/var/www/chartvolt', 'public', 'assets', 'images', sanitizedFilename),
+      // Production admin fallback
       path.join('/var/www/chartvolt', 'apps', 'admin', 'public', 'assets', 'images', sanitizedFilename),
+      // Local dev: current app's public folder
+      path.join(process.cwd(), 'public', 'assets', 'images', sanitizedFilename),
+      // Local dev: admin app's public folder (monorepo)
+      path.join(process.cwd(), 'apps', 'admin', 'public', 'assets', 'images', sanitizedFilename),
     ];
     
     let filePath: string | null = null;
@@ -33,14 +37,17 @@ export async function GET(
       try {
         await access(possiblePath, constants.R_OK);
         filePath = possiblePath;
+        console.log(`✅ Found image at: ${possiblePath}`);
         break;
       } catch {
         // File doesn't exist at this path, try next
+        console.log(`⚠️ Image not at: ${possiblePath}`);
       }
     }
     
     if (!filePath) {
-      console.error(`Branding image not found: ${sanitizedFilename}`);
+      console.error(`❌ Branding image not found in any location: ${sanitizedFilename}`);
+      console.error(`   Searched paths:`, possiblePaths);
       return NextResponse.json({ error: 'Image not found' }, { status: 404 });
     }
     

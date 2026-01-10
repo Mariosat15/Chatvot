@@ -49,21 +49,28 @@ export async function POST(request: NextRequest) {
     const filename = `${field}-${timestamp}.${fileExtension}`;
     
     // Create upload directory if it doesn't exist
-    // In monorepo, admin app is in apps/admin, so we need to go up to the root
-    // and save to the main app's public folder for the web app to serve
+    // Try multiple paths for monorepo compatibility
     const possibleUploadDirs = [
       // Production: /var/www/chartvolt/public/assets/images
+      path.join('/var/www/chartvolt', 'public', 'assets', 'images'),
+      // Monorepo local dev: from apps/admin up to root's public
       path.join(process.cwd(), '..', '..', 'public', 'assets', 'images'),
       // Fallback: current app's public folder
       path.join(process.cwd(), 'public', 'assets', 'images'),
     ];
     
-    // Use the first directory, creating it if needed
-    const uploadDir = possibleUploadDirs[0];
-    try {
-      await mkdir(uploadDir, { recursive: true });
-    } catch {
-      // Directory might already exist
+    // Find the first writable directory or create it
+    let uploadDir = possibleUploadDirs[0];
+    for (const dir of possibleUploadDirs) {
+      try {
+        await mkdir(dir, { recursive: true });
+        uploadDir = dir;
+        console.log(`📁 Using upload directory: ${uploadDir}`);
+        break;
+      } catch (e) {
+        console.warn(`Could not create/use directory ${dir}:`, e);
+        continue;
+      }
     }
 
     // Convert file to buffer

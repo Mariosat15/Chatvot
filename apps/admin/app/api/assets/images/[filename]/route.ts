@@ -19,15 +19,16 @@ export async function GET(
     const sanitizedFilename = path.basename(filename);
     
     // Try multiple possible locations for the file
-    // In monorepo, we need to check both admin and main app public folders
+    // Production path comes first for speed in production
     const possiblePaths = [
-      // Main app's public folder (where uploads should go)
-      path.join(process.cwd(), '..', '..', 'public', 'assets', 'images', sanitizedFilename),
-      // Admin app's own public folder (fallback)
-      path.join(process.cwd(), 'public', 'assets', 'images', sanitizedFilename),
-      // Production paths
+      // Production: /var/www/chartvolt/public/assets/images (main upload location)
       path.join('/var/www/chartvolt', 'public', 'assets', 'images', sanitizedFilename),
+      // Production admin fallback
       path.join('/var/www/chartvolt', 'apps', 'admin', 'public', 'assets', 'images', sanitizedFilename),
+      // Local dev: main app's public folder (monorepo, from apps/admin)
+      path.join(process.cwd(), '..', '..', 'public', 'assets', 'images', sanitizedFilename),
+      // Local dev: admin app's own public folder
+      path.join(process.cwd(), 'public', 'assets', 'images', sanitizedFilename),
     ];
     
     let filePath: string | null = null;
