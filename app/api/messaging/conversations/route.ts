@@ -1,7 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
+import { connectToDatabase } from '@/database/mongoose';
+import { ObjectId } from 'mongodb';
 import MessagingService from '@/lib/services/messaging/messaging.service';
+
+/**
+ * Helper to build query filter for user
+ */
+function buildUserQuery(userId: string) {
+  const queries: any[] = [{ id: userId }];
+  
+  if (ObjectId.isValid(userId)) {
+    queries.push({ _id: new ObjectId(userId) });
+  }
+  queries.push({ _id: userId });
+  
+  return { $or: queries };
+}
 
 /**
  * GET /api/messaging/conversations
@@ -71,7 +87,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { participantId, participantName, participantAvatar } = body;
+    const { participantId } = body;
 
     if (!participantId) {
       return NextResponse.json(
@@ -103,15 +119,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fetch participant's details from database
+    const mongoose = await connectToDatabase();
+    const db = mongoose.connection.db;
+    
+    if (!db) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
+
+    const participantUser = await db.collection('user').findOne(buildUserQuery(participantId));
+    if (!participantUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const participantName = participantUser.name || participantUser.email?.split('@')[0] || 'User';
+    const participantAvatar = participantUser.profileImage || participantUser.image;
+
     const conversation = await MessagingService.findOrCreateDirectConversation(
       {
         id: session.user.id,
-        name: session.user.name || 'User',
+        name: session.user.name || session.user.email?.split('@')[0] || 'User',
         avatar: session.user.image,
       },
       {
         id: participantId,
-        name: participantName || 'User',
+        name: participantName,
         avatar: participantAvatar,
       }
     );

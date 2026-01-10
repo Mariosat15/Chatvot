@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
+import { connectToDatabase } from '@/database/mongoose';
+import { ObjectId } from 'mongodb';
 import MessagingService from '@/lib/services/messaging/messaging.service';
 import { wsNotifier } from '@/lib/services/messaging/websocket-notifier';
+
+/**
+ * Helper to build query filter for user
+ */
+function buildUserQuery(userId: string) {
+  const queries: any[] = [{ id: userId }];
+  
+  if (ObjectId.isValid(userId)) {
+    queries.push({ _id: new ObjectId(userId) });
+  }
+  queries.push({ _id: userId });
+  
+  return { $or: queries };
+}
 
 /**
  * GET /api/messaging/friends/requests
@@ -58,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { toUserId, toUserName, toUserAvatar, message } = body;
+    const { toUserId, message } = body;
 
     if (!toUserId) {
       return NextResponse.json(
@@ -75,16 +91,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch target user's details from database
+    const mongoose = await connectToDatabase();
+    const db = mongoose.connection.db;
+    
+    if (!db) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
+
+    const targetUser = await db.collection('user').findOne(buildUserQuery(toUserId));
+    if (!targetUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Check if target user has disabled friend requests
+    if (targetUser.settings?.privacy?.allowFriendRequests === false) {
+      return NextResponse.json(
+        { error: 'This user has disabled friend requests' },
+        { status: 400 }
+      );
+    }
+
+    const targetUserName = targetUser.name || targetUser.email?.split('@')[0] || 'User';
+    const targetUserAvatar = targetUser.profileImage || targetUser.image;
+
     const friendRequest = await MessagingService.sendFriendRequest(
       {
         id: session.user.id,
-        name: session.user.name || 'User',
+        name: session.user.name || session.user.email?.split('@')[0] || 'User',
         avatar: session.user.image,
       },
       {
         id: toUserId,
-        name: toUserName || 'User',
-        avatar: toUserAvatar,
+        name: targetUserName,
+        avatar: targetUserAvatar,
       },
       message
     );

@@ -1172,7 +1172,11 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               ) : (
                 <div className="space-y-2">
                   {friends.map((friend) => (
-                    <div key={friend.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-colors cursor-pointer">
+                    <div 
+                      key={friend.id} 
+                      onClick={() => startConversationWithFriend(friend.friendId)}
+                      className="p-3 bg-white/5 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-colors cursor-pointer"
+                    >
                       <div className="w-10 h-10 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl flex items-center justify-center overflow-hidden">
                         {friend.friendAvatar ? (
                           <img src={friend.friendAvatar} alt="" className="w-10 h-10 rounded-xl object-cover" />
@@ -1181,13 +1185,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                         )}
                       </div>
                       <span className="text-white font-medium flex-1">{friend.friendName}</span>
-                      <button
-                        onClick={() => startConversationWithFriend(friend.friendId)}
-                        className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30 transition-colors"
+                      <div
+                        className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center"
                         title="Send message"
                       >
                         <Send className="w-4 h-4" />
-                      </button>
+                      </div>
                     </div>
                   ))}
                 </div>
