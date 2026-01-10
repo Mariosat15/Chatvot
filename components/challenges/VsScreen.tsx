@@ -1,10 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { X, Swords } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
 
 // Level info - should match your app's level config
 const LEVEL_INFO: Record<number, { label: string; color: string; bgColor: string; icon: string }> = {
@@ -46,6 +46,8 @@ export default function VsScreen({
   onClose 
 }: VsScreenProps) {
   const levelInfo = LEVEL_INFO[opponent.level || 3];
+  const [player1ImageError, setPlayer1ImageError] = useState(false);
+  const [opponentImageError, setOpponentImageError] = useState(false);
   
   return (
     <AnimatePresence>
@@ -97,14 +99,12 @@ export default function VsScreen({
                     transition={{ delay: 0.2, type: 'spring' }}
                     className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-pink-300 to-pink-500 flex items-center justify-center mb-3 shadow-2xl border-3 border-white/40 overflow-hidden"
                   >
-                    {player1Image ? (
-                      <Image
+                    {player1Image && !player1ImageError ? (
+                      <img
                         src={player1Image}
-                        alt={player1Name}
-                        width={96}
-                        height={96}
+                        alt=""
                         className="w-full h-full object-cover"
-                        unoptimized
+                        onError={() => setPlayer1ImageError(true)}
                       />
                     ) : (
                       <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white drop-shadow-lg">{player1Name.charAt(0).toUpperCase()}</span>
@@ -156,14 +156,12 @@ export default function VsScreen({
                     transition={{ delay: 0.2, type: 'spring' }}
                     className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center mb-3 shadow-2xl border-3 border-white/40 overflow-hidden"
                   >
-                    {opponent.profileImage ? (
-                      <Image
+                    {opponent.profileImage && !opponentImageError ? (
+                      <img
                         src={opponent.profileImage}
-                        alt={opponent.username}
-                        width={96}
-                        height={96}
+                        alt=""
                         className="w-full h-full object-cover"
-                        unoptimized
+                        onError={() => setOpponentImageError(true)}
                       />
                     ) : (
                       <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white drop-shadow-lg">{opponent.username.charAt(0).toUpperCase()}</span>

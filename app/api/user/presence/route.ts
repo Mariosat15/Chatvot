@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
 
     if (listOnline) {
       // Return list of online users who accept challenges
-      const threshold = new Date(Date.now() - 2 * 60 * 1000); // 2 minutes
+      // Use 45 second threshold - user must have heartbeat within last 45 seconds
+      const threshold = new Date(Date.now() - 45 * 1000); // 45 seconds
 
       const onlineUsers = await UserPresence.find({
         status: 'online',
@@ -109,10 +110,11 @@ export async function POST(request: NextRequest) {
     );
 
     // Mark stale users as offline (run periodically)
+    // Users are offline if no heartbeat in last 45 seconds
     await UserPresence.updateMany(
       {
         status: { $ne: 'offline' },
-        lastHeartbeat: { $lt: new Date(Date.now() - 2 * 60 * 1000) },
+        lastHeartbeat: { $lt: new Date(Date.now() - 45 * 1000) },
       },
       { $set: { status: 'offline' } }
     );

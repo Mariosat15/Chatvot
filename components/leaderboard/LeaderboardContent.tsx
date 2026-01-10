@@ -31,6 +31,7 @@ import LeaderboardChallengeButton from '@/components/leaderboard/LeaderboardChal
 import LeaderboardFriendButton from '@/components/leaderboard/LeaderboardFriendButton';
 import MatchmakingCards from '@/components/leaderboard/MatchmakingCards';
 import ProfileCard from '@/components/profile/ProfileCard';
+import ProfileImage from '@/components/ui/ProfileImage';
 import ChallengeCreateDialog from '@/components/challenges/ChallengeCreateDialog';
 import { cn } from '@/lib/utils';
 
@@ -577,16 +578,12 @@ export default function LeaderboardContent({
                     {/* Trader Info */}
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative flex-shrink-0">
-                        <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold overflow-hidden",
-                          entry.profileImage ? "" : "bg-gradient-to-br from-primary-500/30 to-cyan-500/30 text-primary-400 border border-primary-500/30"
-                        )}>
-                          {entry.profileImage ? (
-                            <img src={entry.profileImage} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            entry.username.charAt(0).toUpperCase()
-                          )}
-                        </div>
+                        <ProfileImage
+                          src={entry.profileImage}
+                          fallbackLetter={entry.username}
+                          size="md"
+                          className="rounded-xl"
+                        />
                         {isCurrentUser && (
                           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-primary-500 rounded-full flex items-center justify-center">
                             <span className="text-[8px] text-white font-bold">YOU</span>
