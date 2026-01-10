@@ -223,7 +223,7 @@ export default function AdminOverviewDashboard({
   
   // Reconciliation state
   const [reconciliation, setReconciliation] = useState<ReconciliationSummary | null>(null);
-  const [reconciliationLoading, setReconciliationLoading] = useState(true);
+  const [reconciliationLoading, setReconciliationLoading] = useState(false); // Don't auto-run on load
 
   const fetchStats = async () => {
     try {
@@ -411,9 +411,11 @@ export default function AdminOverviewDashboard({
         "border",
         reconciliationLoading 
           ? "bg-gray-900/50 border-gray-800"
-          : reconciliation?.healthy 
-            ? "bg-green-500/5 border-green-500/30" 
-            : "bg-red-500/5 border-red-500/30"
+          : reconciliation === null
+            ? "bg-gray-900/50 border-gray-700"
+            : reconciliation.healthy 
+              ? "bg-green-500/5 border-green-500/30" 
+              : "bg-red-500/5 border-red-500/30"
       )}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -422,9 +424,11 @@ export default function AdminOverviewDashboard({
                 "h-5 w-5",
                 reconciliationLoading 
                   ? "text-gray-400"
-                  : reconciliation?.healthy 
-                    ? "text-green-400" 
-                    : "text-red-400"
+                  : reconciliation === null
+                    ? "text-gray-400"
+                    : reconciliation.healthy 
+                      ? "text-green-400" 
+                      : "text-red-400"
               )} />
               System Reconciliation
             </CardTitle>
@@ -444,7 +448,10 @@ export default function AdminOverviewDashboard({
                 {reconciliationLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <RefreshCcw className="h-4 w-4" />
+                  <>
+                    <RefreshCcw className="h-4 w-4 mr-1" />
+                    {reconciliation === null ? 'Run Check' : 'Refresh'}
+                  </>
                 )}
               </Button>
             </div>
@@ -544,15 +551,15 @@ export default function AdminOverviewDashboard({
             </div>
           ) : (
             <div className="flex items-center gap-3 py-4 text-gray-400">
-              <XCircle className="h-5 w-5" />
-              <span>Failed to run reconciliation check</span>
+              <RefreshCw className="h-5 w-5" />
+              <span>Click &quot;Run Check&quot; to verify system health</span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={fetchReconciliation}
                 className="ml-auto"
               >
-                Retry
+                Run Check
               </Button>
             </div>
           )}
