@@ -348,6 +348,45 @@ export default function MessagingSection() {
         // Only fetch all when conversation metadata changes (not messages)
         fetchConversationsRef.current?.();
         break;
+        
+      case 'chat_transferred':
+        // Handle chat transfer events - update conversation state immediately
+        if (message.data?.conversationId) {
+          const transferData = message.data;
+          setConversations(prev => prev.map(c => {
+            if (c.id === transferData.conversationId) {
+              return {
+                ...c,
+                isChatTransferred: transferData.isChatTransferred ?? false,
+                chatTransferredTo: transferData.chatTransferredTo,
+                chatTransferredToName: transferData.chatTransferredToName,
+                chatTransferredFrom: transferData.chatTransferredFrom,
+                chatTransferredFromName: transferData.chatTransferredFromName,
+                assignedEmployeeId: transferData.assignedEmployeeId,
+                assignedEmployeeName: transferData.assignedEmployeeName,
+              };
+            }
+            return c;
+          }));
+          
+          // Also update selected conversation if it's the one being transferred
+          if (selectedConvRef.current === transferData.conversationId) {
+            setSelectedConversation(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                isChatTransferred: transferData.isChatTransferred ?? false,
+                chatTransferredTo: transferData.chatTransferredTo,
+                chatTransferredToName: transferData.chatTransferredToName,
+                chatTransferredFrom: transferData.chatTransferredFrom,
+                chatTransferredFromName: transferData.chatTransferredFromName,
+                assignedEmployeeId: transferData.assignedEmployeeId,
+                assignedEmployeeName: transferData.assignedEmployeeName,
+              };
+            });
+          }
+        }
+        break;
     }
   }, [scrollToBottom]);
 

@@ -227,17 +227,19 @@ export async function POST(
       try {
         const wsInternalUrl = process.env.WS_INTERNAL_URL || 'http://localhost:3003';
         
-        await fetch(`${wsInternalUrl}/internal/broadcast`, {
+        await fetch(`${wsInternalUrl}/internal/chat-transferred`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            type: 'chat_transferred',
             conversationId,
-            data: {
-              isChatTransferred: false,
-              assignedEmployeeId: originalEmployeeId,
-              assignedEmployeeName: originalEmployeeName,
-            },
+            isChatTransferred: false,
+            assignedEmployeeId: originalEmployeeId,
+            assignedEmployeeName: originalEmployeeName,
+            // Clear transfer fields
+            chatTransferredTo: null,
+            chatTransferredToName: null,
+            chatTransferredFrom: null,
+            chatTransferredFromName: null,
           }),
         });
 

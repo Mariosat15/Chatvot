@@ -221,6 +221,53 @@ const server = createServer(async (req, res) => {
             }
             break;
 
+          case 'broadcast':
+            // Generic broadcast to conversation participants
+            if (data.conversationId && data.type) {
+              broadcastToConversation(data.conversationId, {
+                type: data.type,
+                data: data.data || data,
+              });
+              console.log(`📢 Broadcast ${data.type} to ${data.conversationId}`);
+            }
+            break;
+
+          case 'chat-transferred':
+            // Broadcast chat transfer event
+            if (data.conversationId) {
+              broadcastToConversation(data.conversationId, {
+                type: 'chat_transferred',
+                data: {
+                  conversationId: data.conversationId,
+                  isChatTransferred: data.isChatTransferred ?? false,
+                  assignedEmployeeId: data.assignedEmployeeId,
+                  assignedEmployeeName: data.assignedEmployeeName,
+                  chatTransferredTo: data.chatTransferredTo,
+                  chatTransferredToName: data.chatTransferredToName,
+                  chatTransferredFrom: data.chatTransferredFrom,
+                  chatTransferredFromName: data.chatTransferredFromName,
+                },
+              });
+              console.log(`🔄 Broadcast chat_transferred to ${data.conversationId}`);
+              
+              // Notify affected employees
+              if (data.assignedEmployeeId) {
+                broadcastToParticipant(data.assignedEmployeeId, {
+                  type: 'notification',
+                  data: {
+                    id: `transfer-${Date.now()}`,
+                    type: 'chat_transfer',
+                    title: data.isChatTransferred ? 'Chat Transferred' : 'Chat Returned',
+                    message: data.isChatTransferred 
+                      ? 'A chat has been transferred to you'
+                      : 'A chat has been returned to you',
+                    data: { conversationId: data.conversationId },
+                  },
+                });
+              }
+            }
+            break;
+
           default:
             console.warn(`Unknown internal endpoint: ${endpoint}`);
         }

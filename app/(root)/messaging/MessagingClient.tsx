@@ -207,6 +207,35 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         
       case 'presence':
         break;
+        
+      case 'chat_transferred':
+        // Handle chat transfer - update conversation state
+        if (message.data?.conversationId) {
+          const transferData = message.data;
+          // Update conversations list
+          setConversations(prev => prev.map(c => {
+            if (c.id === transferData.conversationId) {
+              return {
+                ...c,
+                assignedEmployeeName: transferData.assignedEmployeeName,
+              };
+            }
+            return c;
+          }));
+          // Update selected conversation if it's the one being transferred
+          if (selectedConversation?.id === transferData.conversationId) {
+            setSelectedConversation(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                assignedEmployeeName: transferData.assignedEmployeeName,
+              };
+            });
+            // Also refresh conversation and agent data
+            fetchConversations();
+          }
+        }
+        break;
     }
   }, [selectedConversation?.id, session.user.id]);
 

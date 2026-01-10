@@ -342,21 +342,18 @@ export async function POST(
         const wsInternalUrl = process.env.WS_INTERNAL_URL || 'http://localhost:3003';
         
         // Notify both employees and customer
-        await fetch(`${wsInternalUrl}/internal/broadcast`, {
+        await fetch(`${wsInternalUrl}/internal/chat-transferred`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            type: 'chat_transferred',
             conversationId,
-            data: {
-              isChatTransferred: true,
-              chatTransferredTo: toEmployeeId,
-              chatTransferredToName: toEmployeeName,
-              chatTransferredFrom: originalEmployeeId,
-              chatTransferredFromName: originalEmployeeName,
-              assignedEmployeeId: toEmployeeId,
-              assignedEmployeeName: toEmployeeName,
-            },
+            isChatTransferred: true,
+            chatTransferredTo: toEmployeeId,
+            chatTransferredToName: toEmployeeName,
+            chatTransferredFrom: originalEmployeeId,
+            chatTransferredFromName: originalEmployeeName,
+            assignedEmployeeId: toEmployeeId,
+            assignedEmployeeName: toEmployeeName,
           }),
         });
 
