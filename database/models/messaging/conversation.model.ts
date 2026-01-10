@@ -49,6 +49,11 @@ export interface IConversation extends Document {
   isAIHandled: boolean;
   aiHandledUntil?: Date; // When AI stopped handling
   
+  // Ticket system (for support conversations)
+  ticketNumber?: string;
+  customerId?: string;
+  customerName?: string;
+  
   // Last message preview
   lastMessage?: ILastMessage;
   
@@ -148,6 +153,11 @@ const ConversationSchema = new Schema<IConversation>(
       default: false,
     },
     aiHandledUntil: { type: Date },
+    
+    // Ticket system (for support conversations)
+    ticketNumber: { type: String, index: true },
+    customerId: { type: String, index: true },
+    customerName: { type: String },
     
     lastMessage: LastMessageSchema,
     

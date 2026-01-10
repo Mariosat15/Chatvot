@@ -57,13 +57,17 @@ export class MessagingService {
     isAIHandled?: boolean;
     assignedEmployeeId?: string;
     assignedEmployeeName?: string;
+    // Ticket system fields
+    ticketNumber?: string;
+    customerId?: string;
+    customerName?: string;
   }): Promise<IConversation> {
     await connectToDatabase();
     
     const conversation = await Conversation.create({
       type: params.type,
       status: 'active',
-      participants: params.participants.map(p => ({
+      participants: params.participants.map((p: { id: string; type: 'user' | 'employee' | 'ai'; name: string; avatar?: string }) => ({
         ...p,
         joinedAt: new Date(),
         isActive: true,
@@ -72,6 +76,9 @@ export class MessagingService {
       isAIHandled: params.isAIHandled || false,
       assignedEmployeeId: params.assignedEmployeeId ? new Types.ObjectId(params.assignedEmployeeId) : undefined,
       assignedEmployeeName: params.assignedEmployeeName,
+      ticketNumber: params.ticketNumber,
+      customerId: params.customerId,
+      customerName: params.customerName,
       unreadCounts: new Map(),
       lastActivityAt: new Date(),
     });
@@ -215,7 +222,7 @@ export class MessagingService {
   ): Promise<IConversation> {
     await connectToDatabase();
     
-    const settings = await MessagingSettings.getSettings();
+    const settings = await (MessagingSettings as any).getSettings();
     const db = mongoose.connection.db;
     
     console.log(`🔍 [MessagingService] getOrCreateSupportConversation for user: ${userName} (${userId})`);
@@ -313,7 +320,7 @@ export class MessagingService {
       assignedEmployeeId: assignedEmployee?.id,
       assignedEmployeeName: assignedEmployee?.name,
       // NEW: Ticket system fields
-      ticketNumber,
+      ticketNumber: String(ticketNumber),
       customerId: userId,
       customerName: userName,
     });
@@ -405,7 +412,7 @@ export class MessagingService {
   }): Promise<{ message: IMessage; conversation: IConversation }> {
     await connectToDatabase();
     
-    const settings = await MessagingSettings.getSettings();
+    const settings = await (MessagingSettings as any).getSettings();
     
     // Rate limiting check
     const rateLimitKey = `msg:${params.senderId}`;
@@ -504,8 +511,8 @@ export class MessagingService {
     
     // Stop typing indicator (wrapped in try-catch as this is non-critical)
     try {
-      if (typeof UserPresence.stopTyping === 'function') {
-        await UserPresence.stopTyping(params.senderId);
+      if (typeof (UserPresence as any).stopTyping === 'function') {
+        await (UserPresence as any).stopTyping(params.senderId);
       }
     } catch (err) {
       console.warn('[MessagingService] Failed to stop typing indicator:', err instanceof Error ? err.message : err);
@@ -608,16 +615,16 @@ export class MessagingService {
   ): Promise<IFriendRequest> {
     await connectToDatabase();
     
-    const settings = await MessagingSettings.getSettings();
+    const settings = await (MessagingSettings as any).getSettings();
     
     // Check if already friends
-    const areFriends = await Friendship.areFriends(fromUser.id, toUser.id);
+    const areFriends = await (Friendship as any).areFriends(fromUser.id, toUser.id);
     if (areFriends) {
       throw new Error('You are already friends with this user.');
     }
     
     // Check for existing pending request
-    const hasPending = await FriendRequest.hasPendingRequest(fromUser.id, toUser.id);
+    const hasPending = await (FriendRequest as any).hasPendingRequest(fromUser.id, toUser.id);
     if (hasPending) {
       throw new Error('A friend request already exists between you and this user.');
     }
@@ -676,7 +683,7 @@ export class MessagingService {
     
     if (response === 'accept') {
       // Check max friends limit
-      const settings = await MessagingSettings.getSettings();
+      const settings = await (MessagingSettings as any).getSettings();
       const currentFriendsCount = await Friendship.countDocuments({
         users: userId,
         blockedBy: { $exists: false },
@@ -686,7 +693,7 @@ export class MessagingService {
         throw new Error('Maximum friends limit reached.');
       }
       
-      friendship = await Friendship.createFromRequest(request);
+      friendship = await (Friendship as any).createFromRequest(request);
     }
     
     return { request, friendship };
@@ -717,7 +724,7 @@ export class MessagingService {
   
   static async getFriends(userId: string): Promise<IFriendship[]> {
     await connectToDatabase();
-    return Friendship.getUserFriends(userId);
+    return (Friendship as any).getUserFriends(userId);
   }
   
   static async getPendingFriendRequests(userId: string): Promise<{
@@ -727,8 +734,8 @@ export class MessagingService {
     await connectToDatabase();
     
     const [received, sent] = await Promise.all([
-      FriendRequest.findPendingForUser(userId),
-      FriendRequest.findSentByUser(userId),
+      (FriendRequest as any).findPendingForUser(userId),
+      (FriendRequest as any).findSentByUser(userId),
     ]);
     
     return { received, sent };
@@ -744,7 +751,7 @@ export class MessagingService {
   static async blockUser(userId: string, blockedUserId: string): Promise<IFriendship | null> {
     await connectToDatabase();
     
-    let friendship = await Friendship.getFriendship(userId, blockedUserId);
+    let friendship = await (Friendship as any).getFriendship(userId, blockedUserId);
     
     if (friendship) {
       await friendship.block(userId);
@@ -768,7 +775,7 @@ export class MessagingService {
   static async unblockUser(userId: string, blockedUserId: string): Promise<void> {
     await connectToDatabase();
     
-    const friendship = await Friendship.getFriendship(userId, blockedUserId);
+    const friendship = await (Friendship as any).getFriendship(userId, blockedUserId);
     if (friendship && friendship.blockedBy === userId) {
       await friendship.unblock();
     }
@@ -816,7 +823,7 @@ export class MessagingService {
     // Remove old employee from participants if present
     if (previousEmployeeId) {
       const oldParticipant = conversation.participants.find(
-        p => p.id === previousEmployeeId && p.type === 'employee'
+        (p: { id: string; type: string }) => p.id === previousEmployeeId && p.type === 'employee'
       );
       if (oldParticipant) {
         oldParticipant.isActive = false;
@@ -825,7 +832,7 @@ export class MessagingService {
     }
     
     // Add new employee to participants
-    const existingParticipant = conversation.participants.find(p => p.id === toEmployeeId);
+    const existingParticipant = conversation.participants.find((p: { id: string }) => p.id === toEmployeeId);
     if (existingParticipant) {
       existingParticipant.isActive = true;
       existingParticipant.leftAt = undefined;
@@ -881,7 +888,7 @@ export class MessagingService {
     console.log(`🤖→👤 [escalateFromAI] Conversation: ${conversationId}, Reason: ${reason}`);
     
     // Get the user from participants
-    const userParticipant = conversation.participants.find(p => p.type === 'user');
+    const userParticipant = conversation.participants.find((p: { type: string }) => p.type === 'user');
     const userId = userParticipant?.id;
     
     // Find employee to assign - priority order:
@@ -963,7 +970,7 @@ export class MessagingService {
       
       // Add employee as participant if not already present
       const isParticipant = conversation.participants.some(
-        p => p.id === assignedEmployee!.id && p.type === 'employee'
+        (p: { id: string; type: string }) => p.id === assignedEmployee!.id && p.type === 'employee'
       );
       
       if (!isParticipant) {
@@ -979,7 +986,7 @@ export class MessagingService {
     }
     
     // Remove AI from active participants
-    const aiParticipant = conversation.participants.find(p => p.id === 'ai-assistant');
+    const aiParticipant = conversation.participants.find((p: { id: string }) => p.id === 'ai-assistant');
     if (aiParticipant) {
       aiParticipant.isActive = false;
       aiParticipant.leftAt = new Date();
@@ -1032,9 +1039,9 @@ export class MessagingService {
     await connectToDatabase();
     
     if (status === 'offline') {
-      await UserPresence.setOffline(participantId);
+      await (UserPresence as any).setOffline(participantId);
     } else {
-      await UserPresence.setOnline(participantId, participantType, deviceInfo);
+      await (UserPresence as any).setOnline(participantId, participantType, deviceInfo);
       if (status !== 'online') {
         await UserPresence.findOneAndUpdate(
           { participantId },
@@ -1047,8 +1054,8 @@ export class MessagingService {
   static async setTyping(participantId: string, conversationId: string): Promise<void> {
     await connectToDatabase();
     try {
-      if (typeof UserPresence.setTyping === 'function') {
-        await UserPresence.setTyping(participantId, conversationId);
+      if (typeof (UserPresence as any).setTyping === 'function') {
+        await (UserPresence as any).setTyping(participantId, conversationId);
       }
     } catch (err) {
       console.warn('[MessagingService] setTyping error:', err instanceof Error ? err.message : err);
@@ -1058,8 +1065,8 @@ export class MessagingService {
   static async stopTyping(participantId: string): Promise<void> {
     await connectToDatabase();
     try {
-      if (typeof UserPresence.stopTyping === 'function') {
-        await UserPresence.stopTyping(participantId);
+      if (typeof (UserPresence as any).stopTyping === 'function') {
+        await (UserPresence as any).stopTyping(participantId);
       }
     } catch (err) {
       console.warn('[MessagingService] stopTyping error:', err instanceof Error ? err.message : err);
@@ -1069,8 +1076,8 @@ export class MessagingService {
   static async heartbeat(participantId: string): Promise<void> {
     await connectToDatabase();
     try {
-      if (typeof UserPresence.heartbeat === 'function') {
-        await UserPresence.heartbeat(participantId);
+      if (typeof (UserPresence as any).heartbeat === 'function') {
+        await (UserPresence as any).heartbeat(participantId);
       }
     } catch (err) {
       console.warn('[MessagingService] heartbeat error:', err instanceof Error ? err.message : err);
@@ -1083,14 +1090,14 @@ export class MessagingService {
   
   static async getSettings(): Promise<IMessagingSettings> {
     await connectToDatabase();
-    return MessagingSettings.getSettings();
+    return (MessagingSettings as any).getSettings();
   }
   
   static async updateSettings(
     updates: Partial<IMessagingSettings>
   ): Promise<IMessagingSettings> {
     await connectToDatabase();
-    return MessagingSettings.updateSettings(updates);
+    return (MessagingSettings as any).updateSettings(updates);
   }
   
   // ==========================================
@@ -1103,7 +1110,7 @@ export class MessagingService {
     limit: number = 20
   ): Promise<IMessage[]> {
     await connectToDatabase();
-    return Message.searchMessages(participantId, searchTerm, { limit });
+    return (Message as any).searchMessages(participantId, searchTerm, { limit });
   }
   
   static async searchUsers(
