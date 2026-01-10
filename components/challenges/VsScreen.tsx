@@ -55,7 +55,7 @@ export default function VsScreen({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
           onClick={(e) => {
             // Only close if clicking directly on backdrop, not its children
             if (e.target === e.currentTarget) {
@@ -68,11 +68,11 @@ export default function VsScreen({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="relative w-full max-w-4xl mx-4 overflow-hidden"
+            className="relative w-full max-w-3xl mx-auto my-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* VS Card Container */}
-            <div className="relative h-[420px] flex rounded-2xl overflow-hidden shadow-2xl">
+            <div className="relative h-[280px] sm:h-[320px] md:h-[360px] flex rounded-2xl overflow-hidden shadow-2xl">
               {/* Player 1 Side - Pink/Magenta */}
               <div className="w-1/2 relative overflow-hidden">
                 {/* Gradient Background with ray effects */}
@@ -89,24 +89,25 @@ export default function VsScreen({
                 </div>
                 
                 {/* Content */}
-                <div className="relative h-full flex flex-col items-center justify-center p-8">
+                <div className="relative h-full flex flex-col items-center justify-center p-4 sm:p-6">
                   {/* Avatar Circle */}
                   <motion.div
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ delay: 0.2, type: 'spring' }}
-                    className="w-28 h-28 rounded-full bg-gradient-to-br from-pink-300 to-pink-500 flex items-center justify-center mb-5 shadow-2xl border-4 border-white/40 overflow-hidden"
+                    className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-pink-300 to-pink-500 flex items-center justify-center mb-3 shadow-2xl border-3 border-white/40 overflow-hidden"
                   >
                     {player1Image ? (
                       <Image
                         src={player1Image}
                         alt={player1Name}
-                        width={112}
-                        height={112}
+                        width={96}
+                        height={96}
                         className="w-full h-full object-cover"
+                        unoptimized
                       />
                     ) : (
-                      <span className="text-5xl font-bold text-white drop-shadow-lg">{player1Name.charAt(0).toUpperCase()}</span>
+                      <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white drop-shadow-lg">{player1Name.charAt(0).toUpperCase()}</span>
                     )}
                   </motion.div>
                   
@@ -114,7 +115,7 @@ export default function VsScreen({
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.3 }}
-                    className="text-2xl md:text-3xl font-bold text-white mb-4 drop-shadow-lg text-center"
+                    className="text-lg sm:text-xl md:text-2xl font-bold text-white mb-2 drop-shadow-lg text-center px-2"
                   >
                     {player1Name}
                   </motion.h3>
@@ -124,9 +125,9 @@ export default function VsScreen({
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.4 }}
-                    className="px-5 py-2 rounded-full bg-pink-400/80 border-2 border-white/50 shadow-lg"
+                    className="px-3 py-1.5 rounded-full bg-pink-400/80 border-2 border-white/50 shadow-lg"
                   >
-                    <span className="text-white font-bold text-sm tracking-wide">CHALLENGER</span>
+                    <span className="text-white font-bold text-xs sm:text-sm tracking-wide">CHALLENGER</span>
                   </motion.div>
                 </div>
               </div>
@@ -147,24 +148,25 @@ export default function VsScreen({
                 </div>
                 
                 {/* Content */}
-                <div className="relative h-full flex flex-col items-center justify-center p-8">
+                <div className="relative h-full flex flex-col items-center justify-center p-4 sm:p-6">
                   {/* Avatar Circle */}
                   <motion.div
                     initial={{ scale: 0, rotate: 180 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ delay: 0.2, type: 'spring' }}
-                    className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center mb-5 shadow-2xl border-4 border-white/40 overflow-hidden"
+                    className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center mb-3 shadow-2xl border-3 border-white/40 overflow-hidden"
                   >
                     {opponent.profileImage ? (
                       <Image
                         src={opponent.profileImage}
                         alt={opponent.username}
-                        width={112}
-                        height={112}
+                        width={96}
+                        height={96}
                         className="w-full h-full object-cover"
+                        unoptimized
                       />
                     ) : (
-                      <span className="text-5xl font-bold text-white drop-shadow-lg">{opponent.username.charAt(0).toUpperCase()}</span>
+                      <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white drop-shadow-lg">{opponent.username.charAt(0).toUpperCase()}</span>
                     )}
                   </motion.div>
                   
@@ -172,7 +174,7 @@ export default function VsScreen({
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.3 }}
-                    className="text-2xl md:text-3xl font-bold text-white mb-2 drop-shadow-lg text-center"
+                    className="text-lg sm:text-xl md:text-2xl font-bold text-white mb-2 drop-shadow-lg text-center px-2"
                   >
                     {opponent.username}
                   </motion.h3>
@@ -183,26 +185,14 @@ export default function VsScreen({
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.4 }}
                     className={cn(
-                      "px-4 py-1.5 rounded-full mb-3 flex items-center gap-2 border-2 border-white/30",
+                      "px-3 py-1 rounded-full flex items-center gap-1.5 border-2 border-white/30",
                       levelInfo.bgColor,
                       levelInfo.color
                     )}
                   >
-                    <span>{levelInfo.icon}</span>
-                    <span className="font-semibold text-sm">{levelInfo.label}</span>
+                    <span className="text-sm">{levelInfo.icon}</span>
+                    <span className="font-semibold text-xs sm:text-sm">{levelInfo.label}</span>
                   </motion.div>
-                  
-                  {/* Match Score */}
-                  {opponent.matchScore !== undefined && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.5 }}
-                      className="px-5 py-2 rounded-full bg-purple-400/80 border-2 border-white/50 shadow-lg"
-                    >
-                      <span className="text-white font-bold text-sm">{opponent.matchScore.toFixed(0)}% MATCH</span>
-                    </motion.div>
-                  )}
                 </div>
               </div>
               
@@ -215,11 +205,11 @@ export default function VsScreen({
               >
                 <div className="relative">
                   {/* Outer glow */}
-                  <div className="absolute inset-0 bg-white rounded-2xl blur-xl opacity-60 scale-125" />
+                  <div className="absolute inset-0 bg-white rounded-xl blur-lg opacity-60 scale-125" />
                   
                   {/* VS Badge */}
-                  <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center border-4 border-white shadow-2xl transform rotate-45">
-                    <span className="text-3xl font-black text-white -rotate-45 tracking-wider">VS</span>
+                  <div className="relative w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center border-3 border-white shadow-2xl transform rotate-45">
+                    <span className="text-xl sm:text-2xl md:text-3xl font-black text-white -rotate-45 tracking-wider">VS</span>
                   </div>
                 </div>
               </motion.div>
@@ -230,53 +220,53 @@ export default function VsScreen({
             
             {/* Action Buttons */}
             <motion.div
-              initial={{ y: 50, opacity: 0 }}
+              initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.6 }}
-              className="flex justify-center gap-4 mt-6"
+              transition={{ delay: 0.5 }}
+              className="flex justify-center gap-3 mt-4"
             >
               <Button
                 onClick={onClose}
                 variant="outline"
-                size="lg"
-                className="px-6 py-5 text-base font-semibold bg-gray-800/80 border-gray-600 text-gray-300 hover:bg-gray-700"
+                size="default"
+                className="px-4 py-2 text-sm font-semibold bg-gray-800/80 border-gray-600 text-gray-300 hover:bg-gray-700"
               >
-                <X className="h-5 w-5 mr-2" />
+                <X className="h-4 w-4 mr-1.5" />
                 Cancel
               </Button>
               <Button
                 onClick={onChallenge}
-                size="lg"
-                className="px-6 py-5 text-base font-semibold bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white shadow-lg shadow-purple-500/30"
+                size="default"
+                className="px-5 py-2 text-sm font-semibold bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white shadow-lg shadow-purple-500/30"
               >
-                <Swords className="h-5 w-5 mr-2" />
+                <Swords className="h-4 w-4 mr-1.5" />
                 Challenge Now!
               </Button>
             </motion.div>
             
             {/* Stats Comparison */}
             <motion.div
-              initial={{ y: 30, opacity: 0 }}
+              initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.7 }}
-              className="mt-5 grid grid-cols-3 gap-3 max-w-md mx-auto"
+              transition={{ delay: 0.6 }}
+              className="mt-4 grid grid-cols-3 gap-2 max-w-sm mx-auto"
             >
-              <div className="text-center p-3 bg-gray-800/60 rounded-xl border border-gray-700/50">
-                <p className="text-xs text-gray-500 mb-1">Win Rate</p>
+              <div className="text-center p-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
+                <p className="text-[10px] text-gray-500 mb-0.5">Win Rate</p>
                 <p className={cn(
-                  "text-lg font-bold",
+                  "text-base font-bold",
                   (opponent.winRate ?? 0) >= 50 ? "text-green-400" : "text-red-400"
                 )}>
                   {opponent.winRate?.toFixed(0) ?? '0'}%
                 </p>
               </div>
-              <div className="text-center p-3 bg-gray-800/60 rounded-xl border border-gray-700/50">
-                <p className="text-xs text-gray-500 mb-1">Total Trades</p>
-                <p className="text-lg font-bold text-white">{opponent.totalTrades ?? 0}</p>
+              <div className="text-center p-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
+                <p className="text-[10px] text-gray-500 mb-0.5">Trades</p>
+                <p className="text-base font-bold text-white">{opponent.totalTrades ?? 0}</p>
               </div>
-              <div className="text-center p-3 bg-gray-800/60 rounded-xl border border-gray-700/50">
-                <p className="text-xs text-gray-500 mb-1">Challenges</p>
-                <p className="text-lg font-bold text-purple-400">{opponent.challengesEntered ?? 0}</p>
+              <div className="text-center p-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
+                <p className="text-[10px] text-gray-500 mb-0.5">Challenges</p>
+                <p className="text-base font-bold text-purple-400">{opponent.challengesEntered ?? 0}</p>
               </div>
             </motion.div>
           </motion.div>
