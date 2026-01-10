@@ -47,6 +47,7 @@ import {
   BarChart3,
   UserPlus,
   ArrowUpDown,
+  ArrowRight,
   ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -2488,6 +2489,19 @@ interface ConversationStats {
   withTransfers: number;
 }
 
+interface ConversationMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderType: 'user' | 'employee' | 'ai' | 'system';
+  content: string;
+  createdAt: string;
+}
+
+interface ConversationDetails extends ConversationData {
+  messages: ConversationMessage[];
+}
+
 function UserConversationsTab({ userId, userName }: { userId: string; userName: string }) {
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [stats, setStats] = useState<ConversationStats>({ total: 0, resolved: 0, active: 0, withTransfers: 0 });
@@ -2495,6 +2509,30 @@ function UserConversationsTab({ userId, userName }: { userId: string; userName: 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'resolved'>('all');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  
+  // Conversation detail modal state
+  const [selectedConversation, setSelectedConversation] = useState<ConversationDetails | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const fetchConversationDetails = async (conversationId: string) => {
+    setLoadingDetails(true);
+    try {
+      const response = await fetch(`/api/messaging/conversations/${conversationId}?includeMessages=true`);
+      if (response.ok) {
+        const data = await response.json();
+        // Find the conversation in our list to get transfer data
+        const convData = conversations.find(c => c.id === conversationId);
+        setSelectedConversation({
+          ...convData!,
+          messages: data.messages || [],
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching conversation details:', error);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
 
   const fetchConversations = useCallback(async () => {
     setLoading(true);
@@ -2591,7 +2629,11 @@ function UserConversationsTab({ userId, userName }: { userId: string; userName: 
       ) : (
         <div className="space-y-4">
           {conversations.map((conv) => (
-            <Card key={conv.id} className="bg-gray-800/50 border-gray-700 hover:border-gray-600 transition-colors">
+            <Card 
+              key={conv.id} 
+              className="bg-gray-800/50 border-gray-700 hover:border-cyan-500/50 transition-colors cursor-pointer"
+              onClick={() => fetchConversationDetails(conv.id)}
+            >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4">
@@ -2701,6 +2743,152 @@ function UserConversationsTab({ userId, userName }: { userId: string; userName: 
               Next
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Conversation Detail Modal */}
+      {(selectedConversation || loadingDetails) && (
+        <div className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-4">
+          <Card className="bg-gray-900 border-gray-700 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <CardHeader className="border-b border-gray-800 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white flex items-center gap-3">
+                  <MessageSquare className="h-5 w-5 text-cyan-400" />
+                  Conversation Details
+                  {selectedConversation?.isResolved && (
+                    <Badge className="bg-emerald-500/20 text-emerald-400">Resolved</Badge>
+                  )}
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedConversation(null)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              {selectedConversation && (
+                <p className="text-sm text-gray-400 mt-1">
+                  {selectedConversation.messageCount} messages · Started {formatDate(selectedConversation.createdAt)}
+                </p>
+              )}
+            </CardHeader>
+            
+            <CardContent className="flex-1 overflow-auto p-0">
+              {loadingDetails ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="h-8 w-8 animate-spin text-cyan-400" />
+                </div>
+              ) : selectedConversation ? (
+                <div className="flex flex-col h-full">
+                  {/* Conversation Info */}
+                  <div className="p-4 bg-gray-800/30 border-b border-gray-800 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Customer</p>
+                      <p className="text-sm text-white">{userName}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Assigned To</p>
+                      <p className="text-sm text-cyan-400">{selectedConversation.assignedEmployeeName || 'Unassigned'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Status</p>
+                      <p className={`text-sm ${selectedConversation.isResolved ? 'text-emerald-400' : selectedConversation.isAIHandled ? 'text-purple-400' : 'text-cyan-400'}`}>
+                        {selectedConversation.isResolved ? 'Resolved' : selectedConversation.isAIHandled ? 'AI Handling' : 'Active'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Last Activity</p>
+                      <p className="text-sm text-gray-300">{formatDate(selectedConversation.lastActivityAt)}</p>
+                    </div>
+                  </div>
+
+                  {/* Transfer History */}
+                  {selectedConversation.transfers.length > 0 && (
+                    <div className="p-4 bg-amber-500/5 border-b border-amber-500/20">
+                      <p className="text-xs text-amber-400 mb-2 flex items-center gap-1 font-medium">
+                        <ArrowUpDown className="w-3 h-3" /> Transfer History ({selectedConversation.transfers.length})
+                      </p>
+                      <div className="space-y-2">
+                        {selectedConversation.transfers.map((transfer, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-sm bg-gray-800/50 rounded-lg px-3 py-2">
+                            <span className="text-gray-400">{transfer.fromEmployeeName}</span>
+                            <ArrowRight className="w-4 h-4 text-amber-400" />
+                            <span className="text-cyan-400">{transfer.toEmployeeName}</span>
+                            {transfer.reason && (
+                              <span className="text-gray-500 text-xs">({transfer.reason})</span>
+                            )}
+                            <span className="text-gray-600 text-xs ml-auto">
+                              {formatDate(transfer.transferredAt)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Resolution Info */}
+                  {selectedConversation.isResolved && selectedConversation.resolvedByName && (
+                    <div className="p-4 bg-emerald-500/5 border-b border-emerald-500/20">
+                      <p className="text-sm text-emerald-400 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Resolved by {selectedConversation.resolvedByName}
+                        {selectedConversation.resolvedAt && ` on ${formatDate(selectedConversation.resolvedAt)}`}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Messages */}
+                  <div className="flex-1 overflow-auto p-4 space-y-3">
+                    {selectedConversation.messages.length === 0 ? (
+                      <div className="text-center text-gray-500 py-8">
+                        No messages in this conversation
+                      </div>
+                    ) : (
+                      selectedConversation.messages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`flex ${msg.senderType === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[70%] rounded-xl px-4 py-2 ${
+                              msg.senderType === 'user'
+                                ? 'bg-cyan-500/20 text-cyan-100'
+                                : msg.senderType === 'ai'
+                                  ? 'bg-purple-500/20 text-purple-100'
+                                  : msg.senderType === 'system'
+                                    ? 'bg-gray-700/50 text-gray-400 text-center w-full max-w-full text-xs'
+                                    : 'bg-gray-800 text-gray-100'
+                            }`}
+                          >
+                            {msg.senderType !== 'system' && (
+                              <p className={`text-xs mb-1 ${
+                                msg.senderType === 'user' ? 'text-cyan-400' :
+                                msg.senderType === 'ai' ? 'text-purple-400' :
+                                'text-gray-400'
+                              }`}>
+                                {msg.senderName}
+                                {msg.senderType === 'ai' && ' 🤖'}
+                              </p>
+                            )}
+                            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                            <p className={`text-xs mt-1 ${
+                              msg.senderType === 'user' ? 'text-cyan-500/70' :
+                              msg.senderType === 'system' ? 'text-gray-500' :
+                              'text-gray-500'
+                            }`}>
+                              {new Date(msg.createdAt).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
