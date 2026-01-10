@@ -137,7 +137,7 @@ export class MessagingService {
   ): Promise<IConversation> {
     await connectToDatabase();
     
-    // Check if conversation already exists
+    // Check if conversation already exists (including deleted ones - we'll restore them)
     let conversation = await Conversation.findOne({
       type: 'user-to-user',
       status: { $ne: 'closed' },
@@ -145,7 +145,53 @@ export class MessagingService {
       participants: { $size: 2 },
     });
     
-    if (!conversation) {
+    if (conversation) {
+      // If conversation was deleted by either user, restore it for both
+      // This happens when users unfriend and re-friend
+      const deletedByUsers = (conversation as any).deletedByUsers || [];
+      const messagesClearedByUsers = (conversation as any).messagesClearedByUsers || [];
+      
+      if (deletedByUsers.includes(user1.id) || deletedByUsers.includes(user2.id) ||
+          messagesClearedByUsers.includes(user1.id) || messagesClearedByUsers.includes(user2.id)) {
+        // Restore conversation for both users
+        await Conversation.updateOne(
+          { _id: conversation._id },
+          {
+            $pull: {
+              deletedByUsers: { $in: [user1.id, user2.id] },
+              messagesClearedByUsers: { $in: [user1.id, user2.id] },
+            },
+            $unset: {
+              [`userDeletedAt.${user1.id}`]: 1,
+              [`userDeletedAt.${user2.id}`]: 1,
+              [`messagesClearedAt.${user1.id}`]: 1,
+              [`messagesClearedAt.${user2.id}`]: 1,
+            },
+            $set: {
+              status: 'active',
+              lastActivityAt: new Date(),
+            },
+          }
+        );
+        
+        // Also restore messages for both users
+        const { Message } = await import('@/database/models/messaging/message.model');
+        await Message.updateMany(
+          { conversationId: conversation._id },
+          {
+            $pull: {
+              clearedByUsers: { $in: [user1.id, user2.id] },
+            },
+          }
+        );
+        
+        console.log(`♻️ [DM] Restored conversation ${conversation._id} for users ${user1.id} and ${user2.id}`);
+        
+        // Refetch the conversation to get updated data
+        conversation = await Conversation.findById(conversation._id);
+      }
+    } else {
+      // Create new conversation
       conversation = await this.createConversation({
         type: 'user-to-user',
         participants: [
@@ -155,7 +201,7 @@ export class MessagingService {
       });
     }
     
-    return conversation;
+    return conversation!;
   }
   
   static async getOrCreateSupportConversation(
