@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { User, MapPin, Building2, Mail, Save, Loader2, CheckCircle2, Globe, Lock, Eye, EyeOff, Camera, FileText, Phone } from 'lucide-react';
+import { User, MapPin, Building2, Mail, Save, Loader2, CheckCircle2, Globe, Lock, Eye, EyeOff, Camera, FileText, Phone, Shield, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -62,6 +62,10 @@ export default function ProfileSettingsSection() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Privacy settings
+  const [allowFriendRequests, setAllowFriendRequests] = useState(true);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+
   const countries = countryList().getData();
 
   // Helper function to get flag emoji
@@ -113,6 +117,9 @@ export default function ProfileSettingsSection() {
         setPostalCode(userData.postalCode || '');
         setPhone(userData.phone || '');
         
+        // Load privacy settings
+        setAllowFriendRequests(userData.settings?.privacy?.allowFriendRequests ?? true);
+        
         // Store original values
         originalValues.current = {
           name: userData.name || '',
@@ -131,6 +138,32 @@ export default function ProfileSettingsSection() {
       toast.error('Failed to load profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleFriendRequests = async () => {
+    const newValue = !allowFriendRequests;
+    setSavingPrivacy(true);
+    
+    try {
+      const response = await fetch('/api/user/privacy', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allowFriendRequests: newValue }),
+      });
+
+      if (response.ok) {
+        setAllowFriendRequests(newValue);
+        toast.success(newValue ? 'Friend requests enabled' : 'Friend requests disabled');
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to update privacy settings');
+      }
+    } catch (error) {
+      console.error('Error updating privacy settings:', error);
+      toast.error('Failed to update privacy settings');
+    } finally {
+      setSavingPrivacy(false);
     }
   };
 
@@ -641,6 +674,47 @@ export default function ProfileSettingsSection() {
             </Button>
           </div>
         </form>
+      </div>
+
+      {/* Privacy Settings */}
+      <div className="bg-dark-700/50 rounded-2xl p-6 shadow-xl border border-dark-600">
+        <div className="flex items-center gap-3 mb-6">
+          <Shield className="h-6 w-6 text-purple-500" />
+          <h2 className="text-2xl font-bold text-white">Privacy Settings</h2>
+        </div>
+
+        <div className="space-y-4">
+          {/* Allow Friend Requests Toggle */}
+          <div className="flex items-center justify-between p-4 bg-dark-800/50 rounded-lg border border-dark-600">
+            <div className="flex items-center gap-3">
+              <UserPlus className="h-5 w-5 text-cyan-400" />
+              <div>
+                <p className="text-white font-medium">Allow Friend Requests</p>
+                <p className="text-sm text-gray-400">
+                  {allowFriendRequests 
+                    ? 'Other users can send you friend requests from the leaderboard'
+                    : 'Friend requests from the leaderboard are disabled'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleToggleFriendRequests}
+              disabled={savingPrivacy}
+              className={`relative w-14 h-7 rounded-full transition-colors ${
+                allowFriendRequests ? 'bg-cyan-500' : 'bg-dark-600'
+              } ${savingPrivacy ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <span
+                className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                  allowFriendRequests ? 'translate-x-7' : 'translate-x-0'
+                }`}
+              />
+              {savingPrivacy && (
+                <Loader2 className="absolute top-1.5 left-1/2 -translate-x-1/2 h-4 w-4 animate-spin text-white" />
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Account Information */}

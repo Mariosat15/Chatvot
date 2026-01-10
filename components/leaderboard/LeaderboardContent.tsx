@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import LeaderboardChallengeButton from '@/components/leaderboard/LeaderboardChallengeButton';
+import LeaderboardFriendButton from '@/components/leaderboard/LeaderboardFriendButton';
 import MatchmakingCards from '@/components/leaderboard/MatchmakingCards';
 import ProfileCard from '@/components/profile/ProfileCard';
 import ChallengeCreateDialog from '@/components/challenges/ChallengeCreateDialog';
@@ -915,17 +916,25 @@ export default function LeaderboardContent({
                       </span>
                     </div>
                     
-                    <LeaderboardChallengeButton
-                      userId={entry.userId}
-                      username={entry.username}
-                      isCurrentUser={isCurrentUser}
-                      winRate={entry.winRate}
-                      totalTrades={entry.totalTrades}
-                      challengesEntered={entry.challengesEntered || 0}
-                      level={getLevelFromTitle(entry.userTitle)}
-                      profileImage={entry.profileImage}
-                      compact
-                    />
+                    <div className="flex items-center gap-2">
+                      <LeaderboardFriendButton
+                        userId={entry.userId}
+                        username={entry.username}
+                        isCurrentUser={isCurrentUser}
+                        compact
+                      />
+                      <LeaderboardChallengeButton
+                        userId={entry.userId}
+                        username={entry.username}
+                        isCurrentUser={isCurrentUser}
+                        winRate={entry.winRate}
+                        totalTrades={entry.totalTrades}
+                        challengesEntered={entry.challengesEntered || 0}
+                        level={getLevelFromTitle(entry.userTitle)}
+                        profileImage={entry.profileImage}
+                        compact
+                      />
+                    </div>
                     </div>
                   </div>
                 );
@@ -1086,7 +1095,12 @@ export default function LeaderboardContent({
                         </div>
 
                         {/* Challenge Button */}
-                        <div className="col-span-2 flex items-center justify-center">
+                        <div className="col-span-2 flex items-center justify-center gap-2">
+                          <LeaderboardFriendButton
+                            userId={entry.userId}
+                            username={entry.username}
+                            isCurrentUser={isCurrentUser}
+                          />
                           <LeaderboardChallengeButton
                             userId={entry.userId}
                             username={entry.username}

@@ -102,7 +102,7 @@ export async function GET() {
     // Check both 'profileImage' (custom) and 'image' (better-auth default) fields
     const userImage = user.profileImage || user.image || '';
     
-    const profile: UserProfile = {
+    const profile: UserProfile & { settings?: { privacy?: { allowFriendRequests?: boolean } } } = {
       id: user.id || user._id?.toString(),
       name: user.name || '',
       email: user.email || '',
@@ -115,6 +115,11 @@ export async function GET() {
       phone: user.phone || '',
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      settings: {
+        privacy: {
+          allowFriendRequests: user.settings?.privacy?.allowFriendRequests ?? true,
+        },
+      },
     };
 
     return NextResponse.json({ user: profile });

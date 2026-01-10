@@ -440,6 +440,49 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     }
   };
 
+  // Accept friend request
+  const acceptFriendRequest = async (requestId: string) => {
+    try {
+      const response = await fetch(`/api/messaging/friends/requests/${requestId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'accept' }),
+      });
+      
+      if (response.ok) {
+        // Refresh friends and requests
+        fetchFriends();
+        fetchFriendRequests();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to accept request');
+      }
+    } catch {
+      alert('Network error');
+    }
+  };
+
+  // Decline friend request
+  const declineFriendRequest = async (requestId: string) => {
+    try {
+      const response = await fetch(`/api/messaging/friends/requests/${requestId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'decline' }),
+      });
+      
+      if (response.ok) {
+        // Refresh requests
+        fetchFriendRequests();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to decline request');
+      }
+    } catch {
+      alert('Network error');
+    }
+  };
+
   // Start conversation with a friend
   const startConversationWithFriend = async (friendId: string) => {
     try {
@@ -1170,10 +1213,18 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                         <p className="text-white font-medium">{req.fromUserName}</p>
                       </div>
                       <div className="flex gap-2">
-                        <button className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30">
+                        <button 
+                          onClick={() => acceptFriendRequest(req.id)}
+                          className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30 transition-colors"
+                          title="Accept friend request"
+                        >
                           <Check className="w-4 h-4" />
                         </button>
-                        <button className="w-8 h-8 bg-red-500/20 text-red-400 rounded-lg flex items-center justify-center hover:bg-red-500/30">
+                        <button 
+                          onClick={() => declineFriendRequest(req.id)}
+                          className="w-8 h-8 bg-red-500/20 text-red-400 rounded-lg flex items-center justify-center hover:bg-red-500/30 transition-colors"
+                          title="Decline friend request"
+                        >
                           <X className="w-4 h-4" />
                         </button>
                       </div>
