@@ -89,6 +89,49 @@ class NotificationService {
   }
 
   /**
+   * Create a custom notification directly (without template)
+   */
+  async createCustom(data: {
+    userId: string;
+    type: string;
+    title: string;
+    message: string;
+    icon?: string;
+    category?: string;
+    priority?: string;
+    color?: string;
+    actionUrl?: string;
+    actionText?: string;
+    metadata?: Record<string, any>;
+  }): Promise<any> {
+    try {
+      await connectToDatabase();
+
+      const notification = await Notification.create({
+        userId: data.userId,
+        templateId: `custom_${data.type}`,
+        title: data.title,
+        message: data.message,
+        icon: data.icon || 'bell',
+        category: data.category || 'system',
+        type: data.type,
+        priority: data.priority || 'normal',
+        color: data.color || 'blue',
+        actionUrl: data.actionUrl,
+        actionText: data.actionText,
+        isRead: false,
+        metadata: data.metadata || {},
+        isInstant: true,
+      });
+
+      return notification;
+    } catch (error) {
+      console.error('Error creating custom notification:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get user's notifications
    */
   async getUserNotifications(userId: string, options: GetNotificationsOptions = {}) {
@@ -443,6 +486,102 @@ export async function sendDepositCompletedNotification(
   balance: string
 ): Promise<boolean> {
   return sendNotification({ userId, type: 'deposit_completed', metadata: { amount, balance } });
+}
+
+// ========== Social/Messaging notification helpers ==========
+
+export interface CreateUserNotificationOptions {
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  icon?: string;
+  category?: string;
+  actionUrl?: string;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Create a custom user notification (for social features like friend requests, blocks, messages)
+ */
+export async function createUserNotification(options: CreateUserNotificationOptions): Promise<boolean> {
+  try {
+    const notification = await notificationService.createCustom({
+      userId: options.userId,
+      type: options.type,
+      title: options.title,
+      message: options.message,
+      icon: options.icon || 'bell',
+      category: options.category || 'social',
+      actionUrl: options.actionUrl,
+      metadata: options.metadata,
+    });
+    return !!notification;
+  } catch (error) {
+    console.error('Error creating user notification:', error);
+    return false;
+  }
+}
+
+/**
+ * Send new message notification
+ */
+export async function sendNewMessageNotification(
+  userId: string,
+  senderName: string,
+  messagePreview: string,
+  conversationId: string
+): Promise<boolean> {
+  return createUserNotification({
+    userId,
+    type: 'new_message',
+    title: 'New Message',
+    message: `${senderName}: ${messagePreview.substring(0, 50)}${messagePreview.length > 50 ? '...' : ''}`,
+    icon: 'message-circle',
+    category: 'messaging',
+    actionUrl: `/messaging?conversation=${conversationId}`,
+    metadata: { senderName, conversationId },
+  });
+}
+
+/**
+ * Send friend request notification
+ */
+export async function sendFriendRequestNotification(
+  userId: string,
+  fromUserName: string,
+  fromUserId: string
+): Promise<boolean> {
+  return createUserNotification({
+    userId,
+    type: 'friend_request',
+    title: 'Friend Request',
+    message: `${fromUserName} wants to be your friend.`,
+    icon: 'user-plus',
+    category: 'social',
+    actionUrl: '/messaging?tab=requests',
+    metadata: { fromUserName, fromUserId },
+  });
+}
+
+/**
+ * Send friend request accepted notification
+ */
+export async function sendFriendRequestAcceptedNotification(
+  userId: string,
+  friendName: string,
+  friendId: string
+): Promise<boolean> {
+  return createUserNotification({
+    userId,
+    type: 'friend_request_accepted',
+    title: 'Friend Request Accepted',
+    message: `${friendName} accepted your friend request!`,
+    icon: 'users',
+    category: 'social',
+    actionUrl: `/messaging?friend=${friendId}`,
+    metadata: { friendName, friendId },
+  });
 }
 
 // Default export

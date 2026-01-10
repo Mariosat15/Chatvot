@@ -8,7 +8,9 @@ export type NotificationCategory =
   | 'achievement'   // Badges, level ups, milestones
   | 'system'        // System notifications, maintenance
   | 'admin'         // Manual admin notifications
-  | 'security';     // Security alerts, login, password changes
+  | 'security'      // Security alerts, login, password changes
+  | 'social'        // Friend requests, blocks, messaging
+  | 'messaging';    // Direct messages, support chat
 
 export type NotificationType =
   // Purchase
@@ -77,6 +79,15 @@ export type NotificationType =
   | 'kyc_declined'
   | 'kyc_expired'
   | 'kyc_required'
+  // Social
+  | 'friend_request'
+  | 'friend_request_accepted'
+  | 'friend_removed'
+  | 'user_blocked'
+  // Messaging
+  | 'new_message'
+  | 'support_reply'
+  | 'conversation_assigned'
   // Custom (for admin-created templates)
   | 'custom';
 
@@ -141,7 +152,7 @@ const NotificationTemplateSchema = new Schema<INotificationTemplate>({
   },
   category: {
     type: String,
-    enum: ['purchase', 'competition', 'challenge', 'trading', 'achievement', 'system', 'admin', 'security'],
+    enum: ['purchase', 'competition', 'challenge', 'trading', 'achievement', 'system', 'admin', 'security', 'social', 'messaging'],
     required: true,
   },
   type: {
@@ -1119,6 +1130,132 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       channels: { inApp: true, email: false, push: false },
       actionUrl: '/profile?tab=verification',
       actionText: 'Verify Now',
+    },
+
+    // ========== SOCIAL ==========
+    {
+      templateId: 'friend_request',
+      name: 'Friend Request',
+      description: 'Sent when someone sends a friend request',
+      category: 'social',
+      type: 'friend_request',
+      title: '👋 Friend Request',
+      message: '{{fromUserName}} wants to be your friend!',
+      icon: '👋',
+      priority: 'normal',
+      color: '#06B6D4',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+      actionUrl: '/messaging?tab=requests',
+      actionText: 'View Request',
+    },
+    {
+      templateId: 'friend_request_accepted',
+      name: 'Friend Request Accepted',
+      description: 'Sent when your friend request is accepted',
+      category: 'social',
+      type: 'friend_request_accepted',
+      title: '🎉 Friend Request Accepted!',
+      message: '{{friendName}} accepted your friend request! You can now chat with them.',
+      icon: '🎉',
+      priority: 'normal',
+      color: '#10B981',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+      actionUrl: '/messaging?friend={{friendId}}',
+      actionText: 'Send Message',
+    },
+    {
+      templateId: 'friend_removed',
+      name: 'Friend Removed',
+      description: 'Sent when someone removes you from friends',
+      category: 'social',
+      type: 'friend_removed',
+      title: '👤 Friendship Ended',
+      message: '{{removedByName}} has removed you from their friends list.',
+      icon: '👤',
+      priority: 'low',
+      color: '#6B7280',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+    },
+    {
+      templateId: 'user_blocked',
+      name: 'User Blocked You',
+      description: 'Sent when someone blocks you',
+      category: 'social',
+      type: 'user_blocked',
+      title: '🚫 You Have Been Blocked',
+      message: '{{blockedByName}} has blocked you. You can no longer send them messages or friend requests.',
+      icon: '🚫',
+      priority: 'normal',
+      color: '#EF4444',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+    },
+
+    // ========== MESSAGING ==========
+    {
+      templateId: 'new_message',
+      name: 'New Message',
+      description: 'Sent when you receive a new message',
+      category: 'messaging',
+      type: 'new_message',
+      title: '💬 New Message',
+      message: '{{senderName}}: {{messagePreview}}',
+      icon: '💬',
+      priority: 'normal',
+      color: '#3B82F6',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+      actionUrl: '/messaging?conversation={{conversationId}}',
+      actionText: 'View Message',
+    },
+    {
+      templateId: 'support_reply',
+      name: 'Support Reply',
+      description: 'Sent when support replies to your ticket',
+      category: 'messaging',
+      type: 'support_reply',
+      title: '💬 Support Reply',
+      message: 'A support agent has replied to your ticket. {{messagePreview}}',
+      icon: '💬',
+      priority: 'high',
+      color: '#8B5CF6',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: '/messaging',
+      actionText: 'View Reply',
+    },
+    {
+      templateId: 'conversation_assigned',
+      name: 'Conversation Assigned',
+      description: 'Sent to employee when a conversation is assigned to them',
+      category: 'messaging',
+      type: 'conversation_assigned',
+      title: '📋 New Conversation Assigned',
+      message: 'A new support conversation from {{customerName}} has been assigned to you.',
+      icon: '📋',
+      priority: 'high',
+      color: '#F59E0B',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+      actionUrl: '/messaging',
+      actionText: 'View Conversation',
     },
   ];
 }

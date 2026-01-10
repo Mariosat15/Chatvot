@@ -3,6 +3,7 @@ import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { connectToDatabase } from '@/database/mongoose';
 import { ObjectId } from 'mongodb';
+import { BlockedUser } from '@/database/models/messaging/blocked-user.model';
 
 /**
  * Helper to build query filter for user
@@ -20,7 +21,7 @@ function buildUserQuery(userId: string) {
 
 /**
  * GET /api/messaging/friends/status/[userId]
- * Check friendship status with a user
+ * Check friendship status with a user including block status
  */
 export async function GET(
   request: NextRequest,
@@ -39,7 +40,10 @@ export async function GET(
       return NextResponse.json({ 
         isFriend: false, 
         hasPendingRequest: false,
-        disabled: false 
+        hasReceivedRequest: false,
+        canReceiveRequests: true,
+        isBlocked: false,
+        isBlockedByThem: false,
       });
     }
 
@@ -52,20 +56,44 @@ export async function GET(
     
     const { Friendship, FriendRequest } = await import('@/database/models/messaging/friend.model');
 
-    // Check if the target user has disabled friend requests
+    // Check if the target user has disabled friend requests (check both paths)
     const targetUser = await db.collection('user').findOne(buildUserQuery(userId));
-    const allowFriendRequests = targetUser?.settings?.privacy?.allowFriendRequests ?? true;
+    const allowFriendRequests = 
+      (targetUser?.privacySettings?.allowFriendRequests !== false) && 
+      (targetUser?.settings?.privacy?.allowFriendRequests !== false);
 
-    // Check friendship
-    const areFriends = await Friendship.areFriends(session.user.id, userId);
+    // Check friendship and block status
+    const friendship = await Friendship.getFriendship(session.user.id, userId);
+    const areFriends = friendship && !friendship.blockedBy;
+    const isFriendshipBlockedByMe = friendship?.blockedBy === session.user.id;
+    const isFriendshipBlockedByThem = friendship?.blockedBy === userId;
     
-    // Check pending requests (either direction)
-    const hasPendingRequest = await FriendRequest.hasPendingRequest(session.user.id, userId);
+    // Check non-friendship blocks
+    const isBlockedByMe = await BlockedUser.isBlocked(session.user.id, userId);
+    const isBlockedByThem = await BlockedUser.isBlocked(userId, session.user.id);
+    
+    // Check pending requests
+    // hasPendingRequest = I sent a request to them
+    const sentRequest = await FriendRequest.findOne({
+      fromUserId: session.user.id,
+      toUserId: userId,
+      status: 'pending',
+    });
+    
+    // hasReceivedRequest = They sent a request to me
+    const receivedRequest = await FriendRequest.findOne({
+      fromUserId: userId,
+      toUserId: session.user.id,
+      status: 'pending',
+    });
 
     return NextResponse.json({
-      isFriend: areFriends,
-      hasPendingRequest,
-      disabled: !allowFriendRequests,
+      isFriend: !!areFriends,
+      hasPendingRequest: !!sentRequest,
+      hasReceivedRequest: !!receivedRequest,
+      canReceiveRequests: allowFriendRequests,
+      isBlocked: isBlockedByMe || isFriendshipBlockedByMe,
+      isBlockedByThem: isBlockedByThem || isFriendshipBlockedByThem,
     });
   } catch (error) {
     console.error('Error checking friend status:', error);

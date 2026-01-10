@@ -118,13 +118,22 @@ interface AssignedAgent {
   assignedAt: string;
 }
 
+interface BlockedUser {
+  id: string;
+  name: string;
+  avatar?: string;
+  blockedAt: string;
+  type: 'user' | 'friend';
+}
+
 export default function MessagingClient({ session }: MessagingClientProps) {
-  const [activeTab, setActiveTab] = useState<'chats' | 'friends' | 'requests'>('chats');
+  const [activeTab, setActiveTab] = useState<'chats' | 'friends' | 'requests' | 'blocked'>('chats');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendRequests, setFriendRequests] = useState<{ received: FriendRequest[]; sent: FriendRequest[] }>({ received: [], sent: [] });
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -140,6 +149,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const [isClearing, setIsClearing] = useState(false);
   const [supportTickets, setSupportTickets] = useState<Conversation[]>([]);
   const [showNewTicketConfirm, setShowNewTicketConfirm] = useState(false);
+  const [friendMenuOpen, setFriendMenuOpen] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatMenuRef = useRef<HTMLDivElement>(null);
@@ -376,6 +386,92 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       // Silent fail
     }
   }, []);
+
+  // Fetch blocked users
+  const fetchBlockedUsers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/messaging/blocked');
+      if (response.ok) {
+        const data = await response.json();
+        setBlockedUsers(data.blockedUsers);
+      }
+    } catch {
+      // Silent fail
+    }
+  }, []);
+
+  // Unfriend a user
+  const unfriendUser = async (friendId: string, friendName: string) => {
+    if (!confirm(`Are you sure you want to remove ${friendName} from your friends?`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/messaging/friends/${friendId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        toast.success(`${friendName} has been removed from your friends`);
+        fetchFriends();
+        setFriendMenuOpen(null);
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to unfriend');
+      }
+    } catch {
+      toast.error('Network error');
+    }
+  };
+
+  // Block a user
+  const blockUser = async (userId: string, userName: string) => {
+    if (!confirm(`Are you sure you want to block ${userName}? They won't be able to send you messages or friend requests.`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/messaging/friends/${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'block' }),
+      });
+      
+      if (response.ok) {
+        toast.success(`${userName} has been blocked`);
+        fetchFriends();
+        fetchBlockedUsers();
+        setFriendMenuOpen(null);
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to block');
+      }
+    } catch {
+      toast.error('Network error');
+    }
+  };
+
+  // Unblock a user
+  const unblockUser = async (userId: string, userName: string) => {
+    try {
+      const response = await fetch(`/api/messaging/friends/${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unblock' }),
+      });
+      
+      if (response.ok) {
+        toast.success(`${userName} has been unblocked`);
+        fetchBlockedUsers();
+        fetchFriends();
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to unblock');
+      }
+    } catch {
+      toast.error('Network error');
+    }
+  };
 
   // Fetch messages for selected conversation
   const fetchMessages = useCallback(async (conversationId: string, isInitial: boolean = false) => {
@@ -746,13 +842,14 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         fetchConversations(),
         fetchFriends(),
         fetchFriendRequests(),
+        fetchBlockedUsers(),
         fetchAssignedAgent(),
         fetchSupportTickets(),
       ]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchConversations, fetchFriends, fetchFriendRequests, fetchAssignedAgent, fetchSupportTickets]);
+  }, [fetchConversations, fetchFriends, fetchFriendRequests, fetchBlockedUsers, fetchAssignedAgent, fetchSupportTickets]);
 
   // Track selected conversation ID
   const selectedConversationIdRef = useRef<string | null>(null);
@@ -926,11 +1023,11 @@ export default function MessagingClient({ session }: MessagingClientProps) {
 
           {/* Tabs */}
           <div className="flex bg-white/5 rounded-xl p-1">
-            {['chats', 'friends', 'requests'].map((tab) => (
+            {['chats', 'friends', 'requests', 'blocked'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
-                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all relative ${
+                className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all relative ${
                   activeTab === tab 
                     ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25' 
                     : 'text-gray-400 hover:text-white'
@@ -940,6 +1037,11 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                 {tab === 'requests' && friendRequests.received.length > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
                     {friendRequests.received.length}
+                  </span>
+                )}
+                {tab === 'blocked' && blockedUsers.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-gray-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+                    {blockedUsers.length}
                   </span>
                 )}
               </button>
@@ -1207,22 +1309,72 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                   {friends.map((friend) => (
                     <div 
                       key={friend.id} 
-                      onClick={() => startConversationWithFriend(friend.friendId)}
-                      className="p-3 bg-white/5 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-colors cursor-pointer"
+                      className="p-3 bg-white/5 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-colors relative"
                     >
-                      <div className="w-10 h-10 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl flex items-center justify-center overflow-hidden">
-                        {friend.friendAvatar ? (
-                          <img src={friend.friendAvatar} alt="" className="w-10 h-10 rounded-xl object-cover" />
-                        ) : (
-                          <span className="text-cyan-400 font-medium">{friend.friendName?.charAt(0)}</span>
-                        )}
-                      </div>
-                      <span className="text-white font-medium flex-1">{friend.friendName}</span>
-                      <div
-                        className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center"
-                        title="Send message"
+                      <div 
+                        className="flex items-center gap-3 flex-1 cursor-pointer"
+                        onClick={() => startConversationWithFriend(friend.friendId)}
                       >
-                        <Send className="w-4 h-4" />
+                        <div className="w-10 h-10 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl flex items-center justify-center overflow-hidden">
+                          {friend.friendAvatar ? (
+                            <img src={friend.friendAvatar} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                          ) : (
+                            <span className="text-cyan-400 font-medium">{friend.friendName?.charAt(0)}</span>
+                          )}
+                        </div>
+                        <span className="text-white font-medium flex-1">{friend.friendName}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => startConversationWithFriend(friend.friendId)}
+                          className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30 transition-colors"
+                          title="Send message"
+                        >
+                          <Send className="w-4 h-4" />
+                        </button>
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFriendMenuOpen(friendMenuOpen === friend.id ? null : friend.id);
+                            }}
+                            className="w-8 h-8 bg-white/5 text-gray-400 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"
+                            title="More options"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                          <AnimatePresence>
+                            {friendMenuOpen === friend.id && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                className="absolute right-0 top-full mt-2 w-40 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50"
+                              >
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    unfriendUser(friend.friendId, friend.friendName);
+                                  }}
+                                  className="w-full px-4 py-2.5 text-left text-sm text-gray-300 hover:bg-white/5 flex items-center gap-2 border-b border-white/5"
+                                >
+                                  <UserCircle className="w-4 h-4" />
+                                  Unfriend
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    blockUser(friend.friendId, friend.friendName);
+                                  }}
+                                  className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2"
+                                >
+                                  <Shield className="w-4 h-4" />
+                                  Block
+                                </button>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1287,6 +1439,47 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                           <Clock className="w-3 h-3" /> Pending
                         </p>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'blocked' && (
+            <div className="p-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                Blocked Users ({blockedUsers.length})
+              </h3>
+              {blockedUsers.length === 0 ? (
+                <div className="text-center py-8">
+                  <Shield className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-500">No blocked users</p>
+                  <p className="text-gray-600 text-sm mt-1">Users you block will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {blockedUsers.map((user) => (
+                    <div key={user.id} className="p-3 bg-white/5 rounded-xl flex items-center gap-3">
+                      <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center overflow-hidden">
+                        {user.avatar ? (
+                          <img src={user.avatar} alt="" className="w-10 h-10 rounded-xl object-cover opacity-50" />
+                        ) : (
+                          <span className="text-red-400/50 font-medium">{user.name?.charAt(0)}</span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-gray-400 font-medium">{user.name}</p>
+                        <p className="text-xs text-gray-600">
+                          Blocked {user.blockedAt ? formatDistanceToNow(new Date(user.blockedAt), { addSuffix: true }) : ''}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => unblockUser(user.id, user.name)}
+                        className="px-3 py-1.5 bg-white/5 text-gray-300 text-xs rounded-lg hover:bg-white/10 transition-colors"
+                      >
+                        Unblock
+                      </button>
                     </div>
                   ))}
                 </div>
