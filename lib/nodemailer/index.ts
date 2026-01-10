@@ -117,6 +117,10 @@ async function getWelcomeEmailConfig() {
     let logoUrl = whiteLabelSettings?.emailLogo || '/assets/images/logo.png';
     let dashboardUrl = whiteLabelSettings?.dashboardPreview || '/assets/images/dashboard-preview.png';
     
+    console.log('📧 Email image URLs (from DB):');
+    console.log('   - emailLogo:', whiteLabelSettings?.emailLogo || '(default)');
+    console.log('   - dashboardPreview:', whiteLabelSettings?.dashboardPreview || '(default)');
+    
     // If the URL is already a full URL (CDN, etc.), use it
     // Otherwise, prepend the base URL (or use placeholder if localhost)
     if (!logoUrl.startsWith('http')) {
@@ -135,6 +139,10 @@ async function getWelcomeEmailConfig() {
             dashboardUrl = `${baseUrl}${dashboardUrl}`;
         }
     }
+    
+    console.log('📧 Email image URLs (final):');
+    console.log('   - logoUrl:', logoUrl);
+    console.log('   - dashboardUrl:', dashboardUrl);
     
     // Build company address from flat fields
     let companyAddress = '';
