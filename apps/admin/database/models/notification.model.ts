@@ -76,7 +76,7 @@ const NotificationSchema = new Schema<INotification>({
   },
   category: {
     type: String,
-    enum: ['purchase', 'competition', 'challenge', 'trading', 'achievement', 'system', 'admin', 'security'],
+    enum: ['purchase', 'competition', 'challenge', 'trading', 'achievement', 'system', 'admin', 'security', 'social', 'messaging'],
     required: true,
     index: true,
   },
