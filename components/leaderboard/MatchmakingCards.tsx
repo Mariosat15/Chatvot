@@ -515,6 +515,7 @@ function TraderCard({ match, swipeProgress = 0, isSwipingRight = false, isSwipin
 }) {
   const { trader, matchScore, matchReasons } = match;
   const levelInfo = LEVEL_INFO[trader.level];
+  const [imageError, setImageError] = useState(false);
 
   return (
     <div className="w-full h-full relative overflow-hidden rounded-3xl">
@@ -580,12 +581,14 @@ function TraderCard({ match, swipeProgress = 0, isSwipingRight = false, isSwipin
                 "animate-pulse opacity-60"
               )} />
               <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-gray-800 bg-gradient-to-br from-gray-700 to-gray-800">
-                {trader.profileImage ? (
+                {trader.profileImage && !imageError ? (
                   <Image
                     src={trader.profileImage}
                     alt={trader.username}
                     fill
                     className="object-cover"
+                    onError={() => setImageError(true)}
+                    unoptimized
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
