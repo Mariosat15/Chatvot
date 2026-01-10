@@ -165,14 +165,9 @@ export default function LeaderboardChallengeButton({
     setShowVsScreen(false);
   };
 
-  // Current user sees their own row but no challenge button
+  // Current user - handled in parent component
   if (isCurrentUser) {
-    return (
-      <div className="flex items-center gap-1">
-        <Circle className="h-2 w-2 text-green-500 fill-green-500" />
-        <span className="text-xs text-green-400">You</span>
-      </div>
-    );
+    return null;
   }
 
   const isOnline = onlineStatus?.status === 'online';
@@ -181,28 +176,28 @@ export default function LeaderboardChallengeButton({
   // Compact mode for mobile
   if (compact) {
     return (
-      <div className="flex items-center gap-1.5">
-        {/* Compact Online Status */}
-        {loading ? (
-          <Loader2 className="h-2 w-2 text-gray-500 animate-spin" />
-        ) : (
-          <Circle
-            className={`h-2 w-2 ${
-              isOnline ? 'text-green-500 fill-green-500' : 'text-gray-500 fill-gray-500'
-            }`}
-          />
-        )}
-        
-        {/* Compact Challenge Button */}
-        {canChallenge && (
-          <Button
-            size="sm"
-            onClick={handleChallengeClick}
-            className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-[10px] px-2 py-0.5 h-6"
-          >
-            <Swords className="h-3 w-3" />
-          </Button>
-        )}
+      <>
+        <button
+          onClick={canChallenge ? handleChallengeClick : undefined}
+          disabled={!canChallenge || loading}
+          className={`
+            flex-1 h-9 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all
+            ${canChallenge 
+              ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40' 
+              : 'bg-gray-800/50 text-gray-600 border border-gray-700/50 cursor-not-allowed'
+            }
+          `}
+        >
+          {loading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <>
+              <Circle className={`h-2 w-2 ${isOnline ? 'fill-green-400 text-green-400' : 'fill-gray-500 text-gray-500'}`} />
+              <Swords className="h-3.5 w-3.5" />
+              {canChallenge ? 'Challenge' : 'Offline'}
+            </>
+          )}
+        </button>
 
         {/* VS Screen */}
         {opponentStats && (
@@ -222,41 +217,33 @@ export default function LeaderboardChallengeButton({
           onOpenChange={setDialogOpen}
           challengedUser={dialogOpen ? { userId, username } : null}
         />
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="flex items-center gap-2">
-      {/* Online Status Indicator */}
-      <div className="flex items-center gap-1">
+    <>
+      <button
+        onClick={canChallenge ? handleChallengeClick : undefined}
+        disabled={!canChallenge || loading}
+        className={`
+          h-10 px-4 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all
+          ${canChallenge 
+            ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:scale-[1.02]' 
+            : 'bg-gray-800/50 text-gray-500 border border-gray-700/50 cursor-not-allowed'
+          }
+        `}
+      >
         {loading ? (
-          <Loader2 className="h-2 w-2 text-gray-500 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
-          <Circle
-            className={`h-2 w-2 ${
-              isOnline
-                ? 'text-green-500 fill-green-500'
-                : 'text-gray-500 fill-gray-500'
-            }`}
-          />
+          <>
+            <Circle className={`h-2 w-2 ${isOnline ? 'fill-green-400 text-green-400' : 'fill-gray-500 text-gray-500'}`} />
+            <Swords className="h-4 w-4" />
+            <span className="hidden sm:inline">{canChallenge ? 'Challenge' : 'Offline'}</span>
+          </>
         )}
-        <span className={`text-xs ${isOnline ? 'text-green-400' : 'text-gray-500'}`}>
-          {loading ? '...' : isOnline ? 'Online' : 'Offline'}
-        </span>
-      </div>
-
-      {/* Challenge Button */}
-      {canChallenge && (
-        <Button
-          size="sm"
-          onClick={handleChallengeClick}
-          className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-xs px-2 py-1 h-7"
-        >
-          <Swords className="h-3 w-3 mr-1" />
-          Challenge
-        </Button>
-      )}
+      </button>
 
       {/* VS Screen */}
       {opponentStats && (
@@ -276,7 +263,7 @@ export default function LeaderboardChallengeButton({
         onOpenChange={setDialogOpen}
         challengedUser={dialogOpen ? { userId, username } : null}
       />
-    </div>
+    </>
   );
 }
 

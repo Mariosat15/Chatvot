@@ -46,7 +46,8 @@ export default function LeaderboardFriendButton({
     }
   };
 
-  const sendFriendRequest = async () => {
+  const sendFriendRequest = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (sending || status !== 'none') return;
     setSending(true);
     
@@ -75,14 +76,16 @@ export default function LeaderboardFriendButton({
   // Don't show button for current user
   if (isCurrentUser) return null;
 
+  const baseClasses = cn(
+    "flex items-center justify-center rounded-xl transition-all duration-200 font-medium",
+    compact ? "w-9 h-9" : "w-10 h-10"
+  );
+
   // Loading state
   if (status === 'loading') {
     return (
-      <div className={cn(
-        "flex items-center justify-center",
-        compact ? "w-7 h-7" : "w-8 h-8"
-      )}>
-        <div className="w-3 h-3 border border-gray-500 border-t-transparent rounded-full animate-spin" />
+      <div className={cn(baseClasses, "bg-gray-800/50 border border-gray-700/50")}>
+        <div className="w-4 h-4 border-2 border-gray-600 border-t-gray-400 rounded-full animate-spin" />
       </div>
     );
   }
@@ -92,12 +95,12 @@ export default function LeaderboardFriendButton({
     return (
       <div 
         className={cn(
-          "flex items-center justify-center bg-emerald-500/20 text-emerald-400 rounded-lg",
-          compact ? "w-7 h-7" : "w-8 h-8"
+          baseClasses,
+          "bg-gradient-to-br from-emerald-500/20 to-green-500/20 text-emerald-400 border border-emerald-500/30"
         )}
         title="Already friends"
       >
-        <Users className={compact ? "w-3.5 h-3.5" : "w-4 h-4"} />
+        <Users className="w-4 h-4" />
       </div>
     );
   }
@@ -107,12 +110,12 @@ export default function LeaderboardFriendButton({
     return (
       <div 
         className={cn(
-          "flex items-center justify-center bg-amber-500/20 text-amber-400 rounded-lg",
-          compact ? "w-7 h-7" : "w-8 h-8"
+          baseClasses,
+          "bg-gradient-to-br from-amber-500/20 to-orange-500/20 text-amber-400 border border-amber-500/30"
         )}
         title="Request pending"
       >
-        <Clock className={compact ? "w-3.5 h-3.5" : "w-4 h-4"} />
+        <Clock className="w-4 h-4" />
       </div>
     );
   }
@@ -122,12 +125,12 @@ export default function LeaderboardFriendButton({
     return (
       <div 
         className={cn(
-          "flex items-center justify-center bg-gray-500/20 text-gray-500 rounded-lg cursor-not-allowed",
-          compact ? "w-7 h-7" : "w-8 h-8"
+          baseClasses,
+          "bg-gray-800/50 text-gray-600 border border-gray-700/50 cursor-not-allowed"
         )}
         title="Friend requests disabled by user"
       >
-        <UserPlus className={compact ? "w-3.5 h-3.5" : "w-4 h-4"} />
+        <UserPlus className="w-4 h-4" />
       </div>
     );
   }
@@ -138,16 +141,17 @@ export default function LeaderboardFriendButton({
       onClick={sendFriendRequest}
       disabled={sending}
       className={cn(
-        "flex items-center justify-center bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-colors",
-        compact ? "w-7 h-7" : "w-8 h-8",
+        baseClasses,
+        "bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-cyan-400 border border-cyan-500/30",
+        "hover:from-cyan-500/30 hover:to-blue-500/30 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/10",
         sending && "opacity-50 cursor-not-allowed"
       )}
       title={`Add ${username} as friend`}
     >
       {sending ? (
-        <div className="w-3 h-3 border border-cyan-400 border-t-transparent rounded-full animate-spin" />
+        <div className="w-4 h-4 border-2 border-cyan-500/50 border-t-cyan-400 rounded-full animate-spin" />
       ) : (
-        <UserPlus className={compact ? "w-3.5 h-3.5" : "w-4 h-4"} />
+        <UserPlus className="w-4 h-4" />
       )}
     </button>
   );
