@@ -14,6 +14,7 @@ import {
   Clock,
   XCircle,
   RefreshCcw,
+  RefreshCw,
   Activity,
   Server,
   Wifi,
