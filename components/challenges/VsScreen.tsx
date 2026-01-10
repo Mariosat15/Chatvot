@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { X, Swords } from 'lucide-react';
@@ -48,8 +49,19 @@ export default function VsScreen({
   const levelInfo = LEVEL_INFO[opponent.level || 3];
   const [player1ImageError, setPlayer1ImageError] = useState(false);
   const [opponentImageError, setOpponentImageError] = useState(false);
+  const [mounted, setMounted] = useState(false);
   
-  return (
+  // Wait for client-side mount before rendering portal
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+  
+  // Don't render on server or before mount
+  if (!mounted) return null;
+  
+  // Use portal to render at document body level - avoids overflow:hidden issues
+  return createPortal(
     <AnimatePresence>
       {show && (
         <motion.div
@@ -270,7 +282,8 @@ export default function VsScreen({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 

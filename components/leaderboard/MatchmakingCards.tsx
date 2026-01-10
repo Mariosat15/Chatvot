@@ -142,6 +142,15 @@ export default function MatchmakingCards({ currentUserId: _currentUserId }: Matc
     if (swipeDirection === 'right' && matches[currentIndex]) {
       const match = matches[currentIndex];
       const trader = match.trader;
+      
+      // Don't allow challenge if trader is offline
+      if (!trader.isOnline) {
+        toast.error(`${trader.username} is offline`);
+        setDirection(null);
+        setDragX(0);
+        return;
+      }
+      
       // Show VS screen
       setVsMatch(match);
       setShowVsScreen(true);
@@ -180,15 +189,19 @@ export default function MatchmakingCards({ currentUserId: _currentUserId }: Matc
       return;
     }
     
-    // Show warning if trader is not online
+    // Don't allow challenge if trader is offline
     if (!trader.isOnline) {
-      toast.info(`${trader.username} may be offline - challenge will be pending`);
+      toast.error(`${trader.username} is offline`);
+      return;
     }
     
     // Show VS screen
     setVsMatch(match);
     setShowVsScreen(true);
   };
+  
+  // Check if current trader can be challenged
+  const canChallengeCurrentTrader = currentMatch?.trader?.isOnline && currentMatch?.trader?.acceptingChallenges;
 
   const handleFindBestMatch = async () => {
     try {
@@ -439,15 +452,31 @@ export default function MatchmakingCards({ currentUserId: _currentUserId }: Matc
 
         {/* Challenge Button */}
         <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.92 }}
+          whileHover={canChallengeCurrentTrader ? { scale: 1.1 } : {}}
+          whileTap={canChallengeCurrentTrader ? { scale: 0.92 } : {}}
           onClick={handleDirectChallenge}
-          className="group flex flex-col items-center gap-1"
+          disabled={!canChallengeCurrentTrader}
+          className={cn(
+            "group flex flex-col items-center gap-1",
+            !canChallengeCurrentTrader && "opacity-50 cursor-not-allowed"
+          )}
         >
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 flex items-center justify-center shadow-xl shadow-green-500/30 group-hover:shadow-green-500/50 transition-all ring-4 ring-green-500/20 group-hover:ring-green-500/40">
-            <Swords className="h-8 w-8 text-white" />
+          <div className={cn(
+            "w-16 h-16 rounded-full flex items-center justify-center shadow-xl transition-all ring-4",
+            canChallengeCurrentTrader 
+              ? "bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 shadow-green-500/30 group-hover:shadow-green-500/50 ring-green-500/20 group-hover:ring-green-500/40"
+              : "bg-gray-700 shadow-gray-700/30 ring-gray-600/20"
+          )}>
+            <Swords className={cn("h-8 w-8", canChallengeCurrentTrader ? "text-white" : "text-gray-500")} />
           </div>
-          <span className="text-[10px] text-gray-400 font-bold group-hover:text-green-400 transition-colors uppercase tracking-wide">Challenge</span>
+          <span className={cn(
+            "text-[10px] font-bold transition-colors uppercase tracking-wide",
+            canChallengeCurrentTrader 
+              ? "text-gray-400 group-hover:text-green-400" 
+              : "text-gray-600"
+          )}>
+            {canChallengeCurrentTrader ? 'Challenge' : 'Offline'}
+          </span>
         </motion.button>
       </div>
 
