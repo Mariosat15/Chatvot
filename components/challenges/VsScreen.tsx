@@ -46,19 +46,29 @@ export default function VsScreen({
   onChallenge, 
   onClose 
 }: VsScreenProps) {
-  const levelInfo = LEVEL_INFO[opponent.level || 3];
+  // All hooks must be called unconditionally (before any returns)
   const [player1ImageError, setPlayer1ImageError] = useState(false);
   const [opponentImageError, setOpponentImageError] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   
-  // Wait for client-side mount before rendering portal
+  const levelInfo = LEVEL_INFO[opponent.level || 3];
+  
+  // Set portal root after mount (client-side only)
   useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
+    setPortalRoot(document.body);
+    return () => setPortalRoot(null);
   }, []);
   
-  // Don't render on server or before mount
-  if (!mounted) return null;
+  // Reset image errors when opponent changes
+  useEffect(() => {
+    setPlayer1ImageError(false);
+    setOpponentImageError(false);
+  }, [opponent.username, player1Name]);
+  
+  // Don't render portal on server or before mount
+  if (!portalRoot) {
+    return null;
+  }
   
   // Use portal to render at document body level - avoids overflow:hidden issues
   return createPortal(
