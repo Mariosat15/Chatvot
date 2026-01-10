@@ -49,7 +49,7 @@ export async function DELETE(
 
     // Add user to deletedBy array (soft delete for this user)
     // This allows us to hide it from the user while preserving it for admin/audit
-    const result = await db.collection('conversations').updateOne(
+    await db.collection('conversations').updateOne(
       { _id: convObjectId },
       { 
         $addToSet: { 
@@ -60,10 +60,7 @@ export async function DELETE(
         }
       }
     );
-
-    if (result.modifiedCount === 0) {
-      return NextResponse.json({ error: 'Failed to delete conversation' }, { status: 500 });
-    }
+    // Note: modifiedCount can be 0 if user is already in the array, which is fine
 
     return NextResponse.json({ 
       success: true, 

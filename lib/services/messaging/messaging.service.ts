@@ -124,11 +124,23 @@ export class MessagingService {
     }
     
     // Exclude conversations deleted by this user (unless admin)
+    // Note: $nin on array field returns true if field doesn't exist, is null, or doesn't contain value
     if (!isAdmin) {
-      query.deletedByUsers = { $ne: participantId };
+      query.deletedByUsers = { $nin: [participantId] };
     }
     
-    return Conversation.findOne(query);
+    const conv = await Conversation.findOne(query);
+    
+    // Debug logging for production troubleshooting
+    if (!conv) {
+      console.log(`⚠️ [getConversationById] No conversation found:`, {
+        conversationId,
+        participantId,
+        isAdmin,
+      });
+    }
+    
+    return conv;
   }
   
   static async findOrCreateDirectConversation(
@@ -138,60 +150,52 @@ export class MessagingService {
     await connectToDatabase();
     
     // Check if conversation already exists (including deleted ones - we'll restore them)
+    // Don't filter by status=closed so we can also reactivate closed convos
     let conversation = await Conversation.findOne({
       type: 'user-to-user',
-      status: { $ne: 'closed' },
       'participants.id': { $all: [user1.id, user2.id] },
       participants: { $size: 2 },
     });
     
     if (conversation) {
-      // If conversation was deleted by either user, restore it for both
-      // This happens when users unfriend and re-friend
-      const deletedByUsers = (conversation as any).deletedByUsers || [];
-      const messagesClearedByUsers = (conversation as any).messagesClearedByUsers || [];
+      console.log(`🔍 [DM] Found existing conversation ${conversation._id}`);
       
-      if (deletedByUsers.includes(user1.id) || deletedByUsers.includes(user2.id) ||
-          messagesClearedByUsers.includes(user1.id) || messagesClearedByUsers.includes(user2.id)) {
-        // Restore conversation for both users
-        await Conversation.updateOne(
-          { _id: conversation._id },
-          {
-            $pull: {
-              deletedByUsers: { $in: [user1.id, user2.id] },
-              messagesClearedByUsers: { $in: [user1.id, user2.id] },
-            },
-            $unset: {
-              [`userDeletedAt.${user1.id}`]: 1,
-              [`userDeletedAt.${user2.id}`]: 1,
-              [`messagesClearedAt.${user1.id}`]: 1,
-              [`messagesClearedAt.${user2.id}`]: 1,
-            },
-            $set: {
-              status: 'active',
-              lastActivityAt: new Date(),
-            },
-          }
-        );
-        
-        // Also restore messages for both users
-        const { Message } = await import('@/database/models/messaging/message.model');
-        await Message.updateMany(
-          { conversationId: conversation._id },
-          {
-            $pull: {
-              clearedByUsers: { $in: [user1.id, user2.id] },
-            },
-          }
-        );
-        
-        console.log(`♻️ [DM] Restored conversation ${conversation._id} for users ${user1.id} and ${user2.id}`);
-        
-        // Refetch the conversation to get updated data
-        conversation = await Conversation.findById(conversation._id);
-      }
+      // Always ensure the conversation is active and both users can access it
+      // This handles: deleted conversations, cleared conversations, closed conversations
+      // Remove users from deleted/cleared arrays
+      await Conversation.updateOne(
+        { _id: conversation._id },
+        {
+          $pull: {
+            deletedByUsers: { $in: [user1.id, user2.id] },
+            messagesClearedByUsers: { $in: [user1.id, user2.id] },
+          },
+        }
+      );
+      
+      // Also unset the timestamp fields and set status to active in a second update
+      // (MongoDB doesn't allow $pull and $unset on same field in one operation)
+      conversation = await Conversation.findOneAndUpdate(
+        { _id: conversation._id },
+        {
+          $unset: {
+            [`userDeletedAt.${user1.id}`]: 1,
+            [`userDeletedAt.${user2.id}`]: 1,
+            [`userClearedAt.${user1.id}`]: 1,
+            [`userClearedAt.${user2.id}`]: 1,
+          },
+          $set: {
+            status: 'active',
+            lastActivityAt: new Date(),
+          },
+        },
+        { new: true }
+      );
+      
+      console.log(`♻️ [DM] Restored/activated conversation ${conversation!._id} for users ${user1.id} and ${user2.id}`);
     } else {
       // Create new conversation
+      console.log(`➕ [DM] Creating new conversation for users ${user1.id} and ${user2.id}`);
       conversation = await this.createConversation({
         type: 'user-to-user',
         participants: [

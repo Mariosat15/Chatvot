@@ -72,6 +72,12 @@ export interface IConversation extends Document {
   // Unread counts per participant
   unreadCounts: Map<string, number>;
   
+  // Soft delete tracking (per user)
+  deletedByUsers: string[];  // Users who deleted this conversation from their view
+  messagesClearedByUsers: string[];  // Users who cleared messages
+  userDeletedAt?: Map<string, Date>;  // When each user deleted
+  userClearedAt?: Map<string, Date>;  // When each user cleared messages
+  
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -157,6 +163,27 @@ const ConversationSchema = new Schema<IConversation>(
       default: new Map(),
     },
     
+    // Soft delete tracking (per user)
+    deletedByUsers: {
+      type: [String],
+      default: [],
+      index: true,
+    },
+    messagesClearedByUsers: {
+      type: [String],
+      default: [],
+    },
+    userDeletedAt: {
+      type: Map,
+      of: Date,
+      default: new Map(),
+    },
+    userClearedAt: {
+      type: Map,
+      of: Date,
+      default: new Map(),
+    },
+    
     lastActivityAt: {
       type: Date,
       default: Date.now,
@@ -171,6 +198,7 @@ const ConversationSchema = new Schema<IConversation>(
 
 // Indexes for efficient queries
 ConversationSchema.index({ 'participants.id': 1, status: 1 });
+ConversationSchema.index({ 'participants.id': 1, deletedByUsers: 1 });
 ConversationSchema.index({ assignedEmployeeId: 1, status: 1 });
 ConversationSchema.index({ type: 1, status: 1, lastActivityAt: -1 });
 ConversationSchema.index({ isAIHandled: 1, type: 1 });
