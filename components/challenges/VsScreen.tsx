@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { X, Swords } from 'lucide-react';
@@ -45,10 +46,24 @@ export default function VsScreen({
   onChallenge, 
   onClose 
 }: VsScreenProps) {
+  // All state hooks at the top
   const [player1ImageError, setPlayer1ImageError] = useState(false);
   const [opponentImageError, setOpponentImageError] = useState(false);
   
+  // Use ref instead of state to track portal mount (avoids re-render issues)
+  const portalRef = useRef<HTMLElement | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  
   const levelInfo = LEVEL_INFO[opponent.level || 3];
+  
+  // Set up portal target after mount
+  useEffect(() => {
+    portalRef.current = document.body;
+    setIsMounted(true);
+    return () => {
+      portalRef.current = null;
+    };
+  }, []);
   
   // Reset image errors when opponent changes
   useEffect(() => {
@@ -68,7 +83,8 @@ export default function VsScreen({
     };
   }, [show]);
   
-  return (
+  // Modal content
+  const modalContent = (
     <AnimatePresence>
       {show && (
         <motion.div
@@ -291,5 +307,13 @@ export default function VsScreen({
       )}
     </AnimatePresence>
   );
+  
+  // Use portal to render at document.body level (escapes parent overflow/transform)
+  // Only use portal after component is mounted (client-side)
+  if (!isMounted || !portalRef.current) {
+    return null;
+  }
+  
+  return createPortal(modalContent, portalRef.current);
 }
 
