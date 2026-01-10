@@ -521,7 +521,7 @@ export default function LeaderboardContent({
           {/* Leaderboard Table */}
           <div className="rounded-2xl bg-gray-900/80 border border-gray-800 backdrop-blur-sm overflow-hidden shadow-2xl">
             {/* Table Header */}
-            <div className="hidden lg:grid grid-cols-[80px_1fr_100px_100px_100px_100px_120px_80px_100px_140px] gap-3 px-6 py-4 bg-gray-950/50 border-b border-gray-800">
+            <div className="hidden lg:grid grid-cols-[70px_minmax(200px,1fr)_90px_90px_90px_90px_90px_70px_90px_160px] gap-2 px-6 py-4 bg-gray-950/50 border-b border-gray-800">
               <SortHeader column="rank" label="Rank" />
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Trader</span>
               <SortHeader column="pnl" label="P&L" className="justify-end" />
@@ -557,7 +557,7 @@ export default function LeaderboardContent({
                   <div
                     key={entry.userId}
                     className={cn(
-                      "grid grid-cols-[80px_1fr_100px_100px_100px_100px_120px_80px_100px_140px] gap-3 px-6 py-4 items-center transition-all",
+                      "grid grid-cols-[70px_minmax(200px,1fr)_90px_90px_90px_90px_90px_70px_90px_160px] gap-2 px-6 py-4 items-center transition-all",
                       getRankGradient(entry.rank, isCurrentUser)
                     )}
                   >
@@ -684,7 +684,7 @@ export default function LeaderboardContent({
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-end gap-3 pr-2">
                       {!isCurrentUser ? (
                         <>
                           <LeaderboardFriendButton
@@ -867,18 +867,28 @@ export default function LeaderboardContent({
       )}
 
       {/* Profile Card Modal */}
-      {showProfileCard && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="relative max-w-md w-full">
-            <button
-              onClick={() => setShowProfileCard(false)}
-              className="absolute -top-3 -right-3 z-10 w-10 h-10 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <ProfileCard userId={selectedUser.userId} onClose={() => setShowProfileCard(false)} />
-          </div>
-        </div>
+      {selectedUser && (
+        <ProfileCard 
+          show={showProfileCard}
+          userId={selectedUser.userId} 
+          username={selectedUser.username}
+          stats={{
+            rank: selectedUser.rank,
+            winRate: selectedUser.winRate,
+            totalTrades: selectedUser.totalTrades,
+            totalPnl: selectedUser.totalPnl,
+            competitionsEntered: selectedUser.competitionsEntered,
+            competitionsWon: selectedUser.competitionsWon,
+            challengesEntered: selectedUser.challengesEntered,
+            challengesWon: selectedUser.challengesWon,
+            totalBadges: selectedUser.totalBadges,
+            overallScore: selectedUser.overallScore,
+            userTitle: selectedUser.userTitle,
+            userTitleIcon: selectedUser.userTitleIcon,
+            userTitleColor: selectedUser.userTitleColor,
+          }}
+          onClose={() => setShowProfileCard(false)} 
+        />
       )}
 
       {/* Challenge Dialog */}
