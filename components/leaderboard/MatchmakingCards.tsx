@@ -199,9 +199,6 @@ export default function MatchmakingCards({ currentUserId: _currentUserId }: Matc
     setVsMatch(match);
     setShowVsScreen(true);
   };
-  
-  // Check if current trader can be challenged
-  const canChallengeCurrentTrader = currentMatch?.trader?.isOnline && currentMatch?.trader?.acceptingChallenges;
 
   const handleFindBestMatch = async () => {
     try {
@@ -253,6 +250,9 @@ export default function MatchmakingCards({ currentUserId: _currentUserId }: Matc
 
   const currentMatch = matches[currentIndex];
   const nextMatch = matches[currentIndex + 1];
+  
+  // Check if current trader can be challenged (must be after currentMatch is defined)
+  const canChallengeCurrentTrader = currentMatch?.trader?.isOnline && currentMatch?.trader?.acceptingChallenges !== false;
 
   // Calculate swipe indicators
   const swipeProgress = Math.min(Math.abs(dragX) / 150, 1);
