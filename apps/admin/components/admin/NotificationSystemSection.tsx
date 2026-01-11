@@ -69,11 +69,14 @@ interface NotificationStats {
 const CATEGORY_LABELS: Record<string, { label: string; icon: string; color: string }> = {
   purchase: { label: 'Purchases & Wallet', icon: '💳', color: 'text-blue-400' },
   competition: { label: 'Competitions', icon: '🏆', color: 'text-yellow-400' },
+  challenge: { label: 'Challenges', icon: '⚔️', color: 'text-orange-400' },
   trading: { label: 'Trading', icon: '📈', color: 'text-green-400' },
   achievement: { label: 'Achievements', icon: '🏅', color: 'text-purple-400' },
   system: { label: 'System', icon: '⚙️', color: 'text-gray-400' },
-  admin: { label: 'Admin Messages', icon: '📢', color: 'text-orange-400' },
+  admin: { label: 'Admin Messages', icon: '📢', color: 'text-amber-400' },
   security: { label: 'Security', icon: '🔐', color: 'text-red-400' },
+  social: { label: 'Social & Friends', icon: '👥', color: 'text-cyan-400' },
+  messaging: { label: 'Messaging & Support', icon: '💬', color: 'text-indigo-400' },
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
