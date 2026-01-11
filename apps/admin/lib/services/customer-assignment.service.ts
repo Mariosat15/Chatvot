@@ -312,7 +312,7 @@ class CustomerAssignmentService {
     }
     
     // Send customer email notification about the new account manager (if enabled)
-    const settings = await this.getSettings();
+    // Note: 'settings' was already fetched at the start of this method
     if (settings.notifyCustomerOnAssignment) {
       const newManagerFirstName = toEmployee.name.split(' ')[0] || toEmployee.name;
       
