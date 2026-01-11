@@ -3,6 +3,10 @@ import { connectToDatabase } from '@/database/mongoose';
 import AppSettings from '@/database/models/app-settings.model';
 import { WhiteLabel } from '@/database/models/whitelabel.model';
 
+// Disable Next.js caching for this route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // GET - Fetch app settings (public endpoint)
 export async function GET() {
   try {
@@ -40,8 +44,10 @@ export async function GET() {
       });
     }
     
-    // Also fetch WhiteLabel settings for branding assets
-    const whiteLabel = await WhiteLabel.findOne();
+    // Also fetch WhiteLabel settings for branding assets (no cache)
+    const whiteLabel = await WhiteLabel.findOne().lean();
+    
+    console.log('[Settings API] WhiteLabel appLogo from DB:', whiteLabel?.appLogo);
     
     // Merge branding assets into settings
     const mergedSettings = {
@@ -55,9 +61,17 @@ export async function GET() {
       }
     };
     
+    console.log('[Settings API] Returning appLogo:', mergedSettings.branding.appLogo);
+    
     return NextResponse.json({
       success: true,
       settings: mergedSettings,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
     });
   } catch (error) {
     console.error('Error fetching app settings:', error);

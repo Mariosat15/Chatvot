@@ -223,14 +223,17 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="relative">
             <div className="absolute inset-0 bg-yellow-500/20 blur-xl rounded-full" />
-            <Image 
-              src="/assets/icons/logo.svg" 
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={images.appLogo} 
               alt="logo" 
               width={isCollapsed ? 40 : 140} 
               height={32}
-              priority
               className="relative z-10 cursor-pointer"
               style={{ width: 'auto', height: '32px' }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/assets/icons/logo.svg';
+              }}
             />
           </div>
         </Link>
@@ -349,7 +352,17 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-gray-900/95 backdrop-blur-xl border-b border-gray-800/50 z-50 px-4 flex items-center justify-between">
         <Link href="/dashboard" className="flex items-center">
-          <Image src="/assets/icons/logo.svg" alt="logo" width={120} height={28} priority style={{ width: 'auto', height: '28px' }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={images.appLogo} 
+            alt="logo" 
+            width={120} 
+            height={28} 
+            style={{ width: 'auto', height: '28px' }} 
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/assets/icons/logo.svg';
+            }}
+          />
         </Link>
         
         <div className="flex items-center gap-2">

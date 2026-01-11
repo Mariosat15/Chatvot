@@ -10,6 +10,8 @@ export async function GET() {
   try {
     const images = await getWhiteLabelImages();
     
+    console.log('[WhiteLabel Images API] Returning images:', images);
+    
     // Add no-cache headers to ensure fresh data
     return NextResponse.json(images, {
       headers: {
