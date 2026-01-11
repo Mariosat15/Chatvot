@@ -6,6 +6,7 @@ export interface WhiteLabelDocument extends Document {
   emailLogo: string;
   profileImage: string;
   dashboardPreview: string;
+  favicon: string;
   
   // General Settings
   nodeEnv: string;
@@ -83,6 +84,10 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     dashboardPreview: { 
       type: String, 
       default: '/assets/images/dashboard-preview.png' 
+    },
+    favicon: { 
+      type: String, 
+      default: '/favicon.ico' 
     },
     
     // General Settings
