@@ -223,7 +223,7 @@ function RadialProgress({
   );
 }
 
-// Stat Card with Gradient Border
+// Stat Card with Gradient Border - Consistent glow effect
 function GlowStatCard({
   icon,
   label,
@@ -242,29 +242,31 @@ function GlowStatCard({
   delay?: number;
 }) {
   const colorMap = {
-    blue: { gradient: 'from-blue-500 to-cyan-500', glow: 'shadow-blue-500/20', text: 'text-blue-400' },
-    green: { gradient: 'from-green-500 to-emerald-500', glow: 'shadow-green-500/20', text: 'text-green-400' },
-    red: { gradient: 'from-red-500 to-rose-500', glow: 'shadow-red-500/20', text: 'text-red-400' },
-    yellow: { gradient: 'from-yellow-500 to-amber-500', glow: 'shadow-yellow-500/20', text: 'text-yellow-400' },
-    purple: { gradient: 'from-purple-500 to-violet-500', glow: 'shadow-purple-500/20', text: 'text-purple-400' },
-    orange: { gradient: 'from-orange-500 to-red-500', glow: 'shadow-orange-500/20', text: 'text-orange-400' },
-    cyan: { gradient: 'from-cyan-500 to-blue-500', glow: 'shadow-cyan-500/20', text: 'text-cyan-400' },
+    blue: { gradient: 'from-blue-500 to-cyan-500', border: 'border-blue-500/50', text: 'text-blue-400', shadow: 'rgba(59, 130, 246, 0.3)' },
+    green: { gradient: 'from-green-500 to-emerald-500', border: 'border-green-500/50', text: 'text-green-400', shadow: 'rgba(34, 197, 94, 0.3)' },
+    red: { gradient: 'from-red-500 to-rose-500', border: 'border-red-500/50', text: 'text-red-400', shadow: 'rgba(239, 68, 68, 0.3)' },
+    yellow: { gradient: 'from-yellow-500 to-amber-500', border: 'border-yellow-500/50', text: 'text-yellow-400', shadow: 'rgba(234, 179, 8, 0.3)' },
+    purple: { gradient: 'from-purple-500 to-violet-500', border: 'border-purple-500/50', text: 'text-purple-400', shadow: 'rgba(168, 85, 247, 0.3)' },
+    orange: { gradient: 'from-orange-500 to-red-500', border: 'border-orange-500/50', text: 'text-orange-400', shadow: 'rgba(249, 115, 22, 0.3)' },
+    cyan: { gradient: 'from-cyan-500 to-blue-500', border: 'border-cyan-500/50', text: 'text-cyan-400', shadow: 'rgba(6, 182, 212, 0.3)' },
   };
 
   const colors = colorMap[color];
 
   return (
     <motion.div
-      className={`relative group`}
+      className="relative group"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay }}
     >
-      {/* Glow effect */}
-      <div className={`absolute -inset-0.5 bg-gradient-to-r ${colors.gradient} rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity`} />
-      
-      {/* Card content */}
-      <div className="relative bg-gray-900/90 backdrop-blur-sm rounded-2xl p-4 border border-gray-700/50">
+      {/* Card with consistent glow */}
+      <div 
+        className={`relative bg-gray-900/90 backdrop-blur-sm rounded-2xl p-4 border ${colors.border} transition-all duration-300 group-hover:scale-[1.02]`}
+        style={{
+          boxShadow: `0 0 20px ${colors.shadow}, 0 0 40px ${colors.shadow.replace('0.3', '0.15')}`,
+        }}
+      >
         <div className="flex items-start justify-between">
           <div className={`p-2 rounded-lg bg-gradient-to-br ${colors.gradient} bg-opacity-20`}>
             {icon}
