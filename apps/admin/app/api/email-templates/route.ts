@@ -141,7 +141,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Import the email sending functions
-    const { sendTestWelcomeEmail, sendTestDepositCompletedEmail, sendTestWithdrawalCompletedEmail, sendTestEmailVerificationEmail } = await import('@/lib/nodemailer');
+    const { 
+      sendTestWelcomeEmail, 
+      sendTestDepositCompletedEmail, 
+      sendTestWithdrawalCompletedEmail, 
+      sendTestEmailVerificationEmail,
+      sendTestAccountManagerAssignedEmail,
+      sendTestAccountManagerChangedEmail,
+    } = await import('@/lib/nodemailer');
 
     let emailSent = false;
 
@@ -156,6 +163,12 @@ export async function POST(request: NextRequest) {
       emailSent = true;
     } else if (templateType === 'email_verification') {
       await sendTestEmailVerificationEmail(testEmail);
+      emailSent = true;
+    } else if (templateType === 'account_manager_assigned') {
+      await sendTestAccountManagerAssignedEmail(testEmail);
+      emailSent = true;
+    } else if (templateType === 'account_manager_changed') {
+      await sendTestAccountManagerChangedEmail(testEmail);
       emailSent = true;
     }
 

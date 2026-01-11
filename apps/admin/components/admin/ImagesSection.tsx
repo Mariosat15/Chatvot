@@ -258,12 +258,16 @@ export default function ImagesSection() {
         <div className="flex-shrink-0">
           {currentPath ? (
             <div className="relative h-32 w-32 bg-gray-900 border-2 border-gray-700 rounded-xl overflow-hidden shadow-lg">
-              <Image
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                key={currentPath}
                 src={currentPath}
                 alt={title}
-                fill
-                className="object-contain p-3"
-                unoptimized
+                className="absolute inset-0 w-full h-full object-contain p-3"
+                onError={(e) => {
+                  console.error(`Failed to load image: ${currentPath}`);
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             </div>
           ) : (

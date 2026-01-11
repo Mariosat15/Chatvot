@@ -1937,3 +1937,162 @@ export const sendAccountManagerChangedEmail = async (data: AccountManagerChanged
         // Don't throw - we don't want to fail the transfer if email fails
     }
 };
+
+/**
+ * Send a test account manager assigned email (for admin preview)
+ */
+export const sendTestAccountManagerAssignedEmail = async (testEmail: string) => {
+    console.log(`📧 [TEST] sendTestAccountManagerAssignedEmail called for ${testEmail}`);
+    
+    try {
+        await connectToDatabase();
+        
+        // Get settings and template
+        const [companySettings, appSettings, whiteLabelSettings, template] = await Promise.all([
+            CompanySettings.getSingleton(),
+            getSettings(),
+            WhiteLabel.findOne(),
+            getEmailTemplate('account_manager_assigned'),
+        ]);
+        
+        const platformName = appSettings.appName || companySettings.companyName || 'Chatvolt';
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+        
+        // Get logo URL
+        let logoUrl = whiteLabelSettings?.emailLogo || '/assets/images/logo.png';
+        if (!logoUrl.startsWith('http')) {
+            if (isLocalhost) {
+                logoUrl = 'https://placehold.co/150x50/141414/FDD458?text=Logo';
+            } else {
+                logoUrl = `${baseUrl}${logoUrl}`;
+            }
+        }
+        
+        // Build company address
+        let companyAddress = '';
+        if (companySettings.addressLine1 || companySettings.city) {
+            const parts = [
+                companySettings.addressLine1,
+                companySettings.addressLine2,
+                companySettings.city,
+                companySettings.postalCode,
+                COUNTRY_NAMES[companySettings.country] || companySettings.country,
+            ].filter(Boolean);
+            companyAddress = parts.join(', ');
+        }
+        
+        // Build HTML from database template with test data
+        const htmlTemplate = buildAccountManagerAssignedEmailHtml(template, {
+            customerName: 'Test Customer',
+            managerFirstName: 'John',
+            platformName,
+            baseUrl,
+            logoUrl,
+            companyAddress,
+        });
+        
+        // Replace variables in subject
+        let subject = `[TEST] ${template.subject || '🎉 Meet Your Dedicated Account Manager at {{platformName}}'}`;
+        subject = subject
+            .replace(/\{\{platformName\}\}/g, platformName)
+            .replace(/\{\{managerFirstName\}\}/g, 'John')
+            .replace(/\{\{customerName\}\}/g, 'Test Customer');
+        
+        const mailOptions = {
+            from: `"${platformName}" <${appSettings.nodemailerEmail || process.env.NODEMAILER_EMAIL}>`,
+            to: testEmail,
+            subject,
+            text: `Hi Test Customer, great news! You have been assigned a dedicated account manager: John. They will be your primary point of contact. You can reach them through the messaging feature in your account.`,
+            html: htmlTemplate,
+        };
+        
+        const emailTransporter = await getTransporter();
+        await emailTransporter.sendMail(mailOptions);
+        
+        console.log(`✅ [TEST] Account manager assigned test email sent to ${testEmail}`);
+    } catch (error) {
+        console.error('❌ [TEST] Failed to send account manager assigned test email:', error);
+        throw error;
+    }
+};
+
+/**
+ * Send a test account manager changed email (for admin preview)
+ */
+export const sendTestAccountManagerChangedEmail = async (testEmail: string) => {
+    console.log(`📧 [TEST] sendTestAccountManagerChangedEmail called for ${testEmail}`);
+    
+    try {
+        await connectToDatabase();
+        
+        // Get settings and template
+        const [companySettings, appSettings, whiteLabelSettings, template] = await Promise.all([
+            CompanySettings.getSingleton(),
+            getSettings(),
+            WhiteLabel.findOne(),
+            getEmailTemplate('account_manager_changed'),
+        ]);
+        
+        const platformName = appSettings.appName || companySettings.companyName || 'Chatvolt';
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+        
+        // Get logo URL
+        let logoUrl = whiteLabelSettings?.emailLogo || '/assets/images/logo.png';
+        if (!logoUrl.startsWith('http')) {
+            if (isLocalhost) {
+                logoUrl = 'https://placehold.co/150x50/141414/FDD458?text=Logo';
+            } else {
+                logoUrl = `${baseUrl}${logoUrl}`;
+            }
+        }
+        
+        // Build company address
+        let companyAddress = '';
+        if (companySettings.addressLine1 || companySettings.city) {
+            const parts = [
+                companySettings.addressLine1,
+                companySettings.addressLine2,
+                companySettings.city,
+                companySettings.postalCode,
+                COUNTRY_NAMES[companySettings.country] || companySettings.country,
+            ].filter(Boolean);
+            companyAddress = parts.join(', ');
+        }
+        
+        // Build HTML from database template with test data
+        const htmlTemplate = buildAccountManagerChangedEmailHtml(template, {
+            customerName: 'Test Customer',
+            newManagerFirstName: 'Sarah',
+            previousManagerName: 'John',
+            platformName,
+            baseUrl,
+            logoUrl,
+            companyAddress,
+        });
+        
+        // Replace variables in subject
+        let subject = `[TEST] ${template.subject || '🔄 Your Account Manager Has Changed at {{platformName}}'}`;
+        subject = subject
+            .replace(/\{\{platformName\}\}/g, platformName)
+            .replace(/\{\{newManagerFirstName\}\}/g, 'Sarah')
+            .replace(/\{\{customerName\}\}/g, 'Test Customer');
+        
+        const mailOptions = {
+            from: `"${platformName}" <${appSettings.nodemailerEmail || process.env.NODEMAILER_EMAIL}>`,
+            to: testEmail,
+            subject,
+            text: `Hi Test Customer, your account has been reassigned to a new account manager: Sarah. They are now your primary point of contact. You can reach them through the messaging feature in your account.`,
+            html: htmlTemplate,
+        };
+        
+        const emailTransporter = await getTransporter();
+        await emailTransporter.sendMail(mailOptions);
+        
+        console.log(`✅ [TEST] Account manager changed test email sent to ${testEmail}`);
+    } catch (error) {
+        console.error('❌ [TEST] Failed to send account manager changed test email:', error);
+        throw error;
+    }
+};
