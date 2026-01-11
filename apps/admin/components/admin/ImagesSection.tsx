@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -218,22 +218,42 @@ export default function ImagesSection() {
       console.log(`[Upload] Response data:`, data);
 
       if (response.ok) {
-        const newImages = { ...images, [field]: data.path };
-        setImages(newImages);
-        console.log(`[Upload] New images state:`, newImages);
+        // Use functional update to avoid stale closure
+        let newImages: ImageSettings;
+        setImages(prev => {
+          newImages = { ...prev, [field]: data.path };
+          console.log(`[Upload] New images state:`, newImages);
+          return newImages;
+        });
         
-        // Auto-save to database immediately after upload
-        console.log(`[Upload] Saving to database...`);
+        // Wait for state to settle, then save with fresh data
+        // We need to fetch current state from DB and merge
+        console.log(`[Upload] Fetching current state from DB before save...`);
+        const currentResponse = await fetch('/api/images');
+        const currentData = await currentResponse.json();
+        
+        const mergedImages = {
+          appLogo: currentData.appLogo || '',
+          emailLogo: currentData.emailLogo || '',
+          profileImage: currentData.profileImage || '',
+          dashboardPreview: currentData.dashboardPreview || '',
+          favicon: currentData.favicon || '',
+          [field]: data.path, // Override with new upload
+        };
+        
+        console.log(`[Upload] Saving merged images to database:`, mergedImages);
         const saveResponse = await fetch('/api/images', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newImages),
+          body: JSON.stringify(mergedImages),
         });
         
         console.log(`[Upload] Save response:`, saveResponse.status);
         
         if (saveResponse.ok) {
-          toast.success(`${field} uploaded and saved! Changes will appear after page refresh.`);
+          // Update local state with full merged data
+          setImages(mergedImages);
+          toast.success(`${field} uploaded and saved!`);
         } else {
           const saveError = await saveResponse.json();
           console.error(`[Upload] Save error:`, saveError);
@@ -338,11 +358,12 @@ export default function ImagesSection() {
   };
 
   // handleFileSelect wrapper for the external component
-  const handleFileSelect = useCallback((field: keyof ImageSettings) => (file: File) => {
+  // Not using useCallback since handleFileUpload already handles stale state correctly
+  const handleFileSelect = (field: keyof ImageSettings) => (file: File) => {
     console.log(`[ImagesSection] handleFileSelect for ${field}:`, file.name);
     toast.info(`Uploading ${file.name}...`);
     handleFileUpload(field, file);
-  }, []);
+  };
 
   if (isFetching) {
     return (
