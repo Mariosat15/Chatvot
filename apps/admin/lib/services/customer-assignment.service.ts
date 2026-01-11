@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { CustomerAssignment, ICustomerAssignment } from '@/database/models/customer-assignment.model';
 import { AssignmentSettings, IAssignmentSettings, AssignmentStrategy } from '@/database/models/assignment-settings.model';
 import { customerAuditService, PerformedBy, CustomerInfo } from './customer-audit.service';
@@ -87,7 +88,7 @@ class CustomerAssignmentService {
       CustomerAssignment.countDocuments({ isActive: true }),
     ]);
     
-    return { assignments: assignments as ICustomerAssignment[], total };
+    return { assignments: assignments as unknown as ICustomerAssignment[], total };
   }
   
   /**
@@ -301,7 +302,7 @@ class CustomerAssignmentService {
         params.customerId,
         toEmployee._id.toString(),
         toEmployee.name || toEmployee.email.split('@')[0],
-        toEmployee.profileImage,
+        (toEmployee as any).profileImage,
         previousEmployee.employeeId.toString(),
         previousEmployee.employeeName
       );
@@ -332,8 +333,7 @@ class CustomerAssignmentService {
       
       // Also create in-app notification for customer
       try {
-        const mongoose = await import('mongoose');
-        const db = mongoose.default.connection.db;
+        const db = mongoose.connection.db;
         if (db) {
           const notificationsCollection = db.collection('notifications');
           await notificationsCollection.insertOne({
@@ -784,8 +784,7 @@ class CustomerAssignmentService {
         
         // Also create in-app notification for customer (only showing first name)
         try {
-          const mongoose = await import('mongoose');
-          const db = mongoose.default.connection.db;
+          const db = mongoose.connection.db;
           if (db) {
             const notificationsCollection = db.collection('notifications');
             await notificationsCollection.insertOne({
@@ -932,7 +931,7 @@ class CustomerAssignmentService {
           { _id: conv._id },
           {
             $set: updateData,
-            $push: { 'metadata.transferHistory': transferRecord }
+            $push: { 'metadata.transferHistory': transferRecord } as any
           }
         );
       } else {
@@ -951,7 +950,7 @@ class CustomerAssignmentService {
                 joinedAt: new Date(),
                 isActive: true,
               }
-            }
+            } as any
           }
         );
       }
