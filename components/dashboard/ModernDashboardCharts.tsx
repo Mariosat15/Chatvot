@@ -33,7 +33,7 @@ function GlowStatCard({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string | number;
+  value: string | number | React.ReactNode;
   subvalue?: string;
   trend?: 'up' | 'down' | 'neutral';
   color: 'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'orange' | 'cyan' | 'emerald';
@@ -612,7 +612,12 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
         <GlowStatCard
           icon={<Trophy className="w-5 h-5 text-white" />}
           label="Prizes Won"
-          value={`${settings?.credits.symbol || '⚡'}${data.overview.totalPrizesWon.toLocaleString()}`}
+          value={
+            <span className="inline-flex items-center gap-1">
+              <Zap className="w-5 h-5 text-yellow-400 inline" />
+              {data.overview.totalPrizesWon.toLocaleString()}
+            </span>
+          }
           subvalue="From competitions & challenges"
           color="yellow"
           large
