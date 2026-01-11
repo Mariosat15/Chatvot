@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Save, Upload, RefreshCw, Image as ImageIconLucide, Info, Palette, Star, Users, Quote } from 'lucide-react';
 import Image from 'next/image';
+
+// File input refs for each field
+const fileInputRefs: Record<string, HTMLInputElement | null> = {};
 
 interface ImageSettings {
   appLogo: string;
@@ -288,47 +291,34 @@ export default function ImagesSection() {
 
           <div className="mt-4">
             <input
+              ref={(el) => { fileInputRefs[field] = el; }}
               type="file"
-              id={`file-upload-${field}`}
               accept="image/*"
-              style={{ display: 'none' }}
+              className="block w-full text-sm text-gray-400
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border file:border-purple-500
+                file:text-sm file:font-medium
+                file:bg-transparent file:text-purple-400
+                hover:file:bg-purple-500 hover:file:text-white
+                file:cursor-pointer file:transition-colors"
               onChange={(e) => {
-                alert(`File selected: ${e.target.files?.[0]?.name || 'none'}`);
                 const file = e.target.files?.[0];
-                console.log(`[Upload] File selected for ${field}:`, file?.name, file?.size);
                 if (file) {
+                  console.log(`[Upload] File selected for ${field}:`, file.name, file.size);
                   toast.info(`Uploading ${file.name}...`);
                   handleFileUpload(field, file);
+                  // Reset after upload starts
+                  setTimeout(() => { e.target.value = ''; }, 100);
                 }
-                // Reset input so same file can be selected again
-                e.target.value = '';
               }}
-            />
-            <button
-              type="button"
               disabled={uploading[field]}
-              onClick={() => {
-                const input = document.getElementById(`file-upload-${field}`) as HTMLInputElement;
-                if (input) {
-                  input.click();
-                } else {
-                  alert('Input not found!');
-                }
-              }}
-              className={`inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium h-9 px-3 border border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white transition-colors ${uploading[field] ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {uploading[field] ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4" />
-                  Upload New
-                </>
-              )}
-            </button>
+            />
+            {uploading[field] && (
+              <div className="flex items-center gap-2 mt-2 text-purple-400 text-sm">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Uploading...
+              </div>
+            )}
           </div>
 
           {currentPath && (
