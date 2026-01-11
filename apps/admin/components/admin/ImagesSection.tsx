@@ -290,28 +290,23 @@ export default function ImagesSection() {
           </p>
 
           <div className="mt-4">
+            {/* SIMPLE TEST - just alert on change */}
             <input
-              ref={(el) => { fileInputRefs[field] = el; }}
               type="file"
               accept="image/*"
-              className="block w-full text-sm text-gray-400
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-md file:border file:border-purple-500
-                file:text-sm file:font-medium
-                file:bg-transparent file:text-purple-400
-                hover:file:bg-purple-500 hover:file:text-white
-                file:cursor-pointer file:transition-colors"
-              onChange={(e) => {
+              style={{ border: '2px solid red', padding: '10px' }}
+              onInput={(e: any) => {
+                window.alert('onInput fired! File: ' + (e.target.files?.[0]?.name || 'none'));
+              }}
+              onChange={(e: any) => {
+                window.alert('onChange fired! File: ' + (e.target.files?.[0]?.name || 'none'));
                 const file = e.target.files?.[0];
                 if (file) {
                   console.log(`[Upload] File selected for ${field}:`, file.name, file.size);
                   toast.info(`Uploading ${file.name}...`);
                   handleFileUpload(field, file);
-                  // Reset after upload starts
-                  setTimeout(() => { e.target.value = ''; }, 100);
                 }
               }}
-              disabled={uploading[field]}
             />
             {uploading[field] && (
               <div className="flex items-center gap-2 mt-2 text-purple-400 text-sm">
