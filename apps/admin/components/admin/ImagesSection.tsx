@@ -88,6 +88,8 @@ export default function ImagesSection() {
     field: keyof ImageSettings,
     file: File
   ) => {
+    console.log(`[Upload] Starting upload for ${field}:`, file.name, file.type, file.size);
+    
     // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload an image file');
@@ -107,34 +109,45 @@ export default function ImagesSection() {
       formData.append('file', file);
       formData.append('field', field);
 
+      console.log(`[Upload] Sending request to /api/images/upload`);
       const response = await fetch('/api/images/upload', {
         method: 'POST',
         body: formData,
       });
 
+      console.log(`[Upload] Response status:`, response.status);
       const data = await response.json();
+      console.log(`[Upload] Response data:`, data);
 
       if (response.ok) {
         const newImages = { ...images, [field]: data.path };
         setImages(newImages);
+        console.log(`[Upload] New images state:`, newImages);
         
         // Auto-save to database immediately after upload
+        console.log(`[Upload] Saving to database...`);
         const saveResponse = await fetch('/api/images', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newImages),
         });
         
+        console.log(`[Upload] Save response:`, saveResponse.status);
+        
         if (saveResponse.ok) {
           toast.success(`${field} uploaded and saved! Changes will appear after page refresh.`);
         } else {
+          const saveError = await saveResponse.json();
+          console.error(`[Upload] Save error:`, saveError);
           toast.warning(`${field} uploaded but not saved. Click "Save" to persist.`);
         }
       } else {
+        console.error(`[Upload] Upload failed:`, data);
         toast.error(data.error || 'Upload failed');
       }
     } catch (error) {
-      toast.error('An error occurred during upload');
+      console.error(`[Upload] Exception:`, error);
+      toast.error('An error occurred during upload: ' + (error instanceof Error ? error.message : 'Unknown'));
     } finally {
       setUploading((prev) => ({ ...prev, [field]: false }));
     }
@@ -277,33 +290,33 @@ export default function ImagesSection() {
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) handleFileUpload(field, file);
+                console.log(`[Upload] File selected for ${field}:`, file?.name, file?.size);
+                if (file) {
+                  toast.info(`Uploading ${file.name}...`);
+                  handleFileUpload(field, file);
+                }
               }}
             />
-            <label htmlFor={`upload-${field}`}>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={uploading[field]}
-                className="cursor-pointer border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white"
-                asChild
-              >
-                <span>
-                  {uploading[field] ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload New
-                    </>
-                  )}
-                </span>
-              </Button>
-            </label>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={uploading[field]}
+              className="cursor-pointer border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white"
+              onClick={() => document.getElementById(`upload-${field}`)?.click()}
+            >
+              {uploading[field] ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload New
+                </>
+              )}
+            </Button>
           </div>
 
           {currentPath && (
