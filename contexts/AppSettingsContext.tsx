@@ -20,6 +20,10 @@ export interface AppSettings {
   branding: {
     primaryColor: string;
     accentColor: string;
+    appLogo?: string;
+    emailLogo?: string;
+    favicon?: string;
+    profileImage?: string;
   };
 }
 
@@ -51,6 +55,10 @@ const defaultSettings: AppSettings = {
   branding: {
     primaryColor: '#EAB308',
     accentColor: '#F59E0B',
+    appLogo: '/assets/images/logo.png',
+    emailLogo: '/assets/images/logo.png',
+    favicon: '/favicon.ico',
+    profileImage: '/assets/images/PROFILE.png',
   },
 };
 
