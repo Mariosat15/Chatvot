@@ -79,6 +79,17 @@ export async function POST(request: NextRequest) {
       
       // Verification tokens
       'verifications',
+      
+      // Audit data related to users
+      'auditlogs',
+      'customer_audit_trail',
+      'userprofiles',
+      
+      // Messaging data
+      'conversations',
+      'messages',
+      'friend_requests',
+      'friendships',
     ];
     
     for (const collectionName of collectionsToReset) {

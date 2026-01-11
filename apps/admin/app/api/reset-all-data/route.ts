@@ -128,6 +128,9 @@ export async function POST(request: Request) {
     const messagesCollection = mongoose.connection.collection('messages');
     const friendRequestsCollection = mongoose.connection.collection('friend_requests');
     const friendshipsCollection = mongoose.connection.collection('friendships');
+    // Additional collections to reset
+    const userProfilesCollection = mongoose.connection.collection('userprofiles');
+    const workerJobsCollection = mongoose.connection.collection('worker_jobs');
     
     // Get all existing user IDs
     const existingUsers = await userCollection.find({}, { projection: { _id: 1 } }).toArray();
@@ -187,6 +190,9 @@ export async function POST(request: Request) {
       messages: await messagesCollection.countDocuments(),
       friendRequests: await friendRequestsCollection.countDocuments(),
       friendships: await friendshipsCollection.countDocuments(),
+      // Additional collections
+      userProfiles: await userProfilesCollection.countDocuments(),
+      workerJobs: await workerJobsCollection.countDocuments(),
     };
 
     console.log('📊 Before deletion:', before);
@@ -358,6 +364,14 @@ export async function POST(request: Request) {
     const friendshipsDeleted = await friendshipsCollection.deleteMany({});
     console.log(`✅ Deleted ${friendshipsDeleted.deletedCount} friendships`);
 
+    // Delete user profiles
+    const userProfilesDeleted = await userProfilesCollection.deleteMany({});
+    console.log(`✅ Deleted ${userProfilesDeleted.deletedCount} user profiles`);
+
+    // Delete worker jobs
+    const workerJobsDeleted = await workerJobsCollection.deleteMany({});
+    console.log(`✅ Deleted ${workerJobsDeleted.deletedCount} worker jobs`);
+
     // Delete orphan credit wallets (where user no longer exists)
     if (orphanWalletIds.length > 0) {
       const orphanDeleteResult = await CreditWallet.deleteMany({ _id: { $in: orphanWalletIds } });
@@ -451,6 +465,9 @@ export async function POST(request: Request) {
       messages: await messagesCollection.countDocuments(),
       friendRequests: await friendRequestsCollection.countDocuments(),
       friendships: await friendshipsCollection.countDocuments(),
+      // Additional collections
+      userProfiles: await userProfilesCollection.countDocuments(),
+      workerJobs: await workerJobsCollection.countDocuments(),
     };
 
     console.log('📊 After deletion:', after);
@@ -524,6 +541,9 @@ export async function POST(request: Request) {
         messages: before.messages,
         friendRequests: before.friendRequests,
         friendships: before.friendships,
+        // Additional collections
+        userProfiles: before.userProfiles,
+        workerJobs: before.workerJobs,
       },
       walletsReset: walletResetResult.modifiedCount,
     });
