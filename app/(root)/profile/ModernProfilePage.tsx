@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import ModernProfileTabs from '@/components/profile/ModernProfileTabs';
-import ProfileOverview from '@/components/profile/ProfileOverview';
+import ProfileOverviewCharts from '@/components/profile/ProfileOverviewCharts';
 import XPProgressBar from '@/components/profile/XPProgressBar';
 import BadgesDisplay from '@/components/profile/BadgesDisplay';
 import ProfileSettingsSection from '@/components/profile/ProfileSettingsSection';
@@ -57,18 +57,10 @@ export default function ModernProfilePage({
   titleLevels,
   combinedStats,
 }: ModernProfilePageProps) {
-  // Create overview content with the new components
+  // Create overview content with beautiful charts
   const overviewContent = (
     <div className="space-y-6">
-      {/* Stats Overview */}
-      <ProfileOverview
-        combinedStats={combinedStats}
-        competitionStats={competitionStats}
-        challengeStats={challengeStats}
-        walletData={walletData}
-      />
-
-      {/* XP Progress Bar */}
+      {/* XP Progress Bar at top */}
       <XPProgressBar
         currentXP={levelData.currentXP}
         currentLevel={levelData.currentLevel}
@@ -79,6 +71,14 @@ export default function ModernProfilePage({
         totalBadgesEarned={levelData.totalBadgesEarned}
         badgeXPValues={badgeXPValues}
         titleLevels={titleLevels}
+      />
+
+      {/* Stats Overview with Charts */}
+      <ProfileOverviewCharts
+        combinedStats={combinedStats}
+        competitionStats={competitionStats}
+        challengeStats={challengeStats}
+        walletData={walletData}
       />
     </div>
   );
