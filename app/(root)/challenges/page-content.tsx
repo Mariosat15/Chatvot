@@ -11,6 +11,13 @@ import {
   AlertCircle,
   LayoutGrid,
   List,
+  Trophy,
+  Target,
+  Zap,
+  ChevronDown,
+  Clock,
+  DollarSign,
+  ArrowDownUp,
 } from 'lucide-react';
 import usePresence from '@/hooks/usePresence';
 import ChallengeCard from '@/components/trading/ChallengeCard';
@@ -45,11 +52,14 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'active' | 'completed'>('all');
   const [responding, setResponding] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<'newest' | 'starting' | 'prize' | 'entry'>('newest');
 
   // Track presence
   usePresence('/challenges');
 
-  const fetchChallenges = useCallback(async () => {
+  const fetchChallenges = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setIsRefreshing(true);
     try {
       const res = await fetch('/api/challenges');
       if (res.ok) {
@@ -60,13 +70,16 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
       console.error('Failed to fetch challenges:', error);
     } finally {
       setLoading(false);
+      // Only clear the refresh spinner if this call was the one that set it
+      // This prevents auto-refresh from prematurely hiding the manual refresh spinner
+      if (showSpinner) setIsRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     fetchChallenges();
     // Refresh every 10 seconds
-    const interval = setInterval(fetchChallenges, 10000);
+    const interval = setInterval(() => fetchChallenges(false), 10000);
     return () => clearInterval(interval);
   }, [fetchChallenges]);
 
@@ -112,17 +125,45 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
     }
   };
 
-  const filteredChallenges = challenges.filter((c) => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'pending') return c.status === 'pending';
-    if (activeTab === 'active') return c.status === 'active';
-    if (activeTab === 'completed') return ['completed', 'declined', 'expired', 'cancelled'].includes(c.status);
-    return true;
-  });
+  const filteredChallenges = challenges
+    .filter((c) => {
+      if (activeTab === 'all') return true;
+      if (activeTab === 'pending') return c.status === 'pending';
+      if (activeTab === 'active') return c.status === 'active';
+      if (activeTab === 'completed') return ['completed', 'declined', 'expired', 'cancelled'].includes(c.status);
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          // Sort by creation date (newest first)
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'starting':
+          // Sort by start/accept deadline time (soonest first)
+          const aTime = a.startTime ? new Date(a.startTime).getTime() : new Date(a.acceptDeadline).getTime();
+          const bTime = b.startTime ? new Date(b.startTime).getTime() : new Date(b.acceptDeadline).getTime();
+          return aTime - bTime;
+        case 'prize':
+          // Sort by prize pool (highest first)
+          return (b.prizePool || 0) - (a.prizePool || 0);
+        case 'entry':
+          // Sort by entry fee (lowest first)
+          return (a.entryFee || 0) - (b.entryFee || 0);
+        default:
+          return 0;
+      }
+    });
 
   const pendingReceived = challenges.filter(
     (c) => c.status === 'pending' && c.challengedId === userId
   );
+
+  const stats = {
+    total: challenges.length,
+    active: challenges.filter(c => c.status === 'active').length,
+    won: challenges.filter(c => c.status === 'completed' && c.winnerId === userId).length,
+    pending: challenges.filter(c => c.status === 'pending').length,
+  };
 
   if (loading) {
     return (
@@ -133,42 +174,89 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <Swords className="h-8 w-8 text-orange-500" />
-            My Challenges
-          </h1>
-          <p className="text-gray-400 mt-1">1v1 Trading Battles</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* View Mode Toggle */}
-          <div className="flex rounded-lg bg-gray-800 p-1">
-            <button
-              onClick={() => setViewMode('card')}
-              className={`p-2 rounded-md transition-colors ${
-                viewMode === 'card'
-                  ? 'bg-orange-500 text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-              title="Card View"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-md transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-orange-500 text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-              title="List View"
-            >
-              <List className="h-4 w-4" />
-            </button>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col gap-4">
+        {/* Title Row */}
+        <div className="flex items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="relative flex-shrink-0">
+              <div className="absolute inset-0 bg-orange-500/30 rounded-full blur-xl animate-pulse"></div>
+              <div className="relative rounded-full bg-gradient-to-br from-orange-500 to-red-600 p-2.5 sm:p-4 shadow-xl shadow-orange-500/30">
+                <Swords className="h-5 w-5 sm:h-8 sm:w-8 text-white" />
+              </div>
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white truncate">
+                My Challenges
+              </h1>
+              <p className="text-xs sm:text-sm text-gray-400">1v1 Trading Battles</p>
+            </div>
           </div>
+
+          {/* Mobile: Refresh button */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchChallenges(true)}
+              disabled={isRefreshing}
+              className="p-2 bg-gray-800 rounded-lg border border-gray-700 sm:hidden"
+            >
+              <RefreshCw className={`h-4 w-4 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="appearance-none bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 pr-8 text-sm text-gray-300 cursor-pointer hover:border-gray-600 transition-colors"
+              >
+                <option value="newest">🆕 Newest</option>
+                <option value="starting">⏰ Starting Soon</option>
+                <option value="prize">🏆 Prize Pool</option>
+                <option value="entry">💰 Entry Fee</option>
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            </div>
+            
+            {/* View Mode Toggle */}
+            <div className="flex rounded-lg bg-gray-800 p-1">
+              <button
+                onClick={() => setViewMode('card')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'card'
+                    ? 'bg-orange-500 text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+                title="Card View"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-orange-500 text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+                title="List View"
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Find Opponents Button - Full width on mobile */}
+        <Link href="/leaderboard" className="block sm:hidden">
+          <Button className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 font-semibold">
+            <User className="h-4 w-4 mr-2" />
+            Find Opponents
+          </Button>
+        </Link>
+
+        {/* Desktop: Find Opponents Button */}
+        <div className="hidden sm:flex items-center gap-3">
           <Link href="/leaderboard">
             <Button className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
               <User className="h-4 w-4 mr-2" />
@@ -178,18 +266,50 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
         </div>
       </div>
 
+      {/* Stats Cards - Mobile Optimized */}
+      <div className="grid grid-cols-4 gap-2 sm:gap-4">
+        <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50 rounded-xl p-2.5 sm:p-4 text-center">
+          <div className="flex justify-center mb-1 sm:mb-2">
+            <Swords className="h-4 w-4 sm:h-5 sm:w-5 text-orange-400" />
+          </div>
+          <p className="text-lg sm:text-2xl font-bold text-white tabular-nums">{stats.total}</p>
+          <p className="text-[9px] sm:text-xs text-gray-400">Total</p>
+        </div>
+        <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/30 rounded-xl p-2.5 sm:p-4 text-center">
+          <div className="flex justify-center mb-1 sm:mb-2">
+            <Target className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
+          </div>
+          <p className="text-lg sm:text-2xl font-bold text-blue-400 tabular-nums">{stats.active}</p>
+          <p className="text-[9px] sm:text-xs text-gray-400">Active</p>
+        </div>
+        <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/30 rounded-xl p-2.5 sm:p-4 text-center">
+          <div className="flex justify-center mb-1 sm:mb-2">
+            <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-green-400" />
+          </div>
+          <p className="text-lg sm:text-2xl font-bold text-green-400 tabular-nums">{stats.won}</p>
+          <p className="text-[9px] sm:text-xs text-gray-400">Won</p>
+        </div>
+        <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border border-yellow-500/30 rounded-xl p-2.5 sm:p-4 text-center">
+          <div className="flex justify-center mb-1 sm:mb-2">
+            <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
+          </div>
+          <p className="text-lg sm:text-2xl font-bold text-yellow-400 tabular-nums">{stats.pending}</p>
+          <p className="text-[9px] sm:text-xs text-gray-400">Pending</p>
+        </div>
+      </div>
+
       {/* Pending Challenges Alert */}
       {pendingReceived.length > 0 && (
-        <div className="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border border-yellow-500/50 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 bg-yellow-500/20 rounded-full flex items-center justify-center">
-              <AlertCircle className="h-5 w-5 text-yellow-400 animate-pulse" />
+        <div className="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border border-yellow-500/50 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 bg-yellow-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 animate-pulse" />
             </div>
-            <div className="flex-1">
-              <h3 className="text-yellow-300 font-semibold">
-                You have {pendingReceived.length} pending challenge{pendingReceived.length > 1 ? 's' : ''}!
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm sm:text-base text-yellow-300 font-semibold">
+                {pendingReceived.length} pending challenge{pendingReceived.length > 1 ? 's' : ''}!
               </h3>
-              <p className="text-yellow-300/70 text-sm">
+              <p className="text-xs sm:text-sm text-yellow-300/70 truncate">
                 Respond before they expire
               </p>
             </div>
@@ -197,34 +317,36 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-700 pb-2">
-        {(['all', 'pending', 'active', 'completed'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === tab
-                ? 'bg-orange-500 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
-            }`}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            {tab === 'pending' && pendingReceived.length > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                {pendingReceived.length}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* Tabs - Scrollable on mobile */}
+      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+        <div className="flex gap-1.5 sm:gap-2 border-b border-gray-700 pb-2 min-w-max">
+          {(['all', 'pending', 'active', 'completed'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === tab
+                  ? 'bg-orange-500 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'pending' && pendingReceived.length > 0 && (
+                <span className="ml-1.5 sm:ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                  {pendingReceived.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Challenges Grid */}
       {filteredChallenges.length === 0 ? (
-        <div className="text-center py-12">
-          <Swords className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl text-gray-400 mb-2">No challenges yet</h3>
-          <p className="text-gray-500 mb-4">
+        <div className="text-center py-8 sm:py-12">
+          <Swords className="h-12 w-12 sm:h-16 sm:w-16 text-gray-600 mx-auto mb-3 sm:mb-4" />
+          <h3 className="text-lg sm:text-xl text-gray-400 mb-2">No challenges yet</h3>
+          <p className="text-sm text-gray-500 mb-4 px-4">
             Head to the leaderboard to challenge other traders!
           </p>
           <Link href="/leaderboard">
@@ -234,7 +356,10 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
           </Link>
         </div>
       ) : (
-        <div className={viewMode === 'card' ? 'grid gap-6 md:grid-cols-2 lg:grid-cols-3' : 'space-y-4'}>
+        <div className={viewMode === 'card' 
+          ? 'grid gap-3 sm:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' 
+          : 'space-y-2 sm:space-y-4'
+        }>
           {filteredChallenges.map((challenge) => (
             <ChallengeCard
               key={challenge._id}
@@ -251,4 +376,3 @@ export default function ChallengesPageContent({ userId }: ChallengesPageContentP
     </div>
   );
 }
-

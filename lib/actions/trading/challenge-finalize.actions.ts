@@ -8,7 +8,8 @@ import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import TradingPosition from '@/database/models/trading/trading-position.model';
 import { PlatformTransaction } from '@/database/models/platform-financials.model';
-import { getRealPrice } from '@/lib/services/real-forex-prices.service';
+import { getRealPrice, fetchRealForexPrices } from '@/lib/services/real-forex-prices.service';
+import type { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import mongoose from 'mongoose';
 
 /**
@@ -97,11 +98,11 @@ export async function finalizeChallenge(challengeId: string) {
         const stats = participantStats.get(userId);
         if (stats) {
           // Calculate P&L from entry/exit prices (currentPrice = exitPrice for closed positions)
-          // FOREX: multiply by 10000 for pip value (standard lot = 100,000 units, 1 pip = 0.0001)
+          // FOREX: contractSize = 100,000 units per standard lot
           const priceDiff = position.side === 'long'
             ? position.currentPrice - position.entryPrice
             : position.entryPrice - position.currentPrice;
-          const positionPnL = priceDiff * position.quantity * 10000;
+          const positionPnL = priceDiff * position.quantity * 100000; // Fixed: was 10000
           
           console.log(`  Closed position: ${position.symbol} ${position.side}, Entry: ${position.entryPrice}, Exit: ${position.currentPrice}, P&L: $${positionPnL.toFixed(2)}`);
           
@@ -120,21 +121,27 @@ export async function finalizeChallenge(challengeId: string) {
     const openPositions = allPositions.filter(p => p.status === 'open');
     console.log(`Closing ${openPositions.length} open positions...`);
 
+    // OPTIMIZATION: Fetch all prices at once (instead of one by one in loop!)
+    const uniqueSymbols = [...new Set(openPositions.map(p => p.symbol))] as ForexSymbol[];
+    console.log(`Fetching prices for ${uniqueSymbols.length} unique symbols...`);
+    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+    console.log(`Got ${pricesMap.size} prices in single batch`);
+
     for (const position of openPositions) {
       try {
-        // Get current market price
-        const priceData = await getRealPrice(position.symbol);
+        // Get price from pre-fetched batch (instant!)
+        const priceData = pricesMap.get(position.symbol as ForexSymbol);
         if (!priceData) {
           console.error(`  ❌ Could not get price for ${position.symbol}, skipping`);
           continue;
         }
         const exitPrice = position.side === 'long' ? priceData.bid : priceData.ask;
 
-        // Calculate P&L (FOREX: multiply by 10000 for pip value)
+        // Calculate P&L (FOREX: contractSize = 100,000 units per lot)
         const priceDiff = position.side === 'long'
           ? exitPrice - position.entryPrice
           : position.entryPrice - exitPrice;
-        const positionPnL = priceDiff * position.quantity * 10000;
+        const positionPnL = priceDiff * position.quantity * 100000; // Fixed: was 10000
 
         console.log(`  Closing ${position.symbol} ${position.side} for ${position.userId}: P&L $${positionPnL.toFixed(2)}`);
 
@@ -654,8 +661,10 @@ export async function finalizeChallenge(challengeId: string) {
     }
 
     await session.commitTransaction();
+    // End session immediately after commit to prevent "abortTransaction after commitTransaction" error
+    session.endSession();
 
-    // Send notifications
+    // Send notifications (outside of transaction - fire and forget)
     try {
       const { notificationService } = await import(
         '@/lib/services/notification.service'
@@ -663,28 +672,30 @@ export async function finalizeChallenge(challengeId: string) {
 
       if (winnerId && !isTie) {
         // Notify winner
-        await notificationService.send({
+        notificationService.send({
           userId: winnerId,
           templateId: 'challenge_won',
           variables: {
             challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,  // For actionUrl
             opponentName: loserName || 'opponent',
             prize: winnerPrize,
             pnl: winnerPnL?.toFixed(2) || '0',
           },
-        });
+        }).catch(e => console.error('Failed to send winner notification:', e));
 
         // Notify loser
         if (loserId) {
-          await notificationService.send({
+          notificationService.send({
             userId: loserId,
             templateId: 'challenge_lost',
             variables: {
               challengeId: challenge._id.toString(),
+              challengeSlug: challenge.slug,  // For actionUrl
               opponentName: winnerName || 'opponent',
               pnl: loserPnL?.toFixed(2) || '0',
             },
-          });
+          }).catch(e => console.error('Failed to send loser notification:', e));
         }
       } else if (isTie) {
         // Notify both about tie
@@ -695,50 +706,54 @@ export async function finalizeChallenge(challengeId: string) {
             ? 'Challenger wins by default.'
             : 'No prize awarded.';
 
-        await notificationService.send({
+        notificationService.send({
           userId: challenger.userId,
           templateId: 'challenge_tie',
           variables: {
             challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,  // For actionUrl
             opponentName: challenged.username || 'opponent',
             tieResolution,
           },
-        });
+        }).catch(e => console.error('Failed to send tie notification:', e));
 
-        await notificationService.send({
+        notificationService.send({
           userId: challenged.userId,
           templateId: 'challenge_tie',
           variables: {
             challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,  // For actionUrl
             opponentName: challenger.username || 'opponent',
             tieResolution,
           },
-        });
+        }).catch(e => console.error('Failed to send tie notification:', e));
       }
 
       // Notify disqualified players
       if (challengerDisqualified) {
-        await notificationService.send({
+        notificationService.send({
           userId: challenger.userId,
           templateId: 'challenge_disqualified',
           variables: {
             challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,  // For actionUrl
             opponentName: challenged.username || 'opponent',
             reason: challenger.disqualificationReason || 'Did not meet minimum trade requirement',
           },
-        });
+        }).catch(e => console.error('Failed to send disqualification notification:', e));
       }
 
       if (challengedDisqualified) {
-        await notificationService.send({
+        notificationService.send({
           userId: challenged.userId,
           templateId: 'challenge_disqualified',
           variables: {
             challengeId: challenge._id.toString(),
+            challengeSlug: challenge.slug,  // For actionUrl
             opponentName: challenger.username || 'opponent',
             reason: challenged.disqualificationReason || 'Did not meet minimum trade requirement',
           },
-        });
+        }).catch(e => console.error('Failed to send disqualification notification:', e));
       }
     } catch (notifError) {
       console.error('Error sending challenge notifications:', notifError);
@@ -749,11 +764,19 @@ export async function finalizeChallenge(challengeId: string) {
     );
     return { success: true, winnerId, winnerName, isTie };
   } catch (error) {
-    await session.abortTransaction();
+    // Only abort if session is still in transaction
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     console.error(`Error finalizing challenge ${challengeId}:`, error);
     throw error;
   } finally {
-    session.endSession();
+    // End session if it hasn't been ended yet (for error cases)
+    try {
+      session.endSession();
+    } catch {
+      // Session already ended after successful commit
+    }
   }
 }
 

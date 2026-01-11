@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { Gamepad2, TrendingUp, Zap, Target } from 'lucide-react';
+import { Gamepad2, TrendingUp, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type TradingMode = 'professional' | 'game';

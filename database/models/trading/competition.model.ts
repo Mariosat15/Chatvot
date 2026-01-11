@@ -66,11 +66,25 @@ export interface ICompetition extends Document {
     maxLevel?: number; // Optional max level (for beginner-only competitions)
   };
   
+  // Difficulty Settings
+  difficulty?: {
+    mode: 'auto' | 'manual';
+    manualLevel?: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'extreme';
+  };
+  
   // Restrictions
   maxPositionSize: number; // Max % of capital per position
   maxOpenPositions: number; // Max simultaneous positions
   allowShortSelling: boolean;
   marginCallThreshold: number; // % of capital before forced close
+  
+  // Margin Settings (copied from trading risk settings at creation time)
+  marginSettings?: {
+    liquidation: number; // Stopout level %
+    call: number; // Margin call level %
+    warning: number; // Warning level %
+    safe: number; // Safe level %
+  };
   
   // Risk Limits (per-competition)
   riskLimits: {
@@ -273,6 +287,17 @@ const CompetitionSchema = new Schema<ICompetition>(
         max: 10,
       },
     },
+    difficulty: {
+      mode: {
+        type: String,
+        enum: ['auto', 'manual'],
+        default: 'auto',
+      },
+      manualLevel: {
+        type: String,
+        enum: ['beginner', 'intermediate', 'advanced', 'expert', 'extreme'],
+      },
+    },
     maxPositionSize: {
       type: Number,
       required: true,
@@ -295,9 +320,18 @@ const CompetitionSchema = new Schema<ICompetition>(
     marginCallThreshold: {
       type: Number,
       required: true,
-      default: 50, // 50% of starting capital
+      default: 100, // Margin call level from risk settings (can be 100%+)
       min: 10,
-      max: 90,
+      max: 1000, // Allow high margin call levels
+    },
+    marginSettings: {
+      type: {
+        liquidation: { type: Number, default: 50 },
+        call: { type: Number, default: 100 },
+        warning: { type: Number, default: 150 },
+        safe: { type: Number, default: 200 },
+      },
+      required: false,
     },
     riskLimits: {
       maxDrawdownPercent: {
@@ -365,6 +399,10 @@ CompetitionSchema.index({ status: 1, startTime: -1 });
 // Note: slug already has unique index from schema definition (unique: true)
 CompetitionSchema.index({ createdBy: 1 });
 CompetitionSchema.index({ status: 1, registrationDeadline: 1 });
+// PERFORMANCE: Additional indexes for common queries
+CompetitionSchema.index({ status: 1, endTime: 1 }); // Finding active/ending competitions
+CompetitionSchema.index({ status: 1, currentParticipants: 1 }); // Finding competitions with spots
+CompetitionSchema.index({ tags: 1, status: 1 }); // Tag-based filtering
 
 // Virtual for days until start
 CompetitionSchema.virtual('daysUntilStart').get(function () {

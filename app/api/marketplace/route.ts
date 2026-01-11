@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
     
     // Build query
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {
       isPublished: true,
       status: 'active',
@@ -78,10 +79,10 @@ export async function GET(request: NextRequest) {
       success: true,
       items: itemsWithOwnership,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching marketplace items:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

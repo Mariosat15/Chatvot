@@ -58,6 +58,14 @@ export interface IChallenge extends Document {
   allowShortSelling: boolean;
   marginCallThreshold: number;
   
+  // Margin Settings (copied from trading risk settings at creation time)
+  marginSettings?: {
+    liquidation: number; // Stopout level %
+    call: number; // Margin call level %
+    warning: number; // Warning level %
+    safe: number; // Safe level %
+  };
+  
   // Results
   winnerId?: string;
   winnerName?: string;
@@ -248,9 +256,18 @@ const ChallengeSchema = new Schema<IChallenge>(
     marginCallThreshold: {
       type: Number,
       required: true,
-      default: 50,
+      default: 100, // Margin call level from risk settings (can be 100%+)
       min: 10,
-      max: 90,
+      max: 1000, // Allow high margin call levels
+    },
+    marginSettings: {
+      type: {
+        liquidation: { type: Number, default: 50 },
+        call: { type: Number, default: 100 },
+        warning: { type: Number, default: 150 },
+        safe: { type: Number, default: 200 },
+      },
+      required: false,
     },
     winnerId: String,
     winnerName: String,
@@ -283,12 +300,16 @@ const ChallengeSchema = new Schema<IChallenge>(
   }
 );
 
-// Indexes
+// Indexes - Optimized for common queries
 ChallengeSchema.index({ status: 1, createdAt: -1 });
 ChallengeSchema.index({ challengerId: 1, status: 1 });
 ChallengeSchema.index({ challengedId: 1, status: 1 });
 ChallengeSchema.index({ status: 1, acceptDeadline: 1 });
 ChallengeSchema.index({ status: 1, endTime: 1 });
+// Compound index for cooldown check query (challengerId + challengedId + createdAt)
+ChallengeSchema.index({ challengerId: 1, challengedId: 1, createdAt: -1 });
+// Combined $or query optimization for active challenges count
+ChallengeSchema.index({ challengerId: 1, challengedId: 1, status: 1 });
 
 const Challenge = models?.Challenge || model<IChallenge>('Challenge', ChallengeSchema);
 
@@ -298,6 +319,7 @@ const Challenge = models?.Challenge || model<IChallenge>('Challenge', ChallengeS
   try {
     if (Challenge.collection) {
       const indexes = await Challenge.collection.indexes();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hasStaleIndex = indexes.some((idx: any) => idx.name === 'challengeCode_1');
       if (hasStaleIndex) {
         await Challenge.collection.dropIndex('challengeCode_1');

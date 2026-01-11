@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Badge, getBadgesByCategory, BadgeCategory } from '@/lib/constants/badges';
-import { Lock, Crown, Star, Sparkles, Shield, TrendingUp, DollarSign, AlertTriangle, Zap, Target, BarChart3, Globe, Users, Award, Trophy } from 'lucide-react';
+import { Badge, BadgeCategory } from '@/lib/constants/badges';
+import { Lock, Crown, Star, Sparkles, Shield, TrendingUp, DollarSign, Zap, Target, BarChart3, Globe, Users, Award, Trophy } from 'lucide-react';
 import {
   Select,
   SelectContent,

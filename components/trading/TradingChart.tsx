@@ -96,6 +96,7 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
         if (response.ok) {
           const data = await response.json();
           if (candlestickSeriesRef.current && data.candles) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const formattedCandles = data.candles.map((candle: any) => ({
               time: (candle.timestamp / 1000) as Time,
               open: candle.open,
@@ -122,8 +123,6 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
   useEffect(() => {
     const currentPrice = prices.get(symbol);
     if (!currentPrice || !candlestickSeriesRef.current || isLoading) return;
-
-    console.log(`📊 Chart Update: ${symbol} @ ${currentPrice.mid.toFixed(5)}`);
 
     // Use current timestamp rounded to the nearest timeframe interval
     const getTimeframeSeconds = () => {

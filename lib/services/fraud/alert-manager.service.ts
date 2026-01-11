@@ -17,6 +17,7 @@ import mongoose from 'mongoose';
 export interface AlertEvidence {
   type: string;
   description: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any;
 }
 
@@ -63,45 +64,60 @@ export class AlertManagerService {
       console.log(`   Competition ID: ${competitionId}`);
     }
 
-    // Convert userIds to ObjectIds for query
-    const userObjectIds = userIds.map(id => {
-      try {
-        return new mongoose.Types.ObjectId(id.toString());
-      } catch (e) {
-        console.error(`   ⚠️ Invalid ObjectId: ${id}`);
-        return id;
-      }
-    });
-    console.log(`   Converted to ObjectIds: ${userObjectIds.map(id => id.toString())}`);
+    // Convert userIds to strings for query (schema stores strings, not ObjectIds)
+    const userIdStrings = userIds.map(id => id.toString());
+    console.log(`   User ID strings: ${userIdStrings.join(', ')}`);
 
     // Build the query to find existing alerts for these users
+    // NOTE: suspiciousUserIds and primaryUserId are stored as STRINGS in the schema
     const userQuery = {
       $or: [
-        { suspiciousUserIds: { $in: userObjectIds } },
-        { primaryUserId: { $in: userObjectIds } }
+        { suspiciousUserIds: { $in: userIdStrings } },
+        { primaryUserId: { $in: userIdStrings } }
       ]
     };
 
-    // ALWAYS check if there's a resolved/dismissed alert with the SAME evidence type
+    // ALWAYS check if there's a resolved/dismissed alert with the SAME alert type
     // (to prevent recreating dismissed alerts of the same type)
-    const evidenceTypeCheck = competitionId 
-      ? { 'evidence.data.competitionId': competitionId, 'evidence.type': alertType }
-      : { 'evidence.type': alertType };
+    // IMPORTANT: If the user was CLEARED (investigationClearedAt is set) and this is NEW fraud
+    // activity (detected AFTER clearance), we SHOULD create a new alert
+    // NOTE: We check `alertType` field directly, NOT `evidence.type` (which is the evidence category)
+    const alertTypeCheck = competitionId 
+      ? { alertType, competitionId }
+      : { alertType };
 
     const resolvedAlertOfSameType = await FraudAlert.findOne({
       ...userQuery,
-      ...evidenceTypeCheck,
+      ...alertTypeCheck,
       status: { $in: ['dismissed', 'resolved'] }
-    });
+    }).sort({ resolvedAt: -1 }); // Get most recent resolution
+
+    let shouldBlockNewAlert = false;
 
     if (resolvedAlertOfSameType) {
-      console.log(`⏭️ [ALERT] Found resolved/dismissed alert with same evidence type`);
+      console.log(`⏭️ [ALERT] Found resolved/dismissed alert with same alert type`);
       console.log(`   Previous alert ID: ${resolvedAlertOfSameType._id}`);
       console.log(`   Status: ${resolvedAlertOfSameType.status}`);
-      console.log(`   BUT continuing to check for active alerts...`);
-      // Continue - we should still check if there's an active alert to add OTHER evidence types
+      console.log(`   Investigation cleared at: ${resolvedAlertOfSameType.investigationClearedAt || 'Not set'}`);
+      
+      // Check if user was CLEARED (unbanned/unsuspended) after this investigation
+      // If investigationClearedAt is set, it means the user was unbanned/unsuspended
+      // In that case, NEW fraud activity should create a NEW alert
+      if (resolvedAlertOfSameType.investigationClearedAt) {
+        const clearanceDate = new Date(resolvedAlertOfSameType.investigationClearedAt);
+        console.log(`   ✅ User was CLEARED on: ${clearanceDate.toISOString()}`);
+        console.log(`   → NEW fraud activity after clearance will create a NEW alert`);
+        shouldBlockNewAlert = false; // Allow new alert since user was cleared
+      } else {
+        // User was NOT cleared (still banned/suspended or alert was just dismissed)
+        // Don't create new alert for the same type of fraud
+        console.log(`   ⚠️ User was NOT cleared - blocking new alert of same type`);
+        shouldBlockNewAlert = true;
+      }
+      
+      console.log(`   Continuing to check for active alerts...`);
     } else {
-      console.log(`   No resolved/dismissed alert found with this evidence type - continuing`);
+      console.log(`   No resolved/dismissed alert found with this alert type - continuing`);
     }
 
     // ALWAYS find ANY existing ACTIVE alert for these users (regardless of type)
@@ -131,6 +147,7 @@ export class AlertManagerService {
       const allAlertsForUsers = await FraudAlert.find(userQuery).select('_id status alertType title').lean();
       if (allAlertsForUsers.length > 0) {
         console.log(`   📊 All alerts for these users:`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         allAlertsForUsers.forEach((a: any, i: number) => {
           console.log(`      ${i + 1}. ID: ${a._id}, Status: ${a.status}, Type: ${a.alertType}`);
         });
@@ -146,13 +163,14 @@ export class AlertManagerService {
       return;
     }
 
-    // If the same evidence type was already dismissed, don't create new alert
-    if (resolvedAlertOfSameType) {
-      console.log(`⏭️ [ALERT] No active alert exists and this type was dismissed - NOT creating`);
+    // If the same alert type was already dismissed AND user was NOT cleared, don't create new alert
+    if (shouldBlockNewAlert) {
+      console.log(`⏭️ [ALERT] No active alert exists and this type was dismissed (user NOT cleared) - NOT creating`);
       return;
     }
 
     // No existing alert found - create new one
+    // (Either no previous alert, or user was cleared after previous dismissal)
     console.log(`🆕 [ALERT] Creating NEW alert for these users`);
     await this.createNewAlert(params);
   }
@@ -162,7 +180,9 @@ export class AlertManagerService {
    * ALWAYS adds new evidence with timestamps - allows tracking multiple detections
    * ALL detections for same users are MERGED into ONE alert
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private static async updateExistingAlert(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     existingAlert: any,
     alertType: string,
     evidence: AlertEvidence[],
@@ -191,6 +211,7 @@ export class AlertManagerService {
     
     // Check if this EXACT evidence already exists (same type + same key data)
     const isDuplicateEvidence = (newEvidence: AlertEvidence): boolean => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return existingAlert.evidence.some((existing: any) => {
         if (existing.type !== newEvidence.type) return false;
         
@@ -235,6 +256,7 @@ export class AlertManagerService {
     detectionMethods.add(alertType);
     
     // Also add any detection methods from evidence types
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     existingAlert.evidence.forEach((e: any) => {
       if (e.type.includes('device') || e.type.includes('fingerprint')) detectionMethods.add('same_device');
       if (e.type.includes('payment')) detectionMethods.add('same_payment');
@@ -267,6 +289,25 @@ export class AlertManagerService {
       existingAlert.confidence = confidence;
     }
     
+    // Increment detection count and add to history
+    existingAlert.detectionCount = (existingAlert.detectionCount || 0) + 1;
+    if (!existingAlert.detectionHistory) {
+      existingAlert.detectionHistory = [];
+    }
+    
+    // Get triggered by user from evidence if available
+    const triggeredBy = evidence[0]?.data?.lastActivity?.userId || userIds[0];
+    const ipAddress = evidence[0]?.data?.lastActivity?.ipAddress || evidence[0]?.data?.primaryDevice?.ipAddress;
+    
+    existingAlert.detectionHistory.push({
+      timestamp: new Date(),
+      triggeredBy: triggeredBy,
+      ipAddress: ipAddress,
+      details: `${alertType} detection #${existingAlert.detectionCount}`
+    });
+    
+    console.log(`📊 [ALERT] Detection count: ${existingAlert.detectionCount} (history: ${existingAlert.detectionHistory.length} entries)`);
+    
     try {
       await existingAlert.save();
       
@@ -275,6 +316,7 @@ export class AlertManagerService {
       console.log(`   New Title: ${existingAlert.title}`);
       console.log(`   Detection Methods: ${methodNames}`);
       console.log(`   Total Evidence: ${existingAlert.evidence.length} items`);
+      console.log(`   Detection Count: ${existingAlert.detectionCount}`);
       console.log(`   Severity: ${existingAlert.severity}`);
       console.log(`   Status: ${existingAlert.status}`);
     } catch (saveError) {
@@ -300,6 +342,18 @@ export class AlertManagerService {
 
     console.log(`🆕 [ALERT] Creating new ${alertType} alert`);
     
+    // Count previous alerts for these users (dismissed/resolved)
+    const userIdStrings = userIds.map(id => id.toString());
+    const previousAlertCount = await FraudAlert.countDocuments({
+      $or: [
+        { suspiciousUserIds: { $in: userIdStrings } },
+        { primaryUserId: { $in: userIdStrings } }
+      ],
+      status: { $in: ['dismissed', 'resolved'] }
+    });
+    
+    console.log(`   Previous alerts for these users: ${previousAlertCount}`);
+    
     // Add competitionId to evidence data if provided
     const enhancedEvidence = evidence.map(e => ({
       ...e,
@@ -309,22 +363,35 @@ export class AlertManagerService {
       }
     }));
     
+    // Get triggered by user from evidence if available
+    const triggeredBy = evidence[0]?.data?.lastActivity?.userId || userIds[0];
+    const ipAddress = evidence[0]?.data?.lastActivity?.ipAddress || evidence[0]?.data?.primaryDevice?.ipAddress;
+    
     await FraudAlert.create({
       alertType,
       severity,
       status: 'pending',
-      primaryUserId: new mongoose.Types.ObjectId(userIds[0]),
-      suspiciousUserIds: userIds.map(id => new mongoose.Types.ObjectId(id)),
+      primaryUserId: userIds[0].toString(),
+      suspiciousUserIds: userIdStrings,
       confidence,
       title,
       description,
       evidence: enhancedEvidence,
       autoGenerated: true,
       notificationSent: false,
-      ...(competitionId && { competitionId }) // Store at alert level too
+      detectionCount: 1,
+      detectionHistory: [{
+        timestamp: new Date(),
+        triggeredBy: triggeredBy,
+        ipAddress: ipAddress,
+        details: `Initial ${alertType} detection`
+      }],
+      previousAlertCount: previousAlertCount,
+      ...(competitionId && { competitionId })
     });
     
     console.log(`✅ [ALERT] Created new ${alertType} alert for ${userIds.length} accounts`);
+    console.log(`   Detection count: 1, Previous alerts: ${previousAlertCount}`);
     if (competitionId) {
       console.log(`   Competition: ${competitionId}`);
     }
@@ -341,10 +408,13 @@ export class AlertManagerService {
   ): Promise<boolean> {
     await connectToDatabase();
     
+    // Use strings for query (schema stores strings, not ObjectIds)
+    const userIdStrings = userIds.map(id => id.toString());
+    
     const userQuery = {
       $or: [
-        { suspiciousUserIds: { $in: userIds.map(id => new mongoose.Types.ObjectId(id)) } },
-        { primaryUserId: { $in: userIds.map(id => new mongoose.Types.ObjectId(id)) } }
+        { suspiciousUserIds: { $in: userIdStrings } },
+        { primaryUserId: { $in: userIdStrings } }
       ]
     };
 
@@ -353,9 +423,13 @@ export class AlertManagerService {
       const existingAlert = await FraudAlert.findOne({
         ...userQuery,
         alertType,
-        'evidence.data.competitionId': competitionId,
+        competitionId, // Use direct field, not evidence.data
         status: { $in: ['dismissed', 'resolved'] }
       });
+      // Allow new alert if user was cleared
+      if (existingAlert?.investigationClearedAt) {
+        return true;
+      }
       return !existingAlert;
     }
 
@@ -365,6 +439,11 @@ export class AlertManagerService {
       alertType,
       status: { $in: ['dismissed', 'resolved'] }
     });
+    
+    // Allow new alert if user was cleared
+    if (existingAlert?.investigationClearedAt) {
+      return true;
+    }
     
     return !existingAlert;
   }

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Play, Eye, TrendingUp, TrendingDown, Trophy, BarChart3, Clock, RefreshCw } from 'lucide-react';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface UserParticipant {
   _id: string;
@@ -62,13 +63,18 @@ export default function CompetitionStatusWrapper({
           setIsTransitioning(false);
         }, 500);
       }
+
+      return start.getTime() - now.getTime(); // Return time until start
     };
 
     // Check immediately
-    checkStatus();
+    const timeUntilStart = checkStatus();
 
-    // Check every second for more responsive updates
-    const interval = setInterval(checkStatus, 1000);
+    // Use adaptive interval: 1 second when close to starting, otherwise 10 seconds
+    const isCloseToStart = timeUntilStart > 0 && timeUntilStart < 60000; // Within 1 minute
+    const intervalTime = isCloseToStart ? PERFORMANCE_INTERVALS.COUNTDOWN_UPDATE : PERFORMANCE_INTERVALS.COMPETITION_STATUS;
+    
+    const interval = setInterval(checkStatus, intervalTime);
 
     return () => clearInterval(interval);
   }, [startTime, endTime, status]);
@@ -166,7 +172,7 @@ export default function CompetitionStatusWrapper({
           <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg text-center">
             <p className="text-amber-400 text-sm font-medium flex items-center justify-center gap-2">
               <Clock className="h-4 w-4 animate-pulse" />
-              Competition hasn't started yet. Trading button will appear when it begins!
+              Competition hasn&apos;t started yet. Trading button will appear when it begins!
             </p>
           </div>
         )}

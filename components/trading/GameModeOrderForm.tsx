@@ -3,13 +3,58 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { HelpTooltip } from '@/components/ui/help-tooltip';
-import { TrendingUp, TrendingDown, Zap, Target, Shield, Flame, Trophy, Star } from 'lucide-react';
+import { TrendingUp, TrendingDown, Zap, Target, Shield, Flame, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
+import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
+
+// Collapsible Section Component for Game Mode
+const CollapsibleSection = ({ 
+  title, 
+  icon, 
+  children, 
+  defaultOpen = true,
+  className = "",
+  gradient = "from-dark-300/80 to-dark-400/50"
+}: { 
+  title: string; 
+  icon: string; 
+  children: React.ReactNode; 
+  defaultOpen?: boolean;
+  className?: string;
+  gradient?: string;
+}) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  
+  return (
+    <div className={cn(`bg-gradient-to-br ${gradient} rounded-xl border border-dark-400/30 shadow-lg overflow-hidden`, className)}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full p-4 flex items-center justify-between hover:bg-dark-400/20 transition-colors"
+      >
+        <p className="text-sm font-bold text-light-900 flex items-center gap-2">
+          {icon} {title}
+        </p>
+        {isOpen ? (
+          <ChevronUp className="size-5 text-dark-600 transition-transform" />
+        ) : (
+          <ChevronDown className="size-5 text-dark-600 transition-transform" />
+        )}
+      </button>
+      <div className={cn(
+        "transition-all duration-300 ease-in-out",
+        isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0 overflow-hidden"
+      )}>
+        <div className="p-4 pt-0">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
 import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
 import { useRiskSettings } from '@/hooks/useRiskSettings';
@@ -36,6 +81,8 @@ interface GameModeOrderFormProps {
   // Margin thresholds from admin settings (optional - falls back to defaults)
   // This ensures admin panel issues don't break trading
   marginThresholds?: MarginThresholds;
+  disabled?: boolean; // Disable trading (e.g., when disqualified)
+  disabledReason?: string; // Reason for disabling
 }
 
 // Risk levels with gaming terminology and clear descriptions
@@ -83,6 +130,8 @@ export default function GameModeOrderForm({
   currentEquity,
   existingUsedMargin,
   marginThresholds = DEFAULT_MARGIN_THRESHOLDS,
+  disabled = false,
+  disabledReason,
 }: GameModeOrderFormProps) {
   const { symbol: chartSymbol, setSymbol: setChartSymbol } = useChartSymbol();
   const { prices, subscribe, unsubscribe } = usePrices();
@@ -106,10 +155,8 @@ export default function GameModeOrderForm({
 
   // Subscribe to price updates (CRITICAL - same as Professional mode!)
   useEffect(() => {
-    console.log('🎮 Game Mode Order Form: Subscribing to price updates for', symbol);
     subscribe(symbol);
     return () => {
-      console.log('🎮 Game Mode Order Form: Unsubscribing from', symbol);
       unsubscribe(symbol);
     };
   }, [symbol, subscribe, unsubscribe]);
@@ -192,7 +239,7 @@ export default function GameModeOrderForm({
   const hasEnoughBalance = marginRequired <= availableCapital;
   const positionWithinLimit = positionValue <= (availableCapital * leverage);
   const marginSafeToTrade = !currentlyBelowMarginCall && !wouldCauseMarginCall;
-  const canPlaceOrder = hasEnoughBalance && positionWithinLimit && openPositionsCount < maxPositions && marginSafeToTrade;
+  const canPlaceOrder = !disabled && hasEnoughBalance && positionWithinLimit && openPositionsCount < maxPositions && marginSafeToTrade;
 
   // Calculate max safe amount considering margin stopout levels
   // This ensures we don't push margin level below the WARNING threshold
@@ -281,7 +328,15 @@ export default function GameModeOrderForm({
         }
       }
       
-      await placeOrder({
+      // 🔒 LOCK THE CURRENT PRICE at the moment user clicks trade
+      const lockedPrice = {
+        bid: currentPrice.bid,
+        ask: currentPrice.ask,
+        timestamp: Date.now(),
+      };
+
+      
+      const result = await placeOrder({
         competitionId,
         symbol,
         side: tradeSide,
@@ -290,7 +345,16 @@ export default function GameModeOrderForm({
         leverage,
         takeProfit: takeProfitPrice,
         stopLoss: stopLossPrice,
+        lockedPrice,
       });
+
+      // ⚡ IMMEDIATE UI UPDATE - dispatch position data for instant chart update
+      if (result.success && result.position && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('positionOpened', { 
+          detail: result.position 
+        }));
+        window.dispatchEvent(new CustomEvent('orderPlaced'));
+      }
 
       // Success feedback
       toast.success(
@@ -306,15 +370,16 @@ export default function GameModeOrderForm({
         { duration: 3000 }
       );
 
-      // Refresh streak after trade is placed
-      const updatedStreak = await getUserStreak(competitionId);
-      setStreak(updatedStreak);
+      // Refresh streak NON-BLOCKING (don't wait for it)
+      getUserStreak(competitionId).then(updatedStreak => {
+        setStreak(updatedStreak);
+      }).catch(() => {});
 
       // Reset amount after successful trade to $1
       setAmount(1);
 
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to place trade');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to place trade');
     } finally {
       setIsSubmitting(false);
     }
@@ -345,9 +410,7 @@ export default function GameModeOrderForm({
 
       {/* Current Price Display */}
       {currentPrice && (
-        <div className="bg-dark-300 rounded-lg p-4">
-          <p className="text-xs text-dark-600 mb-2 text-center">Current Price</p>
-          
+        <CollapsibleSection title="Live Market Prices" icon="💰" defaultOpen={true}>
           {/* Mid Price - Large */}
           <p className="text-2xl font-bold text-white font-mono text-center mb-3">
             {currentPrice.mid.toFixed(5)}
@@ -370,18 +433,17 @@ export default function GameModeOrderForm({
               <p className="text-xs text-dark-600 mt-1">You buy here</p>
             </div>
           </div>
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* Risk Level Selector - Gamified */}
-      <div className="bg-gradient-to-br from-blue-600/20 to-cyan-600/20 border-2 border-blue-500/50 rounded-xl p-4">
-        <Label className="text-light-900 font-bold text-lg flex items-center justify-center gap-2 mb-4">
-          🎲 Pick Your Risk Level
+      <CollapsibleSection title="Pick Your Risk Level" icon="🎲" defaultOpen={true} gradient="from-blue-600/20 to-cyan-600/20">
+        <div className="flex items-center justify-center gap-2 mb-4">
           <HelpTooltip 
             content="Choose how much risk you want to take! Safe = small trades, YOLO = big trades. Higher risk = bigger wins or losses!"
             side="bottom"
           />
-        </Label>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           {Object.entries(RISK_LEVELS).map(([key, info]) => {
             const riskAmount = Math.min(availableCapital * info.multiplier, maxSafeAmount);
@@ -389,6 +451,7 @@ export default function GameModeOrderForm({
             return (
               <button
                 key={key}
+                type="button"
                 onClick={() => handleRiskLevelChange(key as keyof typeof RISK_LEVELS)}
                 className={cn(
                   "relative p-4 rounded-xl border-3 transition-all transform hover:scale-105",
@@ -427,20 +490,17 @@ export default function GameModeOrderForm({
             );
           })}
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Custom Amount Slider */}
-      <div>
-        <Label className="text-light-900 mb-2 flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            Fine-tune Amount
-            <HelpTooltip 
-              content="Adjust exactly how much money you want to risk on this trade. Slide left for less, right for more!"
-              side="bottom"
-            />
-          </span>
+      <CollapsibleSection title="Fine-tune Amount" icon="🎚️" defaultOpen={true}>
+        <div className="flex items-center justify-between mb-2">
+          <HelpTooltip 
+            content="Adjust exactly how much money you want to risk on this trade. Slide left for less, right for more!"
+            side="bottom"
+          />
           <span className="text-primary font-bold">${actualAmount.toFixed(2)}</span>
-        </Label>
+        </div>
         <Slider
           value={[amount || 1]}
           onValueChange={(value) => {
@@ -456,108 +516,104 @@ export default function GameModeOrderForm({
           <span>$1</span>
           <span>${maxSafeAmount.toFixed(2)}</span>
         </div>
-      </div>
+      </CollapsibleSection>
 
-      {/* Take Profit Slider */}
-      <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 rounded-lg p-4 border border-green-500/30">
-        <div className="flex items-center justify-between mb-3">
-          <Label className="text-white font-bold flex items-center gap-2">
-            🎯 Take Profit
-            <HelpTooltip 
-              content="Automatically close your trade when you reach this profit! The trade will close and you'll lock in your winnings. Set in pips (price movement steps)."
-              side="bottom"
-            />
-          </Label>
-          <div className="flex items-center gap-2">
-            <span className={cn(
-              "text-xs font-bold px-2 py-1 rounded",
-              tpEnabled ? "bg-green-500/20 text-green-400" : "bg-dark-500 text-dark-600"
-            )}>
-              {tpEnabled ? 'ON' : 'OFF'}
-            </span>
-            <Switch
-              checked={tpEnabled}
-              onCheckedChange={setTpEnabled}
-            />
-          </div>
-        </div>
-        
-        {tpEnabled && (
-          <>
-            <Slider
-              value={[takeProfitPips]}
-              onValueChange={(value) => setTakeProfitPips(value[0])}
-              min={10}
-              max={500}
-              step={10}
-              className="py-4"
-            />
-            <div className="flex justify-between text-xs text-green-400 mt-1">
-              <span>10 pips</span>
-              <span className="text-white font-bold">{takeProfitPips} pips</span>
-              <span>500 pips</span>
+      {/* Take Profit & Stop Loss */}
+      <CollapsibleSection title="Take Profit / Stop Loss" icon="🎯" defaultOpen={false} gradient="from-green-900/20 to-emerald-900/20">
+        {/* Take Profit */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <Label className="text-white font-bold flex items-center gap-2">
+              🎯 Take Profit
+              <HelpTooltip 
+                content="Automatically close your trade when you reach this profit! The trade will close and you'll lock in your winnings. Set in pips (price movement steps)."
+                side="bottom"
+              />
+            </Label>
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                "text-xs font-bold px-2 py-1 rounded",
+                tpEnabled ? "bg-green-500/20 text-green-400" : "bg-dark-500 text-dark-600"
+              )}>
+                {tpEnabled ? 'ON' : 'OFF'}
+              </span>
+              <Switch
+                checked={tpEnabled}
+                onCheckedChange={setTpEnabled}
+              />
             </div>
-          </>
-        )}
-      </div>
+          </div>
+          
+          {tpEnabled && (
+            <>
+              <Slider
+                value={[takeProfitPips]}
+                onValueChange={(value) => setTakeProfitPips(value[0])}
+                min={10}
+                max={500}
+                step={10}
+                className="py-4"
+              />
+              <div className="flex justify-between text-xs text-green-400 mt-1">
+                <span>10 pips</span>
+                <span className="text-white font-bold">{takeProfitPips} pips</span>
+                <span>500 pips</span>
+              </div>
+            </>
+          )}
+        </div>
 
-      {/* Stop Loss Slider */}
-      <div className="bg-gradient-to-br from-red-900/20 to-rose-900/20 rounded-lg p-4 border border-red-500/30">
-        <div className="flex items-center justify-between mb-3">
-          <Label className="text-white font-bold flex items-center gap-2">
-            🛑 Stop Loss
-            <HelpTooltip 
-              content="Automatically close your trade when you're losing this much! This protects you from losing too much money. Set in pips (price movement steps)."
-              side="bottom"
-            />
-          </Label>
-          <div className="flex items-center gap-2">
-            <span className={cn(
-              "text-xs font-bold px-2 py-1 rounded",
-              slEnabled ? "bg-red-500/20 text-red-400" : "bg-dark-500 text-dark-600"
-            )}>
-              {slEnabled ? 'ON' : 'OFF'}
-            </span>
-            <Switch
-              checked={slEnabled}
-              onCheckedChange={setSlEnabled}
-            />
-          </div>
-        </div>
-        
-        {slEnabled && (
-          <>
-            <Slider
-              value={[stopLossPips]}
-              onValueChange={(value) => setStopLossPips(value[0])}
-              min={10}
-              max={500}
-              step={10}
-              className="py-4"
-            />
-            <div className="flex justify-between text-xs text-red-400 mt-1">
-              <span>10 pips</span>
-              <span className="text-white font-bold">{stopLossPips} pips</span>
-              <span>500 pips</span>
+        {/* Stop Loss */}
+        <div className="pt-4 border-t border-dark-500">
+          <div className="flex items-center justify-between mb-3">
+            <Label className="text-white font-bold flex items-center gap-2">
+              🛑 Stop Loss
+              <HelpTooltip 
+                content="Automatically close your trade when you're losing this much! This protects you from losing too much money. Set in pips (price movement steps)."
+                side="bottom"
+              />
+            </Label>
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                "text-xs font-bold px-2 py-1 rounded",
+                slEnabled ? "bg-red-500/20 text-red-400" : "bg-dark-500 text-dark-600"
+              )}>
+                {slEnabled ? 'ON' : 'OFF'}
+              </span>
+              <Switch
+                checked={slEnabled}
+                onCheckedChange={setSlEnabled}
+              />
             </div>
-          </>
-        )}
-      </div>
+          </div>
+          
+          {slEnabled && (
+            <>
+              <Slider
+                value={[stopLossPips]}
+                onValueChange={(value) => setStopLossPips(value[0])}
+                min={10}
+                max={500}
+                step={10}
+                className="py-4"
+              />
+              <div className="flex justify-between text-xs text-red-400 mt-1">
+                <span>10 pips</span>
+                <span className="text-white font-bold">{stopLossPips} pips</span>
+                <span>500 pips</span>
+              </div>
+            </>
+          )}
+        </div>
+      </CollapsibleSection>
 
       {/* Leverage (Admin-controlled, read-only) */}
-      <div className="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 rounded-lg p-4 border border-yellow-500/50 relative overflow-hidden">
-        {/* Live indicator */}
-        <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-500/20 px-2 py-0.5 rounded-full border border-green-500/30">
-          <div className="size-1.5 bg-green-500 rounded-full animate-pulse" />
-          <span className="text-xs text-green-400 font-medium">LIVE</span>
-        </div>
-        
+      <CollapsibleSection title="Power Multiplier (Leverage)" icon="⚡" defaultOpen={true} gradient="from-yellow-900/30 to-orange-900/30">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Zap className="size-5 text-yellow-500" />
             <div>
               <div className="text-xs text-dark-600 flex items-center gap-1">
-                Power Multiplier
                 <HelpTooltip 
                   content="This multiplies your profit/loss! Higher number = bigger wins AND bigger losses. Set by the admin - you can't change this."
                   side="right"
@@ -573,10 +629,10 @@ export default function GameModeOrderForm({
             </div>
           </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Trade Info Panel - Show lot size, margin, no decimals */}
-      <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-lg p-3 border border-purple-500/30">
+      <CollapsibleSection title="Trade Summary" icon="📊" defaultOpen={true} gradient="from-purple-900/30 to-pink-900/30">
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div>
             <p className="text-dark-600">Trade Size (Lots)</p>
@@ -607,7 +663,7 @@ export default function GameModeOrderForm({
             <p className="text-sm font-semibold text-white">${availableCapital.toFixed(2)}</p>
           </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Margin Safety Warning - Show stopout info */}
       {marginSafety.status !== 'safe' && (
@@ -724,7 +780,19 @@ export default function GameModeOrderForm({
         </div>
       )}
 
-      {!canPlaceOrder && !currentlyBelowMarginCall && !wouldCauseMarginCall && (
+      {/* Disabled state message (e.g., disqualified) */}
+      {disabled && (
+        <div className="bg-red/10 border border-red rounded-lg p-3 text-center">
+          <p className="text-sm text-red font-semibold">
+            🚫 Trading Disabled
+          </p>
+          <p className="text-xs text-dark-600 mt-1">
+            {disabledReason || 'You cannot place trades at this time.'}
+          </p>
+        </div>
+      )}
+
+      {!canPlaceOrder && !disabled && !currentlyBelowMarginCall && !wouldCauseMarginCall && (
         <div className="bg-red/10 border border-red rounded-lg p-3 text-center animate-pulse">
           <p className="text-sm text-red font-semibold">
             {!hasEnoughBalance 

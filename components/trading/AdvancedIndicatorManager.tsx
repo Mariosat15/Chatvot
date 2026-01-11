@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,6 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
 import { Activity, Plus, Trash2, Edit2, Copy, Palette, Settings, Layers, TrendingUp, Move } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+// Disable debug logging
+const DEBUG = false;
+const log = (...args: unknown[]): void => { if (DEBUG) log(...args); };
 
 export interface CustomIndicator {
   id: string;
@@ -175,11 +179,13 @@ const LINE_STYLES = [
 interface AdvancedIndicatorManagerProps {
   indicators: CustomIndicator[];
   onIndicatorsChange: (indicators: CustomIndicator[]) => void;
+  portalContainer?: HTMLElement | null;
 }
 
 export default function AdvancedIndicatorManager({
   indicators,
-  onIndicatorsChange
+  onIndicatorsChange,
+  portalContainer
 }: AdvancedIndicatorManagerProps) {
   const [open, setOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<string>('sma');
@@ -324,17 +330,17 @@ export default function AdvancedIndicatorManager({
   };
 
   const updateIndicator = (id: string, updates: Partial<CustomIndicator>) => {
-    console.log('🔧 Updating indicator:', id, 'with updates:', updates);
+    log('🔧 Updating indicator:', id, 'with updates:', updates);
     const updatedIndicators = indicators.map(ind => {
       if (ind.id === id) {
         const updated = { ...ind, ...updates };
-        console.log('   Before:', ind);
-        console.log('   After:', updated);
+        log('   Before:', ind);
+        log('   After:', updated);
         return updated;
       }
       return ind;
     });
-    console.log('📤 Calling onIndicatorsChange with:', updatedIndicators);
+    log('📤 Calling onIndicatorsChange with:', updatedIndicators);
     onIndicatorsChange(updatedIndicators);
   };
 
@@ -348,14 +354,23 @@ export default function AdvancedIndicatorManager({
         size="sm"
         variant="ghost"
         onClick={() => setOpen(true)}
-        className="h-7 px-3 text-xs hover:bg-[#2a2e39] text-[#787b86]"
+        className={cn(
+          "hover:bg-[#2a2e39] relative",
+          "h-8 w-10 p-0 text-[#787b86]"
+        )}
+        title={`Indicators${enabledCount > 0 ? ` (${enabledCount} active)` : ''}`}
       >
-        <Activity className="h-4 w-4 mr-1" />
-        Indicators {enabledCount > 0 && `(${enabledCount})`}
+        <Activity className="h-4 w-4" />
+        {enabledCount > 0 && (
+          <span className="absolute -top-1 -right-1 h-4 w-4 bg-[#2962ff] rounded-full text-[9px] flex items-center justify-center text-white font-bold">
+            {enabledCount}
+          </span>
+        )}
       </Button>
       
       <DialogContent 
         ref={dialogRef}
+        container={portalContainer}
         className="bg-[#131722] border-[#2b2b43] text-white max-w-4xl max-h-[85vh] overflow-y-auto flex flex-col"
         style={isMobile ? undefined : {
           transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
@@ -378,6 +393,7 @@ export default function AdvancedIndicatorManager({
             Indicator Manager
             {!isMobile && <span className="text-xs text-[#787b86] ml-auto">Drag to move</span>}
           </DialogTitle>
+          <DialogDescription className="sr-only">Add and configure chart indicators</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 sm:space-y-6 mt-4 pr-2">
@@ -389,7 +405,7 @@ export default function AdvancedIndicatorManager({
                 <SelectTrigger className="flex-1 bg-[#131722] border-[#2b2b43] text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-[#1e222d] border-[#2b2b43] max-h-80">
+                <SelectContent className="bg-[#1e222d] border-[#2b2b43] max-h-80" container={portalContainer}>
                   <div className="p-2 text-xs font-semibold text-[#787b86]">Moving Averages</div>
                   {['sma', 'ema', 'wma'].map(type => (
                     <SelectItem key={type} value={type} className="text-white">
@@ -445,6 +461,7 @@ export default function AdvancedIndicatorManager({
                     onDuplicate={() => duplicateIndicator(indicator)}
                     onRemove={() => removeIndicator(indicator.id)}
                     onUpdate={(updates) => updateIndicator(indicator.id, updates)}
+                    portalContainer={portalContainer}
                   />
                 ))}
               </div>
@@ -466,6 +483,7 @@ export default function AdvancedIndicatorManager({
                     onDuplicate={() => duplicateIndicator(indicator)}
                     onRemove={() => removeIndicator(indicator.id)}
                     onUpdate={(updates) => updateIndicator(indicator.id, updates)}
+                    portalContainer={portalContainer}
                   />
                 ))}
               </div>
@@ -493,7 +511,8 @@ function IndicatorItem({
   onEdit,
   onDuplicate,
   onRemove,
-  onUpdate
+  onUpdate,
+  portalContainer
 }: {
   indicator: CustomIndicator;
   isEditing: boolean;
@@ -502,6 +521,7 @@ function IndicatorItem({
   onDuplicate: () => void;
   onRemove: () => void;
   onUpdate: (updates: Partial<CustomIndicator>) => void;
+  portalContainer?: HTMLElement | null;
 }) {
   const template = INDICATOR_TEMPLATES[indicator.type as keyof typeof INDICATOR_TEMPLATES];
 
@@ -627,7 +647,7 @@ function IndicatorItem({
                     <SelectTrigger className="h-8 bg-[#1e222d] border-[#2b2b43] text-white">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#1e222d] border-[#2b2b43]">
+                    <SelectContent className="bg-[#1e222d] border-[#2b2b43]" container={portalContainer}>
                       {LINE_STYLES.map(style => (
                         <SelectItem key={style.value} value={String(style.value)} className="text-white">
                           {style.label}
@@ -646,7 +666,7 @@ function IndicatorItem({
                     <SelectTrigger className="h-8 bg-[#1e222d] border-[#2b2b43] text-white">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#1e222d] border-[#2b2b43]">
+                    <SelectContent className="bg-[#1e222d] border-[#2b2b43]" container={portalContainer}>
                       <SelectItem value="true" className="text-white">Yes</SelectItem>
                       <SelectItem value="false" className="text-white">No</SelectItem>
                     </SelectContent>
@@ -888,7 +908,7 @@ function IndicatorItem({
                   <SelectTrigger className="h-8 bg-[#1e222d] border-[#2b2b43] text-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#1e222d] border-[#2b2b43]">
+                  <SelectContent className="bg-[#1e222d] border-[#2b2b43]" container={portalContainer}>
                     <SelectItem value="close" className="text-white">Close</SelectItem>
                     <SelectItem value="open" className="text-white">Open</SelectItem>
                     <SelectItem value="high" className="text-white">High</SelectItem>

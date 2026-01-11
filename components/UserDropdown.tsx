@@ -14,12 +14,12 @@ import {Button} from "@/components/ui/button";
 import {LogOut, User, HelpCircle, Wallet, ChevronDown} from "lucide-react";
 import NavItems from "@/components/NavItems";
 import {signOut} from "@/lib/actions/auth.actions";
-import { useWhiteLabelImages } from "@/hooks/useWhiteLabelImages";
+import { useUserProfileImage } from "@/hooks/useUserProfileImage";
 import Link from "next/link";
 
 const UserDropdown = ({ user }: {user: User}) => {
     const router = useRouter();
-    const { images } = useWhiteLabelImages();
+    const { profileImage } = useUserProfileImage();
 
     const handleSignOut = async () => {
         await signOut();
@@ -35,7 +35,7 @@ const UserDropdown = ({ user }: {user: User}) => {
                     suppressHydrationWarning
                 >
                     <Avatar className="h-9 w-9 ring-2 ring-gray-700 group-hover:ring-yellow-500/50 transition-all duration-300">
-                        <AvatarImage src={images.profileImage} />
+                        <AvatarImage src={profileImage} />
                         <AvatarFallback className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-gray-900 text-sm font-bold">
                             {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}
                         </AvatarFallback>
@@ -59,7 +59,7 @@ const UserDropdown = ({ user }: {user: User}) => {
                 <DropdownMenuLabel className="p-0 mb-2">
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-br from-yellow-500/10 to-transparent border border-yellow-500/20 hover:border-yellow-500/40 transition-all duration-300">
                         <Avatar className="h-12 w-12 ring-2 ring-yellow-500/30">
-                            <AvatarImage src={images.profileImage} />
+                            <AvatarImage src={profileImage} />
                             <AvatarFallback className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-gray-900 font-bold">
                                 {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}
                             </AvatarFallback>

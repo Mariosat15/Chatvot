@@ -8,10 +8,10 @@
 import { connectToDatabase } from '@/database/mongoose';
 import FraudSettings, { DEFAULT_FRAUD_SETTINGS, IFraudSettings } from '@/database/models/fraud/fraud-settings.model';
 
-// Cache settings for 5 minutes
+// Cache settings for 30 seconds (reduced from 5 minutes for faster settings updates)
 let cachedSettings: IFraudSettings | null = null;
 let cacheTime: number = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 30 * 1000; // 30 seconds - short cache for near real-time settings updates
 
 /**
  * Get fraud detection settings (with caching)
@@ -27,15 +27,19 @@ export async function getFraudSettings(): Promise<IFraudSettings> {
   try {
     await connectToDatabase();
     
-    let settings = await FraudSettings.findOne().lean();
+    let settings = await FraudSettings.findOne().lean() as IFraudSettings | null;
     
     // Create default settings if none exist
     if (!settings) {
-      settings = await FraudSettings.create(DEFAULT_FRAUD_SETTINGS);
+      const created = await FraudSettings.create(DEFAULT_FRAUD_SETTINGS);
+      settings = created.toObject() as IFraudSettings;
     }
 
+    // Log when cache is refreshed with key values
+    console.log(`📋 [FraudSettings] Cache refreshed: maxAccountsPerDevice=${settings.maxAccountsPerDevice}, multiAccountDetectionEnabled=${settings.multiAccountDetectionEnabled}`);
+
     // Update cache
-    cachedSettings = settings as IFraudSettings;
+    cachedSettings = settings;
     cacheTime = now;
 
     return cachedSettings;

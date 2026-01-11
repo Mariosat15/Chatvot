@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
     if (!item.isFree && item.price > 0) {
       const balanceBefore = wallet.creditBalance;
       wallet.creditBalance -= item.price;
+      wallet.totalSpentOnMarketplace = (wallet.totalSpentOnMarketplace || 0) + item.price;
       await wallet.save({ session: mongoSession });
       
       // Create transaction record
@@ -144,11 +145,11 @@ export async function POST(request: NextRequest) {
       purchase: purchase[0],
       newBalance: wallet.creditBalance,
     });
-  } catch (error: any) {
+  } catch (error) {
     await mongoSession.abortTransaction();
     console.error('Error purchasing item:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   } finally {

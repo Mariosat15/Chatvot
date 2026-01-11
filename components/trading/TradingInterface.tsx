@@ -4,6 +4,7 @@ import { useState, createContext, useContext } from 'react';
 import OrderForm from '@/components/trading/OrderForm';
 import GameModeOrderForm from '@/components/trading/GameModeOrderForm';
 import TradingModeSelector, { TradingMode } from '@/components/trading/TradingModeSelector';
+import Watchlist from '@/components/trading/Watchlist';
 import type { MarginThresholds } from '@/lib/services/margin-safety.service';
 
 interface TradingInterfaceProps {
@@ -16,6 +17,8 @@ interface TradingInterfaceProps {
   existingUsedMargin: number;
   currentBalance: number;
   marginThresholds?: MarginThresholds;
+  disabled?: boolean; // Disable trading (e.g., when disqualified)
+  disabledReason?: string; // Reason for disabling (e.g., "You are disqualified")
 }
 
 // Create context for trading mode
@@ -64,11 +67,16 @@ export default function TradingInterface({
   existingUsedMargin,
   currentBalance,
   marginThresholds,
+  disabled = false,
+  disabledReason,
 }: TradingInterfaceProps) {
   const { mode, setMode } = useTradingMode();
 
   return (
     <div className="space-y-4">
+      {/* Watchlist - Above Order Form */}
+      <Watchlist className="h-[260px]" />
+      
       {/* Mode Selector */}
       <div className="flex justify-center">
         <TradingModeSelector mode={mode} onModeChange={setMode} />
@@ -99,6 +107,8 @@ export default function TradingInterface({
           existingUsedMargin={existingUsedMargin}
           currentBalance={currentBalance}
           marginThresholds={marginThresholds}
+          disabled={disabled}
+          disabledReason={disabledReason}
         />
       ) : (
         <GameModeOrderForm
@@ -110,6 +120,8 @@ export default function TradingInterface({
           currentEquity={currentEquity}
           existingUsedMargin={existingUsedMargin}
           marginThresholds={marginThresholds}
+          disabled={disabled}
+          disabledReason={disabledReason}
         />
       )}
     </div>

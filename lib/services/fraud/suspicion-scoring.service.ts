@@ -39,7 +39,8 @@ export class SuspicionScoringService {
     tradingSimilarity: 30,  // 30% for similar trading patterns
     mirrorTrading: 35,      // 35% for mirror trading detection
     timezoneLanguage: 10,   // 10% for same timezone + language
-    deviceSwitching: 15     // 15% for unusual device switching
+    deviceSwitching: 15,    // 15% for unusual device switching
+    kycDuplicate: 50        // 50% for duplicate KYC documents
   };
   
   /**

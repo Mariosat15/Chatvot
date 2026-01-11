@@ -1,20 +1,22 @@
 'use client';
 
-import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Coins, Zap, FileText, Download, ExternalLink, Swords } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Zap, FileText, Swords } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
 
 interface Transaction {
   _id: string;
-  transactionType: 'deposit' | 'withdrawal' | 'withdrawal_fee' | 'competition_entry' | 'competition_win' | 'competition_refund' | 'platform_fee' | 'admin_adjustment' | 'challenge_entry' | 'challenge_win' | 'challenge_refund';
+  transactionType: 'deposit' | 'withdrawal' | 'withdrawal_fee' | 'competition_entry' | 'competition_win' | 'competition_refund' | 'platform_fee' | 'admin_adjustment' | 'challenge_entry' | 'challenge_win' | 'challenge_refund' | 'marketplace_purchase';
   amount: number;
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
   description: string;
   createdAt: string;
   paymentMethod?: string;
   exchangeRate?: number;
+  paymentId?: string;
+  failureReason?: string;
+  metadata?: Record<string, any>;
 }
 
 interface TransactionHistoryProps {
@@ -138,6 +140,37 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
   };
 
   const getStatusBadge = () => {
+    // For withdrawals, show more detailed status
+    if (transaction.transactionType === 'withdrawal') {
+      switch (transaction.status) {
+        case 'completed':
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+              ✓ Sent to Bank
+            </span>
+          );
+        case 'pending':
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+              Processing
+            </span>
+          );
+        case 'failed':
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20" title={transaction.failureReason}>
+              Rejected
+            </span>
+          );
+        case 'cancelled':
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20">
+              Cancelled
+            </span>
+          );
+      }
+    }
+
+    // Default status badges for other transaction types
     switch (transaction.status) {
       case 'completed':
         return (
@@ -190,9 +223,31 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
             </p>
             {getStatusBadge()}
           </div>
-          <p className="text-xs text-gray-500 truncate">{transaction.description}</p>
+          {/* Enhanced description for withdrawals showing fees */}
+          {transaction.transactionType === 'withdrawal' && transaction.metadata ? (
+            <p className="text-xs text-gray-500 truncate">
+              {creditsAmount.toFixed(settings?.credits.decimals || 0)} {settings?.credits.name || 'credits'} 
+              {transaction.metadata.netAmountEUR && transaction.metadata.platformFee ? (
+                <span className="text-gray-400">
+                  {' '}(You receive: €{transaction.metadata.netAmountEUR.toFixed(2)}, Fee: €{transaction.metadata.platformFee.toFixed(2)})
+                </span>
+              ) : null}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500 truncate">{transaction.description}</p>
+          )}
+          
+          {/* Show failure/cancel reason for failed transactions */}
+          {(transaction.status === 'failed' || transaction.status === 'cancelled') && (
+            <p 
+              className="text-xs text-red-400 mt-1 truncate max-w-md" 
+              title={transaction.failureReason || transaction.metadata?.cancelReason || transaction.metadata?.clientErrorDescription || transaction.metadata?.errorReason || 'No details available'}
+            >
+              ❌ {transaction.failureReason || transaction.metadata?.cancelReason || transaction.metadata?.clientErrorDescription || transaction.metadata?.errorReason || (transaction.status === 'cancelled' ? 'Payment was cancelled by user' : 'Payment was declined by card issuer')}
+            </p>
+          )}
           <div className="flex items-center gap-2 mt-1">
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-600" suppressHydrationWarning>
               {new Date(transaction.createdAt).toLocaleString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -206,6 +261,13 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
               <>
                 <span className="text-gray-700">•</span>
                 <p className="text-xs text-gray-600 capitalize">{transaction.paymentMethod}</p>
+              </>
+            )}
+            {/* Show bank transfer for withdrawals */}
+            {transaction.transactionType === 'withdrawal' && (
+              <>
+                <span className="text-gray-700">•</span>
+                <p className="text-xs text-gray-600">Bank Transfer</p>
               </>
             )}
           </div>
@@ -238,16 +300,36 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
         {/* Amount */}
         <div className="text-right">
           <div className="flex items-baseline gap-1.5 justify-end">
-            <p className={`text-lg font-bold tabular-nums ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-              {isPositive ? '+' : '-'}{creditsAmount.toFixed(settings.credits.decimals)}
-            </p>
-            <span className={`text-sm font-semibold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-              {settings.credits.symbol}
-            </span>
+            {/* Show amount differently for failed/cancelled transactions */}
+            {(transaction.status === 'failed' || transaction.status === 'cancelled') ? (
+              <>
+                <p className="text-lg font-bold tabular-nums text-gray-500 line-through">
+                  {isPositive ? '+' : '-'}{creditsAmount.toFixed(settings.credits.decimals)}
+                </p>
+                <span className="text-sm font-semibold text-gray-500 line-through">
+                  {settings.credits.symbol}
+                </span>
+              </>
+            ) : (
+              <>
+                <p className={`text-lg font-bold tabular-nums ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {isPositive ? '+' : '-'}{creditsAmount.toFixed(settings.credits.decimals)}
+                </p>
+                <span className={`text-sm font-semibold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {settings.credits.symbol}
+                </span>
+              </>
+            )}
           </div>
           {settings.credits.showEUREquivalent && (
-            <p className="text-xs text-gray-500 tabular-nums">
+            <p className={`text-xs tabular-nums ${(transaction.status === 'failed' || transaction.status === 'cancelled') ? 'text-gray-600 line-through' : 'text-gray-500'}`}>
               ≈ {isPositive ? '+' : '-'}{settings.currency.symbol}{eurAmount.toFixed(2)}
+            </p>
+          )}
+          {/* Show "Not charged" for failed/cancelled */}
+          {(transaction.status === 'failed' || transaction.status === 'cancelled') && (
+            <p className="text-[10px] text-gray-500 mt-0.5">
+              {transaction.status === 'cancelled' ? 'Cancelled' : 'Not processed'}
             </p>
           )}
         </div>

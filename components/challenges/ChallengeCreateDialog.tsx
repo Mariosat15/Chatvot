@@ -21,6 +21,7 @@ import {
   Loader2,
   Target,
   Zap,
+  AlertTriangle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -61,7 +62,18 @@ export default function ChallengeCreateDialog({
     minimumTrades: 1,
   });
 
-  // Fetch challenge settings
+  // Market status state - challenges require market to be open
+  const [marketStatus, setMarketStatus] = useState<{
+    isOpen: boolean;
+    message: string;
+    loading: boolean;
+  }>({
+    isOpen: true,
+    message: '',
+    loading: true,
+  });
+
+  // Fetch challenge settings and market status
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -80,7 +92,59 @@ export default function ChallengeCreateDialog({
         console.error('Failed to fetch settings:', error);
       }
     };
-    if (open) fetchSettings();
+
+    const fetchMarketStatus = async () => {
+      try {
+        const res = await fetch('/api/trading/market-status');
+        if (res.ok) {
+          const data = await res.json();
+          const isOpen = data.isOpen ?? data.status?.toLowerCase() === 'open';
+          setMarketStatus({
+            isOpen,
+            message: isOpen 
+              ? 'Forex market is open' 
+              : `Forex market is ${data.status || 'closed'}`,
+            loading: false,
+          });
+        } else {
+          // Fallback: use time-based check
+          const now = new Date();
+          const utcDay = now.getUTCDay();
+          const utcHour = now.getUTCHours();
+          
+          // Forex closed: Saturday all day, Sunday before 10pm UTC, Friday after 10pm UTC
+          const isClosed = utcDay === 6 || 
+            (utcDay === 0 && utcHour < 22) || 
+            (utcDay === 5 && utcHour >= 22);
+          
+          setMarketStatus({
+            isOpen: !isClosed,
+            message: isClosed ? 'Forex market is closed (Weekend)' : 'Forex market is open',
+            loading: false,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch market status:', error);
+        // Fallback on error
+        const now = new Date();
+        const utcDay = now.getUTCDay();
+        const utcHour = now.getUTCHours();
+        const isClosed = utcDay === 6 || 
+          (utcDay === 0 && utcHour < 22) || 
+          (utcDay === 5 && utcHour >= 22);
+        
+        setMarketStatus({
+          isOpen: !isClosed,
+          message: isClosed ? 'Forex market is closed (Weekend)' : 'Forex market is open',
+          loading: false,
+        });
+      }
+    };
+
+    if (open) {
+      fetchSettings();
+      fetchMarketStatus();
+    }
   }, [open]);
 
   const platformFee = settings?.platformFeePercentage || 10;
@@ -128,7 +192,7 @@ export default function ChallengeCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-900 border-orange-500/50 max-w-md">
+      <DialogContent className="bg-gray-900 border-orange-500/50 max-sm:border-0" fullScreenMobile size="sm">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Swords className="h-5 w-5 text-orange-500" />
@@ -305,6 +369,22 @@ export default function ChallengeCreateDialog({
             </div>
           </div>
 
+          {/* Market Status Warning */}
+          {!marketStatus.loading && !marketStatus.isOpen && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-red-400">Market Closed</p>
+                  <p className="text-xs text-red-300 mt-1">
+                    {marketStatus.message || 'Forex market is currently closed.'}
+                    {' '}Challenges cannot be created while the market is closed because trading is not available.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Warning */}
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
             <p className="text-xs text-yellow-300">
@@ -324,8 +404,8 @@ export default function ChallengeCreateDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading || formData.entryFee < 1}
-            className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+            disabled={loading || formData.entryFee < 1 || !marketStatus.isOpen}
+            className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>

@@ -1,0 +1,45 @@
+import { type Document, type Model } from 'mongoose';
+export interface WhiteLabelDocument extends Document {
+    appLogo: string;
+    emailLogo: string;
+    profileImage: string;
+    dashboardPreview: string;
+    nodeEnv: string;
+    nextPublicBaseUrl: string;
+    nodemailerEmail: string;
+    nodemailerPassword: string;
+    massiveApiKey: string;
+    nextPublicMassiveApiKey: string;
+    openaiApiKey: string;
+    openaiModel: string;
+    openaiEnabled: boolean;
+    openaiForEmails: boolean;
+    mongodbUri: string;
+    betterAuthSecret: string;
+    betterAuthUrl: string;
+    adminEmail: string;
+    adminPassword: string;
+    adminName: string;
+    upstashRedisUrl: string;
+    upstashRedisToken: string;
+    redisEnabled: boolean;
+    redisPriceSyncEnabled: boolean;
+    inngestSigningKey: string;
+    inngestEventKey: string;
+    inngestMode: 'dev' | 'cloud';
+    priceFeedMode: 'websocket' | 'api' | 'both';
+    priceFeedWebsocketEnabled: boolean;
+    priceFeedApiEnabled: boolean;
+    priceFeedPrimarySource: 'websocket' | 'api';
+    priceFeedUpdateInterval: number;
+    priceFeedCacheTTL: number;
+    priceFeedClientPollInterval: number;
+    priceFeedWebsocketReconnectAttempts: number;
+    priceFeedWebsocketReconnectDelay: number;
+    priceFeedApiConcurrency: number;
+    priceFeedFallbackEnabled: boolean;
+    updatedAt: Date;
+    createdAt: Date;
+}
+export declare const WhiteLabel: Model<WhiteLabelDocument>;
+//# sourceMappingURL=whitelabel.model.d.ts.map

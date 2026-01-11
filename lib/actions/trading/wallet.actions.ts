@@ -31,7 +31,7 @@ export const getOrCreateWallet = async () => {
         totalWonFromCompetitions: 0,
         isActive: true,
         kycVerified: false,
-        withdrawalEnabled: false,
+        withdrawalEnabled: true, // Enable withdrawals by default - admin settings control actual eligibility
       });
       
       console.log(`✅ Created new wallet for user ${session.user.id}`);
@@ -93,7 +93,34 @@ export const getWalletTransactions = async (limit: number = 50) => {
       .limit(limit)
       .lean();
 
-    return JSON.parse(JSON.stringify(transactions));
+    // For withdrawals, get actual status from WithdrawalRequest (source of truth)
+    const WithdrawalRequest = (await import('@/database/models/withdrawal-request.model')).default;
+    
+    const enrichedTransactions = await Promise.all(
+      transactions.map(async (t) => {
+        if (t.transactionType === 'withdrawal' && t.metadata?.withdrawalRequestId) {
+          const withdrawalReq = await WithdrawalRequest.findById(t.metadata.withdrawalRequestId).lean();
+          if (withdrawalReq) {
+            // Map withdrawal request status to wallet transaction status
+            let actualStatus = t.status;
+            if (withdrawalReq.status === 'completed') actualStatus = 'completed';
+            else if (withdrawalReq.status === 'rejected' || withdrawalReq.status === 'failed') actualStatus = 'failed';
+            else if (withdrawalReq.status === 'cancelled') actualStatus = 'cancelled';
+            else actualStatus = 'pending'; // pending, approved, processing all show as pending
+            
+            return {
+              ...t,
+              status: actualStatus,
+              // Include failure reason for rejected withdrawals
+              failureReason: withdrawalReq.rejectionReason || withdrawalReq.failureReason,
+            };
+          }
+        }
+        return t;
+      })
+    );
+
+    return JSON.parse(JSON.stringify(enrichedTransactions));
   } catch (error) {
     // Re-throw redirect errors so Next.js can handle them
     if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
@@ -203,7 +230,19 @@ export const initiateDeposit = async (amount: number, currency: string = 'EUR') 
 };
 
 // Complete a deposit after successful Stripe payment
-export const completeDeposit = async (transactionId: string, paymentId: string, paymentMethod: string) => {
+export const completeDeposit = async (
+  transactionId: string, 
+  paymentId: string, 
+  paymentMethod: string,
+  cardDetails?: {
+    brand?: string;
+    last4?: string;
+    expMonth?: number;
+    expYear?: number;
+    country?: string;
+    fingerprint?: string;
+  }
+) => {
   try {
     await connectToDatabase();
 
@@ -218,7 +257,9 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
         throw new Error('Transaction not found');
       }
 
-      if (transaction.status !== 'pending') {
+      // Accept both 'pending' and 'processing' statuses
+      // 'processing' is set by webhook's atomic claim before calling completeDeposit
+      if (transaction.status !== 'pending' && transaction.status !== 'processing') {
         throw new Error('Transaction already processed');
       }
 
@@ -238,11 +279,26 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
         { session: mongoSession }
       );
 
-      // Update transaction
+      // Update transaction with payment info and card details
       transaction.status = 'completed';
       transaction.paymentId = paymentId;
       transaction.paymentMethod = paymentMethod;
       transaction.processedAt = new Date();
+      
+      // Store card details for potential refunds/withdrawals
+      if (cardDetails) {
+        transaction.metadata = {
+          ...transaction.metadata,
+          paymentIntentId: paymentId,
+          cardBrand: cardDetails.brand,
+          cardLast4: cardDetails.last4,
+          cardExpMonth: cardDetails.expMonth,
+          cardExpYear: cardDetails.expYear,
+          cardCountry: cardDetails.country,
+          cardFingerprint: cardDetails.fingerprint,
+        };
+      }
+      
       await transaction.save({ session: mongoSession });
 
       // Commit transaction
@@ -301,16 +357,19 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
         console.log(`ℹ️ No platform fee to record (fee is 0%)`);
       }
 
-      // Evaluate badges for the user (fire and forget - don't wait)
+      // Evaluate badges for the user (MUST complete - not fire and forget)
+      console.log(`🏅 Starting badge evaluation for user ${transaction.userId} after deposit...`);
       try {
         const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
-        evaluateUserBadges(transaction.userId).then(result => {
-          if (result.newBadges.length > 0) {
-            console.log(`🏅 User earned ${result.newBadges.length} new badges after deposit`);
-          }
-        }).catch(err => console.error('Error evaluating badges:', err));
+        const result = await evaluateUserBadges(transaction.userId);
+        if (result.newBadges.length > 0) {
+          console.log(`🏅 User earned ${result.newBadges.length} new badges after deposit`);
+        } else {
+          console.log(`🏅 Badge evaluation complete - no new badges earned`);
+        }
       } catch (error) {
-        console.error('Error importing badge service:', error);
+        console.error('❌ Error evaluating badges for user:', transaction.userId, error);
+        // Don't fail the deposit if badge evaluation fails, but log prominently
       }
 
       // Create and send invoice (fire and forget)
@@ -322,7 +381,7 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
         
         if (invoiceSettings.sendInvoiceOnPurchase) {
           const { InvoiceService } = await import('@/lib/services/invoice.service');
-          const { inngest } = await import('@/lib/inngest/client');
+          const { sendInvoiceEmail } = await import('@/lib/nodemailer');
           const { getUserById } = await import('@/lib/utils/user-lookup');
           
           // Get user info from database (not session, as this may be called from webhook)
@@ -377,18 +436,18 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
             
             console.log(`📄 Invoice ${invoice.invoiceNumber} created`);
             
-            // Send invoice email via Inngest
-            await inngest.send({
-              name: 'app/invoice.created',
-              data: {
-                invoiceId: invoice._id.toString(),
+            // Send invoice email directly (replaces Inngest)
+            try {
+              await sendInvoiceEmail({
+                invoiceId: (invoice._id as unknown as string).toString(),
                 customerEmail,
                 customerName,
-                invoiceNumber: invoice.invoiceNumber,
-              },
-            });
-            
-            console.log(`📧 Invoice email queued for ${customerEmail}`);
+              });
+              console.log(`📧 Invoice email sent to ${customerEmail}`);
+            } catch (emailError) {
+              console.error('⚠️ Failed to send invoice email:', emailError);
+              // Don't fail the deposit if email fails
+            }
           } else {
             console.log(`⚠️ No email found for user ${userId}, skipping invoice`);
           }
@@ -416,6 +475,33 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
         console.log(`🔔 Deposit notification sent to user ${transaction.userId}`);
       } catch (error) {
         console.error('❌ Error sending deposit notification:', error);
+        // Don't throw - deposit already succeeded
+      }
+
+      // Send deposit completed email to user
+      try {
+        const { sendDepositCompletedEmail } = await import('@/lib/nodemailer');
+        const { getUserById } = await import('@/lib/utils/user-lookup');
+        
+        const userId = transaction.userId.toString();
+        const user = await getUserById(userId);
+        const wallet = await CreditWallet.findOne({ userId: transaction.userId });
+        const newBalance = wallet?.creditBalance || creditsToAdd;
+        
+        if (user?.email) {
+          await sendDepositCompletedEmail({
+            email: user.email,
+            name: user.name || user.email.split('@')[0],
+            credits: creditsToAdd,
+            amount: transaction.metadata?.totalCharged || eurAmount + (platformFeeAmount || 0),
+            paymentMethod: paymentMethod || 'Card',
+            transactionId: transaction._id.toString().slice(-8).toUpperCase(),
+            newBalance: newBalance,
+          });
+          console.log(`📧 Deposit confirmation email sent to ${user.email}`);
+        }
+      } catch (error) {
+        console.error('❌ Error sending deposit email:', error);
         // Don't throw - deposit already succeeded
       }
 
@@ -475,14 +561,18 @@ export const initiateWithdrawal = async (creditsAmount: number) => {
     const wallet = await CreditWallet.findOne({ userId: session.user.id });
     if (!wallet) throw new Error('Wallet not found');
 
-    // Validate KYC
-    if (!wallet.kycVerified) {
+    // Check withdrawal settings - KYC requirement is now configurable in admin
+    const WithdrawalSettings = (await import('@/database/models/withdrawal-settings.model')).default;
+    const settings = await WithdrawalSettings.getSingleton();
+    
+    // Validate KYC only if required in settings
+    if (settings.requireKYC && !wallet.kycVerified) {
       throw new Error('KYC verification required for withdrawals');
     }
 
-    // Validate withdrawal enabled
-    if (!wallet.withdrawalEnabled) {
-      throw new Error('Withdrawals not enabled for this account');
+    // Validate wallet is active
+    if (!wallet.isActive) {
+      throw new Error('Wallet is not active');
     }
 
     // Validate amount
@@ -580,35 +670,16 @@ export const initiateWithdrawal = async (creditsAmount: number) => {
         { session: mongoSession }
       );
 
-      // Create separate transaction record for the withdrawal fee (platform revenue)
-      await WalletTransaction.create(
-        [
-          {
-            userId: session.user.id,
-            transactionType: 'withdrawal_fee',
-            amount: -feeAmountCredits,
-            balanceBefore: wallet.creditBalance - creditsAmount,
-            balanceAfter: wallet.creditBalance - totalCreditsDeducted,
-            currency: 'EUR',
-            exchangeRate: eurToCreditsRate,
-            status: 'completed',
-            description: `Withdrawal fee (${actualPlatformFeePercentage}%) for ${creditsAmount} Credits`,
-            metadata: {
-              withdrawalTransactionId: withdrawalTransaction[0]._id,
-              platformFeePercentage: actualPlatformFeePercentage,
-              creditsCharged: feeAmountCredits,
-              eurValue: platformFeeAmountEUR.toFixed(2),
-              bankFeeEUR: bankFeeTotalEUR.toFixed(2),
-              netPlatformEarningEUR: netPlatformEarningEUR.toFixed(2),
-            },
-          },
-        ],
-        { session: mongoSession }
-      );
+      // NOTE: Don't create withdrawal_fee transaction here!
+      // Withdrawal fees should ONLY be recorded when the withdrawal is actually COMPLETED by admin.
+      // This prevents charging users fees for failed/rejected withdrawals.
+      // The fee will be recorded in:
+      // - apps/admin/app/api/withdrawals/[id]/route.ts when admin marks as 'completed'
 
       await mongoSession.commitTransaction();
 
-      console.log(`💸 Withdrawal initiated: ${creditsAmount} Credits (€${eurNet.toFixed(2)} net) for user ${session.user.id}, fee: ${feeAmountCredits} Credits`);
+      console.log(`💸 Withdrawal initiated: ${creditsAmount} Credits (€${eurNet.toFixed(2)} net) for user ${session.user.id}`);
+      console.log(`💵 Withdrawal fee (€${platformFeeAmountEUR.toFixed(2)}) will be recorded when withdrawal is completed`);
       
       // Send withdrawal initiated notification
       try {
@@ -618,22 +689,8 @@ export const initiateWithdrawal = async (creditsAmount: number) => {
         console.error('Error sending withdrawal notification:', notifError);
       }
       
-      // Record withdrawal fee in platform financials (fire and forget)
-      if (platformFeeAmountEUR > 0) {
-        try {
-          const { PlatformFinancialsService } = await import('@/lib/services/platform-financials.service');
-          await PlatformFinancialsService.recordWithdrawalFee({
-            userId: session.user.id,
-            withdrawalAmount: eurGross,
-            platformFeeAmount: platformFeeAmountEUR,
-            bankFeeAmount: bankFeeTotalEUR,
-            netEarning: netPlatformEarningEUR,
-            transactionId: withdrawalTransaction[0]._id.toString(),
-          });
-        } catch (error) {
-          console.error('Error recording withdrawal fee:', error);
-        }
-      }
+      // NOTE: Don't record withdrawal fee to platform financials here!
+      // It will be recorded when the withdrawal is completed by admin.
 
       revalidatePath('/wallet');
 
@@ -646,7 +703,7 @@ export const initiateWithdrawal = async (creditsAmount: number) => {
           feeCredits: feeAmountCredits,
           totalDeducted: totalCreditsDeducted,
           eurGross: eurGross.toFixed(2),
-          eurFee: feeAmountEUR.toFixed(2),
+          eurFee: platformFeeAmountEUR.toFixed(2),
           eurNet: eurNet.toFixed(2),
         },
       };

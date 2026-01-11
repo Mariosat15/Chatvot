@@ -1,15 +1,33 @@
 'use client';
 
-import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, CheckCircle, Shield, Zap, Target, Flame, Star, Crown, Sparkles, Timer, ChevronRight, Award, Swords, Gamepad2 } from 'lucide-react';
+import { Trophy, Users, Clock, Calendar, CheckCircle, Zap, Target, Flame, Crown, Sparkles, Timer, ChevronRight, Swords, Gamepad2, Gauge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { enterCompetition } from '@/lib/actions/trading/competition.actions';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { DifficultyBadge } from '@/components/ui/difficulty-badge';
+import { calculateCompetitionDifficulty } from '@/lib/utils/competition-difficulty';
 
+// Level names mapping
+const LEVEL_NAMES: Record<number, { emoji: string; name: string }> = {
+  1: { emoji: '🌱', name: 'Novice Trader' },
+  2: { emoji: '📚', name: 'Apprentice Trader' },
+  3: { emoji: '⚔️', name: 'Skilled Trader' },
+  4: { emoji: '🎯', name: 'Expert Trader' },
+  5: { emoji: '💎', name: 'Elite Trader' },
+  6: { emoji: '👑', name: 'Master Trader' },
+  7: { emoji: '🔥', name: 'Grand Master' },
+  8: { emoji: '⚡', name: 'Trading Champion' },
+  9: { emoji: '🌟', name: 'Market Legend' },
+  10: { emoji: '👑', name: 'Trading God' },
+};
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionCardProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
   userBalance: number;
   isCompleted?: boolean;
@@ -87,6 +105,67 @@ export default function CompetitionCard({
   const rankingMethod = competition.rules?.rankingMethod || 'pnl';
   const theme = COMPETITION_THEMES[rankingMethod] || COMPETITION_THEMES.pnl;
   const rankingInfo = RANKING_DESCRIPTIONS[rankingMethod] || RANKING_DESCRIPTIONS.pnl;
+
+  // Fetch platform risk settings for actual leverage
+  const [platformLeverage, setPlatformLeverage] = useState<number>(100);
+  
+  useEffect(() => {
+    const fetchRiskSettings = async () => {
+      try {
+        const res = await fetch('/api/trading/risk-settings');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.maxLeverage) {
+            setPlatformLeverage(data.settings.maxLeverage);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch risk settings:', err);
+      }
+    };
+    fetchRiskSettings();
+  }, []);
+
+  // Use platform leverage (actual trading leverage) instead of stored competition value
+  const maxLeverage = platformLeverage;
+
+  const difficulty = useMemo(() => {
+    // Check if competition has manual difficulty setting
+    if (competition.difficulty?.mode === 'manual' && competition.difficulty?.manualLevel) {
+      // Map old manual levels to new trader-based levels
+      const levelMap: Record<string, { level: string; score: number; emoji: string }> = {
+        'beginner': { level: 'Novice', score: 10, emoji: '🌱' },
+        'intermediate': { level: 'Skilled', score: 30, emoji: '⚔️' },
+        'advanced': { level: 'Elite', score: 50, emoji: '💎' },
+        'expert': { level: 'Grand Master', score: 70, emoji: '🔥' },
+        'extreme': { level: 'Trading God', score: 95, emoji: '👑' },
+      };
+      const mapped = levelMap[competition.difficulty.manualLevel] || { level: 'Skilled', score: 30, emoji: '⚔️' };
+      return {
+        level: mapped.level,
+        score: mapped.score,
+        emoji: mapped.emoji,
+        factors: [{ factor: 'Manually Set', impact: 'high' as const, score: mapped.score }],
+      };
+    }
+    
+    // Auto-calculate difficulty using the correct leverage field
+    const start = new Date(competition.startTime);
+    const end = new Date(competition.endTime);
+    const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    
+    return calculateCompetitionDifficulty({
+      entryFeeCredits: competition.entryFee || competition.entryFeeCredits || 0,
+      startingCapital: competition.startingCapital || competition.startingTradingPoints || 10000,
+      leverageAllowed: maxLeverage,
+      maxParticipants: competition.maxParticipants,
+      participantCount: competition.currentParticipants,
+      durationHours,
+      rules: competition.rules,
+      riskLimits: competition.riskLimits,
+      levelRequirement: competition.levelRequirement,
+    });
+  }, [competition, maxLeverage]);
 
   // Live countdown
   const getTimeUntilStart = () => {
@@ -166,101 +245,181 @@ export default function CompetitionCard({
     return (
       <Link href={`/competitions/${competition._id}`}>
         <div className={`group relative overflow-hidden rounded-xl ${theme.bgPattern} border border-gray-700/50 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-xl hover:${theme.glow}`}>
-          <div className="flex items-center gap-4 p-4">
-            {/* Icon */}
-            <div className={`flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br ${theme.gradient} flex items-center justify-center text-2xl shadow-lg ${theme.glow}`}>
-              {theme.icon}
-            </div>
+          <div className="flex flex-col">
+            {/* Main Row */}
+            <div className="flex items-center gap-4 p-4">
+              {/* Icon */}
+              <div className={`flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br ${theme.gradient} flex items-center justify-center text-2xl shadow-lg ${theme.glow}`}>
+                {theme.icon}
+              </div>
 
-            {/* Main Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-bold text-gray-100 truncate group-hover:text-yellow-400 transition-colors">
-                  {competition.name}
-                </h3>
-                {isActive && (
-                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold animate-pulse">
-                    LIVE
+              {/* Main Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-bold text-gray-100 truncate group-hover:text-yellow-400 transition-colors">
+                    {competition.name}
+                  </h3>
+                  {isActive && (
+                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold animate-pulse">
+                      LIVE
+                    </span>
+                  )}
+                  {isCompleted && (
+                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-600 text-white text-[10px] font-bold">
+                      COMPLETED
+                    </span>
+                  )}
+                  {isCancelled && (
+                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                      CANCELLED
+                    </span>
+                  )}
+                  {isUserIn && !isCompleted && !isCancelled && (
+                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-[10px] font-bold border border-green-500/40">
+                      ✓ ENTERED
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-sm text-gray-400">
+                  <span className="flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full bg-gradient-to-r ${theme.gradient}`}></span>
+                    {rankingInfo.name}
                   </span>
+                  <DifficultyBadge difficulty={difficulty} size="sm" showTooltip={true} />
+                  <span className="flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    {competition.currentParticipants}/{competition.maxParticipants}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {getDuration()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Dates */}
+              <div className="flex-shrink-0 text-right px-3 border-l border-gray-700/50">
+                <div className="text-xs text-gray-500 mb-0.5">Start</div>
+                <div className="text-sm font-medium text-gray-300">{formatDateTime(competition.startTime)}</div>
+              </div>
+              <div className="flex-shrink-0 text-right px-3 border-l border-gray-700/50">
+                <div className="text-xs text-gray-500 mb-0.5">End</div>
+                <div className="text-sm font-medium text-gray-300">{formatDateTime(competition.endTime)}</div>
+              </div>
+
+              {/* Prize */}
+              <div className="flex-shrink-0 text-right px-3 border-l border-gray-700">
+                <div className="flex items-center gap-1 text-yellow-500">
+                  <Trophy className="h-4 w-4" />
+                  <span className="text-xl font-black">{getPrizePool().toFixed(0)}</span>
+                </div>
+                <p className="text-xs text-gray-500">Prize Pool</p>
+              </div>
+
+              {/* Entry Fee */}
+              <div className="flex-shrink-0 text-right px-4 border-l border-gray-700">
+                <div className="text-lg font-bold text-gray-100">{getEntryFee()}</div>
+                <p className="text-xs text-gray-500">Entry</p>
+              </div>
+
+              {/* Countdown/Status */}
+              <div className="flex-shrink-0 w-24 text-center">
+                {isUpcoming && (
+                  <div className="px-3 py-1.5 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+                    <p className="text-xs text-yellow-400 font-mono font-bold">{liveCountdown}</p>
+                  </div>
+                )}
+                {isActive && (
+                  <div className="px-3 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/30">
+                    <p className="text-xs text-blue-400 font-bold">TRADING</p>
+                  </div>
                 )}
                 {isCompleted && (
-                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-600 text-white text-[10px] font-bold">
-                    COMPLETED
-                  </span>
+                  <div className="px-3 py-1.5 rounded-lg bg-green-500/20 border border-green-500/30">
+                    <p className="text-xs text-green-400 font-bold">ENDED</p>
+                  </div>
                 )}
                 {isCancelled && (
-                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">
-                    CANCELLED
-                  </span>
+                  <div className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30">
+                    <p className="text-xs text-red-400 font-bold">CANCELLED</p>
+                  </div>
                 )}
               </div>
-              <div className="flex items-center gap-3 text-sm text-gray-400">
-                <span className="flex items-center gap-1">
-                  <span className={`w-2 h-2 rounded-full bg-gradient-to-r ${theme.gradient}`}></span>
-                  {rankingInfo.name}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Users className="h-3 w-3" />
-                  {competition.currentParticipants}/{competition.maxParticipants}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {getDuration()}
+
+              {/* Arrow */}
+              <ChevronRight className="h-5 w-5 text-gray-500 group-hover:text-yellow-500 transition-colors" />
+            </div>
+
+            {/* Additional Info Row */}
+            <div className="flex items-center gap-3 px-4 pb-3 pt-0 -mt-1">
+              {/* Starting Capital */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                <Target className="h-3 w-3 text-purple-400" />
+                <span className="text-[10px] text-purple-300 font-medium">
+                  ${(competition.startingCapital || competition.startingTradingPoints || 10000).toLocaleString()}
                 </span>
               </div>
-            </div>
 
-            {/* Dates */}
-            <div className="flex-shrink-0 text-right px-3 border-l border-gray-700/50">
-              <div className="text-xs text-gray-500 mb-0.5">Start</div>
-              <div className="text-sm font-medium text-gray-300">{formatDateTime(competition.startTime)}</div>
-            </div>
-            <div className="flex-shrink-0 text-right px-3 border-l border-gray-700/50">
-              <div className="text-xs text-gray-500 mb-0.5">End</div>
-              <div className="text-sm font-medium text-gray-300">{formatDateTime(competition.endTime)}</div>
-            </div>
-
-            {/* Prize */}
-            <div className="flex-shrink-0 text-right px-3 border-l border-gray-700">
-              <div className="flex items-center gap-1 text-yellow-500">
-                <Trophy className="h-4 w-4" />
-                <span className="text-xl font-black">{getPrizePool().toFixed(0)}</span>
+              {/* Leverage */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                <Zap className="h-3 w-3 text-orange-400" />
+                <span className="text-[10px] text-orange-300 font-medium">
+                  1:{maxLeverage}
+                </span>
               </div>
-              <p className="text-xs text-gray-500">Prize Pool</p>
-            </div>
 
-            {/* Entry Fee */}
-            <div className="flex-shrink-0 text-right px-4 border-l border-gray-700">
-              <div className="text-lg font-bold text-gray-100">{getEntryFee()}</div>
-              <p className="text-xs text-gray-500">Entry</p>
-            </div>
+              {/* Minimum Trades */}
+              {competition.rules?.minimumTrades && competition.rules.minimumTrades > 1 && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                  <Swords className="h-3 w-3 text-cyan-400" />
+                  <span className="text-[10px] text-cyan-300 font-medium">
+                    Min {competition.rules.minimumTrades} trades
+                  </span>
+                </div>
+              )}
 
-            {/* Countdown/Status */}
-            <div className="flex-shrink-0 w-24 text-center">
-              {isUpcoming && (
-                <div className="px-3 py-1.5 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
-                  <p className="text-xs text-yellow-400 font-mono font-bold">{liveCountdown}</p>
+              {/* Liquidation Risk */}
+              {competition.rules?.disqualifyOnLiquidation && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <Flame className="h-3 w-3 text-red-400" />
+                  <span className="text-[10px] text-red-300 font-medium">
+                    Liquidation = DQ
+                  </span>
                 </div>
               )}
-              {isActive && (
-                <div className="px-3 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/30">
-                  <p className="text-xs text-blue-400 font-bold">TRADING</p>
-                </div>
-              )}
-              {isCompleted && (
-                <div className="px-3 py-1.5 rounded-lg bg-green-500/20 border border-green-500/30">
-                  <p className="text-xs text-green-400 font-bold">ENDED</p>
-                </div>
-              )}
-              {isCancelled && (
-                <div className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30">
-                  <p className="text-xs text-red-400 font-bold">CANCELLED</p>
-                </div>
-              )}
-            </div>
 
-            {/* Arrow */}
-            <ChevronRight className="h-5 w-5 text-gray-500 group-hover:text-yellow-500 transition-colors" />
+              {/* Level Requirement */}
+              {competition.levelRequirement?.enabled && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <Crown className="h-3 w-3 text-amber-400" />
+                  <span className="text-[10px] text-amber-300 font-medium">
+                    Level {competition.levelRequirement.minLevel}+
+                  </span>
+                </div>
+              )}
+
+              {/* Risk Limits */}
+              {competition.riskLimits?.enabled && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <Target className="h-3 w-3 text-blue-400" />
+                  <span className="text-[10px] text-blue-300 font-medium">
+                    Max DD: {competition.riskLimits.maxDrawdownPercent}%
+                  </span>
+                </div>
+              )}
+
+              {/* Asset Classes */}
+              <div className="flex items-center gap-1 ml-auto">
+                {competition.assetClasses?.slice(0, 3).map((asset: string) => (
+                  <span
+                    key={asset}
+                    className="px-2 py-0.5 rounded bg-gray-800/80 text-[10px] font-bold text-gray-400 uppercase border border-gray-700/50"
+                  >
+                    {asset === 'forex' && '💱'} {asset === 'crypto' && '₿'} {asset === 'stocks' && '📊'} {asset}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </Link>
@@ -335,6 +494,12 @@ export default function CompetitionCard({
         <h3 className="text-xl font-black text-center text-gray-100 mb-2 group-hover:text-yellow-400 transition-colors">
           {competition.name}
         </h3>
+        
+        {/* Difficulty Badge */}
+        <div className="flex justify-center mb-3">
+          <DifficultyBadge difficulty={difficulty} size="md" showTooltip={true} />
+        </div>
+        
         <p className="text-sm text-gray-400 text-center mb-4">{competition.description}</p>
 
         {/* Prize Pool - Casino Style */}
@@ -433,6 +598,65 @@ export default function CompetitionCard({
           </div>
         </div>
 
+        {/* Leverage & Risk Info */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+            <div className="absolute top-0 right-0 w-8 h-8 bg-yellow-500/10 rounded-full blur-lg"></div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                <Zap className="h-4 w-4 text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-500 uppercase">Leverage</p>
+                <p className="text-sm font-bold text-yellow-400">
+                  1:{maxLeverage}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {competition.rules?.minimumTrades && competition.rules.minimumTrades > 0 ? (
+            <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+              <div className="absolute top-0 right-0 w-8 h-8 bg-cyan-500/10 rounded-full blur-lg"></div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                  <Swords className="h-4 w-4 text-cyan-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Min Trades</p>
+                  <p className="text-sm font-bold text-cyan-400">{competition.rules.minimumTrades}</p>
+                </div>
+              </div>
+            </div>
+          ) : competition.rules?.disqualifyOnLiquidation ? (
+            <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+              <div className="absolute top-0 right-0 w-8 h-8 bg-red-500/10 rounded-full blur-lg"></div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                  <Flame className="h-4 w-4 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Liquidation</p>
+                  <p className="text-sm font-bold text-red-400">= DQ</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+              <div className="absolute top-0 right-0 w-8 h-8 bg-green-500/10 rounded-full blur-lg"></div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Status</p>
+                  <p className="text-sm font-bold text-green-400">Open</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Dates */}
         <div className="grid grid-cols-2 gap-2 mb-4">
           <div className="relative overflow-hidden rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
@@ -476,13 +700,74 @@ export default function CompetitionCard({
           </div>
         )}
 
+        {/* Difficulty Bar */}
+        <div className={`mb-4 p-3 rounded-xl border ${
+          difficulty.score <= 20 ? 'bg-green-500/10 border-green-500/30'
+            : difficulty.score <= 40 ? 'bg-blue-500/10 border-blue-500/30'
+            : difficulty.score <= 60 ? 'bg-yellow-500/10 border-yellow-500/30'
+            : difficulty.score <= 80 ? 'bg-orange-500/10 border-orange-500/30'
+            : 'bg-red-500/10 border-red-500/30'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Gauge className={`h-4 w-4 ${
+                difficulty.score <= 20 ? 'text-green-400'
+                  : difficulty.score <= 40 ? 'text-blue-400'
+                  : difficulty.score <= 60 ? 'text-yellow-400'
+                  : difficulty.score <= 80 ? 'text-orange-400'
+                  : 'text-red-400'
+              }`} />
+              <span className={`text-xs font-bold ${
+                difficulty.score <= 20 ? 'text-green-400'
+                  : difficulty.score <= 40 ? 'text-blue-400'
+                  : difficulty.score <= 60 ? 'text-yellow-400'
+                  : difficulty.score <= 80 ? 'text-orange-400'
+                  : 'text-red-400'
+              }`}>
+                {difficulty.emoji || '🎯'} {difficulty.level}
+              </span>
+            </div>
+            <span className={`text-xs font-mono ${
+              difficulty.score <= 20 ? 'text-green-400'
+                : difficulty.score <= 40 ? 'text-blue-400'
+                : difficulty.score <= 60 ? 'text-yellow-400'
+                : difficulty.score <= 80 ? 'text-orange-400'
+                : 'text-red-400'
+            }`}>
+              {difficulty.score}/100
+            </span>
+          </div>
+          <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div 
+              className={`h-full transition-all duration-500 ${
+                difficulty.score <= 20 ? 'bg-gradient-to-r from-green-600 to-green-400'
+                  : difficulty.score <= 40 ? 'bg-gradient-to-r from-blue-600 to-blue-400'
+                  : difficulty.score <= 60 ? 'bg-gradient-to-r from-yellow-600 to-yellow-400'
+                  : difficulty.score <= 80 ? 'bg-gradient-to-r from-orange-600 to-orange-400'
+                  : 'bg-gradient-to-r from-red-600 to-red-400'
+              }`}
+              style={{ width: `${difficulty.score}%` }}
+            />
+          </div>
+        </div>
+
         {/* Level Requirement */}
         {competition.levelRequirement?.enabled && (
           <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-purple-500/10 via-violet-500/10 to-purple-500/10 border border-purple-500/30">
             <div className="flex items-center gap-2">
               <Crown className="h-4 w-4 text-purple-400" />
               <span className="text-xs text-purple-300">
-                Level {competition.levelRequirement.minLevel}+ Required
+                {(() => {
+                  const minLevel = competition.levelRequirement.minLevel || 1;
+                  const maxLevel = competition.levelRequirement.maxLevel;
+                  const minInfo = LEVEL_NAMES[minLevel] || { emoji: '🌱', name: 'Novice Trader' };
+                  
+                  if (maxLevel && maxLevel !== minLevel) {
+                    const maxInfo = LEVEL_NAMES[maxLevel] || { emoji: '👑', name: 'Trading God' };
+                    return `${minInfo.emoji} ${minInfo.name} to ${maxInfo.emoji} ${maxInfo.name}`;
+                  }
+                  return `${minInfo.emoji} ${minInfo.name} or higher`;
+                })()}
               </span>
             </div>
           </div>

@@ -1,9 +1,12 @@
 import { connectToDatabase } from '@/database/mongoose';
+import { userCache } from './cache';
 
 export interface UserInfo {
   id: string;
   email: string;
   name: string;
+  profileImage?: string;
+  bio?: string;
   role?: string; // 'trader', 'admin', 'backoffice'
   country?: string;
   address?: string;
@@ -11,11 +14,40 @@ export interface UserInfo {
   postalCode?: string;
 }
 
+// Projection to only fetch fields we need (reduces data transfer)
+const USER_PROJECTION = {
+  id: 1,
+  _id: 1,
+  email: 1,
+  name: 1,
+  profileImage: 1,
+  image: 1,  // better-auth uses 'image' field
+  bio: 1,
+  role: 1,
+  country: 1,
+  address: 1,
+  city: 1,
+  postalCode: 1,
+};
+
 /**
  * Get user information from better-auth user collection by userId
  * Users are stored in a native MongoDB 'user' collection by better-auth
+ * 
+ * PERFORMANCE: Uses LRU cache with 30s TTL to avoid repeated DB queries
+ * Cache hit: ~0.1ms | Cache miss: ~50-100ms
  */
 export async function getUserById(userId: string): Promise<UserInfo | null> {
+  if (!userId) return null;
+  
+  const cacheKey = `user:${userId}`;
+  
+  // Check cache first
+  const cached = userCache.get(cacheKey);
+  if (cached) {
+    return cached as UserInfo;
+  }
+  
   try {
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
@@ -26,13 +58,22 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
     }
 
     // Try finding by 'id' field first (better-auth uses this)
-    let user = await db.collection('user').findOne({ id: userId });
+    // PERFORMANCE: Use projection to only fetch needed fields
+    let user = await db.collection('user').findOne(
+      { id: userId },
+      { projection: USER_PROJECTION }
+    );
     
     // If not found, try by _id as ObjectId
     if (!user) {
       try {
         const { ObjectId } = await import('mongodb');
-        user = await db.collection('user').findOne({ _id: new ObjectId(userId) });
+        if (ObjectId.isValid(userId)) {
+          user = await db.collection('user').findOne(
+            { _id: new ObjectId(userId) },
+            { projection: USER_PROJECTION }
+          );
+        }
       } catch {
         // Not a valid ObjectId, skip
       }
@@ -40,23 +81,33 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
 
     // If still not found, try as string _id
     if (!user) {
-      user = await db.collection('user').findOne({ _id: userId });
+      user = await db.collection('user').findOne(
+        { _id: userId } as Record<string, unknown>,
+        { projection: USER_PROJECTION }
+      );
     }
 
     if (!user) {
       return null;
     }
 
-    return {
+    const userInfo: UserInfo = {
       id: user.id || user._id?.toString() || userId,
       email: user.email || 'unknown',
       name: user.name || user.email || 'Unknown User',
+      profileImage: user.profileImage || user.image,  // Check both profileImage and image (better-auth)
+      bio: user.bio,
       role: user.role || 'trader',
       country: user.country,
       address: user.address,
       city: user.city,
       postalCode: user.postalCode,
     };
+    
+    // Cache the result
+    userCache.set(cacheKey, userInfo);
+    
+    return userInfo;
   } catch (error) {
     console.error('Error fetching user:', error);
     return null;
@@ -87,7 +138,8 @@ export async function getAllUsers(): Promise<UserInfo[]> {
     const users = await db.collection('user').find({
       $and: [
         // Must have email
-        { email: { $exists: true, $ne: null, $ne: '' } },
+        { email: { $exists: true, $ne: null } },
+        { email: { $nin: [''] } },
         // Role filter - only traders
         {
           $or: [
@@ -124,6 +176,8 @@ export async function getAllUsers(): Promise<UserInfo[]> {
         id,
         email,
         name: user.name || email.split('@')[0] || 'Unknown User', // Name is for display only
+        profileImage: user.profileImage || user.image,  // Check both profileImage and image (better-auth)
+        bio: user.bio,
         role: 'trader',
         country: user.country,
         address: user.address,
@@ -177,7 +231,7 @@ export async function getUsersByIds(userIds: string[]): Promise<Map<string, User
 
       // If still not found, try as string _id
       if (!user) {
-        user = await db.collection('user').findOne({ _id: originalId });
+        user = await db.collection('user').findOne({ _id: originalId as any });
       }
 
       if (user) {
@@ -186,6 +240,8 @@ export async function getUsersByIds(userIds: string[]): Promise<Map<string, User
           id: user.id || user._id?.toString() || originalId,
           email: user.email || 'unknown',
           name: user.name || user.email || 'Unknown User',
+          profileImage: user.profileImage || user.image,  // Check both profileImage and image (better-auth)
+          bio: user.bio,
           role: user.role || 'trader',
           country: user.country,
           address: user.address,

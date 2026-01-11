@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import AppSettings from '@/database/models/app-settings.model';
+import { WhiteLabel } from '@/database/models/whitelabel.model';
+
+// Disable Next.js caching for this route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // GET - Fetch app settings (public endpoint)
 export async function GET() {
@@ -39,9 +44,34 @@ export async function GET() {
       });
     }
     
+    // Also fetch WhiteLabel settings for branding assets (no cache)
+    const whiteLabel = await WhiteLabel.findOne().lean();
+    
+    console.log('[Settings API] WhiteLabel appLogo from DB:', whiteLabel?.appLogo);
+    
+    // Merge branding assets into settings
+    const mergedSettings = {
+      ...JSON.parse(JSON.stringify(settings)),
+      branding: {
+        ...JSON.parse(JSON.stringify(settings)).branding,
+        appLogo: whiteLabel?.appLogo || '/assets/images/logo.png',
+        emailLogo: whiteLabel?.emailLogo || '/assets/images/logo.png',
+        favicon: whiteLabel?.favicon || '/favicon.ico',
+        profileImage: whiteLabel?.profileImage || '/assets/images/PROFILE.png',
+      }
+    };
+    
+    console.log('[Settings API] Returning appLogo:', mergedSettings.branding.appLogo);
+    
     return NextResponse.json({
       success: true,
-      settings: JSON.parse(JSON.stringify(settings)),
+      settings: mergedSettings,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
     });
   } catch (error) {
     console.error('Error fetching app settings:', error);

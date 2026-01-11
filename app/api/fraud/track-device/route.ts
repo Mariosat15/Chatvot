@@ -81,7 +81,7 @@ export async function POST(request: Request) {
                      'unknown';
 
     // Detect VPN/Proxy (if enabled)
-    let ipDetection = {
+    let ipDetection: any = {
       isVPN: false,
       isProxy: false,
       isTor: false,
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
 
     // Check if this fingerprint already exists FOR THIS USER FIRST
     // This ensures each user updates their OWN fingerprint, not a linked one
-    let existingFingerprint = await DeviceFingerprint.findOne({
+    const existingFingerprint = await DeviceFingerprint.findOne({
       fingerprintId: fingerprintData.fingerprintId,
       userId: userId
     });
@@ -194,9 +194,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // Handle case where this user already has a fingerprint - just update it
+    // Handle case where this user already has a fingerprint - update it
     if (existingFingerprint) {
-      // Same user, same device - just update THEIR fingerprint
+      // Same user, same device - update THEIR fingerprint
       existingFingerprint.lastSeen = new Date();
       existingFingerprint.timesUsed += 1;
       existingFingerprint.ipAddress = ipAddress;
@@ -217,10 +217,109 @@ export async function POST(request: Request) {
       
       await existingFingerprint.save();
 
+      // 🔥 IMPORTANT: Even if this user is known, check if they're linked to other accounts
+      // This ensures fraud alerts are created EVERY TIME a known multi-account user logs in
+      if (existingFingerprint.linkedUserIds && existingFingerprint.linkedUserIds.length > 0 && fraudSettings.multiAccountDetectionEnabled) {
+        const allLinkedUsers = [existingFingerprint.userId, ...existingFingerprint.linkedUserIds];
+        console.log(`🔍 Known device with linked accounts detected: ${allLinkedUsers.length} accounts (max allowed: ${fraudSettings.maxAccountsPerDevice})`);
+        
+        // Check if accounts exceed the max allowed
+        const exceedsMaxAllowed = allLinkedUsers.length > fraudSettings.maxAccountsPerDevice;
+        
+        // ALWAYS log for debugging
+        if (exceedsMaxAllowed) {
+          console.log(`🚨 EXCEEDS LIMIT: ${allLinkedUsers.length} accounts > max ${fraudSettings.maxAccountsPerDevice} - CREATING ALERT`);
+        } else {
+          console.log(`ℹ️ Within limits: ${allLinkedUsers.length} accounts ≤ max ${fraudSettings.maxAccountsPerDevice} - No alert needed`);
+        }
+        
+        // Only alert if accounts EXCEED the max allowed setting
+        if (exceedsMaxAllowed) {
+          // Get all devices for evidence
+          const allDevices = await DeviceFingerprint.find({
+            userId: { $in: allLinkedUsers }
+          }).lean();
+          
+          const accountsEvidence = allLinkedUsers.map(linkedUserId => {
+            const userDevices = allDevices.filter(d => d.userId === linkedUserId);
+            return {
+              userId: linkedUserId,
+              devicesUsed: userDevices.map(d => ({
+                fingerprintId: d.fingerprintId,
+                browser: `${d.browser} ${d.browserVersion}`,
+                os: `${d.os} ${d.osVersion}`,
+                deviceType: d.deviceType,
+                screenResolution: d.screenResolution,
+                ipAddress: d.ipAddress,
+                timezone: d.timezone,
+                language: d.language,
+                firstSeen: d.firstSeen,
+                lastSeen: d.lastSeen,
+                timesUsed: d.timesUsed
+              }))
+            };
+          });
+          
+          let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+          if (allLinkedUsers.length >= fraudSettings.maxAccountsPerDevice + 2) {
+            severity = 'critical';
+          } else if (allLinkedUsers.length > fraudSettings.maxAccountsPerDevice) {
+            severity = 'high';
+          }
+          
+          // Call AlertManagerService - it will handle checking for cleared/dismissed alerts
+          await AlertManagerService.createOrUpdateAlert({
+            alertType: 'same_device',
+            userIds: allLinkedUsers,
+            title: 'Multiple Accounts on Same Device',
+            description: `${allLinkedUsers.length} accounts detected using the same device (${existingFingerprint.deviceType}, ${existingFingerprint.browser} on ${existingFingerprint.os})`,
+            severity,
+            confidence: 0.85,
+            evidence: [
+              {
+                type: 'device_fingerprint',
+                description: 'Known multi-account device - user login detected',
+                data: {
+                  matchedFingerprintId: existingFingerprint.fingerprintId,
+                  fingerprintId: existingFingerprint.fingerprintId,
+                  linkedAccounts: allLinkedUsers.length,
+                  maxAllowed: fraudSettings.maxAccountsPerDevice,
+                  accountsDetails: accountsEvidence,
+                  lastActivity: {
+                    timestamp: new Date(),
+                    userId: userId,
+                    browser: fingerprintData.browser,
+                    action: 'known_device_login',
+                    ipAddress: ipAddress
+                  }
+                }
+              }
+            ]
+          });
+          
+          // Update suspicion scores
+          await SuspicionScoringService.scoreDeviceMatch(
+            allLinkedUsers,
+            existingFingerprint.fingerprintId,
+            `${existingFingerprint.browser} on ${existingFingerprint.os}`
+          );
+          
+          console.log(`🚨 FRAUD ALERT: Known multi-account user ${userId} logged in`);
+        }
+      }
+
+      const linkedCount = existingFingerprint.linkedUserIds?.length || 0;
+      const totalAccounts = linkedCount + 1; // +1 for current user
+      const exceedsLimit = totalAccounts > fraudSettings.maxAccountsPerDevice;
+      
       return NextResponse.json({
         success: true,
-        suspicious: false,
-        message: 'Device recognized for this user'
+        suspicious: exceedsLimit, // Only mark as suspicious if exceeds max allowed
+        message: linkedCount > 0 
+          ? exceedsLimit 
+            ? `Device linked to ${totalAccounts} accounts (exceeds max: ${fraudSettings.maxAccountsPerDevice})`
+            : `Device linked to ${totalAccounts} accounts (within max: ${fraudSettings.maxAccountsPerDevice})`
+          : 'Device recognized for this user'
       });
     }
     
@@ -286,12 +385,25 @@ export async function POST(request: Request) {
         console.log(`✅ Created separate fingerprint for user ${userId} with ${newUserFingerprint.browser} (linked to ${existingDeviceAnyUser.userId})`);
 
         // Create or update fraud alert
-        // Always create alert when multiple accounts detected, regardless of risk score
+        // Only alert when accounts EXCEED the max allowed setting
         const allLinkedUsers = [existingDeviceAnyUser.userId, ...existingDeviceAnyUser.linkedUserIds];
         
-        console.log(`🔍 Multi-account detected: ${allLinkedUsers.length} accounts on same device (Risk: ${existingDeviceAnyUser.riskScore}, Threshold: ${fraudSettings.alertThreshold})`);
+        // Include current user in the count - they were just added to linkedUserIds
+        // allLinkedUsers = owner + all linked users (including the new user)
+        console.log(`🔍 Multi-account detected: ${allLinkedUsers.length} accounts on same device (max allowed: ${fraudSettings.maxAccountsPerDevice})`);
         
-        if (allLinkedUsers.length >= 2) {  // Changed: Alert when 2+ accounts detected
+        // Check if accounts exceed the max allowed
+        const exceedsMaxAllowed = allLinkedUsers.length > fraudSettings.maxAccountsPerDevice;
+        
+        // ALWAYS log for debugging
+        if (exceedsMaxAllowed) {
+          console.log(`🚨 EXCEEDS LIMIT: ${allLinkedUsers.length} accounts > max ${fraudSettings.maxAccountsPerDevice} - CREATING ALERT`);
+        } else {
+          console.log(`ℹ️ Within limits: ${allLinkedUsers.length} accounts ≤ max ${fraudSettings.maxAccountsPerDevice} - No alert needed`);
+        }
+        
+        // Only create alert if accounts EXCEED the max allowed setting
+        if (exceedsMaxAllowed) {
           let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
           if (allLinkedUsers.length >= fraudSettings.maxAccountsPerDevice + 2) {
             severity = 'critical';
@@ -488,15 +600,18 @@ export async function POST(request: Request) {
             }
           }
         } else {
-          console.log(`⚠️ Multi-account detected but not enough accounts yet: ${allLinkedUsers.length} accounts (need 2+)`);
+          console.log(`ℹ️ Multi-account within limits: ${allLinkedUsers.length} accounts (max allowed: ${fraudSettings.maxAccountsPerDevice})`);
         }
 
-        console.log(`🚨 FRAUD DETECTED: User ${userId} using same device as ${allLinkedUsers.length - 1} other account(s)`);
+        const exceedsLimit = allLinkedUsers.length > fraudSettings.maxAccountsPerDevice;
+        console.log(`🔍 User ${userId} using device shared with ${allLinkedUsers.length - 1} other account(s) - ${exceedsLimit ? '🚨 EXCEEDS LIMIT' : '✓ Within limits'}`);
 
         return NextResponse.json({
           success: true,
-          suspicious: true,
-          message: 'Device already associated with other accounts',
+          suspicious: exceedsLimit, // Only suspicious if exceeds max allowed
+          message: exceedsLimit 
+            ? `Device shared by ${allLinkedUsers.length} accounts (exceeds max: ${fraudSettings.maxAccountsPerDevice})`
+            : `Device shared by ${allLinkedUsers.length} accounts (within max: ${fraudSettings.maxAccountsPerDevice})`,
           linkedAccounts: existingDeviceAnyUser.linkedUserIds.length,
           riskScore: existingDeviceAnyUser.riskScore
         });
@@ -521,7 +636,8 @@ export async function POST(request: Request) {
         const allLinkedUserIds = [...new Set(sameIPBrowserDevices.map(d => d.userId))];
         allLinkedUserIds.push(userId); // Add current user
         
-        console.log(`📊 Creating fraud alert for ${allLinkedUserIds.length} accounts (Same IP + Same Browser)`);
+        const exceedsLimit = allLinkedUserIds.length > fraudSettings.maxAccountsPerDevice;
+        console.log(`📊 ${exceedsLimit ? 'Creating' : 'Skipping'} fraud alert for ${allLinkedUserIds.length} accounts (Same IP + Same Browser) - max allowed: ${fraudSettings.maxAccountsPerDevice}`);
         
         // Create new fingerprint for current user first
         const newFingerprint = await DeviceFingerprint.create({
@@ -570,119 +686,124 @@ export async function POST(request: Request) {
           });
         }
 
-        // Create fraud alert
-        let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
-        if (allLinkedUserIds.length >= 5) {
-          severity = 'critical';
-        } else if (allLinkedUserIds.length >= 3) {
-          severity = 'high';
-        }
+        // Only create fraud alert if accounts EXCEED the max allowed setting
+        if (exceedsLimit) {
+          let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+          if (allLinkedUserIds.length >= fraudSettings.maxAccountsPerDevice + 2) {
+            severity = 'critical';
+          } else if (allLinkedUserIds.length > fraudSettings.maxAccountsPerDevice) {
+            severity = 'high';
+          }
 
-        // Check if alert already exists for these users (ANY alert type)
-        // This ensures we MERGE into existing alerts from other fraud types
-        const existingAlert = await FraudAlert.findOne({
-          status: { $in: ['pending', 'investigating'] },
-          $or: [
-            { suspiciousUserIds: { $in: allLinkedUserIds } },
-            { primaryUserId: { $in: allLinkedUserIds } }
-          ]
-        }).sort({ updatedAt: -1 }); // Get most recently updated
-
-        // Check if we should suppress alerts for these accounts (only for restricted users)
-        const alertStatus = await checkAlertStatus(allLinkedUserIds);
-        
-        if (alertStatus.shouldSuppress) {
-          console.log(`⏭️ Skipping IP+Browser alert creation - accounts are restricted (banned/suspended)`);
-          return NextResponse.json({
-            success: true,
-            suspicious: false,
-            message: 'Fraud detected but alert suppressed (accounts restricted)'
-          });
-        }
-        
-        // Log if merging into existing alert
-        if (existingAlert) {
-          console.log(`📝 Found existing ${existingAlert.alertType} alert (${existingAlert.status}) - merging IP+Browser evidence via AlertManagerService`);
-        }
-        
-        // Get all devices for evidence
-        const allDevices = await DeviceFingerprint.find({
-          userId: { $in: allLinkedUserIds }
-        }).lean();
-
-        const accountsEvidence = allLinkedUserIds.map(linkedUserId => {
-          const userDevices = allDevices.filter(d => d.userId === linkedUserId);
-          return {
-            userId: linkedUserId,
-            devicesUsed: userDevices.map(d => ({
-              fingerprintId: d.fingerprintId,
-              browser: `${d.browser} ${d.browserVersion}`,
-              browserVersion: d.browserVersion,
-              os: `${d.os} ${d.osVersion}`,
-              osVersion: d.osVersion,
-              deviceType: d.deviceType,
-              screenResolution: d.screenResolution,
-              ipAddress: d.ipAddress,
-              timezone: d.timezone,
-              language: d.language,
-              canvas: d.canvas,
-              webgl: d.webgl,
-              webglVendor: d.webglVendor,
-              webglRenderer: d.webglRenderer,
-              gpuInfo: d.gpuInfo,
-              userAgent: d.userAgent,
-              colorDepth: d.colorDepth,
-              fonts: d.fonts,
-              confidence: d.confidence,
-              // Enhanced 50+ data points
-              hardware: d.hardware,
-              media: d.media,
-              plugins: d.plugins,
-              storage: d.storage,
-              features: d.features,
-              firstSeen: d.firstSeen,
-              lastSeen: d.lastSeen,
-              timesUsed: d.timesUsed
-            }))
-          };
-        });
-
-        // Use AlertManagerService which handles MERGING into existing alerts
-        await AlertManagerService.createOrUpdateAlert({
-            alertType: 'same_ip_browser',
-            userIds: allLinkedUserIds,
-            title: `${allLinkedUserIds.length} accounts using same IP + ${currentBrowserName}`,
-            description: `Multiple accounts detected using ${currentBrowserName} from IP ${ipAddress}`,
-            severity: severity,
-            confidence: 0.80,
-            evidence: [
-              {
-                type: 'ip_browser_match',
-                description: `${allLinkedUserIds.length} accounts using ${currentBrowserName} from ${ipAddress}`,
-                data: {
-                  browser: currentBrowserName,
-                  ipAddress: ipAddress,
-                  location: `${ipDetection.city || 'Unknown'}, ${ipDetection.country || 'Unknown'}`,
-                  linkedAccounts: allLinkedUserIds.length,
-                  accountsDetails: accountsEvidence
-                }
-              }
+          // Check if alert already exists for these users (ANY alert type)
+          // This ensures we MERGE into existing alerts from other fraud types
+          const existingAlert = await FraudAlert.findOne({
+            status: { $in: ['pending', 'investigating'] },
+            $or: [
+              { suspiciousUserIds: { $in: allLinkedUserIds } },
+              { primaryUserId: { $in: allLinkedUserIds } }
             ]
-          });
+          }).sort({ updatedAt: -1 }); // Get most recently updated
+
+          // Check if we should suppress alerts for these accounts (only for restricted users)
+          const alertStatus = await checkAlertStatus(allLinkedUserIds);
           
-        // 📊 UPDATE SUSPICION SCORES
-        await SuspicionScoringService.scoreIPBrowserMatch(
-          allLinkedUserIds,
-          ipAddress,
-          currentBrowserName
-        );
+          if (alertStatus.shouldSuppress) {
+            console.log(`⏭️ Skipping IP+Browser alert creation - accounts are restricted (banned/suspended)`);
+            return NextResponse.json({
+              success: true,
+              suspicious: false,
+              message: 'Fraud detected but alert suppressed (accounts restricted)'
+            });
+          }
+          
+          // Log if merging into existing alert
+          if (existingAlert) {
+            console.log(`📝 Found existing ${existingAlert.alertType} alert (${existingAlert.status}) - merging IP+Browser evidence via AlertManagerService`);
+          }
+          
+          // Get all devices for evidence
+          const allDevices = await DeviceFingerprint.find({
+            userId: { $in: allLinkedUserIds }
+          }).lean();
+
+          const accountsEvidence = allLinkedUserIds.map(linkedUserId => {
+            const userDevices = allDevices.filter(d => d.userId === linkedUserId);
+            return {
+              userId: linkedUserId,
+              devicesUsed: userDevices.map(d => ({
+                fingerprintId: d.fingerprintId,
+                browser: `${d.browser} ${d.browserVersion}`,
+                browserVersion: d.browserVersion,
+                os: `${d.os} ${d.osVersion}`,
+                osVersion: d.osVersion,
+                deviceType: d.deviceType,
+                screenResolution: d.screenResolution,
+                ipAddress: d.ipAddress,
+                timezone: d.timezone,
+                language: d.language,
+                canvas: d.canvas,
+                webgl: d.webgl,
+                webglVendor: d.webglVendor,
+                webglRenderer: d.webglRenderer,
+                gpuInfo: d.gpuInfo,
+                userAgent: d.userAgent,
+                colorDepth: d.colorDepth,
+                fonts: d.fonts,
+                confidence: d.confidence,
+                // Enhanced 50+ data points
+                hardware: d.hardware,
+                media: d.media,
+                plugins: d.plugins,
+                storage: d.storage,
+                features: d.features,
+                firstSeen: d.firstSeen,
+                lastSeen: d.lastSeen,
+                timesUsed: d.timesUsed
+              }))
+            };
+          });
+
+          // Use AlertManagerService which handles MERGING into existing alerts
+          await AlertManagerService.createOrUpdateAlert({
+              alertType: 'same_ip_browser',
+              userIds: allLinkedUserIds,
+              title: `${allLinkedUserIds.length} accounts using same IP + ${currentBrowserName}`,
+              description: `Multiple accounts detected using ${currentBrowserName} from IP ${ipAddress} (exceeds max: ${fraudSettings.maxAccountsPerDevice})`,
+              severity: severity,
+              confidence: 0.80,
+              evidence: [
+                {
+                  type: 'ip_browser_match',
+                  description: `${allLinkedUserIds.length} accounts using ${currentBrowserName} from ${ipAddress}`,
+                  data: {
+                    browser: currentBrowserName,
+                    ipAddress: ipAddress,
+                    location: `${ipDetection.city || 'Unknown'}, ${ipDetection.country || 'Unknown'}`,
+                    linkedAccounts: allLinkedUserIds.length,
+                    maxAllowed: fraudSettings.maxAccountsPerDevice,
+                    accountsDetails: accountsEvidence
+                  }
+                }
+              ]
+            });
+            
+          // 📊 UPDATE SUSPICION SCORES
+          await SuspicionScoringService.scoreIPBrowserMatch(
+            allLinkedUserIds,
+            ipAddress,
+            currentBrowserName
+          );
+        }
 
         return NextResponse.json({
           success: true,
-          suspicious: true,
-          message: `Multiple accounts detected using ${currentBrowserName} from this IP`,
+          suspicious: exceedsLimit,
+          message: exceedsLimit 
+            ? `${allLinkedUserIds.length} accounts on same IP + browser (exceeds max: ${fraudSettings.maxAccountsPerDevice})`
+            : `${allLinkedUserIds.length} accounts on same IP + browser (within max: ${fraudSettings.maxAccountsPerDevice})`,
           linkedAccounts: allLinkedUserIds.length - 1,
-          riskScore: 30
+          riskScore: exceedsLimit ? 30 : 10
         });
       }
     }
@@ -821,9 +942,16 @@ export async function POST(request: Request) {
       });
     }
   } catch (error) {
-    console.error('Error tracking device fingerprint:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('❌ Error tracking device fingerprint:', errorMessage);
+    console.error('Stack:', errorStack);
     return NextResponse.json(
-      { success: false, message: 'Failed to track device' },
+      { 
+        success: false, 
+        message: 'Failed to track device',
+        error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { status: 500 }
     );
   }

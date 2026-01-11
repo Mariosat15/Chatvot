@@ -1,249 +1,68 @@
-import { connectToDatabase } from '@/database/mongoose';
+import Notification from '@/database/models/notification.model';
 import NotificationTemplate, { NotificationType, NotificationCategory } from '@/database/models/notification-template.model';
-import Notification, { INotification } from '@/database/models/notification.model';
-import UserNotificationPreferences from '@/database/models/user-notification-preferences.model';
+import { connectToDatabase } from '@/database/mongoose';
 
-interface SendNotificationParams {
+export interface NotificationData {
+  userId: string;
+  type: NotificationType;
+  metadata?: Record<string, any>;
+  adminId?: string;
+  adminEmail?: string;
+}
+
+export interface SendOptions {
   userId: string;
   templateId: string;
-  variables?: Record<string, string | number>;
-  metadata?: Record<string, any>;
-  overrideTitle?: string;
-  overrideMessage?: string;
+  variables?: Record<string, any>;
+  adminId?: string;
+  adminEmail?: string;
 }
 
-interface SendInstantNotificationParams {
-  userId: string | 'all';
-  title: string;
-  message: string;
+export interface GetNotificationsOptions {
+  limit?: number;
+  offset?: number;
   category?: NotificationCategory;
-  priority?: 'low' | 'normal' | 'high' | 'urgent';
-  icon?: string;
-  color?: string;
-  actionUrl?: string;
-  actionText?: string;
-  expiresAt?: Date;
-  sentBy?: {
-    adminId: string;
-    adminEmail: string;
-  };
+  unreadOnly?: boolean;
 }
 
-interface SendBulkNotificationParams {
-  userIds: string[];
-  templateId: string;
-  variables?: Record<string, string | number>;
-  metadata?: Record<string, any>;
+/**
+ * Replace template variables with actual values
+ */
+function replaceVariables(text: string, variables: Record<string, any>): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    return variables[key] !== undefined ? String(variables[key]) : match;
+  });
 }
 
+/**
+ * Notification Service Class - provides all notification functionality
+ */
 class NotificationService {
-  private static templatesSeeded = false;
-
-  /**
-   * Ensure templates are seeded
-   */
-  private async ensureTemplatesSeeded(): Promise<void> {
-    if (NotificationService.templatesSeeded) return;
-    
-    const count = await NotificationTemplate.countDocuments();
-    if (count === 0) {
-      console.log('📋 No notification templates found, seeding defaults...');
-      await NotificationTemplate.seedDefaults();
-    }
-    NotificationService.templatesSeeded = true;
-  }
-
   /**
    * Send a notification using a template
    */
-  async send(params: SendNotificationParams): Promise<INotification | null> {
-    await connectToDatabase();
-    
-    // Ensure templates are seeded
-    await this.ensureTemplatesSeeded();
-
-    let template = await NotificationTemplate.findOne({
-      templateId: params.templateId,
-      isEnabled: true,
-    });
-
-    // If template not found, try seeding again (might be first run)
-    if (!template) {
-      console.log(`⚠️ Template "${params.templateId}" not found, attempting to seed...`);
-      await NotificationTemplate.seedDefaults();
-      template = await NotificationTemplate.findOne({
-        templateId: params.templateId,
-        isEnabled: true,
-      });
-    }
-
-    if (!template) {
-      console.log(`❌ Notification template "${params.templateId}" not found or disabled after seeding`);
-      return null;
-    }
-
-    // Check if user wants to receive this notification
-    console.log(`🔍 Checking if notification "${params.templateId}" is enabled for user ${params.userId}`);
-    let isEnabled = true;
+  async send(options: SendOptions): Promise<any> {
     try {
-      isEnabled = await UserNotificationPreferences.isNotificationEnabled(
-        params.userId,
-        template.category as NotificationCategory,
-        params.templateId
-      );
-      console.log(`   User preference check result: ${isEnabled ? 'enabled' : 'disabled'}`);
-    } catch (error) {
-      console.log(`   ⚠️ Error checking preferences, defaulting to enabled:`, error);
-      isEnabled = true; // Default to enabled on error
-    }
+      await connectToDatabase();
 
-    if (!isEnabled) {
-      console.log(`🔕 Notification "${params.templateId}" disabled by user ${params.userId}`);
-      return null;
-    }
-
-    // Replace variables in title and message
-    let title = params.overrideTitle || template.title;
-    let message = params.overrideMessage || template.message;
-
-    if (params.variables) {
-      for (const [key, value] of Object.entries(params.variables)) {
-        const regex = new RegExp(`{{${key}}}`, 'g');
-        title = title.replace(regex, String(value));
-        message = message.replace(regex, String(value));
-      }
-    }
-
-    // Also replace variables in actionUrl if present
-    let actionUrl = template.actionUrl;
-    if (actionUrl && params.variables) {
-      for (const [key, value] of Object.entries(params.variables)) {
-        const regex = new RegExp(`{{${key}}}`, 'g');
-        actionUrl = actionUrl.replace(regex, String(value));
-      }
-    }
-
-    console.log(`📝 Creating notification in database...`);
-    console.log(`   User: ${params.userId}`);
-    console.log(`   Template: ${params.templateId}`);
-    console.log(`   Title: ${title}`);
-    
-    const notification = await Notification.create({
-      userId: params.userId,
-      templateId: params.templateId,
-      title,
-      message,
-      icon: template.icon,
-      category: template.category,
-      type: template.type,
-      priority: template.priority,
-      color: template.color,
-      actionUrl,
-      actionText: template.actionText,
-      metadata: params.metadata || {},
-      isInstant: false,
-    });
-
-    console.log(`✅ Notification created with ID: ${notification._id}`);
-    console.log(`📬 Notification sent: [${template.type}] to user ${params.userId}`);
-
-    return notification;
-  }
-
-  /**
-   * Send an instant/custom notification (not from template)
-   */
-  async sendInstant(params: SendInstantNotificationParams): Promise<INotification | INotification[]> {
-    await connectToDatabase();
-
-    const notificationData = {
-      templateId: 'instant',
-      title: params.title,
-      message: params.message,
-      icon: params.icon || '📢',
-      category: params.category || 'admin' as NotificationCategory,
-      type: 'admin_message' as NotificationType,
-      priority: params.priority || 'normal',
-      color: params.color || '#FDD458',
-      actionUrl: params.actionUrl,
-      actionText: params.actionText,
-      sentBy: params.sentBy,
-      isInstant: true,
-      expiresAt: params.expiresAt,
-    };
-
-    if (params.userId === 'all') {
-      // Send to all users - get all unique userIds from better-auth user collection
-      const mongoose = await connectToDatabase();
-      const db = mongoose.connection.db;
+      const template = await NotificationTemplate.findOne({ 
+        templateId: options.templateId, 
+        isEnabled: true 
+      });
       
-      if (!db) {
-        throw new Error('Database connection not found');
+      if (!template) {
+        console.warn(`Notification template '${options.templateId}' not found or disabled`);
+        return null;
       }
-      
-      // better-auth stores users in 'user' collection with 'id' field
-      const users = await db.collection('user').find({}).project({ id: 1, _id: 1 }).toArray();
-      
-      const notifications = await Notification.insertMany(
-        users.map(user => ({
-          ...notificationData,
-          userId: user.id || user._id?.toString(),
-        }))
-      );
 
-      console.log(`📢 Broadcast notification sent to ${users.length} users`);
-      return notifications;
-    }
+      const variables = options.variables || {};
+      const title = replaceVariables(template.title, variables);
+      const message = replaceVariables(template.message, variables);
+      const actionUrl = template.actionUrl ? replaceVariables(template.actionUrl, variables) : undefined;
 
-    const notification = await Notification.create({
-      ...notificationData,
-      userId: params.userId,
-    });
-
-    console.log(`📬 Instant notification sent to user ${params.userId}`);
-    return notification;
-  }
-
-  /**
-   * Send notification to multiple users
-   */
-  async sendBulk(params: SendBulkNotificationParams): Promise<number> {
-    await connectToDatabase();
-
-    const template = await NotificationTemplate.findOne({
-      templateId: params.templateId,
-      isEnabled: true,
-    });
-
-    if (!template) {
-      console.log(`⚠️ Notification template "${params.templateId}" not found or disabled`);
-      return 0;
-    }
-
-    // Replace variables in title and message
-    let title = template.title;
-    let message = template.message;
-
-    if (params.variables) {
-      for (const [key, value] of Object.entries(params.variables)) {
-        const regex = new RegExp(`{{${key}}}`, 'g');
-        title = title.replace(regex, String(value));
-        message = message.replace(regex, String(value));
-      }
-    }
-
-    let actionUrl = template.actionUrl;
-    if (actionUrl && params.variables) {
-      for (const [key, value] of Object.entries(params.variables)) {
-        const regex = new RegExp(`{{${key}}}`, 'g');
-        actionUrl = actionUrl.replace(regex, String(value));
-      }
-    }
-
-    const notifications = await Notification.insertMany(
-      params.userIds.map(userId => ({
-        userId,
-        templateId: params.templateId,
+      const notification = await Notification.create({
+        userId: options.userId,
+        templateId: template.templateId,
         title,
         message,
         icon: template.icon,
@@ -253,19 +72,164 @@ class NotificationService {
         color: template.color,
         actionUrl,
         actionText: template.actionText,
-        metadata: params.metadata || {},
+        isRead: false,
+        metadata: variables,
+        sentBy: options.adminId ? {
+          adminId: options.adminId,
+          adminEmail: options.adminEmail,
+        } : undefined,
         isInstant: false,
-      }))
-    );
+      });
 
-    console.log(`📬 Bulk notification sent to ${notifications.length} users`);
-    return notifications.length;
+      return notification;
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      return null;
+    }
   }
 
-  // ========== CONVENIENCE METHODS ==========
+  /**
+   * Create a custom notification directly (without template)
+   */
+  async createCustom(data: {
+    userId: string;
+    type: string;
+    title: string;
+    message: string;
+    icon?: string;
+    category?: string;
+    priority?: string;
+    color?: string;
+    actionUrl?: string;
+    actionText?: string;
+    metadata?: Record<string, any>;
+  }): Promise<any> {
+    try {
+      await connectToDatabase();
 
-  // Purchase notifications
-  async notifyDepositInitiated(userId: string, amount: number) {
+      const notification = await Notification.create({
+        userId: data.userId,
+        templateId: `custom_${data.type}`,
+        title: data.title,
+        message: data.message,
+        icon: data.icon || 'bell',
+        category: data.category || 'system',
+        type: data.type,
+        priority: data.priority || 'normal',
+        color: data.color || 'blue',
+        actionUrl: data.actionUrl,
+        actionText: data.actionText,
+        isRead: false,
+        metadata: data.metadata || {},
+        isInstant: true,
+      });
+
+      return notification;
+    } catch (error) {
+      console.error('Error creating custom notification:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get user's notifications
+   */
+  async getUserNotifications(userId: string, options: GetNotificationsOptions = {}) {
+    await connectToDatabase();
+
+    const { limit = 50, offset = 0, category, unreadOnly } = options;
+
+    const query: any = { userId };
+    if (category) query.category = category;
+    if (unreadOnly) query.isRead = false;
+
+    return Notification.find(query)
+      .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(limit)
+      .lean();
+  }
+
+  /**
+   * Get unread notification count
+   */
+  async getUnreadCount(userId: string): Promise<number> {
+    await connectToDatabase();
+    return Notification.countDocuments({ userId, isRead: false });
+  }
+
+  /**
+   * Mark a single notification as read
+   */
+  async markAsRead(notificationId: string, userId: string): Promise<boolean> {
+    await connectToDatabase();
+    
+    const result = await Notification.findOneAndUpdate(
+      { _id: notificationId, userId },
+      { isRead: true, readAt: new Date() }
+    );
+    
+    return !!result;
+  }
+
+  /**
+   * Mark all notifications as read
+   */
+  async markAllAsRead(userId: string): Promise<number> {
+    await connectToDatabase();
+    
+    const result = await Notification.updateMany(
+      { userId, isRead: false },
+      { isRead: true, readAt: new Date() }
+    );
+    
+    return result.modifiedCount;
+  }
+
+  /**
+   * Clear all notifications
+   */
+  async clearAllNotifications(userId: string): Promise<number> {
+    await connectToDatabase();
+    
+    const result = await Notification.deleteMany({ userId });
+    return result.deletedCount;
+  }
+
+  /**
+   * Delete a single notification
+   */
+  async deleteNotification(notificationId: string, userId: string): Promise<boolean> {
+    await connectToDatabase();
+    
+    const result = await Notification.findOneAndDelete({
+      _id: notificationId,
+      userId,
+    });
+    
+    return !!result;
+  }
+
+  /**
+   * Send notification by type (for KYC, trading events, etc.)
+   */
+  async sendByType(data: NotificationData): Promise<boolean> {
+    const result = await this.send({
+      userId: data.userId,
+      templateId: data.type,
+      variables: data.metadata,
+      adminId: data.adminId,
+      adminEmail: data.adminEmail,
+    });
+    return !!result;
+  }
+
+  // ========== Convenience methods for specific notification types ==========
+
+  /**
+   * Send deposit initiated notification
+   */
+  async notifyDepositInitiated(userId: string, amount: number): Promise<any> {
     console.log(`🔔 Sending deposit_initiated notification to ${userId}`);
     console.log(`   Amount: €${amount.toFixed(2)}`);
     try {
@@ -286,7 +250,10 @@ class NotificationService {
     }
   }
 
-  async notifyDepositCompleted(userId: string, amount: number, balance: number) {
+  /**
+   * Send deposit completed notification
+   */
+  async notifyDepositCompleted(userId: string, amount: number, balance: number): Promise<any> {
     console.log(`🔔 Sending deposit_completed notification to ${userId}`);
     try {
       const result = await this.send({
@@ -302,7 +269,10 @@ class NotificationService {
     }
   }
 
-  async notifyDepositFailed(userId: string, amount: number, reason: string) {
+  /**
+   * Send deposit failed notification
+   */
+  async notifyDepositFailed(userId: string, amount: number, reason: string): Promise<any> {
     console.log(`🔔 Sending deposit_failed notification to ${userId}`);
     try {
       const result = await this.send({
@@ -317,7 +287,10 @@ class NotificationService {
     }
   }
 
-  async notifyWithdrawalInitiated(userId: string, amount: number) {
+  /**
+   * Send withdrawal initiated notification
+   */
+  async notifyWithdrawalInitiated(userId: string, amount: number): Promise<any> {
     console.log(`🔔 Sending withdrawal_initiated notification to ${userId}`);
     try {
       const result = await this.send({
@@ -332,7 +305,10 @@ class NotificationService {
     }
   }
 
-  async notifyWithdrawalCompleted(userId: string, amount: number) {
+  /**
+   * Send withdrawal completed notification
+   */
+  async notifyWithdrawalCompleted(userId: string, amount: number): Promise<any> {
     console.log(`🔔 Sending withdrawal_completed notification to ${userId}`);
     try {
       const result = await this.send({
@@ -347,7 +323,10 @@ class NotificationService {
     }
   }
 
-  async notifyWithdrawalFailed(userId: string, amount: number, reason: string) {
+  /**
+   * Send withdrawal failed notification
+   */
+  async notifyWithdrawalFailed(userId: string, amount: number, reason: string): Promise<any> {
     console.log(`🔔 Sending withdrawal_failed notification to ${userId}`);
     try {
       const result = await this.send({
@@ -362,508 +341,248 @@ class NotificationService {
     }
   }
 
-  // Competition notifications
-  async notifyCompetitionJoined(userId: string, competitionId: string, competitionName: string, entryFee: number) {
-    console.log(`🔔 Sending competition_joined notification to ${userId} for ${competitionName}`);
-    try {
-      const result = await this.send({
-        userId,
-        templateId: 'competition_joined',
-        variables: { competitionId, competitionName, entryFee },
-      });
-      console.log(`✅ Competition joined notification result:`, result ? 'sent' : 'not sent');
-      return result;
-    } catch (error) {
-      console.error('❌ Error in notifyCompetitionJoined:', error);
-      return null;
-    }
-  }
-
-  async notifyCompetitionStartingSoon(userId: string, competitionId: string, competitionName: string, startTime: string) {
-    console.log(`🔔 Sending competition_starting_soon notification to ${userId}`);
-    return this.send({
-      userId,
-      templateId: 'competition_starting_soon',
-      variables: { competitionId, competitionName, startTime },
-    });
-  }
-
-  async notifyCompetitionStarted(userId: string, competitionId: string, competitionName: string) {
-    console.log(`🔔 Sending competition_started notification to ${userId}`);
-    return this.send({
-      userId,
-      templateId: 'competition_started',
-      variables: { competitionId, competitionName },
-    });
-  }
-
-  async notifyCompetitionEndingSoon(userId: string, competitionId: string, competitionName: string, endTime: string) {
-    console.log(`🔔 Sending competition_ending_soon notification to ${userId}`);
-    return this.send({
-      userId,
-      templateId: 'competition_ending_soon',
-      variables: { competitionId, competitionName, endTime },
-    });
-  }
-
-  async notifyCompetitionEnded(userId: string, competitionId: string, competitionName: string, finalRank: number, pnl: number) {
-    return this.send({
-      userId,
-      templateId: 'competition_ended',
-      variables: {
-        competitionId,
-        competitionName,
-        finalRank,
-        pnl: pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2),
-      },
-    });
-  }
-
-  async notifyCompetitionWon(userId: string, competitionName: string, prize: number) {
-    return this.send({
-      userId,
-      templateId: 'competition_won',
-      variables: { competitionName, prize: prize.toFixed(2) },
-    });
-  }
-
-  async notifyPodiumFinish(userId: string, competitionName: string, finalRank: number, prize: number) {
-    return this.send({
-      userId,
-      templateId: 'competition_podium',
-      variables: { competitionName, finalRank, prize: prize.toFixed(2) },
-    });
-  }
-
-  async notifyDisqualified(userId: string, competitionId: string, competitionName: string, reason: string) {
-    console.log(`🔔 Sending competition_disqualified notification to ${userId}`);
-    return this.send({
-      userId,
-      templateId: 'competition_disqualified',
-      variables: { competitionId, competitionName, reason },
-    });
-  }
-
-  async notifyPrizeReceived(userId: string, competitionName: string, prize: number, rank: number) {
-    console.log(`🔔 Sending competition_prize_received notification to ${userId}`);
-    return this.send({
-      userId,
-      templateId: 'competition_prize_received',
-      variables: { competitionName, prize: `€${prize.toFixed(2)}`, rank },
-    });
-  }
-
-  async notifyCompetitionCancelled(userId: string, competitionId: string, competitionName: string, reason: string, entryFee: number) {
-    console.log(`🔔 Sending competition_cancelled notification to ${userId}`);
-    try {
-      const result = await this.send({
-        userId,
-        templateId: 'competition_cancelled',
-        variables: { competitionId, competitionName, reason, entryFee: entryFee.toFixed(2) },
-      });
-      if (result) {
-        console.log(`✅ Competition cancelled notification CREATED: ${result._id}`);
-      }
-      return result;
-    } catch (error) {
-      console.error('❌ Error in notifyCompetitionCancelled:', error);
-      return null;
-    }
-  }
-
-  async notifyCompetitionRefunded(userId: string, competitionName: string, entryFee: number, newBalance: number) {
-    console.log(`🔔 Sending competition_refunded notification to ${userId}`);
-    try {
-      const result = await this.send({
-        userId,
-        templateId: 'competition_refunded',
-        variables: { competitionName, entryFee: entryFee.toFixed(2), balance: newBalance.toFixed(2) },
-      });
-      if (result) {
-        console.log(`✅ Competition refunded notification CREATED: ${result._id}`);
-      }
-      return result;
-    } catch (error) {
-      console.error('❌ Error in notifyCompetitionRefunded:', error);
-      return null;
-    }
-  }
-
-  // Trading notifications
-  async notifyOrderFilled(userId: string, symbol: string, orderType: string, price: number, size: number) {
-    return this.send({
-      userId,
-      templateId: 'order_filled',
-      variables: { symbol, orderType, price: price.toFixed(5), size: size.toString() },
-    });
-  }
-
-  async notifyPositionClosed(userId: string, symbol: string, pnl: number, pnlPercent: number) {
-    return this.send({
-      userId,
-      templateId: 'position_closed',
-      variables: {
-        symbol,
-        pnl: pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2),
-        pnlPercent: pnlPercent.toFixed(2),
-      },
-    });
-  }
-
-  async notifyMarginWarning(userId: string, marginLevel: number) {
-    return this.send({
-      userId,
-      templateId: 'margin_warning',
-      variables: { marginLevel: marginLevel.toFixed(1) },
-    });
-  }
-
-  async notifyMarginCall(userId: string, marginLevel: number) {
-    return this.send({
-      userId,
-      templateId: 'margin_call',
-      variables: { marginLevel: marginLevel.toFixed(1) },
-    });
-  }
-
-  async notifyStopLossTriggered(userId: string, symbol: string, price: number, pnl: number) {
-    console.log(`🔔 Sending stop_loss_triggered notification to ${userId}`);
-    return this.send({
-      userId,
-      templateId: 'stop_loss_triggered',
-      variables: { symbol, price: price.toFixed(5), pnl: pnl.toFixed(2) },
-    });
-  }
-
-  async notifyTakeProfitTriggered(userId: string, symbol: string, price: number, pnl: number) {
-    console.log(`🔔 Sending take_profit_triggered notification to ${userId}`);
-    return this.send({
-      userId,
-      templateId: 'take_profit_triggered',
-      variables: { symbol, price: price.toFixed(5), pnl: `+${pnl.toFixed(2)}` },
-    });
-  }
-
-  async notifyLiquidation(userId: string, symbol: string) {
-    console.log(`🔔 Sending liquidation notification to ${userId}`);
-    return this.send({
-      userId,
-      templateId: 'liquidation',
-      variables: { symbol },
-    });
-  }
-
-  // Achievement notifications
-  async notifyBadgeEarned(userId: string, badgeName: string, badgeDescription: string) {
+  /**
+   * Send badge earned notification
+   */
+  async notifyBadgeEarned(userId: string, badgeName: string, badgeDescription: string): Promise<any> {
     return this.send({
       userId,
       templateId: 'badge_earned',
-      variables: { badgeName, badgeDescription },
+      variables: {
+        badgeName,
+        badgeDescription,
+      },
     });
   }
 
-  async notifyLevelUp(userId: string, level: number, title: string) {
-    console.log(`🔔 Sending level_up notification to ${userId}`);
+  /**
+   * Send competition disqualified notification
+   */
+  async notifyDisqualified(userId: string, competitionName: string, reason: string): Promise<any> {
     return this.send({
       userId,
-      templateId: 'level_up',
-      variables: { level, title },
+      templateId: 'competition_disqualified',
+      variables: {
+        competitionName,
+        reason,
+      },
     });
   }
 
-  async notifyLeaderboardRankUp(userId: string, newRank: number, previousRank: number) {
-    console.log(`🔔 Sending leaderboard_rank_up notification to ${userId}`);
+  /**
+   * Send liquidation notification
+   */
+  async notifyLiquidation(userId: string, competitionName: string, reason: string): Promise<any> {
     return this.send({
       userId,
-      templateId: 'leaderboard_rank_up',
-      variables: { newRank, previousRank, positions: previousRank - newRank },
+      templateId: 'liquidation',
+      variables: {
+        competitionName,
+        reason,
+      },
     });
   }
 
-  // Admin notifications
-  async sendAdminAnnouncement(title: string, message: string, adminId: string, adminEmail: string, userIds?: string[]) {
-    if (userIds && userIds.length > 0) {
-      // Send to specific users
-      return this.sendBulk({
-        userIds,
-        templateId: 'admin_announcement',
-        variables: { message },
-      });
-    }
-    
-    // Broadcast to all
-    return this.sendInstant({
-      userId: 'all',
-      title: title || '📢 Announcement',
-      message,
-      category: 'admin',
-      priority: 'high',
-      icon: '📢',
-      sentBy: { adminId, adminEmail },
+  /**
+   * Send stop loss triggered notification
+   */
+  async notifyStopLossTriggered(userId: string, symbol: string, exitPrice: number, realizedPnl: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'stop_loss_triggered',
+      variables: {
+        symbol,
+        exitPrice: exitPrice.toFixed(5),
+        pnl: realizedPnl >= 0 ? `+€${realizedPnl.toFixed(2)}` : `-€${Math.abs(realizedPnl).toFixed(2)}`,
+      },
     });
   }
 
-  // Security notifications
-  async notifyAccountSuspended(userId: string, reason: string) {
-    console.log(`🔔 Sending account_suspended notification to ${userId}`);
-    console.log(`   Reason: ${reason}`);
-    try {
-      const result = await this.send({
-        userId,
-        templateId: 'account_suspended',
-        variables: { reason },
-      });
-      if (result) {
-        console.log(`✅ Account suspended notification CREATED: ${result._id}`);
-      } else {
-        console.log(`⚠️ Account suspended notification NOT created`);
-      }
-      return result;
-    } catch (error) {
-      console.error('❌ Error in notifyAccountSuspended:', error);
-      return null;
-    }
-  }
-
-  async notifyAccountRestored(userId: string) {
-    console.log(`🔔 Sending account_restored notification to ${userId}`);
-    try {
-      const result = await this.send({
-        userId,
-        templateId: 'account_restored',
-      });
-      if (result) {
-        console.log(`✅ Account restored notification CREATED: ${result._id}`);
-      } else {
-        console.log(`⚠️ Account restored notification NOT created`);
-      }
-      return result;
-    } catch (error) {
-      console.error('❌ Error in notifyAccountRestored:', error);
-      return null;
-    }
-  }
-
-  async notifyNewDeviceLogin(userId: string, deviceInfo: string, location: string, time: string) {
-    console.log(`🔔 Sending login_new_device notification to ${userId}`);
-    try {
-      const result = await this.send({
-        userId,
-        templateId: 'login_new_device',
-        variables: { deviceInfo, location, time },
-      });
-      return result;
-    } catch (error) {
-      console.error('❌ Error in notifyNewDeviceLogin:', error);
-      return null;
-    }
-  }
-
-  async notifyPasswordChanged(userId: string) {
-    console.log(`🔔 Sending password_changed notification to ${userId}`);
-    try {
-      const result = await this.send({
-        userId,
-        templateId: 'password_changed',
-      });
-      return result;
-    } catch (error) {
-      console.error('❌ Error in notifyPasswordChanged:', error);
-      return null;
-    }
-  }
-
-  // ========== QUERY METHODS ==========
-
-  async getUserNotifications(userId: string, options: {
-    limit?: number;
-    offset?: number;
-    category?: NotificationCategory;
-    unreadOnly?: boolean;
-  } = {}) {
-    await connectToDatabase();
-
-    const query: any = { userId };
-    
-    if (options.category) {
-      query.category = options.category;
-    }
-    
-    if (options.unreadOnly) {
-      query.isRead = false;
-    }
-
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .skip(options.offset || 0)
-      .limit(options.limit || 50)
-      .lean();
-
-    return notifications;
-  }
-
-  async getUnreadCount(userId: string): Promise<number> {
-    await connectToDatabase();
-    return Notification.countDocuments({ userId, isRead: false });
-  }
-
-  async markAsRead(notificationId: string, userId: string): Promise<boolean> {
-    await connectToDatabase();
-    
-    const result = await Notification.updateOne(
-      { _id: notificationId, userId },
-      { $set: { isRead: true, readAt: new Date() } }
-    );
-
-    return result.modifiedCount > 0;
-  }
-
-  async markAllAsRead(userId: string): Promise<number> {
-    await connectToDatabase();
-    
-    const result = await Notification.updateMany(
-      { userId, isRead: false },
-      { $set: { isRead: true, readAt: new Date() } }
-    );
-
-    return result.modifiedCount;
-  }
-
-  async deleteNotification(notificationId: string, userId: string): Promise<boolean> {
-    await connectToDatabase();
-    
-    const result = await Notification.deleteOne({ _id: notificationId, userId });
-    return result.deletedCount > 0;
-  }
-
-  async clearAllNotifications(userId: string): Promise<number> {
-    await connectToDatabase();
-    
-    const result = await Notification.deleteMany({ userId });
-    return result.deletedCount;
-  }
-
-  // ========== ADMIN METHODS ==========
-
-  async seedDefaultTemplates(): Promise<void> {
-    await connectToDatabase();
-    await NotificationTemplate.seedDefaults();
-  }
-
-  async getTemplates(category?: NotificationCategory) {
-    await connectToDatabase();
-    
-    const query: any = {};
-    if (category) {
-      query.category = category;
-    }
-    
-    return NotificationTemplate.find(query).sort({ category: 1, name: 1 }).lean();
-  }
-
-  async updateTemplate(templateId: string, updates: Partial<{
-    name: string;
-    title: string;
-    message: string;
-    icon: string;
-    priority: string;
-    color: string;
-    isEnabled: boolean;
-    actionUrl: string;
-    actionText: string;
-    channels: { inApp: boolean; email: boolean; push: boolean };
-  }>) {
-    await connectToDatabase();
-    
-    return NotificationTemplate.findOneAndUpdate(
-      { templateId },
-      { $set: updates },
-      { new: true }
-    );
-  }
-
-  async toggleTemplate(templateId: string, isEnabled: boolean) {
-    await connectToDatabase();
-    
-    return NotificationTemplate.findOneAndUpdate(
-      { templateId },
-      { $set: { isEnabled } },
-      { new: true }
-    );
-  }
-
-  async toggleAllTemplates(isEnabled: boolean) {
-    await connectToDatabase();
-    
-    return NotificationTemplate.updateMany(
-      {},
-      { $set: { isEnabled } }
-    );
-  }
-
-  async createCustomTemplate(data: {
-    templateId: string;
-    name: string;
-    description?: string;
-    category: NotificationCategory;
-    title: string;
-    message: string;
-    icon?: string;
-    priority?: 'low' | 'normal' | 'high' | 'urgent';
-    color?: string;
-    actionUrl?: string;
-    actionText?: string;
-  }) {
-    await connectToDatabase();
-    
-    return NotificationTemplate.create({
-      ...data,
-      type: 'custom',
-      isEnabled: true,
-      isDefault: false,
-      isCustom: true,
-      channels: { inApp: true, email: false, push: false },
+  /**
+   * Send take profit triggered notification
+   */
+  async notifyTakeProfitTriggered(userId: string, symbol: string, exitPrice: number, realizedPnl: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'take_profit_triggered',
+      variables: {
+        symbol,
+        exitPrice: exitPrice.toFixed(5),
+        pnl: realizedPnl >= 0 ? `+€${realizedPnl.toFixed(2)}` : `-€${Math.abs(realizedPnl).toFixed(2)}`,
+      },
     });
-  }
-
-  async deleteCustomTemplate(templateId: string): Promise<boolean> {
-    await connectToDatabase();
-    
-    // Only allow deleting custom templates
-    const result = await NotificationTemplate.deleteOne({
-      templateId,
-      isCustom: true,
-    });
-    
-    return result.deletedCount > 0;
-  }
-
-  async getNotificationStats() {
-    await connectToDatabase();
-    
-    const [totalSent, unreadCount, templateStats] = await Promise.all([
-      Notification.countDocuments(),
-      Notification.countDocuments({ isRead: false }),
-      Notification.aggregate([
-        { $group: { _id: '$category', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-      ]),
-    ]);
-
-    return {
-      totalSent,
-      unreadCount,
-      byCategory: templateStats.reduce((acc, item) => {
-        acc[item._id] = item.count;
-        return acc;
-      }, {} as Record<string, number>),
-    };
   }
 }
 
-// Export singleton instance
+// Create singleton instance
 export const notificationService = new NotificationService();
 
-// Export class for testing
-export { NotificationService };
+// ========== Helper functions for backwards compatibility ==========
 
+export async function sendNotification(data: NotificationData): Promise<boolean> {
+  return notificationService.sendByType(data);
+}
+
+export async function sendBulkNotifications(
+  userIds: string[],
+  type: NotificationType,
+  metadata?: Record<string, any>
+): Promise<number> {
+  let successCount = 0;
+  
+  for (const userId of userIds) {
+    const success = await sendNotification({ userId, type, metadata });
+    if (success) successCount++;
+  }
+  
+  return successCount;
+}
+
+// ========== KYC-specific notification helpers ==========
+
+export async function sendKYCStartedNotification(userId: string): Promise<boolean> {
+  return sendNotification({ userId, type: 'kyc_started' });
+}
+
+export async function sendKYCApprovedNotification(userId: string): Promise<boolean> {
+  return sendNotification({ userId, type: 'kyc_approved' });
+}
+
+export async function sendKYCDeclinedNotification(userId: string, reason?: string): Promise<boolean> {
+  return sendNotification({
+    userId,
+    type: 'kyc_declined',
+    metadata: { reason: reason || 'Verification could not be completed' },
+  });
+}
+
+export async function sendKYCExpiredNotification(userId: string): Promise<boolean> {
+  return sendNotification({ userId, type: 'kyc_expired' });
+}
+
+export async function sendKYCRequiredNotification(userId: string): Promise<boolean> {
+  return sendNotification({ userId, type: 'kyc_required' });
+}
+
+// ========== Withdrawal notification helpers ==========
+
+export async function sendWithdrawalInitiatedNotification(userId: string, amount: string): Promise<boolean> {
+  return sendNotification({ userId, type: 'withdrawal_initiated', metadata: { amount } });
+}
+
+export async function sendWithdrawalCompletedNotification(userId: string, amount: string): Promise<boolean> {
+  return sendNotification({ userId, type: 'withdrawal_completed', metadata: { amount } });
+}
+
+export async function sendWithdrawalFailedNotification(userId: string, reason: string): Promise<boolean> {
+  return sendNotification({ userId, type: 'withdrawal_failed', metadata: { reason } });
+}
+
+// ========== Deposit notification helpers ==========
+
+export async function sendDepositCompletedNotification(
+  userId: string,
+  amount: string,
+  balance: string
+): Promise<boolean> {
+  return sendNotification({ userId, type: 'deposit_completed', metadata: { amount, balance } });
+}
+
+// ========== Social/Messaging notification helpers ==========
+
+export interface CreateUserNotificationOptions {
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  icon?: string;
+  category?: string;
+  actionUrl?: string;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Create a custom user notification (for social features like friend requests, blocks, messages)
+ */
+export async function createUserNotification(options: CreateUserNotificationOptions): Promise<boolean> {
+  try {
+    const notification = await notificationService.createCustom({
+      userId: options.userId,
+      type: options.type,
+      title: options.title,
+      message: options.message,
+      icon: options.icon || 'bell',
+      category: options.category || 'social',
+      actionUrl: options.actionUrl,
+      metadata: options.metadata,
+    });
+    return !!notification;
+  } catch (error) {
+    console.error('Error creating user notification:', error);
+    return false;
+  }
+}
+
+/**
+ * Send new message notification
+ */
+export async function sendNewMessageNotification(
+  userId: string,
+  senderName: string,
+  messagePreview: string,
+  conversationId: string
+): Promise<boolean> {
+  return createUserNotification({
+    userId,
+    type: 'new_message',
+    title: 'New Message',
+    message: `${senderName}: ${messagePreview.substring(0, 50)}${messagePreview.length > 50 ? '...' : ''}`,
+    icon: 'message-circle',
+    category: 'messaging',
+    actionUrl: `/messaging?conversation=${conversationId}`,
+    metadata: { senderName, conversationId },
+  });
+}
+
+/**
+ * Send friend request notification
+ */
+export async function sendFriendRequestNotification(
+  userId: string,
+  fromUserName: string,
+  fromUserId: string
+): Promise<boolean> {
+  return createUserNotification({
+    userId,
+    type: 'friend_request',
+    title: 'Friend Request',
+    message: `${fromUserName} wants to be your friend.`,
+    icon: 'user-plus',
+    category: 'social',
+    actionUrl: '/messaging?tab=requests',
+    metadata: { fromUserName, fromUserId },
+  });
+}
+
+/**
+ * Send friend request accepted notification
+ */
+export async function sendFriendRequestAcceptedNotification(
+  userId: string,
+  friendName: string,
+  friendId: string
+): Promise<boolean> {
+  return createUserNotification({
+    userId,
+    type: 'friend_request_accepted',
+    title: 'Friend Request Accepted',
+    message: `${friendName} accepted your friend request!`,
+    icon: 'users',
+    category: 'social',
+    actionUrl: `/messaging?friend=${friendId}`,
+    metadata: { friendName, friendId },
+  });
+}
+
+// Default export
+export default notificationService;

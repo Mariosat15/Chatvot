@@ -32,11 +32,18 @@ export interface ITradingRiskSettings extends Document {
 interface ITradingRiskSettingsModel extends Model<ITradingRiskSettings> {
   getSingleton(): Promise<ITradingRiskSettings>;
   updateSingleton(updates: Partial<ITradingRiskSettings>): Promise<ITradingRiskSettings>;
+  clearCache(): void;
 }
+
+// In-memory cache for singleton settings (60 second TTL)
+// This avoids DB query on every trade/challenge
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+let cachedRiskSettings: ITradingRiskSettings | null = null;
+let riskCacheTimestamp = 0;
 
 const TradingRiskSettingsSchema = new Schema<ITradingRiskSettings>({
   _id: {
-    type: String,
+    type: Schema.Types.Mixed,
     default: 'global-trading-risk-settings',
   },
   // Margin Levels
@@ -140,8 +147,15 @@ const TradingRiskSettingsSchema = new Schema<ITradingRiskSettings>({
 });
 
 // There should only be one settings document
-// We'll use a singleton pattern with a fixed ID
+// We'll use a singleton pattern with a fixed ID and in-memory caching
 TradingRiskSettingsSchema.statics.getSingleton = async function() {
+  const now = Date.now();
+  
+  // Return cached settings if valid
+  if (cachedRiskSettings && (now - riskCacheTimestamp) < CACHE_TTL_MS) {
+    return cachedRiskSettings;
+  }
+  
   const SINGLETON_ID = 'global-trading-risk-settings';
   let settings = await this.findById(SINGLETON_ID);
   
@@ -164,6 +178,10 @@ TradingRiskSettingsSchema.statics.getSingleton = async function() {
     });
   }
   
+  // Update cache
+  cachedRiskSettings = settings;
+  riskCacheTimestamp = now;
+  
   return settings;
 };
 
@@ -183,7 +201,17 @@ TradingRiskSettingsSchema.statics.updateSingleton = async function(updates: Part
     }
   );
   
+  // Clear cache after update so next read gets fresh data
+  cachedRiskSettings = null;
+  riskCacheTimestamp = 0;
+  
   return settings;
+};
+
+// Clear cache (call after admin updates settings)
+TradingRiskSettingsSchema.statics.clearCache = function() {
+  cachedRiskSettings = null;
+  riskCacheTimestamp = 0;
 };
 
 const TradingRiskSettings = (mongoose.models.TradingRiskSettings || 

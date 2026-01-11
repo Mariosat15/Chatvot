@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Activity, TrendingUp, BarChart3, Waves } from 'lucide-react';
+import { Activity, TrendingUp, Waves } from 'lucide-react';
 
 export interface IndicatorConfig {
   id: string;

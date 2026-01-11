@@ -8,32 +8,31 @@ import { connectToDatabase } from '@/database/mongoose';
 import TradingOrder from '@/database/models/trading/trading-order.model';
 import TradingPosition from '@/database/models/trading/trading-position.model';
 import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import Competition from '@/database/models/trading/competition.model';
-import { getContestAndParticipant, getParticipantModel, ContestType } from './contest-utils';
+import { getContestAndParticipant, getParticipantModel } from './contest-utils';
 import mongoose from 'mongoose';
 import {
   calculateMarginRequired,
-  calculateUnrealizedPnL,
-  calculatePnLPercentage,
   validateQuantity,
   validateSLTP,
   ForexSymbol,
   FOREX_PAIRS,
 } from '@/lib/services/pnl-calculator.service';
 import { validateNewOrder } from '@/lib/services/risk-manager.service';
-import { getRealPrice, isForexMarketOpen, getMarketStatus } from '@/lib/services/real-forex-prices.service';
+import { getRealPrice, fetchRealForexPrices, getMarketStatus } from '@/lib/services/real-forex-prices.service';
+import { isMarketOpen } from '@/lib/services/market-hours.service';
 import { validateLimitOrderPrice } from '@/lib/utils/limit-order-validation';
+import PriceLog from '@/database/models/trading/price-log.model';
 
 /**
  * Check if market is open and throw error if closed
- * Used for all user-initiated trading actions
+ * Uses admin-configured market hours and holidays
  */
 async function ensureMarketOpen(): Promise<void> {
-  const isOpen = await isForexMarketOpen();
-  if (!isOpen) {
-    const status = getMarketStatus();
-    throw new Error(`Market is currently closed. ${status}. Trading is not available until market opens.`);
+  const marketStatus = await isMarketOpen('forex');
+  if (!marketStatus.isOpen) {
+    const reason = marketStatus.reason || getMarketStatus();
+    const holidayInfo = marketStatus.isHoliday ? ` (Holiday: ${marketStatus.holidayName})` : '';
+    throw new Error(`Market is currently closed${holidayInfo}. ${reason}. Trading is not available until market opens.`);
   }
 }
 
@@ -41,8 +40,11 @@ async function ensureMarketOpen(): Promise<void> {
  * Check competition risk limits (max drawdown and daily loss)
  * Returns { allowed: boolean, reason?: string }
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function checkCompetitionRiskLimits(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   participant: any
 ): Promise<{ allowed: boolean; reason?: string }> {
   // Check if risk limits are enabled for this competition
@@ -122,12 +124,13 @@ async function checkCompetitionRiskLimits(
     let totalUnrealizedPnL = 0;
     
     if (openPositions.length > 0) {
-      // Get current prices for all open position symbols
-      const symbols = [...new Set(openPositions.map(p => p.symbol))];
+      // OPTIMIZATION: Fetch all prices at once (instead of one by one in loop!)
+      const uniqueSymbols = [...new Set(openPositions.map(p => p.symbol))] as ForexSymbol[];
+      const pricesMap = await fetchRealForexPrices(uniqueSymbols);
       
       for (const position of openPositions) {
         try {
-          const currentPrice = await getRealPrice(position.symbol);
+          const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
           if (currentPrice) {
             const exitPrice = position.side === 'buy' ? currentPrice.bid : currentPrice.ask;
             const priceDiff = position.side === 'buy' 
@@ -166,6 +169,7 @@ async function checkCompetitionRiskLimits(
 }
 
 // Place a new order
+// lockedPrice: Optional - locked bid/ask from frontend at the moment user clicked trade
 export const placeOrder = async (params: {
   competitionId: string;
   symbol: ForexSymbol;
@@ -176,6 +180,7 @@ export const placeOrder = async (params: {
   stopLoss?: number;
   takeProfit?: number;
   leverage?: number;
+  lockedPrice?: { bid: number; ask: number; timestamp: number };
 }) => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -224,11 +229,34 @@ export const placeOrder = async (params: {
 
     // Check contest is active
     if (contestData.status !== 'active') {
-      throw new Error(`${contestType === 'competition' ? 'Competition' : 'Challenge'} is not active`);
+      const contestName = contestType === 'competition' ? 'Competition' : 'Challenge';
+      if (contestData.status === 'completed') {
+        throw new Error(`${contestName} has ended. You can no longer place trades.`);
+      } else if (contestData.status === 'cancelled') {
+        throw new Error(`${contestName} was cancelled. Trading is not available.`);
+      } else if (contestData.status === 'upcoming') {
+        throw new Error(`${contestName} hasn't started yet. Please wait for it to begin.`);
+      }
+      throw new Error(`${contestName} is not active (Status: ${contestData.status})`);
     }
 
+    // Check participant status with specific error messages
     if (participant.status !== 'active') {
-      throw new Error('Your participation status is not active');
+      const contestName = contestType === 'competition' ? 'Competition' : 'Challenge';
+      
+      if (participant.status === 'liquidated') {
+        const reason = participant.liquidationReason || 'margin call';
+        throw new Error(`⛔ You have been DISQUALIFIED from this ${contestName.toLowerCase()} due to liquidation (${reason}). You can no longer trade.`);
+      } else if (participant.status === 'disqualified') {
+        const reason = participant.disqualificationReason || 'rule violation';
+        throw new Error(`⛔ You have been DISQUALIFIED from this ${contestName.toLowerCase()}. Reason: ${reason}. You can no longer trade.`);
+      } else if (participant.status === 'completed') {
+        throw new Error(`This ${contestName.toLowerCase()} has ended for you. You can no longer place trades.`);
+      } else if (participant.status === 'refunded') {
+        throw new Error(`Your entry fee was refunded. You are no longer participating in this ${contestName.toLowerCase()}.`);
+      }
+      
+      throw new Error(`Your participation status is "${participant.status}". You cannot trade in this ${contestName.toLowerCase()}.`);
     }
 
     // ✅ CHECK RISK LIMITS (Max Drawdown & Daily Loss) - Only for competitions with risk limits
@@ -253,16 +281,59 @@ export const placeOrder = async (params: {
       throw new Error(`Invalid forex pair: ${symbol}`);
     }
 
-    // Get current REAL market price from Massive.com
-    const currentPriceQuote = await getRealPrice(symbol);
-    if (!currentPriceQuote) {
-      throw new Error('Unable to get current market price. Market may be closed or API unavailable.');
+    // Determine price to use for execution
+    // Priority: 1) Locked price from frontend (if fresh), 2) Fresh API price
+    const pipSize = symbol.includes('JPY') ? 0.01 : 0.0001;
+    const MAX_PRICE_AGE_MS = 2000; // Max 2 seconds for locked price
+    
+    let currentPriceQuote: { bid: number; ask: number; mid: number; spread: number; timestamp: number };
+    let executionPrice: number;
+    
+    const { lockedPrice } = params;
+    
+    if (orderType === 'market' && lockedPrice && (Date.now() - lockedPrice.timestamp) < MAX_PRICE_AGE_MS) {
+      // 🔒 Use LOCKED price from frontend - what user saw when they clicked trade
+      console.log(`\n🔒 [ORDER] Using LOCKED price for ${symbol} (age: ${Date.now() - lockedPrice.timestamp}ms)`);
+      console.log(`   Locked BID: ${lockedPrice.bid.toFixed(5)} (${side === 'sell' ? '← WILL USE' : ''})`);
+      console.log(`   Locked ASK: ${lockedPrice.ask.toFixed(5)} (${side === 'buy' ? '← WILL USE' : ''})`);
+      
+      currentPriceQuote = {
+        bid: lockedPrice.bid,
+        ask: lockedPrice.ask,
+        mid: (lockedPrice.bid + lockedPrice.ask) / 2,
+        spread: lockedPrice.ask - lockedPrice.bid,
+        timestamp: lockedPrice.timestamp,
+      };
+      
+      executionPrice = side === 'buy' ? lockedPrice.ask : lockedPrice.bid;
+      console.log(`   ✅ Execution price: ${executionPrice.toFixed(5)} (${side === 'buy' ? 'ASK' : 'BID'}) 🔒 LOCKED`);
+    } else {
+      // Fetch fresh price from API
+      console.log(`\n🔄 [ORDER] Getting fresh price for ${symbol}...`);
+      if (lockedPrice) {
+        console.log(`   ⚠️ Locked price expired (age: ${Date.now() - lockedPrice.timestamp}ms)`);
+      }
+      
+      const freshPrice = await getRealPrice(symbol);
+      if (!freshPrice) {
+        throw new Error('Unable to get current market price. Market may be closed or API unavailable.');
+      }
+      
+      currentPriceQuote = freshPrice;
+      
+      const spreadPips = (freshPrice.spread / pipSize).toFixed(2);
+      console.log(`📊 [ORDER] Market price received:`);
+      console.log(`   BID: ${freshPrice.bid.toFixed(5)} (${side === 'sell' ? '← WILL USE' : ''})`);
+      console.log(`   ASK: ${freshPrice.ask.toFixed(5)} (${side === 'buy' ? '← WILL USE' : ''})`);
+      console.log(`   Spread: ${spreadPips} pips`);
+      console.log(`   Timestamp: ${new Date(freshPrice.timestamp).toISOString()}`);
+      
+      executionPrice = orderType === 'market'
+        ? side === 'buy' ? freshPrice.ask : freshPrice.bid
+        : limitPrice!;
+      
+      console.log(`✅ [ORDER] Execution price: ${executionPrice.toFixed(5)} (${side === 'buy' ? 'ASK' : 'BID'})`);
     }
-
-    // Determine execution price
-    const executionPrice = orderType === 'market'
-      ? side === 'buy' ? currentPriceQuote.ask : currentPriceQuote.bid
-      : limitPrice!;
 
     if (orderType === 'limit' && !limitPrice) {
       throw new Error('Limit price required for limit orders');
@@ -361,6 +432,24 @@ export const placeOrder = async (params: {
         { session: mongoSession }
       );
 
+      // ⚡ For optimistic UI - store position data for immediate frontend update
+      let positionData: {
+        _id: string;
+        symbol: string;
+        side: string;
+        quantity: number;
+        entryPrice: number;
+        currentPrice: number;
+        unrealizedPnl: number;
+        unrealizedPnlPercentage: number;
+        stopLoss?: number;
+        takeProfit?: number;
+        leverage: number;
+        marginUsed: number;
+        status: string;
+        openedAt: string;
+      } | undefined = undefined;
+
       // If market order, create position immediately
       if (orderType === 'market') {
         const position = await TradingPosition.create(
@@ -406,6 +495,26 @@ export const placeOrder = async (params: {
           hasStopLoss: !!position[0].stopLoss
         });
 
+        // ⚡ Add to real-time TP/SL cache for instant triggering
+        if (stopLoss || takeProfit) {
+          try {
+            const { updatePositionInCache } = await import('@/lib/services/tpsl-realtime.service');
+            updatePositionInCache(
+              position[0]._id.toString(),
+              symbol,
+              side === 'buy' ? 'long' : 'short',
+              takeProfit ?? null,
+              stopLoss ?? null,
+              executionPrice,
+              quantity,
+              session.user.id,
+              competitionId
+            );
+          } catch {
+            // Cache update is optional
+          }
+        }
+
         // Update participant (use correct model based on contest type)
         const ParticipantModel = await getParticipantModel(contestType);
         await ParticipantModel.findByIdAndUpdate(
@@ -424,38 +533,84 @@ export const placeOrder = async (params: {
           { session: mongoSession }
         );
 
+        // 📝 Log price snapshot for trade validation/auditing (NON-BLOCKING - fire and forget)
+        const expectedPrice = side === 'buy' ? currentPriceQuote.ask : currentPriceQuote.bid;
+        const slippagePips = Math.abs(executionPrice - expectedPrice) / pipSize;
+        
+        // Don't await - this is non-critical and shouldn't block the response
+        PriceLog.create({
+          symbol,
+          bid: currentPriceQuote.bid,
+          ask: currentPriceQuote.ask,
+          mid: currentPriceQuote.mid,
+          spread: currentPriceQuote.spread,
+          timestamp: new Date(),
+          tradeId: position[0]._id.toString(),
+          orderId: order[0]._id.toString(),
+          tradeType: 'entry',
+          tradeSide: side === 'buy' ? 'long' : 'short',
+          executionPrice,
+          expectedPrice,
+          priceMatchesExpected: slippagePips < 0.5,
+          slippagePips,
+          priceSource: 'rest',
+        }).catch(logError => {
+          console.warn('⚠️ Failed to create price log (non-critical):', logError);
+        });
+
         console.log('✅ POSITION OPENED:');
         console.log(`   Symbol: ${symbol}`);
         console.log(`   Side: ${side.toUpperCase()}`);
         console.log(`   Quantity: ${quantity} lots`);
         console.log(`   Entry Price: ${executionPrice.toFixed(5)} (${side === 'buy' ? 'ASK' : 'BID'})`);
+        console.log(`   Bid/Ask at Entry: ${currentPriceQuote.bid.toFixed(5)} / ${currentPriceQuote.ask.toFixed(5)}`);
+        console.log(`   Spread: ${(currentPriceQuote.spread / pipSize).toFixed(2)} pips`);
+        console.log(`   Slippage: ${slippagePips.toFixed(2)} pips`);
         console.log(`   Leverage: 1:${leverage}`);
         console.log(`   Margin Required: $${marginRequired.toFixed(2)}`);
         console.log(`   Previous Available: $${participant.availableCapital.toFixed(2)}`);
         console.log(`   New Available: $${(participant.availableCapital - marginRequired).toFixed(2)} (Margin Locked 🔒)`);
+
+        // ⚡ Store position data for immediate frontend update
+        positionData = {
+          _id: position[0]._id.toString(),
+          symbol,
+          side: side === 'buy' ? 'long' : 'short',
+          quantity,
+          entryPrice: executionPrice,
+          currentPrice: executionPrice,
+          unrealizedPnl: 0,
+          unrealizedPnlPercentage: 0,
+          stopLoss,
+          takeProfit,
+          leverage,
+          marginUsed: marginRequired,
+          status: 'open',
+          openedAt: new Date().toISOString(),
+        };
       } else {
         console.log(`✅ Limit order placed: ${side} ${quantity} ${symbol} @ ${limitPrice}`);
       }
 
       await mongoSession.commitTransaction();
+      mongoSession.endSession(); // End session immediately after commit
 
-      // Send order filled notification for market orders
+      // 🔔 Send notifications NON-BLOCKING (fire and forget)
       if (orderType === 'market') {
-        try {
-          const { notificationService } = await import('@/lib/services/notification.service');
-          await notificationService.notifyOrderFilled(
+        import('@/lib/services/notification.service').then(({ notificationService }) => {
+          notificationService.notifyOrderFilled(
             session.user.id,
             symbol,
             side.toUpperCase(),
             executionPrice,
             quantity
-          );
-        } catch (notifError) {
-          console.error('Error sending order filled notification:', notifError);
-        }
+          ).catch(notifError => {
+            console.error('Error sending order filled notification:', notifError);
+          });
+        }).catch(() => {});
       }
 
-      // Revalidate appropriate paths based on contest type
+      // Revalidate paths (keep this - Next.js needs it for SSR)
       if (contestType === 'competition') {
         revalidatePath(`/competitions/${competitionId}/trade`);
         revalidatePath(`/competitions/${competitionId}`);
@@ -468,15 +623,18 @@ export const placeOrder = async (params: {
         success: true,
         orderId: order[0]._id.toString(),
         positionId: orderType === 'market' ? order[0].positionId : undefined,
+        position: positionData, // ⚡ Include position for immediate UI update!
         message: orderType === 'market'
           ? 'Order executed successfully'
           : 'Limit order placed successfully',
       };
     } catch (error) {
-      await mongoSession.abortTransaction();
-      throw error;
-    } finally {
+      // Only abort if session is still in a transaction (not yet committed)
+      if (mongoSession.inTransaction()) {
+        await mongoSession.abortTransaction();
+      }
       mongoSession.endSession();
+      throw error;
     }
   } catch (error) {
     console.error('Error placing order:', error);
@@ -495,6 +653,7 @@ export const getUserOrders = async (
 
     await connectToDatabase();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {
       competitionId,
       userId: session.user.id,
@@ -720,6 +879,111 @@ export const checkLimitOrders = async (competitionId: string) => {
     }
   } catch (error) {
     console.error('Error checking limit orders:', error);
+  }
+};
+
+// Execute a single limit order (used by worker)
+export const executeLimitOrder = async (orderId: string, marketPrice: number) => {
+  try {
+    await connectToDatabase();
+
+    const order = await TradingOrder.findById(orderId);
+    if (!order || order.status !== 'pending') {
+      return { success: false, message: 'Order not found or not pending' };
+    }
+
+    const mongoSession = await mongoose.startSession();
+    mongoSession.startTransaction();
+
+    try {
+      // Get participant
+      const participant = await CompetitionParticipant.findById(order.participantId).session(mongoSession);
+      if (!participant) {
+        await mongoSession.abortTransaction();
+        return { success: false, message: 'Participant not found' };
+      }
+
+      // Check if still have capital
+      if (participant.availableCapital < order.marginRequired) {
+        order.status = 'cancelled';
+        order.rejectionReason = 'Insufficient capital';
+        await order.save({ session: mongoSession });
+        await mongoSession.commitTransaction();
+        return { success: false, message: 'Insufficient capital' };
+      }
+
+      // Update order
+      order.status = 'filled';
+      order.executedPrice = marketPrice;
+      order.filledQuantity = order.quantity;
+      order.remainingQuantity = 0;
+      order.executedAt = new Date();
+      await order.save({ session: mongoSession });
+
+      // Create position
+      const position = await TradingPosition.create(
+        [
+          {
+            competitionId: order.competitionId,
+            userId: order.userId,
+            participantId: order.participantId,
+            symbol: order.symbol,
+            side: order.side === 'buy' ? 'long' : 'short',
+            quantity: order.quantity,
+            entryPrice: marketPrice,
+            currentPrice: marketPrice,
+            unrealizedPnl: 0,
+            unrealizedPnlPercentage: 0,
+            stopLoss: order.stopLoss,
+            takeProfit: order.takeProfit,
+            leverage: order.leverage,
+            marginUsed: order.marginRequired,
+            maintenanceMargin: order.marginRequired * 0.5,
+            status: 'open',
+            openedAt: new Date(),
+            openOrderId: order._id.toString(),
+            lastPriceUpdate: new Date(),
+            priceUpdateCount: 0,
+          },
+        ],
+        { session: mongoSession }
+      );
+
+      // Update order with position ID
+      order.positionId = position[0]._id.toString();
+      await order.save({ session: mongoSession });
+
+      // Update participant
+      await CompetitionParticipant.findByIdAndUpdate(
+        participant._id,
+        {
+          $inc: {
+            currentOpenPositions: 1,
+            totalTrades: 1,
+          },
+          $set: {
+            availableCapital: participant.availableCapital - order.marginRequired,
+            usedMargin: participant.usedMargin + order.marginRequired,
+            lastTradeAt: new Date(),
+          },
+        },
+        { session: mongoSession }
+      );
+
+      await mongoSession.commitTransaction();
+
+      console.log(`✅ Limit order executed: ${order.symbol} @ ${marketPrice}`);
+      return { success: true, positionId: position[0]._id.toString() };
+    } catch (error) {
+      await mongoSession.abortTransaction();
+      console.error('Error executing limit order:', error);
+      return { success: false, message: 'Transaction failed' };
+    } finally {
+      mongoSession.endSession();
+    }
+  } catch (error) {
+    console.error('Error in executeLimitOrder:', error);
+    return { success: false, message: 'Failed to execute order' };
   }
 };
 

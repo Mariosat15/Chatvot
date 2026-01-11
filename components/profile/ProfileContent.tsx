@@ -1,17 +1,19 @@
 'use client';
 
-import { Trophy, TrendingUp, Target, Award, DollarSign, Coins, Activity, BarChart3, Zap, Swords } from 'lucide-react';
+import { Trophy, TrendingUp, TrendingDown, Target, Award, Activity, BarChart3, Zap, Swords, DollarSign, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import Link from 'next/link';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface ProfileContentProps {
   session: any;
   competitionStats: any;
   challengeStats?: any;
   walletData: any;
+  combinedStats?: any;
 }
 
-export default function ProfileContent({ session, competitionStats, challengeStats, walletData }: ProfileContentProps) {
+export default function ProfileContent({ session, competitionStats, challengeStats, walletData, combinedStats }: ProfileContentProps) {
   const { settings, creditsToEUR } = useAppSettings();
 
   if (!settings) return null;
@@ -30,6 +32,106 @@ export default function ProfileContent({ session, competitionStats, challengeSta
           </div>
         </div>
       </div>
+
+      {/* Combined Trading Stats - Same as Dashboard */}
+      {combinedStats && (
+        <div className="bg-gradient-to-br from-dark-700/80 to-dark-800/80 rounded-2xl p-6 shadow-xl border border-dark-600">
+          <div className="flex items-center gap-3 mb-6">
+            <Activity className="h-6 w-6 text-blue-500" />
+            <h2 className="text-2xl font-bold text-white">Trading Overview</h2>
+            <span className="text-xs text-dark-400 bg-dark-600 px-2 py-1 rounded">All Competitions + Challenges</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
+            {/* Total Trades */}
+            <div className="bg-dark-800/50 rounded-xl p-4 border border-dark-600">
+              <p className="text-xs text-dark-400 mb-1">Total Trades</p>
+              <p className="text-2xl font-bold text-white tabular-nums">
+                {combinedStats.totalTrades || 0}
+              </p>
+            </div>
+
+            {/* Win Rate */}
+            <div className="bg-dark-800/50 rounded-xl p-4 border border-blue-500/30">
+              <p className="text-xs text-blue-400 mb-1">Win Rate</p>
+              <p className="text-2xl font-bold text-white tabular-nums">
+                {(combinedStats.winRate || 0).toFixed(1)}%
+              </p>
+            </div>
+
+            {/* Winning Trades */}
+            <div className="bg-dark-800/50 rounded-xl p-4 border border-green-500/30">
+              <p className="text-xs text-green-400 mb-1">Winning</p>
+              <p className="text-2xl font-bold text-green-400 tabular-nums">
+                {combinedStats.winningTrades || 0}
+              </p>
+            </div>
+
+            {/* Losing Trades */}
+            <div className="bg-dark-800/50 rounded-xl p-4 border border-red-500/30">
+              <p className="text-xs text-red-400 mb-1">Losing</p>
+              <p className="text-2xl font-bold text-red-400 tabular-nums">
+                {combinedStats.losingTrades || 0}
+              </p>
+            </div>
+
+            {/* Total P&L */}
+            <div className={`bg-dark-800/50 rounded-xl p-4 border ${
+              (combinedStats.totalPnL || 0) >= 0 ? 'border-green-500/30' : 'border-red-500/30'
+            }`}>
+              <p className="text-xs text-dark-400 mb-1">Total P&L</p>
+              <p className={`text-2xl font-bold tabular-nums ${
+                (combinedStats.totalPnL || 0) >= 0 ? 'text-green-400' : 'text-red-400'
+              }`}>
+                {(combinedStats.totalPnL || 0) >= 0 ? '+' : ''}
+                {(combinedStats.totalPnL || 0).toFixed(2)}
+              </p>
+            </div>
+
+            {/* Profit Factor */}
+            <div className="bg-dark-800/50 rounded-xl p-4 border border-purple-500/30">
+              <p className="text-xs text-purple-400 mb-1">Profit Factor</p>
+              <p className={`text-2xl font-bold tabular-nums ${
+                (combinedStats.profitFactor || 0) >= 2 ? 'text-green-400' :
+                (combinedStats.profitFactor || 0) >= 1 ? 'text-yellow-400' : 'text-red-400'
+              }`}>
+                {combinedStats.profitFactor === 999 ? '∞' : (combinedStats.profitFactor || 0).toFixed(2)}
+              </p>
+            </div>
+          </div>
+
+          {/* Additional combined stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-dark-900/50 rounded-lg p-3">
+              <p className="text-xs text-dark-400">Avg Win</p>
+              <p className="text-lg font-semibold text-green-400">
+                +${(combinedStats.averageWin || 0).toFixed(2)}
+              </p>
+            </div>
+            <div className="bg-dark-900/50 rounded-lg p-3">
+              <p className="text-xs text-dark-400">Avg Loss</p>
+              <p className="text-lg font-semibold text-red-400">
+                -${(combinedStats.averageLoss || 0).toFixed(2)}
+              </p>
+            </div>
+            <div className="bg-dark-900/50 rounded-lg p-3">
+              <p className="text-xs text-dark-400">Largest Win</p>
+              <p className="text-lg font-semibold text-green-400">
+                +${(combinedStats.largestWin || 0).toFixed(2)}
+              </p>
+            </div>
+            <div className="bg-dark-900/50 rounded-lg p-3">
+              <p className="text-xs text-dark-400">Total Prizes Won</p>
+              <div className="flex items-baseline gap-1">
+                <p className="text-lg font-semibold text-yellow-400">
+                  {(combinedStats.totalPrizesWon || 0).toFixed(settings?.credits.decimals || 0)}
+                </p>
+                <span className="text-sm text-yellow-500">{settings?.credits.symbol || '⚡'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Wallet Summary */}
       <div className="bg-dark-700/50 rounded-2xl p-6 shadow-xl border border-dark-600">
@@ -115,6 +217,7 @@ export default function ProfileContent({ session, competitionStats, challengeSta
         <div className="flex items-center gap-3 mb-6">
           <Trophy className="h-6 w-6 text-yellow-500" />
           <h2 className="text-2xl font-bold text-white">Competition Stats</h2>
+          <span className="text-xs text-dark-400 bg-dark-600 px-2 py-1 rounded">Competitions Only</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -366,6 +469,7 @@ export default function ProfileContent({ session, competitionStats, challengeSta
           <div className="flex items-center gap-3 mb-6">
             <Swords className="h-6 w-6 text-orange-500" />
             <h2 className="text-2xl font-bold text-white">1v1 Challenge Stats</h2>
+            <span className="text-xs text-dark-400 bg-dark-600 px-2 py-1 rounded">Challenges Only</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

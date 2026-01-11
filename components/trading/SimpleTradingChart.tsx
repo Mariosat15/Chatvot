@@ -4,33 +4,26 @@ import { useEffect, useRef, useState } from 'react';
 import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
 import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { SymbolSelector, SymbolSelectorButton } from './SymbolSelector';
 
 interface SimpleTradingChartProps {
   competitionId: string;
 }
 
 // Map our symbols to TradingView format
-const TV_SYMBOL_MAP: Record<ForexSymbol, string> = {
-  'EUR/USD': 'FX:EURUSD',
-  'GBP/USD': 'FX:GBPUSD',
-  'USD/JPY': 'FX:USDJPY',
-  'USD/CHF': 'FX:USDCHF',
-  'AUD/USD': 'FX:AUDUSD',
-  'USD/CAD': 'FX:USDCAD',
-  'NZD/USD': 'FX:NZDUSD',
-  'EUR/GBP': 'FX:EURGBP',
-  'EUR/JPY': 'FX:EURJPY',
-  'GBP/JPY': 'FX:GBPJPY',
-};
+// Dynamic mapping - converts any forex pair to TradingView format
+function getTradingViewSymbol(symbol: ForexSymbol): string {
+  return `FX:${symbol.replace('/', '')}`;
+}
 
 const SimpleTradingChart = ({ competitionId }: SimpleTradingChartProps) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const { prices, subscribe, unsubscribe, marketOpen, marketStatus } = usePrices();
   const { symbol, setSymbol } = useChartSymbol();
   const [interval, setInterval] = useState<string>('5');
+  const [symbolDialogOpen, setSymbolDialogOpen] = useState(false);
 
   // Subscribe to price updates
   useEffect(() => {
@@ -45,7 +38,7 @@ const SimpleTradingChart = ({ competitionId }: SimpleTradingChartProps) => {
     // Clear previous content
     chartContainerRef.current.innerHTML = '';
 
-    const tvSymbol = TV_SYMBOL_MAP[symbol];
+    const tvSymbol = getTradingViewSymbol(symbol);
 
     // Create widget div
     const widgetDiv = document.createElement('div');
@@ -78,8 +71,6 @@ const SimpleTradingChart = ({ competitionId }: SimpleTradingChartProps) => {
 
     chartContainerRef.current.appendChild(widgetDiv);
     chartContainerRef.current.appendChild(script);
-
-    console.log(`📊 TradingView Chart loaded: ${symbol} (${interval}min)`);
   }, [symbol, interval]);
 
   const currentPrice = prices.get(symbol);
@@ -90,18 +81,17 @@ const SimpleTradingChart = ({ competitionId }: SimpleTradingChartProps) => {
       <div className="flex items-center gap-4 flex-wrap">
         {/* Symbol Selector */}
         <div className="flex-1 min-w-[200px]">
-          <Select value={symbol} onValueChange={(value) => setSymbol(value as ForexSymbol)}>
-            <SelectTrigger className="bg-gray-800 border-gray-700 text-gray-100">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
-              {Object.keys(FOREX_PAIRS).map((sym) => (
-                <SelectItem key={sym} value={sym} className="text-gray-100">
-                  {sym}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SymbolSelectorButton
+            symbol={symbol}
+            onClick={() => setSymbolDialogOpen(true)}
+            className="w-full justify-start bg-gray-800 border border-gray-700 h-10"
+          />
+          <SymbolSelector
+            open={symbolDialogOpen}
+            onOpenChange={setSymbolDialogOpen}
+            selectedSymbol={symbol}
+            onSelectSymbol={setSymbol}
+          />
         </div>
 
         {/* Timeframe Selector */}

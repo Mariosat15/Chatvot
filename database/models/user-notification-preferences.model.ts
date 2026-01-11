@@ -13,11 +13,14 @@ export interface IUserNotificationPreferences extends Document {
   categoryPreferences: {
     purchase: boolean;      // Deposits, withdrawals
     competition: boolean;   // Competition events
+    challenge: boolean;     // 1v1 Challenge events
     trading: boolean;       // Trading alerts
     achievement: boolean;   // Badges, level ups
     system: boolean;        // System updates, maintenance
     admin: boolean;         // Admin messages (always on for important)
     security: boolean;      // Security alerts (always on)
+    social: boolean;        // Friend requests, blocks
+    messaging: boolean;     // Direct messages, support chat
   };
   
   // Specific notification type overrides (optional fine-grained control)
@@ -63,11 +66,14 @@ const UserNotificationPreferencesSchema = new Schema<IUserNotificationPreference
   categoryPreferences: {
     purchase: { type: Boolean, default: true },
     competition: { type: Boolean, default: true },
+    challenge: { type: Boolean, default: true },
     trading: { type: Boolean, default: true },
     achievement: { type: Boolean, default: true },
     system: { type: Boolean, default: true },
     admin: { type: Boolean, default: true },
     security: { type: Boolean, default: true },
+    social: { type: Boolean, default: true },
+    messaging: { type: Boolean, default: true },
   },
   disabledNotifications: {
     type: [String],
@@ -105,11 +111,14 @@ UserNotificationPreferencesSchema.statics.getOrCreatePreferences = async functio
       categoryPreferences: {
         purchase: true,
         competition: true,
+        challenge: true,
         trading: true,
         achievement: true,
         system: true,
         admin: true,
         security: true,
+        social: true,
+        messaging: true,
       },
       disabledNotifications: [],
       quietHoursEnabled: false,

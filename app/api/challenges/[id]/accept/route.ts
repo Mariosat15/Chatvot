@@ -7,6 +7,7 @@ import ChallengeParticipant from '@/database/models/trading/challenge-participan
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import mongoose from 'mongoose';
+import { canJoinChallenge } from '@/lib/services/market-hours.service';
 
 // POST - Accept a challenge
 export async function POST(
@@ -24,6 +25,16 @@ export async function POST(
 
     const { id } = await params;
     await connectToDatabase();
+
+    // Check if market is open for challenges
+    const marketCheck = await canJoinChallenge();
+    if (!marketCheck.canJoin) {
+      await dbSession.abortTransaction();
+      return NextResponse.json(
+        { error: marketCheck.reason || 'Cannot accept challenge: Market is currently closed.' },
+        { status: 400 }
+      );
+    }
 
     const challenge = await Challenge.findById(id).session(dbSession);
 
@@ -178,13 +189,15 @@ export async function POST(
     try {
       const { notificationService } = await import('@/lib/services/notification.service');
       
-      // Notify challenger
+      // Notify challenger that their challenge was accepted
       await notificationService.send({
         userId: challenge.challengerId,
         templateId: 'challenge_accepted',
-        metadata: {
+        variables: {  // Changed from 'metadata' to 'variables'
           challengeId: challenge._id.toString(),
+          challengeSlug: challenge.slug,  // Added for actionUrl
           challengedName: challenge.challengedName,
+          opponentName: challenge.challengedName, // Alias for template compatibility
           entryFee: challenge.entryFee,
           duration: challenge.duration,
           winnerPrize: challenge.winnerPrize,
@@ -192,13 +205,15 @@ export async function POST(
         },
       });
 
-      // Notify challenged (confirmation)
+      // Notify challenged (confirmation) that the challenge started
       await notificationService.send({
         userId: challenge.challengedId,
         templateId: 'challenge_started',
-        metadata: {
+        variables: {  // Changed from 'metadata' to 'variables'
           challengeId: challenge._id.toString(),
+          challengeSlug: challenge.slug,  // Added for actionUrl
           challengerName: challenge.challengerName,
+          opponentName: challenge.challengerName, // Alias for template compatibility
           duration: challenge.duration,
           winnerPrize: challenge.winnerPrize,
           endTime: endTime.toISOString(),

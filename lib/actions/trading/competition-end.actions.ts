@@ -6,8 +6,8 @@ import CompetitionParticipant from '@/database/models/trading/competition-partic
 import TradingPosition from '@/database/models/trading/trading-position.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import { getRealPrice } from '@/lib/services/real-forex-prices.service';
-import { closePositionAutomatic } from './position.actions';
+import { getRealPrice, fetchRealForexPrices } from '@/lib/services/real-forex-prices.service';
+import type { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import mongoose from 'mongoose';
 
 /**
@@ -75,11 +75,11 @@ export async function finalizeCompetition(competitionId: string) {
         const stats = participantStats.get(userId);
         if (stats) {
           // Calculate P&L from entry/exit prices (currentPrice = exitPrice for closed positions)
-          // FOREX: multiply by 10000 for pip value (standard lot = 100,000 units, 1 pip = 0.0001)
+          // FOREX: contractSize = 100,000 units per standard lot
           const priceDiff = position.side === 'long'
             ? position.currentPrice - position.entryPrice
             : position.entryPrice - position.currentPrice;
-          const positionPnL = priceDiff * position.quantity * 10000;
+          const positionPnL = priceDiff * position.quantity * 100000; // Fixed: was 10000
           
           stats.totalPnL += positionPnL;
           stats.currentCapital += positionPnL;
@@ -104,10 +104,26 @@ export async function finalizeCompetition(competitionId: string) {
     const openPositions = allPositions.filter(p => p.status === 'open');
     console.log(`Closing ${openPositions.length} open positions...`);
 
+    // OPTIMIZATION: Fetch all prices at once (instead of one by one in loop!)
+    // This reduces price fetch from 15+ seconds to <1 second
+    const uniqueSymbols = [...new Set(openPositions.map(p => p.symbol))] as ForexSymbol[];
+    console.log(`Fetching prices for ${uniqueSymbols.length} unique symbols: ${uniqueSymbols.join(', ')}`);
+    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+    console.log(`Got ${pricesMap.size} prices in single batch`);
+    
+    // Log which prices we have
+    if (pricesMap.size > 0) {
+      for (const [symbol, price] of pricesMap.entries()) {
+        console.log(`  ✅ ${symbol}: bid=${price.bid}, ask=${price.ask}`);
+      }
+    } else {
+      console.error(`  ❌ WARNING: No prices available! This will prevent position closing.`);
+    }
+
     for (const position of openPositions) {
       try {
-        // Get current market price
-        const priceData = await getRealPrice(position.symbol);
+        // Get price from pre-fetched batch (instant!)
+        const priceData = pricesMap.get(position.symbol as ForexSymbol);
         if (!priceData) {
           console.error(`  ❌ Could not get price for ${position.symbol}, skipping`);
           continue;
@@ -116,11 +132,11 @@ export async function finalizeCompetition(competitionId: string) {
 
         console.log(`  Closing ${position.symbol} ${position.side} for user ${position.userId} at ${exitPrice}`);
 
-        // Calculate P&L for this position (FOREX: multiply by 10000 for pip value)
+        // Calculate P&L for this position (FOREX: contractSize = 100,000 units per lot)
         const priceDiff = position.side === 'long'
           ? exitPrice - position.entryPrice
           : position.entryPrice - exitPrice;
-        const positionPnL = priceDiff * position.quantity * 10000; // FOREX pip value
+        const positionPnL = priceDiff * position.quantity * 100000; // Fixed: was 10000
 
         console.log(`    Entry: ${position.entryPrice}, Exit: ${exitPrice}, P&L: $${positionPnL.toFixed(2)}`);
 
@@ -522,7 +538,7 @@ export async function finalizeCompetition(competitionId: string) {
       });
     }
 
-    // STEP 5: Update competition status
+    // STEP 5: Update competition and participant statuses
     console.log(`🎯 Updating competition status...`);
     competition.status = 'completed';
     competition.winnerId = leaderboard[0]?.userId;
@@ -530,15 +546,31 @@ export async function finalizeCompetition(competitionId: string) {
     competition.finalLeaderboard = leaderboard;
     await competition.save({ session });
 
+    // CRITICAL: Update ALL participant statuses to 'completed' so they don't block withdrawals!
+    // Only update participants that are still 'active' (not liquidated/disqualified)
+    const participantUpdateResult = await CompetitionParticipant.updateMany(
+      {
+        competitionId: competition._id,
+        status: 'active', // Only update active participants
+      },
+      {
+        $set: { status: 'completed' },
+      },
+      { session }
+    );
+    console.log(`   ✅ Updated ${participantUpdateResult.modifiedCount} participant statuses to 'completed'`);
+
     await session.commitTransaction();
+    // End session immediately after commit to prevent "abortTransaction after commitTransaction" error
+    session.endSession();
 
     console.log(`✅ Competition ${competition.name} finalized successfully!`);
     console.log(`   Winners: ${winnerTransactions.length}`);
     console.log(`   Total Distributed: ${totalDistributed} credits`);
     console.log(`   Platform Fee: ${actualPlatformFee.toFixed(2)} credits`);
-    console.log(`   Platform Earned: ${finalPlatformFee.toFixed(2)} credits`);
+    console.log(`   Platform Earned: ${(prizePool - totalDistributed).toFixed(2)} credits`);
 
-    // Evaluate badges for ALL participants after competition ends (fire and forget)
+    // Evaluate badges for ALL participants after competition ends (fire and forget - non-blocking)
     try {
       const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
       const uniqueUserIds = [...new Set(participants.map(p => p.userId.toString()))];
@@ -557,70 +589,74 @@ export async function finalizeCompetition(competitionId: string) {
       console.error('Error importing badge service:', error);
     }
 
-    // Send notifications to all participants about competition end (fire and forget)
+    // Send notifications to all participants about competition end (fire and forget - non-blocking)
     try {
       const { notificationService } = await import('@/lib/services/notification.service');
       
       console.log(`🔔 Sending competition end notifications...`);
       
-      // Notify winners (rank 1 gets special notification)
+      // Notify winners (rank 1 gets special notification) - non-blocking
       for (const dist of prizeDistributions) {
         const winner = leaderboard.find((l) => l.userId === dist.userId);
         if (winner) {
           if (dist.rank === 1) {
             // Winner notification
-            await notificationService.notifyCompetitionWon(
+            notificationService.notifyCompetitionWon(
               winner.userId,
               competition.name,
               dist.prizeAmount
-            );
+            ).catch(e => console.error('Failed to send winner notification:', e));
           } else if (dist.rank <= 3) {
             // Podium notification
-            await notificationService.notifyPodiumFinish(
+            notificationService.notifyPodiumFinish(
               winner.userId,
               competition.name,
               dist.rank,
               dist.prizeAmount
-            );
+            ).catch(e => console.error('Failed to send podium notification:', e));
           }
           
           // Send prize received notification to all winners
-          await notificationService.notifyPrizeReceived(
+          notificationService.notifyPrizeReceived(
             winner.userId,
             competition.name,
             dist.prizeAmount,
             dist.rank
-          );
+          ).catch(e => console.error('Failed to send prize notification:', e));
         }
       }
       
-      // Notify disqualified participants
+      // Notify disqualified participants - non-blocking
       const disqualifiedParticipants = leaderboard.filter(p => p.qualificationStatus === 'disqualified');
+      const { sendNotification } = await import('@/lib/services/notification.service');
       for (const participant of disqualifiedParticipants) {
-        await notificationService.notifyDisqualified(
-          participant.userId,
-          competition._id.toString(),
-          competition.name,
-          participant.disqualificationReason || 'Did not meet competition requirements'
-        );
+        sendNotification({
+          userId: participant.userId,
+          type: 'competition_disqualified',
+          metadata: {
+            competitionId: competition._id.toString(),
+            competitionName: competition.name,
+            reason: participant.disqualificationReason || 'Did not meet competition requirements',
+          },
+        }).catch(e => console.error('Failed to send disqualification notification:', e));
       }
       if (disqualifiedParticipants.length > 0) {
         console.log(`🔔 Sent ${disqualifiedParticipants.length} disqualification notifications`);
       }
 
-      // Notify all participants about competition end
+      // Notify all participants about competition end - non-blocking
       for (const participant of leaderboard) {
         const pnl = participant.pnl || 0;
-        await notificationService.notifyCompetitionEnded(
+        notificationService.notifyCompetitionEnded(
           participant.userId,
           competition._id.toString(),
           competition.name,
           participant.rank || 0,
           pnl
-        );
+        ).catch(e => console.error('Failed to send competition end notification:', e));
       }
       
-      console.log(`🔔 Sent ${leaderboard.length} competition end notifications`);
+      console.log(`🔔 Queued ${leaderboard.length} competition end notifications`);
     } catch (error) {
       console.error('Error sending competition end notifications:', error);
     }
@@ -641,11 +677,19 @@ export async function finalizeCompetition(competitionId: string) {
       },
     };
   } catch (error) {
-    await session.abortTransaction();
+    // Only abort if session is still in transaction
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     console.error('❌ Error finalizing competition:', error);
     throw error;
   } finally {
-    session.endSession();
+    // End session if it hasn't been ended yet (for error cases)
+    try {
+      session.endSession();
+    } catch {
+      // Session already ended after successful commit
+    }
   }
 }
 

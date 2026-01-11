@@ -1,6 +1,6 @@
 'use client';
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Target, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface TradingStatsChartProps {
@@ -90,7 +90,7 @@ export default function TradingStatsChart({
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
+                  label={({ percent }) => `${((percent || 0) * 100).toFixed(1)}%`}
                   outerRadius={80}
                   innerRadius={50}
                   fill="#8884d8"

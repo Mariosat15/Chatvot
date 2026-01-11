@@ -4,6 +4,8 @@ import { headers } from 'next/headers';
 import { getStripeClient, eurToCents, STRIPE_CONFIG } from '@/lib/stripe/config';
 import { initiateDeposit } from '@/lib/actions/trading/wallet.actions';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import CreditWallet from '@/database/models/trading/credit-wallet.model';
+import KYCSettings from '@/database/models/kyc-settings.model';
 import { connectToDatabase } from '@/database/mongoose';
 
 export async function POST(req: NextRequest) {
@@ -13,6 +15,33 @@ export async function POST(req: NextRequest) {
     
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    await connectToDatabase();
+
+    // Check if KYC is required for deposits
+    const kycSettings = await KYCSettings.findOne();
+    if (kycSettings?.enabled && kycSettings?.requiredForDeposit) {
+      const wallet = await CreditWallet.findOne({ userId: session.user.id });
+      if (!wallet?.kycVerified) {
+        console.log(`🛡️ KYC required for deposit - user ${session.user.id} not verified`);
+        return NextResponse.json(
+          { error: 'KYC verification required before depositing. Please complete identity verification first.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // ✅ CHECK USER RESTRICTIONS - Blocked users cannot deposit
+    const { canUserPerformAction } = await import('@/lib/services/user-restriction.service');
+    const restrictionCheck = await canUserPerformAction(session.user.id, 'deposit');
+    
+    if (!restrictionCheck.allowed) {
+      console.log(`❌ Deposit blocked for user ${session.user.id}: ${restrictionCheck.reason}`);
+      return NextResponse.json(
+        { error: restrictionCheck.reason || 'Your account is restricted and cannot make deposits. Please contact support.' },
+        { status: 403 }
+      );
     }
 
     // Get amount from request (amount = base credits, totalAmount = with VAT + platform fee)

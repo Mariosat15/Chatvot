@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, Check, CheckCheck, Trash2, ChevronRight, X, RefreshCw } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, ChevronRight, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -12,6 +12,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
+import { PERFORMANCE_INTERVALS } from '@/lib/utils/performance';
 
 interface Notification {
   _id: string;
@@ -71,9 +72,14 @@ export default function NotificationDropdown() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Poll for new notifications every 30 seconds
+  // Poll for new notifications - optimized with visibility awareness
   useEffect(() => {
-    const pollInterval = setInterval(async () => {
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+    const pollNotifications = async () => {
+      // Skip if tab is hidden
+      if (document.hidden) return;
+      
       try {
         const response = await fetch('/api/notifications?action=count');
         if (response.ok) {
@@ -89,9 +95,22 @@ export default function NotificationDropdown() {
       } catch (error) {
         // Silent fail for polling
       }
-    }, 30000);
+    };
 
-    return () => clearInterval(pollInterval);
+    pollInterval = setInterval(pollNotifications, PERFORMANCE_INTERVALS.NOTIFICATION_POLL);
+
+    // Refresh when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        pollNotifications();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [unreadCount, fetchNotifications]);
 
   // Refresh when opening

@@ -1,6 +1,6 @@
 'use client';
 
-import { Trophy, TrendingUp, TrendingDown, Ban, AlertTriangle, Skull, ShieldX } from 'lucide-react';
+import { Trophy, Ban, AlertTriangle, Skull, ShieldX } from 'lucide-react';
 
 interface LeaderboardEntry {
   _id: string;

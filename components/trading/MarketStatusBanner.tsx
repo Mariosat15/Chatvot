@@ -65,7 +65,7 @@ export default function MarketStatusBanner({ className }: MarketStatusBannerProp
       let targetTime: Date;
       let prefix: string;
 
-      if (marketStatus.isOpen) {
+      if (marketStatus?.isOpen) {
         // Market is open, countdown to close (Friday 22:00 UTC)
         targetTime = getNextMarketClose(now);
         prefix = 'Market closes in';
