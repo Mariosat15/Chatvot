@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Mail, Save, Send, RefreshCw, Eye, Code, Sparkles, AlertCircle, Check, Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, UserPlus, MailCheck } from 'lucide-react';
+import { Mail, Save, Send, RefreshCw, Eye, Code, Sparkles, AlertCircle, Check, Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, UserPlus, MailCheck, UserCog, UserSwitch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,7 +44,7 @@ interface EmailTemplate {
   isActive: boolean;
 }
 
-type TemplateType = 'welcome' | 'deposit_completed' | 'withdrawal_completed' | 'email_verification';
+type TemplateType = 'welcome' | 'deposit_completed' | 'withdrawal_completed' | 'email_verification' | 'account_manager_assigned' | 'account_manager_changed';
 
 const TEMPLATE_CONFIG: Record<TemplateType, {
   title: string;
@@ -139,6 +139,50 @@ const TEMPLATE_CONFIG: Record<TemplateType, {
       closingText: 'This verification link will expire in {{expiryHours}} hours. If you didn\'t create an account, you can safely ignore this email.',
       ctaButtonText: 'Verify Email Address',
       ctaButtonUrl: '{{verificationLink}}',
+    },
+  },
+  account_manager_assigned: {
+    title: 'Account Manager Assigned',
+    description: 'Sent to customers when they are assigned an account manager',
+    icon: UserCog,
+    variables: ['{{customerName}}', '{{managerFirstName}}', '{{platformName}}', '{{baseUrl}}', '{{companyAddress}}'],
+    defaults: {
+      templateType: 'account_manager_assigned',
+      name: 'Account Manager Assigned',
+      subject: '🎉 Meet Your Dedicated Account Manager at {{platformName}}',
+      headingText: '👋 Welcome to Personalized Support!',
+      introText: 'Great news! You have been assigned a dedicated account manager who will be your primary point of contact for all your needs.',
+      featureListLabel: 'Your Account Manager',
+      featureItems: [
+        '{{managerFirstName}} will assist you with any questions about your account',
+        'Get personalized guidance for competitions and trading',
+        'Receive priority support whenever you need help',
+      ],
+      closingText: 'Feel free to reach out through the messaging feature in your account. {{managerFirstName}} is here to help you succeed!',
+      ctaButtonText: 'Send a Message',
+      ctaButtonUrl: '{{baseUrl}}/messaging',
+    },
+  },
+  account_manager_changed: {
+    title: 'Account Manager Changed',
+    description: 'Sent to customers when their account manager is changed/reassigned',
+    icon: UserSwitch,
+    variables: ['{{customerName}}', '{{newManagerFirstName}}', '{{previousManagerName}}', '{{platformName}}', '{{baseUrl}}', '{{companyAddress}}'],
+    defaults: {
+      templateType: 'account_manager_changed',
+      name: 'Account Manager Changed',
+      subject: '🔄 Your Account Manager Has Changed at {{platformName}}',
+      headingText: '👋 Meet Your New Account Manager',
+      introText: 'We wanted to let you know that your account has been reassigned to a new account manager who will be taking care of your needs going forward.',
+      featureListLabel: 'Your New Account Manager',
+      featureItems: [
+        '{{newManagerFirstName}} is now your dedicated point of contact',
+        'All your account history and preferences have been transferred',
+        'You can reach out anytime through the messaging feature',
+      ],
+      closingText: '{{newManagerFirstName}} is excited to work with you and help you achieve your trading goals!',
+      ctaButtonText: 'Say Hello',
+      ctaButtonUrl: '{{baseUrl}}/messaging',
     },
   },
 };
