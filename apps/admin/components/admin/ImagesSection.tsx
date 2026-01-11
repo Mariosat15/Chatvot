@@ -34,6 +34,7 @@ function ImageUploadCard({
   recommendations,
   isUploading,
   onFileSelect,
+  lastUploadedName,
 }: {
   title: string;
   description: string;
@@ -42,6 +43,7 @@ function ImageUploadCard({
   recommendations: string;
   isUploading: boolean;
   onFileSelect: (file: File) => void;
+  lastUploadedName?: string;
 }) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log('[ImageUploadCard] onChange triggered for', field);
@@ -89,7 +91,7 @@ function ImageUploadCard({
             {recommendations}
           </p>
 
-          <div className="mt-4">
+          <div className="mt-4 space-y-2">
             <input
               type="file"
               accept="image/*"
@@ -105,9 +107,15 @@ function ImageUploadCard({
                 disabled:opacity-50"
             />
             {isUploading && (
-              <div className="flex items-center gap-2 mt-2 text-purple-400 text-sm">
+              <div className="flex items-center gap-2 text-purple-400 text-sm">
                 <RefreshCw className="h-4 w-4 animate-spin" />
                 Uploading...
+              </div>
+            )}
+            {lastUploadedName && !isUploading && (
+              <div className="flex items-center gap-2 text-green-400 text-sm">
+                <span className="w-2 h-2 bg-green-400 rounded-full" />
+                Uploaded: {lastUploadedName}
               </div>
             )}
           </div>
@@ -139,6 +147,7 @@ export default function ImagesSection() {
     authPageDashboardImage: '',
   });
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [uploadedNames, setUploadedNames] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
 
@@ -253,6 +262,8 @@ export default function ImagesSection() {
         if (saveResponse.ok) {
           // Update local state with full merged data
           setImages(mergedImages);
+          // Track uploaded filename for display
+          setUploadedNames(prev => ({ ...prev, [field]: file.name }));
           toast.success(`${field} uploaded and saved!`);
         } else {
           const saveError = await saveResponse.json();
@@ -411,6 +422,7 @@ export default function ImagesSection() {
           recommendations="Recommended: 150x50px, PNG with transparency"
           isUploading={uploading.appLogo}
           onFileSelect={handleFileSelect('appLogo')}
+          lastUploadedName={uploadedNames.appLogo}
         />
 
         <ImageUploadCard
@@ -421,6 +433,7 @@ export default function ImagesSection() {
           recommendations="Recommended: 150x50px, PNG with transparency"
           isUploading={uploading.emailLogo}
           onFileSelect={handleFileSelect('emailLogo')}
+          lastUploadedName={uploadedNames.emailLogo}
         />
 
         <ImageUploadCard
@@ -431,6 +444,7 @@ export default function ImagesSection() {
           recommendations="Recommended: 200x200px, Square format, PNG"
           isUploading={uploading.profileImage}
           onFileSelect={handleFileSelect('profileImage')}
+          lastUploadedName={uploadedNames.profileImage}
         />
 
         <ImageUploadCard
@@ -441,6 +455,7 @@ export default function ImagesSection() {
           recommendations="Recommended: 600x400px, JPEG or PNG"
           isUploading={uploading.dashboardPreview}
           onFileSelect={handleFileSelect('dashboardPreview')}
+          lastUploadedName={uploadedNames.dashboardPreview}
         />
 
         <ImageUploadCard
@@ -451,6 +466,7 @@ export default function ImagesSection() {
           recommendations="Recommended: 32x32px or 64x64px, ICO, PNG, or SVG"
           isUploading={uploading.favicon}
           onFileSelect={handleFileSelect('favicon')}
+          lastUploadedName={uploadedNames.favicon}
         />
       </div>
 
