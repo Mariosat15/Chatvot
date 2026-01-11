@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IEmailTemplate extends Document {
-  templateType: 'welcome' | 'price_alert' | 'invoice' | 'news_summary' | 'inactive_reminder' | 'deposit_completed' | 'withdrawal_completed' | 'email_verification';
+  templateType: 'welcome' | 'price_alert' | 'invoice' | 'news_summary' | 'inactive_reminder' | 'deposit_completed' | 'withdrawal_completed' | 'email_verification' | 'account_manager_assigned' | 'account_manager_changed';
   name: string;
   subject: string;
   fromName: string;
@@ -38,7 +38,7 @@ export interface IEmailTemplate extends Document {
 const EmailTemplateSchema = new Schema<IEmailTemplate>({
   templateType: {
     type: String,
-    enum: ['welcome', 'price_alert', 'invoice', 'news_summary', 'inactive_reminder', 'deposit_completed', 'withdrawal_completed', 'email_verification'],
+    enum: ['welcome', 'price_alert', 'invoice', 'news_summary', 'inactive_reminder', 'deposit_completed', 'withdrawal_completed', 'email_verification', 'account_manager_assigned', 'account_manager_changed'],
     required: true,
     unique: true,
   },
@@ -232,6 +232,42 @@ function getTemplateDefaults(type: string): Partial<IEmailTemplate> {
     
     case 'inactive_reminder':
       return { name: 'Inactive User Reminder' };
+    
+    case 'account_manager_assigned':
+      return {
+        name: 'Account Manager Assigned',
+        subject: '🎉 Meet Your Dedicated Account Manager at {{platformName}}',
+        headingText: '👋 Welcome to Personalized Support!',
+        introText: 'Great news! You have been assigned a dedicated account manager who will be your primary point of contact for all your needs.',
+        featureListLabel: 'Your Account Manager',
+        featureItems: [
+          '{{managerFirstName}} will assist you with any questions about your account',
+          'Get personalized guidance for competitions and trading',
+          'Receive priority support whenever you need help',
+        ],
+        closingText: 'Feel free to reach out through the messaging feature in your account. {{managerFirstName}} is here to help you succeed!',
+        ctaButtonText: 'Send a Message',
+        ctaButtonUrl: '{{baseUrl}}/messaging',
+        useAIPersonalization: false,
+      };
+    
+    case 'account_manager_changed':
+      return {
+        name: 'Account Manager Changed',
+        subject: '🔄 Your Account Manager Has Changed at {{platformName}}',
+        headingText: '👋 Meet Your New Account Manager',
+        introText: 'We wanted to let you know that your account has been reassigned to a new account manager who will be taking care of your needs going forward.',
+        featureListLabel: 'Your New Account Manager',
+        featureItems: [
+          '{{newManagerFirstName}} is now your dedicated point of contact',
+          'All your account history and preferences have been transferred',
+          'You can reach out anytime through the messaging feature',
+        ],
+        closingText: '{{newManagerFirstName}} is excited to work with you and help you achieve your trading goals!',
+        ctaButtonText: 'Say Hello',
+        ctaButtonUrl: '{{baseUrl}}/messaging',
+        useAIPersonalization: false,
+      };
     
     default:
       return { name: 'Email Template' };

@@ -3,7 +3,7 @@ import { AssignmentSettings, IAssignmentSettings, AssignmentStrategy } from '@/d
 import { customerAuditService, PerformedBy, CustomerInfo } from './customer-audit.service';
 import { connectToDatabase } from '@/database/mongoose';
 import { Admin } from '@/database/models/admin.model';
-import { getTransporter } from '@/lib/nodemailer';
+import { getTransporter, sendAccountManagerAssignedEmail, sendAccountManagerChangedEmail } from '@/lib/nodemailer';
 import { getSettings } from '@/lib/services/settings.service';
 import { employeeNotificationService } from './employee-notification.service';
 
@@ -309,6 +309,55 @@ class CustomerAssignmentService {
     } catch (chatError) {
       console.error('Error transferring chat conversations:', chatError);
       // Don't fail the whole transfer if chat transfer fails
+    }
+    
+    // Send customer email notification about the new account manager (if enabled)
+    const settings = await this.getSettings();
+    if (settings.notifyCustomerOnAssignment) {
+      const newManagerFirstName = toEmployee.name.split(' ')[0] || toEmployee.name;
+      
+      try {
+        // Send email using template (only shows first name, no email)
+        await sendAccountManagerChangedEmail({
+          customerEmail: currentAssignment.customerEmail,
+          customerName: currentAssignment.customerName,
+          newManagerName: toEmployee.name,
+          newManagerFirstName,
+          previousManagerName: previousEmployee.employeeName?.split(' ')[0],
+        });
+        console.log(`📧 [Transfer] Customer notified of new account manager`);
+      } catch (emailError) {
+        console.error(`❌ [Transfer] Failed to send customer email:`, emailError);
+      }
+      
+      // Also create in-app notification for customer
+      try {
+        const mongoose = await import('mongoose');
+        const db = mongoose.default.connection.db;
+        if (db) {
+          const notificationsCollection = db.collection('notifications');
+          await notificationsCollection.insertOne({
+            userId: params.customerId,
+            templateId: 'account_manager_changed',
+            title: '🔄 New Account Manager',
+            message: `Your account manager has changed. ${newManagerFirstName} is now your dedicated contact and is ready to assist you.`,
+            type: 'info',
+            category: 'messaging',
+            isRead: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            metadata: {
+              newEmployeeId: toEmployee._id.toString(),
+              newEmployeeFirstName: newManagerFirstName,
+              previousEmployeeId: previousEmployee.employeeId.toString(),
+              previousEmployeeFirstName: previousEmployee.employeeName?.split(' ')[0],
+            },
+          });
+          console.log(`📬 [Transfer] Customer IN-APP notification created`);
+        }
+      } catch (inAppError) {
+        console.error(`❌ [Transfer] Failed to create customer in-app notification:`, inAppError);
+      }
     }
     
     return currentAssignment;
@@ -676,6 +725,9 @@ class CustomerAssignmentService {
       
       const transporter = await getTransporter();
       
+      // Extract first name from full name
+      const employeeFirstName = employeeName.split(' ')[0] || employeeName;
+      
       // Send EMAIL notification to employee if enabled
       if (settings.notifyEmployeeOnAssignment && fromEmail) {
         try {
@@ -715,45 +767,22 @@ class CustomerAssignmentService {
         }
       }
       
-      // Send EMAIL notification to customer if enabled
-      if (settings.notifyCustomerOnAssignment && fromEmail) {
+      // Send EMAIL notification to customer if enabled - using template system
+      if (settings.notifyCustomerOnAssignment) {
         try {
-          await transporter.sendMail({
-            from: `"${companyName}" <${fromEmail}>`,
-            to: customerEmail,
-            subject: `Your Dedicated Account Manager at ${companyName}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0a0a0a;">
-                <div style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-                  <h1 style="color: white; margin: 0; font-size: 24px;">🎉 Meet Your Account Manager</h1>
-                </div>
-                <div style="background: #141414; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #30333A; border-top: none;">
-                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
-                    Hello ${customerName},
-                  </p>
-                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
-                    We're pleased to inform you that a dedicated account manager has been assigned to assist you with your account.
-                  </p>
-                  <div style="background: #1E1E1E; border: 1px solid #30333A; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                    <p style="margin: 8px 0; color: #CCDADC;"><strong style="color: #FDD458;">Your Account Manager:</strong> ${employeeName}</p>
-                    <p style="margin: 8px 0; color: #CCDADC;"><strong style="color: #FDD458;">Contact:</strong> ${employeeEmail}</p>
-                  </div>
-                  <p style="color: #CCDADC; font-size: 16px; line-height: 1.6;">
-                    ${employeeName} will be your primary point of contact for any questions or assistance you may need.
-                  </p>
-                  <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-                    Best regards,<br/>The ${companyName} Team
-                  </p>
-                </div>
-              </div>
-            `,
+          // Use the templated email function (only shows manager's first name, no email)
+          await sendAccountManagerAssignedEmail({
+            customerEmail,
+            customerName,
+            managerName: employeeName,
+            managerFirstName: employeeFirstName,
           });
-          console.log(`📧 [Notification] Customer EMAIL sent to ${customerEmail}`);
+          console.log(`📧 [Notification] Customer EMAIL sent to ${customerEmail} using template`);
         } catch (emailError) {
           console.error(`❌ [Notification] Failed to send customer email:`, emailError);
         }
         
-        // Also create in-app notification for customer
+        // Also create in-app notification for customer (only showing first name)
         try {
           const mongoose = await import('mongoose');
           const db = mongoose.default.connection.db;
@@ -761,18 +790,17 @@ class CustomerAssignmentService {
             const notificationsCollection = db.collection('notifications');
             await notificationsCollection.insertOne({
               userId: customerId,
-              templateId: 'customer_assigned_employee',
+              templateId: 'account_manager_assigned',
               title: '👋 Welcome! Your Account Manager',
-              message: `You have been assigned a dedicated account manager: ${employeeName}. They will be your primary contact for any questions or assistance you may need.`,
+              message: `You have been assigned a dedicated account manager: ${employeeFirstName}. They will be your primary contact for any questions or assistance you may need.`,
               type: 'info',
-              category: 'account',
+              category: 'messaging',
               isRead: false,
               createdAt: new Date(),
               updatedAt: new Date(),
               metadata: {
                 employeeId,
-                employeeName,
-                employeeEmail,
+                employeeFirstName,
                 employeeRole,
               },
             });

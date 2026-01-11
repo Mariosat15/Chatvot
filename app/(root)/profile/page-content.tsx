@@ -3,7 +3,7 @@
 import ProfileTabs from '@/components/profile/ProfileTabs';
 import BadgesDisplay from '@/components/profile/BadgesDisplay';
 import ProfileSettingsSection from '@/components/profile/ProfileSettingsSection';
-import NotificationSettings from '@/components/notifications/NotificationSettings';
+import NotificationCenter from '@/components/notifications/NotificationCenter';
 import TradingArsenalSection from '@/components/profile/TradingArsenalSection';
 import KYCVerification from '@/components/kyc/KYCVerification';
 import { Badge } from '@/lib/constants/badges';
@@ -34,7 +34,7 @@ export default function ProfilePageContent({
     <ProfileTabs
       overviewContent={overviewContent}
       badgesContent={<BadgesDisplay badges={badges} stats={badgeStats as any} />}
-      notificationsContent={<NotificationSettings />}
+      notificationsContent={<NotificationCenter />}
       arsenalContent={<TradingArsenalSection />}
       verificationContent={<KYCVerification />}
       settingsContent={<ProfileSettingsSection />}

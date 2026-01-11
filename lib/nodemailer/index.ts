@@ -1265,3 +1265,525 @@ export const sendWithdrawalCompletedEmail = async (data: WithdrawalCompletedEmai
         // Don't throw - we don't want to fail the withdrawal if email fails
     }
 };
+
+/**
+ * Data for account manager assigned email
+ */
+interface AccountManagerAssignedEmailData {
+    customerEmail: string;
+    customerName: string;
+    managerName: string;  // Full name for internal use
+    managerFirstName: string;  // Only first name shown in email
+}
+
+/**
+ * Data for account manager changed email
+ */
+interface AccountManagerChangedEmailData {
+    customerEmail: string;
+    customerName: string;
+    newManagerName: string;
+    newManagerFirstName: string;
+    previousManagerName?: string;
+}
+
+/**
+ * Build account manager assigned email HTML from database template
+ */
+function buildAccountManagerAssignedEmailHtml(
+    template: IEmailTemplate,
+    config: {
+        customerName: string;
+        managerFirstName: string;
+        platformName: string;
+        baseUrl: string;
+        logoUrl: string;
+        companyAddress: string;
+    }
+): string {
+    // If using custom HTML template
+    if (template.useCustomHtml && template.customHtmlTemplate) {
+        return template.customHtmlTemplate
+            .replace(/\{\{customerName\}\}/g, config.customerName)
+            .replace(/\{\{managerFirstName\}\}/g, config.managerFirstName)
+            .replace(/\{\{platformName\}\}/g, config.platformName)
+            .replace(/\{\{baseUrl\}\}/g, config.baseUrl)
+            .replace(/\{\{logoUrl\}\}/g, config.logoUrl)
+            .replace(/\{\{companyAddress\}\}/g, config.companyAddress)
+            .replace(/\{\{year\}\}/g, new Date().getFullYear().toString());
+    }
+    
+    // Build feature list HTML with manager name replacement
+    const featureItems = (template.featureItems || [
+        '{{managerFirstName}} will assist you with any questions about your account',
+        'Get personalized guidance for competitions and trading',
+        'Receive priority support whenever you need help',
+    ]).map(item => item.replace(/\{\{managerFirstName\}\}/g, config.managerFirstName));
+    
+    const featureListHtml = featureItems
+        .map((item: string) => `<li style="margin-bottom: 12px;">${item}</li>`)
+        .join('\n                                ');
+    
+    // Replace template variables
+    const heading = (template.headingText || '👋 Welcome to Personalized Support!')
+        .replace(/\{\{managerFirstName\}\}/g, config.managerFirstName);
+    
+    const introText = (template.introText || 'Great news! You have been assigned a dedicated account manager who will be your primary point of contact for all your needs.')
+        .replace(/\{\{managerFirstName\}\}/g, config.managerFirstName);
+    
+    const closingText = (template.closingText || 'Feel free to reach out through the messaging feature in your account. {{managerFirstName}} is here to help you succeed!')
+        .replace(/\{\{managerFirstName\}\}/g, config.managerFirstName);
+    
+    // Get the CTA URL
+    let ctaUrl = template.ctaButtonUrl || `${config.baseUrl}/messaging`;
+    ctaUrl = ctaUrl.replace(/\{\{baseUrl\}\}/g, config.baseUrl);
+    
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Account Manager - ${config.platformName}</title>
+    <style type="text/css">
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; margin: 0 !important; }
+            .mobile-padding { padding: 24px !important; }
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
+                    
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td align="left" style="padding: 40px 40px 20px 40px;">
+                            <img src="${config.logoUrl}" alt="${config.platformName}" width="150" style="max-width: 100%; height: auto;">
+                        </td>
+                    </tr>
+                    
+                    <!-- Main Content -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px 40px 40px;">
+                            
+                            <!-- Welcome Banner -->
+                            <div style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center;">
+                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
+                                    ${heading}
+                                </h1>
+                                <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                                    Your dedicated support is here
+                                </p>
+                            </div>
+                            
+                            <!-- Greeting -->
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                Hi ${config.customerName},
+                            </p>
+                            
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                ${introText}
+                            </p>
+                            
+                            <!-- Account Manager Card -->
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center; border: 1px solid #FDD458;">
+                                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+                                    <span style="font-size: 36px; color: white; line-height: 80px;">${config.managerFirstName.charAt(0).toUpperCase()}</span>
+                                </div>
+                                <h2 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 600; color: #FDD458;">
+                                    ${config.managerFirstName}
+                                </h2>
+                                <p style="margin: 0; font-size: 14px; color: #9ca3af;">
+                                    Your Dedicated Account Manager
+                                </p>
+                            </div>
+                            
+                            <!-- Feature List -->
+                            <div style="background-color: #050505; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #30333A;">
+                                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #FDD458;">
+                                    ${template.featureListLabel || 'Your Account Manager'}
+                                </h3>
+                                <ul style="margin: 0; padding-left: 20px; color: #CCDADC; font-size: 14px; line-height: 1.8;">
+                                    ${featureListHtml}
+                                </ul>
+                            </div>
+                            
+                            <!-- Closing Text -->
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                ${closingText}
+                            </p>
+                            
+                            <!-- CTA Button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <a href="${ctaUrl}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
+                                            ${template.ctaButtonText || 'Send a Message'}
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
+                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                ${config.companyAddress}
+                            </p>
+                            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                © ${new Date().getFullYear()} ${config.platformName} | <a href="${config.baseUrl}" style="color: #CCDADC !important; text-decoration: underline;">Visit Website</a>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+}
+
+/**
+ * Build account manager changed email HTML from database template
+ */
+function buildAccountManagerChangedEmailHtml(
+    template: IEmailTemplate,
+    config: {
+        customerName: string;
+        newManagerFirstName: string;
+        previousManagerName?: string;
+        platformName: string;
+        baseUrl: string;
+        logoUrl: string;
+        companyAddress: string;
+    }
+): string {
+    // If using custom HTML template
+    if (template.useCustomHtml && template.customHtmlTemplate) {
+        return template.customHtmlTemplate
+            .replace(/\{\{customerName\}\}/g, config.customerName)
+            .replace(/\{\{newManagerFirstName\}\}/g, config.newManagerFirstName)
+            .replace(/\{\{previousManagerName\}\}/g, config.previousManagerName || 'your previous manager')
+            .replace(/\{\{platformName\}\}/g, config.platformName)
+            .replace(/\{\{baseUrl\}\}/g, config.baseUrl)
+            .replace(/\{\{logoUrl\}\}/g, config.logoUrl)
+            .replace(/\{\{companyAddress\}\}/g, config.companyAddress)
+            .replace(/\{\{year\}\}/g, new Date().getFullYear().toString());
+    }
+    
+    // Build feature list HTML with manager name replacement
+    const featureItems = (template.featureItems || [
+        '{{newManagerFirstName}} is now your dedicated point of contact',
+        'All your account history and preferences have been transferred',
+        'You can reach out anytime through the messaging feature',
+    ]).map(item => item.replace(/\{\{newManagerFirstName\}\}/g, config.newManagerFirstName));
+    
+    const featureListHtml = featureItems
+        .map((item: string) => `<li style="margin-bottom: 12px;">${item}</li>`)
+        .join('\n                                ');
+    
+    // Replace template variables
+    const heading = (template.headingText || '👋 Meet Your New Account Manager')
+        .replace(/\{\{newManagerFirstName\}\}/g, config.newManagerFirstName);
+    
+    const introText = (template.introText || 'We wanted to let you know that your account has been reassigned to a new account manager who will be taking care of your needs going forward.')
+        .replace(/\{\{newManagerFirstName\}\}/g, config.newManagerFirstName);
+    
+    const closingText = (template.closingText || '{{newManagerFirstName}} is excited to work with you and help you achieve your trading goals!')
+        .replace(/\{\{newManagerFirstName\}\}/g, config.newManagerFirstName);
+    
+    // Get the CTA URL
+    let ctaUrl = template.ctaButtonUrl || `${config.baseUrl}/messaging`;
+    ctaUrl = ctaUrl.replace(/\{\{baseUrl\}\}/g, config.baseUrl);
+    
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Account Manager - ${config.platformName}</title>
+    <style type="text/css">
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; margin: 0 !important; }
+            .mobile-padding { padding: 24px !important; }
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #050505; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #050505;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-container" style="max-width: 600px; background-color: #141414; border-radius: 8px; border: 1px solid #30333A;">
+                    
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td align="left" style="padding: 40px 40px 20px 40px;">
+                            <img src="${config.logoUrl}" alt="${config.platformName}" width="150" style="max-width: 100%; height: auto;">
+                        </td>
+                    </tr>
+                    
+                    <!-- Main Content -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 20px 40px 40px 40px;">
+                            
+                            <!-- Header Banner -->
+                            <div style="background: linear-gradient(135deg, #8B5CF6 0%, #3b82f6 100%); border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center;">
+                                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #ffffff;">
+                                    ${heading}
+                                </h1>
+                                <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.9);">
+                                    Your support continues seamlessly
+                                </p>
+                            </div>
+                            
+                            <!-- Greeting -->
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                Hi ${config.customerName},
+                            </p>
+                            
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                ${introText}
+                            </p>
+                            
+                            <!-- New Account Manager Card -->
+                            <div style="background-color: #1E1E1E; border-radius: 8px; padding: 24px; margin-bottom: 24px; text-align: center; border: 1px solid #FDD458;">
+                                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #8B5CF6 0%, #3b82f6 100%); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+                                    <span style="font-size: 36px; color: white; line-height: 80px;">${config.newManagerFirstName.charAt(0).toUpperCase()}</span>
+                                </div>
+                                <h2 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 600; color: #FDD458;">
+                                    ${config.newManagerFirstName}
+                                </h2>
+                                <p style="margin: 0; font-size: 14px; color: #9ca3af;">
+                                    Your New Account Manager
+                                </p>
+                            </div>
+                            
+                            <!-- Feature List -->
+                            <div style="background-color: #050505; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #30333A;">
+                                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #FDD458;">
+                                    ${template.featureListLabel || 'Your New Account Manager'}
+                                </h3>
+                                <ul style="margin: 0; padding-left: 20px; color: #CCDADC; font-size: 14px; line-height: 1.8;">
+                                    ${featureListHtml}
+                                </ul>
+                            </div>
+                            
+                            <!-- Closing Text -->
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">
+                                ${closingText}
+                            </p>
+                            
+                            <!-- CTA Button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <a href="${ctaUrl}" style="display: inline-block; background: linear-gradient(135deg, #FDD458 0%, #E8BA40 100%); color: #000000; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 500; line-height: 1;">
+                                            ${template.ctaButtonText || 'Say Hello'}
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 40px 40px 40px; border-top: 1px solid #30333A;">
+                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                ${config.companyAddress}
+                            </p>
+                            <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">
+                                © ${new Date().getFullYear()} ${config.platformName} | <a href="${config.baseUrl}" style="color: #CCDADC !important; text-decoration: underline;">Visit Website</a>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+}
+
+/**
+ * Send account manager assigned email to customer
+ */
+export const sendAccountManagerAssignedEmail = async (data: AccountManagerAssignedEmailData) => {
+    console.log(`📧 [MANAGER] sendAccountManagerAssignedEmail called for ${data.customerEmail}`);
+    
+    try {
+        await connectToDatabase();
+        
+        // Get settings and template
+        const [companySettings, settings, whiteLabelSettings, template] = await Promise.all([
+            CompanySettings.getSingleton(),
+            getSettings(),
+            WhiteLabel.findOne(),
+            getEmailTemplate('account_manager_assigned'),
+        ]);
+        
+        console.log(`📧 [MANAGER] Template found: ${template?.name || 'NONE'}, isActive: ${template?.isActive}`);
+        
+        // Check if template is active
+        if (!template.isActive) {
+            console.log(`⚠️ [MANAGER] Email template "account_manager_assigned" is DISABLED, skipping email to ${data.customerEmail}`);
+            return;
+        }
+        
+        const platformName = settings.appName || companySettings.companyName || 'Chatvolt';
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+        
+        // Get logo URL
+        let logoUrl = whiteLabelSettings?.emailLogo || '/assets/images/logo.png';
+        if (!logoUrl.startsWith('http')) {
+            if (isLocalhost) {
+                logoUrl = 'https://placehold.co/150x50/141414/FDD458?text=Logo';
+            } else {
+                logoUrl = `${baseUrl}${logoUrl}`;
+            }
+        }
+        
+        // Build company address
+        let companyAddress = '';
+        if (companySettings.addressLine1 || companySettings.city) {
+            const parts = [
+                companySettings.addressLine1,
+                companySettings.addressLine2,
+                companySettings.city,
+                companySettings.postalCode,
+                COUNTRY_NAMES[companySettings.country] || companySettings.country,
+            ].filter(Boolean);
+            companyAddress = parts.join(', ');
+        }
+        
+        // Build HTML from database template
+        const htmlTemplate = buildAccountManagerAssignedEmailHtml(template, {
+            customerName: data.customerName,
+            managerFirstName: data.managerFirstName,
+            platformName,
+            baseUrl,
+            logoUrl,
+            companyAddress,
+        });
+        
+        // Replace variables in subject
+        let subject = template.subject || '🎉 Meet Your Dedicated Account Manager at {{platformName}}';
+        subject = subject
+            .replace(/\{\{platformName\}\}/g, platformName)
+            .replace(/\{\{managerFirstName\}\}/g, data.managerFirstName)
+            .replace(/\{\{customerName\}\}/g, data.customerName);
+        
+        const mailOptions = {
+            from: `"${platformName}" <${settings.nodemailerEmail || process.env.NODEMAILER_EMAIL}>`,
+            to: data.customerEmail,
+            subject,
+            text: `Hi ${data.customerName}, you have been assigned a dedicated account manager: ${data.managerFirstName}. They will be your primary point of contact for any questions or assistance you may need. You can reach them through the messaging feature in your account.`,
+            html: htmlTemplate,
+        };
+        
+        const emailTransporter = await getTransporter();
+        await emailTransporter.sendMail(mailOptions);
+        
+        console.log(`✅ [MANAGER] Account manager assigned email sent to ${data.customerEmail}`);
+    } catch (error) {
+        console.error('❌ [MANAGER] Failed to send account manager assigned email:', error);
+        // Don't throw - we don't want to fail the assignment if email fails
+    }
+};
+
+/**
+ * Send account manager changed email to customer
+ */
+export const sendAccountManagerChangedEmail = async (data: AccountManagerChangedEmailData) => {
+    console.log(`📧 [MANAGER] sendAccountManagerChangedEmail called for ${data.customerEmail}`);
+    
+    try {
+        await connectToDatabase();
+        
+        // Get settings and template
+        const [companySettings, settings, whiteLabelSettings, template] = await Promise.all([
+            CompanySettings.getSingleton(),
+            getSettings(),
+            WhiteLabel.findOne(),
+            getEmailTemplate('account_manager_changed'),
+        ]);
+        
+        console.log(`📧 [MANAGER] Template found: ${template?.name || 'NONE'}, isActive: ${template?.isActive}`);
+        
+        // Check if template is active
+        if (!template.isActive) {
+            console.log(`⚠️ [MANAGER] Email template "account_manager_changed" is DISABLED, skipping email to ${data.customerEmail}`);
+            return;
+        }
+        
+        const platformName = settings.appName || companySettings.companyName || 'Chatvolt';
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+        
+        // Get logo URL
+        let logoUrl = whiteLabelSettings?.emailLogo || '/assets/images/logo.png';
+        if (!logoUrl.startsWith('http')) {
+            if (isLocalhost) {
+                logoUrl = 'https://placehold.co/150x50/141414/FDD458?text=Logo';
+            } else {
+                logoUrl = `${baseUrl}${logoUrl}`;
+            }
+        }
+        
+        // Build company address
+        let companyAddress = '';
+        if (companySettings.addressLine1 || companySettings.city) {
+            const parts = [
+                companySettings.addressLine1,
+                companySettings.addressLine2,
+                companySettings.city,
+                companySettings.postalCode,
+                COUNTRY_NAMES[companySettings.country] || companySettings.country,
+            ].filter(Boolean);
+            companyAddress = parts.join(', ');
+        }
+        
+        // Build HTML from database template
+        const htmlTemplate = buildAccountManagerChangedEmailHtml(template, {
+            customerName: data.customerName,
+            newManagerFirstName: data.newManagerFirstName,
+            previousManagerName: data.previousManagerName,
+            platformName,
+            baseUrl,
+            logoUrl,
+            companyAddress,
+        });
+        
+        // Replace variables in subject
+        let subject = template.subject || '🔄 Your Account Manager Has Changed at {{platformName}}';
+        subject = subject
+            .replace(/\{\{platformName\}\}/g, platformName)
+            .replace(/\{\{newManagerFirstName\}\}/g, data.newManagerFirstName)
+            .replace(/\{\{customerName\}\}/g, data.customerName);
+        
+        const mailOptions = {
+            from: `"${platformName}" <${settings.nodemailerEmail || process.env.NODEMAILER_EMAIL}>`,
+            to: data.customerEmail,
+            subject,
+            text: `Hi ${data.customerName}, your account has been reassigned to a new account manager: ${data.newManagerFirstName}. They are now your primary point of contact and are ready to assist you. You can reach them through the messaging feature in your account.`,
+            html: htmlTemplate,
+        };
+        
+        const emailTransporter = await getTransporter();
+        await emailTransporter.sendMail(mailOptions);
+        
+        console.log(`✅ [MANAGER] Account manager changed email sent to ${data.customerEmail}`);
+    } catch (error) {
+        console.error('❌ [MANAGER] Failed to send account manager changed email:', error);
+        // Don't throw - we don't want to fail the transfer if email fails
+    }
+};
