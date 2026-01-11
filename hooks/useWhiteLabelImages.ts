@@ -7,6 +7,7 @@ interface WhiteLabelImages {
   emailLogo: string;
   profileImage: string;
   dashboardPreview: string;
+  favicon: string;
 }
 
 const defaultImages: WhiteLabelImages = {
@@ -14,6 +15,7 @@ const defaultImages: WhiteLabelImages = {
   emailLogo: '/assets/images/logo.png',
   profileImage: '/assets/images/PROFILE.png',
   dashboardPreview: '/assets/images/dashboard-preview.png',
+  favicon: '/favicon.ico',
 };
 
 // Add cache-busting query param to image URLs
@@ -42,6 +44,7 @@ export function useWhiteLabelImages() {
           emailLogo: addCacheBuster(data.emailLogo || defaultImages.emailLogo),
           profileImage: addCacheBuster(data.profileImage || defaultImages.profileImage),
           dashboardPreview: addCacheBuster(data.dashboardPreview || defaultImages.dashboardPreview),
+          favicon: addCacheBuster(data.favicon || defaultImages.favicon),
         });
         setLoading(false);
       })

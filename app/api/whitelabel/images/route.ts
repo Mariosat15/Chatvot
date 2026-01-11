@@ -26,6 +26,7 @@ export async function GET() {
       emailLogo: '/assets/images/logo.png',
       profileImage: '/assets/images/PROFILE.png',
       dashboardPreview: '/assets/images/dashboard-preview.png',
+      favicon: '/favicon.ico',
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

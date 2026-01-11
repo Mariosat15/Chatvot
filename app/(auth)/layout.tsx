@@ -5,28 +5,36 @@ import {headers} from "next/headers";
 import {redirect} from "next/navigation";
 import {connectToDatabase} from "@/database/mongoose";
 import HeroSettings from "@/database/models/hero-settings.model";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
 
 // Fetch auth page settings from database
 async function getAuthPageSettings() {
     try {
         await connectToDatabase();
-        const settings = await HeroSettings.findOne().select({
+        
+        // Fetch testimonial settings from HeroSettings
+        const heroSettings = await HeroSettings.findOne().select({
             authPageTestimonialText: 1,
             authPageTestimonialAuthor: 1,
             authPageTestimonialRole: 1,
             authPageTestimonialRating: 1,
             authPageDashboardImage: 1,
-            logo: 1,
-        }).lean();
+        }).lean() as any;
+        
+        // Fetch branding from WhiteLabel (same source as admin branding settings)
+        const whiteLabel = await WhiteLabel.findOne().select({
+            appLogo: 1,
+        }).lean() as any;
 
         return {
-            testimonialText: settings?.authPageTestimonialText || 'chatvolt turned my watchlist into a winning list. The alerts are spot-on, and I feel more confident making moves in the market',
-            testimonialAuthor: settings?.authPageTestimonialAuthor || 'Ethan R.',
-            testimonialRole: settings?.authPageTestimonialRole || 'Retail Investor',
+            testimonialText: heroSettings?.authPageTestimonialText || 'chatvolt turned my watchlist into a winning list. The alerts are spot-on, and I feel more confident making moves in the market',
+            testimonialAuthor: heroSettings?.authPageTestimonialAuthor || 'Ethan R.',
+            testimonialRole: heroSettings?.authPageTestimonialRole || 'Retail Investor',
             // Use ?? instead of || so that explicit 0 rating (to hide stars) is respected
-            testimonialRating: settings?.authPageTestimonialRating ?? 5,
-            dashboardImage: settings?.authPageDashboardImage || '/assets/images/dashboard.png',
-            logo: settings?.logo || '/assets/icons/logo.svg',
+            testimonialRating: heroSettings?.authPageTestimonialRating ?? 5,
+            dashboardImage: heroSettings?.authPageDashboardImage || '/assets/images/dashboard.png',
+            // Use appLogo from WhiteLabel (same as admin branding)
+            logo: whiteLabel?.appLogo || '/assets/images/logo.png',
         };
     } catch (error) {
         console.error('Failed to load auth page settings:', error);
@@ -36,7 +44,7 @@ async function getAuthPageSettings() {
             testimonialRole: 'Retail Investor',
             testimonialRating: 5,
             dashboardImage: '/assets/images/dashboard.png',
-            logo: '/assets/icons/logo.svg',
+            logo: '/assets/images/logo.png',
         };
     }
 }

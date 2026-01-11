@@ -8,6 +8,7 @@ let imageCache: {
   emailLogo: string;
   profileImage: string;
   dashboardPreview: string;
+  favicon: string;
 } | null = null;
 
 let cacheTime: number = 0;
@@ -32,6 +33,7 @@ export async function getWhiteLabelImages() {
         emailLogo: '/assets/images/logo.png',
         profileImage: '/assets/images/PROFILE.png',
         dashboardPreview: '/assets/images/dashboard-preview.png',
+        favicon: '/favicon.ico',
       };
     } else {
       imageCache = {
@@ -39,6 +41,7 @@ export async function getWhiteLabelImages() {
         emailLogo: settings.emailLogo || '/assets/images/logo.png',
         profileImage: settings.profileImage || '/assets/images/PROFILE.png',
         dashboardPreview: settings.dashboardPreview || '/assets/images/dashboard-preview.png',
+        favicon: settings.favicon || '/favicon.ico',
       };
     }
 
@@ -52,8 +55,14 @@ export async function getWhiteLabelImages() {
       emailLogo: '/assets/images/logo.png',
       profileImage: '/assets/images/PROFILE.png',
       dashboardPreview: '/assets/images/dashboard-preview.png',
+      favicon: '/favicon.ico',
     };
   }
+}
+
+export async function getFavicon() {
+  const images = await getWhiteLabelImages();
+  return images.favicon;
 }
 
 // Get specific image type
