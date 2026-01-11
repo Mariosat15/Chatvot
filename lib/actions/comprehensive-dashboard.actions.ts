@@ -11,6 +11,7 @@ import Challenge from '@/database/models/trading/challenge.model';
 import TradingPosition from '@/database/models/trading/trading-position.model';
 import TradeHistory from '@/database/models/trading/trade-history.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
+import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import { getRealPrice } from '@/lib/services/real-forex-prices.service';
 import { ForexSymbol, calculateUnrealizedPnL } from '@/lib/services/pnl-calculator.service';
 
@@ -76,6 +77,7 @@ export interface ComprehensiveDashboardData {
   
   // Performance Charts Data
   charts: {
+    walletBalanceHistory: { date: string; balance: number; change: number }[];
     equityCurve: { date: string; equity: number; pnl: number }[];
     dailyPnL: { date: string; pnl: number; trades: number }[];
     winLossDistribution: { wins: number; losses: number; breakeven: number };
@@ -229,6 +231,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     allChallenges,
     allTrades,
     wallet,
+    walletTransactions,
   ] = await Promise.all([
     CompetitionParticipant.find({ userId }).lean(),
     ChallengeParticipant.find({ userId }).lean(),
@@ -237,6 +240,8 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     TradeHistory.find({ userId }).sort({ closedAt: -1 }).limit(100).lean(),
     // Wallet is the SOURCE OF TRUTH for financial data (prizes won, etc.)
     CreditWallet.findOne({ userId }).lean(),
+    // Wallet transactions for balance history chart
+    WalletTransaction.find({ userId, status: 'completed' }).sort({ createdAt: 1 }).lean(),
   ]);
   
   // Process competitions
@@ -506,8 +511,9 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const averageWin = winningTrades > 0 ? totalGrossWins / winningTrades : 0;
   const averageLoss = losingTrades > 0 ? totalGrossLosses / losingTrades : 0;
   
-  // Build chart data
-  const charts = await buildChartData(userId, allTrades as any[]);
+  // Build chart data including wallet balance history
+  const currentWalletBalance = walletData?.creditBalance || 0;
+  const charts = await buildChartData(userId, allTrades as any[], walletTransactions as any[], currentWalletBalance);
   
   // Get recent trades and positions
   const recentTrades: TradeData[] = (allTrades as any[]).slice(0, 20).map((t: any) => ({
@@ -591,8 +597,57 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   };
 }
 
-async function buildChartData(userId: string, allTrades: any[]) {
+async function buildChartData(userId: string, allTrades: any[], walletTransactions: any[], currentBalance: number) {
   const now = new Date();
+  
+  // Wallet Balance History - from transactions
+  const walletBalanceHistory: { date: string; balance: number; change: number }[] = [];
+  
+  // Build daily balance from transactions over last 30 days
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  // Create a map of daily balances
+  const dailyBalances = new Map<string, { balance: number; change: number }>();
+  
+  // Initialize with transactions
+  for (const tx of walletTransactions) {
+    const txDate = new Date(tx.createdAt);
+    const dateStr = txDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    
+    // Store the latest balance for each day
+    dailyBalances.set(dateStr, {
+      balance: tx.balanceAfter || 0,
+      change: tx.amount || 0,
+    });
+  }
+  
+  // Build 30-day history
+  let lastKnownBalance = 0;
+  for (let i = 29; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    
+    if (dailyBalances.has(dateStr)) {
+      const dayData = dailyBalances.get(dateStr)!;
+      lastKnownBalance = dayData.balance;
+      walletBalanceHistory.push({ date: dateStr, balance: dayData.balance, change: dayData.change });
+    } else {
+      // No transactions this day, use last known balance
+      walletBalanceHistory.push({ date: dateStr, balance: lastKnownBalance, change: 0 });
+    }
+  }
+  
+  // If no history, just show current balance flat
+  if (walletBalanceHistory.length === 0 || walletBalanceHistory.every(d => d.balance === 0)) {
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      walletBalanceHistory.push({ date: dateStr, balance: currentBalance, change: 0 });
+    }
+  }
   
   // Daily P&L for last 30 days
   const dailyPnL: { date: string; pnl: number; trades: number }[] = [];
@@ -615,7 +670,7 @@ async function buildChartData(userId: string, allTrades: any[]) {
     dailyPnL.push({ date: dateStr, pnl: dayPnL, trades: dayTrades.length });
   }
   
-  // Equity curve (cumulative)
+  // Equity curve (cumulative) - based on trading performance
   const equityCurve: { date: string; equity: number; pnl: number }[] = [];
   let cumulativeEquity = 10000; // Starting capital assumption
   for (const day of dailyPnL) {
@@ -673,6 +728,7 @@ async function buildChartData(userId: string, allTrades: any[]) {
     .slice(-6);
   
   return {
+    walletBalanceHistory,
     equityCurve,
     dailyPnL,
     winLossDistribution: { wins, losses, breakeven },

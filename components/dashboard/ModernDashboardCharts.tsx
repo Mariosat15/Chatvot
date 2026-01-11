@@ -264,7 +264,90 @@ function AnimatedBarChart({
   );
 }
 
-// Enhanced Equity Curve
+// Wallet Balance History Chart
+function WalletBalanceChart({ 
+  data, 
+  symbol = '⚡' 
+}: { 
+  data: { date: string; balance: number; change: number }[];
+  symbol?: string;
+}) {
+  if (data.length < 2) {
+    return <div className="h-40 sm:h-48 flex items-center justify-center text-gray-500">No balance history</div>;
+  }
+  
+  const min = Math.min(...data.map(d => d.balance));
+  const max = Math.max(...data.map(d => d.balance));
+  const range = max - min || 1;
+  
+  const points = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * 100;
+    const y = 100 - ((d.balance - min) / range) * 100;
+    return `${x},${y}`;
+  }).join(' ');
+  
+  const lastBalance = data[data.length - 1]?.balance || 0;
+  const firstBalance = data[0]?.balance || 0;
+  const change = lastBalance - firstBalance;
+  const isPositive = change >= 0;
+  
+  return (
+    <div className="relative">
+      <motion.div 
+        className="absolute top-0 right-0 text-right"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <p className={`text-2xl sm:text-3xl font-bold tabular-nums ${isPositive ? 'text-cyan-400' : 'text-red-400'}`}>
+          {symbol}{lastBalance.toLocaleString()}
+        </p>
+        <p className={`text-sm tabular-nums ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+          {isPositive ? '+' : ''}{change.toLocaleString()} ({firstBalance > 0 ? ((change / firstBalance) * 100).toFixed(2) : '0.00'}%)
+        </p>
+      </motion.div>
+      <svg className="w-full h-40 sm:h-48" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="walletGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
+          </linearGradient>
+          <filter id="walletGlow">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <motion.polygon
+          points={`0,100 ${points} 100,100`}
+          fill="url(#walletGradient)"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1 }}
+        />
+        <motion.polyline
+          points={points}
+          fill="none"
+          stroke="#06b6d4"
+          strokeWidth="0.5"
+          filter="url(#walletGlow)"
+          vectorEffect="non-scaling-stroke"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 2, ease: "easeOut" }}
+        />
+      </svg>
+      <div className="flex justify-between text-xs text-gray-500 mt-2">
+        <span>{data[0]?.date}</span>
+        <span>{data[data.length - 1]?.date}</span>
+      </div>
+    </div>
+  );
+}
+
+// Enhanced Equity Curve (kept for compatibility)
 function EnhancedEquityCurve({ data }: { data: { date: string; equity: number; pnl: number }[] }) {
   if (data.length < 2) {
     return <div className="h-40 sm:h-48 flex items-center justify-center text-gray-500">Not enough data</div>;
@@ -495,44 +578,44 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
         </button>
       </motion.header>
 
-      {/* Hero Stats Grid with Glow Cards */}
+      {/* Hero Stats Grid with Glow Cards - All same size */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="col-span-2 lg:col-span-1">
-          <GlowStatCard
-            icon={<DollarSign className="w-5 h-5 text-white" />}
-            label="Total Capital"
-            value={formatCurrency(data.overview.totalCapital)}
-            subvalue={`${data.overview.activeContests} active contest${data.overview.activeContests !== 1 ? 's' : ''}`}
-            color="emerald"
-            large
-            delay={0}
-          />
-        </div>
-        <div className="col-span-2 lg:col-span-1">
-          <GlowStatCard
-            icon={data.overview.totalPnL >= 0 ? <TrendingUp className="w-5 h-5 text-white" /> : <TrendingDown className="w-5 h-5 text-white" />}
-            label="Total P&L"
-            value={`${data.overview.totalPnL >= 0 ? '+' : ''}${formatCurrency(data.overview.totalPnL)}`}
-            subvalue={formatPercent(data.overview.totalPnLPercentage)}
-            trend={data.overview.totalPnL >= 0 ? 'up' : 'down'}
-            color={data.overview.totalPnL >= 0 ? 'green' : 'red'}
-            large
-            delay={0.1}
-          />
-        </div>
+        <GlowStatCard
+          icon={<DollarSign className="w-5 h-5 text-white" />}
+          label="Total Capital"
+          value={formatCurrency(data.overview.totalCapital)}
+          subvalue={`${data.overview.activeContests} active contest${data.overview.activeContests !== 1 ? 's' : ''}`}
+          color="emerald"
+          large
+          delay={0}
+        />
+        <GlowStatCard
+          icon={data.overview.totalPnL >= 0 ? <TrendingUp className="w-5 h-5 text-white" /> : <TrendingDown className="w-5 h-5 text-white" />}
+          label="Total P&L"
+          value={`${data.overview.totalPnL >= 0 ? '+' : ''}${formatCurrency(data.overview.totalPnL)}`}
+          subvalue={formatPercent(data.overview.totalPnLPercentage)}
+          trend={data.overview.totalPnL >= 0 ? 'up' : 'down'}
+          color={data.overview.totalPnL >= 0 ? 'green' : 'red'}
+          large
+          delay={0.1}
+        />
         <GlowStatCard
           icon={<Target className="w-5 h-5 text-white" />}
           label="Win Rate"
           value={`${data.overview.winRate.toFixed(1)}%`}
+          subvalue={`${data.overview.winningTrades}W / ${data.overview.losingTrades}L`}
           trend={data.overview.winRate >= 50 ? 'up' : 'down'}
           color={data.overview.winRate >= 50 ? 'blue' : 'orange'}
+          large
           delay={0.2}
         />
         <GlowStatCard
           icon={<Trophy className="w-5 h-5 text-white" />}
           label="Prizes Won"
           value={`${settings?.credits.symbol || '⚡'}${data.overview.totalPrizesWon.toLocaleString()}`}
+          subvalue="From competitions & challenges"
           color="yellow"
+          large
           delay={0.3}
         />
       </section>
@@ -609,7 +692,7 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Charts Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Equity Curve */}
+          {/* Wallet Balance History */}
           <motion.section 
             className="bg-gray-800/30 rounded-2xl border border-gray-700/50 overflow-hidden"
             initial={{ opacity: 0, y: 20 }}
@@ -617,16 +700,19 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
             transition={{ duration: 0.5, delay: 0.5 }}
           >
             <div className="p-4 sm:p-5 border-b border-gray-700/50 flex items-center gap-3">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <LineChart className="h-5 w-5 text-blue-400" />
+              <div className="p-2 bg-cyan-500/20 rounded-lg">
+                <DollarSign className="h-5 w-5 text-cyan-400" />
               </div>
               <div>
-                <h3 className="text-base sm:text-lg font-bold text-white">Equity Curve</h3>
-                <p className="text-xs text-gray-400">Last 30 days performance</p>
+                <h3 className="text-base sm:text-lg font-bold text-white">Wallet Balance</h3>
+                <p className="text-xs text-gray-400">Last 30 days balance history</p>
               </div>
             </div>
             <div className="p-4 sm:p-5">
-              <EnhancedEquityCurve data={data.charts.equityCurve} />
+              <WalletBalanceChart 
+                data={data.charts.walletBalanceHistory || []} 
+                symbol={settings?.credits.symbol || '⚡'}
+              />
             </div>
           </motion.section>
 
