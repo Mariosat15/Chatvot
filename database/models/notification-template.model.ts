@@ -82,12 +82,24 @@ export type NotificationType =
   // Social
   | 'friend_request'
   | 'friend_request_accepted'
+  | 'friend_request_declined'
   | 'friend_removed'
   | 'user_blocked'
+  | 'user_unblocked'
   // Messaging
   | 'new_message'
   | 'support_reply'
   | 'conversation_assigned'
+  | 'conversation_transferred'
+  | 'conversation_resolved'
+  // Customer Assignment
+  | 'customer_assigned_to_employee'
+  | 'customer_reassigned'
+  | 'account_manager_assigned'
+  | 'account_manager_changed'
+  // Employee notifications
+  | 'employee_new_customer'
+  | 'employee_customer_removed'
   // Custom (for admin-created templates)
   | 'custom';
 
@@ -1256,6 +1268,182 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
       channels: { inApp: true, email: false, push: false },
       actionUrl: '/messaging',
       actionText: 'View Conversation',
+    },
+    {
+      templateId: 'friend_request_declined',
+      name: 'Friend Request Declined',
+      description: 'Sent when your friend request is declined',
+      category: 'social',
+      type: 'friend_request_declined',
+      title: '😔 Friend Request Declined',
+      message: '{{userName}} declined your friend request.',
+      icon: '😔',
+      priority: 'low',
+      color: '#6B7280',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+    },
+    {
+      templateId: 'user_unblocked',
+      name: 'User Unblocked You',
+      description: 'Sent when someone unblocks you',
+      category: 'social',
+      type: 'user_unblocked',
+      title: '✅ You Have Been Unblocked',
+      message: '{{unblockedByName}} has unblocked you. You can now send them messages and friend requests again.',
+      icon: '✅',
+      priority: 'low',
+      color: '#10B981',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+    },
+    {
+      templateId: 'conversation_transferred',
+      name: 'Conversation Transferred',
+      description: 'Sent when a support conversation is transferred to another employee',
+      category: 'messaging',
+      type: 'conversation_transferred',
+      title: '🔄 Conversation Transferred',
+      message: 'Your conversation has been transferred to {{newEmployeeName}} who will continue assisting you.',
+      icon: '🔄',
+      priority: 'normal',
+      color: '#8B5CF6',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+      actionUrl: '/messaging',
+      actionText: 'View Conversation',
+    },
+    {
+      templateId: 'conversation_resolved',
+      name: 'Conversation Resolved',
+      description: 'Sent when a support conversation is marked as resolved',
+      category: 'messaging',
+      type: 'conversation_resolved',
+      title: '✅ Conversation Resolved',
+      message: 'Your support ticket has been resolved by {{employeeName}}. Thank you for contacting us!',
+      icon: '✅',
+      priority: 'normal',
+      color: '#10B981',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: '/messaging',
+      actionText: 'View Details',
+    },
+
+    // ========== CUSTOMER ASSIGNMENT (for customers) ==========
+    {
+      templateId: 'account_manager_assigned',
+      name: 'Account Manager Assigned',
+      description: 'Sent to customer when an account manager is assigned to them',
+      category: 'messaging',
+      type: 'account_manager_assigned',
+      title: '👤 Account Manager Assigned',
+      message: '{{employeeName}} has been assigned as your account manager. They will assist you with any questions or support needs.',
+      icon: '👤',
+      priority: 'high',
+      color: '#3B82F6',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: '/messaging',
+      actionText: 'Start Conversation',
+    },
+    {
+      templateId: 'account_manager_changed',
+      name: 'Account Manager Changed',
+      description: 'Sent to customer when their account manager is changed',
+      category: 'messaging',
+      type: 'account_manager_changed',
+      title: '🔄 Account Manager Changed',
+      message: 'Your account manager has been changed from {{previousManager}} to {{newManager}}. {{newManager}} will now be handling your account.',
+      icon: '🔄',
+      priority: 'normal',
+      color: '#F59E0B',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: '/messaging',
+      actionText: 'View Details',
+    },
+
+    // ========== EMPLOYEE NOTIFICATIONS (for employees) ==========
+    {
+      templateId: 'customer_assigned_to_employee',
+      name: 'Customer Assigned',
+      description: 'Sent to employee when a new customer is assigned to them',
+      category: 'messaging',
+      type: 'customer_assigned_to_employee',
+      title: '👥 New Customer Assigned',
+      message: '{{customerName}} ({{customerEmail}}) has been assigned to you. You are now their account manager.',
+      icon: '👥',
+      priority: 'high',
+      color: '#10B981',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: '/users/{{customerId}}',
+      actionText: 'View Customer',
+    },
+    {
+      templateId: 'customer_reassigned',
+      name: 'Customer Reassigned',
+      description: 'Sent to employee when a customer is reassigned from/to them',
+      category: 'messaging',
+      type: 'customer_reassigned',
+      title: '🔄 Customer Reassigned',
+      message: '{{customerName}} has been reassigned from {{fromEmployee}} to {{toEmployee}}.',
+      icon: '🔄',
+      priority: 'normal',
+      color: '#F59E0B',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
+    },
+    {
+      templateId: 'employee_new_customer',
+      name: 'New Customer Notification',
+      description: 'Sent to employee when they receive a new customer',
+      category: 'messaging',
+      type: 'employee_new_customer',
+      title: '🆕 New Customer',
+      message: 'You have a new customer: {{customerName}}. Please reach out to introduce yourself.',
+      icon: '🆕',
+      priority: 'high',
+      color: '#06B6D4',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+      actionUrl: '/users/{{customerId}}',
+      actionText: 'View Customer',
+    },
+    {
+      templateId: 'employee_customer_removed',
+      name: 'Customer Removed',
+      description: 'Sent to employee when a customer is removed from their list',
+      category: 'messaging',
+      type: 'employee_customer_removed',
+      title: '📤 Customer Removed',
+      message: '{{customerName}} is no longer assigned to you. They have been reassigned to {{newEmployee}}.',
+      icon: '📤',
+      priority: 'low',
+      color: '#6B7280',
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: false, push: false },
     },
   ];
 }
