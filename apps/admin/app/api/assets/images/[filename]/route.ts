@@ -16,7 +16,10 @@ export async function GET(
     const { filename } = await params;
     
     // Sanitize filename to prevent directory traversal
-    const sanitizedFilename = path.basename(filename);
+    // Also strip query params
+    const sanitizedFilename = path.basename(filename.split('?')[0]);
+    
+    console.log(`🖼️ [Serve] Request for image: ${filename} -> ${sanitizedFilename}`);
     
     // Try multiple possible locations for the file
     // Production path comes first for speed in production
@@ -37,6 +40,7 @@ export async function GET(
       try {
         await access(possiblePath, constants.R_OK);
         filePath = possiblePath;
+        console.log(`✅ [Serve] Found image at: ${possiblePath}`);
         break;
       } catch {
         // File doesn't exist at this path, try next
@@ -44,11 +48,13 @@ export async function GET(
     }
     
     if (!filePath) {
-      console.error(`Branding image not found: ${sanitizedFilename}`);
+      console.error(`❌ [Serve] Image not found: ${sanitizedFilename}`);
+      console.error(`   Searched paths:`, possiblePaths);
       return NextResponse.json({ error: 'Image not found' }, { status: 404 });
     }
     
     const fileBuffer = await readFile(filePath);
+    console.log(`📦 [Serve] Serving ${fileBuffer.length} bytes from ${filePath}`);
     
     // Determine content type
     const ext = sanitizedFilename.split('.').pop()?.toLowerCase();
@@ -66,11 +72,14 @@ export async function GET(
     return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable',
+        // No caching for branding images to allow updates
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       },
     });
   } catch (error) {
-    console.error('Error serving branding image:', error);
+    console.error('❌ [Serve] Error serving branding image:', error);
     return NextResponse.json({ error: 'Failed to serve image' }, { status: 500 });
   }
 }

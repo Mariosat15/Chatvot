@@ -16,7 +16,8 @@ export async function GET(
     const { filename } = await params;
     
     // Sanitize filename to prevent directory traversal
-    const sanitizedFilename = path.basename(filename);
+    // Also strip query params
+    const sanitizedFilename = path.basename(filename.split('?')[0]);
     
     // Try multiple possible locations for the file
     // Production path comes first for speed in production
@@ -69,7 +70,10 @@ export async function GET(
     return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable',
+        // No caching for branding images to allow updates
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       },
     });
   } catch (error) {
