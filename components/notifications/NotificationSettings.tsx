@@ -21,11 +21,14 @@ interface NotificationTemplate {
 interface CategoryPreferences {
   purchase: boolean;
   competition: boolean;
+  challenge: boolean;
   trading: boolean;
   achievement: boolean;
   system: boolean;
   admin: boolean;
   security: boolean;
+  social: boolean;
+  messaging: boolean;
 }
 
 interface Preferences {
@@ -54,6 +57,12 @@ const CATEGORY_INFO: Record<string, { label: string; icon: string; description: 
     description: 'Competition updates, results, and prizes',
     color: 'text-yellow-400',
   },
+  challenge: {
+    label: '1v1 Challenges',
+    icon: '⚔️',
+    description: 'Challenge requests, results, and battle updates',
+    color: 'text-orange-400',
+  },
   trading: {
     label: 'Trading',
     icon: '📈',
@@ -76,13 +85,25 @@ const CATEGORY_INFO: Record<string, { label: string; icon: string; description: 
     label: 'Admin Messages',
     icon: '📢',
     description: 'Important announcements from the platform',
-    color: 'text-orange-400',
+    color: 'text-amber-400',
   },
   security: {
     label: 'Security',
     icon: '🔐',
     description: 'Login alerts and account security (always enabled)',
     color: 'text-red-400',
+  },
+  social: {
+    label: 'Social & Friends',
+    icon: '👥',
+    description: 'Friend requests, blocks, and social updates',
+    color: 'text-cyan-400',
+  },
+  messaging: {
+    label: 'Messaging & Support',
+    icon: '💬',
+    description: 'Direct messages, support replies, and chat notifications',
+    color: 'text-indigo-400',
   },
 };
 
