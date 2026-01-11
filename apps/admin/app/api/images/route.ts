@@ -19,6 +19,7 @@ export async function GET() {
       emailLogo: settings.emailLogo || '/assets/images/logo.png',
       profileImage: settings.profileImage || '/assets/images/PROFILE.png',
       dashboardPreview: settings.dashboardPreview || '/assets/images/dashboard-preview.png',
+      favicon: settings.favicon || '/favicon.ico',
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
@@ -38,7 +39,7 @@ export async function PUT(request: NextRequest) {
     await connectToDatabase();
 
     const body = await request.json();
-    const { appLogo, emailLogo, profileImage, dashboardPreview } = body;
+    const { appLogo, emailLogo, profileImage, dashboardPreview, favicon } = body;
 
     let settings = await WhiteLabel.findOne();
     if (!settings) {
@@ -49,6 +50,7 @@ export async function PUT(request: NextRequest) {
     if (emailLogo !== undefined) settings.emailLogo = emailLogo;
     if (profileImage !== undefined) settings.profileImage = profileImage;
     if (dashboardPreview !== undefined) settings.dashboardPreview = dashboardPreview;
+    if (favicon !== undefined) settings.favicon = favicon;
 
     await settings.save();
 

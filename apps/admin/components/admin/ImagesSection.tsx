@@ -14,6 +14,7 @@ interface ImageSettings {
   emailLogo: string;
   profileImage: string;
   dashboardPreview: string;
+  favicon: string;
 }
 
 interface AuthPageSettings {
@@ -30,6 +31,7 @@ export default function ImagesSection() {
     emailLogo: '',
     profileImage: '',
     dashboardPreview: '',
+    favicon: '',
   });
   const [authSettings, setAuthSettings] = useState<AuthPageSettings>({
     authPageTestimonialText: '',
@@ -369,6 +371,14 @@ export default function ImagesSection() {
           field="dashboardPreview"
           currentPath={images.dashboardPreview}
           recommendations="Recommended: 600x400px, JPEG or PNG"
+        />
+
+        <ImageUploadCard
+          title="Favicon"
+          description="Browser tab icon for the application (appears in browser tabs and bookmarks)"
+          field="favicon"
+          currentPath={images.favicon}
+          recommendations="Recommended: 32x32px or 64x64px, ICO, PNG, or SVG"
         />
       </div>
 
