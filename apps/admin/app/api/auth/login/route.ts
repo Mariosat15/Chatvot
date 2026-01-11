@@ -84,8 +84,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if employee is locked out (force logout toggle)
-    console.log(`🔐 Is locked out: ${admin.isLockedOut || false}`);
-    if (admin.isLockedOut) {
+    // IMPORTANT: Treat undefined as false (not locked out)
+    const isLockedOut = admin.isLockedOut === true;
+    console.log(`🔐 Is locked out: ${isLockedOut} (raw value: ${admin.isLockedOut})`);
+    if (isLockedOut) {
       console.log('❌ Account is locked out by admin');
       return NextResponse.json(
         { error: 'You have been logged out by an administrator. Contact the administrator to regain access.' },

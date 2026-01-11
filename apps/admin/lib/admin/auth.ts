@@ -65,7 +65,8 @@ export async function verifyAdminAuth(): Promise<AdminAuthResult> {
       }
       
       // Check if admin is locked out (toggle-based lockout)
-      if ((admin as any).isLockedOut) {
+      // IMPORTANT: Treat undefined as false (not locked out)
+      if ((admin as any).isLockedOut === true) {
         console.log(`❌ Admin ${admin.email} is locked out - session invalidated`);
         return { isAuthenticated: false };
       }

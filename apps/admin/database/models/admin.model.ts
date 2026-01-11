@@ -186,10 +186,22 @@ const AdminSchema = new Schema<AdminDocument>(
 
 // Hash password before saving
 AdminSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  // Skip if password not modified AND not a new document
+  if (!this.isModified('password') && !this.isNew) return next();
   
+  // Skip if password is not set
+  if (!this.password) return next();
+  
+  // Skip if already hashed (bcrypt hashes start with $2a$ or $2b$)
+  if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) {
+    console.log('⚠️ Password already hashed, skipping re-hash');
+    return next();
+  }
+  
+  console.log(`🔐 Hashing password for ${this.email} (length: ${this.password.length})`);
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  console.log(`✅ Password hashed successfully (hash length: ${this.password.length})`);
   next();
 });
 

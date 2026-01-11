@@ -55,7 +55,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if account is locked out (toggle-based)
-    if ((admin as any).isLockedOut) {
+    // IMPORTANT: Treat undefined as false (not locked out)
+    if ((admin as any).isLockedOut === true) {
       return NextResponse.json({ 
         valid: false, 
         reason: 'locked_out',

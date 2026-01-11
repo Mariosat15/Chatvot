@@ -111,6 +111,9 @@ export async function GET(request: NextRequest) {
           id: emp._id.toString(),
           isSuperAdmin: isSuper,
           isOnline: isOnline,
+          // Ensure these are always boolean, not undefined
+          isLockedOut: emp.isLockedOut === true, // Explicitly convert to boolean, undefined becomes false
+          status: emp.status || 'active', // Default to active if not set
         };
       }),
       roleTemplates: templates.map(t => ({
@@ -214,6 +217,8 @@ export async function POST(request: NextRequest) {
         : undefined;
 
       // Create employee (new employees are never super admin - that's determined by original admin status)
+      // IMPORTANT: Explicitly set isLockedOut to false and clear forceLogoutAt
+      // to ensure new employees are NOT locked out by default
       const newEmployee = new Admin({
         email: email.toLowerCase(),
         name,
@@ -224,6 +229,14 @@ export async function POST(request: NextRequest) {
         isFirstLogin: true,
         status: 'active',
         tempPasswordExpiresAt,
+        // Explicitly set these to ensure employee is NOT locked out
+        isLockedOut: false,
+        lockedOutAt: undefined,
+        lockedOutBy: undefined,
+        lockedOutReason: undefined,
+        forceLogoutAt: undefined,
+        // Password tracking - only set mustChangePassword for auto-generated passwords
+        mustChangePassword: !isManualPassword,
       });
 
       await newEmployee.save();
