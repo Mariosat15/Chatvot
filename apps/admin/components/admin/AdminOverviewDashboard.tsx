@@ -323,7 +323,7 @@ export default function AdminOverviewDashboard({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard Overview</h1>
-          <p className="text-gray-400">
+          <p className="text-gray-400" suppressHydrationWarning>
             {lastRefresh && (
               <>Last updated: {lastRefresh.toLocaleTimeString()}</>
             )}
@@ -435,7 +435,7 @@ export default function AdminOverviewDashboard({
             </CardTitle>
             <div className="flex items-center gap-2">
               {reconciliation?.lastRun && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-500" suppressHydrationWarning>
                   Last check: {new Date(reconciliation.lastRun).toLocaleTimeString()}
                 </span>
               )}
@@ -746,7 +746,7 @@ export default function AdminOverviewDashboard({
                     )} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white truncate">{activity.description}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500" suppressHydrationWarning>
                         {new Date(activity.timestamp).toLocaleString()}
                       </p>
                     </div>

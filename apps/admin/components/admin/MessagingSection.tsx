@@ -671,7 +671,11 @@ export default function MessagingSection() {
 
       if (response.ok) {
         const data = await response.json();
-        setMessages(prev => [...prev, data.message]);
+        // Add message with de-duplication (WebSocket might have already added it)
+        setMessages(prev => {
+          if (prev.some(m => m.id === data.message?.id)) return prev;
+          return [...prev, data.message];
+        });
         messageInputRef.current?.focus();
         // Update conversation's lastMessage locally instead of fetching all
         setConversations(prev => prev.map(c => {
@@ -1253,7 +1257,7 @@ export default function MessagingSection() {
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">
+                              <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0" suppressHydrationWarning>
                                 {conv.lastMessage?.timestamp && formatConversationTime(conv.lastMessage.timestamp)}
                               </span>
                             </div>
@@ -1422,7 +1426,7 @@ export default function MessagingSection() {
                     <User className="w-3.5 h-3.5" />
                     {getCustomer(selectedConversation)?.name || 'Customer'}
                   </span>
-                  <span className="flex items-center gap-1.5 text-gray-400">
+                  <span className="flex items-center gap-1.5 text-gray-400" suppressHydrationWarning>
                     <Clock className="w-3.5 h-3.5" />
                     Started {formatDistanceToNow(new Date(selectedConversation.createdAt), { addSuffix: true })}
                   </span>
