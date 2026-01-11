@@ -115,8 +115,21 @@ export default function ImagesSection() {
       const data = await response.json();
 
       if (response.ok) {
-        setImages((prev) => ({ ...prev, [field]: data.path }));
-        toast.success(`${field} uploaded successfully`);
+        const newImages = { ...images, [field]: data.path };
+        setImages(newImages);
+        
+        // Auto-save to database immediately after upload
+        const saveResponse = await fetch('/api/images', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newImages),
+        });
+        
+        if (saveResponse.ok) {
+          toast.success(`${field} uploaded and saved! Changes will appear after page refresh.`);
+        } else {
+          toast.warning(`${field} uploaded but not saved. Click "Save" to persist.`);
+        }
       } else {
         toast.error(data.error || 'Upload failed');
       }

@@ -62,6 +62,7 @@ export async function GET(
       'gif': 'image/gif',
       'webp': 'image/webp',
       'svg': 'image/svg+xml',
+      'ico': 'image/x-icon',
     };
     const contentType = contentTypes[ext || 'png'] || 'image/png';
     
