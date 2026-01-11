@@ -266,13 +266,18 @@ async function startServer() {
     bcryptPool.initialize();
     const poolStats = bcryptPool.getStats();
     
-    // Check actual pool state - don't misleadingly report success if pool failed
+    // Check actual pool state - fail fast if pool failed (auth won't work without it)
     if (!poolStats.isReady) {
-      console.error(`❌ Worker pool FAILED - no workers available! Auth operations will fail.`);
+      console.error(`❌ Worker pool FAILED - no workers available!`);
+      console.error(`   Auth operations require the worker pool. Cannot start server.`);
+      console.error(`   Check system resources and worker thread support.`);
+      process.exit(1);
     } else if (poolStats.totalWorkers === poolStats.poolSize) {
       console.log(`✅ Worker pool ready (${poolStats.totalWorkers} workers)`);
     } else {
+      // Partial initialization - warn but continue (some workers are better than none)
       console.warn(`⚠️ Worker pool partially ready (${poolStats.totalWorkers}/${poolStats.poolSize} workers)`);
+      console.warn(`   Server will start but auth performance may be degraded.`);
     }
 
     // Start server and store reference for graceful shutdown
