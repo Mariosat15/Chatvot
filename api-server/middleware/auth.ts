@@ -7,6 +7,36 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
+/**
+ * Safely extract Authorization header value
+ * HTTP spec allows multiple headers with same name, resulting in string[]
+ * This prevents TypeError when calling .split() on an array
+ */
+function getAuthorizationHeader(req: Request): string | undefined {
+  const authHeader = req.headers['authorization'];
+  // Handle array case (multiple Authorization headers sent)
+  if (Array.isArray(authHeader)) {
+    return authHeader[0]; // Use first header
+  }
+  return authHeader;
+}
+
+/**
+ * Extract Bearer token from Authorization header
+ */
+function extractBearerToken(req: Request): string | null {
+  const authHeader = getAuthorizationHeader(req);
+  if (!authHeader || typeof authHeader !== 'string') {
+    return null;
+  }
+  // Expected format: "Bearer <token>"
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {
+    return null;
+  }
+  return parts[1];
+}
+
 // SECURITY: No fallback - must be configured via environment
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET;
@@ -35,8 +65,7 @@ export function authenticateToken(
   res: Response,
   next: NextFunction
 ): void {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const token = extractBearerToken(req);
 
   if (!token) {
     res.status(401).json({ error: 'Authentication required' });
@@ -73,8 +102,7 @@ export function optionalAuth(
   res: Response,
   next: NextFunction
 ): void {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = extractBearerToken(req);
 
   if (!token) {
     next();

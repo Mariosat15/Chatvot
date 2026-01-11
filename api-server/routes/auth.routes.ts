@@ -126,10 +126,13 @@ const getAccountModel = (): Model<IAccount> => {
 router.post('/register', async (req: Request, res: Response) => {
   const startTime = Date.now();
   
-  // Start a MongoDB session for transaction
-  const session = await mongoose.startSession();
+  // Session created inside try block to handle connection errors gracefully
+  let session: mongoose.ClientSession | null = null;
   
   try {
+    // Start a MongoDB session for transaction (inside try for proper error handling)
+    session = await mongoose.startSession();
+    
     const { email, password, name } = req.body;
 
     // Type validation - ensure email and password are strings
@@ -170,13 +173,23 @@ router.post('/register', async (req: Request, res: Response) => {
     let orphanedUserId: string | null = null;
     
     if (existingUser) {
-      // Check if they have an account - if not, they're orphaned and we should allow re-registration
-      const existingAccount = await Account.findOne({ userId: existingUser.id, providerId: 'credential' });
+      // Check if they have ANY account (credential OR OAuth) - if not, they're orphaned
+      // IMPORTANT: Don't filter by providerId - OAuth users have different providerIds (google, github, etc.)
+      const existingAccount = await Account.findOne({ userId: existingUser.id });
       if (existingAccount) {
-        res.status(409).json({ error: 'User already exists' });
+        // User has an account - check if it's a credential account for proper error message
+        if (existingAccount.providerId === 'credential') {
+          res.status(409).json({ error: 'User already exists' });
+        } else {
+          // User registered via OAuth - suggest they use that method
+          res.status(409).json({ 
+            error: 'User already exists',
+            message: `This email is already registered via ${existingAccount.providerId}. Please sign in using that method.`
+          });
+        }
         return;
       }
-      // Mark for deletion inside transaction (for atomicity)
+      // No account found - user is truly orphaned, safe to clean up
       orphanedUserId = existingUser._id.toString();
       console.log(`🔧 Found orphaned user ${email}, will clean up in transaction...`);
     }
@@ -198,6 +211,13 @@ router.post('/register', async (req: Request, res: Response) => {
       // Delete orphaned user inside transaction (if exists)
       // This ensures if new user creation fails, orphan is NOT deleted
       if (orphanedUserId) {
+        // RACE CONDITION FIX: Re-verify orphaned state inside transaction
+        // Another request could have created an account during password hashing (300-500ms)
+        const accountCreatedDuringHash = await Account.findOne({ userId: existingUser!.id }, { session });
+        if (accountCreatedDuringHash) {
+          // User is no longer orphaned - abort by throwing
+          throw new Error('CONCURRENT_REGISTRATION');
+        }
         await User.deleteOne({ _id: orphanedUserId }, { session });
         console.log(`🔧 Deleted orphaned user in transaction`);
       }
@@ -294,26 +314,43 @@ router.post('/register', async (req: Request, res: Response) => {
     // Auto-assign customer to employee (if enabled)
     try {
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000';
-      const autoAssignResponse = await fetch(`${baseUrl}/api/customer-assignment/auto-assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          userEmail: email,
-          userName: name || email.split('@')[0],
-        }),
-      });
       
-      if (autoAssignResponse.ok) {
-        const result = await autoAssignResponse.json() as { assigned?: boolean; employee?: { name?: string }; reason?: string };
-        if (result.assigned) {
-          console.log(`✅ Customer auto-assigned to ${result.employee?.name}`);
-        } else {
-          console.log(`📋 Customer not auto-assigned: ${result.reason}`);
+      // Use AbortController for timeout - prevents hanging if auto-assign endpoint is slow/unreachable
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 5000); // 5 second timeout
+      
+      try {
+        const autoAssignResponse = await fetch(`${baseUrl}/api/customer-assignment/auto-assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            userEmail: email,
+            userName: name || email.split('@')[0],
+          }),
+          signal: abortController.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (autoAssignResponse.ok) {
+          const result = await autoAssignResponse.json() as { assigned?: boolean; employee?: { name?: string }; reason?: string };
+          if (result.assigned) {
+            console.log(`✅ Customer auto-assigned to ${result.employee?.name}`);
+          } else {
+            console.log(`📋 Customer not auto-assigned: ${result.reason}`);
+          }
         }
+      } finally {
+        clearTimeout(timeoutId); // Ensure timeout is cleared even on error
       }
     } catch (autoAssignError) {
-      console.error('⚠️ Failed to auto-assign customer:', autoAssignError);
+      // Handle timeout specifically for better logging
+      if (autoAssignError instanceof Error && autoAssignError.name === 'AbortError') {
+        console.warn('⚠️ Customer auto-assign timed out (5s) - will be assigned later');
+      } else {
+        console.error('⚠️ Failed to auto-assign customer:', autoAssignError);
+      }
       // Don't fail registration if auto-assign fails
     }
 
@@ -337,9 +374,20 @@ router.post('/register', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('❌ Registration error:', error);
     
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Handle concurrent registration race condition
+    // This occurs when another request completed registration during password hashing
+    if (errorMessage === 'CONCURRENT_REGISTRATION') {
+      res.status(409).json({ 
+        error: 'User already exists',
+        message: 'An account with this email address was just created. Please try logging in.',
+      });
+      return;
+    }
+    
     // Handle MongoDB duplicate key error (race condition)
     // This occurs when concurrent requests for the same email both pass the initial check
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     if (errorMessage.includes('E11000') || errorMessage.includes('duplicate key')) {
       res.status(409).json({ 
         error: 'User already exists',
@@ -354,8 +402,10 @@ router.post('/register', async (req: Request, res: Response) => {
       message: 'An unexpected error occurred during registration. Please try again.',
     });
   } finally {
-    // Always end the session
-    await session.endSession();
+    // Always end the session (if it was created)
+    if (session) {
+      await session.endSession();
+    }
   }
 });
 
@@ -434,13 +484,16 @@ router.post('/login', async (req: Request, res: Response) => {
         const nodemailer = await import('nodemailer');
         const crypto = await import('crypto');
         
-        // Only resend if no recent token or token expired
+        // Check if we need to generate a new token or can reuse existing
         const needsNewToken = !user.emailVerificationToken || 
           !user.emailVerificationTokenExpiry ||
           new Date(user.emailVerificationTokenExpiry) < new Date();
-          
+        
+        let verificationToken: string;
+        
         if (needsNewToken) {
-          const verificationToken = crypto.randomBytes(32).toString('hex');
+          // Generate new token
+          verificationToken = crypto.randomBytes(32).toString('hex');
           const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
           
           await User.updateOne(
@@ -452,42 +505,45 @@ router.post('/login', async (req: Request, res: Response) => {
               } 
             }
           );
-          
-          // Send verification email in background (don't block response)
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://chartvolt.com';
-          // FIXED: Use userId instead of email - the /api/auth/verify-email endpoint expects userId
-          const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}&userId=${user.id}`;
-          
-          // Use consistent SMTP configuration with registration route
-          const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || process.env.NODEMAILER_HOST,
-            port: parseInt(process.env.SMTP_PORT || process.env.NODEMAILER_PORT || '587'),
-            secure: (process.env.SMTP_SECURE || process.env.NODEMAILER_SECURE) === 'true',
-            auth: {
-              user: process.env.SMTP_USER || process.env.NODEMAILER_EMAIL,
-              pass: process.env.SMTP_PASS || process.env.NODEMAILER_PASSWORD
-            }
-          });
-          
-          const platformName = process.env.PLATFORM_NAME || 'ChartVolt';
-          const senderEmail = process.env.SMTP_USER || process.env.NODEMAILER_EMAIL || 'noreply@chartvolt.com';
-          
-          // Fire and forget - don't await
-          transporter.sendMail({
-            from: `"${platformName}" <${senderEmail}>`,
-            to: email,
-            subject: 'Verify Your Email - ChartVolt',
-            html: `
-              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2>Email Verification Required</h2>
-                <p>You attempted to log in but your email is not yet verified.</p>
-                <p>Please click the link below to verify your email address:</p>
-                <p><a href="${verificationUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Verify Email</a></p>
-                <p style="color: #666; font-size: 12px; margin-top: 20px;">This link expires in 24 hours.</p>
-              </div>
-            `
-          }).catch(err => console.error('Failed to send verification reminder:', err));
+        } else {
+          // Reuse existing valid token
+          verificationToken = user.emailVerificationToken;
         }
+        
+        // Always send verification email (either with new or existing token)
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://chartvolt.com';
+        // FIXED: Use userId instead of email - the /api/auth/verify-email endpoint expects userId
+        const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}&userId=${user.id}`;
+        
+        // Use consistent SMTP configuration with registration route
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST || process.env.NODEMAILER_HOST,
+          port: parseInt(process.env.SMTP_PORT || process.env.NODEMAILER_PORT || '587'),
+          secure: (process.env.SMTP_SECURE || process.env.NODEMAILER_SECURE) === 'true',
+          auth: {
+            user: process.env.SMTP_USER || process.env.NODEMAILER_EMAIL,
+            pass: process.env.SMTP_PASS || process.env.NODEMAILER_PASSWORD
+          }
+        });
+        
+        const platformName = process.env.PLATFORM_NAME || 'ChartVolt';
+        const senderEmail = process.env.SMTP_USER || process.env.NODEMAILER_EMAIL || 'noreply@chartvolt.com';
+        
+        // Fire and forget - don't await
+        transporter.sendMail({
+          from: `"${platformName}" <${senderEmail}>`,
+          to: email,
+          subject: `Verify your email - ${platformName}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2>Email Verification Required</h2>
+              <p>You attempted to log in but your email is not yet verified.</p>
+              <p>Please click the link below to verify your email address:</p>
+              <p><a href="${verificationUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Verify Email</a></p>
+              <p style="color: #666; font-size: 12px; margin-top: 20px;">This link expires in 24 hours.</p>
+            </div>
+          `
+        }).catch(err => console.error('Failed to send verification reminder:', err));
       } catch (emailError) {
         // Don't fail login flow due to email error, just log it
         console.error('Error sending verification reminder:', emailError);
@@ -569,7 +625,10 @@ router.post('/register-batch', async (req: Request, res: Response) => {
     const internalApiKey = process.env.INTERNAL_API_KEY;
     // Get provided key from header (handle array case - take first value)
     const headerKey = req.headers['x-internal-api-key'];
-    const authKey = req.headers['authorization']?.replace('Bearer ', '');
+    // SECURITY FIX: Handle Authorization header array case to prevent TypeError
+    const authHeaderRaw = req.headers['authorization'];
+    const authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
+    const authKey = typeof authHeader === 'string' ? authHeader.replace('Bearer ', '') : undefined;
     const providedKey = Array.isArray(headerKey) ? headerKey[0] : headerKey || authKey;
     
     // If no internal API key is configured, disable this endpoint entirely
@@ -617,12 +676,15 @@ router.post('/register-batch', async (req: Request, res: Response) => {
 
     const User = getUserModel();
     const Account = getAccountModel();
-    const results: Array<{ success: boolean; email: string; userId?: string; error?: string }> = [];
+    
+    // Pre-allocate results array to preserve input order
+    // Each result will be stored at its original index
+    const results: Array<{ success: boolean; email: string; userId?: string; error?: string }> = new Array(users.length);
     let successCount = 0;
     let failureCount = 0;
 
-    // Validate each user before processing
-    const validUsers: Array<{ email: string; password: string; name?: string }> = [];
+    // Validate each user before processing - track original index
+    const validUsers: Array<{ email: string; password: string; name?: string; originalIndex: number }> = [];
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     
     for (let i = 0; i < users.length; i++) {
@@ -630,38 +692,39 @@ router.post('/register-batch', async (req: Request, res: Response) => {
       
       // Validate that element is an object (not null, undefined, or primitive)
       if (!userData || typeof userData !== 'object' || Array.isArray(userData)) {
-        results.push({ 
+        results[i] = { 
           success: false, 
           email: 'unknown', 
           error: `Invalid user data at index ${i}: expected an object` 
-        });
+        };
         failureCount++;
         continue;
       }
       
       // Validate email
       if (!userData.email || typeof userData.email !== 'string' || !emailRegex.test(userData.email)) {
-        results.push({ 
+        results[i] = { 
           success: false, 
           email: userData.email || 'unknown', 
           error: 'Invalid or missing email' 
-        });
+        };
         failureCount++;
         continue;
       }
       
       // Validate password
       if (!userData.password || typeof userData.password !== 'string' || userData.password.length < 6) {
-        results.push({ 
+        results[i] = { 
           success: false, 
           email: userData.email, 
           error: 'Invalid or missing password (min 6 characters)' 
-        });
+        };
         failureCount++;
         continue;
       }
       
-      validUsers.push(userData);
+      // Store original index to preserve order in results
+      validUsers.push({ ...userData, originalIndex: i });
     }
 
     // Process validated users with parallel bcrypt hashing
@@ -681,8 +744,10 @@ router.post('/register-batch', async (req: Request, res: Response) => {
 
     // Save users sequentially with transactions (to handle duplicates and ensure atomicity)
     for (const userData of hashedUsers) {
+      const { originalIndex } = userData;
+      
       if (!userData.hashedPassword) {
-        results.push({ success: false, email: userData.email, error: 'Hash failed' });
+        results[originalIndex] = { success: false, email: userData.email, error: 'Hash failed' };
         failureCount++;
         continue;
       }
@@ -696,16 +761,21 @@ router.post('/register-batch', async (req: Request, res: Response) => {
         let orphanedUserId: string | null = null;
         
         if (existing) {
-          // Check if they have an account - if not, they're orphaned
-          const existingAccount = await Account.findOne({ userId: existing.id, providerId: 'credential' });
+          // Check if they have ANY account (credential OR OAuth) - if not, they're orphaned
+          // IMPORTANT: Don't filter by providerId - OAuth users have different providerIds
+          const existingAccount = await Account.findOne({ userId: existing.id });
           if (existingAccount) {
-            results.push({ success: false, email: userData.email, error: 'Already exists' });
+            // User has an account - they're not orphaned, reject registration
+            const errorMsg = existingAccount.providerId === 'credential' 
+              ? 'Already exists' 
+              : `Already registered via ${existingAccount.providerId}`;
+            results[originalIndex] = { success: false, email: userData.email, error: errorMsg };
             failureCount++;
             // Don't call session.endSession() here - finally block handles it
             // Using continue in try-finally still executes finally first
             continue;
           }
-          // Mark for deletion inside transaction (for atomicity)
+          // No account found - user is truly orphaned, safe to clean up
           orphanedUserId = existing._id.toString();
           console.log(`🔧 Found orphaned user ${userData.email}, will clean up in transaction...`);
         }
@@ -720,6 +790,13 @@ router.post('/register-batch', async (req: Request, res: Response) => {
           // Delete orphaned user inside transaction (if exists)
           // This ensures if new user creation fails, orphan is NOT deleted
           if (orphanedUserId) {
+            // RACE CONDITION FIX: Re-verify orphaned state inside transaction
+            // Another request could have created an account during password hashing
+            const accountCreatedDuringHash = await Account.findOne({ userId: existing!.id }, { session });
+            if (accountCreatedDuringHash) {
+              // User is no longer orphaned - abort by throwing
+              throw new Error('CONCURRENT_REGISTRATION');
+            }
             await User.deleteOne({ _id: orphanedUserId }, { session });
             console.log(`🔧 Deleted orphaned user in transaction`);
           }
@@ -745,20 +822,26 @@ router.post('/register-batch', async (req: Request, res: Response) => {
           }], { session });
         });
 
-        results.push({ success: true, email: userData.email, userId: createdUserId || userId });
+        results[originalIndex] = { success: true, email: userData.email, userId: createdUserId || userId };
         successCount++;
       } catch (error) {
-        // Handle MongoDB duplicate key error (race condition) with clean message
+        // Handle errors with clean messages
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        const cleanError = (errorMessage.includes('E11000') || errorMessage.includes('duplicate key'))
-          ? 'User already exists'
-          : 'Registration failed';
+        let cleanError: string;
         
-        results.push({ 
+        if (errorMessage === 'CONCURRENT_REGISTRATION') {
+          cleanError = 'User was just registered by another request';
+        } else if (errorMessage.includes('E11000') || errorMessage.includes('duplicate key')) {
+          cleanError = 'User already exists';
+        } else {
+          cleanError = 'Registration failed';
+        }
+        
+        results[originalIndex] = { 
           success: false, 
           email: userData.email, 
           error: cleanError
-        });
+        };
         failureCount++;
       } finally {
         await session.endSession();

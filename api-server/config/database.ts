@@ -67,10 +67,15 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
       mongoose.connection.once('connected', onConnected);
       mongoose.connection.once('error', onError);
       
-      // RACE CONDITION FIX: Check if connection completed between state check and listener registration
-      // If connected now, the 'connected' event already fired and won't fire again
-      if (mongoose.connection.readyState === 1) {
+      // RACE CONDITION FIX: Check state after listener registration
+      // Connection may have succeeded or failed in the narrow window
+      const currentState = mongoose.connection.readyState;
+      if (currentState === 1) {
+        // Connected - 'connected' event already fired
         onConnected();
+      } else if (currentState === 0) {
+        // Failed/disconnected - 'error' event already fired
+        onError(new Error('Connection failed before listener was attached'));
       }
     });
     return mongoose;
@@ -112,9 +117,23 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
 }
 
 export async function disconnectFromDatabase(): Promise<void> {
-  if (mongoose.connection.readyState === 0) return;
+  const state = mongoose.connection.readyState;
   
-  await mongoose.disconnect();
+  // 0 = disconnected, already closed
+  if (state === 0) {
+    console.log('📊 Database already disconnected');
+    return;
+  }
+  
+  try {
+    // Close all connections in the connection pool
+    await mongoose.connection.close();
+    console.log('📊 MongoDB connection pool closed cleanly');
+  } catch (error) {
+    console.error('❌ Error closing database connection:', error);
+    // Force disconnect if graceful close fails
+    await mongoose.disconnect();
+  }
 }
 
 export function getConnectionStatus(): boolean {
@@ -167,10 +186,15 @@ export async function ensureDbReady(): Promise<void> {
       mongoose.connection.once('connected', onConnected);
       mongoose.connection.once('error', onError);
       
-      // RACE CONDITION FIX: Check if connection completed between state check and listener registration
-      // If connected now, the 'connected' event already fired and won't fire again
-      if (mongoose.connection.readyState === 1) {
+      // RACE CONDITION FIX: Check state after listener registration
+      // Connection may have succeeded or failed in the narrow window
+      const currentState = mongoose.connection.readyState;
+      if (currentState === 1) {
+        // Connected - 'connected' event already fired
         onConnected();
+      } else if (currentState === 0) {
+        // Failed/disconnected - 'error' event already fired
+        onError(new Error('Connection failed before listener was attached'));
       }
     });
   }
