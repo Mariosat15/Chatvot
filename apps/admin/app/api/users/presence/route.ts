@@ -15,20 +15,23 @@ export async function GET() {
       return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
     }
     
-    // Get all presence records from user_presence collection
-    const presences = await db.collection('user_presence').find({}).toArray();
+    // Get all presence records from userpresences collection (the main user presence, not messaging)
+    // The UserPresence model uses 'userId' field, collection is 'userpresences'
+    const presences = await db.collection('userpresences').find({}).toArray();
     
     // Define threshold for "offline" (45 seconds without heartbeat)
     const offlineThreshold = new Date(Date.now() - 45 * 1000);
     
     // Map presence data with online status
+    // Note: The main UserPresence model uses 'userId' not 'participantId'
     const presenceData = presences.map(p => ({
-      participantId: p.participantId,
+      participantId: p.userId, // Map userId to participantId for consistency with frontend
       status: p.lastHeartbeat && new Date(p.lastHeartbeat) > offlineThreshold 
         ? p.status || 'online' 
         : 'offline',
-      lastSeen: p.lastHeartbeat || p.updatedAt || p.createdAt,
+      lastSeen: p.lastHeartbeat || p.lastSeen || p.updatedAt || p.createdAt,
       lastHeartbeat: p.lastHeartbeat,
+      username: p.username,
     }));
     
     return NextResponse.json({

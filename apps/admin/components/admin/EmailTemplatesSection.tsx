@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Mail, Save, Send, RefreshCw, Eye, Code, Sparkles, AlertCircle, Check, Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, UserPlus, MailCheck, UserCog, UserSwitch } from 'lucide-react';
+import { Mail, Save, Send, RefreshCw, Eye, Code, Sparkles, AlertCircle, Check, Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, UserPlus, MailCheck, UserCog, ArrowLeftRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -166,7 +166,7 @@ const TEMPLATE_CONFIG: Record<TemplateType, {
   account_manager_changed: {
     title: 'Account Manager Changed',
     description: 'Sent to customers when their account manager is changed/reassigned',
-    icon: UserSwitch,
+    icon: ArrowLeftRight,
     variables: ['{{customerName}}', '{{newManagerFirstName}}', '{{previousManagerName}}', '{{platformName}}', '{{baseUrl}}', '{{companyAddress}}'],
     defaults: {
       templateType: 'account_manager_changed',
