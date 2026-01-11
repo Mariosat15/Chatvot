@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import mongoose, { Types } from 'mongoose';
+import { sendAccountManagerAssignedEmail } from '@/lib/nodemailer';
 
 /**
  * POST /api/customer-assignment/auto-assign
@@ -304,8 +305,8 @@ export async function POST(request: NextRequest) {
 
     // Send notification to customer if enabled
     if (settings.notifyCustomerOnAssignment) {
+      // Create in-app notification for the customer
       try {
-        // Create in-app notification for the customer
         const notificationsCollection = db.collection('notifications');
         await notificationsCollection.insertOne({
           userId: userId,
@@ -323,9 +324,24 @@ export async function POST(request: NextRequest) {
             employeeRole: selectedEmployee.role,
           },
         });
-        console.log(`📬 [AutoAssign] Customer notification sent to ${userEmail}`);
+        console.log(`📬 [AutoAssign] Customer in-app notification sent to ${userEmail}`);
       } catch (customerNotifyError) {
-        console.error('Failed to send customer notification:', customerNotifyError);
+        console.error('Failed to send customer in-app notification:', customerNotifyError);
+      }
+      
+      // Send EMAIL notification to customer using template
+      try {
+        const employeeFirstName = selectedEmployee.name.split(' ')[0] || selectedEmployee.name;
+        await sendAccountManagerAssignedEmail({
+          customerEmail: userEmail,
+          customerName: userName,
+          managerName: selectedEmployee.name,
+          managerFirstName: employeeFirstName,
+        });
+        console.log(`📧 [AutoAssign] Customer EMAIL sent to ${userEmail}`);
+      } catch (emailError) {
+        console.error('Failed to send customer email:', emailError);
+        // Don't fail the assignment if email fails
       }
     }
 
