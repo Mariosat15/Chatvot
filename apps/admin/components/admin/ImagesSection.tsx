@@ -287,40 +287,36 @@ export default function ImagesSection() {
           </p>
 
           <div className="mt-4">
-            <input
-              type="file"
-              id={`upload-${field}`}
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                console.log(`[Upload] File selected for ${field}:`, file?.name, file?.size);
-                if (file) {
-                  toast.info(`Uploading ${file.name}...`);
-                  handleFileUpload(field, file);
-                }
-              }}
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={uploading[field]}
-              className="cursor-pointer border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white"
-              onClick={() => document.getElementById(`upload-${field}`)?.click()}
-            >
-              {uploading[field] ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload New
-                </>
-              )}
-            </Button>
+            <label className="inline-block cursor-pointer">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  console.log(`[Upload] File selected for ${field}:`, file?.name, file?.size);
+                  if (file) {
+                    toast.info(`Uploading ${file.name}...`);
+                    handleFileUpload(field, file);
+                  }
+                  // Reset input so same file can be selected again
+                  e.target.value = '';
+                }}
+              />
+              <span className={`inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium h-9 px-3 border border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white transition-colors ${uploading[field] ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                {uploading[field] ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Upload New
+                  </>
+                )}
+              </span>
+            </label>
           </div>
 
           {currentPath && (
