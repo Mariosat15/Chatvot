@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,9 +8,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Save, Upload, RefreshCw, Image as ImageIconLucide, Info, Palette, Star, Users, Quote } from 'lucide-react';
 import Image from 'next/image';
-
-// File input refs for each field
-const fileInputRefs: Record<string, HTMLInputElement | null> = {};
 
 interface ImageSettings {
   appLogo: string;
@@ -26,6 +23,104 @@ interface AuthPageSettings {
   authPageTestimonialRole: string;
   authPageTestimonialRating: number;
   authPageDashboardImage: string;
+}
+
+// SEPARATE COMPONENT - defined outside to prevent remount issues
+function ImageUploadCard({
+  title,
+  description,
+  field,
+  currentPath,
+  recommendations,
+  isUploading,
+  onFileSelect,
+}: {
+  title: string;
+  description: string;
+  field: string;
+  currentPath: string;
+  recommendations: string;
+  isUploading: boolean;
+  onFileSelect: (file: File) => void;
+}) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[ImageUploadCard] onChange triggered for', field);
+    const file = e.target.files?.[0];
+    if (file) {
+      console.log('[ImageUploadCard] File:', file.name, file.size);
+      onFileSelect(file);
+    }
+    // Reset so same file can be selected again
+    e.target.value = '';
+  };
+
+  return (
+    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 hover:border-purple-500/50 transition-all">
+      <div className="flex items-start gap-6">
+        {/* Preview */}
+        <div className="flex-shrink-0">
+          {currentPath ? (
+            <div className="relative h-32 w-32 bg-gray-900 border-2 border-gray-700 rounded-xl overflow-hidden shadow-lg">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                key={currentPath}
+                src={currentPath}
+                alt={title}
+                className="absolute inset-0 w-full h-full object-contain p-3"
+                onError={(e) => {
+                  console.error(`Failed to load image: ${currentPath}`);
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
+          ) : (
+            <div className="h-32 w-32 bg-gray-900 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center">
+              <ImageIconLucide className="h-12 w-12 text-gray-600" />
+            </div>
+          )}
+        </div>
+
+        {/* Info & Upload */}
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-semibold text-gray-100">{title}</h3>
+          <p className="text-sm text-gray-400 mt-1">{description}</p>
+          <p className="text-xs text-purple-400 mt-2 flex items-center gap-1">
+            <ImageIconLucide className="h-3 w-3" />
+            {recommendations}
+          </p>
+
+          <div className="mt-4">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleChange}
+              disabled={isUploading}
+              className="block w-full text-sm text-gray-400
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border file:border-purple-500
+                file:text-sm file:font-medium
+                file:bg-transparent file:text-purple-400
+                hover:file:bg-purple-500 hover:file:text-white
+                file:cursor-pointer file:transition-colors
+                disabled:opacity-50"
+            />
+            {isUploading && (
+              <div className="flex items-center gap-2 mt-2 text-purple-400 text-sm">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Uploading...
+              </div>
+            )}
+          </div>
+
+          {currentPath && (
+            <p className="text-xs text-gray-600 mt-3 font-mono truncate">
+              {currentPath}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function ImagesSection() {
@@ -242,89 +337,12 @@ export default function ImagesSection() {
     }
   };
 
-  const ImageUploadCard = ({
-    title,
-    description,
-    field,
-    currentPath,
-    recommendations,
-  }: {
-    title: string;
-    description: string;
-    field: keyof ImageSettings;
-    currentPath: string;
-    recommendations: string;
-  }) => (
-    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 hover:border-purple-500/50 transition-all">
-      <div className="flex items-start gap-6">
-        {/* Preview */}
-        <div className="flex-shrink-0">
-          {currentPath ? (
-            <div className="relative h-32 w-32 bg-gray-900 border-2 border-gray-700 rounded-xl overflow-hidden shadow-lg">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                key={currentPath}
-                src={currentPath}
-                alt={title}
-                className="absolute inset-0 w-full h-full object-contain p-3"
-                onError={(e) => {
-                  console.error(`Failed to load image: ${currentPath}`);
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </div>
-          ) : (
-            <div className="h-32 w-32 bg-gray-900 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center">
-              <ImageIconLucide className="h-12 w-12 text-gray-600" />
-            </div>
-          )}
-        </div>
-
-        {/* Info & Upload */}
-        <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-gray-100">{title}</h3>
-          <p className="text-sm text-gray-400 mt-1">{description}</p>
-          <p className="text-xs text-purple-400 mt-2 flex items-center gap-1">
-            <ImageIconLucide className="h-3 w-3" />
-            {recommendations}
-          </p>
-
-          <div className="mt-4">
-            {/* SIMPLE TEST - just alert on change */}
-            <input
-              type="file"
-              accept="image/*"
-              style={{ border: '2px solid red', padding: '10px' }}
-              onInput={(e: any) => {
-                window.alert('onInput fired! File: ' + (e.target.files?.[0]?.name || 'none'));
-              }}
-              onChange={(e: any) => {
-                window.alert('onChange fired! File: ' + (e.target.files?.[0]?.name || 'none'));
-                const file = e.target.files?.[0];
-                if (file) {
-                  console.log(`[Upload] File selected for ${field}:`, file.name, file.size);
-                  toast.info(`Uploading ${file.name}...`);
-                  handleFileUpload(field, file);
-                }
-              }}
-            />
-            {uploading[field] && (
-              <div className="flex items-center gap-2 mt-2 text-purple-400 text-sm">
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                Uploading...
-              </div>
-            )}
-          </div>
-
-          {currentPath && (
-            <p className="text-xs text-gray-600 mt-3 font-mono truncate">
-              {currentPath}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  // handleFileSelect wrapper for the external component
+  const handleFileSelect = useCallback((field: keyof ImageSettings) => (file: File) => {
+    console.log(`[ImagesSection] handleFileSelect for ${field}:`, file.name);
+    toast.info(`Uploading ${file.name}...`);
+    handleFileUpload(field, file);
+  }, []);
 
   if (isFetching) {
     return (
@@ -370,6 +388,8 @@ export default function ImagesSection() {
           field="appLogo"
           currentPath={images.appLogo}
           recommendations="Recommended: 150x50px, PNG with transparency"
+          isUploading={uploading.appLogo}
+          onFileSelect={handleFileSelect('appLogo')}
         />
 
         <ImageUploadCard
@@ -378,6 +398,8 @@ export default function ImagesSection() {
           field="emailLogo"
           currentPath={images.emailLogo}
           recommendations="Recommended: 150x50px, PNG with transparency"
+          isUploading={uploading.emailLogo}
+          onFileSelect={handleFileSelect('emailLogo')}
         />
 
         <ImageUploadCard
@@ -386,6 +408,8 @@ export default function ImagesSection() {
           field="profileImage"
           currentPath={images.profileImage}
           recommendations="Recommended: 200x200px, Square format, PNG"
+          isUploading={uploading.profileImage}
+          onFileSelect={handleFileSelect('profileImage')}
         />
 
         <ImageUploadCard
@@ -394,6 +418,8 @@ export default function ImagesSection() {
           field="dashboardPreview"
           currentPath={images.dashboardPreview}
           recommendations="Recommended: 600x400px, JPEG or PNG"
+          isUploading={uploading.dashboardPreview}
+          onFileSelect={handleFileSelect('dashboardPreview')}
         />
 
         <ImageUploadCard
@@ -402,6 +428,8 @@ export default function ImagesSection() {
           field="favicon"
           currentPath={images.favicon}
           recommendations="Recommended: 32x32px or 64x64px, ICO, PNG, or SVG"
+          isUploading={uploading.favicon}
+          onFileSelect={handleFileSelect('favicon')}
         />
       </div>
 
