@@ -97,6 +97,9 @@ export interface UserData {
   };
   // Assignment info
   assignment?: Assignment | null;
+  // Online status
+  isOnline?: boolean;
+  lastSeen?: string;
   // Optional fields that may be present
   country?: string;
   city?: string;
@@ -105,7 +108,7 @@ export interface UserData {
   phone?: string;
 }
 
-type SortField = 'name' | 'email' | 'balance' | 'netProfit' | 'createdAt' | 'competitions' | 'challenges';
+type SortField = 'name' | 'email' | 'balance' | 'netProfit' | 'createdAt' | 'competitions' | 'challenges' | 'online';
 type SortDirection = 'asc' | 'desc';
 
 export default function UsersSection() {
@@ -125,10 +128,14 @@ export default function UsersSection() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [emailVerifiedFilter, setEmailVerifiedFilter] = useState<string>('all');
   const [assignmentFilter, setAssignmentFilter] = useState<string>('all');
+  const [onlineFilter, setOnlineFilter] = useState<string>('all');
   
   // Assignments data
   const [assignments, setAssignments] = useState<Map<string, Assignment>>(new Map());
   const [employees, setEmployees] = useState<{ _id: string; name: string; email: string }[]>([]);
+  
+  // Online status data
+  const [onlineStatus, setOnlineStatus] = useState<Map<string, { isOnline: boolean; lastSeen?: string }>>(new Map());
   
   // Detail panel state
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
@@ -138,6 +145,11 @@ export default function UsersSection() {
     fetchUsers();
     fetchAssignments();
     fetchEmployees();
+    fetchOnlineStatus();
+    
+    // Refresh online status every 30 seconds
+    const onlineInterval = setInterval(fetchOnlineStatus, 30000);
+    return () => clearInterval(onlineInterval);
   }, []);
 
   const fetchUsers = async () => {
@@ -193,13 +205,37 @@ export default function UsersSection() {
     }
   };
 
-  // Enrich users with assignment data
+  const fetchOnlineStatus = async () => {
+    try {
+      const response = await fetch('/api/users/presence');
+      if (response.ok) {
+        const data = await response.json();
+        const statusMap = new Map<string, { isOnline: boolean; lastSeen?: string }>();
+        (data.presences || []).forEach((p: { participantId: string; status: string; lastSeen?: string }) => {
+          statusMap.set(p.participantId, {
+            isOnline: p.status !== 'offline',
+            lastSeen: p.lastSeen,
+          });
+        });
+        setOnlineStatus(statusMap);
+      }
+    } catch (error) {
+      console.error('Error fetching online status:', error);
+    }
+  };
+
+  // Enrich users with assignment data and online status
   const enrichedUsers = useMemo(() => {
-    return users.map(user => ({
-      ...user,
-      assignment: assignments.get(user.id) || null,
-    }));
-  }, [users, assignments]);
+    return users.map(user => {
+      const presence = onlineStatus.get(user.id);
+      return {
+        ...user,
+        assignment: assignments.get(user.id) || null,
+        isOnline: presence?.isOnline || false,
+        lastSeen: presence?.lastSeen,
+      };
+    });
+  }, [users, assignments, onlineStatus]);
 
   // Filter and sort users
   const filteredAndSortedUsers = useMemo(() => {
@@ -241,6 +277,13 @@ export default function UsersSection() {
       }
     }
     
+    // Apply online filter
+    if (onlineFilter !== 'all') {
+      result = result.filter((user) => 
+        onlineFilter === 'online' ? user.isOnline : !user.isOnline
+      );
+    }
+    
     // Apply sorting
     result.sort((a, b) => {
       let comparison = 0;
@@ -266,6 +309,10 @@ export default function UsersSection() {
         case 'challenges':
           comparison = (a.challenges?.total || 0) - (b.challenges?.total || 0);
           break;
+        case 'online':
+          // Online users first when sorting descending
+          comparison = (a.isOnline ? 1 : 0) - (b.isOnline ? 1 : 0);
+          break;
       }
       return sortDirection === 'asc' ? comparison : -comparison;
     });
@@ -278,7 +325,7 @@ export default function UsersSection() {
     });
     
     return result;
-  }, [enrichedUsers, searchQuery, roleFilter, emailVerifiedFilter, assignmentFilter, sortField, sortDirection]);
+  }, [enrichedUsers, searchQuery, roleFilter, emailVerifiedFilter, assignmentFilter, onlineFilter, sortField, sortDirection]);
 
   // Paginated users
   const paginatedUsers = useMemo(() => {
@@ -329,7 +376,9 @@ export default function UsersSection() {
     totalBalance: users.reduce((sum, u) => sum + u.wallet.balance, 0),
     assignedUsers: assignments.size,
     unassignedUsers: users.length - assignments.size,
-  }), [users, assignments]);
+    onlineUsers: enrichedUsers.filter(u => u.isOnline).length,
+    offlineUsers: enrichedUsers.filter(u => !u.isOnline).length,
+  }), [users, assignments, enrichedUsers]);
 
   return (
     <div className="h-full flex flex-col">
@@ -346,8 +395,17 @@ export default function UsersSection() {
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-white">User Management</h2>
-                <p className="text-cyan-100 text-sm">
-                  {stats.totalUsers} users • {stats.verifiedEmails} verified • {stats.assignedUsers} assigned • {stats.unassignedUsers} unassigned
+                <p className="text-cyan-100 text-sm flex items-center gap-2 flex-wrap">
+                  <span>{stats.totalUsers} users</span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                    {stats.onlineUsers} online
+                  </span>
+                  <span>•</span>
+                  <span>{stats.verifiedEmails} verified</span>
+                  <span>•</span>
+                  <span>{stats.assignedUsers} assigned</span>
                 </p>
               </div>
             </div>
@@ -455,6 +513,28 @@ export default function UsersSection() {
             </SelectContent>
           </Select>
           
+          {/* Online Status Filter */}
+          <Select value={onlineFilter} onValueChange={(v) => { setOnlineFilter(v); setCurrentPage(1); }}>
+            <SelectTrigger className="w-[140px] bg-gray-900 border-gray-700">
+              <SelectValue placeholder="Online Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="online">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                  Online ({stats.onlineUsers})
+                </span>
+              </SelectItem>
+              <SelectItem value="offline">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-gray-500 rounded-full"></span>
+                  Offline ({stats.offlineUsers})
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          
           {/* Page Size */}
           <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
             <SelectTrigger className="w-[100px] bg-gray-900 border-gray-700">
@@ -494,6 +574,9 @@ export default function UsersSection() {
                 <tr>
                   <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     <SortableHeader field="name">User</SortableHeader>
+                  </th>
+                  <th className="text-center p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <SortableHeader field="online">Online</SortableHeader>
                   </th>
                   <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     Status
@@ -553,7 +636,24 @@ export default function UsersSection() {
                         </div>
                       </td>
                       
-                      {/* Status */}
+                      {/* Online Status */}
+                      <td className="p-4 text-center">
+                        <div className="flex items-center justify-center">
+                          {user.isOnline ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/50"></span>
+                              <span className="text-xs text-green-400 font-medium">Online</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5" title={user.lastSeen ? `Last seen: ${new Date(user.lastSeen).toLocaleString()}` : 'Never seen'}>
+                              <span className="w-2.5 h-2.5 bg-gray-500 rounded-full"></span>
+                              <span className="text-xs text-gray-500 font-medium">Offline</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      
+                      {/* Email Status */}
                       <td className="p-4">
                         <div className="flex items-center gap-2">
                           {user.emailVerified ? (
