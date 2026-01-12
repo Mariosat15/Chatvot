@@ -420,13 +420,26 @@ export default function ProfileOverviewCharts({
     { label: 'Losses', value: combinedStats?.losingTrades || 0, color: '#ef4444', maxValue: combinedStats?.totalTrades || 1 },
   ], [combinedStats]);
 
-  // Wallet distribution data
-  const walletDistribution = useMemo(() => [
-    { label: 'Balance', value: walletData?.currentBalance || 0, color: '#eab308' },
-    { label: 'Deposited', value: walletData?.totalDeposited || 0, color: '#3b82f6' },
-    { label: 'Won', value: (walletData?.totalWonFromCompetitions || 0) + (walletData?.totalWonFromChallenges || 0), color: '#22c55e' },
-    { label: 'Withdrawn', value: walletData?.totalWithdrawn || 0, color: '#6b7280' },
-  ], [walletData]);
+  // Wallet distribution data - shows fund sources and current balance breakdown
+  const walletDistribution = useMemo(() => {
+    const deposited = walletData?.totalDeposited || 0;
+    const won = (walletData?.totalWonFromCompetitions || 0) + (walletData?.totalWonFromChallenges || 0);
+    const withdrawn = walletData?.totalWithdrawn || 0;
+    const balance = walletData?.currentBalance || 0;
+    
+    // Calculate what portion of balance is from each source
+    const totalReceived = deposited + won;
+    const totalSpent = totalReceived - balance + withdrawn; // Entry fees, etc.
+    
+    // Show balance breakdown (proportional attribution)
+    const depositPortion = totalReceived > 0 ? (deposited / totalReceived) * balance : balance;
+    const wonPortion = totalReceived > 0 ? (won / totalReceived) * balance : 0;
+    
+    return [
+      { label: 'Deposited', value: Number(depositPortion.toFixed(2)), color: '#3b82f6' },
+      { label: 'Won', value: Number(wonPortion.toFixed(2)), color: '#22c55e' },
+    ].filter(item => item.value > 0);
+  }, [walletData]);
 
   const hasActivity = competitionStats?.totalCompetitionsEntered > 0 || challengeStats?.totalChallengesEntered > 0;
 
