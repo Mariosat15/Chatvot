@@ -613,10 +613,10 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
           icon={<Trophy className="w-5 h-5 text-white" />}
           label="Prizes Won"
           value={
-            <>
-              <Zap className="w-5 h-5 text-yellow-400" />
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Zap className="w-5 h-5 text-yellow-400 flex-shrink-0" style={{ display: 'inline-block' }} />
               <span>{data.overview.totalPrizesWon.toLocaleString()}</span>
-            </>
+            </span>
           }
           subvalue="From competitions & challenges"
           color="yellow"
