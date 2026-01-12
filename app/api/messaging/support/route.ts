@@ -272,7 +272,7 @@ async function handleAIResponse(
     return await escalateToHuman(conversationId, userId, userName, shouldEscalate ? 'User requested human assistance' : 'Maximum AI responses reached');
   }
   
-  // Generate AI response using OpenAI
+  // Generate AI response using RAG-only service (NO company data access)
   try {
     const openaiApiKey = process.env.OPENAI_API_KEY;
     console.log(`🤖 [AI] OpenAI API key configured: ${openaiApiKey ? 'YES' : 'NO'}`);
@@ -294,41 +294,25 @@ async function handleAIResponse(
       content: m.content
     }));
     
-    // Build system prompt
-    const systemPrompt = settings.aiSystemPrompt || `You are a helpful customer support assistant for ChartVolt, a trading platform. 
-Be friendly, professional, and helpful. If you cannot help with something or the user seems frustrated, 
-suggest connecting them with a human agent. Keep responses concise but informative.`;
+    // Use RAG-only service - NO company data access
+    const { generateCustomerSupportResponse } = await import('@/lib/services/customer-ai.service');
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...conversationHistory,
-        ],
-        max_tokens: 500,
-        temperature: 0.7,
-      }),
-    });
+    const platformName = settings.platformName || 'ChartVolt';
     
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      console.error(`🤖 [AI] OpenAI API error: ${response.status}`, errorText);
-      return null;
-    }
+    console.log(`🤖 [AI] Using RAG-only customer support AI...`);
     
-    const data = await response.json();
-    const aiContent = data.choices?.[0]?.message?.content;
+    const aiResult = await generateCustomerSupportResponse(
+      userMessage,
+      conversationHistory,
+      platformName
+    );
     
-    console.log(`🤖 [AI] OpenAI response received, content length: ${aiContent?.length || 0}`);
+    const aiContent = aiResult.content;
+    
+    console.log(`🤖 [AI] RAG response received, usedRAG: ${aiResult.usedRAG}, sources: ${aiResult.sourcesUsed.join(', ')}`);
     
     if (!aiContent) {
-      console.log(`🤖 [AI] ERROR: No content in OpenAI response`);
+      console.log(`🤖 [AI] ERROR: No content in AI response`);
       return null;
     }
     

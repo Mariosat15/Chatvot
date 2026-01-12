@@ -3988,9 +3988,34 @@ export async function POST(request: NextRequest) {
     // Get the last user message for audit logging
     const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
 
+    // RAG-FIRST: Search vector database for relevant context
+    let ragContext = '';
+    try {
+      const ragResults = await aiKnowledgeService.search(lastUserMessage, {
+        maxResults: 3,
+        threshold: 0.65,
+      });
+      
+      if (ragResults.length > 0) {
+        ragContext = '\n\n## RELEVANT KNOWLEDGE FROM DATABASE:\n';
+        for (const result of ragResults) {
+          const source = (result.sourceId as any)?.name || 'Knowledge Base';
+          ragContext += `\n[Source: ${source}]\n${result.content}\n---\n`;
+        }
+        console.log(`🤖 [Admin AI] RAG found ${ragResults.length} relevant chunks`);
+      }
+    } catch (ragError) {
+      console.warn('🤖 [Admin AI] RAG search failed (continuing without):', ragError);
+    }
+
+    // Build enhanced system prompt with RAG context
+    const enhancedSystemPrompt = ragContext 
+      ? `${SYSTEM_PROMPT}${ragContext}\n\nUse the above RELEVANT KNOWLEDGE when answering questions about platform features, policies, or procedures.`
+      : SYSTEM_PROMPT;
+
     // Build messages with system prompt
     const chatMessages: OpenAI.ChatCompletionMessageParam[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: enhancedSystemPrompt },
       ...messages.map((m: any) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
