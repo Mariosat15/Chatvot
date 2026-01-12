@@ -453,7 +453,7 @@ export const getUserDashboardData = async () => {
     }
 
     // Fetch all closed trades from all competitions for daily P&L calculation
-    const allCompetitionIds = validCompetitions.map(comp => comp?.competition._id);
+    // (allCompetitionIds already defined above for stats aggregation)
     const allTrades = await TradeHistory.find({
       competitionId: { $in: allCompetitionIds },
       userId: session.user.id,
