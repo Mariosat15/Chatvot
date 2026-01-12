@@ -426,6 +426,172 @@ class NotificationService {
       },
     });
   }
+
+  /**
+   * Send competition joined notification
+   */
+  async notifyCompetitionJoined(userId: string, competitionName: string): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'competition_joined',
+      variables: { competitionName },
+    });
+  }
+
+  /**
+   * Send competition cancelled notification
+   */
+  async notifyCompetitionCancelled(userId: string, competitionName: string, reason?: string): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'competition_cancelled',
+      variables: { competitionName, reason: reason || 'Competition was cancelled' },
+    });
+  }
+
+  /**
+   * Send competition won notification
+   */
+  async notifyCompetitionWon(userId: string, competitionName: string, prize: number, position: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'competition_won',
+      variables: { 
+        competitionName, 
+        prize: `€${prize.toFixed(2)}`,
+        position: position.toString(),
+      },
+    });
+  }
+
+  /**
+   * Send podium finish notification (2nd, 3rd place)
+   */
+  async notifyPodiumFinish(userId: string, competitionName: string, prize: number, position: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'podium_finish',
+      variables: { 
+        competitionName, 
+        prize: `€${prize.toFixed(2)}`,
+        position: position.toString(),
+      },
+    });
+  }
+
+  /**
+   * Send prize received notification
+   */
+  async notifyPrizeReceived(userId: string, competitionName: string, prize: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'prize_received',
+      variables: { 
+        competitionName, 
+        prize: `€${prize.toFixed(2)}`,
+      },
+    });
+  }
+
+  /**
+   * Send competition ended notification
+   */
+  async notifyCompetitionEnded(userId: string, competitionName: string, finalPosition: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'competition_ended',
+      variables: { 
+        competitionName, 
+        finalPosition: finalPosition.toString(),
+      },
+    });
+  }
+
+  /**
+   * Send order filled notification
+   */
+  async notifyOrderFilled(userId: string, symbol: string, side: string, quantity: number, price: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'order_filled',
+      variables: { 
+        symbol, 
+        side: side.toUpperCase(),
+        quantity: quantity.toString(),
+        price: price.toFixed(5),
+      },
+    });
+  }
+
+  /**
+   * Send position closed notification
+   */
+  async notifyPositionClosed(userId: string, symbol: string, realizedPnl: number, pnlPercentage: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'position_closed',
+      variables: { 
+        symbol, 
+        pnl: realizedPnl >= 0 ? `+€${realizedPnl.toFixed(2)}` : `-€${Math.abs(realizedPnl).toFixed(2)}`,
+        pnlPercentage: `${pnlPercentage >= 0 ? '+' : ''}${pnlPercentage.toFixed(2)}%`,
+      },
+    });
+  }
+
+  /**
+   * Send competition starting soon notification
+   */
+  async notifyCompetitionStartingSoon(userId: string, competitionName: string, startsIn: string): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'competition_starting_soon',
+      variables: { competitionName, startsIn },
+    });
+  }
+
+  /**
+   * Send competition ending soon notification
+   */
+  async notifyCompetitionEndingSoon(userId: string, competitionName: string, endsIn: string): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'competition_ending_soon',
+      variables: { competitionName, endsIn },
+    });
+  }
+
+  /**
+   * Send competition started notification
+   */
+  async notifyCompetitionStarted(userId: string, competitionName: string): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'competition_started',
+      variables: { competitionName },
+    });
+  }
+
+  /**
+   * Send margin warning notification
+   */
+  async notifyMarginWarning(userId: string, marginLevel: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'margin_warning',
+      variables: { marginLevel: `${marginLevel.toFixed(1)}%` },
+    });
+  }
+
+  /**
+   * Send margin call notification
+   */
+  async notifyMarginCall(userId: string, marginLevel: number): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'margin_call',
+      variables: { marginLevel: `${marginLevel.toFixed(1)}%` },
+    });
+  }
 }
 
 // Create singleton instance
