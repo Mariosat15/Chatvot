@@ -3989,11 +3989,13 @@ export async function POST(request: NextRequest) {
     const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
 
     // RAG-FIRST: Search vector database for relevant context
+    // Admin AI can access 'admin' and 'both' audience knowledge
     let ragContext = '';
     try {
       const ragResults = await aiKnowledgeService.search(lastUserMessage, {
         maxResults: 3,
         threshold: 0.65,
+        audience: 'admin', // Admin AI can see admin + both
       });
       
       if (ragResults.length > 0) {

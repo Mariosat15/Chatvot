@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/admin/auth';
 import { aiKnowledgeService } from '@/lib/services/ai-knowledge.service';
 import { PLATFORM_KNOWLEDGE_BASE } from '@/lib/ai-agent/knowledge-base';
+import { CUSTOMER_FAQ_KNOWLEDGE_BASE } from '@/lib/ai-agent/customer-knowledge-base';
 import { AIKnowledgeSource } from '@/database/models/ai-knowledge.model';
 
 // POST - Index the built-in help/wiki content
@@ -10,47 +11,76 @@ export async function POST(request: NextRequest) {
     const admin = await requireAdminAuth();
     
     const body = await request.json().catch(() => ({}));
-    const { force = false } = body;
+    const { force = false, type = 'all' } = body; // type: 'admin', 'customer', 'all'
     
-    // Check if we already have the built-in help indexed
-    const existingHelpSource = await AIKnowledgeSource.findOne({ 
-      type: 'help_article',
-      name: 'ChartVolt Platform Knowledge Base'
-    });
+    const results: { admin?: any; customer?: any } = {};
     
-    if (existingHelpSource && !force) {
-      return NextResponse.json({
-        success: true,
-        message: 'Built-in help is already indexed',
-        source: existingHelpSource,
-        alreadyIndexed: true,
+    // Index ADMIN knowledge base (only for admin AI)
+    if (type === 'admin' || type === 'all') {
+      const existingAdminSource = await AIKnowledgeSource.findOne({ 
+        type: 'help_article',
+        name: 'ChartVolt Platform Knowledge Base'
       });
+      
+      if (existingAdminSource && !force) {
+        results.admin = { alreadyIndexed: true, source: existingAdminSource };
+      } else {
+        if (existingAdminSource && force) {
+          await aiKnowledgeService.deleteSource(existingAdminSource._id.toString());
+        }
+        
+        const adminSource = await aiKnowledgeService.createSource({
+          name: 'ChartVolt Platform Knowledge Base',
+          type: 'help_article',
+          audience: 'admin', // ADMIN ONLY - internal docs
+          content: PLATFORM_KNOWLEDGE_BASE,
+          metadata: {
+            title: 'ChartVolt Platform - Complete Admin Guide',
+            description: 'Internal admin documentation - NOT for customers',
+            category: 'Admin',
+            tags: ['admin', 'internal', 'guide', 'documentation'],
+          },
+          createdBy: admin.adminId || 'system',
+        });
+        results.admin = { alreadyIndexed: false, source: adminSource };
+      }
     }
     
-    // Delete existing help source if forcing re-index
-    if (existingHelpSource && force) {
-      await aiKnowledgeService.deleteSource(existingHelpSource._id.toString());
+    // Index CUSTOMER FAQ knowledge base (for customer support AI)
+    if (type === 'customer' || type === 'all') {
+      const existingCustomerSource = await AIKnowledgeSource.findOne({ 
+        type: 'help_article',
+        name: 'Customer FAQ Knowledge Base'
+      });
+      
+      if (existingCustomerSource && !force) {
+        results.customer = { alreadyIndexed: true, source: existingCustomerSource };
+      } else {
+        if (existingCustomerSource && force) {
+          await aiKnowledgeService.deleteSource(existingCustomerSource._id.toString());
+        }
+        
+        const customerSource = await aiKnowledgeService.createSource({
+          name: 'Customer FAQ Knowledge Base',
+          type: 'help_article',
+          audience: 'customer', // CUSTOMER ONLY - public facing FAQ
+          content: CUSTOMER_FAQ_KNOWLEDGE_BASE,
+          metadata: {
+            title: 'Customer FAQ & Help',
+            description: 'Public-facing FAQ for customer support AI',
+            category: 'Customer Support',
+            tags: ['faq', 'customer', 'support', 'help'],
+          },
+          createdBy: admin.adminId || 'system',
+        });
+        results.customer = { alreadyIndexed: false, source: customerSource };
+      }
     }
-    
-    // Create the knowledge source from the built-in knowledge base
-    const source = await aiKnowledgeService.createSource({
-      name: 'ChartVolt Platform Knowledge Base',
-      type: 'help_article',
-      content: PLATFORM_KNOWLEDGE_BASE,
-      metadata: {
-        title: 'ChartVolt Platform - Complete Admin Guide',
-        description: 'Built-in comprehensive documentation for the admin panel',
-        category: 'General',
-        tags: ['help', 'documentation', 'admin', 'guide', 'built-in'],
-      },
-      createdBy: admin.adminId || 'system',
-    });
     
     return NextResponse.json({
       success: true,
-      message: 'Built-in help has been indexed successfully',
-      source,
-      alreadyIndexed: false,
+      message: 'Knowledge bases indexed successfully',
+      results,
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
@@ -69,15 +99,26 @@ export async function GET() {
   try {
     await requireAdminAuth();
     
-    const existingHelpSource = await AIKnowledgeSource.findOne({ 
-      type: 'help_article',
-      name: 'ChartVolt Platform Knowledge Base'
-    });
+    const [adminSource, customerSource] = await Promise.all([
+      AIKnowledgeSource.findOne({ 
+        type: 'help_article',
+        name: 'ChartVolt Platform Knowledge Base'
+      }),
+      AIKnowledgeSource.findOne({ 
+        type: 'help_article',
+        name: 'Customer FAQ Knowledge Base'
+      }),
+    ]);
     
     return NextResponse.json({
       success: true,
-      indexed: !!existingHelpSource,
-      source: existingHelpSource,
+      indexed: !!(adminSource || customerSource),
+      adminIndexed: !!adminSource,
+      customerIndexed: !!customerSource,
+      sources: {
+        admin: adminSource,
+        customer: customerSource,
+      },
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {

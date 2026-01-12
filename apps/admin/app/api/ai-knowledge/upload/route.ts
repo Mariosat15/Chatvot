@@ -24,6 +24,11 @@ export async function POST(request: NextRequest) {
     const category = formData.get('category') as string || 'General';
     const description = formData.get('description') as string || '';
     const tags = formData.get('tags') as string || '';
+    const audienceRaw = formData.get('audience') as string || 'customer';
+    
+    // Validate audience - default to customer for safety
+    const validAudiences = ['customer', 'admin', 'both'];
+    const audience = validAudiences.includes(audienceRaw) ? audienceRaw : 'customer';
     
     if (!file) {
       return NextResponse.json(
@@ -86,10 +91,11 @@ export async function POST(request: NextRequest) {
     const filePath = path.join(uploadsDir, `${timestamp}-${safeFileName}`);
     await writeFile(filePath, buffer);
     
-    // Create knowledge source
+    // Create knowledge source with audience
     const source = await aiKnowledgeService.createSource({
       name: name || file.name.replace(/\.[^/.]+$/, ''),
       type: 'document',
+      audience: audience as 'customer' | 'admin' | 'both', // Include audience
       content,
       originalFileName: file.name,
       fileUrl: `/uploads/ai-knowledge/${timestamp}-${safeFileName}`,

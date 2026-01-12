@@ -157,7 +157,9 @@ function cosineSimilarity(a: number[], b: number[]): number {
 /**
  * Search the vector database for relevant knowledge
  * Uses multiple strategies: semantic search + keyword fallback
- * Returns ONLY public knowledge - NO company stats
+ * 
+ * SECURITY: ONLY searches 'customer' and 'both' audience knowledge
+ * NEVER accesses 'admin' audience knowledge
  */
 async function searchKnowledgeBase(
   query: string,
@@ -173,9 +175,13 @@ async function searchKnowledgeBase(
   }
   
   try {
-    // Get all active chunks
+    // SECURITY: Only get chunks for 'customer' or 'both' audience
+    // NEVER include 'admin' audience chunks
     const chunks = await db.collection('aiknowledgechunks')
-      .find({ isActive: true })
+      .find({ 
+        isActive: true,
+        audience: { $in: ['customer', 'both'] } // SECURITY FILTER
+      })
       .toArray();
     
     if (chunks.length === 0) {

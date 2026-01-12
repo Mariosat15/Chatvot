@@ -8,7 +8,11 @@ export async function POST(request: NextRequest) {
     const admin = await requireAdminAuth();
     
     const body = await request.json();
-    const { url, name, category, description, followLinks, maxPages } = body;
+    const { url, name, category, description, followLinks, maxPages, audience: audienceRaw } = body;
+    
+    // Validate audience - default to customer for safety
+    const validAudiences = ['customer', 'admin', 'both'];
+    const audience = validAudiences.includes(audienceRaw) ? audienceRaw : 'customer';
     
     if (!url) {
       return NextResponse.json(
@@ -53,10 +57,11 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Create knowledge source
+    // Create knowledge source with audience
     const source = await aiKnowledgeService.createSource({
       name: name || extractTitleFromHtml(html) || new URL(url).hostname,
       type: 'url',
+      audience: audience as 'customer' | 'admin' | 'both', // Include audience
       content,
       websiteUrl: url,
       metadata: {

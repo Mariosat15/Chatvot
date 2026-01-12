@@ -6,10 +6,17 @@ import { Schema, model, models, type Document, type Model, Types } from 'mongoos
 
 export type SourceType = 'document' | 'url' | 'help_article' | 'manual';
 
+// CRITICAL: Audience determines which AI agents can access this knowledge
+// - 'customer': ONLY customer support AI (public-facing, safe info)
+// - 'admin': ONLY admin AI agent (internal data, company info)
+// - 'both': Accessible by both agents
+export type KnowledgeAudience = 'customer' | 'admin' | 'both';
+
 export interface IAIKnowledgeSource extends Document {
   _id: Types.ObjectId;
   name: string;
   type: SourceType;
+  audience: KnowledgeAudience; // NEW: Who can access this knowledge
   originalFileName?: string;
   fileUrl?: string;
   websiteUrl?: string;
@@ -42,6 +49,12 @@ const AIKnowledgeSourceSchema = new Schema<IAIKnowledgeSource>(
       enum: ['document', 'url', 'help_article', 'manual'],
       required: true 
     },
+    audience: {
+      type: String,
+      enum: ['customer', 'admin', 'both'],
+      default: 'customer', // Default to customer for safety
+      required: true,
+    },
     originalFileName: { type: String },
     fileUrl: { type: String },
     websiteUrl: { type: String },
@@ -73,6 +86,7 @@ const AIKnowledgeSourceSchema = new Schema<IAIKnowledgeSource>(
 // Index for efficient queries
 AIKnowledgeSourceSchema.index({ type: 1, status: 1 });
 AIKnowledgeSourceSchema.index({ isActive: 1 });
+AIKnowledgeSourceSchema.index({ audience: 1 }); // NEW: Index for audience filtering
 AIKnowledgeSourceSchema.index({ 'metadata.category': 1 });
 
 export const AIKnowledgeSource: Model<IAIKnowledgeSource> = 
@@ -85,6 +99,7 @@ export const AIKnowledgeSource: Model<IAIKnowledgeSource> =
 export interface IAIKnowledgeChunk extends Document {
   _id: Types.ObjectId;
   sourceId: Types.ObjectId;
+  audience: KnowledgeAudience; // Denormalized for fast filtering
   content: string;
   contentHash: string; // For deduplication
   embedding: number[]; // Vector embedding (1536 dimensions for OpenAI ada-002)
@@ -105,6 +120,12 @@ export interface IAIKnowledgeChunk extends Document {
 const AIKnowledgeChunkSchema = new Schema<IAIKnowledgeChunk>(
   {
     sourceId: { type: Schema.Types.ObjectId, ref: 'AIKnowledgeSource', required: true },
+    audience: {
+      type: String,
+      enum: ['customer', 'admin', 'both'],
+      default: 'customer',
+      required: true,
+    },
     content: { type: String, required: true },
     contentHash: { type: String, required: true },
     embedding: { type: [Number], required: true },
@@ -126,6 +147,7 @@ const AIKnowledgeChunkSchema = new Schema<IAIKnowledgeChunk>(
 AIKnowledgeChunkSchema.index({ sourceId: 1 });
 AIKnowledgeChunkSchema.index({ contentHash: 1 }, { unique: true });
 AIKnowledgeChunkSchema.index({ isActive: 1 });
+AIKnowledgeChunkSchema.index({ audience: 1, isActive: 1 }); // NEW: Fast audience filtering
 AIKnowledgeChunkSchema.index({ 'metadata.sectionTitle': 'text', content: 'text' });
 
 export const AIKnowledgeChunk: Model<IAIKnowledgeChunk> = 

@@ -30,10 +30,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+type KnowledgeAudience = 'customer' | 'admin' | 'both';
+
 interface KnowledgeSource {
   _id: string;
   name: string;
   type: 'document' | 'url' | 'help_article' | 'manual';
+  audience: KnowledgeAudience; // NEW: Who can access this knowledge
   originalFileName?: string;
   fileUrl?: string;
   websiteUrl?: string;
@@ -78,6 +81,9 @@ export default function AIKnowledgeSection() {
   const [indexingHelp, setIndexingHelp] = useState(false);
   const [helpIndexed, setHelpIndexed] = useState(false);
   
+  // Audience filter - show customer or admin knowledge bases
+  const [audienceFilter, setAudienceFilter] = useState<'all' | 'customer' | 'admin'>('all');
+  
   // Add source modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [addType, setAddType] = useState<'document' | 'url' | 'manual'>('document');
@@ -89,6 +95,7 @@ export default function AIKnowledgeSection() {
   const [formCategory, setFormCategory] = useState('General');
   const [formDescription, setFormDescription] = useState('');
   const [formTags, setFormTags] = useState('');
+  const [formAudience, setFormAudience] = useState<KnowledgeAudience>('customer'); // NEW
   const [uploading, setUploading] = useState(false);
   
   // Test search
@@ -164,6 +171,7 @@ export default function AIKnowledgeSection() {
       formData.append('category', formCategory);
       formData.append('description', formDescription);
       formData.append('tags', formTags);
+      formData.append('audience', formAudience); // NEW: Include audience
 
       const response = await fetch('/api/ai-knowledge/upload', {
         method: 'POST',
@@ -204,6 +212,7 @@ export default function AIKnowledgeSection() {
           name: formName,
           category: formCategory,
           description: formDescription,
+          audience: formAudience, // NEW: Include audience
         }),
       });
 
@@ -240,6 +249,7 @@ export default function AIKnowledgeSection() {
           name: formName,
           type: 'manual',
           content: formContent,
+          audience: formAudience, // NEW: Include audience
           metadata: {
             category: formCategory,
             description: formDescription,
@@ -364,6 +374,27 @@ export default function AIKnowledgeSection() {
     setFormCategory('General');
     setFormDescription('');
     setFormTags('');
+    setFormAudience('customer');
+  };
+
+  // Filter sources by audience
+  const filteredSources = sources.filter(source => {
+    if (audienceFilter === 'all') return true;
+    if (audienceFilter === 'customer') return source.audience === 'customer' || source.audience === 'both';
+    if (audienceFilter === 'admin') return source.audience === 'admin' || source.audience === 'both';
+    return true;
+  });
+
+  // Get audience badge color
+  const getAudienceBadge = (audience: KnowledgeAudience) => {
+    switch (audience) {
+      case 'customer':
+        return <span className="text-xs px-2 py-0.5 rounded bg-green-500/20 text-green-400">Customer</span>;
+      case 'admin':
+        return <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-400">Admin</span>;
+      case 'both':
+        return <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">Both</span>;
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -437,6 +468,33 @@ export default function AIKnowledgeSection() {
             Add Knowledge
           </button>
         </div>
+      </div>
+
+      {/* Audience Filter */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-gray-400 text-sm">Filter by audience:</span>
+        <div className="flex gap-1 bg-gray-800 rounded-lg p-1">
+          {(['all', 'customer', 'admin'] as const).map((aud) => (
+            <button
+              key={aud}
+              onClick={() => setAudienceFilter(aud)}
+              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+                audienceFilter === aud
+                  ? aud === 'customer' 
+                    ? 'bg-green-600 text-white'
+                    : aud === 'admin'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              {aud === 'all' ? 'All' : aud === 'customer' ? '👥 Customer Support' : '🔧 Admin Only'}
+            </button>
+          ))}
+        </div>
+        <span className="text-gray-500 text-xs ml-2">
+          ({filteredSources.length} of {sources.length} sources)
+        </span>
       </div>
 
       {/* Stats Cards */}
@@ -533,17 +591,22 @@ export default function AIKnowledgeSection() {
       {/* Sources Tab */}
       {activeTab === 'sources' && (
         <div className="space-y-4">
-          {sources.length === 0 ? (
+          {filteredSources.length === 0 ? (
             <div className="text-center py-12 bg-gray-800/30 rounded-xl border border-gray-700/50">
               <Database className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400">No knowledge sources yet</p>
+              <p className="text-gray-400">
+                {sources.length === 0 
+                  ? 'No knowledge sources yet' 
+                  : `No ${audienceFilter === 'customer' ? 'customer' : 'admin'} knowledge sources`
+                }
+              </p>
               <p className="text-gray-500 text-sm mt-1">
                 Add documents, URLs, or manual entries to build your AI knowledge base
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {sources.map((source) => (
+              {filteredSources.map((source) => (
                 <motion.div
                   key={source._id}
                   initial={{ opacity: 0 }}
@@ -563,7 +626,7 @@ export default function AIKnowledgeSection() {
                         {getTypeIcon(source.type)}
                       </div>
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold text-white">{source.name}</h3>
                           {getStatusIcon(source.status)}
                           <span className={`text-xs px-2 py-0.5 rounded ${
@@ -574,6 +637,8 @@ export default function AIKnowledgeSection() {
                           }`}>
                             {source.status}
                           </span>
+                          {/* Audience Badge */}
+                          {getAudienceBadge(source.audience || 'customer')}
                         </div>
                         <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
                           <span className="capitalize">{source.type}</span>
@@ -906,6 +971,38 @@ export default function AIKnowledgeSection() {
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
+                </div>
+
+                {/* AUDIENCE SELECTOR - Critical for security */}
+                <div>
+                  <label className="text-sm text-gray-400 block mb-1">
+                    Audience <span className="text-red-400">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    {(['customer', 'admin', 'both'] as const).map((aud) => (
+                      <button
+                        key={aud}
+                        type="button"
+                        onClick={() => setFormAudience(aud)}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                          formAudience === aud
+                            ? aud === 'customer' 
+                              ? 'bg-green-600 border-green-500 text-white'
+                              : aud === 'admin'
+                              ? 'bg-purple-600 border-purple-500 text-white'
+                              : 'bg-blue-600 border-blue-500 text-white'
+                            : 'bg-gray-700/50 border-gray-600 text-gray-400 hover:border-gray-500'
+                        }`}
+                      >
+                        {aud === 'customer' ? '👥 Customer Support' : aud === 'admin' ? '🔧 Admin Only' : '📚 Both'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    {formAudience === 'customer' && '⚠️ Will be used by customer support AI chatbot (public-facing)'}
+                    {formAudience === 'admin' && '🔒 Will only be used by admin AI agent (internal stats, procedures)'}
+                    {formAudience === 'both' && '📚 Will be accessible by both customer and admin AI agents'}
+                  </p>
                 </div>
 
                 <div>

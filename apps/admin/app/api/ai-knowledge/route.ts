@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const admin = await requireAdminAuth();
     
     const body = await request.json();
-    const { name, type, content, websiteUrl, metadata } = body;
+    const { name, type, content, websiteUrl, metadata, audience } = body;
     
     if (!name || !type) {
       return NextResponse.json(
@@ -68,9 +68,14 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Validate audience
+    const validAudiences = ['customer', 'admin', 'both'];
+    const safeAudience = validAudiences.includes(audience) ? audience : 'customer';
+    
     const source = await aiKnowledgeService.createSource({
       name,
       type,
+      audience: safeAudience, // Include audience in source
       content: type === 'manual' ? content : undefined,
       websiteUrl: type === 'url' ? websiteUrl : undefined,
       metadata,

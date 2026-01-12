@@ -6,7 +6,8 @@ import {
   AIKnowledgeSettings,
   IAIKnowledgeSource,
   IAIKnowledgeChunk,
-  SourceType 
+  SourceType,
+  KnowledgeAudience,
 } from '@/database/models/ai-knowledge.model';
 import { getSettings } from '@/lib/services/settings.service';
 
@@ -239,10 +240,12 @@ export class AIKnowledgeService {
   
   /**
    * Create a new knowledge source
+   * @param audience - 'customer' (customer support only), 'admin' (admin AI only), 'both' (accessible by both)
    */
   async createSource(data: {
     name: string;
     type: SourceType;
+    audience?: KnowledgeAudience; // NEW: Who can access this knowledge
     content?: string;
     fileUrl?: string;
     websiteUrl?: string;
@@ -263,6 +266,7 @@ export class AIKnowledgeService {
     
     const source = await AIKnowledgeSource.create({
       ...data,
+      audience: data.audience || 'customer', // Default to customer for safety
       status: 'pending',
     });
     
@@ -317,9 +321,10 @@ export class AIKnowledgeService {
         // Generate embedding
         const embedding = await generateEmbedding(chunk.content);
         
-        // Create chunk
+        // Create chunk with audience from source
         const newChunk = await AIKnowledgeChunk.create({
           sourceId: source._id,
+          audience: source.audience || 'customer', // Copy audience from source
           content: chunk.content,
           contentHash,
           embedding,
@@ -396,12 +401,16 @@ export class AIKnowledgeService {
   
   /**
    * Search knowledge base with semantic similarity
+   * @param audience - Filter by audience: 'customer', 'admin', or 'both'
+   *   - For customer AI: pass 'customer' - will search 'customer' and 'both'
+   *   - For admin AI: pass 'admin' - will search 'admin' and 'both'
    */
   async search(query: string, options?: {
     maxResults?: number;
     threshold?: number;
     category?: string;
     sourceTypes?: SourceType[];
+    audience?: 'customer' | 'admin'; // NEW: Filter by audience
   }) {
     await connectToDatabase();
     
@@ -412,8 +421,20 @@ export class AIKnowledgeService {
     // Generate query embedding
     const queryEmbedding = await generateEmbedding(query);
     
-    // Build match query
+    // Build match query with audience filtering
     const matchQuery: any = { isActive: true };
+    
+    // SECURITY: Filter by audience
+    // Customer AI can only see 'customer' and 'both'
+    // Admin AI can see 'admin' and 'both'
+    if (options?.audience === 'customer') {
+      matchQuery.audience = { $in: ['customer', 'both'] };
+      console.log('[AI Knowledge] Filtering for CUSTOMER audience');
+    } else if (options?.audience === 'admin') {
+      matchQuery.audience = { $in: ['admin', 'both'] };
+      console.log('[AI Knowledge] Filtering for ADMIN audience');
+    }
+    // If no audience specified, search all (for admin panel testing)
     
     if (options?.sourceTypes?.length) {
       const sources = await AIKnowledgeSource.find({ 
