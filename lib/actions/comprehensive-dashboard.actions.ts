@@ -471,40 +471,56 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     totalCapital += p.currentCapital || 0;
   }
   
-  // All-time stats = from all participations
-  let totalPnL = 0;
+  // SINGLE SOURCE OF TRUTH: Get stats from TradeHistory collection
+  // This ensures consistency between Dashboard, Profile, and Admin Panel
+  const [tradeStats] = await TradeHistory.aggregate([
+    { $match: { userId } },
+    {
+      $group: {
+        _id: null,
+        totalTrades: { $sum: 1 },
+        winningTrades: { $sum: { $cond: ['$isWinner', 1, 0] } },
+        losingTrades: { $sum: { $cond: ['$isWinner', 0, 1] } },
+        totalPnL: { $sum: '$realizedPnl' },
+        grossWins: { $sum: { $cond: [{ $gt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
+        grossLosses: { $sum: { $cond: [{ $lt: ['$realizedPnl', 0] }, { $abs: '$realizedPnl' }, 0] } },
+        largestWin: { $max: { $cond: [{ $gt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
+        largestLoss: { $min: { $cond: [{ $lt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
+      }
+    }
+  ]);
+
+  const stats = tradeStats || {
+    totalTrades: 0,
+    winningTrades: 0,
+    losingTrades: 0,
+    totalPnL: 0,
+    grossWins: 0,
+    grossLosses: 0,
+    largestWin: 0,
+    largestLoss: 0,
+  };
+
+  const totalTrades = stats.totalTrades;
+  const winningTrades = stats.winningTrades;
+  const losingTrades = stats.losingTrades;
+  const totalPnL = stats.totalPnL;
+  const totalGrossWins = stats.grossWins;
+  const totalGrossLosses = stats.grossLosses;
+  const largestWin = stats.largestWin || 0;
+  const largestLoss = stats.largestLoss || 0;
+
+  // Calculate unrealized PnL from participation records (this is still valid)
   let unrealizedPnL = 0;
-  let realizedPnL = 0;
-  let totalTrades = 0;
-  let winningTrades = 0;
-  let losingTrades = 0;
-  let totalGrossWins = 0;
-  let totalGrossLosses = 0;
-  let largestWin = 0;
-  let largestLoss = 0;
+  let realizedPnL = stats.totalPnL;
+  for (const p of allParticipations) {
+    unrealizedPnL += p.unrealizedPnl || 0;
+  }
   
   // IMPORTANT: Use wallet as SOURCE OF TRUTH for prizes won (not participation records)
   // This ensures consistency with the profile page which also uses wallet data
   const walletData = wallet as any;
   const totalPrizesWon = (walletData?.totalWonFromCompetitions || 0) + (walletData?.totalWonFromChallenges || 0);
-  
-  for (const p of allParticipations) {
-    totalPnL += p.pnl || 0;
-    unrealizedPnL += p.unrealizedPnl || 0;
-    realizedPnL += p.realizedPnl || 0;
-    totalTrades += p.totalTrades || 0;
-    winningTrades += p.winningTrades || 0;
-    losingTrades += p.losingTrades || 0;
-    
-    if (p.averageWin && p.winningTrades) {
-      totalGrossWins += p.averageWin * p.winningTrades;
-    }
-    if (p.averageLoss && p.losingTrades) {
-      totalGrossLosses += Math.abs(p.averageLoss) * p.losingTrades;
-    }
-    if (p.largestWin && p.largestWin > largestWin) largestWin = p.largestWin;
-    if (p.largestLoss && p.largestLoss < largestLoss) largestLoss = p.largestLoss;
-  }
   
   const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
   const profitFactor = totalGrossLosses > 0 ? totalGrossWins / totalGrossLosses : (totalGrossWins > 0 ? 999 : 0);
