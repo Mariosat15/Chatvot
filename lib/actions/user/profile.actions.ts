@@ -9,6 +9,7 @@ import Competition from '@/database/models/trading/competition.model';
 import Challenge from '@/database/models/trading/challenge.model';
 import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
+import TradeHistory from '@/database/models/trading/trade-history.model';
 
 /**
  * Combined trading stats (competitions + challenges)
@@ -31,7 +32,8 @@ export interface CombinedTradingStats {
 
 /**
  * Get combined trading stats (competitions + challenges)
- * This function calculates stats THE SAME WAY as dashboard does!
+ * SINGLE SOURCE OF TRUTH: Calculates from TradeHistory collection
+ * This ensures consistency between dashboard, profile, and admin panel
  */
 export async function getCombinedTradingStats(userId?: string): Promise<CombinedTradingStats> {
   try {
@@ -42,71 +44,75 @@ export async function getCombinedTradingStats(userId?: string): Promise<Combined
 
     await connectToDatabase();
 
-    // Get all participations - SAME as dashboard
-    const [competitionParticipations, challengeParticipations, wallet] = await Promise.all([
+    // Get wallet and participation data for non-trade stats
+    const [competitionParticipations, wallet] = await Promise.all([
       CompetitionParticipant.find({ userId: targetUserId }).lean(),
-      ChallengeParticipant.find({ userId: targetUserId }).lean(),
       CreditWallet.findOne({ userId: targetUserId }).lean(),
     ]);
 
-    // Combine ALL participations - SAME as dashboard
-    const allParticipations = [...competitionParticipations, ...challengeParticipations] as any[];
-
-    // Aggregate stats - SAME logic as dashboard (lines 470-502)
-    let totalPnL = 0;
-    let totalTrades = 0;
-    let winningTrades = 0;
-    let losingTrades = 0;
-    let totalGrossWins = 0;
-    let totalGrossLosses = 0;
-    let largestWin = 0;
-    let largestLoss = 0;
-    let totalStartingCapital = 0;
-
-    for (const p of allParticipations) {
-      totalPnL += p.pnl || 0;
-      totalTrades += p.totalTrades || 0;
-      winningTrades += p.winningTrades || 0;
-      losingTrades += p.losingTrades || 0;
-      totalStartingCapital += p.startingCapital || 0;
-
-      if (p.averageWin && p.winningTrades) {
-        totalGrossWins += p.averageWin * p.winningTrades;
+    // SINGLE SOURCE OF TRUTH: Get stats from TradeHistory collection
+    // This ensures admin and customer see the SAME numbers
+    const [tradeStats] = await TradeHistory.aggregate([
+      { $match: { userId: targetUserId } },
+      {
+        $group: {
+          _id: null,
+          totalTrades: { $sum: 1 },
+          winningTrades: { $sum: { $cond: ['$isWinner', 1, 0] } },
+          losingTrades: { $sum: { $cond: ['$isWinner', 0, 1] } },
+          totalPnL: { $sum: '$realizedPnl' },
+          grossWins: { $sum: { $cond: [{ $gt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
+          grossLosses: { $sum: { $cond: [{ $lt: ['$realizedPnl', 0] }, { $abs: '$realizedPnl' }, 0] } },
+          largestWin: { $max: { $cond: [{ $gt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
+          largestLoss: { $min: { $cond: [{ $lt: ['$realizedPnl', 0] }, '$realizedPnl', 0] } },
+        }
       }
-      if (p.averageLoss && p.losingTrades) {
-        totalGrossLosses += Math.abs(p.averageLoss) * p.losingTrades;
-      }
-      if (p.largestWin && p.largestWin > largestWin) largestWin = p.largestWin;
-      if (p.largestLoss && p.largestLoss < largestLoss) largestLoss = p.largestLoss;
-    }
+    ]);
 
-    // Calculate derived stats - SAME as dashboard
-    const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
-    const profitFactor = totalGrossLosses > 0 
-      ? totalGrossWins / totalGrossLosses 
-      : (totalGrossWins > 0 ? 999 : 0);
-    const averageWin = winningTrades > 0 ? totalGrossWins / winningTrades : 0;
-    const averageLoss = losingTrades > 0 ? totalGrossLosses / losingTrades : 0;
+    const stats = tradeStats || {
+      totalTrades: 0,
+      winningTrades: 0,
+      losingTrades: 0,
+      totalPnL: 0,
+      grossWins: 0,
+      grossLosses: 0,
+      largestWin: 0,
+      largestLoss: 0,
+    };
+
+    // Calculate total starting capital from participations
+    const totalStartingCapital = competitionParticipations.reduce(
+      (sum: number, p: any) => sum + (p.startingCapital || 0),
+      0
+    );
+
+    // Calculate derived stats
+    const winRate = stats.totalTrades > 0 ? (stats.winningTrades / stats.totalTrades) * 100 : 0;
+    const profitFactor = stats.grossLosses > 0 
+      ? stats.grossWins / stats.grossLosses 
+      : (stats.grossWins > 0 ? 999 : 0);
+    const averageWin = stats.winningTrades > 0 ? stats.grossWins / stats.winningTrades : 0;
+    const averageLoss = stats.losingTrades > 0 ? stats.grossLosses / stats.losingTrades : 0;
     const totalPnLPercentage = totalStartingCapital > 0 
-      ? (totalPnL / totalStartingCapital) * 100 
+      ? (stats.totalPnL / totalStartingCapital) * 100 
       : 0;
 
-    // IMPORTANT: Use wallet as SOURCE OF TRUTH for prizes won - SAME as dashboard
+    // Use wallet as SOURCE OF TRUTH for prizes won
     const walletData = wallet as any;
     const totalPrizesWon = (walletData?.totalWonFromCompetitions || 0) + (walletData?.totalWonFromChallenges || 0);
 
     return {
-      totalTrades,
-      winningTrades,
-      losingTrades,
+      totalTrades: stats.totalTrades,
+      winningTrades: stats.winningTrades,
+      losingTrades: stats.losingTrades,
       winRate,
-      totalPnL,
+      totalPnL: stats.totalPnL,
       totalPnLPercentage,
       profitFactor,
       averageWin,
       averageLoss,
-      largestWin,
-      largestLoss,
+      largestWin: stats.largestWin || 0,
+      largestLoss: stats.largestLoss || 0,
       totalPrizesWon,
     };
   } catch (error) {

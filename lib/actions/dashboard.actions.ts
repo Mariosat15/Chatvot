@@ -10,6 +10,7 @@ import TradingPosition from '@/database/models/trading/trading-position.model';
 import TradeHistory from '@/database/models/trading/trade-history.model';
 import { getRealPrice } from '@/lib/services/real-forex-prices.service';
 import { ForexSymbol, calculateUnrealizedPnL } from '@/lib/services/pnl-calculator.service';
+import { getContestStats } from '@/lib/services/user-stats.service';
 
 // Disable verbose logging in production
 const DEBUG = false;
@@ -115,18 +116,32 @@ export const getUserDashboardDataForApi = async (userId: string) => {
       (sum, comp) => sum + (comp?.openPositionsCount || 0),
       0
     );
-    const totalTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.totalTrades || 0),
-      0
-    );
-    const totalWinningTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.winningTrades || 0),
-      0
-    );
-    const totalLosingTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.losingTrades || 0),
-      0
-    );
+
+    // Get REAL stats from TradeHistory - SINGLE SOURCE OF TRUTH
+    // This ensures consistency between admin panel and customer dashboard
+    const allCompetitionIds = validCompetitions.map(comp => comp?.competition._id);
+    
+    const tradeStats = await TradeHistory.aggregate([
+      { 
+        $match: { 
+          userId,
+          competitionId: { $in: allCompetitionIds }
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalTrades: { $sum: 1 },
+          winningTrades: { $sum: { $cond: ['$isWinner', 1, 0] } },
+          losingTrades: { $sum: { $cond: ['$isWinner', 0, 1] } },
+        }
+      }
+    ]);
+
+    const stats = tradeStats[0] || { totalTrades: 0, winningTrades: 0, losingTrades: 0 };
+    const totalTrades = stats.totalTrades;
+    const totalWinningTrades = stats.winningTrades;
+    const totalLosingTrades = stats.losingTrades;
     const overallWinRate = totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
 
     return {
@@ -377,21 +392,32 @@ export const getUserDashboardData = async () => {
       0
     );
 
-    // Calculate aggregate trading stats (same method as profile)
-    const totalTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.totalTrades || 0),
-      0
-    );
+    // Calculate aggregate trading stats from TradeHistory (SINGLE SOURCE OF TRUTH)
+    // This ensures consistency between admin panel and customer dashboard
+    const allCompetitionIds = validCompetitions.map(comp => comp?.competition._id);
+    
+    // Get REAL stats from TradeHistory - not from potentially stale participant records
+    const tradeStats = await TradeHistory.aggregate([
+      { 
+        $match: { 
+          userId: session.user.id,
+          competitionId: { $in: allCompetitionIds }
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalTrades: { $sum: 1 },
+          winningTrades: { $sum: { $cond: ['$isWinner', 1, 0] } },
+          losingTrades: { $sum: { $cond: ['$isWinner', 0, 1] } },
+        }
+      }
+    ]);
 
-    const totalWinningTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.winningTrades || 0),
-      0
-    );
-
-    const totalLosingTrades = validCompetitions.reduce(
-      (sum, comp) => sum + (comp?.participation.losingTrades || 0),
-      0
-    );
+    const stats = tradeStats[0] || { totalTrades: 0, winningTrades: 0, losingTrades: 0 };
+    const totalTrades = stats.totalTrades;
+    const totalWinningTrades = stats.winningTrades;
+    const totalLosingTrades = stats.losingTrades;
 
     // Calculate true overall win rate (not average of win rates)
     const overallWinRate = totalTrades > 0 
