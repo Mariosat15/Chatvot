@@ -79,7 +79,7 @@ function GlowStatCard({
         </div>
         <div className="mt-3">
           <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">{label}</p>
-          <p className={`${large ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'} font-bold ${colors.text} tabular-nums`}>{value}</p>
+          <div className={`${large ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'} font-bold ${colors.text} flex items-center gap-1`}>{value}</div>
           {subvalue && <p className="text-xs text-gray-500 mt-1">{subvalue}</p>}
         </div>
       </div>
@@ -613,10 +613,10 @@ export default function ModernDashboardCharts({ data }: ModernDashboardProps) {
           icon={<Trophy className="w-5 h-5 text-white" />}
           label="Prizes Won"
           value={
-            <span className="inline-flex items-center gap-1">
-              <Zap className="w-5 h-5 text-yellow-400 inline" />
-              {data.overview.totalPrizesWon.toLocaleString()}
-            </span>
+            <>
+              <Zap className="w-5 h-5 text-yellow-400" />
+              <span>{data.overview.totalPrizesWon.toLocaleString()}</span>
+            </>
           }
           subvalue="From competitions & challenges"
           color="yellow"
