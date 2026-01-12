@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBulkUserStats } from '@/lib/services/user-stats.service';
+import { getBulkUserStats } from '../../../../../lib/services/user-stats.service';
 
 /**
  * GET /api/trading-history/users
