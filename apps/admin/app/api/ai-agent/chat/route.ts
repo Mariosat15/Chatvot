@@ -34,6 +34,9 @@ import {
 // Import knowledge base for answering admin questions
 import { PLATFORM_KNOWLEDGE_BASE, QUICK_ANSWERS } from '@/lib/ai-agent/knowledge-base';
 
+// Import AI Knowledge service for vectorized search
+import { aiKnowledgeService } from '@/lib/services/ai-knowledge.service';
+
 // Note: Fraud-related models (PaymentFingerprint, FraudAlert, SuspicionScore) 
 // are queried via raw MongoDB to avoid schema registration issues
 
@@ -812,6 +815,27 @@ const TOOLS: OpenAI.ChatCompletionTool[] = [
           }
         },
         required: ['question']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_knowledge_base',
+      description: 'Search the AI knowledge base for information from uploaded documents, URLs, and help articles. Use this to find specific information about the platform, policies, procedures, or any custom knowledge that has been added.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The search query or question to find relevant information'
+          },
+          category: {
+            type: 'string',
+            description: 'Optional category to filter results (e.g., "Trading", "Competitions", "Wallet", "Technical")'
+          }
+        },
+        required: ['query']
       }
     }
   },
@@ -3093,6 +3117,8 @@ async function executeTool(name: string, args: any): Promise<AgentResult> {
       return executeGetSystemHelp(args);
     case 'get_quick_answer':
       return executeGetQuickAnswer(args);
+    case 'search_knowledge_base':
+      return await executeSearchKnowledgeBase(args);
     
     // Deposit tools
     case 'get_recent_deposits':
@@ -3586,6 +3612,52 @@ function executeGetQuickAnswer(args: { question: string }): AgentResult {
     title: 'No Quick Answer',
     data: `No quick answer found for "${args.question}". Try using get_system_help with a topic like: competitions, challenges, withdrawals, vat, fees, kyc, fraud_detection, badges_xp, trading_risk, etc.`
   };
+}
+
+// ==================== KNOWLEDGE BASE SEARCH ====================
+
+async function executeSearchKnowledgeBase(args: { query: string; category?: string }): Promise<AgentResult> {
+  try {
+    const results = await aiKnowledgeService.search(args.query, {
+      maxResults: 5,
+      category: args.category,
+    });
+    
+    if (results.length === 0) {
+      return {
+        type: 'text',
+        title: 'Knowledge Base Search',
+        data: `No relevant information found in the knowledge base for: "${args.query}". Try the built-in help with get_system_help or get_quick_answer.`
+      };
+    }
+    
+    // Format results as readable text
+    let responseText = `Found ${results.length} relevant result(s) for "${args.query}":\n\n`;
+    
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      const source = (result.sourceId as any)?.name || 'Unknown Source';
+      const similarity = ((result.similarity || 0) * 100).toFixed(1);
+      const section = result.headingPath?.length > 0 ? result.headingPath.join(' > ') : '';
+      
+      responseText += `### Result ${i + 1} (${similarity}% match) - ${source}`;
+      if (section) responseText += ` [${section}]`;
+      responseText += `\n\n${result.content}\n\n---\n\n`;
+    }
+    
+    return {
+      type: 'text',
+      title: 'Knowledge Base Results',
+      data: responseText
+    };
+  } catch (error) {
+    console.error('Knowledge base search error:', error);
+    return {
+      type: 'text',
+      title: 'Knowledge Base Search Error',
+      data: `Unable to search knowledge base: ${error instanceof Error ? error.message : 'Unknown error'}. This might be due to missing OpenAI API key or no indexed content.`
+    };
+  }
 }
 
 // ==================== NEW TOOLS IMPLEMENTATIONS ====================

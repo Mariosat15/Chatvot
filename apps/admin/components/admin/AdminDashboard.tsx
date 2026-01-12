@@ -100,6 +100,7 @@ import MarketSettingsSection from '@/components/admin/MarketSettingsSection';
 import DependencyUpdatesSection from '@/components/admin/DependencyUpdatesSection';
 import AdminOverviewDashboard from '@/components/admin/AdminOverviewDashboard';
 import AIAgentSection from '@/components/admin/AIAgentSection';
+import AIKnowledgeSection from '@/components/admin/AIKnowledgeSection';
 import EmployeesSection from '@/components/admin/EmployeesSection';
 import CustomerAssignmentSettings from '@/components/admin/CustomerAssignmentSettings';
 import EmployeeProfileSection from '@/components/admin/EmployeeProfileSection';
@@ -380,6 +381,13 @@ const menuGroups: MenuGroup[] = [
         icon: <Bot className="h-5 w-5" />,
         color: 'text-violet-400',
         bgColor: 'bg-violet-500/10 hover:bg-violet-500/20',
+      },
+      {
+        id: 'ai-knowledge',
+        label: 'AI Database',
+        icon: <Database className="h-5 w-5" />,
+        color: 'text-cyan-400',
+        bgColor: 'bg-cyan-500/10 hover:bg-cyan-500/20',
       },
     ],
   },
@@ -783,6 +791,8 @@ export default function AdminDashboard({
         return <DependencyUpdatesSection key={currentRefreshKey} />;
       case 'ai-agent':
         return <AIAgentSection key={currentRefreshKey} />;
+      case 'ai-knowledge':
+        return <AIKnowledgeSection key={currentRefreshKey} />;
       case 'employees':
         return <EmployeesSection key={currentRefreshKey} />;
       case 'customer-assignment':
