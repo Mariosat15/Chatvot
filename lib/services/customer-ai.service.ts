@@ -162,45 +162,64 @@ function buildContext(results: SearchResult[]): string {
  * - Internal company metrics
  * - Employee information
  * - Any database query capabilities
+ * 
+ * STRICT RAG-ONLY: Will NOT answer if no knowledge base results found.
  */
 export async function generateCustomerSupportResponse(
   userMessage: string,
   conversationHistory: { role: string; content: string }[],
   platformName: string = 'ChartVolt'
-): Promise<{ content: string; usedRAG: boolean; sourcesUsed: string[] }> {
+): Promise<{ content: string; usedRAG: boolean; sourcesUsed: string[]; noKnowledge?: boolean }> {
   const openaiKey = process.env.OPENAI_API_KEY;
   
   if (!openaiKey) {
     throw new Error('OpenAI API key not configured');
   }
   
-  // Step 1: Search vector database for relevant knowledge
-  const searchResults = await searchKnowledgeBase(userMessage, 5, 0.6);
+  console.log(`🤖 [CustomerAI] Searching knowledge base for: "${userMessage.substring(0, 100)}..."`);
+  
+  // Step 1: Search vector database for relevant knowledge (lower threshold to catch more)
+  const searchResults = await searchKnowledgeBase(userMessage, 5, 0.5);
   const context = buildContext(searchResults);
   const sourcesUsed = [...new Set(searchResults.map(r => r.source))];
   
-  // Step 2: Build RAG-constrained system prompt
-  const systemPrompt = context
-    ? `You are a helpful customer support assistant for ${platformName}.
+  console.log(`🤖 [CustomerAI] Found ${searchResults.length} results, sources: ${sourcesUsed.join(', ') || 'none'}`);
+  
+  // STRICT RAG: If no knowledge found, return a canned response - DO NOT let GPT make up answers
+  if (searchResults.length === 0) {
+    console.log(`🤖 [CustomerAI] NO KNOWLEDGE FOUND - returning strict no-knowledge response`);
+    return {
+      content: `I apologize, but I don't have specific information about that in my knowledge base. 
 
-IMPORTANT RULES:
-1. ONLY use the information provided in the CONTEXT below to answer questions.
-2. If the answer is not in the CONTEXT, politely say you don't have that information and offer to connect them with a human agent.
-3. NEVER make up information or use knowledge outside the provided CONTEXT.
-4. Be friendly, professional, and concise.
-5. If the user seems frustrated or asks for a human, offer to connect them with support staff.
+To get accurate information about ${platformName}, I'd recommend:
+• Checking our Help section for guides and FAQs
+• Speaking with one of our support team members who can help you directly
 
-CONTEXT:
+Would you like me to connect you with a human support agent? Just say "human" or "agent" and I'll transfer you right away!`,
+      usedRAG: false,
+      sourcesUsed: [],
+      noKnowledge: true,
+    };
+  }
+  
+  // Step 2: Build STRICT RAG-only system prompt
+  const systemPrompt = `You are a customer support assistant for ${platformName}.
+
+CRITICAL RULES - YOU MUST FOLLOW THESE:
+1. You can ONLY answer using the KNOWLEDGE BASE CONTEXT provided below.
+2. DO NOT use any outside knowledge, general information, or make assumptions.
+3. If the question cannot be answered from the CONTEXT below, say: "I don't have that specific information. Would you like me to connect you with a support agent?"
+4. NEVER mention competitors, other platforms, or generic industry information.
+5. Be friendly and helpful, but ONLY use facts from the CONTEXT.
+
+KNOWLEDGE BASE CONTEXT:
 ${context}
 
-Remember: Only answer based on the CONTEXT above. If unsure, say "I don't have specific information about that, but I can connect you with our support team who can help further."`
-    : `You are a helpful customer support assistant for ${platformName}.
-
-IMPORTANT: I don't have specific knowledge loaded right now. Please provide general assistance and offer to connect the user with a human support agent for specific questions.
-
-Be friendly and professional. If you cannot help, suggest: "I'd be happy to connect you with our support team who can provide more detailed assistance."`;
+REMEMBER: You know NOTHING except what's in the CONTEXT above. If it's not there, you don't know it.`;
   
-  // Step 3: Call OpenAI with RAG-constrained prompt
+  // Step 3: Call OpenAI with STRICT RAG-constrained prompt
+  console.log(`🤖 [CustomerAI] Calling OpenAI with ${searchResults.length} knowledge chunks...`);
+  
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -211,11 +230,11 @@ Be friendly and professional. If you cannot help, suggest: "I'd be happy to conn
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        ...conversationHistory.slice(-8), // Last 8 messages for context
+        ...conversationHistory.slice(-6), // Last 6 messages for context
         { role: 'user', content: userMessage },
       ],
-      max_tokens: 500,
-      temperature: 0.5, // Lower temperature for more factual responses
+      max_tokens: 400,
+      temperature: 0.3, // Very low temperature for strict factual responses from context
     }),
   });
   

@@ -309,7 +309,12 @@ async function handleAIResponse(
     
     const aiContent = aiResult.content;
     
-    console.log(`🤖 [AI] RAG response received, usedRAG: ${aiResult.usedRAG}, sources: ${aiResult.sourcesUsed.join(', ')}`);
+    console.log(`🤖 [AI] RAG response: usedRAG=${aiResult.usedRAG}, noKnowledge=${aiResult.noKnowledge}, sources=[${aiResult.sourcesUsed.join(', ')}]`);
+    
+    if (aiResult.noKnowledge) {
+      console.log(`⚠️ [AI] WARNING: No knowledge base content found! Customer getting fallback response.`);
+      console.log(`⚠️ [AI] Make sure to index knowledge in Admin Panel → AI & Automation → AI Database`);
+    }
     
     if (!aiContent) {
       console.log(`🤖 [AI] ERROR: No content in AI response`);
