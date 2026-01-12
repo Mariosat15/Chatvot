@@ -28,7 +28,7 @@ import {
   ToggleLeft,
   ToggleRight,
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface KnowledgeSource {
   _id: string;
@@ -135,7 +135,7 @@ export default function AIKnowledgeSection() {
       
       if (response.ok) {
         if (data.alreadyIndexed) {
-          toast('Built-in help is already indexed', { icon: '📚' });
+          toast.info('Built-in help is already indexed');
         } else {
           toast.success('Built-in help indexed successfully');
         }
@@ -345,7 +345,7 @@ export default function AIKnowledgeSection() {
       if (response.ok) {
         setTestResults(data.results || []);
         if (data.results.length === 0) {
-          toast('No matching results found', { icon: '🔍' });
+          toast.info('No matching results found');
         }
       } else {
         toast.error(data.error || 'Search failed');
