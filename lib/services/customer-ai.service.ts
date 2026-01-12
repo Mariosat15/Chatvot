@@ -8,6 +8,11 @@
  * - NO access to company statistics
  * - NO database query capabilities
  * - NO access to internal data (user counts, revenue, VAT, etc.)
+ * 
+ * SEARCH FEATURES:
+ * - Query expansion with synonyms
+ * - Multiple search strategies
+ * - Keyword extraction for better matching
  */
 
 import { connectToDatabase } from '@/database/mongoose';
@@ -18,6 +23,70 @@ interface SearchResult {
   similarity: number;
   source: string;
   section?: string;
+}
+
+// Common synonyms and related terms for better search
+const QUERY_EXPANSIONS: Record<string, string[]> = {
+  'challenge': ['1v1', 'head-to-head', 'battle', 'versus', 'compete'],
+  'challenges': ['1v1', 'head-to-head', 'battles', 'versus', 'compete'],
+  '1v1': ['challenge', 'head-to-head', 'one versus one', 'battle'],
+  'competition': ['contest', 'tournament', 'event', 'compete'],
+  'competitions': ['contests', 'tournaments', 'events', 'trading competition'],
+  'deposit': ['add money', 'fund', 'payment', 'add credits'],
+  'withdraw': ['withdrawal', 'cash out', 'take money', 'payout'],
+  'withdrawal': ['withdraw', 'cash out', 'payout', 'take money out'],
+  'money': ['funds', 'credits', 'balance', 'cash'],
+  'credits': ['money', 'funds', 'balance', 'currency'],
+  'win': ['prize', 'reward', 'winnings', 'earn'],
+  'prize': ['win', 'reward', 'winnings', 'payout'],
+  'account': ['profile', 'registration', 'sign up'],
+  'verify': ['verification', 'kyc', 'identity'],
+  'kyc': ['verify', 'verification', 'identity', 'documents'],
+  'trade': ['trading', 'buy', 'sell', 'position'],
+  'trading': ['trade', 'buy', 'sell', 'positions'],
+  'leverage': ['margin', 'multiplier'],
+  'fee': ['fees', 'cost', 'charge', 'commission'],
+  'start': ['begin', 'getting started', 'how to', 'create'],
+  'problem': ['issue', 'error', 'trouble', 'help', 'not working'],
+  'help': ['support', 'assist', 'problem', 'issue'],
+};
+
+/**
+ * Expand query with synonyms for better matching
+ */
+function expandQuery(query: string): string[] {
+  const words = query.toLowerCase().split(/\s+/);
+  const expansions = new Set<string>();
+  
+  // Add original query
+  expansions.add(query.toLowerCase());
+  
+  // Add expansions for each word
+  for (const word of words) {
+    const synonyms = QUERY_EXPANSIONS[word];
+    if (synonyms) {
+      for (const synonym of synonyms) {
+        // Create query with synonym replacement
+        const expandedQuery = query.toLowerCase().replace(word, synonym);
+        expansions.add(expandedQuery);
+      }
+    }
+  }
+  
+  return Array.from(expansions);
+}
+
+/**
+ * Extract key terms from query for keyword matching
+ */
+function extractKeyTerms(query: string): string[] {
+  const stopWords = new Set(['what', 'how', 'why', 'when', 'where', 'is', 'are', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'this', 'that', 'do', 'does', 'can', 'i', 'my', 'me', 'you', 'your']);
+  
+  return query
+    .toLowerCase()
+    .replace(/[?!.,]/g, '')
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !stopWords.has(word));
 }
 
 /**
@@ -72,12 +141,13 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 /**
  * Search the vector database for relevant knowledge
+ * Uses multiple strategies: semantic search + keyword fallback
  * Returns ONLY public knowledge - NO company stats
  */
 async function searchKnowledgeBase(
   query: string,
   maxResults: number = 5,
-  minSimilarity: number = 0.65
+  minSimilarity: number = 0.5
 ): Promise<SearchResult[]> {
   await connectToDatabase();
   
@@ -88,18 +158,17 @@ async function searchKnowledgeBase(
   }
   
   try {
-    // Generate embedding for the query
-    const queryEmbedding = await generateEmbedding(query);
-    
     // Get all active chunks
     const chunks = await db.collection('aiknowledgechunks')
       .find({ isActive: true })
       .toArray();
     
     if (chunks.length === 0) {
-      console.log('[CustomerAI] No knowledge chunks available');
+      console.log('[CustomerAI] ⚠️ No knowledge chunks available - please index knowledge base!');
       return [];
     }
+    
+    console.log(`[CustomerAI] Searching ${chunks.length} knowledge chunks...`);
     
     // Get sources for reference
     const sourceIds = [...new Set(chunks.map(c => c.sourceId?.toString()))];
@@ -112,20 +181,91 @@ async function searchKnowledgeBase(
     
     const sourceMap = new Map(sources.map(s => [s._id.toString(), s.name]));
     
-    // Calculate similarities and filter
-    const results = chunks
-      .map(chunk => ({
-        content: chunk.content,
-        similarity: cosineSimilarity(queryEmbedding, chunk.embedding || []),
-        source: sourceMap.get(chunk.sourceId?.toString()) || 'Knowledge Base',
-        section: chunk.headingPath?.join(' > ') || undefined,
-      }))
-      .filter(r => r.similarity >= minSimilarity)
+    // Strategy 1: Semantic search with query expansion
+    const expandedQueries = expandQuery(query);
+    console.log(`[CustomerAI] Query expansions: ${expandedQueries.slice(0, 3).join(', ')}...`);
+    
+    let allResults: SearchResult[] = [];
+    
+    // Search with original and expanded queries
+    for (const searchQuery of expandedQueries.slice(0, 3)) { // Limit to 3 expansions
+      try {
+        const queryEmbedding = await generateEmbedding(searchQuery);
+        
+        const results = chunks
+          .map(chunk => ({
+            content: chunk.content,
+            similarity: cosineSimilarity(queryEmbedding, chunk.embedding || []),
+            source: sourceMap.get(chunk.sourceId?.toString()) || 'Knowledge Base',
+            section: chunk.headingPath?.join(' > ') || undefined,
+          }))
+          .filter(r => r.similarity >= minSimilarity);
+        
+        allResults.push(...results);
+      } catch (embeddingError) {
+        console.warn(`[CustomerAI] Embedding failed for query: ${searchQuery}`);
+      }
+    }
+    
+    // Strategy 2: Keyword-based fallback search
+    const keyTerms = extractKeyTerms(query);
+    console.log(`[CustomerAI] Key terms: ${keyTerms.join(', ')}`);
+    
+    if (keyTerms.length > 0) {
+      const keywordResults = chunks
+        .map(chunk => {
+          const contentLower = chunk.content.toLowerCase();
+          const sectionLower = (chunk.headingPath || []).join(' ').toLowerCase();
+          
+          // Count keyword matches
+          let matchScore = 0;
+          for (const term of keyTerms) {
+            if (contentLower.includes(term)) matchScore += 0.15;
+            if (sectionLower.includes(term)) matchScore += 0.1;
+          }
+          
+          // Check for expanded synonyms in content
+          for (const term of keyTerms) {
+            const synonyms = QUERY_EXPANSIONS[term] || [];
+            for (const syn of synonyms) {
+              if (contentLower.includes(syn)) matchScore += 0.1;
+            }
+          }
+          
+          return {
+            content: chunk.content,
+            similarity: Math.min(matchScore, 0.85), // Cap keyword-based similarity
+            source: sourceMap.get(chunk.sourceId?.toString()) || 'Knowledge Base',
+            section: chunk.headingPath?.join(' > ') || undefined,
+          };
+        })
+        .filter(r => r.similarity >= 0.2); // Lower threshold for keyword matches
+      
+      allResults.push(...keywordResults);
+    }
+    
+    // Deduplicate and sort by similarity
+    const uniqueResults = new Map<string, SearchResult>();
+    for (const result of allResults) {
+      const key = result.content.substring(0, 100);
+      const existing = uniqueResults.get(key);
+      if (!existing || result.similarity > existing.similarity) {
+        uniqueResults.set(key, result);
+      }
+    }
+    
+    const finalResults = Array.from(uniqueResults.values())
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, maxResults);
     
-    console.log(`[CustomerAI] Found ${results.length} relevant chunks for query`);
-    return results;
+    console.log(`[CustomerAI] Found ${finalResults.length} unique results (top similarity: ${finalResults[0]?.similarity?.toFixed(3) || 'N/A'})`);
+    
+    // Log top results for debugging
+    if (finalResults.length > 0) {
+      console.log(`[CustomerAI] Top result section: ${finalResults[0].section || 'N/A'}`);
+    }
+    
+    return finalResults;
   } catch (error) {
     console.error('[CustomerAI] Error searching knowledge base:', error);
     return [];
@@ -133,7 +273,7 @@ async function searchKnowledgeBase(
 }
 
 /**
- * Build context from search results
+ * Build context from search results with clear formatting
  */
 function buildContext(results: SearchResult[]): string {
   if (results.length === 0) {
@@ -141,12 +281,13 @@ function buildContext(results: SearchResult[]): string {
   }
   
   let context = '';
-  for (const result of results) {
-    context += `---\n`;
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    context += `\n=== KNOWLEDGE ${i + 1} ===\n`;
     if (result.section) {
-      context += `[${result.section}]\n`;
+      context += `Topic: ${result.section}\n`;
     }
-    context += `${result.content}\n\n`;
+    context += `\n${result.content}\n`;
   }
   
   return context.trim();
