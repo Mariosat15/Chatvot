@@ -129,6 +129,16 @@ The ranking method is always displayed in the competition details before you joi
 ## Q20: What happens if I get liquidated?
 If your losses reach the liquidation threshold (your trading capital drops to zero), you're eliminated from that competition. You won't be able to place new trades, but you may still be ranked based on when you were liquidated. Some competitions may have different rules - check the specific competition terms.
 
+## Q20b: How can someone get disqualified from a competition?
+You can get disqualified from a competition for several reasons:
+1. **Liquidation**: If your trading capital drops to zero, you're automatically eliminated
+2. **Minimum trade requirements**: Some competitions require a minimum number of trades - not meeting this can disqualify you
+3. **Rule violations**: Using automated trading bots, market manipulation, or other prohibited activities
+4. **Account issues**: Having an unverified account or suspicious activity
+5. **Technical violations**: Opening positions outside allowed trading hours or instruments
+
+Disqualified participants may lose their ranking position and won't be eligible for prizes. Always check the specific competition rules before joining to understand all requirements.
+
 ## Q21: Can I join multiple competitions at once?
 Yes! You can participate in multiple competitions simultaneously. Each competition is independent with its own trading capital and results.
 

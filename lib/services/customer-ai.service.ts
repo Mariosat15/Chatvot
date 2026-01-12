@@ -49,6 +49,21 @@ const QUERY_EXPANSIONS: Record<string, string[]> = {
   'start': ['begin', 'getting started', 'how to', 'create'],
   'problem': ['issue', 'error', 'trouble', 'help', 'not working'],
   'help': ['support', 'assist', 'problem', 'issue'],
+  // Competition rules
+  'disqualified': ['eliminated', 'removed', 'kicked out', 'liquidated', 'banned', 'rules violation'],
+  'disqualify': ['eliminate', 'remove', 'liquidate', 'kick out'],
+  'eliminated': ['disqualified', 'removed', 'liquidated', 'out'],
+  'liquidated': ['eliminated', 'disqualified', 'margin call', 'blown account'],
+  'rules': ['terms', 'conditions', 'requirements', 'restrictions'],
+  'banned': ['suspended', 'blocked', 'restricted', 'disqualified'],
+  // More common terms
+  'winner': ['first place', 'champion', 'top', 'best'],
+  'lose': ['loss', 'losing', 'lost'],
+  'join': ['enter', 'participate', 'sign up', 'register'],
+  'leave': ['exit', 'quit', 'withdraw from'],
+  'capital': ['money', 'funds', 'balance', 'starting capital'],
+  'profit': ['gain', 'earnings', 'pnl', 'returns'],
+  'loss': ['lose', 'negative', 'down'],
 };
 
 /**
@@ -343,20 +358,24 @@ Would you like me to connect you with a human support agent? Just say "human" or
     };
   }
   
-  // Step 2: Build STRICT RAG-only system prompt
-  const systemPrompt = `You are a customer support assistant for ${platformName}.
+  // Step 2: Build RAG-based system prompt that USES the context
+  const systemPrompt = `You are a friendly customer support assistant for ${platformName}.
 
-CRITICAL RULES - YOU MUST FOLLOW THESE:
-1. You can ONLY answer using the KNOWLEDGE BASE CONTEXT provided below.
-2. DO NOT use any outside knowledge, general information, or make assumptions.
-3. If the question cannot be answered from the CONTEXT below, say: "I don't have that specific information. Would you like me to connect you with a support agent?"
-4. NEVER mention competitors, other platforms, or generic industry information.
-5. Be friendly and helpful, but ONLY use facts from the CONTEXT.
+YOUR TASK: Answer the customer's question using the KNOWLEDGE BASE below.
 
-KNOWLEDGE BASE CONTEXT:
+RULES:
+1. READ the KNOWLEDGE BASE carefully - the answer is likely there.
+2. Use the information to give a helpful, accurate answer.
+3. Be conversational and friendly, not robotic.
+4. If the KNOWLEDGE BASE contains related information, use it to help the customer.
+5. Only say "I don't have that information" if the KNOWLEDGE BASE truly has NOTHING relevant.
+6. NEVER make up information not in the KNOWLEDGE BASE.
+7. NEVER mention competitors or other platforms.
+
+KNOWLEDGE BASE:
 ${context}
 
-REMEMBER: You know NOTHING except what's in the CONTEXT above. If it's not there, you don't know it.`;
+IMPORTANT: The customer is asking a question. Look through the KNOWLEDGE BASE above and answer based on what you find. Be helpful!`;
   
   // Step 3: Call OpenAI with STRICT RAG-constrained prompt
   console.log(`🤖 [CustomerAI] Calling OpenAI with ${searchResults.length} knowledge chunks...`);
