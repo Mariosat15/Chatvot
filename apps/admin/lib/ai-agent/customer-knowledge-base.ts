@@ -85,29 +85,36 @@ Deposits are generally free. Withdrawal fees may apply depending on the method a
 
 ---
 
-# Credits & Wallet
+# Credits, Volts & Wallet
 
-## Q13: What are credits and how do they work?
-Credits are our platform currency. When you deposit money, it's converted to credits at a fixed rate (typically 100 credits = €1). You use credits to:
-- Enter competitions
-- Join 1v1 challenges
-- Your winnings are also paid in credits which can be withdrawn as real money.
+## Q13: What are Volts?
+Volts (⚡) are our platform currency, also called credits. When you deposit real money (EUR), it's converted to Volts at a fixed rate. The standard conversion rate is €1 = 100 Volts. You use Volts to:
+- Pay entry fees for competitions
+- Join 1v1 challenges against other traders
+- Purchase items in the marketplace
+Your winnings are also paid in Volts, which you can withdraw as real money.
 
-## Q14: What's the difference between credits and trading capital?
-- **Credits**: Real money converted to platform currency. Used to pay entry fees.
-- **Trading Capital**: Virtual money you receive when entering a competition. This is what you trade with during competitions. Trading capital cannot be withdrawn - only profits from competitions can be converted to credits and withdrawn.
+## Q13b: What are credits?
+Credits and Volts are the same thing! "Credits" is the generic term, and "Volts" (⚡) is the branded name we use on the platform. They work exactly the same way.
+
+## Q14: What's the difference between Volts/credits and trading capital?
+- **Volts/Credits**: Real money converted to platform currency. Used to pay entry fees. Can be deposited and withdrawn.
+- **Trading Capital**: Virtual money you receive when entering a competition. This is what you trade with during competitions. Trading capital cannot be withdrawn - only prizes from winning competitions are converted to Volts and added to your wallet.
 
 ## Q15: Can I transfer credits to another user?
 No, credits cannot be transferred between users. Each account's credits are tied to that specific account for security and regulatory reasons.
 
-## Q16: Why did my credit balance change?
-Your credit balance changes when you:
-- Make a deposit (increases)
+## Q16: Why did my Volt/credit balance change?
+Your Volt balance changes when you:
+- Make a deposit (increases) - €10 deposit = 1,000 Volts
 - Enter a competition (decreases by entry fee)
-- Win a competition (increases by prize amount)
+- Win a competition (increases by prize amount in Volts)
 - Make a withdrawal (decreases)
 - Receive a refund (increases)
 Check your transaction history in the Wallet section for details.
+
+## Q16b: How do I check my Volt balance?
+Go to your Wallet page or look at the header bar - your current Volt balance (⚡) is always displayed there.
 
 ---
 
