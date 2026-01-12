@@ -412,6 +412,20 @@ class NotificationService {
       },
     });
   }
+
+  /**
+   * Send level up notification when user gains a new level
+   */
+  async notifyLevelUp(userId: string, level: number, title: string): Promise<any> {
+    return this.send({
+      userId,
+      templateId: 'level_up',
+      variables: {
+        level: level.toString(),
+        title,
+      },
+    });
+  }
 }
 
 // Create singleton instance
