@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         category: 'General',
         tags: ['help', 'documentation', 'admin', 'guide', 'built-in'],
       },
-      createdBy: admin.id,
+      createdBy: admin.adminId || 'system',
     });
     
     return NextResponse.json({

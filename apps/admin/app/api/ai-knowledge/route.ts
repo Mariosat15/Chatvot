@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       content: type === 'manual' ? content : undefined,
       websiteUrl: type === 'url' ? websiteUrl : undefined,
       metadata,
-      createdBy: admin.id,
+      createdBy: admin.adminId || 'system',
     });
     
     return NextResponse.json({

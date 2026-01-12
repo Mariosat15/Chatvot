@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
         category,
         tags: tags ? tags.split(',').map(t => t.trim()) : [],
       },
-      createdBy: admin.id,
+      createdBy: admin.adminId || 'system',
     });
     
     return NextResponse.json({

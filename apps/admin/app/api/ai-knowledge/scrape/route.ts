@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         description: description || extractDescriptionFromHtml(html),
         category: category || 'General',
       },
-      createdBy: admin.id,
+      createdBy: admin.adminId || 'system',
     });
     
     return NextResponse.json({
