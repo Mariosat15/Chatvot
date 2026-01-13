@@ -160,6 +160,7 @@ export default function MarketplaceSection() {
   const [editingItem, setEditingItem] = useState<Partial<MarketplaceItem>>(emptyItem);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   useEffect(() => {
     fetchItems();
@@ -198,6 +199,47 @@ export default function MarketplaceSection() {
       }
     } catch (error) {
       toast.error('Failed to seed marketplace');
+    }
+  };
+
+  // Handle cosmetic image upload
+  const handleCosmeticImageUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('slug', editingItem.slug || 'item');
+      formData.append('cosmeticType', editingItem.cosmeticType || 'avatar');
+
+      const response = await fetch('/api/marketplace/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setEditingItem(prev => ({ ...prev, imageUrl: data.url }));
+        toast.success('Image uploaded successfully');
+      } else {
+        toast.error(data.error || 'Failed to upload image');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
     }
   };
   
@@ -801,38 +843,76 @@ export default function MarketplaceSection() {
                 )}
               </div>
               
-              {/* Cosmetic Image URL */}
+              {/* Cosmetic Image Upload */}
               {editingItem.category === 'cosmetic' && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Image URL *</Label>
-                    <Input
-                      value={editingItem.imageUrl || ''}
-                      onChange={(e) => setEditingItem({ ...editingItem, imageUrl: e.target.value })}
-                      placeholder="/assets/avatars/my-avatar.png"
-                      className="bg-gray-800 border-gray-700"
-                    />
-                    <p className="text-xs text-gray-500">
-                      Upload the image to public/assets/avatars/ and enter the path here
-                    </p>
+                  <div className="space-y-3">
+                    <Label className="flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4 text-pink-400" />
+                      Cosmetic Image *
+                    </Label>
+                    
+                    {/* File Upload */}
+                    <div className="flex flex-col gap-3">
+                      <input
+                        type="file"
+                        id="cosmetic-image-upload"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleCosmeticImageUpload(file);
+                          e.target.value = '';
+                        }}
+                        disabled={uploadingImage}
+                      />
+                      <label 
+                        htmlFor="cosmetic-image-upload"
+                        className={cn(
+                          "flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed cursor-pointer transition-all",
+                          uploadingImage 
+                            ? "border-gray-600 bg-gray-800/50 cursor-not-allowed" 
+                            : "border-pink-500/50 bg-pink-500/5 hover:bg-pink-500/10 hover:border-pink-500"
+                        )}
+                      >
+                        {uploadingImage ? (
+                          <>
+                            <RefreshCw className="h-5 w-5 animate-spin text-pink-400" />
+                            <span className="text-pink-400">Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon className="h-5 w-5 text-pink-400" />
+                            <span className="text-pink-400">Click to upload image</span>
+                          </>
+                        )}
+                      </label>
+                      
+                      <p className="text-xs text-gray-500">
+                        Recommended: 200x200px square image, PNG or JPEG (max 5MB)
+                      </p>
+                    </div>
                   </div>
                   
                   {/* Preview */}
                   {editingItem.imageUrl && (
-                    <div className="flex items-center gap-4 p-4 bg-gray-800 rounded-lg">
+                    <div className="flex items-center gap-4 p-4 bg-gray-800/50 border border-gray-700 rounded-xl">
                       <div className="relative">
                         <img
                           src={editingItem.imageUrl}
                           alt="Preview"
-                          className="w-20 h-20 rounded-xl object-cover border-2 border-gray-700"
+                          className="w-24 h-24 rounded-xl object-cover border-2 border-pink-500/50 shadow-lg shadow-pink-500/20"
                           onError={(e) => {
                             e.currentTarget.src = '/placeholder-avatar.png';
                           }}
                         />
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <p className="text-sm text-gray-400">Preview</p>
-                        <p className="text-white font-medium">{editingItem.name || 'Untitled'}</p>
+                        <p className="text-white font-medium text-lg">{editingItem.name || 'Untitled'}</p>
+                        <p className="text-xs text-gray-500 mt-1 font-mono truncate max-w-[200px]">
+                          {editingItem.imageUrl}
+                        </p>
                       </div>
                     </div>
                   )}
