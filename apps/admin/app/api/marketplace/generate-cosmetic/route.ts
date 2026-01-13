@@ -90,27 +90,44 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `You are a creative writer for a trading platform marketplace. You create compelling, unique names and descriptions for cosmetic avatar items that traders can purchase.
+          content: `You are a creative writer for a trading platform marketplace. You create compelling, unique names and rich backstories for cosmetic avatar items that traders can purchase.
 
-Your task is to analyze the provided avatar image and create:
-1. A unique, memorable name (2-3 words max, creative trading/gaming themed)
-2. A short tagline (max 100 characters) - catchy and intriguing
-3. A full backstory/description (2-3 paragraphs) - creative lore about this avatar character
+IMPORTANT: Carefully analyze the actual image - note colors, weapons/items, clothing, pose, mood, and any distinctive features. Your description MUST match what's actually in the image.
+
+Your task is to create:
+
+1. **Name** (2-3 words max) - Epic, memorable, trading/gaming themed. Based on what you SEE in the image.
+
+2. **Short Tagline** (max 100 characters) - Catchy one-liner describing the character.
+
+3. **Full Description** - Use this EXACT format:
+
+**Origin Story**
+[2-3 paragraphs of creative lore about who this character is, their background, and their role in the trading world. Connect their appearance to their story.]
+
+**Symbolism**
+[List 4-5 visual elements you can see in the image and explain their trading-related meaning]
+• [Visible Item/Feature]: [Trading symbolism]
+• [Visible Color/Effect]: [What it represents]
+• [Visible Armor/Clothing]: [Its meaning]
+• [Visible Expression/Pose]: [What it conveys]
+
+*"[A memorable quote from the character about trading]"*
 
 The cosmetic type is: ${cosmeticType || 'avatar'}
 
 Guidelines:
-- Names should be epic, memorable, and relate to trading/markets/finance themes creatively
-- Think of themes like: market warriors, trading legends, financial mystics, chart masters, etc.
-- Backstories should be creative fiction about who this character is
-- Make it feel like a collectible character with history and personality
-- Keep it professional but fun - this is for a trading platform
+- BE ACCURATE to what's in the image - describe actual colors, weapons, clothing, effects
+- Names should relate to trading/markets/finance themes creatively
+- Think themes like: market warriors, trading legends, financial mystics, chart masters, assassins, etc.
+- Make it feel like a premium collectible character
+- The symbolism section MUST reference actual visual elements from the image
 
 Respond in JSON format:
 {
   "name": "Character Name",
-  "shortDescription": "Short catchy tagline",
-  "fullDescription": "Full backstory and description..."
+  "shortDescription": "Short catchy tagline under 100 chars",
+  "fullDescription": "**Origin Story**\\n[story paragraphs]\\n\\n**Symbolism**\\n• Item: Meaning\\n• Item: Meaning\\n\\n*\\"Quote here\\"*"
 }`
         },
         {
@@ -118,20 +135,20 @@ Respond in JSON format:
           content: [
             {
               type: 'text',
-              text: 'Analyze this avatar image and create a unique name, tagline, and backstory for it:'
+              text: 'Carefully analyze this avatar image. Note all visual details: colors, weapons, armor, effects, pose, expression. Then create a unique name, tagline, and detailed backstory that accurately reflects what you see:'
             },
             {
               type: 'image_url',
               image_url: {
                 url: imageData, // Use base64 data URL
-                detail: 'low' // Use low detail to reduce token usage
+                detail: 'high' // Use high detail for accurate image analysis
               }
             }
           ]
         }
       ],
-      max_tokens: 800,
-      temperature: 0.9, // Higher creativity
+      max_tokens: 1200, // More tokens for detailed response
+      temperature: 0.85, // Good creativity while maintaining accuracy
     });
     
     console.log(`✅ [AI Generate] OpenAI response received`);
