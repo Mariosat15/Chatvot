@@ -222,22 +222,28 @@ export default function MarketplaceSection() {
       formData.append('slug', editingItem.slug || 'item');
       formData.append('cosmeticType', editingItem.cosmeticType || 'avatar');
 
+      console.log('[Marketplace Upload] Starting upload for:', file.name, file.size);
+      
       const response = await fetch('/api/marketplace/upload', {
         method: 'POST',
         body: formData,
       });
 
+      console.log('[Marketplace Upload] Response status:', response.status);
+      
       const data = await response.json();
+      console.log('[Marketplace Upload] Response data:', data);
 
       if (response.ok && data.success) {
         setEditingItem(prev => ({ ...prev, imageUrl: data.url }));
         toast.success('Image uploaded successfully');
       } else {
-        toast.error(data.error || 'Failed to upload image');
+        console.error('[Marketplace Upload] Error:', data);
+        toast.error(data.error || `Upload failed (${response.status})`);
       }
     } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
+      console.error('[Marketplace Upload] Exception:', error);
+      toast.error('Network error: ' + (error instanceof Error ? error.message : 'Failed to upload'));
     } finally {
       setUploadingImage(false);
     }
@@ -897,15 +903,16 @@ export default function MarketplaceSection() {
                   {/* Preview */}
                   {editingItem.imageUrl && (
                     <div className="flex items-center gap-4 p-4 bg-gray-800/50 border border-gray-700 rounded-xl">
-                      <div className="relative">
+                      <div className="relative w-24 h-24 rounded-xl border-2 border-pink-500/50 shadow-lg shadow-pink-500/20 overflow-hidden bg-gray-900 flex items-center justify-center">
                         <img
                           src={editingItem.imageUrl}
                           alt="Preview"
-                          className="w-24 h-24 rounded-xl object-cover border-2 border-pink-500/50 shadow-lg shadow-pink-500/20"
+                          className="w-full h-full object-cover"
                           onError={(e) => {
-                            e.currentTarget.src = '/placeholder-avatar.png';
+                            e.currentTarget.style.display = 'none';
                           }}
                         />
+                        <User className="w-10 h-10 text-gray-600 absolute" />
                       </div>
                       <div className="flex-1">
                         <p className="text-sm text-gray-400">Preview</p>
