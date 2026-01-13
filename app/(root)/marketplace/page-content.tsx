@@ -19,6 +19,8 @@ import {
   BarChart3,
   Layers,
   ArrowUpRight,
+  Palette,
+  User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -41,6 +43,8 @@ interface MarketplaceItem {
   version: string;
   indicatorType?: string;
   strategyConfig?: Record<string, unknown>;
+  cosmeticType?: string;
+  imageUrl?: string;
   totalPurchases: number;
   averageRating: number;
   totalRatings: number;
@@ -50,12 +54,13 @@ interface MarketplaceItem {
   owned: boolean;
 }
 
-type Category = 'all' | 'indicator' | 'strategy';
+type Category = 'all' | 'indicator' | 'strategy' | 'cosmetic';
 
 const CATEGORIES: { value: Category; label: string; icon: React.ComponentType<{ className?: string }>; color: string; bgGradient: string }[] = [
   { value: 'all', label: 'All Items', icon: Sparkles, color: 'text-white', bgGradient: 'from-gray-600/20 to-gray-800/20' },
   { value: 'indicator', label: 'Indicators', icon: LineChart, color: 'text-emerald-400', bgGradient: 'from-emerald-500/20 to-teal-500/20' },
   { value: 'strategy', label: 'Strategies', icon: Target, color: 'text-orange-400', bgGradient: 'from-orange-500/20 to-amber-500/20' },
+  { value: 'cosmetic', label: 'Cosmetics', icon: Palette, color: 'text-pink-400', bgGradient: 'from-pink-500/20 to-rose-500/20' },
 ];
 
 const INDICATOR_TYPE_INFO: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string; label: string }> = {
@@ -104,7 +109,7 @@ export default function MarketplaceContent() {
       if (data.success) {
         // Filter out any trading_bot items
         const filteredItems = data.items.filter((item: MarketplaceItem) => 
-          item.category === 'indicator' || item.category === 'strategy'
+          item.category === 'indicator' || item.category === 'strategy' || item.category === 'cosmetic'
         );
         setItems(filteredItems);
       }
@@ -162,6 +167,7 @@ export default function MarketplaceContent() {
   const featuredItems = items.filter(i => i.isFeatured);
   const indicators = items.filter(i => i.category === 'indicator');
   const strategies = items.filter(i => i.category === 'strategy');
+  const cosmetics = items.filter(i => i.category === 'cosmetic');
   
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
@@ -370,6 +376,33 @@ export default function MarketplaceContent() {
                 )}
               </section>
             )}
+            
+            {/* Cosmetics Section */}
+            {(category === 'all' || category === 'cosmetic') && cosmetics.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="p-2 rounded-lg bg-pink-500/10">
+                    <Palette className="h-5 w-5 text-pink-400" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">Cosmetics</h2>
+                  <span className="px-3 py-1 rounded-full bg-pink-500/10 text-pink-400 text-sm font-medium">
+                    {cosmetics.length}
+                  </span>
+                  <div className="flex-1 h-px bg-gradient-to-r from-pink-500/20 to-transparent" />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                  {cosmetics.filter(i => category === 'cosmetic' || !i.isFeatured).map((item) => (
+                    <CosmeticCard
+                      key={item._id}
+                      item={item}
+                      onView={() => setSelectedItem(item)}
+                      onPurchase={() => handlePurchase(item)}
+                      purchasing={purchasing === item._id}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </div>
@@ -558,6 +591,116 @@ function ItemCard({
                 <ShoppingCart className="h-4 w-4" />
                 Get
               </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Cosmetic Card Component
+function CosmeticCard({
+  item,
+  onView,
+  onPurchase,
+  purchasing,
+}: {
+  item: MarketplaceItem;
+  onView: () => void;
+  onPurchase: () => void;
+  purchasing: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'group relative rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer',
+        'bg-gradient-to-b from-gray-800/50 to-gray-900/50 backdrop-blur-sm',
+        'border border-gray-700/50 hover:border-pink-500/50',
+        'hover:shadow-2xl hover:shadow-pink-500/10 hover:-translate-y-1',
+        item.owned && 'ring-2 ring-pink-500/30'
+      )}
+      onClick={onView}
+    >
+      {/* Top gradient accent */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 to-rose-500" />
+      
+      {/* Image */}
+      <div className="relative aspect-square bg-gray-800">
+        {item.imageUrl ? (
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <User className="w-16 h-16 text-gray-600" />
+          </div>
+        )}
+        
+        {/* Badges */}
+        <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+          {item.owned && (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-pink-500/20 backdrop-blur-sm border border-pink-500/30 rounded-full">
+              <BadgeCheck className="h-3 w-3 text-pink-400" />
+              <span className="text-xs font-semibold text-pink-400">Owned</span>
+            </div>
+          )}
+          {!item.owned && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-pink-500/10 text-pink-400 backdrop-blur-sm border border-pink-500/20">
+              Avatar
+            </span>
+          )}
+        </div>
+      </div>
+      
+      {/* Content */}
+      <div className="p-4">
+        <h3 className="text-sm font-bold text-white mb-1 line-clamp-1 group-hover:text-pink-400 transition-colors">
+          {item.name}
+        </h3>
+        <p className="text-xs text-gray-400 mb-3 line-clamp-2 min-h-[32px]">
+          {item.shortDescription}
+        </p>
+        
+        {/* Price & Action */}
+        <div className="flex items-center justify-between">
+          <div className="text-lg font-bold">
+            {item.isFree ? (
+              <span className="text-green-400">FREE</span>
+            ) : (
+              <span className="text-pink-400">⚡ {item.price}</span>
+            )}
+          </div>
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPurchase();
+            }}
+            disabled={purchasing}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+              item.owned 
+                ? 'bg-pink-500/20 text-pink-400 cursor-default'
+                : 'bg-pink-500 hover:bg-pink-600 text-white hover:shadow-lg hover:shadow-pink-500/30'
+            )}
+          >
+            {purchasing ? (
+              <span className="flex items-center gap-1">
+                <span className="animate-spin">⏳</span>
+              </span>
+            ) : item.owned ? (
+              <span className="flex items-center gap-1">
+                <Check className="h-3 w-3" />
+                Owned
+              </span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <ShoppingCart className="h-3 w-3" />
+                Get
+              </span>
             )}
           </button>
         </div>

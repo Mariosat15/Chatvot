@@ -12,6 +12,10 @@ import {
   Clock,
   Activity,
   ArrowUpRight,
+  Palette,
+  User,
+  CheckCircle,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -45,6 +49,8 @@ interface MarketplaceItem {
   version: string;
   strategyType?: string;
   indicatorType?: string;
+  cosmeticType?: string;
+  imageUrl?: string;
   defaultSettings: Record<string, any>;
 }
 
@@ -66,6 +72,7 @@ const CATEGORIES = [
   { value: 'trading_bot', label: 'Trading Bots', icon: Bot },
   { value: 'indicator', label: 'Indicators', icon: TrendingUp },
   { value: 'strategy', label: 'Strategies', icon: Zap },
+  { value: 'cosmetic', label: 'Cosmetics', icon: Palette },
 ];
 
 const getCategoryIcon = (category: string) => {
@@ -81,6 +88,8 @@ export default function TradingArsenalSection() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editedSettings, setEditedSettings] = useState<Record<string, any>>({});
+  const [applyingAvatar, setApplyingAvatar] = useState<string | null>(null);
+  const [currentAvatarId, setCurrentAvatarId] = useState<string | null>(null);
   
   useEffect(() => {
     fetchPurchases();
@@ -170,9 +179,44 @@ export default function TradingArsenalSection() {
     }
   };
   
+  const handleApplyAvatar = async (purchase: Purchase) => {
+    if (!purchase.item?.imageUrl) {
+      toast.error('Avatar image not found');
+      return;
+    }
+    
+    try {
+      setApplyingAvatar(purchase.purchaseId);
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileImage: purchase.item.imageUrl,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setCurrentAvatarId(purchase.itemId);
+        toast.success(`Avatar "${purchase.item.name}" applied!`);
+        // Refresh the page to show new avatar
+        window.location.reload();
+      } else {
+        toast.error(data.error || 'Failed to apply avatar');
+      }
+    } catch (error) {
+      console.error('Error applying avatar:', error);
+      toast.error('Failed to apply avatar');
+    } finally {
+      setApplyingAvatar(null);
+    }
+  };
+  
   const bots = purchases.filter(p => p.item?.category === 'trading_bot');
   const indicators = purchases.filter(p => p.item?.category === 'indicator');
-  const others = purchases.filter(p => !['trading_bot', 'indicator'].includes(p.item?.category || ''));
+  const cosmetics = purchases.filter(p => p.item?.category === 'cosmetic');
+  const others = purchases.filter(p => !['trading_bot', 'indicator', 'cosmetic'].includes(p.item?.category || ''));
   
   return (
     <div className="space-y-6">
@@ -274,6 +318,27 @@ export default function TradingArsenalSection() {
                     purchase={purchase}
                     onToggle={() => handleToggleEnabled(purchase)}
                     onSettings={() => handleOpenSettings(purchase)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Cosmetics */}
+          {cosmetics.length > 0 && (category === 'all' || category === 'cosmetic') && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Palette className="h-5 w-5 text-pink-400" />
+                Cosmetics ({cosmetics.length})
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {cosmetics.map((purchase) => (
+                  <CosmeticCard
+                    key={purchase.purchaseId}
+                    purchase={purchase}
+                    onApply={() => handleApplyAvatar(purchase)}
+                    isApplying={applyingAvatar === purchase.purchaseId}
+                    isCurrentAvatar={currentAvatarId === purchase.itemId}
                   />
                 ))}
               </div>
@@ -432,6 +497,90 @@ function PurchaseCard({
             {purchase.isEnabled ? 'Active' : 'Inactive'}
           </div>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Cosmetic Card Component for Avatars
+function CosmeticCard({
+  purchase,
+  onApply,
+  isApplying,
+  isCurrentAvatar,
+}: {
+  purchase: Purchase;
+  onApply: () => void;
+  isApplying: boolean;
+  isCurrentAvatar: boolean;
+}) {
+  return (
+    <Card className={cn(
+      'bg-gray-900/80 border transition-all group',
+      isCurrentAvatar 
+        ? 'border-pink-500/50 ring-2 ring-pink-500/30' 
+        : 'border-gray-700 hover:border-pink-500/30'
+    )}>
+      <CardContent className="p-3">
+        {/* Avatar Image */}
+        <div className="relative aspect-square mb-3 rounded-xl overflow-hidden bg-gray-800">
+          {purchase.item?.imageUrl ? (
+            <img
+              src={purchase.item.imageUrl}
+              alt={purchase.item.name}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <User className="w-12 h-12 text-gray-600" />
+            </div>
+          )}
+          
+          {/* Current Avatar Badge */}
+          {isCurrentAvatar && (
+            <div className="absolute top-2 right-2 bg-pink-500 rounded-full p-1">
+              <CheckCircle className="w-4 h-4 text-white" />
+            </div>
+          )}
+        </div>
+        
+        {/* Name & Description */}
+        <h4 className="font-semibold text-white text-sm mb-1 line-clamp-1">
+          {purchase.item?.name || 'Unknown'}
+        </h4>
+        <p className="text-xs text-gray-400 mb-3 line-clamp-2">
+          {purchase.item?.shortDescription || 'Avatar'}
+        </p>
+        
+        {/* Apply Button */}
+        <Button 
+          onClick={onApply}
+          disabled={isApplying || isCurrentAvatar}
+          className={cn(
+            'w-full',
+            isCurrentAvatar 
+              ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30 cursor-default'
+              : 'bg-pink-500 hover:bg-pink-600 text-white'
+          )}
+          size="sm"
+        >
+          {isApplying ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Applying...
+            </>
+          ) : isCurrentAvatar ? (
+            <>
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Applied
+            </>
+          ) : (
+            <>
+              <User className="w-4 h-4 mr-2" />
+              Apply Avatar
+            </>
+          )}
+        </Button>
       </CardContent>
     </Card>
   );

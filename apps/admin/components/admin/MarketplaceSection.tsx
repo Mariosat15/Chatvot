@@ -15,6 +15,9 @@ import {
   Save,
   Code,
   Star,
+  Palette,
+  Image as ImageIcon,
+  User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -60,7 +63,7 @@ interface MarketplaceItem {
   slug: string;
   shortDescription: string;
   fullDescription: string;
-  category: 'indicator' | 'strategy';
+  category: 'indicator' | 'strategy' | 'cosmetic';
   price: number;
   originalPrice?: number;
   isFree: boolean;
@@ -70,6 +73,8 @@ interface MarketplaceItem {
   version: string;
   indicatorType?: string;
   strategyConfig?: StrategyConfig;
+  cosmeticType?: string;
+  imageUrl?: string;
   codeTemplate: string;
   defaultSettings: Record<string, any>;
   supportedAssets: string[];
@@ -85,12 +90,21 @@ interface Stats {
   totalItems: number;
   totalIndicators: number;
   totalStrategies: number;
+  totalCosmetics: number;
   totalPurchases: number;
 }
 
 const CATEGORIES = [
   { value: 'indicator', label: 'Indicator', icon: TrendingUp },
   { value: 'strategy', label: 'Strategy', icon: Target },
+  { value: 'cosmetic', label: 'Cosmetic', icon: Palette },
+];
+
+const COSMETIC_TYPES = [
+  { value: 'avatar', label: 'Avatar' },
+  { value: 'profile_frame', label: 'Profile Frame' },
+  { value: 'badge', label: 'Badge' },
+  { value: 'title', label: 'Title' },
 ];
 
 const RISK_LEVELS = ['low', 'medium', 'high'];
@@ -127,6 +141,8 @@ const emptyItem: Partial<MarketplaceItem> = {
       arrowSize: 'medium',
     },
   },
+  cosmeticType: 'avatar',
+  imageUrl: '',
   supportedAssets: [],
   tags: [],
   riskLevel: 'medium',
@@ -297,7 +313,7 @@ export default function MarketplaceSection() {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="bg-gray-900 border-gray-700">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -334,10 +350,21 @@ export default function MarketplaceSection() {
         <Card className="bg-gray-900 border-gray-700">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
+              <Palette className="h-8 w-8 text-pink-400" />
+              <div>
+                <div className="text-2xl font-bold text-white">{stats?.totalCosmetics || 0}</div>
+                <div className="text-sm text-gray-400">Cosmetics</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gray-900 border-gray-700">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
               <Users className="h-8 w-8 text-purple-400" />
               <div>
                 <div className="text-2xl font-bold text-white">{stats?.totalPurchases || 0}</div>
-                <div className="text-sm text-gray-400">Total Purchases</div>
+                <div className="text-sm text-gray-400">Purchases</div>
               </div>
             </div>
           </CardContent>
@@ -549,9 +576,11 @@ export default function MarketplaceSection() {
               {editingItem.category === 'strategy' && (
                 <TabsTrigger value="strategy">Strategy Builder</TabsTrigger>
               )}
-              <TabsTrigger value="code">
-                {editingItem.category === 'strategy' ? 'Settings' : 'Code & Settings'}
-              </TabsTrigger>
+              {editingItem.category !== 'cosmetic' && (
+                <TabsTrigger value="code">
+                  {editingItem.category === 'strategy' ? 'Settings' : 'Code & Settings'}
+                </TabsTrigger>
+              )}
             </TabsList>
             
             {/* Basic Info Tab */}
@@ -749,7 +778,66 @@ export default function MarketplaceSection() {
                     </p>
                   </div>
                 )}
+                
+                {editingItem.category === 'cosmetic' && (
+                  <div className="space-y-2">
+                    <Label>Cosmetic Type</Label>
+                    <Select
+                      value={editingItem.cosmeticType || 'avatar'}
+                      onValueChange={(v) => setEditingItem({ ...editingItem, cosmeticType: v })}
+                    >
+                      <SelectTrigger className="bg-gray-800 border-gray-700">
+                        <SelectValue placeholder="Select cosmetic type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COSMETIC_TYPES.map(type => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
+              
+              {/* Cosmetic Image URL */}
+              {editingItem.category === 'cosmetic' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Image URL *</Label>
+                    <Input
+                      value={editingItem.imageUrl || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, imageUrl: e.target.value })}
+                      placeholder="/assets/avatars/my-avatar.png"
+                      className="bg-gray-800 border-gray-700"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Upload the image to public/assets/avatars/ and enter the path here
+                    </p>
+                  </div>
+                  
+                  {/* Preview */}
+                  {editingItem.imageUrl && (
+                    <div className="flex items-center gap-4 p-4 bg-gray-800 rounded-lg">
+                      <div className="relative">
+                        <img
+                          src={editingItem.imageUrl}
+                          alt="Preview"
+                          className="w-20 h-20 rounded-xl object-cover border-2 border-gray-700"
+                          onError={(e) => {
+                            e.currentTarget.src = '/placeholder-avatar.png';
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400">Preview</p>
+                        <p className="text-white font-medium">{editingItem.name || 'Untitled'}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="space-y-2">
                 <Label>Risk Warning</Label>
@@ -784,7 +872,8 @@ export default function MarketplaceSection() {
               </TabsContent>
             )}
             
-            {/* Code Tab */}
+            {/* Code Tab - Not for cosmetics */}
+            {editingItem.category !== 'cosmetic' && (
             <TabsContent value="code" className="space-y-4 pb-20">
               {/* Important Info Banner - different for strategies */}
               {editingItem.category === 'strategy' ? (
@@ -909,6 +998,7 @@ export default function MarketplaceSection() {
               </div>
               )}
             </TabsContent>
+            )}
               </Tabs>
             </div>
           

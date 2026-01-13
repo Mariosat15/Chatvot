@@ -1,7 +1,10 @@
 import mongoose, { Document, Schema, Model } from 'mongoose';
 
-// Item Categories - Indicators and Strategies
-export type ItemCategory = 'indicator' | 'strategy';
+// Item Categories - Indicators, Strategies, and Cosmetics
+export type ItemCategory = 'indicator' | 'strategy' | 'cosmetic';
+
+// Cosmetic Types
+export type CosmeticType = 'avatar' | 'profile_frame' | 'badge' | 'title';
 
 // Item Status
 export type ItemStatus = 'active' | 'inactive' | 'coming_soon' | 'deprecated';
@@ -90,6 +93,8 @@ export interface IMarketplaceItem extends Document {
   version: string;
   indicatorType?: IndicatorType; // For indicator items
   strategyConfig?: IStrategyConfig; // For strategy items
+  cosmeticType?: CosmeticType; // For cosmetic items (avatar, frame, etc.)
+  imageUrl?: string; // For cosmetic items - the actual image/asset
   
   // The actual code/configuration (JSON string)
   codeTemplate: string;
@@ -184,7 +189,7 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     category: {
       type: String,
       required: true,
-      enum: ['indicator', 'strategy'],
+      enum: ['indicator', 'strategy', 'cosmetic'],
       default: 'indicator',
     },
     price: {
@@ -227,6 +232,11 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       enum: ['sma', 'ema', 'bb', 'rsi', 'macd', 'support_resistance'],
     },
     strategyConfig: StrategyConfigSchema,
+    cosmeticType: {
+      type: String,
+      enum: ['avatar', 'profile_frame', 'badge', 'title'],
+    },
+    imageUrl: String, // For cosmetic items - the actual image/asset
     codeTemplate: {
       type: String,
       required: true,
