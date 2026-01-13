@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import { Admin } from '@/database/models/admin.model';
 import bcrypt from 'bcryptjs';
 import { employeeNotificationService } from '@/lib/services/employee-notification.service';
+import { syncEmployeeProfile } from '@/lib/services/profile-sync.service';
 
 /**
  * GET /api/employee/profile
@@ -136,6 +137,20 @@ export async function PUT(request: NextRequest) {
         changedFields,
         'self'
       );
+    }
+
+    // Sync profile changes to messaging (conversations, messages)
+    if (name !== undefined || avatar !== undefined) {
+      try {
+        await syncEmployeeProfile({
+          employeeId: auth.adminId!,
+          name: name !== undefined ? name.trim() : undefined,
+          avatar: avatar !== undefined ? (avatar || undefined) : undefined,
+        });
+      } catch (syncError) {
+        console.error('Error syncing employee profile to messaging:', syncError);
+        // Don't fail the request if sync fails
+      }
     }
 
     console.log(`✅ Employee profile updated: ${auth.email} - Fields: ${changedFields.join(', ')}`);

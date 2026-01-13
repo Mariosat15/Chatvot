@@ -3,6 +3,7 @@ import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import { connectToDatabase } from '@/database/mongoose';
 import { ObjectId } from 'mongodb';
+import { syncUserProfile } from '@/lib/services/profile-sync.service';
 
 export interface UserProfile {
   id: string;
@@ -187,6 +188,21 @@ export async function PUT(req: NextRequest) {
       postalCode: result.postalCode,
       phone: result.phone,
     });
+
+    // Sync profile changes to messaging (friends, conversations, messages)
+    // Only sync if name or profileImage changed
+    if (name !== undefined || profileImage !== undefined) {
+      try {
+        await syncUserProfile({
+          userId: session.user.id,
+          name: name !== undefined ? name.trim() : undefined,
+          avatar: profileImage !== undefined ? profileImage : undefined,
+        });
+      } catch (syncError) {
+        console.error('Error syncing profile to messaging:', syncError);
+        // Don't fail the request if sync fails
+      }
+    }
 
     // Check both 'profileImage' (custom) and 'image' (better-auth default) fields
     const updatedUserImage = result.profileImage || result.image || '';

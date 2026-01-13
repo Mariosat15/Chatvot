@@ -5,6 +5,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import { ObjectId } from 'mongodb';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
+import { syncUserProfile } from '@/lib/services/profile-sync.service';
 
 // Maximum file size: 5MB
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -114,6 +115,17 @@ export async function POST(req: NextRequest) {
     );
 
     console.log(`✅ Profile image uploaded for user: ${session.user.email}`, profileImageUrl);
+
+    // Sync profile image to messaging (friends, conversations, messages)
+    try {
+      await syncUserProfile({
+        userId: session.user.id,
+        avatar: profileImageUrl,
+      });
+    } catch (syncError) {
+      console.error('Error syncing profile image to messaging:', syncError);
+      // Don't fail the request if sync fails
+    }
 
     return NextResponse.json({ 
       success: true,
