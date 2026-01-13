@@ -161,6 +161,7 @@ export default function MarketplaceSection() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [generatingAI, setGeneratingAI] = useState(false);
   
   useEffect(() => {
     fetchItems();
@@ -246,6 +247,53 @@ export default function MarketplaceSection() {
       toast.error('Network error: ' + (error instanceof Error ? error.message : 'Failed to upload'));
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  // Generate title and description from image using AI
+  const handleGenerateWithAI = async () => {
+    if (!editingItem.imageUrl) {
+      toast.error('Please upload an image first');
+      return;
+    }
+
+    setGeneratingAI(true);
+    
+    try {
+      console.log('[AI Generate] Starting generation for:', editingItem.imageUrl);
+      
+      const response = await fetch('/api/marketplace/generate-cosmetic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: editingItem.imageUrl,
+          cosmeticType: editingItem.cosmeticType || 'avatar'
+        }),
+      });
+
+      const data = await response.json();
+      console.log('[AI Generate] Response:', data);
+
+      if (response.ok && data.success) {
+        setEditingItem(prev => ({
+          ...prev,
+          name: data.generated.name || prev.name,
+          shortDescription: data.generated.shortDescription || prev.shortDescription,
+          fullDescription: data.generated.fullDescription || prev.fullDescription,
+          // Auto-generate slug from name
+          slug: (data.generated.name || prev.name || 'item').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        }));
+        toast.success('AI generated title and description!');
+        // Switch to basic tab to show the generated content
+        setActiveTab('basic');
+      } else {
+        toast.error(data.error || 'Failed to generate content');
+      }
+    } catch (error) {
+      console.error('[AI Generate] Exception:', error);
+      toast.error('Failed to generate: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setGeneratingAI(false);
     }
   };
   
@@ -919,25 +967,50 @@ export default function MarketplaceSection() {
                   
                   {/* Preview */}
                   {editingItem.imageUrl && (
-                    <div className="flex items-center gap-4 p-4 bg-gray-800/50 border border-gray-700 rounded-xl">
-                      <div className="relative w-24 h-24 rounded-xl border-2 border-pink-500/50 shadow-lg shadow-pink-500/20 overflow-hidden bg-gray-900 flex items-center justify-center">
-                        <img
-                          src={editingItem.imageUrl}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                        <User className="w-10 h-10 text-gray-600 absolute" />
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4 p-4 bg-gray-800/50 border border-gray-700 rounded-xl">
+                        <div className="relative w-24 h-24 rounded-xl border-2 border-pink-500/50 shadow-lg shadow-pink-500/20 overflow-hidden bg-gray-900 flex items-center justify-center">
+                          <img
+                            src={editingItem.imageUrl}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          <User className="w-10 h-10 text-gray-600 absolute" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-400">Preview</p>
+                          <p className="text-white font-medium text-lg">{editingItem.name || 'Untitled'}</p>
+                          <p className="text-xs text-gray-500 mt-1 font-mono truncate max-w-[200px]">
+                            {editingItem.imageUrl}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-400">Preview</p>
-                        <p className="text-white font-medium text-lg">{editingItem.name || 'Untitled'}</p>
-                        <p className="text-xs text-gray-500 mt-1 font-mono truncate max-w-[200px]">
-                          {editingItem.imageUrl}
-                        </p>
-                      </div>
+                      
+                      {/* AI Generate Button */}
+                      <Button
+                        type="button"
+                        onClick={handleGenerateWithAI}
+                        disabled={generatingAI || !editingItem.imageUrl}
+                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium"
+                      >
+                        {generatingAI ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                            AI Generating Title & Bio...
+                          </>
+                        ) : (
+                          <>
+                            <Star className="h-4 w-4 mr-2" />
+                            ✨ Generate Title & Bio with AI
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-xs text-gray-500 text-center">
+                        AI will analyze the image and create a unique name, tagline, and backstory
+                      </p>
                     </div>
                   )}
                 </div>
