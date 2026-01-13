@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { readFile, access } from 'fs/promises';
+import { constants } from 'fs';
+import path from 'path';
 
 /**
  * POST /api/marketplace/generate-cosmetic
@@ -23,22 +26,65 @@ export async function POST(request: NextRequest) {
     // Check for OpenAI API key
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
+      console.error('❌ [AI Generate] OPENAI_API_KEY not configured');
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
     }
 
     const openai = new OpenAI({ apiKey });
 
-    // Build the full image URL if it's a relative path
-    let fullImageUrl = imageUrl;
-    if (imageUrl.startsWith('/')) {
-      // Get the base URL from environment or construct it
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://admin.chartvolt.com';
-      fullImageUrl = `${baseUrl}${imageUrl}`;
-    }
+    console.log(`🤖 [AI Generate] Processing image: ${imageUrl}`);
 
-    console.log(`🤖 [AI Generate] Analyzing image for cosmetic: ${fullImageUrl}`);
+    // Convert image to base64 for OpenAI (since URLs may not be publicly accessible)
+    let imageData: string;
+    let mimeType: string = 'image/png';
+    
+    // Extract filename from URL (handles /api/assets/marketplace/filename.png?t=123)
+    const urlPath = imageUrl.split('?')[0];
+    const filename = urlPath.split('/').pop() || '';
+    
+    // Determine mime type from extension
+    const ext = filename.split('.').pop()?.toLowerCase();
+    if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
+    else if (ext === 'gif') mimeType = 'image/gif';
+    else if (ext === 'webp') mimeType = 'image/webp';
+    
+    // Try to read the file from disk
+    const possiblePaths = [
+      // Production
+      path.join('/var/www/chartvolt', 'public', 'uploads', 'marketplace', filename),
+      // Monorepo local dev
+      path.join(process.cwd(), '..', '..', 'public', 'uploads', 'marketplace', filename),
+      // Admin app local
+      path.join(process.cwd(), 'public', 'uploads', 'marketplace', filename),
+    ];
+    
+    let fileBuffer: Buffer | null = null;
+    for (const filePath of possiblePaths) {
+      try {
+        await access(filePath, constants.R_OK);
+        fileBuffer = await readFile(filePath);
+        console.log(`✅ [AI Generate] Found image at: ${filePath}`);
+        break;
+      } catch {
+        // Try next path
+      }
+    }
+    
+    if (!fileBuffer) {
+      console.error(`❌ [AI Generate] Could not find image file: ${filename}`);
+      console.error(`   Searched paths:`, possiblePaths);
+      return NextResponse.json({ 
+        error: 'Could not find image file. Please try uploading again.' 
+      }, { status: 400 });
+    }
+    
+    // Convert to base64
+    imageData = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+    console.log(`🤖 [AI Generate] Converted image to base64 (${Math.round(fileBuffer.length / 1024)}KB)`);
 
     // Use OpenAI Vision to analyze the image and generate content
+    console.log(`🤖 [AI Generate] Calling OpenAI Vision API...`);
+    
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -77,7 +123,7 @@ Respond in JSON format:
             {
               type: 'image_url',
               image_url: {
-                url: fullImageUrl,
+                url: imageData, // Use base64 data URL
                 detail: 'low' // Use low detail to reduce token usage
               }
             }
@@ -87,6 +133,8 @@ Respond in JSON format:
       max_tokens: 800,
       temperature: 0.9, // Higher creativity
     });
+    
+    console.log(`✅ [AI Generate] OpenAI response received`);
 
     const content = response.choices[0]?.message?.content;
     
