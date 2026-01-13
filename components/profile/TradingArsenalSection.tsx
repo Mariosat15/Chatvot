@@ -428,9 +428,23 @@ export default function TradingArsenalSection() {
                 {infoDialogItem.item?.fullDescription && (
                   <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
                     <h4 className="text-sm font-medium text-gray-300 mb-2">Description</h4>
-                    <p className="text-gray-400 text-sm whitespace-pre-wrap leading-relaxed">
-                      {infoDialogItem.item.fullDescription}
-                    </p>
+                    <div 
+                      className="text-gray-400 text-sm leading-relaxed"
+                      dangerouslySetInnerHTML={{ 
+                        __html: infoDialogItem.item.fullDescription
+                          // Bold text
+                          .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
+                          // Italic quotes
+                          .replace(/\*"(.*?)"\*/g, '<em class="text-cyan-400 italic block mt-3 text-base">"$1"</em>')
+                          .replace(/\*(.*?)\*/g, '<em class="text-gray-500 italic">$1</em>')
+                          // Bullet points
+                          .replace(/^• (.*$)/gm, '<li class="ml-3 text-gray-400 list-disc">$1</li>')
+                          .replace(/^- (.*$)/gm, '<li class="ml-3 text-gray-400 list-disc">$1</li>')
+                          // Line breaks
+                          .replace(/\n\n/g, '<br/><br/>')
+                          .replace(/\n/g, '<br/>')
+                      }} 
+                    />
                   </div>
                 )}
                 
