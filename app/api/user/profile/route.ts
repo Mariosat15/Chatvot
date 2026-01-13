@@ -10,6 +10,8 @@ export interface UserProfile {
   name: string;
   email: string;
   profileImage?: string;
+  activeFrameId?: string;
+  activeFrameUrl?: string;
   bio?: string;
   country?: string;
   address?: string;
@@ -108,6 +110,8 @@ export async function GET() {
       name: user.name || '',
       email: user.email || '',
       profileImage: userImage,
+      activeFrameId: user.activeFrameId || '',
+      activeFrameUrl: user.activeFrameUrl || '',
       bio: user.bio || '',
       country: user.country || '',
       address: user.address || '',
@@ -143,7 +147,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, profileImage, bio, country, address, city, postalCode, phone } = body;
+    const { name, profileImage, activeFrameId, activeFrameUrl, bio, country, address, city, postalCode, phone } = body;
 
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
@@ -160,6 +164,8 @@ export async function PUT(req: NextRequest) {
 
     if (name !== undefined) updateFields.name = name.trim();
     if (profileImage !== undefined) updateFields.profileImage = profileImage;
+    if (activeFrameId !== undefined) updateFields.activeFrameId = activeFrameId;
+    if (activeFrameUrl !== undefined) updateFields.activeFrameUrl = activeFrameUrl;
     if (bio !== undefined) updateFields.bio = bio.trim();
     if (country !== undefined) updateFields.country = country;
     if (address !== undefined) updateFields.address = address.trim();
@@ -212,6 +218,8 @@ export async function PUT(req: NextRequest) {
       name: result.name || '',
       email: result.email || '',
       profileImage: updatedUserImage,
+      activeFrameId: result.activeFrameId || '',
+      activeFrameUrl: result.activeFrameUrl || '',
       bio: result.bio || '',
       country: result.country || '',
       address: result.address || '',

@@ -8,18 +8,18 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {useRouter} from "next/navigation";
 import {Button} from "@/components/ui/button";
 import {LogOut, User, HelpCircle, Wallet, ChevronDown} from "lucide-react";
 import NavItems from "@/components/NavItems";
 import {signOut} from "@/lib/actions/auth.actions";
 import { useUserProfileImage } from "@/hooks/useUserProfileImage";
+import AvatarWithFrame from "@/components/ui/AvatarWithFrame";
 import Link from "next/link";
 
 const UserDropdown = ({ user }: {user: User}) => {
     const router = useRouter();
-    const { profileImage } = useUserProfileImage();
+    const { profileImage, frameUrl } = useUserProfileImage();
 
     const handleSignOut = async () => {
         await signOut();
@@ -34,12 +34,14 @@ const UserDropdown = ({ user }: {user: User}) => {
                     className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-gray-800/50 border border-transparent hover:border-yellow-500/30 transition-all duration-300 group"
                     suppressHydrationWarning
                 >
-                    <Avatar className="h-9 w-9 ring-2 ring-gray-700 group-hover:ring-yellow-500/50 transition-all duration-300">
-                        <AvatarImage src={profileImage} />
-                        <AvatarFallback className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-gray-900 text-sm font-bold">
-                            {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}
-                        </AvatarFallback>
-                    </Avatar>
+                    <div className="ring-2 ring-gray-700 group-hover:ring-yellow-500/50 transition-all duration-300 rounded-full">
+                        <AvatarWithFrame
+                            avatarUrl={profileImage}
+                            frameUrl={frameUrl}
+                            name={user?.name || user?.email}
+                            size="md"
+                        />
+                    </div>
                     <div className="hidden md:flex flex-col items-start mr-1">
                         <span className='text-sm font-semibold text-gray-100 group-hover:text-yellow-500 transition-colors'>
                             {user?.name || user?.email?.split('@')[0]}
@@ -58,12 +60,14 @@ const UserDropdown = ({ user }: {user: User}) => {
                 {/* User Info Header */}
                 <DropdownMenuLabel className="p-0 mb-2">
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-br from-yellow-500/10 to-transparent border border-yellow-500/20 hover:border-yellow-500/40 transition-all duration-300">
-                        <Avatar className="h-12 w-12 ring-2 ring-yellow-500/30">
-                            <AvatarImage src={profileImage} />
-                            <AvatarFallback className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-gray-900 font-bold">
-                                {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}
-                            </AvatarFallback>
-                        </Avatar>
+                        <div className="ring-2 ring-yellow-500/30 rounded-full">
+                            <AvatarWithFrame
+                                avatarUrl={profileImage}
+                                frameUrl={frameUrl}
+                                name={user?.name || user?.email}
+                                size="lg"
+                            />
+                        </div>
                         <div className="flex flex-col flex-1 min-w-0">
                             <span className='text-base font-bold text-gray-100 truncate'>
                                 {user?.name || 'Trader'}

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Camera, MapPin, Calendar, ChevronDown, Sparkles, Trophy, Swords, TrendingUp, Verified } from 'lucide-react';
+import { useState } from 'react';
+import { Camera, Calendar, ChevronDown, Sparkles, Trophy, Swords, TrendingUp, Verified } from 'lucide-react';
 import { useUserProfileImage } from '@/hooks/useUserProfileImage';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+import AvatarWithFrame from '@/components/ui/AvatarWithFrame';
 
 interface ProfileHeaderProps {
   session: {
@@ -50,11 +51,10 @@ export default function ProfileHeader({
   walletData,
   isKYCVerified = false,
 }: ProfileHeaderProps) {
-  const { profileImage, hasCustomImage } = useUserProfileImage();
+  const { profileImage, frameUrl, hasCustomImage } = useUserProfileImage();
   const { settings } = useAppSettings();
   const [showQuickStats, setShowQuickStats] = useState(true);
 
-  const userInitials = session.user.name?.charAt(0) || session.user.email?.charAt(0) || 'U';
   const displayName = session.user.name || 'Trader';
   const memberSince = new Date().getFullYear(); // Would come from user data
 
@@ -95,32 +95,29 @@ export default function ProfileHeader({
                   style={{ background: `conic-gradient(from 0deg, ${levelData.currentColor}, transparent, ${levelData.currentColor})` }}
                 />
                 
-                {/* Avatar */}
-                <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden ring-4 ring-gray-800 bg-gradient-to-br from-gray-700 to-gray-800">
-                  {profileImage && hasCustomImage ? (
-                    <img
-                      src={profileImage}
-                      alt={displayName}
-                      className="w-full h-full object-cover"
+                {/* Avatar with Frame */}
+                <div className="relative">
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 ring-4 ring-gray-800 rounded-full">
+                    <AvatarWithFrame
+                      avatarUrl={hasCustomImage ? profileImage : null}
+                      frameUrl={frameUrl}
+                      name={displayName}
+                      size="2xl"
+                      className="w-full h-full"
                     />
-                  ) : (
-                    <div 
-                      className="w-full h-full flex items-center justify-center text-4xl font-bold text-white"
-                      style={{ backgroundColor: levelData.currentColor + '40' }}
-                    >
-                      {userInitials.toUpperCase()}
-                    </div>
-                  )}
+                  </div>
                   
-                  {/* Camera Overlay */}
-                  <button className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Camera className="w-8 h-8 text-white" />
-                  </button>
+                  {/* Camera Overlay - only show when no frame */}
+                  {!frameUrl && (
+                    <button className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
+                      <Camera className="w-8 h-8 text-white" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Level Badge */}
                 <div 
-                  className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold shadow-lg border-2 border-gray-800"
+                  className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold shadow-lg border-2 border-gray-800 z-20"
                   style={{ backgroundColor: levelData.currentColor }}
                 >
                   <span className="text-white drop-shadow">{levelData.currentIcon}</span>
@@ -128,7 +125,7 @@ export default function ProfileHeader({
 
                 {/* Verified Badge */}
                 {isKYCVerified && (
-                  <div className="absolute -top-1 -right-1 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center shadow-lg border-2 border-gray-800">
+                  <div className="absolute -top-1 -right-1 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center shadow-lg border-2 border-gray-800 z-20">
                     <Verified className="w-4 h-4 text-white" />
                   </div>
                 )}

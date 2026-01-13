@@ -97,6 +97,8 @@ export default function TradingArsenalSection() {
   const [editedSettings, setEditedSettings] = useState<Record<string, any>>({});
   const [applyingAvatar, setApplyingAvatar] = useState<string | null>(null);
   const [currentAvatarId, setCurrentAvatarId] = useState<string | null>(null);
+  const [applyingFrame, setApplyingFrame] = useState<string | null>(null);
+  const [currentFrameId, setCurrentFrameId] = useState<string | null>(null);
   const [infoDialogItem, setInfoDialogItem] = useState<Purchase | null>(null);
   
   useEffect(() => {
@@ -221,9 +223,76 @@ export default function TradingArsenalSection() {
     }
   };
   
+  const handleApplyFrame = async (purchase: Purchase) => {
+    if (!purchase.item?.imageUrl) {
+      toast.error('Frame image not found');
+      return;
+    }
+    
+    try {
+      setApplyingFrame(purchase.purchaseId);
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activeFrameId: purchase.itemId,
+          activeFrameUrl: purchase.item.imageUrl,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setCurrentFrameId(purchase.itemId);
+        toast.success(`Frame "${purchase.item.name}" applied!`);
+        // Refresh the page to show new frame
+        window.location.reload();
+      } else {
+        toast.error(data.error || 'Failed to apply frame');
+      }
+    } catch (error) {
+      console.error('Error applying frame:', error);
+      toast.error('Failed to apply frame');
+    } finally {
+      setApplyingFrame(null);
+    }
+  };
+  
+  const handleRemoveFrame = async () => {
+    try {
+      setApplyingFrame('removing');
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activeFrameId: '',
+          activeFrameUrl: '',
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setCurrentFrameId(null);
+        toast.success('Frame removed');
+        window.location.reload();
+      } else {
+        toast.error(data.error || 'Failed to remove frame');
+      }
+    } catch (error) {
+      console.error('Error removing frame:', error);
+      toast.error('Failed to remove frame');
+    } finally {
+      setApplyingFrame(null);
+    }
+  };
+  
   const bots = purchases.filter(p => p.item?.category === 'trading_bot');
   const indicators = purchases.filter(p => p.item?.category === 'indicator');
   const cosmetics = purchases.filter(p => p.item?.category === 'cosmetic');
+  const avatars = cosmetics.filter(p => p.item?.cosmeticType === 'avatar');
+  const frames = cosmetics.filter(p => p.item?.cosmeticType === 'profile_frame');
+  const otherCosmetics = cosmetics.filter(p => !['avatar', 'profile_frame'].includes(p.item?.cosmeticType || ''));
   const others = purchases.filter(p => !['trading_bot', 'indicator', 'cosmetic'].includes(p.item?.category || ''));
   
   return (
@@ -334,22 +403,94 @@ export default function TradingArsenalSection() {
             </div>
           )}
           
-          {/* Cosmetics */}
-          {cosmetics.length > 0 && (category === 'all' || category === 'cosmetic') && (
+          {/* Avatars */}
+          {avatars.length > 0 && (category === 'all' || category === 'cosmetic') && (
             <div>
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Palette className="h-5 w-5 text-pink-400" />
-                Cosmetics ({cosmetics.length})
+                <User className="h-5 w-5 text-pink-400" />
+                Avatars ({avatars.length})
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {cosmetics.map((purchase) => (
+                {avatars.map((purchase) => (
                   <CosmeticCard
                     key={purchase.purchaseId}
                     purchase={purchase}
                     onApply={() => handleApplyAvatar(purchase)}
                     onInfo={() => setInfoDialogItem(purchase)}
                     isApplying={applyingAvatar === purchase.purchaseId}
-                    isCurrentAvatar={currentAvatarId === purchase.itemId}
+                    isCurrentItem={currentAvatarId === purchase.itemId}
+                    applyLabel="Apply Avatar"
+                    appliedLabel="Applied"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Profile Frames */}
+          {frames.length > 0 && (category === 'all' || category === 'cosmetic') && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Palette className="h-5 w-5 text-purple-400" />
+                Profile Frames ({frames.length})
+              </h3>
+              <p className="text-sm text-gray-400 mb-4">
+                Frames wrap around your avatar wherever it&apos;s displayed
+              </p>
+              
+              {/* Remove Frame Button */}
+              {currentFrameId && (
+                <Button
+                  onClick={handleRemoveFrame}
+                  variant="outline"
+                  size="sm"
+                  className="mb-4 border-gray-600 text-gray-400 hover:text-white"
+                  disabled={applyingFrame === 'removing'}
+                >
+                  {applyingFrame === 'removing' ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Removing...
+                    </>
+                  ) : (
+                    'Remove Current Frame'
+                  )}
+                </Button>
+              )}
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {frames.map((purchase) => (
+                  <FrameCard
+                    key={purchase.purchaseId}
+                    purchase={purchase}
+                    onApply={() => handleApplyFrame(purchase)}
+                    onInfo={() => setInfoDialogItem(purchase)}
+                    isApplying={applyingFrame === purchase.purchaseId}
+                    isCurrentFrame={currentFrameId === purchase.itemId}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Other Cosmetics (badges, titles, etc.) */}
+          {otherCosmetics.length > 0 && (category === 'all' || category === 'cosmetic') && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Palette className="h-5 w-5 text-pink-400" />
+                Other Cosmetics ({otherCosmetics.length})
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {otherCosmetics.map((purchase) => (
+                  <CosmeticCard
+                    key={purchase.purchaseId}
+                    purchase={purchase}
+                    onApply={() => {}}
+                    onInfo={() => setInfoDialogItem(purchase)}
+                    isApplying={false}
+                    isCurrentItem={false}
+                    applyLabel="View"
+                    appliedLabel="Owned"
                   />
                 ))}
               </div>
@@ -676,24 +817,28 @@ function PurchaseCard({
   );
 }
 
-// Cosmetic Card Component for Avatars
+// Cosmetic Card Component for Avatars and other cosmetics
 function CosmeticCard({
   purchase,
   onApply,
   onInfo,
   isApplying,
-  isCurrentAvatar,
+  isCurrentItem,
+  applyLabel = 'Apply Avatar',
+  appliedLabel = 'Applied',
 }: {
   purchase: Purchase;
   onApply: () => void;
   onInfo: () => void;
   isApplying: boolean;
-  isCurrentAvatar: boolean;
+  isCurrentItem: boolean;
+  applyLabel?: string;
+  appliedLabel?: string;
 }) {
   return (
     <Card className={cn(
       'bg-gray-900/80 border transition-all group',
-      isCurrentAvatar 
+      isCurrentItem 
         ? 'border-pink-500/50 ring-2 ring-pink-500/30' 
         : 'border-gray-700 hover:border-pink-500/30'
     )}>
@@ -721,8 +866,8 @@ function CosmeticCard({
             <Info className="w-4 h-4 text-white" />
           </button>
           
-          {/* Current Avatar Badge */}
-          {isCurrentAvatar && (
+          {/* Current Item Badge */}
+          {isCurrentItem && (
             <div className="absolute top-2 right-2 bg-pink-500 rounded-full p-1">
               <CheckCircle className="w-4 h-4 text-white" />
             </div>
@@ -734,16 +879,16 @@ function CosmeticCard({
           {purchase.item?.name || 'Unknown'}
         </h4>
         <p className="text-xs text-gray-400 mb-3 line-clamp-2">
-          {purchase.item?.shortDescription || 'Avatar'}
+          {purchase.item?.shortDescription || 'Cosmetic'}
         </p>
         
         {/* Apply Button */}
         <Button 
           onClick={onApply}
-          disabled={isApplying || isCurrentAvatar}
+          disabled={isApplying || isCurrentItem}
           className={cn(
             'w-full',
-            isCurrentAvatar 
+            isCurrentItem 
               ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30 cursor-default'
               : 'bg-pink-500 hover:bg-pink-600 text-white'
           )}
@@ -754,15 +899,114 @@ function CosmeticCard({
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Applying...
             </>
-          ) : isCurrentAvatar ? (
+          ) : isCurrentItem ? (
+            <>
+              <CheckCircle className="w-4 h-4 mr-2" />
+              {appliedLabel}
+            </>
+          ) : (
+            <>
+              <User className="w-4 h-4 mr-2" />
+              {applyLabel}
+            </>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Frame Card Component for Profile Frames
+function FrameCard({
+  purchase,
+  onApply,
+  onInfo,
+  isApplying,
+  isCurrentFrame,
+}: {
+  purchase: Purchase;
+  onApply: () => void;
+  onInfo: () => void;
+  isApplying: boolean;
+  isCurrentFrame: boolean;
+}) {
+  return (
+    <Card className={cn(
+      'bg-gray-900/80 border transition-all group',
+      isCurrentFrame 
+        ? 'border-purple-500/50 ring-2 ring-purple-500/30' 
+        : 'border-gray-700 hover:border-purple-500/30'
+    )}>
+      <CardContent className="p-3">
+        {/* Frame Preview */}
+        <div className="relative aspect-square mb-3 rounded-xl overflow-hidden bg-gradient-to-br from-gray-800 to-gray-900">
+          {/* Demo Avatar in Center */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-[60%] h-[60%] rounded-full bg-gradient-to-br from-cyan-500/30 to-blue-500/30 flex items-center justify-center">
+              <User className="w-8 h-8 text-cyan-400/50" />
+            </div>
+          </div>
+          
+          {/* Frame Overlay */}
+          {purchase.item?.imageUrl && (
+            <img
+              src={purchase.item.imageUrl}
+              alt={purchase.item.name}
+              className="absolute inset-0 w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+            />
+          )}
+          
+          {/* Info Button */}
+          <button
+            onClick={onInfo}
+            className="absolute top-2 left-2 bg-purple-500/90 hover:bg-purple-400 rounded-full p-1.5 shadow-lg shadow-purple-500/30 transition-all hover:scale-110 z-20"
+            title="View Details"
+          >
+            <Info className="w-4 h-4 text-white" />
+          </button>
+          
+          {/* Current Frame Badge */}
+          {isCurrentFrame && (
+            <div className="absolute top-2 right-2 bg-purple-500 rounded-full p-1 z-20">
+              <CheckCircle className="w-4 h-4 text-white" />
+            </div>
+          )}
+        </div>
+        
+        {/* Name & Description */}
+        <h4 className="font-semibold text-white text-sm mb-1 line-clamp-1">
+          {purchase.item?.name || 'Unknown'}
+        </h4>
+        <p className="text-xs text-gray-400 mb-3 line-clamp-2">
+          {purchase.item?.shortDescription || 'Profile Frame'}
+        </p>
+        
+        {/* Apply Button */}
+        <Button 
+          onClick={onApply}
+          disabled={isApplying || isCurrentFrame}
+          className={cn(
+            'w-full',
+            isCurrentFrame 
+              ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 cursor-default'
+              : 'bg-purple-500 hover:bg-purple-600 text-white'
+          )}
+          size="sm"
+        >
+          {isApplying ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Applying...
+            </>
+          ) : isCurrentFrame ? (
             <>
               <CheckCircle className="w-4 h-4 mr-2" />
               Applied
             </>
           ) : (
             <>
-              <User className="w-4 h-4 mr-2" />
-              Apply Avatar
+              <Palette className="w-4 h-4 mr-2" />
+              Apply Frame
             </>
           )}
         </Button>
