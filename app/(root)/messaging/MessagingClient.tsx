@@ -247,6 +247,106 @@ export default function MessagingClient({ session }: MessagingClientProps) {
           }
         }
         break;
+        
+      case 'profile_updated':
+        // Handle profile update from another user - refetch friends and conversations
+        if (message.data?.userId) {
+          console.log(`🔄 Profile updated for user ${message.data.userId}, refreshing data...`);
+          
+          // Update friends list with new data
+          setFriends(prev => prev.map(friend => {
+            if (friend.friendId === message.data.userId) {
+              return {
+                ...friend,
+                friendName: message.data.name ?? friend.friendName,
+                friendAvatar: message.data.avatar ?? friend.friendAvatar,
+              };
+            }
+            return friend;
+          }));
+          
+          // Update conversations list with new participant data
+          setConversations(prev => prev.map(conv => {
+            const updatedParticipants = conv.participants.map(p => {
+              if (p.id === message.data.userId) {
+                return {
+                  ...p,
+                  name: message.data.name ?? p.name,
+                  avatar: message.data.avatar ?? p.avatar,
+                };
+              }
+              return p;
+            });
+            
+            // Update lastMessage sender name if applicable
+            const updatedLastMessage = conv.lastMessage?.senderId === message.data.userId
+              ? { ...conv.lastMessage, senderName: message.data.name ?? conv.lastMessage.senderName }
+              : conv.lastMessage;
+            
+            return {
+              ...conv,
+              participants: updatedParticipants,
+              lastMessage: updatedLastMessage,
+            };
+          }));
+          
+          // Update selected conversation if applicable
+          if (selectedConversation) {
+            setSelectedConversation(prev => {
+              if (!prev) return prev;
+              const updatedParticipants = prev.participants.map(p => {
+                if (p.id === message.data.userId) {
+                  return {
+                    ...p,
+                    name: message.data.name ?? p.name,
+                    avatar: message.data.avatar ?? p.avatar,
+                  };
+                }
+                return p;
+              });
+              return {
+                ...prev,
+                participants: updatedParticipants,
+              };
+            });
+          }
+          
+          // Update messages in current conversation
+          setMessages(prev => prev.map(msg => {
+            if (msg.senderId === message.data.userId) {
+              return {
+                ...msg,
+                senderName: message.data.name ?? msg.senderName,
+                senderAvatar: message.data.avatar ?? msg.senderAvatar,
+              };
+            }
+            return msg;
+          }));
+          
+          // Update friend requests
+          setFriendRequests(prev => ({
+            received: prev.received.map(req => {
+              if (req.fromUserId === message.data.userId) {
+                return {
+                  ...req,
+                  fromUserName: message.data.name ?? req.fromUserName,
+                  fromUserAvatar: message.data.avatar ?? req.fromUserAvatar,
+                };
+              }
+              return req;
+            }),
+            sent: prev.sent.map(req => {
+              if (req.toUserId === message.data.userId) {
+                return {
+                  ...req,
+                  toUserName: message.data.name ?? req.toUserName,
+                };
+              }
+              return req;
+            }),
+          }));
+        }
+        break;
     }
   }, [selectedConversation?.id, session.user.id]);
 

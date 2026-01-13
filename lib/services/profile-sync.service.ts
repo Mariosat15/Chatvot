@@ -14,6 +14,40 @@ interface ProfileSyncData {
 }
 
 /**
+ * Notify affected users via WebSocket that a profile has been updated
+ */
+async function notifyProfileUpdate(
+  userId: string,
+  name: string | undefined,
+  avatar: string | undefined,
+  affectedUserIds: string[]
+): Promise<void> {
+  if (affectedUserIds.length === 0) return;
+  
+  try {
+    const wsHost = process.env.WEBSOCKET_HOST || 'localhost';
+    const wsPort = process.env.WEBSOCKET_PORT || '3003';
+    const wsUrl = `http://${wsHost}:${wsPort}/internal/profile-updated`;
+    
+    await fetch(wsUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        name,
+        avatar,
+        affectedUserIds: [...new Set(affectedUserIds)], // Deduplicate
+      }),
+    });
+    
+    console.log(`[ProfileSync] WebSocket notification sent to ${affectedUserIds.length} users`);
+  } catch (error) {
+    console.error('[ProfileSync] Failed to send WebSocket notification:', error);
+    // Don't throw - WebSocket notification is optional
+  }
+}
+
+/**
  * Sync user profile changes across all messaging-related collections
  */
 export async function syncUserProfile(data: ProfileSyncData): Promise<{
@@ -50,6 +84,9 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
 
   console.log(`[ProfileSync] Syncing profile for user ${userId}`, { name, avatar: avatar ? '(updated)' : undefined });
 
+  // Collect all affected user IDs for WebSocket notification
+  const affectedUserIds: string[] = [];
+
   try {
     // 1. Update Friendships - userDetails array
     if (hasNameUpdate || hasAvatarUpdate) {
@@ -59,6 +96,20 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
       }
       if (hasAvatarUpdate) {
         friendshipUpdateFields['userDetails.$.userAvatar'] = avatar;
+      }
+
+      // Get friendships to collect friend IDs for notification
+      const friendships = await db.collection('friendships').find(
+        { 'userDetails.userId': userId }
+      ).toArray();
+      
+      // Collect friend IDs
+      for (const friendship of friendships) {
+        for (const detail of friendship.userDetails || []) {
+          if (detail.userId && detail.userId !== userId) {
+            affectedUserIds.push(detail.userId);
+          }
+        }
       }
 
       const friendshipResult = await db.collection('friendships').updateMany(
@@ -119,6 +170,13 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
           }
         }
 
+        // Collect other participant IDs for notification
+        for (const participant of conv.participants || []) {
+          if (participant.id && participant.id !== userId && participant.type === 'user') {
+            affectedUserIds.push(participant.id);
+          }
+        }
+
         // Also update customerName if this user is the customer
         if (hasNameUpdate && conv.customerId === userId) {
           updateDoc.customerName = name;
@@ -159,6 +217,11 @@ export async function syncUserProfile(data: ProfileSyncData): Promise<{
       );
       results.messages = messageResult.modifiedCount;
       console.log(`[ProfileSync] Updated ${results.messages} recent messages`);
+    }
+
+    // Notify affected users via WebSocket
+    if (affectedUserIds.length > 0) {
+      await notifyProfileUpdate(userId, name, avatar, affectedUserIds);
     }
 
     console.log(`[ProfileSync] ✅ Profile sync completed for user ${userId}`, results);

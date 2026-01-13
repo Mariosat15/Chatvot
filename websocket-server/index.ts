@@ -268,6 +268,31 @@ const server = createServer(async (req, res) => {
             }
             break;
 
+          case 'profile-updated':
+            // Broadcast profile update to affected users (friends and conversation participants)
+            if (data.userId && data.affectedUserIds) {
+              const profileUpdateEvent = {
+                type: 'profile_updated',
+                data: {
+                  userId: data.userId,
+                  name: data.name,
+                  avatar: data.avatar,
+                  timestamp: new Date().toISOString(),
+                },
+              };
+              
+              // Notify all affected users (friends and conversation participants)
+              for (const affectedUserId of data.affectedUserIds) {
+                broadcastToParticipant(affectedUserId, profileUpdateEvent);
+              }
+              
+              // Also notify the user themselves (for multi-tab/device sync)
+              broadcastToParticipant(data.userId, profileUpdateEvent);
+              
+              console.log(`👤 Profile updated: ${data.userId} -> notified ${data.affectedUserIds.length} users`);
+            }
+            break;
+
           default:
             console.warn(`Unknown internal endpoint: ${endpoint}`);
         }
