@@ -21,6 +21,11 @@ import {
   ArrowUpRight,
   Palette,
   User,
+  SortAsc,
+  ArrowDownAZ,
+  Flame,
+  Clock,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -55,6 +60,16 @@ interface MarketplaceItem {
 }
 
 type Category = 'all' | 'indicator' | 'strategy' | 'cosmetic';
+type SortOption = 'popular' | 'cheapest' | 'expensive' | 'rating' | 'newest' | 'name';
+
+const SORT_OPTIONS: { value: SortOption; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: 'popular', label: 'Most Popular', icon: Flame },
+  { value: 'cheapest', label: 'Cheapest First', icon: SortAsc },
+  { value: 'expensive', label: 'Most Expensive', icon: TrendingUp },
+  { value: 'rating', label: 'Highest Rated', icon: Star },
+  { value: 'newest', label: 'Newest', icon: Clock },
+  { value: 'name', label: 'Name A-Z', icon: ArrowDownAZ },
+];
 
 const CATEGORIES: { value: Category; label: string; icon: React.ComponentType<{ className?: string }>; color: string; bgGradient: string }[] = [
   { value: 'all', label: 'All Items', icon: Sparkles, color: 'text-white', bgGradient: 'from-gray-600/20 to-gray-800/20' },
@@ -88,6 +103,8 @@ export default function MarketplaceContent() {
   const [search, setSearch] = useState('');
   const [showFreeOnly, setShowFreeOnly] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>('popular');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
   
   // Use ref to store the current search value without triggering re-renders
   const searchRef = useRef(search);
@@ -164,10 +181,31 @@ export default function MarketplaceContent() {
     fetchItems(search);
   };
   
+  // Sorting function
+  const sortItems = (itemsToSort: MarketplaceItem[]): MarketplaceItem[] => {
+    return [...itemsToSort].sort((a, b) => {
+      switch (sortBy) {
+        case 'cheapest':
+          return a.price - b.price;
+        case 'expensive':
+          return b.price - a.price;
+        case 'rating':
+          return b.averageRating - a.averageRating;
+        case 'newest':
+          return 0; // Would need createdAt field, defaulting to original order
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'popular':
+        default:
+          return b.totalPurchases - a.totalPurchases;
+      }
+    });
+  };
+
   const featuredItems = items.filter(i => i.isFeatured);
-  const indicators = items.filter(i => i.category === 'indicator');
-  const strategies = items.filter(i => i.category === 'strategy');
-  const cosmetics = items.filter(i => i.category === 'cosmetic');
+  const indicators = sortItems(items.filter(i => i.category === 'indicator'));
+  const strategies = sortItems(items.filter(i => i.category === 'strategy'));
+  const cosmetics = sortItems(items.filter(i => i.category === 'cosmetic'));
   
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
@@ -255,18 +293,85 @@ export default function MarketplaceContent() {
             })}
           </div>
           
-          <button
-            onClick={() => setShowFreeOnly(!showFreeOnly)}
-            className={cn(
-              'flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all',
-              showFreeOnly
-                ? 'bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/20 text-green-400'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            )}
-          >
-            <Gift className="h-5 w-5" />
-            Free Only
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Free Only Toggle */}
+            <button
+              onClick={() => setShowFreeOnly(!showFreeOnly)}
+              className={cn(
+                'flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all',
+                showFreeOnly
+                  ? 'bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/20 text-green-400'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              )}
+            >
+              <Gift className="h-5 w-5" />
+              Free Only
+            </button>
+            
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all border border-gray-700/50"
+              >
+                {(() => {
+                  const currentSort = SORT_OPTIONS.find(s => s.value === sortBy);
+                  const SortIcon = currentSort?.icon || SortAsc;
+                  return (
+                    <>
+                      <SortIcon className="h-5 w-5" />
+                      <span className="hidden sm:inline">{currentSort?.label}</span>
+                      <ChevronDown className={cn(
+                        "h-4 w-4 transition-transform",
+                        showSortDropdown && "rotate-180"
+                      )} />
+                    </>
+                  );
+                })()}
+              </button>
+              
+              {showSortDropdown && (
+                <>
+                  {/* Backdrop to close dropdown */}
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setShowSortDropdown(false)} 
+                  />
+                  
+                  {/* Dropdown menu */}
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                    <div className="py-2">
+                      {SORT_OPTIONS.map((option) => {
+                        const Icon = option.icon;
+                        const isActive = sortBy === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              setSortBy(option.value);
+                              setShowSortDropdown(false);
+                            }}
+                            className={cn(
+                              'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
+                              isActive 
+                                ? 'bg-emerald-500/10 text-emerald-400' 
+                                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                            )}
+                          >
+                            <Icon className="h-4 w-4" />
+                            <span>{option.label}</span>
+                            {isActive && (
+                              <Check className="h-4 w-4 ml-auto" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
         
         {loading ? (
