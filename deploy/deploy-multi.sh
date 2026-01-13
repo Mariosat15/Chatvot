@@ -116,6 +116,23 @@ deploy_to_server() {
     echo "🔨 Building worker..."
     npm run worker:build
     
+    # Update nginx config if changed
+    echo "🌐 Checking nginx configuration..."
+    if ! diff -q deploy/nginx.conf /etc/nginx/sites-available/chartvolt > /dev/null 2>&1; then
+      echo "📝 Nginx config has changed, updating..."
+      cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
+      
+      echo "🔍 Testing nginx config..."
+      if nginx -t; then
+        echo "✅ Nginx config valid, reloading..."
+        systemctl reload nginx
+      else
+        echo "❌ Nginx config invalid! Not reloading."
+      fi
+    else
+      echo "✅ Nginx config unchanged"
+    fi
+    
     echo "🔄 Reloading PM2..."
     pm2 reload ecosystem.config.js
     

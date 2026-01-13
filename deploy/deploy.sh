@@ -58,6 +58,24 @@ cd websocket-server && npm run build && cd ..
 echo "🔨 Building worker..."
 npm run worker:build
 
+# Update nginx config if changed
+echo "🌐 Checking nginx configuration..."
+if ! diff -q deploy/nginx.conf /etc/nginx/sites-available/chartvolt > /dev/null 2>&1; then
+  echo "📝 Nginx config has changed, updating..."
+  sudo cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
+  
+  echo "🔍 Testing nginx config..."
+  if sudo nginx -t; then
+    echo "✅ Nginx config valid, reloading..."
+    sudo systemctl reload nginx
+  else
+    echo "❌ Nginx config invalid! Not reloading."
+    echo "   Please check deploy/nginx.conf for errors."
+  fi
+else
+  echo "✅ Nginx config unchanged"
+fi
+
 # Reload PM2
 echo "🔄 Reloading PM2 apps..."
 pm2 reload ecosystem.config.js
