@@ -601,13 +601,13 @@ function PurchaseCard({
           
           <div className="flex items-center gap-2">
             <Button 
-              variant="ghost" 
+              variant="outline" 
               size="sm" 
               onClick={onInfo}
-              className="text-gray-400 hover:text-cyan-400"
-              title="View Details"
+              className="border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 gap-1.5"
             >
               <Info className="h-4 w-4" />
+              <span className="text-xs">Info</span>
             </Button>
             <Button 
               variant="ghost" 
@@ -698,10 +698,10 @@ function CosmeticCard({
             </div>
           )}
           
-          {/* Info Button */}
+          {/* Info Button - Always Visible */}
           <button
             onClick={onInfo}
-            className="absolute top-2 left-2 bg-black/60 hover:bg-black/80 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-2 left-2 bg-cyan-500/90 hover:bg-cyan-400 rounded-full p-1.5 shadow-lg shadow-cyan-500/30 transition-all hover:scale-110"
             title="View Details"
           >
             <Info className="w-4 h-4 text-white" />
