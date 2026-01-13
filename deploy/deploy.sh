@@ -58,22 +58,45 @@ cd websocket-server && npm run build && cd ..
 echo "🔨 Building worker..."
 npm run worker:build
 
-# Update nginx config if changed
+# Update nginx config (smart - preserves SSL)
 echo "🌐 Checking nginx configuration..."
-if ! diff -q deploy/nginx.conf /etc/nginx/sites-available/chartvolt > /dev/null 2>&1; then
-  echo "📝 Nginx config has changed, updating..."
+
+# Check if current config has SSL (certbot added it)
+if grep -q "listen 443" /etc/nginx/sites-available/chartvolt 2>/dev/null; then
+  echo "🔒 SSL detected in nginx config - preserving certbot settings"
+  echo "   Only updating client_max_body_size if needed..."
+  
+  # Check if admin block has client_max_body_size
+  if ! grep -A20 "server_name admin.chartvolt.com" /etc/nginx/sites-available/chartvolt | grep -q "client_max_body_size"; then
+    echo "📝 Adding client_max_body_size to admin server block..."
+    # Use sed to add client_max_body_size after admin server_name line
+    sudo sed -i '/server_name admin.chartvolt.com/a\    client_max_body_size 10M;' /etc/nginx/sites-available/chartvolt
+    
+    echo "🔍 Testing nginx config..."
+    if sudo nginx -t; then
+      echo "✅ Nginx config valid, reloading..."
+      sudo systemctl reload nginx
+    else
+      echo "❌ Nginx config invalid after modification!"
+      echo "   Please check /etc/nginx/sites-available/chartvolt manually."
+    fi
+  else
+    echo "✅ client_max_body_size already configured"
+  fi
+else
+  # No SSL - safe to copy our base config
+  echo "📝 No SSL detected, copying base nginx config..."
   sudo cp deploy/nginx.conf /etc/nginx/sites-available/chartvolt
   
   echo "🔍 Testing nginx config..."
   if sudo nginx -t; then
     echo "✅ Nginx config valid, reloading..."
     sudo systemctl reload nginx
+    echo "⚠️  Note: Run 'sudo certbot --nginx' to enable SSL"
   else
     echo "❌ Nginx config invalid! Not reloading."
     echo "   Please check deploy/nginx.conf for errors."
   fi
-else
-  echo "✅ Nginx config unchanged"
 fi
 
 # Reload PM2
