@@ -1615,11 +1615,12 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         // Fetch candles from SERVER (source of truth)
         // For 1m: Server gets from MongoDB (saved by websocket-price-streamer)
         // For other TFs: Server gets from Massive.com REST API
+        // Request ALL available history - cleanup script manages how much is kept
         log(`📊 Loading candles from server: ${symbol} (${timeframe})`);
         const response = await fetch('/api/trading/candles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol, timeframe, count: 500 }),
+          body: JSON.stringify({ symbol, timeframe, count: 100000 }), // Get all available history
         });
         
         if (!response.ok) {

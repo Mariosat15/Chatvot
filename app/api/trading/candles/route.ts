@@ -217,7 +217,11 @@ async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): P
  * Shared handler for both GET and POST
  */
 async function handleCandleRequest(symbol: string, timeframe: string, count: number) {
-  const limit = count || 500;
+  // For 1m: get all available candles (cleanup script manages retention)
+  // For other TFs: use reasonable default
+  const limit = timeframe === '1m' || timeframe === '1' 
+    ? Math.min(count || 100000, 200000) // 1m: up to 200k candles (~139 days)
+    : Math.min(count || 500, 5000);     // Other TFs: reasonable limit
 
   // For 1-minute timeframe: Get from MongoDB (server source of truth)
   if (timeframe === '1m' || timeframe === '1') {
