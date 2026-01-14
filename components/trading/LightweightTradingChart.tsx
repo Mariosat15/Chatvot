@@ -1994,8 +1994,9 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       }
     };
     
-    // Poll every 200ms for smooth real-time updates
-    const intervalId = setInterval(fetchFormingCandle, 200);
+    // Poll every 500ms for real-time updates (balance between smoothness and server load)
+    // 1000 users × 2 req/sec = 2000 req/sec (manageable)
+    const intervalId = setInterval(fetchFormingCandle, 500);
     
     // Fetch immediately
     fetchFormingCandle();
