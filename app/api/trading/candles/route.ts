@@ -4,6 +4,9 @@ import Candle1m from '@/database/models/candle-1m.model';
 import { getRecentCandles, Timeframe } from '@/lib/services/forex-historical.service';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 
+// Track which symbols are currently being seeded (prevent duplicate seeding)
+const seedingInProgress = new Set<string>();
+
 /**
  * Get Candles API - SERVER SOURCE OF TRUTH
  * 
@@ -55,19 +58,67 @@ export async function GET(request: NextRequest) {
 }
 
 /**
+ * Seed historical candles from Massive.com to MongoDB
+ * This is called ONCE per symbol when MongoDB is empty
+ */
+async function seedHistoricalCandles(symbol: string, limit: number): Promise<void> {
+  // Prevent duplicate seeding for same symbol
+  if (seedingInProgress.has(symbol)) {
+    console.log(`⏳ [Candles API] Seeding already in progress for ${symbol}, waiting...`);
+    // Wait a bit for the other request to finish
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    return;
+  }
+  
+  seedingInProgress.add(symbol);
+  
+  try {
+    console.log(`🌱 [Candles API] Seeding historical candles for ${symbol}...`);
+    
+    // Fetch from Massive.com REST API
+    const candles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit);
+    
+    if (candles.length === 0) {
+      console.log(`⚠️ [Candles API] No candles returned from Massive.com for ${symbol}`);
+      return;
+    }
+    
+    // Convert to format expected by bulkUpsertCandles
+    const candlesToSave = candles.map(c => ({
+      symbol,
+      time: c.time, // Already in ms
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume || 0,
+    }));
+    
+    // Save ALL candles to MongoDB
+    await Candle1m.bulkUpsertCandles(candlesToSave);
+    
+    console.log(`✅ [Candles API] Seeded ${candles.length} historical candles for ${symbol} to MongoDB`);
+  } catch (error) {
+    console.error(`❌ [Candles API] Failed to seed candles for ${symbol}:`, error);
+  } finally {
+    seedingInProgress.delete(symbol);
+  }
+}
+
+/**
  * Shared handler for both GET and POST
  */
 async function handleCandleRequest(symbol: string, timeframe: string, count: number) {
   const limit = count || 500;
 
-  // For 1-minute timeframe: Try MongoDB first, fallback to Massive.com REST API
+  // For 1-minute timeframe: Get from MongoDB (server source of truth)
   if (timeframe === '1m' || timeframe === '1') {
     try {
       await connectToDatabase();
-      const candles = await Candle1m.getCandles(symbol, limit);
+      let candles = await Candle1m.getCandles(symbol, limit);
       
-      // If MongoDB has candles, return them
-      if (candles && candles.length > 0) {
+      // If MongoDB has enough candles, return them
+      if (candles && candles.length >= 50) {
         console.log(`🕯️ [Candles API] Returning ${candles.length} candles from MongoDB for ${symbol}`);
         return NextResponse.json({ 
           candles,
@@ -76,36 +127,39 @@ async function handleCandleRequest(symbol: string, timeframe: string, count: num
         });
       }
       
-      // MongoDB empty - fall back to Massive.com REST API
-      console.log(`⚠️ [Candles API] MongoDB empty for ${symbol}, falling back to Massive.com API`);
-    } catch (dbError) {
-      console.error(`❌ [Candles API] MongoDB error for ${symbol}:`, dbError);
-    }
-    
-    // Fallback: Fetch from Massive.com REST API (same as other timeframes)
-    try {
-      const candles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit);
-      const formattedCandles = candles.map(c => ({
-        time: Math.floor(c.time / 1000),
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.volume,
-      }));
+      // MongoDB empty or too few candles - SEED historical data first
+      console.log(`⚠️ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, seeding historical data...`);
       
-      console.log(`✅ [Candles API] Returning ${formattedCandles.length} candles from Massive.com API for ${symbol}`);
-      return NextResponse.json({ 
-        candles: formattedCandles,
-        source: 'massive_api_fallback',
-        lastUpdate: Date.now(),
-      });
-    } catch (apiError) {
-      console.error(`❌ [Candles API] Massive.com API error for ${symbol}:`, apiError);
+      // Seed historical candles (fetches from Massive.com and saves to MongoDB)
+      await seedHistoricalCandles(symbol, limit);
+      
+      // Now fetch from MongoDB again (should have data now)
+      candles = await Candle1m.getCandles(symbol, limit);
+      
+      if (candles && candles.length > 0) {
+        console.log(`✅ [Candles API] After seeding: Returning ${candles.length} candles from MongoDB for ${symbol}`);
+        return NextResponse.json({ 
+          candles,
+          source: 'mongodb_seeded',
+          lastUpdate: Date.now(),
+        });
+      }
+      
+      // Still no candles - return empty with error message
+      console.error(`❌ [Candles API] Failed to get candles for ${symbol} after seeding`);
       return NextResponse.json({ 
         candles: [],
         source: 'error',
-        error: 'Failed to fetch candles from any source',
+        error: 'Failed to fetch historical candles',
+        lastUpdate: Date.now(),
+      });
+      
+    } catch (dbError) {
+      console.error(`❌ [Candles API] MongoDB error for ${symbol}:`, dbError);
+      return NextResponse.json({ 
+        candles: [],
+        source: 'error',
+        error: 'Database error',
         lastUpdate: Date.now(),
       });
     }
