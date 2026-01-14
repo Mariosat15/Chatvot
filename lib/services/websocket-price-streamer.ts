@@ -357,11 +357,12 @@ function subscribeToFeeds(): void {
   // Subscribe to:
   // - C.* = All forex quotes (bid/ask)
   // - CAS.* = All forex second aggregates (OHLC per second)
-  // Format: {"action":"subscribe","params":"C.*,CAS.*"}
+  // - CA.* = All forex MINUTE aggregates (OHLC per minute) - FOR SERVER CANDLE STORAGE!
+  // Format: {"action":"subscribe","params":"C.*,CAS.*,CA.*"}
   
   ws.send(JSON.stringify({
     action: 'subscribe',
-    params: 'C.*,CAS.*', // All forex quotes and second aggregates
+    params: 'C.*,CAS.*,CA.*', // All forex quotes + second aggregates + MINUTE aggregates
   }));
 }
 
@@ -394,6 +395,10 @@ function handleMessage(data: string): void {
         case 'CA':
           // Forex Aggregate (minute): {"ev":"CA","pair":"EUR-USD","o":1.05,"h":1.051,"l":1.049,"c":1.0505}
           // IMPORTANT: Save to MongoDB for server-side candle source of truth
+          // Log occasionally to verify CA.* is being received (10% of messages)
+          if (Math.random() < 0.1) {
+            console.log(`🕯️ [CA] Received minute candle for ${msg.pair || msg.p}`);
+          }
           handleAggregateMessage(msg, true);  // true = is minute aggregate, save to MongoDB
           break;
         case 'CAS':
