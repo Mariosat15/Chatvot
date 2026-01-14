@@ -84,9 +84,11 @@ async function seedHistoricalCandles(symbol: string, limit: number): Promise<voi
     }
     
     // Convert to format expected by bulkUpsertCandles
+    // NOTE: getRecentCandles returns time in SECONDS, but bulkUpsertCandles expects MILLISECONDS
+    // (because it divides by 1000 internally)
     const candlesToSave = candles.map(c => ({
       symbol,
-      time: c.time, // Already in ms
+      time: c.time * 1000, // Convert seconds to ms (bulkUpsertCandles will divide by 1000)
       open: c.open,
       high: c.high,
       low: c.low,

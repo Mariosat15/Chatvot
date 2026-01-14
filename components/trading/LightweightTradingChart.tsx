@@ -1627,8 +1627,9 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         }
         
         const data = await response.json();
+        // API returns time in SECONDS - use directly (LightweightCharts expects seconds)
         const candles: OHLCCandle[] = data.candles.map((c: { time: number; open: number; high: number; low: number; close: number; volume?: number }) => ({
-          time: c.time * 1000, // Convert seconds to ms for OHLCCandle format
+          time: c.time, // Already in seconds - DO NOT multiply by 1000!
           open: c.open,
           high: c.high,
           low: c.low,
@@ -1986,25 +1987,25 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           }
         }
         
-        // Update candleDataRef for indicators
+        // Update candleDataRef for indicators (time already in seconds from API)
         if (candleDataRef.current.length > 0 && latestCandles.length > 0) {
           const lastServerCandle = latestCandles[latestCandles.length - 1];
           const lastRefIndex = candleDataRef.current.length - 1;
           
-          if (candleDataRef.current[lastRefIndex].time === lastServerCandle.time * 1000) {
+          if (candleDataRef.current[lastRefIndex].time === lastServerCandle.time) {
             // Update existing candle
             candleDataRef.current[lastRefIndex] = {
-              time: lastServerCandle.time * 1000,
+              time: lastServerCandle.time, // Already in seconds
               open: lastServerCandle.open,
               high: lastServerCandle.high,
               low: lastServerCandle.low,
               close: lastServerCandle.close,
               volume: lastServerCandle.volume || 0,
             };
-          } else if (lastServerCandle.time * 1000 > candleDataRef.current[lastRefIndex].time) {
+          } else if (lastServerCandle.time > candleDataRef.current[lastRefIndex].time) {
             // New candle - add it
             candleDataRef.current.push({
-              time: lastServerCandle.time * 1000,
+              time: lastServerCandle.time, // Already in seconds
               open: lastServerCandle.open,
               high: lastServerCandle.high,
               low: lastServerCandle.low,
