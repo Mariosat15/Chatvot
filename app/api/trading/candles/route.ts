@@ -136,7 +136,8 @@ async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): P
     const settings = await MarketDataSettings.findOne({ key: 'market_data_settings' });
     if (!settings?.gapFill?.enabled || settings?.gapFill?.mode !== 'auto') return;
     
-    const maxGapMinutes = settings.gapFill.maxGapMinutes || 60;
+    // Massive.com typically provides ~500 candles (~8 hours), so only fill recent gaps
+    const maxGapMinutes = 480; // 8 hours max
     
     // Detect gaps
     const gaps: Array<{ startTime: number; endTime: number; missing: number }> = [];

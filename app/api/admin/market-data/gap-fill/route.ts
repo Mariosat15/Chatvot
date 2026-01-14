@@ -64,13 +64,17 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST - Fill gaps in candle data from Massive.com API
+ * Note: Only fills gaps that Massive.com can provide data for (recent data only)
  */
 export async function POST(request: NextRequest) {
   try {
     await connectToDatabase();
     
     const body = await request.json();
-    const { symbol, maxGapMinutes = 60 } = body;
+    const { symbol } = body;
+    
+    // Massive.com typically provides ~500 candles of history, so ~8 hours max
+    const maxGapMinutes = 480; // 8 hours - realistic limit for what Massive.com can fill
     
     const symbols = symbol ? [symbol] : FOREX_PAIRS.slice(0, 10);
     

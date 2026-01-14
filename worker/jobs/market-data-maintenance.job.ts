@@ -1,15 +1,22 @@
 /**
  * Market Data Maintenance Job
  * 
- * Handles automatic cleanup and gap filling for 1m candles.
- * Runs on a schedule or can be triggered manually.
+ * Handles automatic cleanup for 1m candles.
+ * Runs on a schedule configured by admin:
+ * - Daily at specific hour
+ * - Weekly on specific days (e.g., weekends)
+ * - Monthly on specific week and days
  */
 
 import { connectToDatabase } from '../../database/mongoose';
-import Candle1m from '../../database/models/candle-1m.model';
 import mongoose from 'mongoose';
 
-const MAIN_APP_URL = process.env.MAIN_APP_URL || 'http://localhost:3000';
+interface CleanupSchedule {
+  type: 'daily' | 'weekly' | 'monthly';
+  hour: number; // 0-23 UTC
+  weekDays: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
+  monthWeek: number; // 1-4 (which week of month)
+}
 
 interface MarketDataSettings {
   cleanup: {
@@ -17,12 +24,11 @@ interface MarketDataSettings {
     mode: 'auto' | 'manual';
     daysToKeep: number;
     lastRun: string | null;
-    autoRunTime: string;
+    schedule: CleanupSchedule;
   };
   gapFill: {
     enabled: boolean;
     mode: 'auto' | 'manual';
-    maxGapMinutes: number;
     lastRun: string | null;
   };
 }
@@ -43,11 +49,61 @@ async function getSettings(): Promise<MarketDataSettings | null> {
 }
 
 /**
+ * Check if cleanup should run based on schedule
+ */
+function shouldRunCleanup(schedule: CleanupSchedule, lastRun: Date | null): boolean {
+  const now = new Date();
+  const currentHour = now.getUTCHours();
+  const currentDay = now.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const currentDate = now.getUTCDate();
+  
+  // Check if current hour matches
+  if (currentHour !== schedule.hour) {
+    return false;
+  }
+  
+  // Check if already ran today
+  if (lastRun) {
+    const lastRunDate = new Date(lastRun);
+    if (lastRunDate.toDateString() === now.toDateString()) {
+      return false; // Already ran today
+    }
+  }
+  
+  switch (schedule.type) {
+    case 'daily':
+      return true; // Runs every day at specified hour
+      
+    case 'weekly':
+      // Check if today is one of the configured days
+      return schedule.weekDays.includes(currentDay);
+      
+    case 'monthly':
+      // Check if we're in the correct week and day
+      const weekOfMonth = Math.ceil(currentDate / 7);
+      if (weekOfMonth !== schedule.monthWeek) {
+        return false;
+      }
+      return schedule.weekDays.includes(currentDay);
+      
+    default:
+      return false;
+  }
+}
+
+/**
  * Run cleanup - deletes old candles
+ * Uses timestamp comparison: t < cutoffTime (Unix seconds)
  */
 async function runCleanup(daysToKeep: number): Promise<{ success: boolean; deletedCount: number }> {
   try {
+    // Calculate cutoff timestamp in seconds
+    // t field stores Unix timestamp in seconds (e.g., 1768348800)
     const cutoffTime = Math.floor(Date.now() / 1000) - (daysToKeep * 24 * 60 * 60);
+    const cutoffDate = new Date(cutoffTime * 1000);
+    
+    console.log(`🧹 [Cleanup] Deleting candles older than ${cutoffDate.toISOString()} (${daysToKeep} days ago)`);
+    console.log(`   Cutoff timestamp: ${cutoffTime} (comparing t < ${cutoffTime})`);
     
     const result = await mongoose.connection.db?.collection('candles_1m').deleteMany({
       t: { $lt: cutoffTime }
@@ -64,7 +120,7 @@ async function runCleanup(daysToKeep: number): Promise<{ success: boolean; delet
       );
     }
     
-    console.log(`🧹 [Market Data Cleanup] Deleted ${deletedCount} old candles`);
+    console.log(`🧹 [Market Data Cleanup] Deleted ${deletedCount} candles older than ${daysToKeep} days`);
     return { success: true, deletedCount };
   } catch (error) {
     console.error('❌ [Market Data Cleanup] Error:', error);
@@ -73,71 +129,35 @@ async function runCleanup(daysToKeep: number): Promise<{ success: boolean; delet
 }
 
 /**
- * Run gap fill via API (delegates to main app)
- */
-async function runGapFill(maxGapMinutes: number): Promise<{ success: boolean; filledCount: number }> {
-  try {
-    const response = await fetch(`${MAIN_APP_URL}/api/admin/market-data/gap-fill`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ maxGapMinutes }),
-    });
-    
-    if (!response.ok) {
-      console.error('❌ [Market Data Gap Fill] API request failed');
-      return { success: false, filledCount: 0 };
-    }
-    
-    const data = await response.json();
-    console.log(`🔧 [Market Data Gap Fill] Filled ${data.gapFill?.totalCandlesFilled || 0} candles`);
-    
-    return { 
-      success: true, 
-      filledCount: data.gapFill?.totalCandlesFilled || 0 
-    };
-  } catch (error) {
-    console.error('❌ [Market Data Gap Fill] Error:', error);
-    return { success: false, filledCount: 0 };
-  }
-}
-
-/**
- * Main maintenance job - runs periodically
+ * Main maintenance job - runs periodically (every 5 minutes by default)
+ * Checks if cleanup should run based on admin-configured schedule
  */
 export async function runMarketDataMaintenance(): Promise<void> {
-  console.log('📊 [Market Data Maintenance] Starting...');
-  
   try {
     await connectToDatabase();
     
     const settings = await getSettings();
     if (!settings) {
-      console.log('⏭️ [Market Data Maintenance] No settings found, skipping');
-      return;
+      return; // No settings, skip silently
     }
     
-    // Check if cleanup should run (auto mode and correct time)
+    // Check if auto cleanup should run
     if (settings.cleanup.enabled && settings.cleanup.mode === 'auto') {
-      const now = new Date();
-      const [targetHour, targetMinute] = settings.cleanup.autoRunTime.split(':').map(Number);
+      const lastRun = settings.cleanup.lastRun ? new Date(settings.cleanup.lastRun) : null;
       
-      // Run if within 5 minutes of target time
-      if (now.getUTCHours() === targetHour && now.getUTCMinutes() >= targetMinute && now.getUTCMinutes() < targetMinute + 5) {
-        // Check if already ran today
-        const lastRun = settings.cleanup.lastRun ? new Date(settings.cleanup.lastRun) : null;
-        const today = new Date().toDateString();
-        
-        if (!lastRun || lastRun.toDateString() !== today) {
-          console.log('🧹 [Market Data Maintenance] Running auto cleanup...');
-          await runCleanup(settings.cleanup.daysToKeep);
+      if (shouldRunCleanup(settings.cleanup.schedule, lastRun)) {
+        console.log('🧹 [Market Data Maintenance] Schedule triggered, running auto cleanup...');
+        console.log(`   Schedule: ${settings.cleanup.schedule.type} at ${settings.cleanup.schedule.hour}:00 UTC`);
+        if (settings.cleanup.schedule.type !== 'daily') {
+          console.log(`   Days: ${settings.cleanup.schedule.weekDays.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}`);
         }
+        await runCleanup(settings.cleanup.daysToKeep);
       }
     }
     
-    // Gap fill runs in background via API calls, not here
-    // This prevents duplicate gap fills
+    // Gap fill runs in background via API calls during chart requests, not here
+    // This prevents duplicate work and ensures gaps are filled when users need data
     
-    console.log('✅ [Market Data Maintenance] Complete');
   } catch (error) {
     console.error('❌ [Market Data Maintenance] Error:', error);
   }

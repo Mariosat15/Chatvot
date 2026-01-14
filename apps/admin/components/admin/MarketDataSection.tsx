@@ -2,18 +2,24 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 
+interface CleanupSchedule {
+  type: 'daily' | 'weekly' | 'monthly';
+  hour: number;
+  weekDays: number[];
+  monthWeek: number;
+}
+
 interface MarketDataSettings {
   cleanup: {
     enabled: boolean;
     mode: 'auto' | 'manual';
     daysToKeep: number;
     lastRun: string | null;
-    autoRunTime: string;
+    schedule: CleanupSchedule;
   };
   gapFill: {
     enabled: boolean;
     mode: 'auto' | 'manual';
-    maxGapMinutes: number;
     lastRun: string | null;
   };
 }
@@ -165,7 +171,7 @@ export default function MarketDataSection() {
       const res = await fetch(`${BASE_URL}/api/admin/market-data/gap-fill`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ maxGapMinutes: settings?.gapFill.maxGapMinutes || 60 }),
+        body: JSON.stringify({}),
       });
 
       if (res.ok) {
@@ -258,7 +264,7 @@ export default function MarketDataSection() {
         
         {settings && (
           <div className="space-y-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -276,7 +282,7 @@ export default function MarketDataSection() {
                 disabled={!settings.cleanup.enabled}
               >
                 <option value="manual">Manual</option>
-                <option value="auto">Auto (Daily)</option>
+                <option value="auto">Auto (Scheduled)</option>
               </select>
             </div>
             
@@ -294,6 +300,102 @@ export default function MarketDataSection() {
                 (~{((settings.cleanup.daysToKeep * 9.5)).toFixed(0)} MB storage)
               </span>
             </div>
+            
+            {/* Schedule Settings - only shown in auto mode */}
+            {settings.cleanup.mode === 'auto' && settings.cleanup.enabled && (
+              <div className="bg-gray-700/50 rounded-lg p-4 space-y-3">
+                <h4 className="text-white font-medium">📅 Schedule</h4>
+                
+                <div className="flex items-center gap-4 flex-wrap">
+                  <label className="text-gray-300">Run:</label>
+                  <select
+                    value={settings.cleanup.schedule?.type || 'daily'}
+                    onChange={(e) => saveSettings({ 
+                      cleanup: { 
+                        ...settings.cleanup, 
+                        schedule: { ...settings.cleanup.schedule, type: e.target.value as 'daily' | 'weekly' | 'monthly' } 
+                      } 
+                    })}
+                    className="bg-gray-700 text-white rounded-lg px-3 py-2"
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                  
+                  <label className="text-gray-300">at</label>
+                  <select
+                    value={settings.cleanup.schedule?.hour ?? 0}
+                    onChange={(e) => saveSettings({ 
+                      cleanup: { 
+                        ...settings.cleanup, 
+                        schedule: { ...settings.cleanup.schedule, hour: parseInt(e.target.value) } 
+                      } 
+                    })}
+                    className="bg-gray-700 text-white rounded-lg px-3 py-2"
+                  >
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <option key={i} value={i}>{String(i).padStart(2, '0')}:00 UTC</option>
+                    ))}
+                  </select>
+                </div>
+                
+                {/* Day selection for weekly/monthly */}
+                {(settings.cleanup.schedule?.type === 'weekly' || settings.cleanup.schedule?.type === 'monthly') && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-gray-300">On:</label>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => (
+                      <label key={day} className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={settings.cleanup.schedule?.weekDays?.includes(i) ?? (i === 0 || i === 6)}
+                          onChange={(e) => {
+                            const currentDays = settings.cleanup.schedule?.weekDays || [0, 6];
+                            const newDays = e.target.checked 
+                              ? [...currentDays, i]
+                              : currentDays.filter(d => d !== i);
+                            saveSettings({ 
+                              cleanup: { 
+                                ...settings.cleanup, 
+                                schedule: { ...settings.cleanup.schedule, weekDays: newDays } 
+                              } 
+                            });
+                          }}
+                          className="w-3 h-3 rounded"
+                        />
+                        <span className="text-gray-300 text-sm">{day}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Week of month for monthly */}
+                {settings.cleanup.schedule?.type === 'monthly' && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-gray-300">Week:</label>
+                    <select
+                      value={settings.cleanup.schedule?.monthWeek ?? 1}
+                      onChange={(e) => saveSettings({ 
+                        cleanup: { 
+                          ...settings.cleanup, 
+                          schedule: { ...settings.cleanup.schedule, monthWeek: parseInt(e.target.value) } 
+                        } 
+                      })}
+                      className="bg-gray-700 text-white rounded-lg px-3 py-2"
+                    >
+                      <option value={1}>1st week</option>
+                      <option value={2}>2nd week</option>
+                      <option value={3}>3rd week</option>
+                      <option value={4}>4th week</option>
+                    </select>
+                  </div>
+                )}
+                
+                <div className="text-gray-400 text-xs">
+                  ℹ️ Worker checks every 5 minutes. Cleanup runs once when schedule matches.
+                </div>
+              </div>
+            )}
             
             {settings.cleanup.lastRun && (
               <div className="text-gray-400 text-sm">
@@ -318,7 +420,7 @@ export default function MarketDataSection() {
         
         {settings && (
           <div className="space-y-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -340,17 +442,10 @@ export default function MarketDataSection() {
               </select>
             </div>
             
-            <div className="flex items-center gap-4">
-              <label className="text-white">Max Gap to Fill:</label>
-              <input
-                type="number"
-                min="1"
-                max="1440"
-                value={settings.gapFill.maxGapMinutes}
-                onChange={(e) => saveSettings({ gapFill: { ...settings.gapFill, maxGapMinutes: parseInt(e.target.value) || 60 } })}
-                className="bg-gray-700 text-white rounded-lg px-3 py-2 w-24"
-              />
-              <span className="text-gray-400">minutes</span>
+            <div className="text-gray-400 text-sm bg-gray-700/50 rounded-lg p-3">
+              ℹ️ Gap fill can only restore recent data (~8 hours) that Massive.com still has available.
+              <br />
+              Older deleted data cannot be recovered. Charts will simply show from where data exists.
             </div>
             
             {settings.gapFill.lastRun && (
@@ -362,7 +457,7 @@ export default function MarketDataSection() {
             {/* Detected Gaps */}
             <div className="bg-gray-700 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-white font-medium">Detected Gaps: {gaps.length}</span>
+                <span className="text-white font-medium">Detected Gaps (recent, fillable): {gaps.length}</span>
                 <button
                   onClick={fetchGaps}
                   className="text-blue-400 hover:text-blue-300 text-sm"
@@ -383,7 +478,7 @@ export default function MarketDataSection() {
                   )}
                 </div>
               ) : (
-                <div className="text-green-400">✅ No gaps detected</div>
+                <div className="text-green-400">✅ No recent fillable gaps detected</div>
               )}
             </div>
             
@@ -402,9 +497,10 @@ export default function MarketDataSection() {
       <div className="bg-gray-800/50 rounded-lg p-4 text-gray-400 text-sm">
         <p><strong>ℹ️ How it works:</strong></p>
         <ul className="list-disc list-inside mt-2 space-y-1">
-          <li><strong>Cleanup:</strong> Deletes candles older than X days. Run manually or enable auto mode for daily cleanup.</li>
-          <li><strong>Gap Fill:</strong> Detects missing candles and fills them from Massive.com API. Safe - never overwrites existing data.</li>
-          <li><strong>Auto mode:</strong> Gap fill runs automatically in background when requests are made.</li>
+          <li><strong>Cleanup:</strong> Deletes candles where timestamp (t) &lt; cutoff. Example: t: 1768348800 is Jan 14, 2026 00:00 UTC.</li>
+          <li><strong>Schedule:</strong> Worker checks every 5 minutes. When schedule matches (right hour + day), cleanup runs once.</li>
+          <li><strong>Gap Fill:</strong> Only fills recent gaps (~8 hours max) that Massive.com can still provide.</li>
+          <li><strong>Deleted data:</strong> Old deleted data is gone forever. Charts simply show from where data exists.</li>
         </ul>
       </div>
     </div>
