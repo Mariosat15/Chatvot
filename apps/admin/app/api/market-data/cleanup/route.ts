@@ -58,12 +58,18 @@ export async function POST(request: NextRequest) {
       console.log(`🧹 [Cleanup] Will delete: t < ${cutoffTime} (${sampleCandle.t < cutoffTime ? 'YES this sample would be deleted' : 'NO this sample would be kept'})`);
     }
     
+    // Count how many WILL be deleted (before actually deleting)
+    const toDeleteCount = await db.collection('candles_1m').countDocuments({
+      t: { $lt: cutoffTime }
+    });
+    console.log(`🧹 [Cleanup] Candles matching delete criteria: ${toDeleteCount}`);
+    
     // Delete old candles
     const result = await db.collection('candles_1m').deleteMany({
       t: { $lt: cutoffTime }
     });
     
-    console.log(`🧹 [Cleanup] Delete result: ${JSON.stringify(result)}`);
+    console.log(`🧹 [Cleanup] Delete result: acknowledged=${result.acknowledged}, deletedCount=${result.deletedCount}`);
     
     // Get count after cleanup
     const countAfter = await db.collection('candles_1m').countDocuments();
