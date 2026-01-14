@@ -441,9 +441,9 @@ export default function MarketDataSection() {
             </div>
             
             <div className="text-gray-400 text-sm bg-gray-700/50 rounded-lg p-3">
-              ℹ️ Gap fill can only restore recent data (~8 hours) that Massive.com still has available.
+              ℹ️ Gap fill uses Massive.com Custom Bars API with exact timestamps.
               <br />
-              Older deleted data cannot be recovered. Charts will simply show from where data exists.
+              <strong>History available:</strong> Up to 2 years (Basic plan) or all history (Starter/Business).
             </div>
             
             {settings.gapFill.lastRun && (
@@ -497,8 +497,8 @@ export default function MarketDataSection() {
         <ul className="list-disc list-inside mt-2 space-y-1">
           <li><strong>Cleanup:</strong> Deletes candles where timestamp (t) &lt; cutoff. Example: t: 1768348800 is Jan 14, 2026 00:00 UTC.</li>
           <li><strong>Schedule:</strong> Worker checks every 5 minutes. When schedule matches (right hour + day), cleanup runs once.</li>
-          <li><strong>Gap Fill:</strong> Only fills recent gaps (~8 hours max) that Massive.com can still provide.</li>
-          <li><strong>Deleted data:</strong> Old deleted data is gone forever. Charts simply show from where data exists.</li>
+          <li><strong>Gap Fill:</strong> Uses Massive.com Custom Bars API with exact from/to timestamps.</li>
+          <li><strong>History:</strong> Basic plan = 2 years, Starter/Business = All history.</li>
         </ul>
       </div>
     </div>

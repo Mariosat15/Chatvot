@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import Candle1m from '@/database/models/candle-1m.model';
-import { getRecentCandles, Timeframe } from '@/lib/services/forex-historical.service';
+import { fetchCandlesForRange, Timeframe } from '@/lib/services/forex-historical.service';
 import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
 import mongoose from 'mongoose';
 
@@ -98,37 +98,32 @@ export async function POST(request: NextRequest) {
         const timeDiff = candles[i].time - candles[i - 1].time;
         const missingMinutes = Math.floor(timeDiff / 60) - 1;
         
-        // Try to fill all gaps - Massive.com will return what it has available
+        // Try to fill all gaps - use exact timestamp range for precision
+        // Massive.com Custom Bars API supports:
+        // - Millisecond timestamp for from/to
+        // - 2 years history (Basic) or All history (Starter/Business)
+        // - Up to 50,000 results per query
         if (missingMinutes > 0) {
           try {
-            // Gap times (in seconds)
-            const gapStart = candles[i - 1].time + 60;
-            const gapEnd = candles[i].time - 60;
+            // Gap times (in seconds from MongoDB)
+            const gapStartSec = candles[i - 1].time + 60;
+            const gapEndSec = candles[i].time - 60;
             
-            // Calculate how many minutes from NOW back to the gap start
-            const nowSeconds = Math.floor(Date.now() / 1000);
-            const minutesFromNow = Math.ceil((nowSeconds - gapStart) / 60);
+            // Convert to milliseconds for Massive.com API
+            const gapStartMs = gapStartSec * 1000;
+            const gapEndMs = gapEndSec * 1000;
             
-            // Request enough candles to cover from now back to the gap
-            // Add extra buffer for safety
-            const barsToRequest = Math.min(500, minutesFromNow + 20);
+            console.log(`📊 Gap ${sym}: ${new Date(gapStartMs).toISOString()} - ${new Date(gapEndMs).toISOString()} (${missingMinutes} min)`);
             
-            console.log(`📊 Gap ${sym}: ${new Date(gapStart * 1000).toISOString()} - ${new Date(gapEnd * 1000).toISOString()} (${missingMinutes} min), requesting ${barsToRequest} bars`);
-            
-            // Fetch historical candles (returns milliseconds)
-            const historicalCandles = await getRecentCandles(
+            // Fetch EXACT range from Massive.com - no filtering needed!
+            const candlesToFill = await fetchCandlesForRange(
               sym as ForexSymbol,
               '1' as Timeframe,
-              barsToRequest
+              gapStartMs,
+              gapEndMs
             );
             
-            // Filter to only the gap period
-            const candlesToFill = historicalCandles.filter(c => {
-              const timeInSeconds = Math.floor(c.time / 1000);
-              return timeInSeconds >= gapStart && timeInSeconds <= gapEnd;
-            });
-            
-            console.log(`📊 Found ${candlesToFill.length} candles to fill gap (from ${historicalCandles.length} fetched)`);
+            console.log(`📊 Massive.com returned ${candlesToFill.length} candles for gap`);
             
             for (const candle of candlesToFill) {
               // Check if candle already exists

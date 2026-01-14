@@ -123,6 +123,82 @@ export async function fetchHistoricalCandles(
 }
 
 /**
+ * Fetch candles for an EXACT time range using millisecond timestamps
+ * This is designed for gap filling - fetches only the specific period needed
+ * 
+ * Based on Massive.com Custom Bars API:
+ * GET /v2/aggs/ticker/{forexTicker}/range/{multiplier}/{timespan}/{from}/{to}
+ * 
+ * According to docs:
+ * - from/to accept millisecond timestamps
+ * - Basic plan: 2 years history
+ * - Starter/Business: All history
+ * - Max 50,000 results per query
+ */
+export async function fetchCandlesForRange(
+  symbol: ForexSymbol,
+  timeframe: Timeframe,
+  fromTimestampMs: number,
+  toTimestampMs: number
+): Promise<OHLCCandle[]> {
+  if (!MASSIVE_API_KEY) {
+    console.error('❌ MASSIVE_API_KEY is not set');
+    return [];
+  }
+
+  const ticker = symbolToMassiveFormat(symbol);
+  const { multiplier, timespan } = TIMEFRAME_MAP[timeframe];
+  
+  // Use millisecond timestamps for precise range queries
+  const endpoint = `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${fromTimestampMs}/${toTimestampMs}`;
+  const url = `${MASSIVE_API_BASE_URL}${endpoint}?adjusted=true&sort=asc&limit=50000&apiKey=${MASSIVE_API_KEY}`;
+
+  console.log(`📊 [Gap Fill] Fetching ${symbol} candles from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store' // Don't cache gap fill requests
+    });
+
+    if (!response.ok) {
+      console.error(`❌ [Gap Fill] API error: ${response.status} ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    
+    if (!data.results || data.results.length === 0) {
+      console.log(`⚠️ [Gap Fill] No data available for ${symbol} in requested range`);
+      return [];
+    }
+
+    // Convert to our format - Massive returns time in milliseconds
+    const candles: OHLCCandle[] = data.results.map((bar: {
+      t: number;
+      o: number;
+      h: number;
+      l: number;
+      c: number;
+      v?: number;
+    }) => ({
+      time: bar.t, // Keep in milliseconds, caller will convert if needed
+      open: bar.o,
+      high: bar.h,
+      low: bar.l,
+      close: bar.c,
+      volume: bar.v || 0,
+    }));
+
+    console.log(`✅ [Gap Fill] Fetched ${candles.length} candles for ${symbol}`);
+    return candles;
+  } catch (err) {
+    console.error('❌ [Gap Fill] Error:', err instanceof Error ? err.message : 'Unknown error');
+    return [];
+  }
+}
+
+/**
  * Get recent candles for initial chart load
  * Fetches last N days/hours depending on timeframe
  */

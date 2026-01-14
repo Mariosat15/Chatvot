@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import Candle1m from '@/database/models/candle-1m.model';
-import { getRecentCandles, Timeframe } from '@/lib/services/forex-historical.service';
+import { getRecentCandles, fetchCandlesForRange, Timeframe } from '@/lib/services/forex-historical.service';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { getFormingCandle } from '@/lib/services/websocket-price-streamer';
 import mongoose from 'mongoose';
@@ -155,6 +155,8 @@ async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): P
     if (gaps.length === 0) return;
     
     // Fill gaps in background (fire and forget)
+    // Using Massive.com Custom Bars API with exact from/to timestamps
+    // Supports up to 2 years history (Basic) or all history (Starter/Business)
     gapFillInProgress.add(symbol);
     
     (async () => {
@@ -163,41 +165,38 @@ async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): P
         let filledCount = 0;
         
         for (const gap of gaps) {
-          // Calculate how many minutes from NOW back to the gap start
-          const nowSeconds = Math.floor(Date.now() / 1000);
-          const minutesFromNow = Math.ceil((nowSeconds - gap.startTime) / 60);
+          // Convert gap times to milliseconds for Massive.com API
+          const gapStartMs = gap.startTime * 1000;
+          const gapEndMs = gap.endTime * 1000;
           
-          // Request enough candles to cover from now back to the gap
-          const barsToRequest = Math.min(500, minutesFromNow + 20);
-          
-          const historicalCandles = await getRecentCandles(
+          // Fetch EXACT range - no filtering needed
+          const candlesToFill = await fetchCandlesForRange(
             symbol as ForexSymbol,
             '1' as Timeframe,
-            barsToRequest
+            gapStartMs,
+            gapEndMs
           );
           
-          for (const candle of historicalCandles) {
+          for (const candle of candlesToFill) {
             const timeInSeconds = Math.floor(candle.time / 1000);
             
-            if (timeInSeconds >= gap.startTime && timeInSeconds <= gap.endTime) {
-              // Check if exists
-              const existing = await mongoose.connection.db?.collection('candles_1m').findOne({
+            // Check if exists
+            const existing = await mongoose.connection.db?.collection('candles_1m').findOne({
+              symbol,
+              t: timeInSeconds,
+            });
+            
+            if (!existing) {
+              await Candle1m.upsertCandle(
                 symbol,
-                t: timeInSeconds,
-              });
-              
-              if (!existing) {
-                await Candle1m.upsertCandle(
-                  symbol,
-                  candle.time,
-                  candle.open,
-                  candle.high,
-                  candle.low,
-                  candle.close,
-                  candle.volume || 0
-                );
-                filledCount++;
-              }
+                candle.time, // milliseconds
+                candle.open,
+                candle.high,
+                candle.low,
+                candle.close,
+                candle.volume || 0
+              );
+              filledCount++;
             }
           }
         }
