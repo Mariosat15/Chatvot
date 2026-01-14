@@ -97,6 +97,7 @@ import PendingWithdrawalsSection from '@/components/admin/PendingWithdrawalsSect
 import KYCSettingsSection from '@/components/admin/KYCSettingsSection';
 import KYCHistorySection from '@/components/admin/KYCHistorySection';
 import MarketSettingsSection from '@/components/admin/MarketSettingsSection';
+import MarketDataSection from '@/components/admin/MarketDataSection';
 import DependencyUpdatesSection from '@/components/admin/DependencyUpdatesSection';
 import AdminOverviewDashboard from '@/components/admin/AdminOverviewDashboard';
 import AIAgentSection from '@/components/admin/AIAgentSection';
@@ -222,6 +223,13 @@ const menuGroups: MenuGroup[] = [
         icon: <TrendingUp className="h-5 w-5" />,
         color: 'text-violet-400',
         bgColor: 'bg-violet-500/10 hover:bg-violet-500/20',
+      },
+      {
+        id: 'market-data',
+        label: 'Market Data',
+        icon: <Database className="h-5 w-5" />,
+        color: 'text-emerald-400',
+        bgColor: 'bg-emerald-500/10 hover:bg-emerald-500/20',
       },
     ],
   },
@@ -736,6 +744,8 @@ export default function AdminDashboard({
         return <MarketSettingsSection key={currentRefreshKey} />;
       case 'symbols':
         return <SymbolsSection key={currentRefreshKey} />;
+      case 'market-data':
+        return <MarketDataSection key={currentRefreshKey} />;
       case 'payments':
         return <PendingPaymentsSection key={currentRefreshKey} />;
       case 'failed-deposits':

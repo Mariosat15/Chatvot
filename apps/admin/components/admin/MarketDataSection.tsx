@@ -1,0 +1,412 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+
+interface MarketDataSettings {
+  cleanup: {
+    enabled: boolean;
+    mode: 'auto' | 'manual';
+    daysToKeep: number;
+    lastRun: string | null;
+    autoRunTime: string;
+  };
+  gapFill: {
+    enabled: boolean;
+    mode: 'auto' | 'manual';
+    maxGapMinutes: number;
+    lastRun: string | null;
+  };
+}
+
+interface MarketDataStats {
+  totalCandles: number;
+  storage: {
+    mb: string;
+    gb: string;
+  };
+  dateRange: {
+    oldest: string | null;
+    newest: string | null;
+    daysOfData: number;
+  };
+  growth: {
+    candlesPerDay: number;
+    mbPerDay: string;
+    projectedMbPerMonth: string;
+    projectedGbPerYear: string;
+  };
+  symbolCounts: Array<{ symbol: string; count: number }>;
+  health: {
+    status: string;
+    message: string;
+  };
+}
+
+interface Gap {
+  symbol: string;
+  startTime: number;
+  endTime: number;
+  missingMinutes: number;
+}
+
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+
+export default function MarketDataSection() {
+  const [settings, setSettings] = useState<MarketDataSettings | null>(null);
+  const [stats, setStats] = useState<MarketDataStats | null>(null);
+  const [gaps, setGaps] = useState<Gap[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [cleanupRunning, setCleanupRunning] = useState(false);
+  const [gapFillRunning, setGapFillRunning] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Fetch settings and stats
+  const fetchData = useCallback(async () => {
+    try {
+      const [settingsRes, statsRes] = await Promise.all([
+        fetch(`${BASE_URL}/api/admin/market-data/settings`),
+        fetch(`${BASE_URL}/api/admin/market-data/stats`),
+      ]);
+
+      if (settingsRes.ok) {
+        const data = await settingsRes.json();
+        setSettings(data.settings);
+      }
+
+      if (statsRes.ok) {
+        const data = await statsRes.json();
+        setStats(data.stats);
+      }
+    } catch (error) {
+      console.error('Error fetching market data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch gaps
+  const fetchGaps = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/admin/market-data/gap-fill`);
+      if (res.ok) {
+        const data = await res.json();
+        setGaps(data.gaps || []);
+      }
+    } catch (error) {
+      console.error('Error fetching gaps:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    fetchGaps();
+  }, [fetchData]);
+
+  // Save settings
+  const saveSettings = async (newSettings: Partial<MarketDataSettings>) => {
+    setSaving(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/admin/market-data/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data.settings);
+        setMessage({ type: 'success', text: 'Settings saved successfully!' });
+      } else {
+        setMessage({ type: 'error', text: 'Failed to save settings' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error saving settings' });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMessage(null), 3000);
+    }
+  };
+
+  // Run cleanup
+  const runCleanup = async () => {
+    if (!settings) return;
+    
+    setCleanupRunning(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/admin/market-data/cleanup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ daysToKeep: settings.cleanup.daysToKeep }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMessage({ 
+          type: 'success', 
+          text: `Cleanup complete! Deleted ${data.cleanup.deletedCount} candles, freed ${data.cleanup.freedMB} MB` 
+        });
+        fetchData(); // Refresh stats
+      } else {
+        setMessage({ type: 'error', text: 'Cleanup failed' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error running cleanup' });
+    } finally {
+      setCleanupRunning(false);
+      setTimeout(() => setMessage(null), 5000);
+    }
+  };
+
+  // Run gap fill
+  const runGapFill = async () => {
+    setGapFillRunning(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/admin/market-data/gap-fill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maxGapMinutes: settings?.gapFill.maxGapMinutes || 60 }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMessage({ 
+          type: 'success', 
+          text: `Gap fill complete! Filled ${data.gapFill.totalCandlesFilled} candles across ${data.gapFill.totalGapsFilled} gaps` 
+        });
+        fetchGaps(); // Refresh gaps
+        fetchData(); // Refresh stats
+      } else {
+        setMessage({ type: 'error', text: 'Gap fill failed' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error running gap fill' });
+    } finally {
+      setGapFillRunning(false);
+      setTimeout(() => setMessage(null), 5000);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-white">Market Data Management</h2>
+        <button
+          onClick={() => { fetchData(); fetchGaps(); }}
+          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+        >
+          🔄 Refresh
+        </button>
+      </div>
+
+      {/* Message */}
+      {message && (
+        <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'}`}>
+          {message.text}
+        </div>
+      )}
+
+      {/* Stats Section */}
+      <div className="bg-gray-800 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">📊 Database Statistics</h3>
+        
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-700 rounded-lg p-4">
+              <div className="text-gray-400 text-sm">Total Candles</div>
+              <div className="text-2xl font-bold text-white">{stats.totalCandles.toLocaleString()}</div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-4">
+              <div className="text-gray-400 text-sm">Storage Size</div>
+              <div className="text-2xl font-bold text-white">{stats.storage.mb} MB</div>
+              <div className="text-gray-400 text-xs">{stats.storage.gb} GB</div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-4">
+              <div className="text-gray-400 text-sm">Days of Data</div>
+              <div className="text-2xl font-bold text-white">{stats.dateRange.daysOfData}</div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-4">
+              <div className="text-gray-400 text-sm">Growth Rate</div>
+              <div className="text-xl font-bold text-white">{stats.growth.mbPerDay} MB/day</div>
+              <div className="text-gray-400 text-xs">{stats.growth.projectedMbPerMonth} MB/month</div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-4 col-span-2">
+              <div className="text-gray-400 text-sm">Health Status</div>
+              <div className={`text-lg font-bold ${stats.health.status === 'healthy' ? 'text-green-400' : 'text-yellow-400'}`}>
+                {stats.health.message}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Cleanup Section */}
+      <div className="bg-gray-800 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">🧹 Candle Cleanup</h3>
+        
+        {settings && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={settings.cleanup.enabled}
+                  onChange={(e) => saveSettings({ cleanup: { ...settings.cleanup, enabled: e.target.checked } })}
+                  className="w-4 h-4 rounded"
+                />
+                <span className="text-white">Enable Cleanup</span>
+              </label>
+              
+              <select
+                value={settings.cleanup.mode}
+                onChange={(e) => saveSettings({ cleanup: { ...settings.cleanup, mode: e.target.value as 'auto' | 'manual' } })}
+                className="bg-gray-700 text-white rounded-lg px-3 py-2"
+                disabled={!settings.cleanup.enabled}
+              >
+                <option value="manual">Manual</option>
+                <option value="auto">Auto (Daily)</option>
+              </select>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <label className="text-white">Days to Keep:</label>
+              <input
+                type="number"
+                min="1"
+                max="365"
+                value={settings.cleanup.daysToKeep}
+                onChange={(e) => saveSettings({ cleanup: { ...settings.cleanup, daysToKeep: parseInt(e.target.value) || 30 } })}
+                className="bg-gray-700 text-white rounded-lg px-3 py-2 w-24"
+              />
+              <span className="text-gray-400">
+                (~{((settings.cleanup.daysToKeep * 9.5)).toFixed(0)} MB storage)
+              </span>
+            </div>
+            
+            {settings.cleanup.lastRun && (
+              <div className="text-gray-400 text-sm">
+                Last run: {new Date(settings.cleanup.lastRun).toLocaleString()}
+              </div>
+            )}
+            
+            <button
+              onClick={runCleanup}
+              disabled={cleanupRunning || saving}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
+            >
+              {cleanupRunning ? '⏳ Running...' : '🗑️ Run Cleanup Now'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Gap Fill Section */}
+      <div className="bg-gray-800 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">🔧 Gap Detection & Fill</h3>
+        
+        {settings && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={settings.gapFill.enabled}
+                  onChange={(e) => saveSettings({ gapFill: { ...settings.gapFill, enabled: e.target.checked } })}
+                  className="w-4 h-4 rounded"
+                />
+                <span className="text-white">Enable Gap Fill</span>
+              </label>
+              
+              <select
+                value={settings.gapFill.mode}
+                onChange={(e) => saveSettings({ gapFill: { ...settings.gapFill, mode: e.target.value as 'auto' | 'manual' } })}
+                className="bg-gray-700 text-white rounded-lg px-3 py-2"
+                disabled={!settings.gapFill.enabled}
+              >
+                <option value="manual">Manual</option>
+                <option value="auto">Auto (Background)</option>
+              </select>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <label className="text-white">Max Gap to Fill:</label>
+              <input
+                type="number"
+                min="1"
+                max="1440"
+                value={settings.gapFill.maxGapMinutes}
+                onChange={(e) => saveSettings({ gapFill: { ...settings.gapFill, maxGapMinutes: parseInt(e.target.value) || 60 } })}
+                className="bg-gray-700 text-white rounded-lg px-3 py-2 w-24"
+              />
+              <span className="text-gray-400">minutes</span>
+            </div>
+            
+            {settings.gapFill.lastRun && (
+              <div className="text-gray-400 text-sm">
+                Last run: {new Date(settings.gapFill.lastRun).toLocaleString()}
+              </div>
+            )}
+            
+            {/* Detected Gaps */}
+            <div className="bg-gray-700 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white font-medium">Detected Gaps: {gaps.length}</span>
+                <button
+                  onClick={fetchGaps}
+                  className="text-blue-400 hover:text-blue-300 text-sm"
+                >
+                  Refresh
+                </button>
+              </div>
+              
+              {gaps.length > 0 ? (
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {gaps.slice(0, 10).map((gap, i) => (
+                    <div key={i} className="text-sm text-gray-300">
+                      {gap.symbol}: {new Date(gap.startTime * 1000).toLocaleTimeString()} - {new Date(gap.endTime * 1000).toLocaleTimeString()} ({gap.missingMinutes} min)
+                    </div>
+                  ))}
+                  {gaps.length > 10 && (
+                    <div className="text-gray-400">...and {gaps.length - 10} more</div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-green-400">✅ No gaps detected</div>
+              )}
+            </div>
+            
+            <button
+              onClick={runGapFill}
+              disabled={gapFillRunning || saving || gaps.length === 0}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
+            >
+              {gapFillRunning ? '⏳ Filling Gaps...' : '🔧 Fill Gaps Now'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Info Section */}
+      <div className="bg-gray-800/50 rounded-lg p-4 text-gray-400 text-sm">
+        <p><strong>ℹ️ How it works:</strong></p>
+        <ul className="list-disc list-inside mt-2 space-y-1">
+          <li><strong>Cleanup:</strong> Deletes candles older than X days. Run manually or enable auto mode for daily cleanup.</li>
+          <li><strong>Gap Fill:</strong> Detects missing candles and fills them from Massive.com API. Safe - never overwrites existing data.</li>
+          <li><strong>Auto mode:</strong> Gap fill runs automatically in background when requests are made.</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
