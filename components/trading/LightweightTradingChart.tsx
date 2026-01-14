@@ -1916,10 +1916,36 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           title: `ASK ${currentPrice.ask.toFixed(5)}`,
         });
       }
+      
+      // Update current candle's CLOSE price in real-time for smooth chart movement
+      // O/H/L comes from server (CA.*), only close updates locally
+      if (currentCandleRef.current && candlestickSeriesRef.current) {
+        const mid = currentPrice.mid;
+        const lastCandle = currentCandleRef.current;
+        
+        if (chartType === 'line') {
+          // For line chart, just update the value
+          (candlestickSeriesRef.current as any).update({
+            time: lastCandle.time,
+            value: mid,
+          });
+        } else {
+          // For candlestick charts, update close price (and extend H/L if needed)
+          const updatedCandle: CandlestickData<UTCTimestamp> = {
+            time: lastCandle.time,
+            open: lastCandle.open,
+            high: Math.max(lastCandle.high, mid), // Extend high if price goes higher
+            low: Math.min(lastCandle.low, mid),   // Extend low if price goes lower
+            close: mid, // Always update close to current price
+          };
+          candlestickSeriesRef.current.update(updatedCandle);
+          currentCandleRef.current = updatedCandle;
+        }
+      }
     } catch {
       // Chart may be disposed, ignore
     }
-  }, [prices, symbol]);
+  }, [prices, symbol, chartType]);
 
   // Poll server for candle updates - SERVER IS SOURCE OF TRUTH
   // NO local candle building - just display what server gives us
