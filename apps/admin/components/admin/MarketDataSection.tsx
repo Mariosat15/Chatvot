@@ -568,7 +568,7 @@ export default function MarketDataSection() {
             {/* Detected Gaps */}
             <div className="bg-gray-700 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-white font-medium">Detected Gaps (recent, fillable): {gaps.length}</span>
+                <span className="text-white font-medium">Detected Gaps: {gaps.length}</span>
                 <button
                   onClick={fetchGaps}
                   className="text-blue-400 hover:text-blue-300 text-sm"
@@ -578,18 +578,33 @@ export default function MarketDataSection() {
               </div>
               
               {gaps.length > 0 ? (
-                <div className="max-h-40 overflow-y-auto space-y-1">
-                  {gaps.slice(0, 10).map((gap, i) => (
-                    <div key={i} className="text-sm text-gray-300">
-                      {gap.symbol}: {new Date(gap.startTime * 1000).toLocaleTimeString()} - {new Date(gap.endTime * 1000).toLocaleTimeString()} ({gap.missingMinutes} min)
-                    </div>
-                  ))}
-                  {gaps.length > 10 && (
-                    <div className="text-gray-400">...and {gaps.length - 10} more</div>
+                <div className="max-h-48 overflow-y-auto space-y-1">
+                  {gaps.slice(0, 15).map((gap, i) => {
+                    const startDate = new Date(gap.startTime * 1000);
+                    const endDate = new Date(gap.endTime * 1000);
+                    const isLargeGap = gap.missingMinutes > 60; // More than 1 hour
+                    const formatDate = (d: Date) => isLargeGap 
+                      ? d.toLocaleDateString() + ' ' + d.toLocaleTimeString()
+                      : d.toLocaleTimeString();
+                    
+                    return (
+                      <div key={i} className={`text-sm ${isLargeGap ? 'text-yellow-400 font-medium' : 'text-gray-300'}`}>
+                        {gap.symbol}: {formatDate(startDate)} → {formatDate(endDate)} 
+                        ({gap.missingMinutes >= 1440 
+                          ? `${Math.round(gap.missingMinutes / 1440)} days` 
+                          : gap.missingMinutes >= 60 
+                            ? `${Math.round(gap.missingMinutes / 60)} hours`
+                            : `${gap.missingMinutes} min`})
+                        {isLargeGap && ' ⚠️'}
+                      </div>
+                    );
+                  })}
+                  {gaps.length > 15 && (
+                    <div className="text-gray-400">...and {gaps.length - 15} more</div>
                   )}
                 </div>
               ) : (
-                <div className="text-green-400">✅ No recent fillable gaps detected</div>
+                <div className="text-green-400">✅ No gaps detected (excluding weekends)</div>
               )}
             </div>
             
@@ -631,6 +646,16 @@ export default function MarketDataSection() {
               onChange={(e) => setSeedToDate(e.target.value)}
               className="bg-gray-700 text-white rounded-lg px-3 py-2"
             />
+            <button
+              onClick={() => setSeedToDate(new Date().toISOString().split('T')[0])}
+              className="text-blue-400 hover:text-blue-300 text-sm underline"
+            >
+              Set to Today
+            </button>
+          </div>
+          
+          <div className="text-yellow-400 text-sm bg-yellow-900/30 rounded-lg p-3">
+            ⚠️ <strong>Tip:</strong> Set &quot;To&quot; to <strong>today&apos;s date</strong> to avoid gaps between seeded and live data!
           </div>
           
           {/* Symbol Selection */}
