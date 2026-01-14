@@ -4,9 +4,15 @@ import Candle1m from '@/database/models/candle-1m.model';
 import { getRecentCandles, Timeframe } from '@/lib/services/forex-historical.service';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { getFormingCandle } from '@/lib/services/websocket-price-streamer';
+import mongoose from 'mongoose';
 
 // Track which symbols are currently being seeded (prevent duplicate seeding)
 const seedingInProgress = new Set<string>();
+
+// Track gap fill operations (prevent duplicates, run occasionally)
+const gapFillInProgress = new Set<string>();
+const lastGapFillCheck = new Map<string, number>();
+const GAP_FILL_CHECK_INTERVAL = 60000; // Check for gaps every 60 seconds per symbol
 
 /**
  * Get Candles API - SERVER SOURCE OF TRUTH
@@ -109,6 +115,98 @@ async function seedHistoricalCandles(symbol: string, limit: number): Promise<voi
 }
 
 /**
+ * Auto-fill gaps in candle data (runs in background)
+ * Only runs if gap fill is enabled in settings
+ */
+async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): Promise<void> {
+  // Check if we should run gap fill
+  const now = Date.now();
+  const lastCheck = lastGapFillCheck.get(symbol) || 0;
+  
+  if (now - lastCheck < GAP_FILL_CHECK_INTERVAL) return;
+  if (gapFillInProgress.has(symbol)) return;
+  
+  lastGapFillCheck.set(symbol, now);
+  
+  // Check if auto gap fill is enabled
+  try {
+    const MarketDataSettings = mongoose.models.MarketDataSettings;
+    if (!MarketDataSettings) return;
+    
+    const settings = await MarketDataSettings.findOne({ key: 'market_data_settings' });
+    if (!settings?.gapFill?.enabled || settings?.gapFill?.mode !== 'auto') return;
+    
+    const maxGapMinutes = settings.gapFill.maxGapMinutes || 60;
+    
+    // Detect gaps
+    const gaps: Array<{ startTime: number; endTime: number; missing: number }> = [];
+    for (let i = 1; i < candles.length; i++) {
+      const timeDiff = candles[i].time - candles[i - 1].time;
+      const missingMinutes = Math.floor(timeDiff / 60) - 1;
+      
+      if (missingMinutes > 0 && missingMinutes <= maxGapMinutes) {
+        gaps.push({
+          startTime: candles[i - 1].time + 60,
+          endTime: candles[i].time - 60,
+          missing: missingMinutes,
+        });
+      }
+    }
+    
+    if (gaps.length === 0) return;
+    
+    // Fill gaps in background (fire and forget)
+    gapFillInProgress.add(symbol);
+    
+    (async () => {
+      try {
+        console.log(`🔧 [Auto Gap Fill] Filling ${gaps.length} gaps for ${symbol}...`);
+        
+        for (const gap of gaps) {
+          const historicalCandles = await getRecentCandles(
+            symbol as ForexSymbol,
+            '1' as Timeframe,
+            gap.missing + 10
+          );
+          
+          for (const candle of historicalCandles) {
+            const timeInSeconds = Math.floor(candle.time / 1000);
+            
+            if (timeInSeconds >= gap.startTime && timeInSeconds <= gap.endTime) {
+              // Check if exists
+              const existing = await mongoose.connection.db?.collection('candles_1m').findOne({
+                symbol,
+                t: timeInSeconds,
+              });
+              
+              if (!existing) {
+                await Candle1m.upsertCandle(
+                  symbol,
+                  candle.time,
+                  candle.open,
+                  candle.high,
+                  candle.low,
+                  candle.close,
+                  candle.volume || 0
+                );
+              }
+            }
+          }
+        }
+        
+        console.log(`✅ [Auto Gap Fill] Completed for ${symbol}`);
+      } catch (error) {
+        console.error(`❌ [Auto Gap Fill] Failed for ${symbol}:`, error);
+      } finally {
+        gapFillInProgress.delete(symbol);
+      }
+    })();
+  } catch {
+    // Settings not available, skip gap fill
+  }
+}
+
+/**
  * Shared handler for both GET and POST
  */
 async function handleCandleRequest(symbol: string, timeframe: string, count: number) {
@@ -122,6 +220,9 @@ async function handleCandleRequest(symbol: string, timeframe: string, count: num
       
       // If MongoDB has enough candles, add forming candle and return
       if (candles && candles.length >= 50) {
+        // Auto-fill gaps in background (if enabled)
+        autoFillGaps(symbol, candles);
+        
         // Get current forming candle from WebSocket streamer (SERVER AUTHORITATIVE!)
         const formingCandle = getFormingCandle(symbol);
         
