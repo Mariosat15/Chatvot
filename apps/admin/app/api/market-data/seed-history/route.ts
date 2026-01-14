@@ -161,11 +161,28 @@ export async function POST(request: NextRequest) {
           totalFetched += candles.length;
 
           if (candles.length > 0) {
+            // Debug: Log first candle time
+            const firstCandle = candles[0];
+            const firstTimeSeconds = Math.floor(firstCandle.t / 1000);
+            console.log(`📊 [Seed Debug] First candle: t=${firstCandle.t}ms = ${firstTimeSeconds}s = ${new Date(firstCandle.t).toISOString()}`);
+            
+            // Check if this candle already exists
+            const existingCheck = await mongoose.connection.db?.collection('candles_1m').findOne({
+              symbol,
+              t: firstTimeSeconds,
+            });
+            console.log(`📊 [Seed Debug] Existing check for ${symbol} t=${firstTimeSeconds}: ${existingCheck ? 'FOUND' : 'NOT FOUND'}`);
+            
+            if (existingCheck) {
+              console.log(`📊 [Seed Debug] Existing candle: ${JSON.stringify(existingCheck)}`);
+            }
+            
             // Bulk upsert to MongoDB
             const bulkOps = candles.map((c) => ({
               updateOne: {
                 filter: { symbol, t: Math.floor(c.t / 1000) },
                 update: {
+                  $setOnInsert: { symbol },
                   $set: {
                     o: c.o,
                     h: c.h,
@@ -179,8 +196,13 @@ export async function POST(request: NextRequest) {
             }));
 
             const result = await Candle1m.bulkWrite(bulkOps, { ordered: false });
+            
+            // Debug: Log the actual result object
+            console.log(`📊 [Seed Debug] BulkWrite result: upserted=${result.upsertedCount}, matched=${result.matchedCount}, modified=${result.modifiedCount}`);
+            
             totalInserted += result.upsertedCount || 0;
-            totalSkipped += (result.modifiedCount || 0) + (result.matchedCount || 0) - (result.modifiedCount || 0);
+            // Only count as skipped if it was matched (already existed)
+            totalSkipped += result.matchedCount || 0;
           }
 
           chunkStart = chunkEnd;
