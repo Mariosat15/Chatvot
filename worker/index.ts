@@ -44,6 +44,7 @@ import { runPriceCacheUpdate } from './jobs/price-cache.job';
 import { runBadgeEvaluation } from './jobs/evaluate-badges.job';
 import { defineWithdrawalProcessJob, scheduleWithdrawalJobs } from './jobs/withdrawal-process.job';
 import { runKYCExpiryCheck } from './jobs/kyc-expiry-check.job';
+import { runMarketDataMaintenance } from './jobs/market-data-maintenance.job';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -261,6 +262,19 @@ agenda.define('kyc-expiry-check', async () => {
   }
 });
 
+/**
+ * Market Data Maintenance Job
+ * Runs every 5 minutes to check if cleanup should run (auto mode)
+ * Gap fill runs in background via API, not here
+ */
+agenda.define('market-data-maintenance', async () => {
+  try {
+    await runMarketDataMaintenance();
+  } catch (error) {
+    console.error(`📊 [MARKET DATA MAINTENANCE] Failed:`, error);
+  }
+});
+
 // Define withdrawal processing jobs
 defineWithdrawalProcessJob(agenda);
 
@@ -317,6 +331,7 @@ async function startWorker(): Promise<void> {
     await agenda.every('1 minute', 'price-cache');
     await agenda.every('1 hour', 'evaluate-badges');
     await agenda.every('1 day', 'kyc-expiry-check');  // Daily KYC expiry check
+    await agenda.every('5 minutes', 'market-data-maintenance');  // Market data cleanup check
     
     // Schedule withdrawal processing jobs
     await scheduleWithdrawalJobs(agenda);
@@ -329,6 +344,7 @@ async function startWorker(): Promise<void> {
     console.log('   • price-cache: every 1 minute');
     console.log('   • evaluate-badges: every 1 hour');
     console.log('   • kyc-expiry-check: every 1 day (expiry reminders & auto-reset)');
+    console.log('   • market-data-maintenance: every 5 minutes (auto cleanup check)');
     console.log('   • check-pending-withdrawals: every 1 hour (status summary)');
     console.log('   • check-stuck-withdrawals: every 6 hours');
     console.log('   • check-old-pending-withdrawals: every 12 hours');
