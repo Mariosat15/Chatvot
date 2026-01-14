@@ -81,9 +81,11 @@ export async function checkTPSLForSymbol(
     // Check Stop Loss
     if (position.stopLoss !== null) {
       if (position.side === 'long' && marketPrice <= position.stopLoss) {
+        console.log(`🔴 [SL TRIGGER] ${position.symbol} LONG: bid=${bid.toFixed(5)} <= SL=${position.stopLoss.toFixed(5)} (ask=${ask.toFixed(5)}, spread=${((ask-bid)*10000).toFixed(1)} pips)`);
         triggeredPositions.push({ position, price: marketPrice, reason: 'stop_loss' });
         continue;
       } else if (position.side === 'short' && marketPrice >= position.stopLoss) {
+        console.log(`🔴 [SL TRIGGER] ${position.symbol} SHORT: ask=${ask.toFixed(5)} >= SL=${position.stopLoss.toFixed(5)} (bid=${bid.toFixed(5)}, spread=${((ask-bid)*10000).toFixed(1)} pips)`);
         triggeredPositions.push({ position, price: marketPrice, reason: 'stop_loss' });
         continue;
       }
@@ -92,9 +94,11 @@ export async function checkTPSLForSymbol(
     // Check Take Profit
     if (position.takeProfit !== null) {
       if (position.side === 'long' && marketPrice >= position.takeProfit) {
+        console.log(`🟢 [TP TRIGGER] ${position.symbol} LONG: bid=${bid.toFixed(5)} >= TP=${position.takeProfit.toFixed(5)}`);
         triggeredPositions.push({ position, price: marketPrice, reason: 'take_profit' });
         continue;
       } else if (position.side === 'short' && marketPrice <= position.takeProfit) {
+        console.log(`🟢 [TP TRIGGER] ${position.symbol} SHORT: ask=${ask.toFixed(5)} <= TP=${position.takeProfit.toFixed(5)}`);
         triggeredPositions.push({ position, price: marketPrice, reason: 'take_profit' });
         continue;
       }
