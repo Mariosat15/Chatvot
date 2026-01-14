@@ -33,6 +33,17 @@ export interface StreamingPriceQuote {
 // We use a STRICT singleton pattern with connection state tracking
 // The priceCache/dynamicSpreadCache are per-context but that's OK - they get populated from WebSocket
 
+// Structure for forming candles (current minute being built)
+export interface FormingCandle {
+  symbol: string;
+  time: number;    // Unix timestamp in SECONDS (start of minute)
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  tickCount: number;
+}
+
 interface WebSocketGlobalState {
   ws: import('ws').WebSocket | null;
   isConnecting: boolean;
@@ -43,6 +54,7 @@ interface WebSocketGlobalState {
   heartbeatTimer: NodeJS.Timeout | null;
   priceCache: Map<ForexSymbol, StreamingPriceQuote>;
   dynamicSpreadCache: Map<ForexSymbol, number>;
+  formingCandles: Map<string, FormingCandle>; // Current minute candles being built
   lastUpdateTime: number;
   initialized: boolean;
   connectionId: string;
@@ -72,6 +84,7 @@ function getGlobalState(): WebSocketGlobalState {
       heartbeatTimer: null,
       priceCache: new Map<ForexSymbol, StreamingPriceQuote>(),
       dynamicSpreadCache: new Map<ForexSymbol, number>(),
+      formingCandles: new Map<string, FormingCandle>(),
       lastUpdateTime: 0,
       initialized: false,
       connectionId: Math.random().toString(36).substring(7),
@@ -556,6 +569,43 @@ function handleQuoteMessage(msg: {
   
   // 📦 Queue price for MongoDB cache (Worker reads from here)
   queuePriceForMongoCache(symbol, roundedBid, roundedAsk, quote.timestamp);
+  
+  // 🕯️ UPDATE FORMING CANDLE (current minute) - Server is authoritative source
+  updateFormingCandle(symbol, safeMid);
+}
+
+/**
+ * Update the forming candle for a symbol
+ * This builds the current minute candle from real-time quotes
+ * All browsers get this data = identical charts!
+ */
+function updateFormingCandle(symbol: ForexSymbol, price: number): void {
+  const state = getState();
+  const now = Date.now();
+  
+  // Get current minute timestamp (floored to minute boundary) in SECONDS
+  const minuteTime = Math.floor(now / 60000) * 60;
+  
+  const existing = state.formingCandles.get(symbol);
+  
+  if (!existing || existing.time !== minuteTime) {
+    // New minute started - create new forming candle
+    state.formingCandles.set(symbol, {
+      symbol,
+      time: minuteTime,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+      tickCount: 1,
+    });
+  } else {
+    // Same minute - update OHLC
+    existing.high = Math.max(existing.high, price);
+    existing.low = Math.min(existing.low, price);
+    existing.close = price;
+    existing.tickCount++;
+  }
 }
 
 /**
@@ -906,6 +956,23 @@ export function resetWebSocket(): void {
   closeWebSocket();
   getState().reconnectAttempts = 0;
   initializeWebSocket();
+}
+
+/**
+ * Get the forming candle for a symbol (current minute being built)
+ * This is the SERVER's authoritative forming candle - all browsers should use this!
+ */
+export function getFormingCandle(symbol: string): FormingCandle | null {
+  const state = getState();
+  return state.formingCandles.get(symbol) || null;
+}
+
+/**
+ * Get all forming candles (current minute candles being built)
+ */
+export function getAllFormingCandles(): Map<string, FormingCandle> {
+  const state = getState();
+  return new Map(state.formingCandles);
 }
 
 // ============================================

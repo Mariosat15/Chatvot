@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import Candle1m from '@/database/models/candle-1m.model';
 import { getRecentCandles, Timeframe } from '@/lib/services/forex-historical.service';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
+import { getFormingCandle } from '@/lib/services/websocket-price-streamer';
 
 // Track which symbols are currently being seeded (prevent duplicate seeding)
 const seedingInProgress = new Set<string>();
@@ -119,11 +120,49 @@ async function handleCandleRequest(symbol: string, timeframe: string, count: num
       await connectToDatabase();
       let candles = await Candle1m.getCandles(symbol, limit);
       
-      // If MongoDB has enough candles, return them
+      // If MongoDB has enough candles, add forming candle and return
       if (candles && candles.length >= 50) {
-        console.log(`🕯️ [Candles API] Returning ${candles.length} candles from MongoDB for ${symbol}`);
+        // Get current forming candle from WebSocket streamer (SERVER AUTHORITATIVE!)
+        const formingCandle = getFormingCandle(symbol);
+        
+        // Create response candles, potentially adding/updating forming candle
+        const responseCandles = [...candles];
+        
+        if (formingCandle) {
+          const lastCandle = responseCandles[responseCandles.length - 1];
+          
+          if (lastCandle && lastCandle.time === formingCandle.time) {
+            // Same minute - UPDATE with server's authoritative values
+            responseCandles[responseCandles.length - 1] = {
+              time: formingCandle.time,
+              open: formingCandle.open,
+              high: formingCandle.high,
+              low: formingCandle.low,
+              close: formingCandle.close,
+            };
+          } else if (!lastCandle || formingCandle.time > lastCandle.time) {
+            // New minute - APPEND forming candle
+            responseCandles.push({
+              time: formingCandle.time,
+              open: formingCandle.open,
+              high: formingCandle.high,
+              low: formingCandle.low,
+              close: formingCandle.close,
+            });
+          }
+        }
+        
+        console.log(`🕯️ [Candles API] Returning ${responseCandles.length} candles (incl. forming) for ${symbol}`);
         return NextResponse.json({ 
-          candles,
+          candles: responseCandles,
+          formingCandle: formingCandle ? {
+            time: formingCandle.time,
+            open: formingCandle.open,
+            high: formingCandle.high,
+            low: formingCandle.low,
+            close: formingCandle.close,
+            tickCount: formingCandle.tickCount,
+          } : null,
           source: 'mongodb',
           lastUpdate: Date.now(),
         });
@@ -139,9 +178,42 @@ async function handleCandleRequest(symbol: string, timeframe: string, count: num
       candles = await Candle1m.getCandles(symbol, limit);
       
       if (candles && candles.length > 0) {
-        console.log(`✅ [Candles API] After seeding: Returning ${candles.length} candles from MongoDB for ${symbol}`);
+        // Also add forming candle after seeding
+        const formingCandle = getFormingCandle(symbol);
+        const responseCandles = [...candles];
+        
+        if (formingCandle) {
+          const lastCandle = responseCandles[responseCandles.length - 1];
+          if (lastCandle && lastCandle.time === formingCandle.time) {
+            responseCandles[responseCandles.length - 1] = {
+              time: formingCandle.time,
+              open: formingCandle.open,
+              high: formingCandle.high,
+              low: formingCandle.low,
+              close: formingCandle.close,
+            };
+          } else if (!lastCandle || formingCandle.time > lastCandle.time) {
+            responseCandles.push({
+              time: formingCandle.time,
+              open: formingCandle.open,
+              high: formingCandle.high,
+              low: formingCandle.low,
+              close: formingCandle.close,
+            });
+          }
+        }
+        
+        console.log(`✅ [Candles API] After seeding: Returning ${responseCandles.length} candles for ${symbol}`);
         return NextResponse.json({ 
-          candles,
+          candles: responseCandles,
+          formingCandle: formingCandle ? {
+            time: formingCandle.time,
+            open: formingCandle.open,
+            high: formingCandle.high,
+            low: formingCandle.low,
+            close: formingCandle.close,
+            tickCount: formingCandle.tickCount,
+          } : null,
           source: 'mongodb_seeded',
           lastUpdate: Date.now(),
         });
