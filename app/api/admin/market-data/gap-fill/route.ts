@@ -36,15 +36,13 @@ export async function GET(request: NextRequest) {
         if (timeDiff > 60) {
           const missingMinutes = Math.floor(timeDiff / 60) - 1;
           
-          // Only report gaps up to 1 hour (60 minutes)
-          if (missingMinutes <= 60) {
-            allGaps.push({
-              symbol: sym,
-              startTime: candles[i - 1].time,
-              endTime: candles[i].time,
-              missingMinutes,
-            });
-          }
+          // Report ALL gaps - no limit
+          allGaps.push({
+            symbol: sym,
+            startTime: candles[i - 1].time,
+            endTime: candles[i].time,
+            missingMinutes,
+          });
         }
       }
     }
@@ -64,7 +62,8 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST - Fill gaps in candle data from Massive.com API
- * Note: Only fills gaps that Massive.com can provide data for (recent data only)
+ * Note: Can only fill gaps where Massive.com still has data available
+ * Older gaps will be detected but cannot be filled
  */
 export async function POST(request: NextRequest) {
   try {
@@ -72,9 +71,6 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json();
     const { symbol } = body;
-    
-    // Massive.com typically provides ~500 candles of history, so ~8 hours max
-    const maxGapMinutes = 480; // 8 hours - realistic limit for what Massive.com can fill
     
     const symbols = symbol ? [symbol] : FOREX_PAIRS.slice(0, 10);
     

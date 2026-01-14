@@ -60,15 +60,14 @@ export async function GET(request: NextRequest) {
         if (timeDiff > 60) {
           const missingMinutes = Math.floor(timeDiff / 60) - 1;
           
-          // Only report recent fillable gaps (up to 8 hours)
-          if (missingMinutes <= 480) {
-            allGaps.push({
-              symbol: sym,
-              startTime: candles[i - 1].t,
-              endTime: candles[i].t,
-              missingMinutes,
-            });
-          }
+          // Report ALL gaps - no limit
+          // Note: Gap FILL can only restore what Massive.com still has (recent data)
+          allGaps.push({
+            symbol: sym,
+            startTime: candles[i - 1].t,
+            endTime: candles[i].t,
+            missingMinutes,
+          });
         }
       }
     }
