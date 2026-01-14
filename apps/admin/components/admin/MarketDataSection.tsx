@@ -55,8 +55,6 @@ interface Gap {
   missingMinutes: number;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-
 export default function MarketDataSection() {
   const [settings, setSettings] = useState<MarketDataSettings | null>(null);
   const [stats, setStats] = useState<MarketDataStats | null>(null);
@@ -71,8 +69,8 @@ export default function MarketDataSection() {
   const fetchData = useCallback(async () => {
     try {
       const [settingsRes, statsRes] = await Promise.all([
-        fetch(`${BASE_URL}/api/admin/market-data/settings`),
-        fetch(`${BASE_URL}/api/admin/market-data/stats`),
+        fetch('/api/market-data/settings'),
+        fetch('/api/market-data/stats'),
       ]);
 
       if (settingsRes.ok) {
@@ -94,7 +92,7 @@ export default function MarketDataSection() {
   // Fetch gaps
   const fetchGaps = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/admin/market-data/gap-fill`);
+      const res = await fetch('/api/market-data/gap-fill');
       if (res.ok) {
         const data = await res.json();
         setGaps(data.gaps || []);
@@ -113,7 +111,7 @@ export default function MarketDataSection() {
   const saveSettings = async (newSettings: Partial<MarketDataSettings>) => {
     setSaving(true);
     try {
-      const res = await fetch(`${BASE_URL}/api/admin/market-data/settings`, {
+      const res = await fetch('/api/market-data/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings),
@@ -140,7 +138,7 @@ export default function MarketDataSection() {
     
     setCleanupRunning(true);
     try {
-      const res = await fetch(`${BASE_URL}/api/admin/market-data/cleanup`, {
+      const res = await fetch('/api/market-data/cleanup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ daysToKeep: settings.cleanup.daysToKeep }),
@@ -168,7 +166,7 @@ export default function MarketDataSection() {
   const runGapFill = async () => {
     setGapFillRunning(true);
     try {
-      const res = await fetch(`${BASE_URL}/api/admin/market-data/gap-fill`, {
+      const res = await fetch('/api/market-data/gap-fill', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
