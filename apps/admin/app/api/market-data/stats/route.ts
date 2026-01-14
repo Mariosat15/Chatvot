@@ -31,12 +31,16 @@ export async function GET() {
       });
     }
     
-    // Get collection stats
-    let stats;
+    // Get total count using countDocuments (more reliable than stats)
+    const totalCandles = await db.collection('candles_1m').countDocuments();
+    
+    // Get collection stats for size info
+    let collStats = { size: 0, avgObjSize: 200, nindexes: 0, totalIndexSize: 0 };
     try {
-      stats = await db.collection('candles_1m').stats();
+      collStats = await db.collection('candles_1m').stats();
     } catch {
-      stats = { count: 0, size: 0, avgObjSize: 0, nindexes: 0, totalIndexSize: 0 };
+      // If stats fails, estimate size based on count
+      collStats.size = totalCandles * 200; // ~200 bytes per doc estimate
     }
     
     // Get date range
@@ -52,26 +56,27 @@ export async function GET() {
     
     // Calculate days of data
     const daysOfData = oldestCandle && newestCandle 
-      ? Math.round((newestCandle.t - oldestCandle.t) / 86400)
+      ? Math.max(1, Math.round((newestCandle.t - oldestCandle.t) / 86400))
       : 0;
     
     // Calculate growth rate
-    const candlesPerDay = daysOfData > 0 ? Math.round(stats.count / daysOfData) : 0;
-    const mbPerDay = daysOfData > 0 ? (stats.size / daysOfData / 1024 / 1024).toFixed(2) : '0';
+    const candlesPerDay = daysOfData > 0 ? Math.round(totalCandles / daysOfData) : 0;
+    const storageSize = collStats.size || (totalCandles * 200);
+    const mbPerDay = daysOfData > 0 ? (storageSize / daysOfData / 1024 / 1024).toFixed(2) : '0';
     
     return NextResponse.json({
       success: true,
       stats: {
-        totalCandles: stats.count,
+        totalCandles,
         storage: {
-          bytes: stats.size,
-          mb: (stats.size / 1024 / 1024).toFixed(2),
-          gb: (stats.size / 1024 / 1024 / 1024).toFixed(3),
-          avgDocBytes: Math.round(stats.avgObjSize || 0),
+          bytes: storageSize,
+          mb: (storageSize / 1024 / 1024).toFixed(2),
+          gb: (storageSize / 1024 / 1024 / 1024).toFixed(3),
+          avgDocBytes: Math.round(collStats.avgObjSize || 200),
         },
         indexes: {
-          count: stats.nindexes,
-          sizeMB: ((stats.totalIndexSize || 0) / 1024 / 1024).toFixed(2),
+          count: collStats.nindexes || 0,
+          sizeMB: ((collStats.totalIndexSize || 0) / 1024 / 1024).toFixed(2),
         },
         dateRange: {
           oldest: oldestCandle ? new Date(oldestCandle.t * 1000).toISOString() : null,
@@ -89,8 +94,8 @@ export async function GET() {
           count: s.count,
         })),
         health: {
-          status: stats.count > 500000 ? 'warning' : 'healthy',
-          message: stats.count > 500000 
+          status: totalCandles > 500000 ? 'warning' : 'healthy',
+          message: totalCandles > 500000 
             ? '⚠️ Consider running cleanup to reduce database size'
             : '✅ Database size is healthy',
         },

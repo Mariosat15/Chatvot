@@ -5,6 +5,9 @@ import { getRecentCandles, Timeframe } from '@/lib/services/forex-historical.ser
 import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
 import mongoose from 'mongoose';
 
+// Get array of forex symbols from FOREX_PAIRS object
+const FOREX_SYMBOLS = Object.keys(FOREX_PAIRS) as ForexSymbol[];
+
 interface Gap {
   symbol: string;
   startTime: number;
@@ -20,7 +23,7 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
     
     const symbol = request.nextUrl.searchParams.get('symbol');
-    const symbols = symbol ? [symbol] : FOREX_PAIRS.slice(0, 10); // Check top 10 pairs
+    const symbols = symbol ? [symbol] : FOREX_SYMBOLS.slice(0, 10); // Check top 10 pairs
     
     const allGaps: Gap[] = [];
     
@@ -72,7 +75,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { symbol } = body;
     
-    const symbols = symbol ? [symbol] : FOREX_PAIRS.slice(0, 10);
+    const symbols = symbol ? [symbol] : FOREX_SYMBOLS.slice(0, 10);
     
     let totalGapsFilled = 0;
     let totalCandlesFilled = 0;
