@@ -45,10 +45,25 @@ export async function POST(request: NextRequest) {
     const cutoffTime = Math.floor(Date.now() / 1000) - (daysToKeep * 24 * 60 * 60);
     const cutoffDate = new Date(cutoffTime * 1000);
     
+    // Debug: Log what we're about to delete
+    console.log(`🧹 [Cleanup] Database: ${db.databaseName}`);
+    console.log(`🧹 [Cleanup] Candles before: ${countBefore}`);
+    console.log(`🧹 [Cleanup] Days to keep: ${daysToKeep}`);
+    console.log(`🧹 [Cleanup] Cutoff time: ${cutoffTime} (${cutoffDate.toISOString()})`);
+    
+    // Check a sample candle to see its timestamp format
+    const sampleCandle = await db.collection('candles_1m').findOne({});
+    if (sampleCandle) {
+      console.log(`🧹 [Cleanup] Sample candle: t=${sampleCandle.t}, date=${new Date(sampleCandle.t * 1000).toISOString()}`);
+      console.log(`🧹 [Cleanup] Will delete: t < ${cutoffTime} (${sampleCandle.t < cutoffTime ? 'YES this sample would be deleted' : 'NO this sample would be kept'})`);
+    }
+    
     // Delete old candles
     const result = await db.collection('candles_1m').deleteMany({
       t: { $lt: cutoffTime }
     });
+    
+    console.log(`🧹 [Cleanup] Delete result: ${JSON.stringify(result)}`);
     
     // Get count after cleanup
     const countAfter = await db.collection('candles_1m').countDocuments();
