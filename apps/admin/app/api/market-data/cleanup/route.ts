@@ -37,10 +37,8 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    // Get stats before cleanup
-    const statsBefore = await db.collection('candles_1m').stats();
-    const countBefore = statsBefore.count;
-    const sizeBefore = statsBefore.size;
+    // Get count before cleanup (use countDocuments instead of deprecated stats)
+    const countBefore = await db.collection('candles_1m').countDocuments();
     
     // Calculate cutoff timestamp (in seconds)
     const cutoffTime = Math.floor(Date.now() / 1000) - (daysToKeep * 24 * 60 * 60);
@@ -51,10 +49,8 @@ export async function POST(request: NextRequest) {
       t: { $lt: cutoffTime }
     });
     
-    // Get stats after cleanup
-    const statsAfter = await db.collection('candles_1m').stats();
-    const countAfter = statsAfter.count;
-    const sizeAfter = statsAfter.size;
+    // Get count after cleanup
+    const countAfter = await db.collection('candles_1m').countDocuments();
     
     // Update last run time in settings
     const MarketDataSettings = mongoose.models.MarketDataSettings;
@@ -65,10 +61,14 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const freedSpace = sizeBefore - sizeAfter;
+    // Estimate size based on average document size (~200 bytes)
+    const avgDocSize = 200;
+    const sizeBefore = countBefore * avgDocSize;
+    const sizeAfter = countAfter * avgDocSize;
+    const freedSpace = (countBefore - countAfter) * avgDocSize;
     
     console.log(`🧹 [Cleanup] Deleted ${result.deletedCount} candles older than ${cutoffDate.toISOString()}`);
-    console.log(`📊 [Cleanup] Freed ${(freedSpace / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`📊 [Cleanup] Freed ~${(freedSpace / 1024 / 1024).toFixed(2)} MB (estimated)`);
     
     return NextResponse.json({
       success: true,
