@@ -60,16 +60,55 @@ export async function GET(request: NextRequest) {
 async function handleCandleRequest(symbol: string, timeframe: string, count: number) {
   const limit = count || 500;
 
-  // For 1-minute timeframe: Get from MongoDB (server source of truth)
+  // For 1-minute timeframe: Try MongoDB first, fallback to Massive.com REST API
   if (timeframe === '1m' || timeframe === '1') {
-    await connectToDatabase();
-    const candles = await Candle1m.getCandles(symbol, limit);
+    try {
+      await connectToDatabase();
+      const candles = await Candle1m.getCandles(symbol, limit);
+      
+      // If MongoDB has candles, return them
+      if (candles && candles.length > 0) {
+        console.log(`🕯️ [Candles API] Returning ${candles.length} candles from MongoDB for ${symbol}`);
+        return NextResponse.json({ 
+          candles,
+          source: 'mongodb',
+          lastUpdate: Date.now(),
+        });
+      }
+      
+      // MongoDB empty - fall back to Massive.com REST API
+      console.log(`⚠️ [Candles API] MongoDB empty for ${symbol}, falling back to Massive.com API`);
+    } catch (dbError) {
+      console.error(`❌ [Candles API] MongoDB error for ${symbol}:`, dbError);
+    }
     
-    return NextResponse.json({ 
-      candles,
-      source: 'mongodb',
-      lastUpdate: Date.now(),
-    });
+    // Fallback: Fetch from Massive.com REST API (same as other timeframes)
+    try {
+      const candles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit);
+      const formattedCandles = candles.map(c => ({
+        time: Math.floor(c.time / 1000),
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume,
+      }));
+      
+      console.log(`✅ [Candles API] Returning ${formattedCandles.length} candles from Massive.com API for ${symbol}`);
+      return NextResponse.json({ 
+        candles: formattedCandles,
+        source: 'massive_api_fallback',
+        lastUpdate: Date.now(),
+      });
+    } catch (apiError) {
+      console.error(`❌ [Candles API] Massive.com API error for ${symbol}:`, apiError);
+      return NextResponse.json({ 
+        candles: [],
+        source: 'error',
+        error: 'Failed to fetch candles from any source',
+        lastUpdate: Date.now(),
+      });
+    }
   }
 
   // For other timeframes: Fetch from Massive.com REST API
