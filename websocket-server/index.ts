@@ -293,6 +293,39 @@ const server = createServer(async (req, res) => {
             }
             break;
 
+          case 'prices':
+            // Broadcast prices AND forming candles to ALL connected clients
+            // Called by websocket-price-streamer every ~200ms
+            if (data.prices || data.formingCandles) {
+              const priceEvent = {
+                type: 'price_update',
+                data: {
+                  prices: data.prices || [],
+                  formingCandles: data.formingCandles || [],
+                  timestamp: Date.now(),
+                },
+              };
+              
+              // Broadcast to ALL connections (not just specific conversations)
+              let clientCount = 0;
+              connections.forEach((conn) => {
+                if (conn.ws.readyState === WebSocket.OPEN) {
+                  try {
+                    conn.ws.send(JSON.stringify(priceEvent));
+                    clientCount++;
+                  } catch {
+                    // Ignore send errors
+                  }
+                }
+              });
+              
+              // Log occasionally (every 10th broadcast)
+              if (Math.random() < 0.1) {
+                console.log(`📊 Broadcast ${data.prices?.length || 0} prices + ${data.formingCandles?.length || 0} candles to ${clientCount} clients`);
+              }
+            }
+            break;
+
           default:
             console.warn(`Unknown internal endpoint: ${endpoint}`);
         }

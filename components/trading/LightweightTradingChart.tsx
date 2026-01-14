@@ -1948,16 +1948,70 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     }
   }, [prices, symbol, chartType]);
 
-  // Poll server for candle updates - SERVER IS SOURCE OF TRUTH
-  // NO local candle building - just display what server gives us
+  // FAST POLL: Get forming candle from server every 200ms (for 1m timeframe)
+  // This ensures O/H/L updates in real-time from server (no local building!)
+  useEffect(() => {
+    if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
+    
+    // Only do fast polling for 1m timeframe
+    const isOneMinute = timeframe === '1' || (timeframe as string) === '1m';
+    if (!isOneMinute) return;
+    
+    const fetchFormingCandle = async () => {
+      if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
+      
+      try {
+        const response = await fetch(`/api/trading/forming-candle?symbol=${encodeURIComponent(symbol)}`);
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        if (!data.candle) return;
+        
+        const serverCandle = data.candle;
+        
+        // Update the current candle with server's O/H/L/C
+        const candleData: CandlestickData<UTCTimestamp> = {
+          time: serverCandle.time as UTCTimestamp,
+          open: serverCandle.open,
+          high: serverCandle.high,
+          low: serverCandle.low,
+          close: serverCandle.close,
+        };
+        
+        if (chartType === 'line') {
+          (candlestickSeriesRef.current as any).update({
+            time: serverCandle.time as UTCTimestamp,
+            value: serverCandle.close,
+          });
+        } else {
+          candlestickSeriesRef.current?.update(candleData);
+        }
+        
+        // Update reference
+        currentCandleRef.current = candleData;
+      } catch {
+        // Ignore errors - forming candle updates are best-effort
+      }
+    };
+    
+    // Poll every 200ms for smooth real-time updates
+    const intervalId = setInterval(fetchFormingCandle, 200);
+    
+    // Fetch immediately
+    fetchFormingCandle();
+    
+    return () => clearInterval(intervalId);
+  }, [symbol, timeframe, chartType]);
+
+  // Poll server for FULL candle history - SERVER IS SOURCE OF TRUTH
+  // This runs less frequently and gets historical + new candles
   useEffect(() => {
     if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current || !currentCandleRef.current) return;
 
     // Determine poll interval based on timeframe
-    // 1m: Poll every 1 second (real-time feel)
-    // Other TFs: Poll less frequently
+    // Less frequent since forming candle updates happen via fast poll above
     const pollIntervals: Record<string, number> = {
-      '1': 1000,      // 1 second for 1m - real-time feel
+      '1': 5000,      // 5 seconds for 1m (forming candle updates via fast poll)
       '5': 5000,      // 5 seconds for 5m
       '15': 10000,    // 10 seconds for 15m
       '60': 30000,    // 30 seconds for 1h

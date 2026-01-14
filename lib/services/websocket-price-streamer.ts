@@ -1085,6 +1085,78 @@ function shouldSkipWebSocket(): boolean {
   return false;
 }
 
+// ============================================
+// BROADCAST FORMING CANDLES TO WEBSOCKET SERVER
+// ============================================
+// This sends forming candles to all connected browsers via WebSocket
+// Browsers just display - no local candle building needed!
+
+let broadcastTimer: NodeJS.Timeout | null = null;
+const BROADCAST_INTERVAL_MS = 200; // Broadcast every 200ms for smooth updates
+
+async function broadcastFormingCandles(): Promise<void> {
+  const state = getState();
+  
+  // Get all forming candles
+  const formingCandles = Array.from(state.formingCandles.values());
+  
+  // Get all prices
+  const prices = Array.from(state.priceCache.values());
+  
+  if (formingCandles.length === 0 && prices.length === 0) return;
+  
+  // Get WebSocket internal URL
+  const wsInternalUrl = process.env.WEBSOCKET_INTERNAL_URL || 'http://localhost:3003';
+  
+  try {
+    const response = await fetch(`${wsInternalUrl}/internal/prices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prices: prices.map(p => ({
+          symbol: p.symbol,
+          bid: p.bid,
+          ask: p.ask,
+          mid: p.mid,
+          timestamp: p.timestamp,
+        })),
+        formingCandles: formingCandles.map(c => ({
+          symbol: c.symbol,
+          time: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        })),
+      }),
+    });
+    
+    if (!response.ok && Math.random() < 0.01) {
+      console.warn(`⚠️ [Broadcast] WebSocket server returned ${response.status}`);
+    }
+  } catch (error) {
+    // Log only occasionally to avoid spam
+    if (Math.random() < 0.01) {
+      console.warn('⚠️ [Broadcast] Failed to send to WebSocket server:', error instanceof Error ? error.message : error);
+    }
+  }
+}
+
+function startBroadcastTimer(): void {
+  if (broadcastTimer) return; // Already running
+  
+  broadcastTimer = setInterval(broadcastFormingCandles, BROADCAST_INTERVAL_MS);
+  console.log(`📡 [Broadcast] Started broadcasting forming candles every ${BROADCAST_INTERVAL_MS}ms`);
+}
+
+function stopBroadcastTimer(): void {
+  if (broadcastTimer) {
+    clearInterval(broadcastTimer);
+    broadcastTimer = null;
+    console.log('📡 [Broadcast] Stopped broadcasting');
+  }
+}
+
 async function autoInitialize(): Promise<void> {
   const state = getState();
   
@@ -1117,7 +1189,11 @@ async function autoInitialize(): Promise<void> {
   
   try {
     await initializeWebSocket();
-    console.log('✅ [AUTO-INIT] WebSocket and TP/SL cache ready');
+    
+    // Start broadcasting forming candles to WebSocket server
+    startBroadcastTimer();
+    
+    console.log('✅ [AUTO-INIT] WebSocket, TP/SL cache, and broadcast ready');
   } catch (error) {
     console.error('❌ [AUTO-INIT] Failed:', error);
   }
