@@ -399,7 +399,10 @@ export default function MarketDataSection() {
                 min="0"
                 max="365"
                 value={settings.cleanup.daysToKeep}
-                onChange={(e) => saveSettings({ cleanup: { ...settings.cleanup, daysToKeep: parseInt(e.target.value) ?? 0 } })}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  saveSettings({ cleanup: { ...settings.cleanup, daysToKeep: Number.isNaN(val) ? 0 : Math.max(0, val) } });
+                }}
                 className="bg-gray-700 text-white rounded-lg px-3 py-2 w-24"
               />
               <span className="text-gray-400">
