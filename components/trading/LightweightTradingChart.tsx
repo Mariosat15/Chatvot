@@ -6,7 +6,7 @@ import { useDragScroll } from '@/hooks/useDragScroll';
 import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
 import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
-import { getRecentCandles, OHLCCandle, Timeframe } from '@/lib/services/forex-historical.service';
+import { OHLCCandle, Timeframe } from '@/lib/services/forex-historical.service';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
@@ -1612,9 +1612,31 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           });
         }
 
-        // Fetch historical data from Massive.com
-        log(`📊 Loading historical data: ${symbol} (${timeframe})`);
-        const candles = await getRecentCandles(symbol, timeframe, 500);
+        // Fetch candles from SERVER (source of truth)
+        // For 1m: Server gets from MongoDB (saved by websocket-price-streamer)
+        // For other TFs: Server gets from Massive.com REST API
+        log(`📊 Loading candles from server: ${symbol} (${timeframe})`);
+        const response = await fetch('/api/trading/candles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol, timeframe, count: 500 }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch candles: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const candles: OHLCCandle[] = data.candles.map((c: { time: number; open: number; high: number; low: number; close: number; volume?: number }) => ({
+          time: c.time * 1000, // Convert seconds to ms for OHLCCandle format
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: c.volume || 0,
+        }));
+        
+        log(`📊 Received ${candles.length} candles from ${data.source}`);
 
         if (candles.length === 0) {
           throw new Error('No historical data available');
@@ -1873,18 +1895,14 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     };
   }, [candlesLoaded]);
 
-  // Update chart with real-time prices
+  // Update price lines with real-time prices (bid/ask lines only)
   useEffect(() => {
-    // Check if component is still mounted and chart is valid
-    if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current || !currentCandleRef.current) return;
+    if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
 
     const currentPrice = prices.get(symbol);
     if (!currentPrice) return;
 
-    const now = Date.now();
-    
-    // Update price lines immediately (no throttle for precision)
-    // Wrap in try-catch to prevent "Object is disposed" errors
+    // Update bid/ask price lines immediately (no throttle for precision)
     try {
       if (bidPriceLineRef.current && askPriceLineRef.current) {
         bidPriceLineRef.current.applyOptions({
@@ -1899,111 +1917,121 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       }
     } catch {
       // Chart may be disposed, ignore
-      return;
     }
+  }, [prices, symbol]);
+
+  // Poll server for candle updates - SERVER IS SOURCE OF TRUTH
+  // NO local candle building - just display what server gives us
+  useEffect(() => {
+    if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current || !currentCandleRef.current) return;
+
+    // Determine poll interval based on timeframe
+    // 1m: Poll every 1 second (real-time feel)
+    // Other TFs: Poll less frequently
+    const pollIntervals: Record<string, number> = {
+      '1': 1000,      // 1 second for 1m - real-time feel
+      '5': 5000,      // 5 seconds for 5m
+      '15': 10000,    // 10 seconds for 15m
+      '60': 30000,    // 30 seconds for 1h
+      '240': 60000,   // 1 minute for 4h
+      'D': 300000,    // 5 minutes for daily
+    };
     
-    // Throttle candle updates to once per second
-    if (now - lastUpdateRef.current < 1000) return;
-    lastUpdateRef.current = now;
-
-    const mid = currentPrice.mid;
-    const currentTime = Math.floor(now / 1000) as UTCTimestamp;
-
-    // Determine candle window based on timeframe
-    let candleWindow = 60; // 1 minute default
-    switch (timeframe) {
-      case '1': candleWindow = 60; break;
-      case '5': candleWindow = 300; break;
-      case '15': candleWindow = 900; break;
-      case '60': candleWindow = 3600; break;
-      case '240': candleWindow = 14400; break;
-      case 'D': candleWindow = 86400; break;
-    }
-
-    const candleTime = (Math.floor(currentTime / candleWindow) * candleWindow) as UTCTimestamp;
-    const lastCandle = currentCandleRef.current;
-
-    try {
-      // If same candle period, update current candle
-      if (lastCandle.time === candleTime) {
-        if (chartType === 'line') {
-          // For line chart, use simple value format
-          const updatedLine = {
-            time: candleTime,
-            value: mid,
-          };
-          (candlestickSeriesRef.current as any).update(updatedLine);
-          // Store as candlestick format for reference
-          currentCandleRef.current = {
-            time: candleTime,
-            open: lastCandle.open,
-            high: Math.max(lastCandle.high, mid),
-            low: Math.min(lastCandle.low, mid),
-            close: mid,
-          };
-        } else {
-          // For candlestick-based charts
-          const updatedCandle: CandlestickData<UTCTimestamp> = {
-            time: candleTime,
-            open: lastCandle.open,
-            high: Math.max(lastCandle.high, mid),
-            low: Math.min(lastCandle.low, mid),
-            close: mid,
-          };
-          candlestickSeriesRef.current.update(updatedCandle);
-          currentCandleRef.current = updatedCandle;
-          
-          // Update candleDataRef with latest candle data for strategy signals
-          if (candleDataRef.current.length > 0) {
-            const lastIndex = candleDataRef.current.length - 1;
-            if (candleDataRef.current[lastIndex].time === candleTime) {
-              candleDataRef.current[lastIndex] = updatedCandle;
+    const pollInterval = pollIntervals[timeframe] || 5000;
+    
+    const fetchLatestCandles = async () => {
+      if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
+      
+      try {
+        // Fetch latest candles from server
+        const response = await fetch('/api/trading/candles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol, timeframe, count: 10 }), // Just get last 10 candles for updates
+        });
+        
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        if (!data.candles || data.candles.length === 0) return;
+        
+        // Update chart with latest candles from server
+        const latestCandles = data.candles;
+        
+        for (const candle of latestCandles) {
+          try {
+            const candleData: CandlestickData<UTCTimestamp> = {
+              time: candle.time as UTCTimestamp,
+              open: candle.open,
+              high: candle.high,
+              low: candle.low,
+              close: candle.close,
+            };
+            
+            if (chartType === 'line') {
+              // For line chart, use simple value format
+              (candlestickSeriesRef.current as ISeriesApi<'Candlestick'>).update({
+                time: candle.time as UTCTimestamp,
+                value: candle.close,
+              } as any);
+            } else {
+              // For candlestick-based charts
+              candlestickSeriesRef.current?.update(candleData);
             }
+            
+            // Update reference to latest candle
+            currentCandleRef.current = candleData;
+          } catch {
+            // Ignore individual candle update errors
           }
         }
-      } else {
-        // New candle period, create new candle
-        if (chartType === 'line') {
-          // For line chart, use simple value format
-          const newLine = {
-            time: candleTime,
-            value: mid,
-          };
-          (candlestickSeriesRef.current as any).update(newLine);
-          // Store as candlestick format for reference
-          currentCandleRef.current = {
-            time: candleTime,
-            open: mid,
-            high: mid,
-            low: mid,
-            close: mid,
-          };
-        } else {
-          // For candlestick-based charts
-          const newCandle: CandlestickData<UTCTimestamp> = {
-            time: candleTime,
-            open: mid,
-            high: mid,
-            low: mid,
-            close: mid,
-          };
-          candlestickSeriesRef.current.update(newCandle);
-          currentCandleRef.current = newCandle;
+        
+        // Update candleDataRef for indicators
+        if (candleDataRef.current.length > 0 && latestCandles.length > 0) {
+          const lastServerCandle = latestCandles[latestCandles.length - 1];
+          const lastRefIndex = candleDataRef.current.length - 1;
           
-          // Add new candle to candleDataRef for strategy signals
-          if (candleDataRef.current.length > 0) {
-            candleDataRef.current.push(newCandle);
-            // Keep array size manageable (last 500 candles)
+          if (candleDataRef.current[lastRefIndex].time === lastServerCandle.time * 1000) {
+            // Update existing candle
+            candleDataRef.current[lastRefIndex] = {
+              time: lastServerCandle.time * 1000,
+              open: lastServerCandle.open,
+              high: lastServerCandle.high,
+              low: lastServerCandle.low,
+              close: lastServerCandle.close,
+              volume: lastServerCandle.volume || 0,
+            };
+          } else if (lastServerCandle.time * 1000 > candleDataRef.current[lastRefIndex].time) {
+            // New candle - add it
+            candleDataRef.current.push({
+              time: lastServerCandle.time * 1000,
+              open: lastServerCandle.open,
+              high: lastServerCandle.high,
+              low: lastServerCandle.low,
+              close: lastServerCandle.close,
+              volume: lastServerCandle.volume || 0,
+            });
+            // Keep array size manageable
             if (candleDataRef.current.length > 500) {
               candleDataRef.current.shift();
             }
           }
         }
+      } catch {
+        // Network error or chart disposed - ignore
       }
-    } catch {
-      // Series type mismatch or disposed chart during transition - ignore
-    }
-  }, [prices, symbol, timeframe, chartType]);
+    };
+    
+    // Start polling
+    const intervalId = setInterval(fetchLatestCandles, pollInterval);
+    
+    // Also fetch immediately on mount
+    fetchLatestCandles();
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [symbol, timeframe, chartType]);
 
   // Add/update position entry price lines on the chart
   useEffect(() => {

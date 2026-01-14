@@ -13,6 +13,8 @@
  */
 
 import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
+import Candle1m from '@/database/models/candle-1m.model';
+import { connectToDatabase } from '@/database/mongoose';
 
 export interface StreamingPriceQuote {
   symbol: ForexSymbol;
@@ -391,11 +393,13 @@ function handleMessage(data: string): void {
           break;
         case 'CA':
           // Forex Aggregate (minute): {"ev":"CA","pair":"EUR-USD","o":1.05,"h":1.051,"l":1.049,"c":1.0505}
-          handleAggregateMessage(msg);
+          // IMPORTANT: Save to MongoDB for server-side candle source of truth
+          handleAggregateMessage(msg, true);  // true = is minute aggregate, save to MongoDB
           break;
         case 'CAS':
           // Forex Aggregate (second): same format as CA but per second
-          handleAggregateMessage(msg);
+          // Note: We DON'T save CAS to MongoDB - only CA (minute) aggregates
+          handleAggregateMessage(msg, false);  // false = is second aggregate, don't save
           break;
         case 'auth_success': {
           const state = getState();
@@ -552,6 +556,9 @@ function handleQuoteMessage(msg: {
 /**
  * Handle aggregate messages (per-second or per-minute bars)
  * Format: {"ev":"CA","pair":"EUR-USD","o":1.05,"h":1.051,"l":1.049,"c":1.0505,"v":1000,"s":..,"e":..}
+ * 
+ * @param msg - The aggregate message from Massive.com WebSocket
+ * @param isMinuteAggregate - If true (CA.*), save to MongoDB for candle source of truth
  */
 function handleAggregateMessage(msg: {
   ev: string;
@@ -562,9 +569,9 @@ function handleAggregateMessage(msg: {
   l?: number;      // low
   c?: number;      // close
   v?: number;      // volume
-  s?: number;      // start timestamp
-  e?: number;      // end timestamp
-}): void {
+  s?: number;      // start timestamp (milliseconds)
+  e?: number;      // end timestamp (milliseconds)
+}, isMinuteAggregate: boolean = false): void {
   let symbolKey = msg.pair || msg.p || '';
   symbolKey = symbolKey.replace('-', '').replace('/', '').toUpperCase();
   
@@ -607,6 +614,89 @@ function handleAggregateMessage(msg: {
     
     // 📦 Queue price for MongoDB cache (Worker reads from here)
     queuePriceForMongoCache(symbol, roundedBid, roundedAsk, quote.timestamp);
+  }
+  
+  // 🕯️ SAVE CANDLE TO MONGODB (only for minute aggregates, not second)
+  // This is the SERVER SOURCE OF TRUTH for candle data
+  // All browsers will poll /api/candles to get this data
+  if (isMinuteAggregate && msg.o !== undefined && msg.h !== undefined && 
+      msg.l !== undefined && msg.s !== undefined) {
+    saveCandleToMongoDB(symbol, msg.s, msg.o, msg.h, msg.l, msg.c, msg.v || 0);
+  }
+}
+
+/**
+ * Save minute candle to MongoDB - SERVER SOURCE OF TRUTH
+ * 
+ * This is the ONLY place candles are saved. All browsers poll /api/candles
+ * to get this data, ensuring everyone sees identical charts.
+ * 
+ * Fire-and-forget: Errors are logged but don't block price processing
+ */
+let dbConnected = false;
+let candleSaveQueue: Array<{
+  symbol: string;
+  time: number;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
+}> = [];
+let candleSaveTimer: NodeJS.Timeout | null = null;
+
+async function saveCandleToMongoDB(
+  symbol: string,
+  startTime: number,  // milliseconds from Massive
+  open: number,
+  high: number,
+  low: number,
+  close: number,
+  volume: number
+): Promise<void> {
+  // Queue the candle for batch save (more efficient than individual saves)
+  candleSaveQueue.push({ symbol, time: startTime, o: open, h: high, l: low, c: close, v: volume });
+  
+  // Debounce: Save every 500ms to batch multiple candles together
+  if (!candleSaveTimer) {
+    candleSaveTimer = setTimeout(async () => {
+      const candlesToSave = [...candleSaveQueue];
+      candleSaveQueue = [];
+      candleSaveTimer = null;
+      
+      if (candlesToSave.length === 0) return;
+      
+      try {
+        // Ensure DB connection
+        if (!dbConnected) {
+          await connectToDatabase();
+          dbConnected = true;
+          console.log('🔌 [Candle DB] Connected to MongoDB for candle storage');
+        }
+        
+        // Bulk upsert all queued candles
+        await Candle1m.bulkUpsertCandles(
+          candlesToSave.map(c => ({
+            symbol: c.symbol,
+            time: c.time,
+            open: c.o,
+            high: c.h,
+            low: c.l,
+            close: c.c,
+            volume: c.v,
+          }))
+        );
+        
+        // Log occasionally (not every batch to reduce noise)
+        if (Math.random() < 0.1) {  // 10% of the time
+          console.log(`🕯️ [Candle DB] Saved ${candlesToSave.length} candles to MongoDB`);
+        }
+      } catch (error) {
+        // Log error but don't crash - candle storage failure shouldn't break price updates
+        console.error('❌ [Candle DB] Failed to save candles:', error instanceof Error ? error.message : error);
+        dbConnected = false;  // Reset connection flag to retry next time
+      }
+    }, 500);
   }
 }
 
