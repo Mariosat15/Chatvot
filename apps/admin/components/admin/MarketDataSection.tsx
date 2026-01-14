@@ -396,14 +396,16 @@ export default function MarketDataSection() {
               <label className="text-white">Days to Keep:</label>
               <input
                 type="number"
-                min="1"
+                min="0"
                 max="365"
                 value={settings.cleanup.daysToKeep}
-                onChange={(e) => saveSettings({ cleanup: { ...settings.cleanup, daysToKeep: parseInt(e.target.value) || 30 } })}
+                onChange={(e) => saveSettings({ cleanup: { ...settings.cleanup, daysToKeep: parseInt(e.target.value) ?? 0 } })}
                 className="bg-gray-700 text-white rounded-lg px-3 py-2 w-24"
               />
               <span className="text-gray-400">
-                (~{((settings.cleanup.daysToKeep * 9.5)).toFixed(0)} MB storage)
+                {settings.cleanup.daysToKeep === 0 
+                  ? '⚠️ Will delete ALL history!' 
+                  : `(~${((settings.cleanup.daysToKeep * 9.5)).toFixed(0)} MB storage)`}
               </span>
             </div>
             

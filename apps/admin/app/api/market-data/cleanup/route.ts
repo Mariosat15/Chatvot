@@ -12,8 +12,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { daysToKeep } = body;
     
-    if (!daysToKeep || daysToKeep < 1) {
-      return NextResponse.json({ error: 'daysToKeep must be at least 1' }, { status: 400 });
+    // Allow 0 to delete ALL history
+    if (daysToKeep === undefined || daysToKeep === null || daysToKeep < 0) {
+      return NextResponse.json({ error: 'daysToKeep must be 0 or greater' }, { status: 400 });
     }
     
     const db = mongoose.connection.db;
