@@ -1923,40 +1923,66 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         const mid = currentPrice.mid;
         const lastCandle = currentCandleRef.current;
         
-        // CRITICAL: Check if we're still in the same minute as the last candle
-        // If a new minute started, DON'T update old candle - wait for server poll
+        // Check if we're still in the same minute as the last candle (for 1m timeframe)
         const currentMinute = Math.floor(Date.now() / 60000) * 60;
         const candleMinute = lastCandle.time;
-        
-        // Only update if we're in the same minute (for 1m timeframe)
-        // For other timeframes, always update (server handles boundaries)
         const isOneMinute = timeframe === '1' || (timeframe as string) === '1m';
-        const shouldUpdate = !isOneMinute || (currentMinute === candleMinute);
         
-        if (!shouldUpdate) {
-          // New minute started! Don't update old candle.
-          // Server poll will provide the new candle.
-          return;
-        }
-        
-        if (chartType === 'line') {
-          // For line chart, just update the value
-          (candlestickSeriesRef.current as any).update({
-            time: lastCandle.time,
-            value: mid,
-          });
-        } else {
-          // For candlestick: extend H/L with price (normal trading behavior)
-          // Server will reset these values every 1 second to ensure sync
-          const updatedCandle: CandlestickData<UTCTimestamp> = {
-            time: lastCandle.time,
-            open: lastCandle.open,
-            high: Math.max(lastCandle.high, mid),
-            low: Math.min(lastCandle.low, mid),
+        if (isOneMinute && currentMinute > candleMinute) {
+          // NEW MINUTE! Create new candle immediately (don't freeze!)
+          // Server will correct with authoritative values on next poll
+          const newCandle: CandlestickData<UTCTimestamp> = {
+            time: currentMinute as UTCTimestamp,
+            open: mid,  // First price of new minute
+            high: mid,
+            low: mid,
             close: mid,
           };
-          candlestickSeriesRef.current.update(updatedCandle);
-          currentCandleRef.current = updatedCandle;
+          
+          if (chartType === 'line') {
+            (candlestickSeriesRef.current as any).update({
+              time: currentMinute as UTCTimestamp,
+              value: mid,
+            });
+          } else {
+            candlestickSeriesRef.current.update(newCandle);
+          }
+          currentCandleRef.current = newCandle;
+          
+          // Also update candleDataRef for indicators
+          if (candleDataRef.current.length > 0) {
+            candleDataRef.current.push({
+              time: currentMinute,
+              open: mid,
+              high: mid,
+              low: mid,
+              close: mid,
+              volume: 0,
+            });
+            if (candleDataRef.current.length > 500) {
+              candleDataRef.current.shift();
+            }
+          }
+        } else {
+          // Same candle period - update existing candle
+          if (chartType === 'line') {
+            (candlestickSeriesRef.current as any).update({
+              time: lastCandle.time,
+              value: mid,
+            });
+          } else {
+            // For candlestick: extend H/L with price (normal trading behavior)
+            // Server will reset these values every 1 second to ensure sync
+            const updatedCandle: CandlestickData<UTCTimestamp> = {
+              time: lastCandle.time,
+              open: lastCandle.open,
+              high: Math.max(lastCandle.high, mid),
+              low: Math.min(lastCandle.low, mid),
+              close: mid,
+            };
+            candlestickSeriesRef.current.update(updatedCandle);
+            currentCandleRef.current = updatedCandle;
+          }
         }
       }
     } catch {
