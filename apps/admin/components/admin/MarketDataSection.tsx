@@ -55,6 +55,21 @@ interface Gap {
   missingMinutes: number;
 }
 
+interface TradingSymbol {
+  symbol: string;
+  name: string;
+  enabled: boolean;
+  category: string;
+}
+
+interface SeedResult {
+  symbol: string;
+  fetched: number;
+  inserted: number;
+  skipped: number;
+  error?: string;
+}
+
 export default function MarketDataSection() {
   const [settings, setSettings] = useState<MarketDataSettings | null>(null);
   const [stats, setStats] = useState<MarketDataStats | null>(null);
@@ -64,6 +79,14 @@ export default function MarketDataSection() {
   const [cleanupRunning, setCleanupRunning] = useState(false);
   const [gapFillRunning, setGapFillRunning] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  
+  // Seed history state
+  const [availableSymbols, setAvailableSymbols] = useState<TradingSymbol[]>([]);
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
+  const [seedFromDate, setSeedFromDate] = useState('');
+  const [seedToDate, setSeedToDate] = useState('');
+  const [seedRunning, setSeedRunning] = useState(false);
+  const [seedResults, setSeedResults] = useState<SeedResult[] | null>(null);
 
   // Fetch settings and stats
   const fetchData = useCallback(async () => {
@@ -89,6 +112,19 @@ export default function MarketDataSection() {
     }
   }, []);
 
+  // Fetch available symbols from admin
+  const fetchSymbols = async () => {
+    try {
+      const res = await fetch('/api/symbols?enabled=true');
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableSymbols(data.symbols || []);
+      }
+    } catch (error) {
+      console.error('Error fetching symbols:', error);
+    }
+  };
+
   // Fetch gaps
   const fetchGaps = async () => {
     try {
@@ -105,6 +141,15 @@ export default function MarketDataSection() {
   useEffect(() => {
     fetchData();
     fetchGaps();
+    fetchSymbols();
+    
+    // Set default dates (last 30 days)
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    setSeedToDate(today.toISOString().split('T')[0]);
+    setSeedFromDate(thirtyDaysAgo.toISOString().split('T')[0]);
   }, [fetchData]);
 
   // Save settings
@@ -189,6 +234,69 @@ export default function MarketDataSection() {
       setGapFillRunning(false);
       setTimeout(() => setMessage(null), 5000);
     }
+  };
+
+  // Run seed history
+  const runSeedHistory = async () => {
+    if (selectedSymbols.length === 0) {
+      setMessage({ type: 'error', text: 'Please select at least one symbol' });
+      return;
+    }
+    if (!seedFromDate || !seedToDate) {
+      setMessage({ type: 'error', text: 'Please select date range' });
+      return;
+    }
+
+    setSeedRunning(true);
+    setSeedResults(null);
+    try {
+      const res = await fetch('/api/market-data/seed-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbols: selectedSymbols,
+          fromDate: seedFromDate,
+          toDate: seedToDate,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSeedResults(data.results);
+        setMessage({ 
+          type: 'success', 
+          text: `Seeding complete! Fetched ${data.summary.totalFetched} candles, inserted ${data.summary.totalInserted} new` 
+        });
+        fetchData(); // Refresh stats
+      } else {
+        const error = await res.json();
+        setMessage({ type: 'error', text: error.error || 'Seeding failed' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error running seed' });
+    } finally {
+      setSeedRunning(false);
+      setTimeout(() => setMessage(null), 10000);
+    }
+  };
+
+  // Toggle symbol selection
+  const toggleSymbol = (symbol: string) => {
+    setSelectedSymbols(prev => 
+      prev.includes(symbol) 
+        ? prev.filter(s => s !== symbol)
+        : [...prev, symbol]
+    );
+  };
+
+  // Select all symbols
+  const selectAllSymbols = () => {
+    setSelectedSymbols(availableSymbols.map(s => s.symbol));
+  };
+
+  // Deselect all symbols
+  const deselectAllSymbols = () => {
+    setSelectedSymbols([]);
   };
 
   if (loading) {
@@ -489,6 +597,114 @@ export default function MarketDataSection() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Seed Historical Data Section */}
+      <div className="bg-gray-800 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">📥 Seed Historical Data</h3>
+        
+        <div className="space-y-4">
+          <div className="text-gray-400 text-sm bg-gray-700/50 rounded-lg p-3">
+            ℹ️ Import historical 1-minute candles from Massive.com into your database.
+            <br />
+            <strong>History available:</strong> Up to 2 years (Basic plan) or all history (Starter/Business).
+          </div>
+          
+          {/* Date Range */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <label className="text-white">From:</label>
+            <input
+              type="date"
+              value={seedFromDate}
+              onChange={(e) => setSeedFromDate(e.target.value)}
+              className="bg-gray-700 text-white rounded-lg px-3 py-2"
+            />
+            <label className="text-white">To:</label>
+            <input
+              type="date"
+              value={seedToDate}
+              onChange={(e) => setSeedToDate(e.target.value)}
+              className="bg-gray-700 text-white rounded-lg px-3 py-2"
+            />
+          </div>
+          
+          {/* Symbol Selection */}
+          <div className="bg-gray-700 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-white font-medium">Select Symbols ({selectedSymbols.length}/{availableSymbols.length})</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={selectAllSymbols}
+                  className="text-blue-400 hover:text-blue-300 text-sm"
+                >
+                  Select All
+                </button>
+                <span className="text-gray-500">|</span>
+                <button
+                  onClick={deselectAllSymbols}
+                  className="text-gray-400 hover:text-gray-300 text-sm"
+                >
+                  Deselect All
+                </button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 max-h-48 overflow-y-auto">
+              {availableSymbols.map((sym) => (
+                <label
+                  key={sym.symbol}
+                  className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                    selectedSymbols.includes(sym.symbol)
+                      ? 'bg-blue-600/30 border border-blue-500'
+                      : 'bg-gray-600/30 hover:bg-gray-600/50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedSymbols.includes(sym.symbol)}
+                    onChange={() => toggleSymbol(sym.symbol)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <span className="text-white text-sm">{sym.symbol}</span>
+                </label>
+              ))}
+            </div>
+            
+            {availableSymbols.length === 0 && (
+              <div className="text-gray-400 text-center py-4">
+                No symbols available. Add symbols in Trading Symbols section.
+              </div>
+            )}
+          </div>
+          
+          {/* Estimation */}
+          {selectedSymbols.length > 0 && seedFromDate && seedToDate && (
+            <div className="text-gray-400 text-sm">
+              📊 Estimated: ~{Math.ceil((new Date(seedToDate).getTime() - new Date(seedFromDate).getTime()) / (1000 * 60 * 60 * 24))} days × {selectedSymbols.length} symbols = 
+              ~{(Math.ceil((new Date(seedToDate).getTime() - new Date(seedFromDate).getTime()) / (1000 * 60 * 60 * 24)) * 1440 * selectedSymbols.length).toLocaleString()} candles
+            </div>
+          )}
+          
+          {/* Seed Results */}
+          {seedResults && (
+            <div className="bg-gray-700 rounded-lg p-4 max-h-40 overflow-y-auto">
+              <div className="text-white font-medium mb-2">Results:</div>
+              {seedResults.map((result, i) => (
+                <div key={i} className={`text-sm ${result.error ? 'text-red-400' : 'text-gray-300'}`}>
+                  {result.symbol}: {result.error ? `❌ ${result.error}` : `✅ Fetched ${result.fetched}, Inserted ${result.inserted}`}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <button
+            onClick={runSeedHistory}
+            disabled={seedRunning || selectedSymbols.length === 0}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
+          >
+            {seedRunning ? '⏳ Seeding Data...' : '📥 Start Seeding'}
+          </button>
+        </div>
       </div>
 
       {/* Info Section */}
