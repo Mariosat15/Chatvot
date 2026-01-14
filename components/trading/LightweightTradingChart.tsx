@@ -1917,8 +1917,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         });
       }
       
-      // Update current candle's CLOSE price in real-time for smooth chart movement
-      // O/H/L comes from server (CA.*), only close updates locally
+      // Update current candle's CLOSE price ONLY - O/H/L stays from server
+      // This ensures ALL users see IDENTICAL candles (no local Math.max/min divergence)
       if (currentCandleRef.current && candlestickSeriesRef.current) {
         const mid = currentPrice.mid;
         const lastCandle = currentCandleRef.current;
@@ -1930,16 +1930,17 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             value: mid,
           });
         } else {
-          // For candlestick charts, update close price (and extend H/L if needed)
+          // For candlestick charts, ONLY update close price
+          // O/H/L stays from server (NO local Math.max/min = NO divergence!)
           const updatedCandle: CandlestickData<UTCTimestamp> = {
             time: lastCandle.time,
             open: lastCandle.open,
-            high: Math.max(lastCandle.high, mid), // Extend high if price goes higher
-            low: Math.min(lastCandle.low, mid),   // Extend low if price goes lower
-            close: mid, // Always update close to current price
+            high: lastCandle.high,  // Keep from server - NO local extension
+            low: lastCandle.low,    // Keep from server - NO local extension
+            close: mid,             // Only close updates from real-time price
           };
           candlestickSeriesRef.current.update(updatedCandle);
-          currentCandleRef.current = updatedCandle;
+          // Don't update currentCandleRef - keep server O/H/L values
         }
       }
     } catch {
