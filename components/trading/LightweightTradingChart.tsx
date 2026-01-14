@@ -1918,10 +1918,26 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       }
       
       // Update current candle with real-time price (real trading feel)
-      // Math.max/min extends H/L locally - server resets values every 2 seconds via polling
+      // Math.max/min extends H/L locally - server resets values every 1 second via polling
       if (currentCandleRef.current && candlestickSeriesRef.current) {
         const mid = currentPrice.mid;
         const lastCandle = currentCandleRef.current;
+        
+        // CRITICAL: Check if we're still in the same minute as the last candle
+        // If a new minute started, DON'T update old candle - wait for server poll
+        const currentMinute = Math.floor(Date.now() / 60000) * 60;
+        const candleMinute = lastCandle.time;
+        
+        // Only update if we're in the same minute (for 1m timeframe)
+        // For other timeframes, always update (server handles boundaries)
+        const isOneMinute = timeframe === '1' || (timeframe as string) === '1m';
+        const shouldUpdate = !isOneMinute || (currentMinute === candleMinute);
+        
+        if (!shouldUpdate) {
+          // New minute started! Don't update old candle.
+          // Server poll will provide the new candle.
+          return;
+        }
         
         if (chartType === 'line') {
           // For line chart, just update the value
@@ -1931,7 +1947,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           });
         } else {
           // For candlestick: extend H/L with price (normal trading behavior)
-          // Server will reset these values every 2 seconds to ensure sync
+          // Server will reset these values every 1 second to ensure sync
           const updatedCandle: CandlestickData<UTCTimestamp> = {
             time: lastCandle.time,
             open: lastCandle.open,
