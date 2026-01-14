@@ -44,13 +44,28 @@ async function fetchCandlesFromMassive(
   const endpoint = `/v2/aggs/ticker/${ticker}/range/1/minute/${fromMs}/${toMs}`;
   const url = `${MASSIVE_API_BASE_URL}${endpoint}?adjusted=true&sort=asc&limit=50000&apiKey=${MASSIVE_API_KEY}`;
 
+  console.log(`🌐 [Massive API] Requesting: ${ticker} from ${new Date(fromMs).toISOString()} to ${new Date(toMs).toISOString()}`);
+
   const response = await fetch(url, { cache: 'no-store' });
   
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`❌ [Massive API] Error ${response.status}: ${errorText}`);
     throw new Error(`Massive.com API error: ${response.status}`);
   }
 
   const data = await response.json();
+  
+  if (data.results && data.results.length > 0) {
+    const firstResult = data.results[0];
+    const lastResult = data.results[data.results.length - 1];
+    console.log(`✅ [Massive API] Got ${data.results.length} candles`);
+    console.log(`   First: ${new Date(firstResult.t).toISOString()}`);
+    console.log(`   Last: ${new Date(lastResult.t).toISOString()}`);
+  } else {
+    console.log(`⚠️ [Massive API] No results returned for ${ticker}`);
+  }
+  
   return data.results || [];
 }
 
@@ -131,7 +146,9 @@ export async function POST(request: NextRequest) {
     // Calculate date range in days
     const days = Math.ceil((toMs - fromMs) / (1000 * 60 * 60 * 24));
     
-    console.log(`📥 [Seed History] Starting: ${symbols.length} symbols, ${days} days (${fromDate} to ${toDate})`);
+    console.log(`📥 [Seed History] Starting: ${symbols.length} symbols, ${days} days`);
+    console.log(`📥 [Seed History] From: ${fromDate} (${fromMs}ms = ${new Date(fromMs).toISOString()})`);
+    console.log(`📥 [Seed History] To: ${toDate} (${toMs}ms = ${new Date(toMs).toISOString()})`);
 
     const results: Array<{
       symbol: string;
