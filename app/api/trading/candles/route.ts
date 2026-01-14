@@ -160,12 +160,20 @@ async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): P
     (async () => {
       try {
         console.log(`🔧 [Auto Gap Fill] Filling ${gaps.length} gaps for ${symbol}...`);
+        let filledCount = 0;
         
         for (const gap of gaps) {
+          // Calculate how many minutes from NOW back to the gap start
+          const nowSeconds = Math.floor(Date.now() / 1000);
+          const minutesFromNow = Math.ceil((nowSeconds - gap.startTime) / 60);
+          
+          // Request enough candles to cover from now back to the gap
+          const barsToRequest = Math.min(500, minutesFromNow + 20);
+          
           const historicalCandles = await getRecentCandles(
             symbol as ForexSymbol,
             '1' as Timeframe,
-            gap.missing + 10
+            barsToRequest
           );
           
           for (const candle of historicalCandles) {
@@ -188,12 +196,13 @@ async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): P
                   candle.close,
                   candle.volume || 0
                 );
+                filledCount++;
               }
             }
           }
         }
         
-        console.log(`✅ [Auto Gap Fill] Completed for ${symbol}`);
+        console.log(`✅ [Auto Gap Fill] Completed for ${symbol} - filled ${filledCount} candles`);
       } catch (error) {
         console.error(`❌ [Auto Gap Fill] Failed for ${symbol}:`, error);
       } finally {

@@ -101,23 +101,34 @@ export async function POST(request: NextRequest) {
         // Try to fill all gaps - Massive.com will return what it has available
         if (missingMinutes > 0) {
           try {
-            // Fetch candles from Massive.com for this gap period
-            // We need to get candles for the time range: startTime+60 to endTime-60
+            // Gap times (in seconds)
             const gapStart = candles[i - 1].time + 60;
             const gapEnd = candles[i].time - 60;
             
-            // Fetch historical candles (returns milliseconds, we need seconds)
+            // Calculate how many minutes from NOW back to the gap start
+            const nowSeconds = Math.floor(Date.now() / 1000);
+            const minutesFromNow = Math.ceil((nowSeconds - gapStart) / 60);
+            
+            // Request enough candles to cover from now back to the gap
+            // Add extra buffer for safety
+            const barsToRequest = Math.min(500, minutesFromNow + 20);
+            
+            console.log(`📊 Gap ${sym}: ${new Date(gapStart * 1000).toISOString()} - ${new Date(gapEnd * 1000).toISOString()} (${missingMinutes} min), requesting ${barsToRequest} bars`);
+            
+            // Fetch historical candles (returns milliseconds)
             const historicalCandles = await getRecentCandles(
               sym as ForexSymbol,
               '1' as Timeframe,
-              missingMinutes + 10 // Get a few extra to ensure coverage
+              barsToRequest
             );
             
-            // Filter to only the gap period and save
+            // Filter to only the gap period
             const candlesToFill = historicalCandles.filter(c => {
               const timeInSeconds = Math.floor(c.time / 1000);
               return timeInSeconds >= gapStart && timeInSeconds <= gapEnd;
             });
+            
+            console.log(`📊 Found ${candlesToFill.length} candles to fill gap (from ${historicalCandles.length} fetched)`);
             
             for (const candle of candlesToFill) {
               // Check if candle already exists
