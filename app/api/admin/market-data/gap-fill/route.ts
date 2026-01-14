@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
         const timeDiff = candles[i].time - candles[i - 1].time;
         const missingMinutes = Math.floor(timeDiff / 60) - 1;
         
-        // Only fill gaps up to maxGapMinutes
-        if (missingMinutes > 0 && missingMinutes <= maxGapMinutes) {
+        // Try to fill all gaps - Massive.com will return what it has available
+        if (missingMinutes > 0) {
           try {
             // Fetch candles from Massive.com for this gap period
             // We need to get candles for the time range: startTime+60 to endTime-60
