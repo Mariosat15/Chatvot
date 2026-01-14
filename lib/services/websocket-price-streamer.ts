@@ -407,12 +407,10 @@ function handleMessage(data: string): void {
           break;
         case 'CA':
           // Forex Aggregate (minute): {"ev":"CA","pair":"EUR-USD","o":1.05,"h":1.051,"l":1.049,"c":1.0505}
-          // IMPORTANT: Save to MongoDB for server-side candle source of truth
-          // Log occasionally to verify CA.* is being received (10% of messages)
-          if (Math.random() < 0.1) {
-            console.log(`🕯️ [CA] Received minute candle for ${msg.pair || msg.p}`);
-          }
-          handleAggregateMessage(msg, true);  // true = is minute aggregate, save to MongoDB
+          // NOTE: We NO LONGER save CA.* to MongoDB!
+          // Our server builds candles from C.* quotes instead (for consistency)
+          // CA.* is only used for price updates now
+          handleAggregateMessage(msg, false);  // false = don't save to MongoDB
           break;
         case 'CAS':
           // Forex Aggregate (second): same format as CA but per second
@@ -578,6 +576,8 @@ function handleQuoteMessage(msg: {
  * Update the forming candle for a symbol
  * This builds the current minute candle from real-time quotes
  * All browsers get this data = identical charts!
+ * 
+ * When a new minute starts, SAVE the completed candle to MongoDB
  */
 function updateFormingCandle(symbol: ForexSymbol, price: number): void {
   const state = getState();
@@ -589,7 +589,14 @@ function updateFormingCandle(symbol: ForexSymbol, price: number): void {
   const existing = state.formingCandles.get(symbol);
   
   if (!existing || existing.time !== minuteTime) {
-    // New minute started - create new forming candle
+    // New minute started!
+    
+    // SAVE the previous forming candle to MongoDB (if it exists and has ticks)
+    if (existing && existing.tickCount > 0) {
+      saveCompletedCandleToMongoDB(existing);
+    }
+    
+    // Create new forming candle for the new minute
     state.formingCandles.set(symbol, {
       symbol,
       time: minuteTime,
@@ -605,6 +612,31 @@ function updateFormingCandle(symbol: ForexSymbol, price: number): void {
     existing.low = Math.min(existing.low, price);
     existing.close = price;
     existing.tickCount++;
+  }
+}
+
+/**
+ * Save a completed forming candle to MongoDB
+ * This is called when a new minute starts - we save the PREVIOUS minute's candle
+ */
+async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void> {
+  try {
+    await connectToDatabase();
+    
+    // Convert time from seconds to milliseconds for the model (it divides by 1000 internally)
+    await Candle1m.upsertCandle(
+      candle.symbol,
+      candle.time * 1000, // Seconds to milliseconds
+      candle.open,
+      candle.high,
+      candle.low,
+      candle.close,
+      0 // Volume - we don't track this from C.* quotes
+    );
+    
+    console.log(`💾 [Candle Saved] ${candle.symbol} @ ${new Date(candle.time * 1000).toISOString()} | O:${candle.open.toFixed(5)} H:${candle.high.toFixed(5)} L:${candle.low.toFixed(5)} C:${candle.close.toFixed(5)} (${candle.tickCount} ticks)`);
+  } catch (error) {
+    console.error(`❌ [Candle Save Error] ${candle.symbol}:`, error instanceof Error ? error.message : error);
   }
 }
 
