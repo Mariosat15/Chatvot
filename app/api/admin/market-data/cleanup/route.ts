@@ -1,7 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
-import Candle1m from '@/database/models/candle-1m.model';
 import mongoose from 'mongoose';
+
+/**
+ * Helper to get collection stats without deprecated .stats() method
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getCollectionStats(collection: any) {
+  const count = await collection.countDocuments();
+  let size = 0;
+  
+  try {
+    const collStats = await collection.aggregate([
+      { $collStats: { storageStats: {} } }
+    ]).toArray();
+    
+    if (collStats.length > 0 && collStats[0].storageStats) {
+      size = collStats[0].storageStats.size || 0;
+    }
+  } catch {
+    // Fallback: estimate based on count
+    size = count * 100;
+  }
+  
+  return { count, size };
+}
 
 /**
  * POST - Run candle cleanup (delete old candles)
@@ -13,8 +36,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { daysToKeep } = body;
     
-    if (!daysToKeep || daysToKeep < 1) {
-      return NextResponse.json({ error: 'daysToKeep must be at least 1' }, { status: 400 });
+    // Allow 0 days to delete all
+    if (daysToKeep === undefined || daysToKeep < 0) {
+      return NextResponse.json({ error: 'daysToKeep must be 0 or greater' }, { status: 400 });
     }
     
     const db = mongoose.connection.db;
@@ -22,24 +46,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
     }
     
+    const collection = db.collection('candles_1m');
+    
     // Get stats before cleanup
-    const statsBefore = await db.collection('candles_1m').stats();
-    const countBefore = statsBefore.count;
-    const sizeBefore = statsBefore.size;
+    const { count: countBefore, size: sizeBefore } = await getCollectionStats(collection);
     
     // Calculate cutoff timestamp (in seconds)
     const cutoffTime = Math.floor(Date.now() / 1000) - (daysToKeep * 24 * 60 * 60);
     const cutoffDate = new Date(cutoffTime * 1000);
     
     // Delete old candles
-    const result = await db.collection('candles_1m').deleteMany({
+    const result = await collection.deleteMany({
       t: { $lt: cutoffTime }
     });
     
     // Get stats after cleanup
-    const statsAfter = await db.collection('candles_1m').stats();
-    const countAfter = statsAfter.count;
-    const sizeAfter = statsAfter.size;
+    const { count: countAfter, size: sizeAfter } = await getCollectionStats(collection);
     
     // Update last run time in settings
     const MarketDataSettings = mongoose.models.MarketDataSettings;

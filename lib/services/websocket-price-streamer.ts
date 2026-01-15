@@ -51,6 +51,16 @@ interface SymbolSpreadSettings {
   pip: number;            // pip value (0.0001 or 0.01)
 }
 
+// Completed 1m candle for buffering (used to build 5m forming candles)
+interface CompletedCandle {
+  symbol: string;
+  time: number;    // Unix timestamp in SECONDS
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
 interface WebSocketGlobalState {
   ws: import('ws').WebSocket | null;
   isConnecting: boolean;
@@ -63,6 +73,7 @@ interface WebSocketGlobalState {
   dynamicSpreadCache: Map<ForexSymbol, number>;
   symbolSpreadSettings: Map<string, SymbolSpreadSettings>; // Fixed spread settings per symbol
   formingCandles: Map<string, FormingCandle>; // Current minute candles being built
+  completedCandlesBuffer: Map<string, CompletedCandle[]>; // Recent completed 1m candles per symbol (for 5m aggregation)
   lastUpdateTime: number;
   initialized: boolean;
   connectionId: string;
@@ -94,6 +105,7 @@ function getGlobalState(): WebSocketGlobalState {
       dynamicSpreadCache: new Map<ForexSymbol, number>(),
       symbolSpreadSettings: new Map<string, SymbolSpreadSettings>(),
       formingCandles: new Map<string, FormingCandle>(),
+      completedCandlesBuffer: new Map<string, CompletedCandle[]>(), // For 5m aggregation
       lastUpdateTime: 0,
       initialized: false,
       connectionId: Math.random().toString(36).substring(7),
@@ -745,10 +757,39 @@ function updateFormingCandle(symbol: ForexSymbol, bidPrice: number): void {
 }
 
 /**
- * Save a completed forming candle to MongoDB
+ * Save a completed forming candle to MongoDB AND add to in-memory buffer
  * This is called when a new minute starts - we save the PREVIOUS minute's candle
+ * 
+ * The buffer is used for building 5m forming candles without querying MongoDB
  */
 async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void> {
+  const state = getState();
+  
+  // Add to in-memory buffer for 5m aggregation
+  const completedCandle: CompletedCandle = {
+    symbol: candle.symbol,
+    time: candle.time,
+    open: candle.open,
+    high: candle.high,
+    low: candle.low,
+    close: candle.close,
+  };
+  
+  if (!state.completedCandlesBuffer.has(candle.symbol)) {
+    state.completedCandlesBuffer.set(candle.symbol, []);
+  }
+  
+  const buffer = state.completedCandlesBuffer.get(candle.symbol)!;
+  buffer.push(completedCandle);
+  
+  // Keep only last 15 candles (enough for 15m aggregation, could extend later)
+  // 5m needs max 5 candles, 15m needs max 15 candles
+  const MAX_BUFFER_SIZE = 15;
+  if (buffer.length > MAX_BUFFER_SIZE) {
+    buffer.shift(); // Remove oldest
+  }
+  
+  // Save to MongoDB
   try {
     await connectToDatabase();
     
@@ -767,6 +808,56 @@ async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void
   } catch (error) {
     console.error(`❌ [Candle Save Error] ${candle.symbol}:`, error instanceof Error ? error.message : error);
   }
+}
+
+/**
+ * Calculate 5m forming candle from completed 1m candles buffer + current 1m forming candle
+ * Returns null if not enough data to build 5m candle
+ */
+function calculate5mFormingCandle(symbol: string): FormingCandle | null {
+  const state = getState();
+  const forming1m = state.formingCandles.get(symbol);
+  
+  if (!forming1m) return null;
+  
+  // Calculate 5m period boundary (seconds)
+  const FIVE_MIN_SECONDS = 5 * 60;
+  const currentPeriodStart = Math.floor(forming1m.time / FIVE_MIN_SECONDS) * FIVE_MIN_SECONDS;
+  
+  // Get all 1m candles in the current 5m period from buffer
+  const buffer = state.completedCandlesBuffer.get(symbol) || [];
+  const periodCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
+  
+  // Add completed 1m candles from this 5m period
+  for (const candle of buffer) {
+    if (candle.time >= currentPeriodStart && candle.time < currentPeriodStart + FIVE_MIN_SECONDS) {
+      periodCandles.push(candle);
+    }
+  }
+  
+  // Add the current forming 1m candle
+  periodCandles.push({
+    time: forming1m.time,
+    open: forming1m.open,
+    high: forming1m.high,
+    low: forming1m.low,
+    close: forming1m.close,
+  });
+  
+  // Sort by time
+  periodCandles.sort((a, b) => a.time - b.time);
+  
+  if (periodCandles.length === 0) return null;
+  
+  return {
+    symbol,
+    time: currentPeriodStart,
+    open: periodCandles[0].open,
+    high: Math.max(...periodCandles.map(c => c.high)),
+    low: Math.min(...periodCandles.map(c => c.low)),
+    close: periodCandles[periodCandles.length - 1].close,
+    tickCount: periodCandles.length, // Number of 1m candles aggregated
+  };
 }
 
 /**
@@ -1103,6 +1194,13 @@ export function getFormingCandle(symbol: string): FormingCandle | null {
 }
 
 /**
+ * Get 5m forming candle (calculated from buffer + 1m forming)
+ */
+export function getForming5mCandle(symbol: string): FormingCandle | null {
+  return calculate5mFormingCandle(symbol);
+}
+
+/**
  * Get all forming candles (current minute candles being built)
  */
 export function getAllFormingCandles(): Map<string, FormingCandle> {
@@ -1256,8 +1354,17 @@ async function broadcastFormingCandles(): Promise<void> {
   checkAndUpdateBroadcastInterval().catch(() => {});
   const state = getState();
   
-  // Get all forming candles
+  // Get all 1m forming candles
   const formingCandles = Array.from(state.formingCandles.values());
+  
+  // Calculate 5m forming candles for each symbol
+  const formingCandles5m: FormingCandle[] = [];
+  for (const candle1m of formingCandles) {
+    const candle5m = calculate5mFormingCandle(candle1m.symbol);
+    if (candle5m) {
+      formingCandles5m.push(candle5m);
+    }
+  }
   
   // Get all prices
   const prices = Array.from(state.priceCache.values());
@@ -1279,6 +1386,7 @@ async function broadcastFormingCandles(): Promise<void> {
           mid: p.mid,
           timestamp: p.timestamp,
         })),
+        // 1m forming candles (timeframe: '1m')
         formingCandles: formingCandles.map(c => ({
           symbol: c.symbol,
           time: c.time,
@@ -1286,6 +1394,17 @@ async function broadcastFormingCandles(): Promise<void> {
           high: c.high,
           low: c.low,
           close: c.close,
+          timeframe: '1m', // Explicit timeframe marker
+        })),
+        // 5m forming candles (aggregated from 1m)
+        formingCandles5m: formingCandles5m.map(c => ({
+          symbol: c.symbol,
+          time: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          timeframe: '5m', // Explicit timeframe marker
         })),
       }),
     });
@@ -1316,6 +1435,48 @@ function stopBroadcastTimer(): void {
     clearInterval(broadcastTimer);
     broadcastTimer = null;
     console.log('📡 [Broadcast] Stopped broadcasting');
+  }
+}
+
+/**
+ * Seed the completed candles buffer from MongoDB
+ * This ensures 5m forming candles work immediately after server restart
+ */
+async function seedCompletedCandlesBuffer(): Promise<void> {
+  const state = getState();
+  
+  try {
+    await connectToDatabase();
+    
+    // Get symbols from FOREX_PAIRS
+    const symbols = Object.keys(FOREX_PAIRS);
+    
+    console.log(`🌱 [Buffer Seed] Seeding completed candles buffer for ${symbols.length} symbols...`);
+    
+    for (const symbol of symbols) {
+      // Get last 15 completed 1m candles for each symbol (enough for 15m aggregation)
+      const candles = await Candle1m.getCandles(symbol, 15);
+      
+      if (candles.length > 0) {
+        // Store in buffer (skip the most recent one as it might be the current forming candle)
+        const completedCandles = candles.slice(0, -1).map(c => ({
+          symbol,
+          time: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        }));
+        
+        if (completedCandles.length > 0) {
+          state.completedCandlesBuffer.set(symbol, completedCandles);
+        }
+      }
+    }
+    
+    console.log(`✅ [Buffer Seed] Seeded ${state.completedCandlesBuffer.size} symbols with completed candles`);
+  } catch (error) {
+    console.warn('⚠️ [Buffer Seed] Failed to seed buffer:', error instanceof Error ? error.message : error);
   }
 }
 
@@ -1351,6 +1512,9 @@ async function autoInitialize(): Promise<void> {
   
   try {
     await initializeWebSocket();
+    
+    // Seed the completed candles buffer from MongoDB for 5m aggregation
+    await seedCompletedCandlesBuffer();
     
     // Start broadcasting forming candles to WebSocket server
     await startBroadcastTimer();

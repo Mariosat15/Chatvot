@@ -294,14 +294,15 @@ const server = createServer(async (req, res) => {
             break;
 
           case 'prices':
-            // Broadcast prices AND forming candles to ALL connected clients
+            // Broadcast prices AND forming candles (1m + 5m) to ALL connected clients
             // Called by websocket-price-streamer every ~200ms
-            if (data.prices || data.formingCandles) {
+            if (data.prices || data.formingCandles || data.formingCandles5m) {
               const priceEvent = {
                 type: 'price_update',
                 data: {
                   prices: data.prices || [],
-                  formingCandles: data.formingCandles || [],
+                  formingCandles: data.formingCandles || [],      // 1m forming candles
+                  formingCandles5m: data.formingCandles5m || [],  // 5m forming candles
                   timestamp: Date.now(),
                 },
               };
@@ -321,7 +322,7 @@ const server = createServer(async (req, res) => {
               
               // Log occasionally (every 10th broadcast)
               if (Math.random() < 0.1) {
-                console.log(`📊 Broadcast ${data.prices?.length || 0} prices + ${data.formingCandles?.length || 0} candles to ${clientCount} clients`);
+                console.log(`📊 Broadcast ${data.prices?.length || 0} prices + ${data.formingCandles?.length || 0} 1m + ${data.formingCandles5m?.length || 0} 5m to ${clientCount} clients`);
               }
             }
             break;

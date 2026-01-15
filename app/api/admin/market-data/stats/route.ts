@@ -14,21 +14,40 @@ export async function GET() {
       return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
     }
     
-    // Get collection stats
-    let stats;
+    const collection = db.collection('candles_1m');
+    
+    // Get collection stats using countDocuments and $collStats (stats() is deprecated)
+    let totalCount = 0;
+    let storageSize = 0;
+    let avgObjSize = 0;
+    let indexCount = 0;
+    let totalIndexSize = 0;
+    
     try {
-      stats = await db.collection('candles_1m').stats();
+      totalCount = await collection.countDocuments();
+      
+      const collStats = await collection.aggregate([
+        { $collStats: { storageStats: {} } }
+      ]).toArray();
+      
+      if (collStats.length > 0 && collStats[0].storageStats) {
+        storageSize = collStats[0].storageStats.size || 0;
+        avgObjSize = collStats[0].storageStats.avgObjSize || 0;
+        indexCount = collStats[0].storageStats.nindexes || 0;
+        totalIndexSize = collStats[0].storageStats.totalIndexSize || 0;
+      }
     } catch {
-      // Collection might not exist yet
-      stats = { count: 0, size: 0, avgObjSize: 0, nindexes: 0, totalIndexSize: 0 };
+      // Collection might not exist yet or $collStats failed
+      totalCount = 0;
+      storageSize = 0;
     }
     
     // Get date range
-    const oldestCandle = await db.collection('candles_1m').findOne({}, { sort: { t: 1 } });
-    const newestCandle = await db.collection('candles_1m').findOne({}, { sort: { t: -1 } });
+    const oldestCandle = await collection.findOne({}, { sort: { t: 1 } });
+    const newestCandle = await collection.findOne({}, { sort: { t: -1 } });
     
     // Count by symbol (top 10)
-    const symbolCounts = await db.collection('candles_1m').aggregate([
+    const symbolCounts = await collection.aggregate([
       { $group: { _id: '$symbol', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 }
@@ -40,22 +59,22 @@ export async function GET() {
       : 0;
     
     // Calculate growth rate
-    const candlesPerDay = daysOfData > 0 ? Math.round(stats.count / daysOfData) : 0;
-    const mbPerDay = daysOfData > 0 ? (stats.size / daysOfData / 1024 / 1024).toFixed(2) : '0';
+    const candlesPerDay = daysOfData > 0 ? Math.round(totalCount / daysOfData) : 0;
+    const mbPerDay = daysOfData > 0 ? (storageSize / daysOfData / 1024 / 1024).toFixed(2) : '0';
     
     return NextResponse.json({
       success: true,
       stats: {
-        totalCandles: stats.count,
+        totalCandles: totalCount,
         storage: {
-          bytes: stats.size,
-          mb: (stats.size / 1024 / 1024).toFixed(2),
-          gb: (stats.size / 1024 / 1024 / 1024).toFixed(3),
-          avgDocBytes: Math.round(stats.avgObjSize || 0),
+          bytes: storageSize,
+          mb: (storageSize / 1024 / 1024).toFixed(2),
+          gb: (storageSize / 1024 / 1024 / 1024).toFixed(3),
+          avgDocBytes: Math.round(avgObjSize),
         },
         indexes: {
-          count: stats.nindexes,
-          sizeMB: (stats.totalIndexSize / 1024 / 1024).toFixed(2),
+          count: indexCount,
+          sizeMB: (totalIndexSize / 1024 / 1024).toFixed(2),
         },
         dateRange: {
           oldest: oldestCandle ? new Date(oldestCandle.t * 1000).toISOString() : null,
@@ -73,8 +92,8 @@ export async function GET() {
           count: s.count,
         })),
         health: {
-          status: stats.count > 500000 ? 'warning' : 'healthy',
-          message: stats.count > 500000 
+          status: totalCount > 500000 ? 'warning' : 'healthy',
+          message: totalCount > 500000 
             ? '⚠️ Consider running cleanup to reduce database size'
             : '✅ Database size is healthy',
         },

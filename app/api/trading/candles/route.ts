@@ -4,6 +4,7 @@ import Candle1m from '@/database/models/candle-1m.model';
 import { getRecentCandles, fetchCandlesForRange, Timeframe } from '@/lib/services/forex-historical.service';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { getFormingCandle } from '@/lib/services/websocket-price-streamer';
+import { getAggregatedCandles, isAggregatorSupported } from '@/lib/services/candle-aggregator.service';
 import mongoose from 'mongoose';
 
 // Track which symbols are currently being seeded (prevent duplicate seeding)
@@ -351,7 +352,32 @@ async function handleCandleRequest(symbol: string, timeframe: string, count: num
     }
   }
 
-  // For other timeframes: Fetch from Massive.com REST API
+  // ====================================================================
+  // AGGREGATED TIMEFRAMES (built from 1m candles)
+  // Currently: 5m (can be extended to 15m, 30m, 1h, 4h)
+  // Benefits: 100% consistency with 1m, no external API calls, fast caching
+  // ====================================================================
+  if (isAggregatorSupported(timeframe)) {
+    try {
+      const result = await getAggregatedCandles(symbol, timeframe, limit);
+      
+      return NextResponse.json({
+        candles: result.candles,
+        formingCandle: result.formingCandle,
+        source: result.source,
+        cached: result.cached,
+        lastUpdate: Date.now(),
+      });
+    } catch (error) {
+      console.error(`❌ [Candles API] Aggregation failed for ${symbol} ${timeframe}:`, error);
+      // Fall through to Massive.com API as fallback
+    }
+  }
+
+  // ====================================================================
+  // OTHER TIMEFRAMES: Fetch from Massive.com REST API
+  // Used for: D, W, M (or as fallback if aggregation fails)
+  // ====================================================================
   const timeframeMap: Record<string, Timeframe> = {
     '5m': '5',
     '15m': '15',
