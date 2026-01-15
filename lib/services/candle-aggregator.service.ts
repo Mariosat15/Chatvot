@@ -345,46 +345,45 @@ export async function getAggregatedCandles(
       const YEARS_OF_HISTORY = 10;
       const fromTimestampMs = (oldestMongoTime * 1000) - (YEARS_OF_HISTORY * 365 * 24 * 60 * 60 * 1000);
       const toTimestampMs = (oldestMongoTime - 60) * 1000;
-        
-        console.log(`📅 [Background] Starting fetch for ${symbol} ${timeframe} from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
-        
-        // Background async fetch
-        (async () => {
-          try {
-            const apiCandles = await fetchCandlesForRange(
-              symbol as ForexSymbol, 
-              apiTimeframe, 
-              fromTimestampMs, 
-              toTimestampMs
-            );
+      
+      console.log(`📅 [Background] Starting fetch for ${symbol} ${timeframe} from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
+      
+      // Background async fetch
+      (async () => {
+        try {
+          const apiCandles = await fetchCandlesForRange(
+            symbol as ForexSymbol, 
+            apiTimeframe, 
+            fromTimestampMs, 
+            toTimestampMs
+          );
+          
+          if (apiCandles.length > 0) {
+            const apiCandlesFormatted: AggregatedCandle[] = apiCandles.map(c => ({
+              time: Math.floor(c.time / 1000),
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+              volume: c.volume,
+            }));
             
-            if (apiCandles.length > 0) {
-              const apiCandlesFormatted: AggregatedCandle[] = apiCandles.map(c => ({
-                time: Math.floor(c.time / 1000),
-                open: c.open,
-                high: c.high,
-                low: c.low,
-                close: c.close,
-                volume: c.volume,
-              }));
-              
-              // Cache the results
-              historicalApiCache.set(historicalCacheKey, {
-                candles: apiCandlesFormatted,
-                fetchedAt: Date.now(),
-              });
-              
-              console.log(`✅ [Background] Cached ${apiCandlesFormatted.length} ${timeframe} candles for ${symbol} (oldest: ${new Date(apiCandlesFormatted[0]?.time * 1000).toISOString()})`);
-            } else {
-              console.log(`⚠️ [Background] No historical data available from Massive.com for ${symbol} ${timeframe}`);
-            }
-          } catch (error) {
-            console.error(`❌ [Background] Failed to fetch ${symbol} ${timeframe}:`, error);
-          } finally {
-            backgroundFetchInProgress.delete(historicalCacheKey);
+            // Cache the results
+            historicalApiCache.set(historicalCacheKey, {
+              candles: apiCandlesFormatted,
+              fetchedAt: Date.now(),
+            });
+            
+            console.log(`✅ [Background] Cached ${apiCandlesFormatted.length} ${timeframe} candles for ${symbol} (oldest: ${new Date(apiCandlesFormatted[0]?.time * 1000).toISOString()})`);
+          } else {
+            console.log(`⚠️ [Background] No historical data available from Massive.com for ${symbol} ${timeframe}`);
           }
-        })();
-      }
+        } catch (error) {
+          console.error(`❌ [Background] Failed to fetch ${symbol} ${timeframe}:`, error);
+        } finally {
+          backgroundFetchInProgress.delete(historicalCacheKey);
+        }
+      })();
     }
   } else if (candles1m.length === 0) {
     // No MongoDB data at all - fetch entirely from Massive.com API using getRecentCandles
