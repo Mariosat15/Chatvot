@@ -224,131 +224,153 @@ async function handleCandleRequest(symbol: string, timeframe: string, count: num
     ? Math.min(count || 100000, 200000) // 1m: up to 200k candles (~139 days)
     : Math.min(count || 500, 5000);     // Other TFs: reasonable limit
 
-  // For 1-minute timeframe: Get from MongoDB (server source of truth)
+  // For 1-minute timeframe: HYBRID - MongoDB (recent) + Massive.com (older)
   if (timeframe === '1m' || timeframe === '1') {
     try {
       await connectToDatabase();
-      let candles = await Candle1m.getCandles(symbol, limit);
       
-      // If MongoDB has enough candles, add forming candle and return
-      if (candles && candles.length >= 50) {
-        // Auto-fill gaps in background (if enabled)
-        autoFillGaps(symbol, candles);
+      // Get ALL candles from MongoDB (no limit - we'll merge with API data)
+      const mongoCandles = await Candle1m.getCandles(symbol, 200000) || [];
+      
+      // Get forming candle from WebSocket streamer
+      const formingCandle = getFormingCandle(symbol);
+      
+      // Find the oldest timestamp in MongoDB
+      const oldestMongoTime = mongoCandles.length > 0 
+        ? mongoCandles[0].time  // Candles are sorted newest-first, so [0] is newest
+        : null;
+      
+      // Actually, getCandles returns sorted by time ascending, so first is oldest
+      const sortedMongoCandles = [...mongoCandles].sort((a, b) => a.time - b.time);
+      const oldestMongoTimestamp = sortedMongoCandles.length > 0 ? sortedMongoCandles[0].time : null;
+      const newestMongoTimestamp = sortedMongoCandles.length > 0 ? sortedMongoCandles[sortedMongoCandles.length - 1].time : null;
+      
+      let finalCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
+      
+      // If user wants more candles than MongoDB has, fetch older data from Massive.com
+      if (mongoCandles.length < limit && oldestMongoTimestamp) {
+        console.log(`🔄 [Candles API] MongoDB has ${mongoCandles.length} candles, user wants ${limit}. Fetching older data from Massive.com...`);
         
-        // Get current forming candle from WebSocket streamer (SERVER AUTHORITATIVE!)
-        const formingCandle = getFormingCandle(symbol);
+        // Fetch from Massive.com API (this returns candles sorted newest first)
+        const apiCandles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit);
         
-        // Create response candles, potentially adding/updating forming candle
-        const responseCandles = [...candles];
+        // Convert API candles to seconds (they come in seconds already from getRecentCandles)
+        const apiCandlesFormatted = apiCandles.map(c => ({
+          time: c.time, // Already in seconds
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        }));
         
-        if (formingCandle) {
-          const lastCandle = responseCandles[responseCandles.length - 1];
-          
-          if (lastCandle && lastCandle.time === formingCandle.time) {
-            // Same minute - UPDATE with server's authoritative values
-            responseCandles[responseCandles.length - 1] = {
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            };
-          } else if (!lastCandle || formingCandle.time > lastCandle.time) {
-            // New minute - APPEND forming candle
-            responseCandles.push({
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            });
-          }
-        }
+        // MERGE: Use MongoDB for recent data (authoritative), Massive.com for older data
+        // MongoDB data takes priority for any overlapping timestamps
+        const mongoTimeSet = new Set(sortedMongoCandles.map(c => c.time));
         
-        console.log(`🕯️ [Candles API] Returning ${responseCandles.length} candles (incl. forming) for ${symbol}`);
-        return NextResponse.json({ 
-          candles: responseCandles,
-          formingCandle: formingCandle ? {
+        // Get API candles that are OLDER than our MongoDB data (no overlap)
+        const olderApiCandles = apiCandlesFormatted.filter(c => 
+          c.time < oldestMongoTimestamp! && !mongoTimeSet.has(c.time)
+        );
+        
+        // Combine: [older API data] + [MongoDB data]
+        finalCandles = [...olderApiCandles, ...sortedMongoCandles].sort((a, b) => a.time - b.time);
+        
+        console.log(`✅ [Candles API] Merged: ${olderApiCandles.length} from Massive.com + ${sortedMongoCandles.length} from MongoDB = ${finalCandles.length} total`);
+      } else if (mongoCandles.length === 0) {
+        // No MongoDB data - fetch entirely from Massive.com
+        console.log(`⚠️ [Candles API] No MongoDB data for ${symbol}, fetching from Massive.com...`);
+        
+        const apiCandles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit);
+        finalCandles = apiCandles.map(c => ({
+          time: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        })).sort((a, b) => a.time - b.time);
+        
+        // Also seed to MongoDB for future use
+        seedHistoricalCandles(symbol, limit).catch(err => 
+          console.error(`Failed to seed candles for ${symbol}:`, err)
+        );
+      } else {
+        // MongoDB has enough data
+        finalCandles = sortedMongoCandles;
+      }
+      
+      // Auto-fill gaps in background (if enabled)
+      if (finalCandles.length > 0) {
+        autoFillGaps(symbol, finalCandles);
+      }
+      
+      // Add/update forming candle
+      if (formingCandle) {
+        const lastCandle = finalCandles[finalCandles.length - 1];
+        
+        if (lastCandle && lastCandle.time === formingCandle.time) {
+          // Same minute - UPDATE with server's authoritative values
+          finalCandles[finalCandles.length - 1] = {
             time: formingCandle.time,
             open: formingCandle.open,
             high: formingCandle.high,
             low: formingCandle.low,
             close: formingCandle.close,
-            tickCount: formingCandle.tickCount,
-          } : null,
-          source: 'mongodb',
-          lastUpdate: Date.now(),
-        });
-      }
-      
-      // MongoDB empty or too few candles - SEED historical data first
-      console.log(`⚠️ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, seeding historical data...`);
-      
-      // Seed historical candles (fetches from Massive.com and saves to MongoDB)
-      await seedHistoricalCandles(symbol, limit);
-      
-      // Now fetch from MongoDB again (should have data now)
-      candles = await Candle1m.getCandles(symbol, limit);
-      
-      if (candles && candles.length > 0) {
-        // Also add forming candle after seeding
-        const formingCandle = getFormingCandle(symbol);
-        const responseCandles = [...candles];
-        
-        if (formingCandle) {
-          const lastCandle = responseCandles[responseCandles.length - 1];
-          if (lastCandle && lastCandle.time === formingCandle.time) {
-            responseCandles[responseCandles.length - 1] = {
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            };
-          } else if (!lastCandle || formingCandle.time > lastCandle.time) {
-            responseCandles.push({
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            });
-          }
-        }
-        
-        console.log(`✅ [Candles API] After seeding: Returning ${responseCandles.length} candles for ${symbol}`);
-        return NextResponse.json({ 
-          candles: responseCandles,
-          formingCandle: formingCandle ? {
+          };
+        } else if (!lastCandle || formingCandle.time > lastCandle.time) {
+          // New minute - APPEND forming candle
+          finalCandles.push({
             time: formingCandle.time,
             open: formingCandle.open,
             high: formingCandle.high,
             low: formingCandle.low,
             close: formingCandle.close,
-            tickCount: formingCandle.tickCount,
-          } : null,
-          source: 'mongodb_seeded',
-          lastUpdate: Date.now(),
-        });
+          });
+        }
       }
       
-      // Still no candles - return empty with error message
-      console.error(`❌ [Candles API] Failed to get candles for ${symbol} after seeding`);
+      // Limit to requested count (take most recent)
+      const limitedCandles = finalCandles.slice(-limit);
+      
       return NextResponse.json({ 
-        candles: [],
-        source: 'error',
-        error: 'Failed to fetch historical candles',
+        candles: limitedCandles,
+        formingCandle: formingCandle ? {
+          time: formingCandle.time,
+          open: formingCandle.open,
+          high: formingCandle.high,
+          low: formingCandle.low,
+          close: formingCandle.close,
+          tickCount: formingCandle.tickCount,
+        } : null,
+        source: mongoCandles.length < limit ? 'hybrid_mongodb_massive' : 'mongodb',
+        mongoCount: mongoCandles.length,
         lastUpdate: Date.now(),
       });
       
     } catch (dbError) {
-      console.error(`❌ [Candles API] MongoDB error for ${symbol}:`, dbError);
-      return NextResponse.json({ 
-        candles: [],
-        source: 'error',
-        error: 'Database error',
-        lastUpdate: Date.now(),
-      });
+      console.error(`❌ [Candles API] Error for ${symbol}:`, dbError);
+      
+      // Fallback to Massive.com API only
+      try {
+        const apiCandles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit);
+        return NextResponse.json({ 
+          candles: apiCandles.map(c => ({
+            time: c.time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+          })),
+          source: 'massive_api_fallback',
+          lastUpdate: Date.now(),
+        });
+      } catch {
+        return NextResponse.json({ 
+          candles: [],
+          source: 'error',
+          error: 'Database and API error',
+          lastUpdate: Date.now(),
+        });
+      }
     }
   }
 

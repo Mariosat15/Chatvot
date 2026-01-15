@@ -20,6 +20,8 @@
 import { connectToDatabase } from '@/database/mongoose';
 import Candle1m, { CandleData } from '@/database/models/candle-1m.model';
 import { getFormingCandle, FormingCandle } from '@/lib/services/websocket-price-streamer';
+import { getRecentCandles, Timeframe } from '@/lib/services/forex-historical.service';
+import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 
 // ============================================
 // TYPES
@@ -268,6 +270,15 @@ export async function getAggregatedCandles(
     throw new Error(`Unsupported timeframe: ${timeframe}`);
   }
   
+  // Map timeframe to Massive.com API format
+  const apiTimeframeMap: Record<number, Timeframe> = {
+    5: '5',
+    15: '15',
+    30: '30',
+    60: '60',
+    240: '240',
+  };
+  
   // Calculate how many 1m candles we need
   // For 500 5m candles, we need 500 * 5 = 2500 1m candles
   const candles1mNeeded = count * timeframeMinutes;
@@ -276,17 +287,90 @@ export async function getAggregatedCandles(
   await connectToDatabase();
   const candles1m = await Candle1m.getCandles(symbol, candles1mNeeded);
   
-  if (candles1m.length === 0) {
-    return {
-      candles: [],
-      formingCandle: null,
-      source: 'aggregated_empty',
-      cached: false,
-    };
-  }
+  // Aggregate into target timeframe from MongoDB data
+  const aggregatedFromMongo = aggregateCandles(candles1m, timeframeMinutes);
   
-  // Aggregate into target timeframe
-  const aggregated = aggregateCandles(candles1m, timeframeMinutes);
+  // ==== HYBRID MERGE: If MongoDB doesn't have enough, fetch older from Massive.com ====
+  let finalAggregated: AggregatedCandle[] = [];
+  let source = 'aggregated_fresh';
+  
+  if (aggregatedFromMongo.length < count && candles1m.length > 0) {
+    // MongoDB has some data but not enough - fetch older data from Massive.com
+    console.log(`🔄 [Aggregator] ${symbol} ${timeframe}: MongoDB has ${aggregatedFromMongo.length} candles, need ${count}. Fetching older from Massive.com...`);
+    
+    try {
+      const apiTimeframe = apiTimeframeMap[timeframeMinutes];
+      if (apiTimeframe) {
+        // Fetch from Massive.com API
+        const apiCandles = await getRecentCandles(symbol as ForexSymbol, apiTimeframe, count);
+        
+        // Convert API candles to our format
+        const apiCandlesFormatted: AggregatedCandle[] = apiCandles.map(c => ({
+          time: c.time, // Already in seconds
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: c.volume,
+        }));
+        
+        // Find oldest time in MongoDB data
+        const oldestMongoTime = aggregatedFromMongo.length > 0 
+          ? Math.min(...aggregatedFromMongo.map(c => c.time))
+          : Infinity;
+        
+        // Get API candles that are OLDER than our MongoDB data
+        const olderApiCandles = apiCandlesFormatted.filter(c => c.time < oldestMongoTime);
+        
+        // Create a set of MongoDB times for deduplication
+        const mongoTimeSet = new Set(aggregatedFromMongo.map(c => c.time));
+        
+        // Filter out any duplicates
+        const uniqueOlderCandles = olderApiCandles.filter(c => !mongoTimeSet.has(c.time));
+        
+        // Merge: [older API data] + [MongoDB aggregated data]
+        finalAggregated = [...uniqueOlderCandles, ...aggregatedFromMongo].sort((a, b) => a.time - b.time);
+        source = 'hybrid_aggregated_massive';
+        
+        console.log(`✅ [Aggregator] ${symbol} ${timeframe}: Merged ${uniqueOlderCandles.length} from API + ${aggregatedFromMongo.length} from MongoDB = ${finalAggregated.length} total`);
+      } else {
+        finalAggregated = aggregatedFromMongo;
+      }
+    } catch (apiError) {
+      console.error(`⚠️ [Aggregator] Failed to fetch from Massive.com for ${symbol} ${timeframe}:`, apiError);
+      finalAggregated = aggregatedFromMongo;
+    }
+  } else if (candles1m.length === 0) {
+    // No MongoDB data - fetch entirely from Massive.com API
+    console.log(`⚠️ [Aggregator] ${symbol} ${timeframe}: No MongoDB data, fetching from Massive.com...`);
+    
+    try {
+      const apiTimeframe = apiTimeframeMap[timeframeMinutes];
+      if (apiTimeframe) {
+        const apiCandles = await getRecentCandles(symbol as ForexSymbol, apiTimeframe, count);
+        finalAggregated = apiCandles.map(c => ({
+          time: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: c.volume,
+        })).sort((a, b) => a.time - b.time);
+        source = 'massive_api_only';
+      }
+    } catch (apiError) {
+      console.error(`❌ [Aggregator] Failed to fetch from Massive.com for ${symbol} ${timeframe}:`, apiError);
+      return {
+        candles: [],
+        formingCandle: null,
+        source: 'error',
+        cached: false,
+      };
+    }
+  } else {
+    // MongoDB has enough data
+    finalAggregated = aggregatedFromMongo;
+  }
   
   // Get forming candle
   const forming1m = getFormingCandle(symbol);
@@ -294,7 +378,7 @@ export async function getAggregatedCandles(
   
   // Store in cache (without forming candle - that's calculated fresh)
   aggregatedCandleCache.set(cacheKey, {
-    candles: aggregated,
+    candles: finalAggregated,
     formingCandle: null, // We recalculate this on each request
     cachedAt: Date.now(),
     symbol,
@@ -302,7 +386,7 @@ export async function getAggregatedCandles(
   });
   
   // Prepare result with forming candle
-  const result = [...aggregated];
+  const result = [...finalAggregated];
   
   if (formingCandle) {
     const lastIndex = result.length - 1;
@@ -315,13 +399,13 @@ export async function getAggregatedCandles(
   
   // Log occasionally
   if (Math.random() < 0.1) {
-    console.log(`📊 [Aggregator] ${symbol} ${timeframe}: ${candles1m.length} 1m → ${aggregated.length} candles (cache: ${cacheHits} hits, ${cacheMisses} misses)`);
+    console.log(`📊 [Aggregator] ${symbol} ${timeframe}: ${finalAggregated.length} candles (source: ${source}, cache: ${cacheHits} hits, ${cacheMisses} misses)`);
   }
   
   return {
     candles: result.slice(-count),
     formingCandle,
-    source: 'aggregated_fresh',
+    source,
     cached: false,
   };
 }
