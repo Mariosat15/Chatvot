@@ -782,9 +782,9 @@ async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void
   const buffer = state.completedCandlesBuffer.get(candle.symbol)!;
   buffer.push(completedCandle);
   
-  // Keep only last 30 candles (enough for 30m aggregation)
-  // 5m needs max 5 candles, 15m needs max 15 candles, 30m needs max 30 candles
-  const MAX_BUFFER_SIZE = 30;
+  // Keep only last 60 candles (enough for 1h aggregation)
+  // 5m needs max 5 candles, 15m needs max 15 candles, 30m needs max 30 candles, 1h needs max 60 candles
+  const MAX_BUFFER_SIZE = 60;
   if (buffer.length > MAX_BUFFER_SIZE) {
     buffer.shift(); // Remove oldest
   }
@@ -881,6 +881,13 @@ function calculate15mFormingCandle(symbol: string): FormingCandle | null {
  */
 function calculate30mFormingCandle(symbol: string): FormingCandle | null {
   return calculateFormingCandleForTimeframe(symbol, 30);
+}
+
+/**
+ * Calculate 1h forming candle from 1m candles
+ */
+function calculate1hFormingCandle(symbol: string): FormingCandle | null {
+  return calculateFormingCandleForTimeframe(symbol, 60);
 }
 
 /**
@@ -1238,6 +1245,13 @@ export function getForming30mCandle(symbol: string): FormingCandle | null {
 }
 
 /**
+ * Get 1h forming candle (calculated from buffer + 1m forming)
+ */
+export function getForming1hCandle(symbol: string): FormingCandle | null {
+  return calculate1hFormingCandle(symbol);
+}
+
+/**
  * Get all forming candles (current minute candles being built)
  */
 export function getAllFormingCandles(): Map<string, FormingCandle> {
@@ -1394,10 +1408,11 @@ async function broadcastFormingCandles(): Promise<void> {
   // Get all 1m forming candles
   const formingCandles = Array.from(state.formingCandles.values());
   
-  // Calculate 5m, 15m, and 30m forming candles for each symbol
+  // Calculate 5m, 15m, 30m, and 1h forming candles for each symbol
   const formingCandles5m: FormingCandle[] = [];
   const formingCandles15m: FormingCandle[] = [];
   const formingCandles30m: FormingCandle[] = [];
+  const formingCandles1h: FormingCandle[] = [];
   
   for (const candle1m of formingCandles) {
     const candle5m = calculate5mFormingCandle(candle1m.symbol);
@@ -1413,6 +1428,11 @@ async function broadcastFormingCandles(): Promise<void> {
     const candle30m = calculate30mFormingCandle(candle1m.symbol);
     if (candle30m) {
       formingCandles30m.push(candle30m);
+    }
+    
+    const candle1h = calculate1hFormingCandle(candle1m.symbol);
+    if (candle1h) {
+      formingCandles1h.push(candle1h);
     }
   }
   
@@ -1476,6 +1496,16 @@ async function broadcastFormingCandles(): Promise<void> {
           close: c.close,
           timeframe: '30m',
         })),
+        // 1h forming candles (aggregated from 1m)
+        formingCandles1h: formingCandles1h.map(c => ({
+          symbol: c.symbol,
+          time: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          timeframe: '1h',
+        })),
       }),
     });
     
@@ -1510,7 +1540,7 @@ function stopBroadcastTimer(): void {
 
 /**
  * Seed the completed candles buffer from MongoDB
- * This ensures 5m forming candles work immediately after server restart
+ * This ensures 5m, 15m, 30m, and 1h forming candles work immediately after server restart
  */
 async function seedCompletedCandlesBuffer(): Promise<void> {
   const state = getState();
@@ -1524,8 +1554,8 @@ async function seedCompletedCandlesBuffer(): Promise<void> {
     console.log(`🌱 [Buffer Seed] Seeding completed candles buffer for ${symbols.length} symbols...`);
     
     for (const symbol of symbols) {
-      // Get last 30 completed 1m candles for each symbol (enough for 30m aggregation)
-      const candles = await Candle1m.getCandles(symbol, 30);
+      // Get last 60 completed 1m candles for each symbol (enough for 1h aggregation)
+      const candles = await Candle1m.getCandles(symbol, 60);
       
       if (candles.length > 0) {
         // Store in buffer (skip the most recent one as it might be the current forming candle)

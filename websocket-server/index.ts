@@ -294,9 +294,9 @@ const server = createServer(async (req, res) => {
             break;
 
           case 'prices':
-            // Broadcast prices AND forming candles (1m + 5m + 15m + 30m) to ALL connected clients
+            // Broadcast prices AND forming candles (1m + 5m + 15m + 30m + 1h) to ALL connected clients
             // Called by websocket-price-streamer every ~200ms
-            if (data.prices || data.formingCandles || data.formingCandles5m || data.formingCandles15m || data.formingCandles30m) {
+            if (data.prices || data.formingCandles || data.formingCandles5m || data.formingCandles15m || data.formingCandles30m || data.formingCandles1h) {
               const priceEvent = {
                 type: 'price_update',
                 data: {
@@ -305,6 +305,7 @@ const server = createServer(async (req, res) => {
                   formingCandles5m: data.formingCandles5m || [],    // 5m forming candles
                   formingCandles15m: data.formingCandles15m || [],  // 15m forming candles
                   formingCandles30m: data.formingCandles30m || [],  // 30m forming candles
+                  formingCandles1h: data.formingCandles1h || [],    // 1h forming candles
                   timestamp: Date.now(),
                 },
               };
@@ -324,7 +325,7 @@ const server = createServer(async (req, res) => {
               
               // Log occasionally (every 10th broadcast)
               if (Math.random() < 0.1) {
-                console.log(`📊 Broadcast ${data.prices?.length || 0} prices + ${data.formingCandles?.length || 0} 1m + ${data.formingCandles5m?.length || 0} 5m + ${data.formingCandles15m?.length || 0} 15m + ${data.formingCandles30m?.length || 0} 30m to ${clientCount} clients`);
+                console.log(`📊 Broadcast ${data.prices?.length || 0} prices + ${data.formingCandles?.length || 0} 1m + ${data.formingCandles5m?.length || 0} 5m + ${data.formingCandles15m?.length || 0} 15m + ${data.formingCandles30m?.length || 0} 30m + ${data.formingCandles1h?.length || 0} 1h to ${clientCount} clients`);
               }
             }
             break;
