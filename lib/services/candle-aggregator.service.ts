@@ -22,6 +22,13 @@ import Candle1m, { CandleData } from '@/database/models/candle-1m.model';
 import { getFormingCandle, FormingCandle } from '@/lib/services/websocket-price-streamer';
 import { getRecentCandles, fetchCandlesForRange, Timeframe } from '@/lib/services/forex-historical.service';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
+import { 
+  getHistoricalCandles, 
+  saveHistoricalCandles, 
+  hasHistoricalData,
+  normalizeTimeframe,
+  HistoricalTimeframe 
+} from '@/database/models/candle-historical.model';
 
 // ============================================
 // TYPES
@@ -86,16 +93,11 @@ const aggregatedCandleCache = new Map<string, CacheEntry>();
 let cacheHits = 0;
 let cacheMisses = 0;
 
-// Progressive loading: Track background fetches
+// Progressive loading: Track background fetches to avoid duplicate API calls
 const backgroundFetchInProgress = new Set<string>();
-interface HistoricalCache {
-  candles: AggregatedCandle[];
-  fetchedAt: number;
-}
-const historicalApiCache = new Map<string, HistoricalCache>();
-// Historical data is STATIC (doesn't change) - cache for 24 hours
-// Only today's candles change, and those come from MongoDB not API
-const HISTORICAL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+// NOTE: Historical data is now stored in MongoDB permanently (candles_historical_*)
+// No more RAM cache that gets lost on restart!
 
 /**
  * Get cache key for a symbol/timeframe combination
@@ -301,90 +303,98 @@ export async function getAggregatedCandles(
   // Aggregate into target timeframe from MongoDB data
   const aggregatedFromMongo = aggregateCandles(candles1m, timeframeMinutes);
   
-  // ==== PROGRESSIVE LOADING: Fast initial load, background fetch for history ====
+  // ==== HISTORICAL DATA: Stored permanently in MongoDB ====
   let finalAggregated: AggregatedCandle[] = [];
   let source = 'aggregated_fresh';
   
-  // ALWAYS try to get historical data from API for higher timeframes
-  // This ensures we have full depth even if MongoDB has "enough" for the current limit
   const apiTimeframe = apiTimeframeMap[timeframeMinutes];
-  const historicalCacheKey = `${symbol}:${timeframe}:historical`;
-  const cachedHistorical = historicalApiCache.get(historicalCacheKey);
-  const cacheValid = cachedHistorical && (Date.now() - cachedHistorical.fetchedAt < HISTORICAL_CACHE_TTL);
+  const normalizedTf = normalizeTimeframe(timeframe);
+  const backgroundKey = `${symbol}:${timeframe}:fetch`;
   
   const oldestMongoTime = aggregatedFromMongo.length > 0 
     ? Math.min(...aggregatedFromMongo.map(c => c.time))
     : Math.floor(Date.now() / 1000);
   
-  if (cacheValid && cachedHistorical && cachedHistorical.candles.length > 0) {
-    // USE CACHED HISTORICAL DATA - instant!
-    console.log(`⚡ [Aggregator] Using cached historical data for ${symbol} ${timeframe} (${cachedHistorical.candles.length} candles)`);
-    
-    const mongoTimeSet = new Set(aggregatedFromMongo.map(c => c.time));
-    const uniqueOlderCandles = cachedHistorical.candles.filter(c => 
-      c.time < oldestMongoTime && !mongoTimeSet.has(c.time)
-    );
-    
-    finalAggregated = [...uniqueOlderCandles, ...aggregatedFromMongo].sort((a, b) => a.time - b.time);
-    source = 'hybrid_cached';
-    
-    console.log(`✅ [Aggregator] ${symbol} ${timeframe}: Merged ${uniqueOlderCandles.length} cached + ${aggregatedFromMongo.length} MongoDB = ${finalAggregated.length} total`);
-  } else if (apiTimeframe && candles1m.length > 0) {
-    // NO CACHE - Return MongoDB data immediately, fetch API data in background
-    console.log(`🚀 [Aggregator] Progressive load: Returning ${aggregatedFromMongo.length} MongoDB candles for ${symbol} ${timeframe} immediately`);
-    finalAggregated = aggregatedFromMongo;
-    source = 'mongodb_progressive';
-    
-    // Start background fetch if not already running
-    if (!backgroundFetchInProgress.has(historicalCacheKey)) {
-      backgroundFetchInProgress.add(historicalCacheKey);
+  // Check if we have historical data in MongoDB (permanent storage)
+  if (normalizedTf && apiTimeframe) {
+    try {
+      // Get historical candles from MongoDB (before oldest aggregated candle)
+      const historicalCandles = await getHistoricalCandles(
+        normalizedTf,
+        symbol,
+        oldestMongoTime,
+        count
+      );
       
-      // ALWAYS fetch 10 years of history for higher timeframes (not just "missing" candles)
-      // This ensures we get full depth from Massive.com API
-      // Currencies Starter plan supports 10+ years of historical data
-      const YEARS_OF_HISTORY = 10;
-      const fromTimestampMs = (oldestMongoTime * 1000) - (YEARS_OF_HISTORY * 365 * 24 * 60 * 60 * 1000);
-      const toTimestampMs = (oldestMongoTime - 60) * 1000;
-      
-      console.log(`📅 [Background] Starting fetch for ${symbol} ${timeframe} from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
-      
-      // Background async fetch
-      (async () => {
-        try {
-          const apiCandles = await fetchCandlesForRange(
-            symbol as ForexSymbol, 
-            apiTimeframe, 
-            fromTimestampMs, 
-            toTimestampMs
-          );
+      if (historicalCandles.length > 0) {
+        // Merge historical (old) + aggregated (recent)
+        const mongoTimeSet = new Set(aggregatedFromMongo.map(c => c.time));
+        const uniqueOlderCandles = historicalCandles.filter(c => !mongoTimeSet.has(c.time));
+        
+        finalAggregated = [...uniqueOlderCandles, ...aggregatedFromMongo].sort((a, b) => a.time - b.time);
+        source = 'hybrid_mongodb';
+        
+        console.log(`✅ [Aggregator] ${symbol} ${timeframe}: Merged ${uniqueOlderCandles.length} historical + ${aggregatedFromMongo.length} recent = ${finalAggregated.length} total`);
+      } else {
+        // No historical data yet - return MongoDB data and fetch in background
+        finalAggregated = aggregatedFromMongo;
+        source = 'mongodb_only';
+        
+        // Start background fetch if not already running
+        if (!backgroundFetchInProgress.has(backgroundKey) && candles1m.length > 0) {
+          backgroundFetchInProgress.add(backgroundKey);
           
-          if (apiCandles.length > 0) {
-            const apiCandlesFormatted: AggregatedCandle[] = apiCandles.map(c => ({
-              time: Math.floor(c.time / 1000),
-              open: c.open,
-              high: c.high,
-              low: c.low,
-              close: c.close,
-              volume: c.volume,
-            }));
-            
-            // Cache the results
-            historicalApiCache.set(historicalCacheKey, {
-              candles: apiCandlesFormatted,
-              fetchedAt: Date.now(),
-            });
-            
-            console.log(`✅ [Background] Cached ${apiCandlesFormatted.length} ${timeframe} candles for ${symbol} (oldest: ${new Date(apiCandlesFormatted[0]?.time * 1000).toISOString()})`);
-          } else {
-            console.log(`⚠️ [Background] No historical data available from Massive.com for ${symbol} ${timeframe}`);
-          }
-        } catch (error) {
-          console.error(`❌ [Background] Failed to fetch ${symbol} ${timeframe}:`, error);
-        } finally {
-          backgroundFetchInProgress.delete(historicalCacheKey);
+          // Fetch 10 years of history from Massive.com API
+          const YEARS_OF_HISTORY = 10;
+          const fromTimestampMs = (oldestMongoTime * 1000) - (YEARS_OF_HISTORY * 365 * 24 * 60 * 60 * 1000);
+          const toTimestampMs = (oldestMongoTime - 60) * 1000;
+          
+          console.log(`📅 [Background] Fetching historical ${timeframe} for ${symbol} from ${new Date(fromTimestampMs).toISOString()}`);
+          
+          // Background async fetch and SAVE TO MONGODB (permanent!)
+          (async () => {
+            try {
+              const apiCandles = await fetchCandlesForRange(
+                symbol as ForexSymbol, 
+                apiTimeframe, 
+                fromTimestampMs, 
+                toTimestampMs
+              );
+              
+              if (apiCandles.length > 0) {
+                const candlesToSave = apiCandles.map(c => ({
+                  time: Math.floor(c.time / 1000),
+                  open: c.open,
+                  high: c.high,
+                  low: c.low,
+                  close: c.close,
+                  volume: c.volume,
+                }));
+                
+                // SAVE TO MONGODB PERMANENTLY (not RAM!)
+                const savedCount = await saveHistoricalCandles(normalizedTf, symbol, candlesToSave);
+                
+                console.log(`💾 [Background] Saved ${savedCount} historical ${timeframe} candles for ${symbol} to MongoDB (permanent!)`);
+              } else {
+                console.log(`⚠️ [Background] No historical data from Massive.com for ${symbol} ${timeframe}`);
+              }
+            } catch (error) {
+              console.error(`❌ [Background] Failed to fetch/save ${symbol} ${timeframe}:`, error);
+            } finally {
+              backgroundFetchInProgress.delete(backgroundKey);
+            }
+          })();
         }
-      })();
+      }
+    } catch (error) {
+      console.error(`❌ [Aggregator] Error reading historical data for ${symbol} ${timeframe}:`, error);
+      finalAggregated = aggregatedFromMongo;
+      source = 'mongodb_fallback';
     }
+  } else if (candles1m.length > 0) {
+    // Timeframe doesn't support historical storage, use aggregated only
+    finalAggregated = aggregatedFromMongo;
+    source = 'aggregated_only';
   } else if (candles1m.length === 0) {
     // No MongoDB data at all - fetch entirely from Massive.com API using getRecentCandles
     console.log(`⚠️ [Aggregator] ${symbol} ${timeframe}: No MongoDB data, fetching from Massive.com API...`);
