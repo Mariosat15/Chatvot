@@ -15,6 +15,20 @@ const gapFillInProgress = new Set<string>();
 const lastGapFillCheck = new Map<string, number>();
 const GAP_FILL_CHECK_INTERVAL = 60000; // Check for gaps every 60 seconds per symbol
 
+// ====================================================================
+// PROGRESSIVE LOADING: Cache for historical API data
+// Returns MongoDB data immediately, fetches API data in background
+// ====================================================================
+interface CachedHistoricalData {
+  candles: Array<{ time: number; open: number; high: number; low: number; close: number }>;
+  fetchedAt: number;
+  oldestTime: number;
+  newestTime: number;
+}
+const historicalDataCache = new Map<string, CachedHistoricalData>();
+const backgroundFetchInProgress = new Set<string>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
+
 /**
  * Get Candles API - SERVER SOURCE OF TRUTH
  * 
@@ -327,83 +341,86 @@ async function handleCandleRequest(symbol: string, timeframe: string, count: num
       const newestMongoTimestamp = sortedMongoCandles.length > 0 ? sortedMongoCandles[sortedMongoCandles.length - 1].time : null;
       
       let finalCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
+      let loadingMore = false;
       
-      // If user wants more candles than MongoDB has, fetch older data from Massive.com
+      // ====================================================================
+      // PROGRESSIVE LOADING: Fast initial load, background fetch for history
+      // ====================================================================
+      const cacheKey = `${symbol}:1m`;
+      const cachedData = historicalDataCache.get(cacheKey);
+      const cacheValid = cachedData && (Date.now() - cachedData.fetchedAt < CACHE_TTL_MS);
+      
+      // If user wants more candles than MongoDB has, we need API data
       if (mongoCandles.length < limit && oldestMongoTimestamp) {
         const missingCandles = limit - mongoCandles.length;
-        console.log(`🔄 [Candles API] MongoDB has ${mongoCandles.length} 1m candles, user wants ${limit} (missing ${missingCandles}). Fetching older data from Massive.com...`);
-        console.log(`   MongoDB oldest: ${new Date(oldestMongoTimestamp * 1000).toISOString()}`);
         
-        // Calculate exact range to fetch (from oldest MongoDB going backwards)
-        // This bypasses the 60-day limit of getRecentCandles!
-        const fromTimestampMs = (oldestMongoTimestamp - (missingCandles * 60)) * 1000;
-        const toTimestampMs = (oldestMongoTimestamp - 60) * 1000;
-        
-        console.log(`📅 [Candles API] Fetching 1m from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
-        
-        // Use fetchCandlesForRange for precise historical data (no day limit!)
-        const apiCandles = await fetchCandlesForRange(symbol as ForexSymbol, '1' as Timeframe, fromTimestampMs, toTimestampMs);
-        
-        console.log(`📊 [Candles API] API returned ${apiCandles.length} 1m candles`);
-        
-        // Convert API candles - fetchCandlesForRange returns time in MILLISECONDS
-        const apiCandlesFormatted = apiCandles.map(c => ({
-          time: Math.floor(c.time / 1000), // Convert ms to seconds
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-        }));
-        
-        // Log the range of API data received
-        if (apiCandlesFormatted.length > 0) {
-          const apiOldest = Math.min(...apiCandlesFormatted.map(c => c.time));
-          const apiNewest = Math.max(...apiCandlesFormatted.map(c => c.time));
-          console.log(`   API data range: ${new Date(apiOldest * 1000).toISOString()} to ${new Date(apiNewest * 1000).toISOString()}`);
+        // Check if we have valid cached historical data
+        if (cacheValid && cachedData) {
+          // USE CACHED DATA - instant response!
+          console.log(`⚡ [Candles API] Using cached historical data for ${symbol} (${cachedData.candles.length} candles)`);
           
-          // Check for gap between API newest and MongoDB oldest
-          const gapSeconds = oldestMongoTimestamp - apiNewest;
-          const gapMinutes = Math.floor(gapSeconds / 60);
-          if (gapMinutes > 5) {
-            console.log(`⚠️ [Candles API] GAP DETECTED: ${gapMinutes} minutes (${Math.floor(gapMinutes / 60 / 24)} days) between API data end and MongoDB start!`);
-          }
-        }
-        
-        // MERGE: Use MongoDB for recent data (authoritative), Massive.com for older data
-        // MongoDB data takes priority for any overlapping timestamps
-        const mongoTimeSet = new Set(sortedMongoCandles.map(c => c.time));
-        
-        // Get API candles that are OLDER than our MongoDB data (no overlap)
-        const olderApiCandles = apiCandlesFormatted.filter(c => 
-          c.time < oldestMongoTimestamp! && !mongoTimeSet.has(c.time)
-        );
-        
-        // Combine: [older API data] + [MongoDB data]
-        finalCandles = [...olderApiCandles, ...sortedMongoCandles].sort((a, b) => a.time - b.time);
-        
-        console.log(`✅ [Candles API] Merged: ${olderApiCandles.length} from Massive.com + ${sortedMongoCandles.length} from MongoDB = ${finalCandles.length} total`);
-        
-        // ====================================================================
-        // BOUNDARY GAP DETECTION & FILL
-        // Check for gap between Massive.com data and MongoDB data
-        // ====================================================================
-        if (olderApiCandles.length > 0 && oldestMongoTimestamp) {
-          const newestApiTime = Math.max(...olderApiCandles.map(c => c.time));
-          const gapMinutes = Math.floor((oldestMongoTimestamp - newestApiTime) / 60) - 1;
-          const gapDays = Math.floor(gapMinutes / 60 / 24);
+          const mongoTimeSet = new Set(sortedMongoCandles.map(c => c.time));
+          const olderCachedCandles = cachedData.candles.filter(c => 
+            c.time < oldestMongoTimestamp! && !mongoTimeSet.has(c.time)
+          );
           
-          // If gap is significant (> 5 minutes), try to fill
-          // We now allow larger gaps - Massive.com API will return what it has
-          if (gapMinutes > 5) {
-            console.log(`🔍 [Boundary Gap] Detected ${gapMinutes} minutes (${gapDays} days) gap between API data and MongoDB for ${symbol}`);
-            console.log(`   API ends at: ${new Date(newestApiTime * 1000).toISOString()}`);
-            console.log(`   MongoDB starts at: ${new Date(oldestMongoTimestamp * 1000).toISOString()}`);
+          finalCandles = [...olderCachedCandles, ...sortedMongoCandles].sort((a, b) => a.time - b.time);
+          console.log(`✅ [Candles API] Merged: ${olderCachedCandles.length} cached + ${sortedMongoCandles.length} MongoDB = ${finalCandles.length} total`);
+        } else {
+          // NO CACHE - Return MongoDB data immediately, fetch API data in background
+          console.log(`🚀 [Candles API] Progressive load: Returning ${mongoCandles.length} MongoDB candles immediately`);
+          finalCandles = sortedMongoCandles;
+          loadingMore = true;
+          
+          // Start background fetch (fire and forget)
+          if (!backgroundFetchInProgress.has(cacheKey)) {
+            backgroundFetchInProgress.add(cacheKey);
             
-            // Fill gap in background (fire and forget)
-            // Note: Large gaps might be due to market closure or API data unavailability
-            fillBoundaryGap(symbol, newestApiTime, oldestMongoTimestamp).catch(err =>
-              console.error(`Failed to fill boundary gap for ${symbol}:`, err)
-            );
+            const fromTimestampMs = (oldestMongoTimestamp - (missingCandles * 60)) * 1000;
+            const toTimestampMs = (oldestMongoTimestamp - 60) * 1000;
+            
+            console.log(`📅 [Background] Starting fetch for ${symbol} from ${new Date(fromTimestampMs).toISOString()}`);
+            
+            // Background async fetch
+            (async () => {
+              try {
+                const apiCandles = await fetchCandlesForRange(symbol as ForexSymbol, '1' as Timeframe, fromTimestampMs, toTimestampMs);
+                
+                if (apiCandles.length > 0) {
+                  const apiCandlesFormatted = apiCandles.map(c => ({
+                    time: Math.floor(c.time / 1000),
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close,
+                  }));
+                  
+                  const apiOldest = Math.min(...apiCandlesFormatted.map(c => c.time));
+                  const apiNewest = Math.max(...apiCandlesFormatted.map(c => c.time));
+                  
+                  // Cache the results
+                  historicalDataCache.set(cacheKey, {
+                    candles: apiCandlesFormatted,
+                    fetchedAt: Date.now(),
+                    oldestTime: apiOldest,
+                    newestTime: apiNewest,
+                  });
+                  
+                  console.log(`✅ [Background] Cached ${apiCandlesFormatted.length} candles for ${symbol} (${new Date(apiOldest * 1000).toISOString()} to ${new Date(apiNewest * 1000).toISOString()})`);
+                  
+                  // Check for boundary gap and fill
+                  const gapMinutes = Math.floor((oldestMongoTimestamp - apiNewest) / 60);
+                  if (gapMinutes > 5) {
+                    console.log(`🔍 [Background] Gap detected: ${gapMinutes} minutes - will fill on next request`);
+                    fillBoundaryGap(symbol, apiNewest, oldestMongoTimestamp).catch(() => {});
+                  }
+                }
+              } catch (error) {
+                console.error(`❌ [Background] Failed to fetch for ${symbol}:`, error);
+              } finally {
+                backgroundFetchInProgress.delete(cacheKey);
+              }
+            })();
           }
         }
       } else if (mongoCandles.length === 0) {
@@ -471,8 +488,9 @@ async function handleCandleRequest(symbol: string, timeframe: string, count: num
           close: formingCandle.close,
           tickCount: formingCandle.tickCount,
         } : null,
-        source: mongoCandles.length < limit ? 'hybrid_mongodb_massive' : 'mongodb',
+        source: loadingMore ? 'mongodb_progressive' : (mongoCandles.length < limit ? 'hybrid_mongodb_massive' : 'mongodb'),
         mongoCount: mongoCandles.length,
+        loadingMore, // If true, more historical data is being fetched in background
         lastUpdate: Date.now(),
       });
       

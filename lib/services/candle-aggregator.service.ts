@@ -86,6 +86,15 @@ const aggregatedCandleCache = new Map<string, CacheEntry>();
 let cacheHits = 0;
 let cacheMisses = 0;
 
+// Progressive loading: Track background fetches
+const backgroundFetchInProgress = new Set<string>();
+interface HistoricalCache {
+  candles: AggregatedCandle[];
+  fetchedAt: number;
+}
+const historicalApiCache = new Map<string, HistoricalCache>();
+const HISTORICAL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Get cache key for a symbol/timeframe combination
  */
@@ -290,85 +299,89 @@ export async function getAggregatedCandles(
   // Aggregate into target timeframe from MongoDB data
   const aggregatedFromMongo = aggregateCandles(candles1m, timeframeMinutes);
   
-  // ==== HYBRID MERGE: If MongoDB doesn't have enough, fetch older from Massive.com ====
+  // ==== PROGRESSIVE LOADING: Fast initial load, background fetch for history ====
   let finalAggregated: AggregatedCandle[] = [];
   let source = 'aggregated_fresh';
   
   if (aggregatedFromMongo.length < count && candles1m.length > 0) {
-    // MongoDB has some data but not enough - fetch older data from Massive.com
+    // MongoDB has some data but not enough - check cache or use progressive loading
     const missingCandles = count - aggregatedFromMongo.length;
-    console.log(`🔄 [Aggregator] ${symbol} ${timeframe}: MongoDB has ${aggregatedFromMongo.length} candles, need ${count} (missing ${missingCandles}). Fetching older from Massive.com...`);
+    const historicalCacheKey = `${symbol}:${timeframe}:historical`;
+    const cachedHistorical = historicalApiCache.get(historicalCacheKey);
+    const cacheValid = cachedHistorical && (Date.now() - cachedHistorical.fetchedAt < HISTORICAL_CACHE_TTL);
     
-    try {
-      const apiTimeframe = apiTimeframeMap[timeframeMinutes];
-      if (apiTimeframe) {
-        // Find oldest time in MongoDB data (in seconds)
-        const oldestMongoTime = aggregatedFromMongo.length > 0 
-          ? Math.min(...aggregatedFromMongo.map(c => c.time))
-          : Math.floor(Date.now() / 1000);
+    const apiTimeframe = apiTimeframeMap[timeframeMinutes];
+    const oldestMongoTime = aggregatedFromMongo.length > 0 
+      ? Math.min(...aggregatedFromMongo.map(c => c.time))
+      : Math.floor(Date.now() / 1000);
+    
+    if (cacheValid && cachedHistorical) {
+      // USE CACHED HISTORICAL DATA - instant!
+      console.log(`⚡ [Aggregator] Using cached historical data for ${symbol} ${timeframe} (${cachedHistorical.candles.length} candles)`);
+      
+      const mongoTimeSet = new Set(aggregatedFromMongo.map(c => c.time));
+      const uniqueOlderCandles = cachedHistorical.candles.filter(c => 
+        c.time < oldestMongoTime && !mongoTimeSet.has(c.time)
+      );
+      
+      finalAggregated = [...uniqueOlderCandles, ...aggregatedFromMongo].sort((a, b) => a.time - b.time);
+      source = 'hybrid_cached';
+      
+      console.log(`✅ [Aggregator] ${symbol} ${timeframe}: Merged ${uniqueOlderCandles.length} cached + ${aggregatedFromMongo.length} MongoDB = ${finalAggregated.length} total`);
+    } else if (apiTimeframe) {
+      // NO CACHE - Return MongoDB data immediately, fetch API data in background
+      console.log(`🚀 [Aggregator] Progressive load: Returning ${aggregatedFromMongo.length} MongoDB candles for ${symbol} ${timeframe} immediately`);
+      finalAggregated = aggregatedFromMongo;
+      source = 'mongodb_progressive';
+      
+      // Start background fetch if not already running
+      if (!backgroundFetchInProgress.has(historicalCacheKey)) {
+        backgroundFetchInProgress.add(historicalCacheKey);
         
-        // Calculate how far back we need to go
-        // missingCandles * timeframeMinutes gives us minutes needed
         const minutesBack = missingCandles * timeframeMinutes;
         const fromTimestampMs = (oldestMongoTime - (minutesBack * 60)) * 1000;
-        const toTimestampMs = (oldestMongoTime - 60) * 1000; // End just before MongoDB data
+        const toTimestampMs = (oldestMongoTime - 60) * 1000;
         
-        console.log(`📅 [Aggregator] Fetching ${symbol} ${timeframe} from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
-        console.log(`   MongoDB oldest: ${new Date(oldestMongoTime * 1000).toISOString()}, requesting ${missingCandles} candles going back ${minutesBack} minutes`);
+        console.log(`📅 [Background] Starting fetch for ${symbol} ${timeframe} from ${new Date(fromTimestampMs).toISOString()}`);
         
-        // Use fetchCandlesForRange for precise historical data (no 2-day limit!)
-        const apiCandles = await fetchCandlesForRange(
-          symbol as ForexSymbol, 
-          apiTimeframe, 
-          fromTimestampMs, 
-          toTimestampMs
-        );
-        
-        console.log(`📊 [Aggregator] API returned ${apiCandles.length} candles for ${symbol} ${timeframe}`);
-        
-        // Convert API candles to our format
-        // fetchCandlesForRange returns time in MILLISECONDS, need to convert to seconds
-        const apiCandlesFormatted: AggregatedCandle[] = apiCandles.map(c => ({
-          time: Math.floor(c.time / 1000), // Convert ms to seconds
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          volume: c.volume,
-        }));
-        
-        // Log the range of API data received
-        if (apiCandlesFormatted.length > 0) {
-          const apiOldest = Math.min(...apiCandlesFormatted.map(c => c.time));
-          const apiNewest = Math.max(...apiCandlesFormatted.map(c => c.time));
-          console.log(`   API data range: ${new Date(apiOldest * 1000).toISOString()} to ${new Date(apiNewest * 1000).toISOString()}`);
-          
-          // Check for gap between API newest and MongoDB oldest
-          const gapSeconds = oldestMongoTime - apiNewest;
-          const gapMinutes = Math.floor(gapSeconds / 60);
-          if (gapMinutes > timeframeMinutes * 2) {
-            console.log(`⚠️ [Aggregator] GAP DETECTED: ${gapMinutes} minutes (${Math.floor(gapMinutes / 60 / 24)} days) between API data end and MongoDB start!`);
-            console.log(`   API ends at: ${new Date(apiNewest * 1000).toISOString()}`);
-            console.log(`   MongoDB starts at: ${new Date(oldestMongoTime * 1000).toISOString()}`);
+        // Background async fetch
+        (async () => {
+          try {
+            const apiCandles = await fetchCandlesForRange(
+              symbol as ForexSymbol, 
+              apiTimeframe, 
+              fromTimestampMs, 
+              toTimestampMs
+            );
+            
+            if (apiCandles.length > 0) {
+              const apiCandlesFormatted: AggregatedCandle[] = apiCandles.map(c => ({
+                time: Math.floor(c.time / 1000),
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+                volume: c.volume,
+              }));
+              
+              // Cache the results
+              historicalApiCache.set(historicalCacheKey, {
+                candles: apiCandlesFormatted,
+                fetchedAt: Date.now(),
+              });
+              
+              console.log(`✅ [Background] Cached ${apiCandlesFormatted.length} ${timeframe} candles for ${symbol}`);
+            }
+          } catch (error) {
+            console.error(`❌ [Background] Failed to fetch ${symbol} ${timeframe}:`, error);
+          } finally {
+            backgroundFetchInProgress.delete(historicalCacheKey);
           }
-        }
-        
-        // Create a set of MongoDB times for deduplication
-        const mongoTimeSet = new Set(aggregatedFromMongo.map(c => c.time));
-        
-        // Filter to only candles OLDER than MongoDB and not duplicates
-        const uniqueOlderCandles = apiCandlesFormatted.filter(c => 
-          c.time < oldestMongoTime && !mongoTimeSet.has(c.time)
-        );
-        
-        // Merge: [older API data] + [MongoDB aggregated data]
-        finalAggregated = [...uniqueOlderCandles, ...aggregatedFromMongo].sort((a, b) => a.time - b.time);
-        source = 'hybrid_aggregated_massive';
-        
-        console.log(`✅ [Aggregator] ${symbol} ${timeframe}: Merged ${uniqueOlderCandles.length} from API + ${aggregatedFromMongo.length} from MongoDB = ${finalAggregated.length} total`);
-      } else {
-        finalAggregated = aggregatedFromMongo;
+        })();
       }
+    } else {
+      finalAggregated = aggregatedFromMongo;
+    }
     } catch (apiError) {
       console.error(`⚠️ [Aggregator] Failed to fetch from Massive.com for ${symbol} ${timeframe}:`, apiError);
       finalAggregated = aggregatedFromMongo;
