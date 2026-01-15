@@ -218,11 +218,21 @@ async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): P
  * Shared handler for both GET and POST
  */
 async function handleCandleRequest(symbol: string, timeframe: string, count: number) {
-  // For 1m: get all available candles (cleanup script manages retention)
-  // For other TFs: use reasonable default
-  const limit = timeframe === '1m' || timeframe === '1' 
-    ? Math.min(count || 100000, 200000) // 1m: up to 200k candles (~139 days)
-    : Math.min(count || 500, 5000);     // Other TFs: reasonable limit
+  // Calculate limit based on timeframe
+  // Higher limits for aggregated timeframes to ensure hybrid merge can work
+  let limit: number;
+  
+  if (timeframe === '1m' || timeframe === '1') {
+    // 1m: up to 200k candles (~139 days)
+    limit = Math.min(count || 100000, 200000);
+  } else if (['5m', '5', '15m', '15', '30m', '30', '1h', '60', '4h', '240'].includes(timeframe)) {
+    // Aggregated timeframes: allow up to 50k candles for hybrid merge
+    // This ensures we request MORE than MongoDB has, triggering the merge
+    limit = Math.min(count || 50000, 50000);
+  } else {
+    // D, W, M: reasonable limit
+    limit = Math.min(count || 500, 5000);
+  }
 
   // For 1-minute timeframe: HYBRID - MongoDB (recent) + Massive.com (older)
   if (timeframe === '1m' || timeframe === '1') {
