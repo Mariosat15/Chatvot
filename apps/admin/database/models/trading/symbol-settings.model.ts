@@ -24,6 +24,7 @@ export interface ITradingSymbol extends Document {
   
   // Display/simulation settings
   defaultSpread: number;    // Spread in pips
+  useFixedSpread: boolean;  // If true, use fixed spread; if false, use variable from Massive.com
   commission: number;       // Commission per lot (in USD)
   
   // UI settings
@@ -96,6 +97,11 @@ const TradingSymbolSchema = new Schema<ITradingSymbol>(
       required: true,
       default: 1.5, // 1.5 pips
       min: 0,
+    },
+    useFixedSpread: {
+      type: Boolean,
+      required: true,
+      default: false, // Default to variable spread (current behavior)
     },
     commission: {
       type: Number,

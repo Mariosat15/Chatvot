@@ -44,6 +44,13 @@ export interface FormingCandle {
   tickCount: number;
 }
 
+// Symbol settings for fixed spread (loaded from database)
+interface SymbolSpreadSettings {
+  useFixedSpread: boolean;
+  defaultSpread: number;  // in pips
+  pip: number;            // pip value (0.0001 or 0.01)
+}
+
 interface WebSocketGlobalState {
   ws: import('ws').WebSocket | null;
   isConnecting: boolean;
@@ -54,6 +61,7 @@ interface WebSocketGlobalState {
   heartbeatTimer: NodeJS.Timeout | null;
   priceCache: Map<ForexSymbol, StreamingPriceQuote>;
   dynamicSpreadCache: Map<ForexSymbol, number>;
+  symbolSpreadSettings: Map<string, SymbolSpreadSettings>; // Fixed spread settings per symbol
   formingCandles: Map<string, FormingCandle>; // Current minute candles being built
   lastUpdateTime: number;
   initialized: boolean;
@@ -84,6 +92,7 @@ function getGlobalState(): WebSocketGlobalState {
       heartbeatTimer: null,
       priceCache: new Map<ForexSymbol, StreamingPriceQuote>(),
       dynamicSpreadCache: new Map<ForexSymbol, number>(),
+      symbolSpreadSettings: new Map<string, SymbolSpreadSettings>(),
       formingCandles: new Map<string, FormingCandle>(),
       lastUpdateTime: 0,
       initialized: false,
@@ -186,6 +195,61 @@ async function flushPricesToMongo(): Promise<void> {
     // Don't log every error - just occasionally
     if (Math.random() < 0.1) {
       console.error('⚠️ [MongoDB Cache] Failed to write prices:', error);
+    }
+  }
+}
+
+/**
+ * Load symbol spread settings from database
+ * Called periodically to pick up admin changes
+ */
+let symbolSettingsLoaded = false;
+let symbolSettingsLoadTime = 0;
+const SYMBOL_SETTINGS_CACHE_MS = 60000; // Reload every 60 seconds
+
+async function loadSymbolSpreadSettings(): Promise<void> {
+  const now = Date.now();
+  
+  // Skip if recently loaded
+  if (symbolSettingsLoaded && now - symbolSettingsLoadTime < SYMBOL_SETTINGS_CACHE_MS) {
+    return;
+  }
+  
+  try {
+    const { connectToDatabase } = await import('@/database/mongoose');
+    const mongoose = await import('mongoose');
+    
+    await connectToDatabase();
+    
+    // Get TradingSymbol collection directly (it's in the main database)
+    const db = mongoose.default.connection.db;
+    if (!db) return;
+    
+    const symbols = await db.collection('tradingsymbols').find({}).toArray();
+    
+    const state = getState();
+    for (const sym of symbols) {
+      if (sym.symbol) {
+        state.symbolSpreadSettings.set(sym.symbol, {
+          useFixedSpread: sym.useFixedSpread || false,
+          defaultSpread: sym.defaultSpread || 1.5,
+          pip: sym.pip || 0.0001,
+        });
+      }
+    }
+    
+    symbolSettingsLoaded = true;
+    symbolSettingsLoadTime = now;
+    
+    // Log fixed spread symbols
+    const fixedCount = Array.from(state.symbolSpreadSettings.values()).filter(s => s.useFixedSpread).length;
+    if (fixedCount > 0) {
+      console.log(`📊 [Symbol Settings] Loaded ${symbols.length} symbols, ${fixedCount} using fixed spread`);
+    }
+  } catch (error) {
+    // Silently fail - will use variable spread as fallback
+    if (Math.random() < 0.1) {
+      console.error('⚠️ [Symbol Settings] Failed to load:', error);
     }
   }
 }
@@ -504,19 +568,43 @@ function handleQuoteMessage(msg: {
     return;
   }
 
-  const bid = msg.b;
-  const ask = msg.a;
+  const rawBid = msg.b;
+  const rawAsk = msg.a;
   
-  if (bid === undefined || ask === undefined) return;
+  if (rawBid === undefined || rawAsk === undefined) return;
 
   // CRITICAL: Validate bid < ask (reject invalid data)
-  if (bid >= ask) {
-    console.warn(`⚠️ Invalid quote for ${symbol}: bid (${bid}) >= ask (${ask}) - skipping`);
+  if (rawBid >= rawAsk) {
+    console.warn(`⚠️ Invalid quote for ${symbol}: bid (${rawBid}) >= ask (${rawAsk}) - skipping`);
     return;
   }
 
-  const mid = (bid + ask) / 2;
-  const spread = ask - bid;
+  // Calculate mid price (always from real data)
+  const mid = (rawBid + rawAsk) / 2;
+  
+  // Load symbol settings periodically (non-blocking)
+  loadSymbolSpreadSettings().catch(() => {});
+  
+  // Check if fixed spread is enabled for this symbol
+  const state = getState();
+  const spreadSettings = state.symbolSpreadSettings.get(symbol);
+  
+  let bid: number;
+  let ask: number;
+  let spread: number;
+  
+  if (spreadSettings?.useFixedSpread) {
+    // FIXED SPREAD: Calculate bid/ask from mid using admin-defined spread
+    const halfSpread = (spreadSettings.defaultSpread * spreadSettings.pip) / 2;
+    bid = mid - halfSpread;
+    ask = mid + halfSpread;
+    spread = spreadSettings.defaultSpread * spreadSettings.pip;
+  } else {
+    // VARIABLE SPREAD: Use raw bid/ask from Massive.com
+    bid = rawBid;
+    ask = rawAsk;
+    spread = rawAsk - rawBid;
+  }
 
   // Round values
   const roundedBid = Number(bid.toFixed(5));

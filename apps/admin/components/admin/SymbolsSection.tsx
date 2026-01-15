@@ -44,6 +44,7 @@ interface TradingSymbol {
   maxLotSize: number;
   lotStep: number;
   defaultSpread: number;
+  useFixedSpread: boolean;
   commission: number;
   popular: boolean;
   sortOrder: number;
@@ -768,6 +769,24 @@ export default function SymbolsSection() {
                 </div>
               </div>
               
+              {/* Fixed Spread Toggle */}
+              <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm font-medium">Use Fixed Spread</Label>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {editForm.useFixedSpread 
+                        ? `Fixed ${editForm.defaultSpread || 1.5} pip spread (like retail brokers)`
+                        : 'Variable spread from market data (can widen during news)'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editForm.useFixedSpread || false}
+                    onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, useFixedSpread: checked }))}
+                  />
+                </div>
+              </div>
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Switch
