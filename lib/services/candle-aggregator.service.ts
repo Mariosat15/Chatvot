@@ -315,6 +315,9 @@ export async function getAggregatedCandles(
     ? Math.min(...aggregatedFromMongo.map(c => c.time))
     : Math.floor(Date.now() / 1000);
   
+  // DEBUG: Log what we're working with
+  console.log(`🔍 [Aggregator DEBUG] ${symbol} ${timeframe}: normalizedTf=${normalizedTf}, apiTimeframe=${apiTimeframe}, aggregatedFromMongo=${aggregatedFromMongo.length}, oldestMongoTime=${new Date(oldestMongoTime * 1000).toISOString()}`);
+  
   // Check if we have historical data in MongoDB (permanent storage)
   if (normalizedTf && apiTimeframe) {
     try {
@@ -326,7 +329,24 @@ export async function getAggregatedCandles(
         count
       );
       
-      if (historicalCandles.length > 0) {
+      console.log(`🔍 [Aggregator DEBUG] ${symbol} ${timeframe}: Found ${historicalCandles.length} historical candles in MongoDB`);
+      
+      // Check if there's a GAP between historical data and recent data
+      const newestHistoricalTime = historicalCandles.length > 0 
+        ? Math.max(...historicalCandles.map(c => c.time))
+        : 0;
+      const gapMinutes = newestHistoricalTime > 0 
+        ? Math.floor((oldestMongoTime - newestHistoricalTime) / 60)
+        : Infinity;
+      
+      console.log(`🔍 [Aggregator DEBUG] ${symbol} ${timeframe}: newestHistorical=${newestHistoricalTime > 0 ? new Date(newestHistoricalTime * 1000).toISOString() : 'none'}, gap=${gapMinutes} minutes`);
+      
+      // If we have historical data AND the gap is small (< 1 week), use it
+      // Otherwise, we need to fetch more to fill the gap
+      const ONE_WEEK_MINUTES = 7 * 24 * 60;
+      const hasGoodCoverage = historicalCandles.length > 0 && gapMinutes < ONE_WEEK_MINUTES;
+      
+      if (hasGoodCoverage) {
         // Merge historical (old) + aggregated (recent)
         const mongoTimeSet = new Set(aggregatedFromMongo.map(c => c.time));
         const uniqueOlderCandles = historicalCandles.filter(c => !mongoTimeSet.has(c.time));
@@ -336,9 +356,13 @@ export async function getAggregatedCandles(
         
         console.log(`✅ [Aggregator] ${symbol} ${timeframe}: Merged ${uniqueOlderCandles.length} historical + ${aggregatedFromMongo.length} recent = ${finalAggregated.length} total`);
       } else {
-        // No historical data yet - return MongoDB data and fetch in background
+        // No historical data OR there's a big gap - return MongoDB data and fetch in background
         finalAggregated = aggregatedFromMongo;
-        source = 'mongodb_only';
+        source = historicalCandles.length > 0 ? 'mongodb_gap_detected' : 'mongodb_only';
+        
+        if (historicalCandles.length > 0) {
+          console.log(`⚠️ [Aggregator] ${symbol} ${timeframe}: Gap of ${gapMinutes} minutes detected, need to fetch more history`);
+        }
         
         // Start background fetch if not already running
         if (!backgroundFetchInProgress.has(backgroundKey) && candles1m.length > 0) {
@@ -349,7 +373,7 @@ export async function getAggregatedCandles(
           const fromTimestampMs = (oldestMongoTime * 1000) - (YEARS_OF_HISTORY * 365 * 24 * 60 * 60 * 1000);
           const toTimestampMs = (oldestMongoTime - 60) * 1000;
           
-          console.log(`📅 [Background] Fetching historical ${timeframe} for ${symbol} from ${new Date(fromTimestampMs).toISOString()}`);
+          console.log(`📅 [Background] Fetching historical ${timeframe} for ${symbol} from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
           
           // Background async fetch and SAVE TO MONGODB (permanent!)
           (async () => {
@@ -360,6 +384,8 @@ export async function getAggregatedCandles(
                 fromTimestampMs, 
                 toTimestampMs
               );
+              
+              console.log(`📥 [Background] Received ${apiCandles.length} candles from API for ${symbol} ${timeframe}`);
               
               if (apiCandles.length > 0) {
                 const candlesToSave = apiCandles.map(c => ({
@@ -374,7 +400,7 @@ export async function getAggregatedCandles(
                 // SAVE TO MONGODB PERMANENTLY (not RAM!)
                 const savedCount = await saveHistoricalCandles(normalizedTf, symbol, candlesToSave);
                 
-                console.log(`💾 [Background] Saved ${savedCount} historical ${timeframe} candles for ${symbol} to MongoDB (permanent!)`);
+                console.log(`💾 [Background] Saved ${savedCount} NEW historical ${timeframe} candles for ${symbol} to MongoDB (total received: ${candlesToSave.length})`);
               } else {
                 console.log(`⚠️ [Background] No historical data from Massive.com for ${symbol} ${timeframe}`);
               }
@@ -384,6 +410,8 @@ export async function getAggregatedCandles(
               backgroundFetchInProgress.delete(backgroundKey);
             }
           })();
+        } else {
+          console.log(`⏳ [Aggregator] ${symbol} ${timeframe}: Background fetch already in progress or no 1m data`);
         }
       }
     } catch (error) {
