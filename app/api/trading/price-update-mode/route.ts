@@ -23,13 +23,18 @@ export async function GET() {
     
     const settings = await MarketDataSettings.findOne({ key: 'market_data_settings' });
     
-    return NextResponse.json({
+    const response = {
       mode: settings?.priceUpdateMode || 'polling',
       pollingIntervalMs: settings?.pollingIntervalMs || 200,
       websocketIntervalMs: settings?.websocketIntervalMs || 200,
       // Cache for 10 seconds - client can re-check periodically
       cacheTTL: 10000,
-    });
+    };
+    
+    // Debug log
+    console.log('📡 [Price Update Mode API] Returning:', response.mode, 'polling:', response.pollingIntervalMs, 'ws:', response.websocketIntervalMs);
+    
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Error getting price update mode:', error);
     // Default to polling on error

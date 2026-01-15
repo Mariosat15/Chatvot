@@ -268,11 +268,13 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         const response = await fetch('/api/trading/price-update-mode');
         if (response.ok && mounted) {
           const data = await response.json();
+          console.log('📡 [Chart Mode] Fetched settings:', data);
           setPriceUpdateMode(data.mode || 'polling');
           setPollingIntervalMs(data.pollingIntervalMs || 200);
           setWebsocketIntervalMs(data.websocketIntervalMs || 200);
         }
-      } catch {
+      } catch (error) {
+        console.warn('📡 [Chart Mode] Failed to fetch settings:', error);
         // Default to polling on error
       }
     };
@@ -2010,24 +2012,27 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     
     // ==== WEBSOCKET MODE ====
     if (priceUpdateMode === 'websocket') {
-      console.log('📡 [Chart] WebSocket mode enabled - connecting to price stream');
-      
       // Get WebSocket URL (same as useWebSocket hook)
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${wsProtocol}//${window.location.host}/ws?token=price-viewer&type=user`;
       
+      console.log('📡 [Chart] WebSocket mode enabled - connecting to:', wsUrl);
+      
       let ws: WebSocket | null = null;
       let reconnectTimeout: NodeJS.Timeout | null = null;
       let isCleanedUp = false;
+      let messageCount = 0;
       
       const connect = () => {
         if (isCleanedUp) return;
+        
+        console.log('📡 [Chart WebSocket] Attempting connection...');
         
         try {
           ws = new WebSocket(wsUrl);
           
           ws.onopen = () => {
-            console.log('✅ [Chart WebSocket] Connected for price updates');
+            console.log('✅ [Chart WebSocket] Connected for price updates!');
           };
           
           ws.onmessage = (event) => {
@@ -2037,6 +2042,12 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               // Handle price_update events
               if (message.type === 'price_update' && message.data) {
                 const { prices, formingCandles } = message.data;
+                
+                // Log occasionally
+                messageCount++;
+                if (messageCount % 50 === 1) {
+                  console.log(`📊 [Chart WebSocket] Received update #${messageCount}: ${prices?.length || 0} prices, ${formingCandles?.length || 0} candles`);
+                }
                 
                 // Find forming candle for current symbol
                 const candle = formingCandles?.find((c: { symbol: string }) => c.symbol === symbol);
@@ -2051,18 +2062,21 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             }
           };
           
-          ws.onclose = () => {
+          ws.onclose = (event) => {
+            console.log('❌ [Chart WebSocket] Disconnected:', event.code, event.reason);
             if (!isCleanedUp) {
               // Reconnect after 2 seconds
+              console.log('📡 [Chart WebSocket] Will reconnect in 2 seconds...');
               reconnectTimeout = setTimeout(connect, 2000);
             }
           };
           
-          ws.onerror = () => {
+          ws.onerror = (error) => {
+            console.error('🚨 [Chart WebSocket] Error:', error);
             // Will trigger onclose
           };
         } catch (error) {
-          console.warn('📡 [Chart WebSocket] Connection error:', error);
+          console.error('🚨 [Chart WebSocket] Connection failed:', error);
           // Retry after 3 seconds
           if (!isCleanedUp) {
             reconnectTimeout = setTimeout(connect, 3000);
@@ -2075,6 +2089,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       
       // Cleanup
       return () => {
+        console.log('🧹 [Chart WebSocket] Cleaning up connection');
         isCleanedUp = true;
         if (reconnectTimeout) clearTimeout(reconnectTimeout);
         if (ws) {
