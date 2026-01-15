@@ -119,6 +119,15 @@ export async function GET() {
         priceUpdateMode: settings.priceUpdateMode || 'polling',
         pollingIntervalMs: settings.pollingIntervalMs || 200,
         websocketIntervalMs: settings.websocketIntervalMs || 200,
+        candleLimits: settings.candleLimits || {
+          '1m': 1440,
+          '5m': 2016,
+          '15m': 2688,
+          '30m': 1440,
+          '1h': 720,
+          '4h': 540,
+          '1d': 365,
+        },
         updatedAt: settings.updatedAt,
       },
     });
@@ -136,7 +145,7 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
     
     const body = await request.json();
-    const { cleanup, gapFill, priceUpdateMode, pollingIntervalMs, websocketIntervalMs } = body;
+    const { cleanup, gapFill, priceUpdateMode, pollingIntervalMs, websocketIntervalMs, candleLimits } = body;
     
     const updateData: Record<string, unknown> = {};
     
@@ -206,6 +215,16 @@ export async function POST(request: NextRequest) {
       updateData['websocketIntervalMs'] = Math.max(50, Math.min(2000, websocketIntervalMs));
     }
     
+    // Candle limits per timeframe
+    if (candleLimits && typeof candleLimits === 'object') {
+      const validTimeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1d'];
+      for (const tf of validTimeframes) {
+        if (typeof candleLimits[tf] === 'number') {
+          updateData[`candleLimits.${tf}`] = Math.max(100, Math.min(50000, candleLimits[tf]));
+        }
+      }
+    }
+    
     const settings = await MarketDataSettings.findOneAndUpdate(
       { key: 'market_data_settings' },
       { $set: updateData },
@@ -220,6 +239,15 @@ export async function POST(request: NextRequest) {
         priceUpdateMode: settings.priceUpdateMode || 'polling',
         pollingIntervalMs: settings.pollingIntervalMs || 200,
         websocketIntervalMs: settings.websocketIntervalMs || 200,
+        candleLimits: settings.candleLimits || {
+          '1m': 1440,
+          '5m': 2016,
+          '15m': 2688,
+          '30m': 1440,
+          '1h': 720,
+          '4h': 540,
+          '1d': 365,
+        },
         updatedAt: settings.updatedAt,
       },
     });
