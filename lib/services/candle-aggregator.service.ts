@@ -303,46 +303,47 @@ export async function getAggregatedCandles(
   let finalAggregated: AggregatedCandle[] = [];
   let source = 'aggregated_fresh';
   
-  if (aggregatedFromMongo.length < count && candles1m.length > 0) {
-    // MongoDB has some data but not enough - check cache or use progressive loading
-    const missingCandles = count - aggregatedFromMongo.length;
-    const historicalCacheKey = `${symbol}:${timeframe}:historical`;
-    const cachedHistorical = historicalApiCache.get(historicalCacheKey);
-    const cacheValid = cachedHistorical && (Date.now() - cachedHistorical.fetchedAt < HISTORICAL_CACHE_TTL);
+  // ALWAYS try to get historical data from API for higher timeframes
+  // This ensures we have full depth even if MongoDB has "enough" for the current limit
+  const apiTimeframe = apiTimeframeMap[timeframeMinutes];
+  const historicalCacheKey = `${symbol}:${timeframe}:historical`;
+  const cachedHistorical = historicalApiCache.get(historicalCacheKey);
+  const cacheValid = cachedHistorical && (Date.now() - cachedHistorical.fetchedAt < HISTORICAL_CACHE_TTL);
+  
+  const oldestMongoTime = aggregatedFromMongo.length > 0 
+    ? Math.min(...aggregatedFromMongo.map(c => c.time))
+    : Math.floor(Date.now() / 1000);
+  
+  if (cacheValid && cachedHistorical && cachedHistorical.candles.length > 0) {
+    // USE CACHED HISTORICAL DATA - instant!
+    console.log(`⚡ [Aggregator] Using cached historical data for ${symbol} ${timeframe} (${cachedHistorical.candles.length} candles)`);
     
-    const apiTimeframe = apiTimeframeMap[timeframeMinutes];
-    const oldestMongoTime = aggregatedFromMongo.length > 0 
-      ? Math.min(...aggregatedFromMongo.map(c => c.time))
-      : Math.floor(Date.now() / 1000);
+    const mongoTimeSet = new Set(aggregatedFromMongo.map(c => c.time));
+    const uniqueOlderCandles = cachedHistorical.candles.filter(c => 
+      c.time < oldestMongoTime && !mongoTimeSet.has(c.time)
+    );
     
-    if (cacheValid && cachedHistorical) {
-      // USE CACHED HISTORICAL DATA - instant!
-      console.log(`⚡ [Aggregator] Using cached historical data for ${symbol} ${timeframe} (${cachedHistorical.candles.length} candles)`);
+    finalAggregated = [...uniqueOlderCandles, ...aggregatedFromMongo].sort((a, b) => a.time - b.time);
+    source = 'hybrid_cached';
+    
+    console.log(`✅ [Aggregator] ${symbol} ${timeframe}: Merged ${uniqueOlderCandles.length} cached + ${aggregatedFromMongo.length} MongoDB = ${finalAggregated.length} total`);
+  } else if (apiTimeframe && candles1m.length > 0) {
+    // NO CACHE - Return MongoDB data immediately, fetch API data in background
+    console.log(`🚀 [Aggregator] Progressive load: Returning ${aggregatedFromMongo.length} MongoDB candles for ${symbol} ${timeframe} immediately`);
+    finalAggregated = aggregatedFromMongo;
+    source = 'mongodb_progressive';
+    
+    // Start background fetch if not already running
+    if (!backgroundFetchInProgress.has(historicalCacheKey)) {
+      backgroundFetchInProgress.add(historicalCacheKey);
       
-      const mongoTimeSet = new Set(aggregatedFromMongo.map(c => c.time));
-      const uniqueOlderCandles = cachedHistorical.candles.filter(c => 
-        c.time < oldestMongoTime && !mongoTimeSet.has(c.time)
-      );
-      
-      finalAggregated = [...uniqueOlderCandles, ...aggregatedFromMongo].sort((a, b) => a.time - b.time);
-      source = 'hybrid_cached';
-      
-      console.log(`✅ [Aggregator] ${symbol} ${timeframe}: Merged ${uniqueOlderCandles.length} cached + ${aggregatedFromMongo.length} MongoDB = ${finalAggregated.length} total`);
-    } else if (apiTimeframe) {
-      // NO CACHE - Return MongoDB data immediately, fetch API data in background
-      console.log(`🚀 [Aggregator] Progressive load: Returning ${aggregatedFromMongo.length} MongoDB candles for ${symbol} ${timeframe} immediately`);
-      finalAggregated = aggregatedFromMongo;
-      source = 'mongodb_progressive';
-      
-      // Start background fetch if not already running
-      if (!backgroundFetchInProgress.has(historicalCacheKey)) {
-        backgroundFetchInProgress.add(historicalCacheKey);
+      // ALWAYS fetch 2 years of history for higher timeframes (not just "missing" candles)
+      // This ensures we get full depth from Massive.com API
+      const YEARS_OF_HISTORY = 2;
+      const fromTimestampMs = (oldestMongoTime * 1000) - (YEARS_OF_HISTORY * 365 * 24 * 60 * 60 * 1000);
+      const toTimestampMs = (oldestMongoTime - 60) * 1000;
         
-        const minutesBack = missingCandles * timeframeMinutes;
-        const fromTimestampMs = (oldestMongoTime - (minutesBack * 60)) * 1000;
-        const toTimestampMs = (oldestMongoTime - 60) * 1000;
-        
-        console.log(`📅 [Background] Starting fetch for ${symbol} ${timeframe} from ${new Date(fromTimestampMs).toISOString()}`);
+        console.log(`📅 [Background] Starting fetch for ${symbol} ${timeframe} from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
         
         // Background async fetch
         (async () => {
@@ -370,7 +371,9 @@ export async function getAggregatedCandles(
                 fetchedAt: Date.now(),
               });
               
-              console.log(`✅ [Background] Cached ${apiCandlesFormatted.length} ${timeframe} candles for ${symbol}`);
+              console.log(`✅ [Background] Cached ${apiCandlesFormatted.length} ${timeframe} candles for ${symbol} (oldest: ${new Date(apiCandlesFormatted[0]?.time * 1000).toISOString()})`);
+            } else {
+              console.log(`⚠️ [Background] No historical data available from Massive.com for ${symbol} ${timeframe}`);
             }
           } catch (error) {
             console.error(`❌ [Background] Failed to fetch ${symbol} ${timeframe}:`, error);
@@ -379,15 +382,12 @@ export async function getAggregatedCandles(
           }
         })();
       }
-    } else {
-      finalAggregated = aggregatedFromMongo;
     }
   } else if (candles1m.length === 0) {
-    // No MongoDB data - fetch entirely from Massive.com API using getRecentCandles
-    console.log(`⚠️ [Aggregator] ${symbol} ${timeframe}: No MongoDB data, fetching from Massive.com...`);
+    // No MongoDB data at all - fetch entirely from Massive.com API using getRecentCandles
+    console.log(`⚠️ [Aggregator] ${symbol} ${timeframe}: No MongoDB data, fetching from Massive.com API...`);
     
     try {
-      const apiTimeframe = apiTimeframeMap[timeframeMinutes];
       if (apiTimeframe) {
         const apiCandles = await getRecentCandles(symbol as ForexSymbol, apiTimeframe, count);
         finalAggregated = apiCandles.map(c => ({
@@ -409,9 +409,12 @@ export async function getAggregatedCandles(
         cached: false,
       };
     }
-  } else {
-    // MongoDB has enough data
+  }
+  
+  // Final fallback: if still empty, use whatever MongoDB has
+  if (finalAggregated.length === 0 && aggregatedFromMongo.length > 0) {
     finalAggregated = aggregatedFromMongo;
+    source = 'mongodb_fallback';
   }
   
   // Get forming candle
