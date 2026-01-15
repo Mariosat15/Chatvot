@@ -134,6 +134,8 @@ export async function fetchHistoricalCandles(
  * - Basic plan: 2 years history
  * - Starter/Business: All history
  * - Max 50,000 results per query
+ * 
+ * This function implements PAGINATION to fetch more than 50,000 candles
  */
 export async function fetchCandlesForRange(
   symbol: ForexSymbol,
@@ -149,52 +151,77 @@ export async function fetchCandlesForRange(
   const ticker = symbolToMassiveFormat(symbol);
   const { multiplier, timespan } = TIMEFRAME_MAP[timeframe];
   
-  // Use millisecond timestamps for precise range queries
-  const endpoint = `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${fromTimestampMs}/${toTimestampMs}`;
-  const url = `${MASSIVE_API_BASE_URL}${endpoint}?adjusted=true&sort=asc&limit=50000&apiKey=${MASSIVE_API_KEY}`;
-
-  console.log(`📊 [Gap Fill] Fetching ${symbol} candles from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
+  const allCandles: OHLCCandle[] = [];
+  let currentFrom = fromTimestampMs;
+  let pageCount = 0;
+  const MAX_PAGES = 10; // Safety limit: max 500,000 candles
+  
+  console.log(`📊 [Historical] Fetching ${symbol} ${timeframe} from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
 
   try {
-    const response = await fetch(url, {
-      method: 'GET',
-      cache: 'no-store' // Don't cache gap fill requests
-    });
+    while (currentFrom < toTimestampMs && pageCount < MAX_PAGES) {
+      pageCount++;
+      
+      const endpoint = `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${currentFrom}/${toTimestampMs}`;
+      const url = `${MASSIVE_API_BASE_URL}${endpoint}?adjusted=true&sort=asc&limit=50000&apiKey=${MASSIVE_API_KEY}`;
 
-    if (!response.ok) {
-      console.error(`❌ [Gap Fill] API error: ${response.status} ${response.statusText}`);
-      return [];
+      const response = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store'
+      });
+
+      if (!response.ok) {
+        console.error(`❌ [Historical] API error: ${response.status} ${response.statusText}`);
+        break;
+      }
+
+      const data = await response.json();
+      
+      if (!data.results || data.results.length === 0) {
+        console.log(`⚠️ [Historical] No more data for ${symbol} after page ${pageCount}`);
+        break;
+      }
+
+      // Convert to our format
+      const pageCandles: OHLCCandle[] = data.results.map((bar: {
+        t: number;
+        o: number;
+        h: number;
+        l: number;
+        c: number;
+        v?: number;
+      }) => ({
+        time: bar.t,
+        open: bar.o,
+        high: bar.h,
+        low: bar.l,
+        close: bar.c,
+        volume: bar.v || 0,
+      }));
+
+      allCandles.push(...pageCandles);
+      
+      // If we got less than 50000, we've reached the end
+      if (pageCandles.length < 50000) {
+        console.log(`✅ [Historical] Page ${pageCount}: ${pageCandles.length} candles (last page)`);
+        break;
+      }
+      
+      // Update currentFrom to continue from after the last candle
+      const lastCandleTime = pageCandles[pageCandles.length - 1].time;
+      currentFrom = lastCandleTime + 1; // Start from next millisecond
+      
+      console.log(`📄 [Historical] Page ${pageCount}: ${pageCandles.length} candles, continuing from ${new Date(currentFrom).toISOString()}`);
+      
+      // Small delay between requests to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    const data = await response.json();
-    
-    if (!data.results || data.results.length === 0) {
-      console.log(`⚠️ [Gap Fill] No data available for ${symbol} in requested range`);
-      return [];
-    }
-
-    // Convert to our format - Massive returns time in milliseconds
-    const candles: OHLCCandle[] = data.results.map((bar: {
-      t: number;
-      o: number;
-      h: number;
-      l: number;
-      c: number;
-      v?: number;
-    }) => ({
-      time: bar.t, // Keep in milliseconds, caller will convert if needed
-      open: bar.o,
-      high: bar.h,
-      low: bar.l,
-      close: bar.c,
-      volume: bar.v || 0,
-    }));
-
-    console.log(`✅ [Gap Fill] Fetched ${candles.length} candles for ${symbol}`);
-    return candles;
+    console.log(`✅ [Historical] Total: ${allCandles.length} candles for ${symbol} ${timeframe} in ${pageCount} pages`);
+    return allCandles;
   } catch (err) {
-    console.error('❌ [Gap Fill] Error:', err instanceof Error ? err.message : 'Unknown error');
-    return [];
+    console.error('❌ [Historical] Error:', err instanceof Error ? err.message : 'Unknown error');
+    return allCandles; // Return what we have so far
   }
 }
 
