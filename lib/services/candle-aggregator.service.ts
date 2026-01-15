@@ -331,11 +331,16 @@ export async function getAggregatedCandles(
   if (normalizedTf && apiTimeframe) {
     try {
       // Get historical candles from MongoDB (before oldest aggregated candle)
+      // For historical data, we want MORE candles than just `count` because:
+      // - Recent data comes from aggregated MongoDB (limited by 1m retention)
+      // - Historical data fills in the older periods
+      // Request up to 50,000 historical candles to show full chart history
+      const historicalLimit = Math.max(count, 50000);
       const historicalCandles = await getHistoricalCandles(
         normalizedTf,
         symbol,
         oldestMongoTime,
-        count
+        historicalLimit
       );
       
       console.log(`🔍 [Aggregator DEBUG] ${symbol} ${timeframe}: Found ${historicalCandles.length} historical candles in MongoDB`);

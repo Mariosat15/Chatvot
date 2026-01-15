@@ -782,9 +782,11 @@ async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void
   const buffer = state.completedCandlesBuffer.get(candle.symbol)!;
   buffer.push(completedCandle);
   
-  // Keep only last 60 candles (enough for 1h aggregation)
-  // 5m needs max 5 candles, 15m needs max 15 candles, 30m needs max 30 candles, 1h needs max 60 candles
-  const MAX_BUFFER_SIZE = 60;
+  // Keep only last 240 candles (enough for 4h aggregation)
+  // 5m needs max 5 candles, 15m needs max 15 candles, 30m needs max 30 candles, 
+  // 1h needs max 60 candles, 4h needs max 240 candles
+  // For 1d, we use whatever is in buffer (partial day forming candle)
+  const MAX_BUFFER_SIZE = 240;
   if (buffer.length > MAX_BUFFER_SIZE) {
     buffer.shift(); // Remove oldest
   }
@@ -1582,8 +1584,8 @@ async function seedCompletedCandlesBuffer(): Promise<void> {
     console.log(`🌱 [Buffer Seed] Seeding completed candles buffer for ${symbols.length} symbols...`);
     
     for (const symbol of symbols) {
-      // Get last 60 completed 1m candles for each symbol (enough for 1h aggregation)
-      const candles = await Candle1m.getCandles(symbol, 60);
+      // Get last 240 completed 1m candles for each symbol (enough for 4h aggregation)
+      const candles = await Candle1m.getCandles(symbol, 240);
       
       if (candles.length > 0) {
         // Store in buffer (skip the most recent one as it might be the current forming candle)
