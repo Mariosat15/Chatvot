@@ -22,9 +22,7 @@ interface MarketDataSettings {
     mode: 'auto' | 'manual';
     lastRun: string | null;
   };
-  // Price update mode for browser clients
   priceUpdateMode: 'polling' | 'websocket';
-  // Interval settings in milliseconds
   pollingIntervalMs: number;
   websocketIntervalMs: number;
 }
@@ -75,6 +73,90 @@ interface SeedResult {
   error?: string;
 }
 
+// Collapsible Section Component
+function Section({ 
+  title, 
+  icon, 
+  children, 
+  defaultOpen = true,
+  badge,
+  badgeColor = 'gray'
+}: { 
+  title: string; 
+  icon: string; 
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  badge?: string | number;
+  badgeColor?: 'gray' | 'green' | 'blue' | 'red' | 'yellow' | 'purple';
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  
+  const badgeColors = {
+    gray: 'bg-gray-600 text-gray-200',
+    green: 'bg-green-600/30 text-green-400 border border-green-500/30',
+    blue: 'bg-blue-600/30 text-blue-400 border border-blue-500/30',
+    red: 'bg-red-600/30 text-red-400 border border-red-500/30',
+    yellow: 'bg-yellow-600/30 text-yellow-400 border border-yellow-500/30',
+    purple: 'bg-purple-600/30 text-purple-400 border border-purple-500/30',
+  };
+  
+  return (
+    <div className="bg-[#1a1d29] rounded-xl border border-gray-800/50 overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-800/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl">{icon}</span>
+          <span className="text-white font-semibold text-lg">{title}</span>
+          {badge !== undefined && (
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeColors[badgeColor]}`}>
+              {badge}
+            </span>
+          )}
+        </div>
+        <svg 
+          className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {isOpen && (
+        <div className="px-5 pb-5 pt-2 border-t border-gray-800/50">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Stat Card Component
+function StatCard({ label, value, subValue, color = 'white' }: { 
+  label: string; 
+  value: string | number; 
+  subValue?: string;
+  color?: 'white' | 'green' | 'blue' | 'yellow' | 'red';
+}) {
+  const colors = {
+    white: 'text-white',
+    green: 'text-green-400',
+    blue: 'text-blue-400',
+    yellow: 'text-yellow-400',
+    red: 'text-red-400',
+  };
+  
+  return (
+    <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+      <div className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-1">{label}</div>
+      <div className={`text-2xl font-bold ${colors[color]}`}>{value}</div>
+      {subValue && <div className="text-gray-500 text-xs mt-0.5">{subValue}</div>}
+    </div>
+  );
+}
+
 export default function MarketDataSection() {
   const [settings, setSettings] = useState<MarketDataSettings | null>(null);
   const [stats, setStats] = useState<MarketDataStats | null>(null);
@@ -85,7 +167,6 @@ export default function MarketDataSection() {
   const [gapFillRunning, setGapFillRunning] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
-  // Seed history state
   const [availableSymbols, setAvailableSymbols] = useState<TradingSymbol[]>([]);
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
   const [seedFromDate, setSeedFromDate] = useState('');
@@ -93,23 +174,14 @@ export default function MarketDataSection() {
   const [seedRunning, setSeedRunning] = useState(false);
   const [seedResults, setSeedResults] = useState<SeedResult[] | null>(null);
 
-  // Fetch settings and stats
   const fetchData = useCallback(async () => {
     try {
       const [settingsRes, statsRes] = await Promise.all([
         fetch('/api/market-data/settings'),
         fetch('/api/market-data/stats'),
       ]);
-
-      if (settingsRes.ok) {
-        const data = await settingsRes.json();
-        setSettings(data.settings);
-      }
-
-      if (statsRes.ok) {
-        const data = await statsRes.json();
-        setStats(data.stats);
-      }
+      if (settingsRes.ok) setSettings((await settingsRes.json()).settings);
+      if (statsRes.ok) setStats((await statsRes.json()).stats);
     } catch (error) {
       console.error('Error fetching market data:', error);
     } finally {
@@ -117,27 +189,19 @@ export default function MarketDataSection() {
     }
   }, []);
 
-  // Fetch available symbols from admin
   const fetchSymbols = async () => {
     try {
       const res = await fetch('/api/symbols?enabled=true');
-      if (res.ok) {
-        const data = await res.json();
-        setAvailableSymbols(data.symbols || []);
-      }
+      if (res.ok) setAvailableSymbols((await res.json()).symbols || []);
     } catch (error) {
       console.error('Error fetching symbols:', error);
     }
   };
 
-  // Fetch gaps
   const fetchGaps = async () => {
     try {
       const res = await fetch('/api/market-data/gap-fill');
-      if (res.ok) {
-        const data = await res.json();
-        setGaps(data.gaps || []);
-      }
+      if (res.ok) setGaps((await res.json()).gaps || []);
     } catch (error) {
       console.error('Error fetching gaps:', error);
     }
@@ -147,17 +211,13 @@ export default function MarketDataSection() {
     fetchData();
     fetchGaps();
     fetchSymbols();
-    
-    // Set default dates (last 30 days)
     const today = new Date();
     const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
     setSeedToDate(today.toISOString().split('T')[0]);
     setSeedFromDate(thirtyDaysAgo.toISOString().split('T')[0]);
   }, [fetchData]);
 
-  // Save settings
   const saveSettings = async (newSettings: Partial<MarketDataSettings>) => {
     setSaving(true);
     try {
@@ -166,26 +226,22 @@ export default function MarketDataSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings),
       });
-
       if (res.ok) {
-        const data = await res.json();
-        setSettings(data.settings);
-        setMessage({ type: 'success', text: 'Settings saved successfully!' });
+        setSettings((await res.json()).settings);
+        setMessage({ type: 'success', text: 'Settings saved!' });
       } else {
-        setMessage({ type: 'error', text: 'Failed to save settings' });
+        setMessage({ type: 'error', text: 'Failed to save' });
       }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Error saving settings' });
+    } catch {
+      setMessage({ type: 'error', text: 'Error saving' });
     } finally {
       setSaving(false);
       setTimeout(() => setMessage(null), 3000);
     }
   };
 
-  // Run cleanup
   const runCleanup = async () => {
     if (!settings) return;
-    
     setCleanupRunning(true);
     try {
       const res = await fetch('/api/market-data/cleanup', {
@@ -193,18 +249,14 @@ export default function MarketDataSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ daysToKeep: settings.cleanup.daysToKeep }),
       });
-
       if (res.ok) {
         const data = await res.json();
-        setMessage({ 
-          type: 'success', 
-          text: `Cleanup complete! Deleted ${data.cleanup.deletedCount} candles, freed ${data.cleanup.freedMB} MB` 
-        });
-        fetchData(); // Refresh stats
+        setMessage({ type: 'success', text: `Deleted ${data.cleanup.deletedCount} candles, freed ${data.cleanup.freedMB} MB` });
+        fetchData();
       } else {
         setMessage({ type: 'error', text: 'Cleanup failed' });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Error running cleanup' });
     } finally {
       setCleanupRunning(false);
@@ -212,7 +264,6 @@ export default function MarketDataSection() {
     }
   };
 
-  // Run gap fill
   const runGapFill = async () => {
     setGapFillRunning(true);
     try {
@@ -221,19 +272,15 @@ export default function MarketDataSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
-
       if (res.ok) {
         const data = await res.json();
-        setMessage({ 
-          type: 'success', 
-          text: `Gap fill complete! Filled ${data.gapFill.totalCandlesFilled} candles across ${data.gapFill.totalGapsFilled} gaps` 
-        });
-        fetchGaps(); // Refresh gaps
-        fetchData(); // Refresh stats
+        setMessage({ type: 'success', text: `Filled ${data.gapFill.totalCandlesFilled} candles across ${data.gapFill.totalGapsFilled} gaps` });
+        fetchGaps();
+        fetchData();
       } else {
         setMessage({ type: 'error', text: 'Gap fill failed' });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Error running gap fill' });
     } finally {
       setGapFillRunning(false);
@@ -241,7 +288,6 @@ export default function MarketDataSection() {
     }
   };
 
-  // Run seed history
   const runSeedHistory = async () => {
     if (selectedSymbols.length === 0) {
       setMessage({ type: 'error', text: 'Please select at least one symbol' });
@@ -251,33 +297,24 @@ export default function MarketDataSection() {
       setMessage({ type: 'error', text: 'Please select date range' });
       return;
     }
-
     setSeedRunning(true);
     setSeedResults(null);
     try {
       const res = await fetch('/api/market-data/seed-history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbols: selectedSymbols,
-          fromDate: seedFromDate,
-          toDate: seedToDate,
-        }),
+        body: JSON.stringify({ symbols: selectedSymbols, fromDate: seedFromDate, toDate: seedToDate }),
       });
-
       if (res.ok) {
         const data = await res.json();
         setSeedResults(data.results);
-        setMessage({ 
-          type: 'success', 
-          text: `Seeding complete! Fetched ${data.summary.totalFetched} candles, inserted ${data.summary.totalInserted} new` 
-        });
-        fetchData(); // Refresh stats
+        setMessage({ type: 'success', text: `Seeding complete! Inserted ${data.summary.totalInserted} candles` });
+        fetchData();
       } else {
         const error = await res.json();
         setMessage({ type: 'error', text: error.error || 'Seeding failed' });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Error running seed' });
     } finally {
       setSeedRunning(false);
@@ -285,598 +322,414 @@ export default function MarketDataSection() {
     }
   };
 
-  // Toggle symbol selection
   const toggleSymbol = (symbol: string) => {
-    setSelectedSymbols(prev => 
-      prev.includes(symbol) 
-        ? prev.filter(s => s !== symbol)
-        : [...prev, symbol]
-    );
-  };
-
-  // Select all symbols
-  const selectAllSymbols = () => {
-    setSelectedSymbols(availableSymbols.map(s => s.symbol));
-  };
-
-  // Deselect all symbols
-  const deselectAllSymbols = () => {
-    setSelectedSymbols([]);
+    setSelectedSymbols(prev => prev.includes(symbol) ? prev.filter(s => s !== symbol) : [...prev, symbol]);
   };
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-500 border-t-transparent"></div>
+          <span className="text-gray-400">Loading market data...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Market Data Management</h2>
+    <div className="space-y-4 p-1">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Market Data</h1>
+          <p className="text-gray-500 text-sm mt-1">Manage candle data, price updates, and historical data</p>
+        </div>
         <button
           onClick={() => { fetchData(); fetchGaps(); }}
-          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+          className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-2 border border-gray-700"
         >
-          🔄 Refresh
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
         </button>
       </div>
 
-      {/* Message */}
+      {/* Toast Message */}
       {message && (
-        <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'}`}>
-          {message.text}
+        <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-in slide-in-from-top-2 ${
+          message.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+        }`}>
+          {message.type === 'success' ? '✓' : '✕'} {message.text}
         </div>
       )}
 
-      {/* Stats Section */}
-      <div className="bg-gray-800 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">📊 Database Statistics</h3>
-        
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-gray-700 rounded-lg p-4">
-              <div className="text-gray-400 text-sm">Total Candles</div>
-              <div className="text-2xl font-bold text-white">{stats.totalCandles.toLocaleString()}</div>
-            </div>
-            
-            <div className="bg-gray-700 rounded-lg p-4">
-              <div className="text-gray-400 text-sm">Storage Size</div>
-              <div className="text-2xl font-bold text-white">{stats.storage.mb} MB</div>
-              <div className="text-gray-400 text-xs">{stats.storage.gb} GB</div>
-            </div>
-            
-            <div className="bg-gray-700 rounded-lg p-4">
-              <div className="text-gray-400 text-sm">Days of Data</div>
-              <div className="text-2xl font-bold text-white">{stats.dateRange.daysOfData}</div>
-            </div>
-            
-            <div className="bg-gray-700 rounded-lg p-4">
-              <div className="text-gray-400 text-sm">Growth Rate</div>
-              <div className="text-xl font-bold text-white">{stats.growth.mbPerDay} MB/day</div>
-              <div className="text-gray-400 text-xs">{stats.growth.projectedMbPerMonth} MB/month</div>
-            </div>
-            
-            <div className="bg-gray-700 rounded-lg p-4 col-span-2">
-              <div className="text-gray-400 text-sm">Health Status</div>
-              <div className={`text-lg font-bold ${stats.health.status === 'healthy' ? 'text-green-400' : 'text-yellow-400'}`}>
-                {stats.health.message}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Quick Stats Row */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="Total Candles" value={stats.totalCandles.toLocaleString()} />
+          <StatCard label="Storage" value={`${stats.storage.mb} MB`} subValue={`${stats.storage.gb} GB`} />
+          <StatCard label="Days of Data" value={stats.dateRange.daysOfData} color="blue" />
+          <StatCard 
+            label="Health" 
+            value={stats.health.status === 'healthy' ? '● Healthy' : '● Warning'} 
+            color={stats.health.status === 'healthy' ? 'green' : 'yellow'} 
+          />
+        </div>
+      )}
 
-      {/* Price Update Mode Toggle */}
-      {settings && (
-        <div className="bg-gray-800 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">📡 Real-Time Price Updates</h3>
-          
-          <div className="space-y-4">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-4 bg-gray-700 rounded-lg p-1">
+      {/* Real-Time Updates Section */}
+      <Section 
+        title="Real-Time Updates" 
+        icon="📡" 
+        badge={settings?.priceUpdateMode === 'websocket' ? 'WebSocket' : 'Polling'}
+        badgeColor={settings?.priceUpdateMode === 'websocket' ? 'green' : 'blue'}
+      >
+        {settings && (
+          <div className="space-y-5">
+            {/* Mode Toggle */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="inline-flex bg-[#12141c] rounded-lg p-1 border border-gray-800/50">
                 <button
                   onClick={() => saveSettings({ priceUpdateMode: 'polling' })}
-                  className={`px-4 py-2 rounded-lg transition-all ${
-                    settings.priceUpdateMode === 'polling' 
-                      ? 'bg-blue-600 text-white shadow-lg' 
-                      : 'text-gray-400 hover:text-white'
+                  className={`px-5 py-2.5 rounded-md text-sm font-medium transition-all ${
+                    settings.priceUpdateMode === 'polling'
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                      : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                   }`}
                 >
                   📊 Polling
                 </button>
                 <button
                   onClick={() => saveSettings({ priceUpdateMode: 'websocket' })}
-                  className={`px-4 py-2 rounded-lg transition-all ${
-                    settings.priceUpdateMode === 'websocket' 
-                      ? 'bg-green-600 text-white shadow-lg' 
-                      : 'text-gray-400 hover:text-white'
+                  className={`px-5 py-2.5 rounded-md text-sm font-medium transition-all ${
+                    settings.priceUpdateMode === 'websocket'
+                      ? 'bg-green-600 text-white shadow-lg shadow-green-600/20'
+                      : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                   }`}
                 >
                   ⚡ WebSocket
                 </button>
               </div>
-              
-              <div className="text-sm">
-                {settings.priceUpdateMode === 'polling' ? (
-                  <span className="text-blue-300">
-                    ✅ Current: Browsers poll every {settings.pollingIntervalMs}ms (reliable, more server load)
-                  </span>
-                ) : (
-                  <span className="text-green-300">
-                    ⚡ Current: Server pushes updates every {settings.websocketIntervalMs}ms (99% less server load)
-                  </span>
-                )}
-              </div>
+              <p className="text-sm text-gray-400">
+                {settings.priceUpdateMode === 'polling' 
+                  ? `Browsers poll every ${settings.pollingIntervalMs}ms`
+                  : `Server broadcasts every ${settings.websocketIntervalMs}ms`}
+              </p>
             </div>
-            
+
             {/* Interval Settings */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-700/50 rounded-lg p-4">
-                <label className="text-blue-400 font-medium block mb-2">
-                  📊 Polling Interval
-                </label>
-                <div className="flex items-center gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-blue-400 font-medium text-sm">Polling Interval</span>
+                  <span className="text-gray-500 text-xs">50-2000ms</span>
+                </div>
+                <div className="flex items-center gap-3">
                   <input
-                    type="number"
+                    type="range"
                     min="50"
                     max="2000"
                     step="50"
                     value={settings.pollingIntervalMs}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value);
-                      if (!Number.isNaN(val)) {
-                        saveSettings({ pollingIntervalMs: Math.max(50, Math.min(2000, val)) });
-                      }
-                    }}
-                    className="bg-gray-700 text-white rounded-lg px-3 py-2 w-24"
+                    onChange={(e) => saveSettings({ pollingIntervalMs: parseInt(e.target.value) })}
+                    className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                   />
-                  <span className="text-gray-400">ms</span>
+                  <div className="w-16 text-right">
+                    <span className="text-white font-mono text-sm">{settings.pollingIntervalMs}</span>
+                    <span className="text-gray-500 text-xs ml-0.5">ms</span>
+                  </div>
                 </div>
-                <p className="text-gray-500 text-xs mt-1">
-                  How often browsers poll for updates (50-2000ms)
-                </p>
               </div>
               
-              <div className="bg-gray-700/50 rounded-lg p-4">
-                <label className="text-green-400 font-medium block mb-2">
-                  ⚡ WebSocket Interval
-                </label>
-                <div className="flex items-center gap-2">
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-green-400 font-medium text-sm">WebSocket Interval</span>
+                  <span className="text-gray-500 text-xs">50-2000ms</span>
+                </div>
+                <div className="flex items-center gap-3">
                   <input
-                    type="number"
+                    type="range"
                     min="50"
                     max="2000"
                     step="50"
                     value={settings.websocketIntervalMs}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value);
-                      if (!Number.isNaN(val)) {
-                        saveSettings({ websocketIntervalMs: Math.max(50, Math.min(2000, val)) });
-                      }
-                    }}
-                    className="bg-gray-700 text-white rounded-lg px-3 py-2 w-24"
+                    onChange={(e) => saveSettings({ websocketIntervalMs: parseInt(e.target.value) })}
+                    className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
                   />
-                  <span className="text-gray-400">ms</span>
+                  <div className="w-16 text-right">
+                    <span className="text-white font-mono text-sm">{settings.websocketIntervalMs}</span>
+                    <span className="text-gray-500 text-xs ml-0.5">ms</span>
+                  </div>
                 </div>
-                <p className="text-gray-500 text-xs mt-1">
-                  How often server broadcasts updates (50-2000ms)
-                </p>
               </div>
             </div>
-            
-            <div className="bg-gray-700/50 rounded-lg p-4">
-              <h4 className="text-white font-medium mb-2">ℹ️ Mode Comparison</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+
+            {/* Mode Info */}
+            <div className="bg-[#12141c]/50 rounded-lg p-4 border border-gray-800/20">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
                 <div>
-                  <div className="text-blue-400 font-medium">Polling Mode</div>
-                  <ul className="text-gray-400 mt-1 space-y-1">
-                    <li>• Browsers request data every 200ms</li>
-                    <li>• Higher server load (2000+ req/sec with many users)</li>
-                    <li>• Most reliable consistency</li>
-                    <li>• Recommended for stability</li>
+                  <div className="text-blue-400 font-medium mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                    Polling Mode
+                  </div>
+                  <ul className="text-gray-500 space-y-1 ml-4">
+                    <li>• Browsers request data periodically</li>
+                    <li>• Higher server load with many users</li>
+                    <li>• Most reliable & stable</li>
                   </ul>
                 </div>
                 <div>
-                  <div className="text-green-400 font-medium">WebSocket Mode</div>
-                  <ul className="text-gray-400 mt-1 space-y-1">
-                    <li>• Server broadcasts to all browsers</li>
-                    <li>• 99% less server load</li>
-                    <li>• Faster updates (~10ms vs ~200ms)</li>
-                    <li>• Requires careful implementation</li>
+                  <div className="text-green-400 font-medium mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-400"></span>
+                    WebSocket Mode
+                  </div>
+                  <ul className="text-gray-500 space-y-1 ml-4">
+                    <li>• Server pushes to all browsers</li>
+                    <li>• 99% less server requests</li>
+                    <li>• Faster updates (~10ms)</li>
                   </ul>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Cleanup Section */}
-      <div className="bg-gray-800 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">🧹 Candle Cleanup</h3>
-        
-        {settings && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-4 flex-wrap">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={settings.cleanup.enabled}
-                  onChange={(e) => saveSettings({ cleanup: { ...settings.cleanup, enabled: e.target.checked } })}
-                  className="w-4 h-4 rounded"
-                />
-                <span className="text-white">Enable Cleanup</span>
-              </label>
-              
-              <select
-                value={settings.cleanup.mode}
-                onChange={(e) => saveSettings({ cleanup: { ...settings.cleanup, mode: e.target.value as 'auto' | 'manual' } })}
-                className="bg-gray-700 text-white rounded-lg px-3 py-2"
-                disabled={!settings.cleanup.enabled}
-              >
-                <option value="manual">Manual</option>
-                <option value="auto">Auto (Scheduled)</option>
-              </select>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <label className="text-white">Days to Keep:</label>
-              <input
-                type="number"
-                min="0"
-                max="365"
-                value={settings.cleanup.daysToKeep}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  saveSettings({ cleanup: { ...settings.cleanup, daysToKeep: Number.isNaN(val) ? 0 : Math.max(0, val) } });
-                }}
-                className="bg-gray-700 text-white rounded-lg px-3 py-2 w-24"
-              />
-              <span className="text-gray-400">
-                {settings.cleanup.daysToKeep === 0 
-                  ? '⚠️ Will delete ALL history!' 
-                  : `(~${((settings.cleanup.daysToKeep * 9.5)).toFixed(0)} MB storage)`}
-              </span>
-            </div>
-            
-            {/* Schedule Settings - only shown in auto mode */}
-            {settings.cleanup.mode === 'auto' && settings.cleanup.enabled && (
-              <div className="bg-gray-700/50 rounded-lg p-4 space-y-3">
-                <h4 className="text-white font-medium">📅 Schedule</h4>
-                
-                <div className="flex items-center gap-4 flex-wrap">
-                  <label className="text-gray-300">Run:</label>
-                  <select
-                    value={settings.cleanup.schedule?.type || 'daily'}
-                    onChange={(e) => saveSettings({ 
-                      cleanup: { 
-                        ...settings.cleanup, 
-                        schedule: { ...settings.cleanup.schedule, type: e.target.value as 'daily' | 'weekly' | 'monthly' } 
-                      } 
-                    })}
-                    className="bg-gray-700 text-white rounded-lg px-3 py-2"
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                  
-                  <label className="text-gray-300">at</label>
-                  <select
-                    value={settings.cleanup.schedule?.hour ?? 0}
-                    onChange={(e) => saveSettings({ 
-                      cleanup: { 
-                        ...settings.cleanup, 
-                        schedule: { ...settings.cleanup.schedule, hour: parseInt(e.target.value) } 
-                      } 
-                    })}
-                    className="bg-gray-700 text-white rounded-lg px-3 py-2"
-                  >
-                    {Array.from({ length: 24 }, (_, i) => (
-                      <option key={i} value={i}>{String(i).padStart(2, '0')}:00 UTC</option>
-                    ))}
-                  </select>
-                </div>
-                
-                {/* Day selection for weekly/monthly */}
-                {(settings.cleanup.schedule?.type === 'weekly' || settings.cleanup.schedule?.type === 'monthly') && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-gray-300">On:</label>
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => (
-                      <label key={day} className="flex items-center gap-1">
-                        <input
-                          type="checkbox"
-                          checked={settings.cleanup.schedule?.weekDays?.includes(i) ?? (i === 0 || i === 6)}
-                          onChange={(e) => {
-                            const currentDays = settings.cleanup.schedule?.weekDays || [0, 6];
-                            const newDays = e.target.checked 
-                              ? [...currentDays, i]
-                              : currentDays.filter(d => d !== i);
-                            saveSettings({ 
-                              cleanup: { 
-                                ...settings.cleanup, 
-                                schedule: { ...settings.cleanup.schedule, weekDays: newDays } 
-                              } 
-                            });
-                          }}
-                          className="w-3 h-3 rounded"
-                        />
-                        <span className="text-gray-300 text-sm">{day}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-                
-                {/* Week of month for monthly */}
-                {settings.cleanup.schedule?.type === 'monthly' && (
-                  <div className="flex items-center gap-2">
-                    <label className="text-gray-300">Week:</label>
-                    <select
-                      value={settings.cleanup.schedule?.monthWeek ?? 1}
-                      onChange={(e) => saveSettings({ 
-                        cleanup: { 
-                          ...settings.cleanup, 
-                          schedule: { ...settings.cleanup.schedule, monthWeek: parseInt(e.target.value) } 
-                        } 
-                      })}
-                      className="bg-gray-700 text-white rounded-lg px-3 py-2"
-                    >
-                      <option value={1}>1st week</option>
-                      <option value={2}>2nd week</option>
-                      <option value={3}>3rd week</option>
-                      <option value={4}>4th week</option>
-                    </select>
-                  </div>
-                )}
-                
-                <div className="text-gray-400 text-xs">
-                  ℹ️ Worker checks every 5 minutes. Cleanup runs once when schedule matches.
-                </div>
-              </div>
-            )}
-            
-            {settings.cleanup.lastRun && (
-              <div className="text-gray-400 text-sm">
-                Last run: {new Date(settings.cleanup.lastRun).toLocaleString()}
-              </div>
-            )}
-            
-            <button
-              onClick={runCleanup}
-              disabled={cleanupRunning || saving}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
-            >
-              {cleanupRunning ? '⏳ Running...' : '🗑️ Run Cleanup Now'}
-            </button>
-          </div>
         )}
-      </div>
+      </Section>
 
-      {/* Gap Fill Section */}
-      <div className="bg-gray-800 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">🔧 Gap Detection & Fill</h3>
-        
+      {/* Data Maintenance Section */}
+      <Section title="Data Maintenance" icon="🔧" defaultOpen={false}>
         {settings && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-4 flex-wrap">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={settings.gapFill.enabled}
-                  onChange={(e) => saveSettings({ gapFill: { ...settings.gapFill, enabled: e.target.checked } })}
-                  className="w-4 h-4 rounded"
-                />
-                <span className="text-white">Enable Gap Fill</span>
-              </label>
-              
-              <select
-                value={settings.gapFill.mode}
-                onChange={(e) => saveSettings({ gapFill: { ...settings.gapFill, mode: e.target.value as 'auto' | 'manual' } })}
-                className="bg-gray-700 text-white rounded-lg px-3 py-2"
-                disabled={!settings.gapFill.enabled}
-              >
-                <option value="manual">Manual</option>
-                <option value="auto">Auto (Background)</option>
-              </select>
-            </div>
-            
-            <div className="text-gray-400 text-sm bg-gray-700/50 rounded-lg p-3">
-              ℹ️ Gap fill uses Massive.com Custom Bars API with exact timestamps.
-              <br />
-              <strong>History available:</strong> Up to 2 years (Basic plan) or all history (Starter/Business).
-            </div>
-            
-            {settings.gapFill.lastRun && (
-              <div className="text-gray-400 text-sm">
-                Last run: {new Date(settings.gapFill.lastRun).toLocaleString()}
-              </div>
-            )}
-            
-            {/* Detected Gaps */}
-            <div className="bg-gray-700 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-white font-medium">Detected Gaps: {gaps.length}</span>
-                <button
-                  onClick={fetchGaps}
-                  className="text-blue-400 hover:text-blue-300 text-sm"
-                >
-                  Refresh
-                </button>
-              </div>
-              
-              {gaps.length > 0 ? (
-                <div className="max-h-48 overflow-y-auto space-y-1">
-                  {gaps.slice(0, 15).map((gap, i) => {
-                    const startDate = new Date(gap.startTime * 1000);
-                    const endDate = new Date(gap.endTime * 1000);
-                    const isLargeGap = gap.missingMinutes > 60; // More than 1 hour
-                    const formatDate = (d: Date) => isLargeGap 
-                      ? d.toLocaleDateString() + ' ' + d.toLocaleTimeString()
-                      : d.toLocaleTimeString();
-                    
-                    return (
-                      <div key={i} className={`text-sm ${isLargeGap ? 'text-yellow-400 font-medium' : 'text-gray-300'}`}>
-                        {gap.symbol}: {formatDate(startDate)} → {formatDate(endDate)} 
-                        ({gap.missingMinutes >= 1440 
-                          ? `${Math.round(gap.missingMinutes / 1440)} days` 
-                          : gap.missingMinutes >= 60 
-                            ? `${Math.round(gap.missingMinutes / 60)} hours`
-                            : `${gap.missingMinutes} min`})
-                        {isLargeGap && ' ⚠️'}
-                      </div>
-                    );
-                  })}
-                  {gaps.length > 15 && (
-                    <div className="text-gray-400">...and {gaps.length - 15} more</div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-green-400">✅ No gaps detected (excluding weekends)</div>
-              )}
-            </div>
-            
-            <button
-              onClick={runGapFill}
-              disabled={gapFillRunning || saving || gaps.length === 0}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
-            >
-              {gapFillRunning ? '⏳ Filling Gaps...' : '🔧 Fill Gaps Now'}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Seed Historical Data Section */}
-      <div className="bg-gray-800 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">📥 Seed Historical Data</h3>
-        
-        <div className="space-y-4">
-          <div className="text-gray-400 text-sm bg-gray-700/50 rounded-lg p-3">
-            ℹ️ Import historical 1-minute candles from Massive.com into your database.
-            <br />
-            <strong>History available:</strong> Up to 2 years (Basic plan) or all history (Starter/Business).
-          </div>
-          
-          {/* Date Range */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <label className="text-white">From:</label>
-            <input
-              type="date"
-              value={seedFromDate}
-              onChange={(e) => setSeedFromDate(e.target.value)}
-              className="bg-gray-700 text-white rounded-lg px-3 py-2"
-            />
-            <label className="text-white">To:</label>
-            <input
-              type="date"
-              value={seedToDate}
-              onChange={(e) => setSeedToDate(e.target.value)}
-              className="bg-gray-700 text-white rounded-lg px-3 py-2"
-            />
-            <button
-              onClick={() => setSeedToDate(new Date().toISOString().split('T')[0])}
-              className="text-blue-400 hover:text-blue-300 text-sm underline"
-            >
-              Set to Today
-            </button>
-          </div>
-          
-          <div className="text-yellow-400 text-sm bg-yellow-900/30 rounded-lg p-3">
-            ⚠️ <strong>Tip:</strong> Set &quot;To&quot; to <strong>today&apos;s date</strong> to avoid gaps between seeded and live data!
-          </div>
-          
-          {/* Symbol Selection */}
-          <div className="bg-gray-700 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-white font-medium">Select Symbols ({selectedSymbols.length}/{availableSymbols.length})</span>
-              <div className="flex gap-2">
-                <button
-                  onClick={selectAllSymbols}
-                  className="text-blue-400 hover:text-blue-300 text-sm"
-                >
-                  Select All
-                </button>
-                <span className="text-gray-500">|</span>
-                <button
-                  onClick={deselectAllSymbols}
-                  className="text-gray-400 hover:text-gray-300 text-sm"
-                >
-                  Deselect All
-                </button>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 max-h-48 overflow-y-auto">
-              {availableSymbols.map((sym) => (
-                <label
-                  key={sym.symbol}
-                  className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                    selectedSymbols.includes(sym.symbol)
-                      ? 'bg-blue-600/30 border border-blue-500'
-                      : 'bg-gray-600/30 hover:bg-gray-600/50'
-                  }`}
-                >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Cleanup Card */}
+            <div className="bg-[#12141c] rounded-lg p-5 border border-gray-800/30">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-white font-semibold flex items-center gap-2">
+                  🗑️ Cleanup Old Data
+                </h4>
+                <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={selectedSymbols.includes(sym.symbol)}
-                    onChange={() => toggleSymbol(sym.symbol)}
-                    className="w-4 h-4 rounded"
+                    checked={settings.cleanup.enabled}
+                    onChange={(e) => saveSettings({ cleanup: { ...settings.cleanup, enabled: e.target.checked } })}
+                    className="sr-only peer"
                   />
-                  <span className="text-white text-sm">{sym.symbol}</span>
+                  <div className="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
-              ))}
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-gray-400 text-sm block mb-2">Keep data for</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min="0"
+                      max="365"
+                      value={settings.cleanup.daysToKeep}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        saveSettings({ cleanup: { ...settings.cleanup, daysToKeep: Number.isNaN(val) ? 0 : Math.max(0, val) } });
+                      }}
+                      className="bg-gray-800 text-white rounded-lg px-3 py-2 w-20 border border-gray-700 focus:border-blue-500 focus:outline-none"
+                    />
+                    <span className="text-gray-400">days</span>
+                    <span className="text-gray-600 text-sm">
+                      (~{((settings.cleanup.daysToKeep * 9.5)).toFixed(0)} MB)
+                    </span>
+                  </div>
+                  {settings.cleanup.daysToKeep === 0 && (
+                    <p className="text-red-400 text-xs mt-2">⚠️ Will delete ALL history!</p>
+                  )}
+                </div>
+
+                {settings.cleanup.lastRun && (
+                  <p className="text-gray-500 text-xs">
+                    Last run: {new Date(settings.cleanup.lastRun).toLocaleString()}
+                  </p>
+                )}
+                
+                <button
+                  onClick={runCleanup}
+                  disabled={cleanupRunning || saving}
+                  className="w-full px-4 py-2.5 bg-red-600/20 hover:bg-red-600/30 border border-red-600/30 text-red-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {cleanupRunning ? '⏳ Running...' : '🗑️ Run Cleanup Now'}
+                </button>
+              </div>
+            </div>
+
+            {/* Gap Fill Card */}
+            <div className="bg-[#12141c] rounded-lg p-5 border border-gray-800/30">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-white font-semibold flex items-center gap-2">
+                  🔧 Gap Detection
+                  {gaps.length > 0 && (
+                    <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 text-xs rounded-full">
+                      {gaps.length} gaps
+                    </span>
+                  )}
+                </h4>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.gapFill.enabled}
+                    onChange={(e) => saveSettings({ gapFill: { ...settings.gapFill, enabled: e.target.checked } })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              
+              <div className="space-y-4">
+                {gaps.length > 0 ? (
+                  <div className="bg-gray-800/50 rounded-lg p-3 max-h-32 overflow-y-auto">
+                    {gaps.slice(0, 8).map((gap, i) => {
+                      const startDate = new Date(gap.startTime * 1000);
+                      const endDate = new Date(gap.endTime * 1000);
+                      return (
+                        <div key={i} className="text-xs text-gray-400 py-1 border-b border-gray-800/50 last:border-0">
+                          <span className="text-white">{gap.symbol}</span>: {startDate.toLocaleDateString()} → {endDate.toLocaleDateString()} 
+                          <span className="text-yellow-400 ml-1">
+                            ({gap.missingMinutes >= 1440 ? `${Math.round(gap.missingMinutes / 1440)}d` : `${gap.missingMinutes}m`})
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {gaps.length > 8 && <div className="text-gray-500 text-xs pt-1">+{gaps.length - 8} more</div>}
+                  </div>
+                ) : (
+                  <div className="bg-green-600/10 border border-green-600/20 rounded-lg p-3 text-green-400 text-sm text-center">
+                    ✓ No gaps detected
+                  </div>
+                )}
+
+                {settings.gapFill.lastRun && (
+                  <p className="text-gray-500 text-xs">
+                    Last run: {new Date(settings.gapFill.lastRun).toLocaleString()}
+                  </p>
+                )}
+                
+                <button
+                  onClick={runGapFill}
+                  disabled={gapFillRunning || saving || gaps.length === 0}
+                  className="w-full px-4 py-2.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-600/30 text-blue-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {gapFillRunning ? '⏳ Filling...' : '🔧 Fill Gaps Now'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {/* Historical Data Import Section */}
+      <Section title="Import Historical Data" icon="📥" defaultOpen={false}>
+        <div className="space-y-5">
+          {/* Date Range */}
+          <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+            <h4 className="text-white font-medium mb-4">Date Range</h4>
+            <div className="flex flex-wrap items-center gap-4">
+              <div>
+                <label className="text-gray-500 text-xs block mb-1">From</label>
+                <input
+                  type="date"
+                  value={seedFromDate}
+                  onChange={(e) => setSeedFromDate(e.target.value)}
+                  className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-gray-500 text-xs block mb-1">To</label>
+                <input
+                  type="date"
+                  value={seedToDate}
+                  onChange={(e) => setSeedToDate(e.target.value)}
+                  className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <button
+                onClick={() => setSeedToDate(new Date().toISOString().split('T')[0])}
+                className="text-blue-400 hover:text-blue-300 text-sm mt-5"
+              >
+                Set to today →
+              </button>
+            </div>
+            <p className="text-yellow-500/70 text-xs mt-3">
+              💡 Set &quot;To&quot; date to today to avoid gaps between seeded and live data
+            </p>
+          </div>
+
+          {/* Symbol Selection */}
+          <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-white font-medium">
+                Select Symbols 
+                <span className="text-gray-500 font-normal ml-2">({selectedSymbols.length}/{availableSymbols.length})</span>
+              </h4>
+              <div className="flex gap-3 text-sm">
+                <button onClick={() => setSelectedSymbols(availableSymbols.map(s => s.symbol))} className="text-blue-400 hover:text-blue-300">
+                  Select All
+                </button>
+                <button onClick={() => setSelectedSymbols([])} className="text-gray-400 hover:text-gray-300">
+                  Clear
+                </button>
+              </div>
             </div>
             
-            {availableSymbols.length === 0 && (
-              <div className="text-gray-400 text-center py-4">
-                No symbols available. Add symbols in Trading Symbols section.
-              </div>
-            )}
-          </div>
-          
-          {/* Estimation */}
-          {selectedSymbols.length > 0 && seedFromDate && seedToDate && (
-            <div className="text-gray-400 text-sm">
-              📊 Estimated: ~{Math.ceil((new Date(seedToDate).getTime() - new Date(seedFromDate).getTime()) / (1000 * 60 * 60 * 24))} days × {selectedSymbols.length} symbols = 
-              ~{(Math.ceil((new Date(seedToDate).getTime() - new Date(seedFromDate).getTime()) / (1000 * 60 * 60 * 24)) * 1440 * selectedSymbols.length).toLocaleString()} candles
-            </div>
-          )}
-          
-          {/* Seed Results */}
-          {seedResults && (
-            <div className="bg-gray-700 rounded-lg p-4 max-h-40 overflow-y-auto">
-              <div className="text-white font-medium mb-2">Results:</div>
-              {seedResults.map((result, i) => (
-                <div key={i} className={`text-sm ${result.error ? 'text-red-400' : 'text-gray-300'}`}>
-                  {result.symbol}: {result.error ? `❌ ${result.error}` : `✅ Fetched ${result.fetched}, Inserted ${result.inserted}`}
-                </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-40 overflow-y-auto">
+              {availableSymbols.map((sym) => (
+                <button
+                  key={sym.symbol}
+                  onClick={() => toggleSymbol(sym.symbol)}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    selectedSymbols.includes(sym.symbol)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                  }`}
+                >
+                  {sym.symbol}
+                </button>
               ))}
             </div>
+          </div>
+
+          {/* Estimation */}
+          {selectedSymbols.length > 0 && seedFromDate && seedToDate && (
+            <div className="bg-purple-600/10 border border-purple-600/20 rounded-lg p-4 text-sm">
+              <span className="text-purple-400">📊 Estimated:</span>
+              <span className="text-white ml-2">
+                ~{(Math.ceil((new Date(seedToDate).getTime() - new Date(seedFromDate).getTime()) / (1000 * 60 * 60 * 24)) * 1440 * selectedSymbols.length).toLocaleString()} candles
+              </span>
+              <span className="text-gray-500 ml-2">
+                ({Math.ceil((new Date(seedToDate).getTime() - new Date(seedFromDate).getTime()) / (1000 * 60 * 60 * 24))} days × {selectedSymbols.length} symbols)
+              </span>
+            </div>
           )}
-          
+
+          {/* Results */}
+          {seedResults && (
+            <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30 max-h-40 overflow-y-auto">
+              <h4 className="text-white font-medium mb-2">Results</h4>
+              <div className="space-y-1">
+                {seedResults.map((result, i) => (
+                  <div key={i} className={`text-xs ${result.error ? 'text-red-400' : 'text-gray-400'}`}>
+                    <span className="text-white">{result.symbol}</span>: {result.error ? `❌ ${result.error}` : `✓ ${result.inserted} inserted`}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button
             onClick={runSeedHistory}
             disabled={seedRunning || selectedSymbols.length === 0}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
+            className="w-full sm:w-auto px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
-            {seedRunning ? '⏳ Seeding Data...' : '📥 Start Seeding'}
+            {seedRunning ? '⏳ Importing...' : '📥 Start Import'}
           </button>
         </div>
-      </div>
-
-      {/* Info Section */}
-      <div className="bg-gray-800/50 rounded-lg p-4 text-gray-400 text-sm">
-        <p><strong>ℹ️ How it works:</strong></p>
-        <ul className="list-disc list-inside mt-2 space-y-1">
-          <li><strong>Cleanup:</strong> Deletes candles where timestamp (t) &lt; cutoff. Example: t: 1768348800 is Jan 14, 2026 00:00 UTC.</li>
-          <li><strong>Schedule:</strong> Worker checks every 5 minutes. When schedule matches (right hour + day), cleanup runs once.</li>
-          <li><strong>Gap Fill:</strong> Uses Massive.com Custom Bars API with exact from/to timestamps.</li>
-          <li><strong>History:</strong> Basic plan = 2 years, Starter/Business = All history.</li>
-        </ul>
-      </div>
+      </Section>
     </div>
   );
 }
