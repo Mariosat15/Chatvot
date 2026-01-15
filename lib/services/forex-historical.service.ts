@@ -198,7 +198,7 @@ export async function fetchCandlesForRange(
   const allCandles: OHLCCandle[] = [];
   let chunkStart = fromTimestampMs;
   let chunkCount = 0;
-  const MAX_CHUNKS = 50; // Safety limit
+  const MAX_CHUNKS = 150; // Allow up to 150 chunks for 10+ years of data
 
   try {
     while (chunkStart < toTimestampMs && chunkCount < MAX_CHUNKS) {

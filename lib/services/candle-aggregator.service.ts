@@ -96,6 +96,10 @@ let cacheMisses = 0;
 // Progressive loading: Track background fetches to avoid duplicate API calls
 const backgroundFetchInProgress = new Set<string>();
 
+// Track which symbol/timeframe combinations have already had historical data fetched
+// This prevents re-fetching on every request even if there's still a gap
+const historicalFetchCompleted = new Set<string>();
+
 // NOTE: Historical data is now stored in MongoDB permanently (candles_historical_*)
 // No more RAM cache that gets lost on restart!
 
@@ -341,12 +345,13 @@ export async function getAggregatedCandles(
       
       console.log(`🔍 [Aggregator DEBUG] ${symbol} ${timeframe}: newestHistorical=${newestHistoricalTime > 0 ? new Date(newestHistoricalTime * 1000).toISOString() : 'none'}, gap=${gapMinutes} minutes`);
       
-      // If we have historical data AND the gap is small (< 1 week), use it
-      // Otherwise, we need to fetch more to fill the gap
-      const ONE_WEEK_MINUTES = 7 * 24 * 60;
-      const hasGoodCoverage = historicalCandles.length > 0 && gapMinutes < ONE_WEEK_MINUTES;
+      // Check if we've already completed a historical fetch for this symbol/timeframe
+      const fetchCompletedKey = `${symbol}:${normalizedTf}`;
+      const alreadyFetched = historicalFetchCompleted.has(fetchCompletedKey);
       
-      if (hasGoodCoverage) {
+      // If we have ANY historical data, use it (merge with MongoDB aggregated)
+      // Only trigger background fetch if no historical data AND not already fetched
+      if (historicalCandles.length > 0) {
         // Merge historical (old) + aggregated (recent)
         const mongoTimeSet = new Set(aggregatedFromMongo.map(c => c.time));
         const uniqueOlderCandles = historicalCandles.filter(c => !mongoTimeSet.has(c.time));
@@ -355,14 +360,18 @@ export async function getAggregatedCandles(
         source = 'hybrid_mongodb';
         
         console.log(`✅ [Aggregator] ${symbol} ${timeframe}: Merged ${uniqueOlderCandles.length} historical + ${aggregatedFromMongo.length} recent = ${finalAggregated.length} total`);
-      } else {
-        // No historical data OR there's a big gap - return MongoDB data and fetch in background
-        finalAggregated = aggregatedFromMongo;
-        source = historicalCandles.length > 0 ? 'mongodb_gap_detected' : 'mongodb_only';
         
-        if (historicalCandles.length > 0) {
-          console.log(`⚠️ [Aggregator] ${symbol} ${timeframe}: Gap of ${gapMinutes} minutes detected, need to fetch more history`);
-        }
+        // Mark as fetched since we have data
+        historicalFetchCompleted.add(fetchCompletedKey);
+      } else if (alreadyFetched) {
+        // We've already tried fetching but got no data - just use MongoDB data
+        finalAggregated = aggregatedFromMongo;
+        source = 'mongodb_only_no_history_available';
+        console.log(`📊 [Aggregator] ${symbol} ${timeframe}: No historical data available (already fetched), using ${aggregatedFromMongo.length} aggregated candles`);
+      } else {
+        // No historical data and haven't fetched yet - return MongoDB data and fetch in background
+        finalAggregated = aggregatedFromMongo;
+        source = 'mongodb_only';
         
         // Start background fetch if not already running
         if (!backgroundFetchInProgress.has(backgroundKey) && candles1m.length > 0) {
@@ -404,14 +413,19 @@ export async function getAggregatedCandles(
               } else {
                 console.log(`⚠️ [Background] No historical data from Massive.com for ${symbol} ${timeframe}`);
               }
+              
+              // Mark as completed regardless of result
+              historicalFetchCompleted.add(fetchCompletedKey);
             } catch (error) {
               console.error(`❌ [Background] Failed to fetch/save ${symbol} ${timeframe}:`, error);
+              // Still mark as completed to avoid infinite retries
+              historicalFetchCompleted.add(fetchCompletedKey);
             } finally {
               backgroundFetchInProgress.delete(backgroundKey);
             }
           })();
-        } else {
-          console.log(`⏳ [Aggregator] ${symbol} ${timeframe}: Background fetch already in progress or no 1m data`);
+        } else if (backgroundFetchInProgress.has(backgroundKey)) {
+          console.log(`⏳ [Aggregator] ${symbol} ${timeframe}: Background fetch already in progress`);
         }
       }
     } catch (error) {
