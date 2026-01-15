@@ -93,7 +93,9 @@ interface HistoricalCache {
   fetchedAt: number;
 }
 const historicalApiCache = new Map<string, HistoricalCache>();
-const HISTORICAL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// Historical data is STATIC (doesn't change) - cache for 24 hours
+// Only today's candles change, and those come from MongoDB not API
+const HISTORICAL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
  * Get cache key for a symbol/timeframe combination
