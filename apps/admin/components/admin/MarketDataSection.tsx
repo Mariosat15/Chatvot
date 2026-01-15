@@ -32,7 +32,7 @@ interface MarketDataSettings {
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_FULL_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// Unified Schedule Picker Component - Same layout for all uses
+// Unified Schedule Picker Component - IDENTICAL layout for both Weekly and Monthly
 function SchedulePicker({ 
   schedule, 
   onChange,
@@ -48,14 +48,12 @@ function SchedulePicker({
     blue: {
       active: 'bg-blue-600 text-white border-blue-600',
       activeTab: 'bg-blue-600 text-white shadow-lg shadow-blue-600/20',
-      border: 'border-blue-600/30',
       text: 'text-blue-400',
       summary: 'border-blue-600/20 bg-blue-600/5',
     },
     purple: {
       active: 'bg-purple-600 text-white border-purple-600',
       activeTab: 'bg-purple-600 text-white shadow-lg shadow-purple-600/20',
-      border: 'border-purple-600/30',
       text: 'text-purple-400',
       summary: 'border-purple-600/20 bg-purple-600/5',
     },
@@ -84,11 +82,11 @@ function SchedulePicker({
   };
 
   return (
-    <div className={`space-y-4 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
-      {/* Row 1: Frequency Toggle */}
-      <div className="flex items-center">
-        <span className="text-gray-400 text-sm w-24 shrink-0">Frequency</span>
-        <div className="inline-flex bg-gray-900/50 rounded-lg p-0.5 border border-gray-800/50">
+    <div className={`space-y-3 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
+      {/* Row 1: Frequency */}
+      <div className="grid grid-cols-[80px_1fr] items-center gap-3">
+        <span className="text-gray-400 text-sm">Frequency</span>
+        <div className="inline-flex bg-gray-900/50 rounded-lg p-0.5 border border-gray-800/50 w-fit">
           <button
             onClick={() => onChange({ ...schedule, type: 'weekly' })}
             className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
@@ -108,40 +106,33 @@ function SchedulePicker({
         </div>
       </div>
 
-      {/* Row 2: Day Selection (always same height container) */}
-      <div className="flex items-start">
-        <span className="text-gray-400 text-sm w-24 shrink-0 pt-1.5">
-          {schedule.type === 'weekly' ? 'Run on' : 'Day'}
-        </span>
-        <div className="flex-1">
+      {/* Row 2: Day Selection - SAME LABEL AND HEIGHT FOR BOTH */}
+      <div className="grid grid-cols-[80px_1fr] items-center gap-3">
+        <span className="text-gray-400 text-sm">Day</span>
+        <div className="min-h-[32px] flex items-center">
           {schedule.type === 'weekly' ? (
-            <div className="space-y-2">
-              <div className="flex flex-wrap gap-1.5">
-                {DAY_NAMES.map((day, index) => (
-                  <button
-                    key={day}
-                    onClick={() => toggleDay(index)}
-                    className={`w-10 h-8 rounded-md text-xs font-medium transition-all border ${
-                      schedule.weekDays.includes(index)
-                        ? colors.active
-                        : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-white'
-                    }`}
-                    title={DAY_FULL_NAMES[index]}
-                  >
-                    {day}
-                  </button>
-                ))}
-              </div>
-              {schedule.weekDays.length === 0 && (
-                <p className="text-yellow-500 text-xs">⚠️ Select at least one day</p>
-              )}
+            <div className="flex flex-wrap gap-1.5">
+              {DAY_NAMES.map((day, index) => (
+                <button
+                  key={day}
+                  onClick={() => toggleDay(index)}
+                  className={`w-10 h-8 rounded-md text-xs font-medium transition-all border ${
+                    schedule.weekDays.includes(index)
+                      ? colors.active
+                      : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-white'
+                  }`}
+                  title={DAY_FULL_NAMES[index]}
+                >
+                  {day}
+                </button>
+              ))}
             </div>
           ) : (
             <div className="flex items-center gap-2">
               <select
                 value={schedule.monthDay}
                 onChange={(e) => onChange({ ...schedule, monthDay: parseInt(e.target.value) })}
-                className="bg-gray-800 text-white rounded-lg px-3 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm w-20"
+                className="bg-gray-800 text-white rounded-lg px-3 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm w-20 h-8"
               >
                 {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
                   <option key={day} value={day}>
@@ -155,14 +146,22 @@ function SchedulePicker({
         </div>
       </div>
 
-      {/* Row 3: Time Picker */}
-      <div className="flex items-center">
-        <span className="text-gray-400 text-sm w-24 shrink-0">Time</span>
+      {/* Warning for no days selected */}
+      {schedule.type === 'weekly' && schedule.weekDays.length === 0 && (
+        <div className="grid grid-cols-[80px_1fr] gap-3">
+          <span></span>
+          <p className="text-yellow-500 text-xs">⚠️ Select at least one day</p>
+        </div>
+      )}
+
+      {/* Row 3: Time */}
+      <div className="grid grid-cols-[80px_1fr] items-center gap-3">
+        <span className="text-gray-400 text-sm">Time</span>
         <div className="flex items-center gap-1.5">
           <select
             value={schedule.hour}
             onChange={(e) => onChange({ ...schedule, hour: parseInt(e.target.value) })}
-            className="bg-gray-800 text-white rounded-lg px-2 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm font-mono w-14"
+            className="bg-gray-800 text-white rounded-lg px-2 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm font-mono w-14 h-8"
           >
             {Array.from({ length: 24 }, (_, i) => i).map(h => (
               <option key={h} value={h}>{h.toString().padStart(2, '0')}</option>
@@ -172,7 +171,7 @@ function SchedulePicker({
           <select
             value={schedule.minute}
             onChange={(e) => onChange({ ...schedule, minute: parseInt(e.target.value) })}
-            className="bg-gray-800 text-white rounded-lg px-2 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm font-mono w-14"
+            className="bg-gray-800 text-white rounded-lg px-2 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm font-mono w-14 h-8"
           >
             {[0, 15, 30, 45].map(m => (
               <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
@@ -182,7 +181,7 @@ function SchedulePicker({
         </div>
       </div>
 
-      {/* Row 4: Schedule Summary */}
+      {/* Row 4: Summary */}
       <div className={`rounded-lg px-3 py-2.5 border ${colors.summary}`}>
         <div className="flex items-center gap-2">
           <span className="text-base">📅</span>
