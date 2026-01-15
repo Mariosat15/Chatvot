@@ -1898,13 +1898,18 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   }, [candlesLoaded]);
 
   // Update price lines with real-time prices (bid/ask lines only)
+  // NOTE: For 1m timeframe, bid/ask is updated from forming candle poll (for perfect sync with candles)
   useEffect(() => {
     if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
+
+    // Skip for 1m timeframe - forming candle poll handles bid/ask update for perfect sync
+    const isOneMinute = timeframe === '1' || (timeframe as string) === '1m';
+    if (isOneMinute) return;
 
     const currentPrice = prices.get(symbol);
     if (!currentPrice) return;
 
-    // Update bid/ask price lines immediately (no throttle for precision)
+    // Update bid/ask price lines for non-1m timeframes
     try {
       if (bidPriceLineRef.current && askPriceLineRef.current) {
         bidPriceLineRef.current.applyOptions({
@@ -1917,20 +1922,10 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           title: `ASK ${currentPrice.ask.toFixed(5)}`,
         });
       }
-      
-      // ❌ REMOVED: Don't update candle close from WebSocket prices!
-      // This was causing flickering because:
-      // 1. WebSocket price updates close to value X
-      // 2. Server forming candle poll updates close to value Y (slightly different)
-      // 3. They fight each other = FLICKER
-      //
-      // Solution: ONLY the forming candle poll (every 500ms) updates candles
-      // This ensures a single source of truth and eliminates flickering
-      // The bid/ask lines above still update in real-time from WebSocket
     } catch {
       // Chart may be disposed, ignore
     }
-  }, [prices, symbol, chartType]);
+  }, [prices, symbol, chartType, timeframe]);
 
   // FAST POLL: Get forming candle from server every 200ms (for 1m timeframe)
   // This ensures O/H/L updates in real-time from server (no local building!)
@@ -1949,6 +1944,19 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         if (!response.ok) return;
         
         const data = await response.json();
+        
+        // Update bid/ask lines from SAME source as candle (perfect sync!)
+        if (data.price && bidPriceLineRef.current && askPriceLineRef.current) {
+          bidPriceLineRef.current.applyOptions({
+            price: data.price.bid,
+            title: `BID ${data.price.bid.toFixed(5)}`,
+          });
+          askPriceLineRef.current.applyOptions({
+            price: data.price.ask,
+            title: `ASK ${data.price.ask.toFixed(5)}`,
+          });
+        }
+        
         if (!data.candle) return;
         
         const serverCandle = data.candle;
