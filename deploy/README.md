@@ -186,7 +186,36 @@ pm2 restart all
 pm2 logs --lines 30
 ```
 
-### 6. Configure NGINX
+### 6. Database Setup (NEW INSTALLATIONS ONLY)
+
+For **new white label deployments**, run the database setup script to create indexes and seed default data:
+
+```bash
+# Run database setup
+node scripts/setup-database.js
+```
+
+This script will:
+- ✅ Create all required MongoDB indexes (for fast queries)
+- ✅ Seed default trading symbols (EUR/USD, GBP/USD, etc.)
+- ✅ Create default market data settings
+- ✅ Verify setup is complete
+
+**Options:**
+```bash
+# Only create indexes (skip seeding data)
+node scripts/setup-database.js --indexes-only
+
+# Only seed data (skip index creation)
+node scripts/setup-database.js --seed-only
+
+# Force re-seed data (overwrites existing)
+node scripts/setup-database.js --force
+```
+
+> ⚠️ **Skip this step for existing deployments** - only run on fresh databases!
+
+### 7. Configure NGINX
 
 > ⚠️ **IMPORTANT: Rate Limiting Must Be Added Manually**
 > 
@@ -229,7 +258,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### 7. Start Applications
+### 8. Start Applications
 
 ```bash
 # Start all apps with PM2
@@ -257,7 +286,7 @@ pm2 save
 pm2 status
 ```
 
-### 8. SSL Certificate (Let's Encrypt)
+### 9. SSL Certificate (Let's Encrypt)
 
 ```bash
 # After DNS is propagated (chartvolt.com → 148.230.124.57)
@@ -277,6 +306,60 @@ Select the "Network Access" tab (or "IP Access List")
 Click "+ Add IP Address"
 Enter: 148.230.124.57 (your VPS IP)
 Click Confirm
+
+---
+
+## 🏷️ White Label Deployment
+
+For deploying Chartvolt to new customers with their own database:
+
+### Option 1: Full Automated Setup (Recommended)
+
+```bash
+# On a fresh server, run the complete setup script
+sudo ./deploy/setup-new-customer.sh
+```
+
+This handles everything: server setup, code, database, nginx, and PM2.
+
+### Option 2: Manual with deploy.sh
+
+```bash
+# Standard update (existing installation)
+./deploy/sh
+
+# New customer installation (includes database setup)
+./deploy.sh --new
+
+# Only setup database (skip code deployment)
+./deploy.sh --db-only
+
+# Force re-seed database data
+./deploy.sh --db-only --force-db
+```
+
+### Option 3: Database Setup Only
+
+```bash
+# Create indexes and seed default data
+node scripts/setup-database.js
+
+# Options:
+node scripts/setup-database.js --indexes-only  # Only create indexes
+node scripts/setup-database.js --seed-only     # Only seed data
+node scripts/setup-database.js --force         # Force re-seed
+```
+
+### What Database Setup Creates:
+
+| Item | Description |
+|------|-------------|
+| **Indexes** | All required MongoDB indexes for fast queries |
+| **Trading Symbols** | 30+ forex pairs (EUR/USD, GBP/USD, etc.) |
+| **Market Settings** | Default WebSocket intervals, candle limits |
+
+---
+
 ## Management Commands
 
 ### PM2 Commands
