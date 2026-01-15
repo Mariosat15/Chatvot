@@ -337,9 +337,10 @@ export async function getAggregatedCandles(
     if (!backgroundFetchInProgress.has(historicalCacheKey)) {
       backgroundFetchInProgress.add(historicalCacheKey);
       
-      // ALWAYS fetch 2 years of history for higher timeframes (not just "missing" candles)
+      // ALWAYS fetch 10 years of history for higher timeframes (not just "missing" candles)
       // This ensures we get full depth from Massive.com API
-      const YEARS_OF_HISTORY = 2;
+      // Currencies Starter plan supports 10+ years of historical data
+      const YEARS_OF_HISTORY = 10;
       const fromTimestampMs = (oldestMongoTime * 1000) - (YEARS_OF_HISTORY * 365 * 24 * 60 * 60 * 1000);
       const toTimestampMs = (oldestMongoTime - 60) * 1000;
         
