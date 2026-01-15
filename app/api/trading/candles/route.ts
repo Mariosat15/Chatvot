@@ -214,6 +214,77 @@ async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): P
   }
 }
 
+// Track boundary gap fill operations (prevent duplicates)
+const boundaryGapFillInProgress = new Set<string>();
+
+/**
+ * Fill the gap between Massive.com API data and MongoDB data
+ * This runs in background and saves candles to MongoDB for future requests
+ */
+async function fillBoundaryGap(symbol: string, apiEndTime: number, mongoStartTime: number): Promise<void> {
+  const gapKey = `${symbol}:${apiEndTime}:${mongoStartTime}`;
+  
+  // Prevent duplicate fills
+  if (boundaryGapFillInProgress.has(gapKey)) {
+    console.log(`⏳ [Boundary Gap] Already filling gap for ${symbol}, skipping...`);
+    return;
+  }
+  
+  boundaryGapFillInProgress.add(gapKey);
+  
+  try {
+    // Calculate the gap range (add 60 seconds buffer on each side)
+    const gapStartMs = (apiEndTime + 60) * 1000;
+    const gapEndMs = (mongoStartTime - 60) * 1000;
+    
+    console.log(`🔧 [Boundary Gap] Filling gap for ${symbol} from ${new Date(gapStartMs).toISOString()} to ${new Date(gapEndMs).toISOString()}`);
+    
+    // Fetch 1m candles for the gap range from Massive.com
+    const gapCandles = await fetchCandlesForRange(
+      symbol as ForexSymbol,
+      '1' as Timeframe,
+      gapStartMs,
+      gapEndMs
+    );
+    
+    if (gapCandles.length === 0) {
+      console.log(`⚠️ [Boundary Gap] No candles available from Massive.com for gap period (likely market closed)`);
+      return;
+    }
+    
+    // Save to MongoDB
+    let savedCount = 0;
+    for (const candle of gapCandles) {
+      const timeInSeconds = Math.floor(candle.time / 1000);
+      
+      // Check if already exists
+      const existing = await mongoose.connection.db?.collection('candles_1m').findOne({
+        symbol,
+        t: timeInSeconds,
+      });
+      
+      if (!existing) {
+        await Candle1m.upsertCandle(
+          symbol,
+          candle.time, // milliseconds
+          candle.open,
+          candle.high,
+          candle.low,
+          candle.close,
+          candle.volume || 0
+        );
+        savedCount++;
+      }
+    }
+    
+    console.log(`✅ [Boundary Gap] Filled ${savedCount} candles for ${symbol} (fetched ${gapCandles.length} from API)`);
+  } catch (error) {
+    console.error(`❌ [Boundary Gap] Failed to fill gap for ${symbol}:`, error);
+  } finally {
+    boundaryGapFillInProgress.delete(gapKey);
+  }
+}
+
 /**
  * Shared handler for both GET and POST
  */
@@ -286,6 +357,29 @@ async function handleCandleRequest(symbol: string, timeframe: string, count: num
         finalCandles = [...olderApiCandles, ...sortedMongoCandles].sort((a, b) => a.time - b.time);
         
         console.log(`✅ [Candles API] Merged: ${olderApiCandles.length} from Massive.com + ${sortedMongoCandles.length} from MongoDB = ${finalCandles.length} total`);
+        
+        // ====================================================================
+        // BOUNDARY GAP DETECTION & FILL
+        // Check for gap between Massive.com data and MongoDB data
+        // ====================================================================
+        if (olderApiCandles.length > 0 && oldestMongoTimestamp) {
+          const newestApiTime = Math.max(...olderApiCandles.map(c => c.time));
+          const gapMinutes = Math.floor((oldestMongoTimestamp - newestApiTime) / 60) - 1;
+          
+          // If gap is significant (> 5 minutes) but not a weekend (> 2 days), try to fill
+          if (gapMinutes > 5 && gapMinutes < 2880) { // 2880 = 2 days in minutes
+            console.log(`🔍 [Boundary Gap] Detected ${gapMinutes} minute gap between API data and MongoDB for ${symbol}`);
+            console.log(`   API ends at: ${new Date(newestApiTime * 1000).toISOString()}`);
+            console.log(`   MongoDB starts at: ${new Date(oldestMongoTimestamp * 1000).toISOString()}`);
+            
+            // Fill gap in background (fire and forget)
+            fillBoundaryGap(symbol, newestApiTime, oldestMongoTimestamp).catch(err =>
+              console.error(`Failed to fill boundary gap for ${symbol}:`, err)
+            );
+          } else if (gapMinutes > 5) {
+            console.log(`⏭️ [Boundary Gap] Skipping ${gapMinutes} minute gap for ${symbol} (likely weekend/holiday)`);
+          }
+        }
       } else if (mongoCandles.length === 0) {
         // No MongoDB data - fetch entirely from Massive.com
         console.log(`⚠️ [Candles API] No MongoDB data for ${symbol}, fetching from Massive.com...`);
