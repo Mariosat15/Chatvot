@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import mongoose from 'mongoose';
 
+// Schedule sub-schema for both cleanup and gapFill
+const ScheduleSchema = new mongoose.Schema({
+  type: { type: String, enum: ['weekly', 'monthly'], default: 'weekly' },
+  weekDays: { type: [Number], default: [0] }, // 0 = Sunday, 1 = Monday, ... 6 = Saturday
+  monthDay: { type: Number, default: 1, min: 1, max: 28 }, // Day of month (1-28)
+  hour: { type: Number, default: 3, min: 0, max: 23 },
+  minute: { type: Number, default: 0, min: 0, max: 59 },
+}, { _id: false });
+
 // Settings schema for market data management
 const MarketDataSettingsSchema = new mongoose.Schema({
   key: { type: String, unique: true, default: 'market_data_settings' },
@@ -10,17 +19,13 @@ const MarketDataSettingsSchema = new mongoose.Schema({
     mode: { type: String, enum: ['auto', 'manual'], default: 'manual' },
     daysToKeep: { type: Number, default: 30 },
     lastRun: { type: Date, default: null },
-    schedule: {
-      type: { type: String, enum: ['daily', 'weekly', 'monthly'], default: 'daily' },
-      hour: { type: Number, default: 0 },
-      weekDays: { type: [Number], default: [0, 6] },
-      monthWeek: { type: Number, default: 1 },
-    },
+    schedule: { type: ScheduleSchema, default: () => ({ type: 'weekly', weekDays: [0], monthDay: 1, hour: 3, minute: 0 }) },
   },
   gapFill: {
     enabled: { type: Boolean, default: true },
     mode: { type: String, enum: ['auto', 'manual'], default: 'auto' },
     lastRun: { type: Date, default: null },
+    schedule: { type: ScheduleSchema, default: () => ({ type: 'weekly', weekDays: [1, 3, 5], monthDay: 1, hour: 4, minute: 0 }) },
   },
   // Price update mode: how browsers receive real-time price updates
   // 'polling' = browsers poll /api/trading/forming-candle (reliable)
@@ -70,16 +75,24 @@ export async function GET() {
           daysToKeep: 30,
           lastRun: null,
           schedule: {
-            type: 'daily',
-            hour: 0,
-            weekDays: [0, 6],
-            monthWeek: 1,
+            type: 'weekly',
+            weekDays: [0], // Sunday
+            monthDay: 1,
+            hour: 3,
+            minute: 0,
           },
         },
         gapFill: {
           enabled: true,
           mode: 'auto',
           lastRun: null,
+          schedule: {
+            type: 'weekly',
+            weekDays: [1, 3, 5], // Mon, Wed, Fri
+            monthDay: 1,
+            hour: 4,
+            minute: 0,
+          },
         },
         priceUpdateMode: 'polling',
         pollingIntervalMs: 200,
@@ -119,20 +132,25 @@ export async function POST(request: NextRequest) {
     if (cleanup) {
       if (typeof cleanup.enabled === 'boolean') updateData['cleanup.enabled'] = cleanup.enabled;
       if (cleanup.mode) updateData['cleanup.mode'] = cleanup.mode;
-      if (cleanup.daysToKeep) updateData['cleanup.daysToKeep'] = Math.max(1, Math.min(365, cleanup.daysToKeep));
+      if (typeof cleanup.daysToKeep === 'number') updateData['cleanup.daysToKeep'] = Math.max(0, Math.min(365, cleanup.daysToKeep));
       
       if (cleanup.schedule) {
-        if (cleanup.schedule.type) updateData['cleanup.schedule.type'] = cleanup.schedule.type;
+        if (cleanup.schedule.type && ['weekly', 'monthly'].includes(cleanup.schedule.type)) {
+          updateData['cleanup.schedule.type'] = cleanup.schedule.type;
+        }
         if (typeof cleanup.schedule.hour === 'number') {
           updateData['cleanup.schedule.hour'] = Math.max(0, Math.min(23, cleanup.schedule.hour));
         }
-        if (cleanup.schedule.weekDays) {
+        if (typeof cleanup.schedule.minute === 'number') {
+          updateData['cleanup.schedule.minute'] = Math.max(0, Math.min(59, cleanup.schedule.minute));
+        }
+        if (Array.isArray(cleanup.schedule.weekDays)) {
           updateData['cleanup.schedule.weekDays'] = cleanup.schedule.weekDays.filter(
             (d: number) => d >= 0 && d <= 6
           );
         }
-        if (cleanup.schedule.monthWeek) {
-          updateData['cleanup.schedule.monthWeek'] = Math.max(1, Math.min(4, cleanup.schedule.monthWeek));
+        if (typeof cleanup.schedule.monthDay === 'number') {
+          updateData['cleanup.schedule.monthDay'] = Math.max(1, Math.min(28, cleanup.schedule.monthDay));
         }
       }
     }
@@ -140,6 +158,26 @@ export async function POST(request: NextRequest) {
     if (gapFill) {
       if (typeof gapFill.enabled === 'boolean') updateData['gapFill.enabled'] = gapFill.enabled;
       if (gapFill.mode) updateData['gapFill.mode'] = gapFill.mode;
+      
+      if (gapFill.schedule) {
+        if (gapFill.schedule.type && ['weekly', 'monthly'].includes(gapFill.schedule.type)) {
+          updateData['gapFill.schedule.type'] = gapFill.schedule.type;
+        }
+        if (typeof gapFill.schedule.hour === 'number') {
+          updateData['gapFill.schedule.hour'] = Math.max(0, Math.min(23, gapFill.schedule.hour));
+        }
+        if (typeof gapFill.schedule.minute === 'number') {
+          updateData['gapFill.schedule.minute'] = Math.max(0, Math.min(59, gapFill.schedule.minute));
+        }
+        if (Array.isArray(gapFill.schedule.weekDays)) {
+          updateData['gapFill.schedule.weekDays'] = gapFill.schedule.weekDays.filter(
+            (d: number) => d >= 0 && d <= 6
+          );
+        }
+        if (typeof gapFill.schedule.monthDay === 'number') {
+          updateData['gapFill.schedule.monthDay'] = Math.max(1, Math.min(28, gapFill.schedule.monthDay));
+        }
+      }
     }
     
     // Price update mode
