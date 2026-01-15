@@ -2,26 +2,25 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import mongoose from 'mongoose';
 
-// Use the same schema as admin but read-only
-const MarketDataSettingsSchema = new mongoose.Schema({
-  key: { type: String, unique: true },
-  priceUpdateMode: { type: String, enum: ['polling', 'websocket'], default: 'polling' },
-  pollingIntervalMs: { type: Number, default: 200 },
-  websocketIntervalMs: { type: Number, default: 200 },
-}, { timestamps: true });
-
-const MarketDataSettings = mongoose.models.MarketDataSettings || 
-  mongoose.model('MarketDataSettings', MarketDataSettingsSchema);
-
 /**
  * GET - Get current price update mode and intervals
  * This is called by the chart to determine whether to use polling or websocket
+ * 
+ * NOTE: We query MongoDB directly to avoid Mongoose model caching issues
+ * between the admin app and main app
  */
 export async function GET() {
   try {
     await connectToDatabase();
     
-    const settings = await MarketDataSettings.findOne({ key: 'market_data_settings' });
+    // Query MongoDB collection directly (bypasses Mongoose model cache)
+    // The admin app creates this in collection: marketdatasettings
+    const db = mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database not connected');
+    }
+    
+    const settings = await db.collection('marketdatasettings').findOne({ key: 'market_data_settings' });
     
     const response = {
       mode: settings?.priceUpdateMode || 'polling',
@@ -32,7 +31,7 @@ export async function GET() {
     };
     
     // Debug log
-    console.log('📡 [Price Update Mode API] Returning:', response.mode, 'polling:', response.pollingIntervalMs, 'ws:', response.websocketIntervalMs);
+    console.log('📡 [Price Update Mode API] Raw from DB:', settings?.priceUpdateMode, '| Returning:', response.mode);
     
     return NextResponse.json(response);
   } catch (error) {

@@ -1201,20 +1201,23 @@ const BROADCAST_SETTINGS_CHECK_INTERVAL = 30000; // Check admin settings every 3
 
 /**
  * Load broadcast interval from admin settings
+ * NOTE: Query MongoDB directly to bypass Mongoose model caching issues
  */
 async function loadBroadcastInterval(): Promise<number> {
   try {
     await connectToDatabase();
     
-    // Import mongoose model for MarketDataSettings
+    // Import mongoose
     const mongoose = await import('mongoose');
-    const MarketDataSettings = mongoose.models.MarketDataSettings || 
-      mongoose.model('MarketDataSettings', new mongoose.Schema({
-        key: { type: String, unique: true },
-        websocketIntervalMs: { type: Number, default: 200 },
-      }));
     
-    const settings = await MarketDataSettings.findOne({ key: 'market_data_settings' });
+    // Query MongoDB collection directly (bypasses Mongoose model cache)
+    const db = mongoose.connection.db;
+    if (!db) {
+      console.warn('⚠️ [Broadcast] Database not connected, using default interval');
+      return 200;
+    }
+    
+    const settings = await db.collection('marketdatasettings').findOne({ key: 'market_data_settings' });
     const interval = settings?.websocketIntervalMs || 200;
     
     // Validate range (50-2000ms)
