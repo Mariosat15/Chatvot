@@ -261,6 +261,154 @@ interface SeedResult {
   error?: string;
 }
 
+// Default candle limits
+const DEFAULT_CANDLE_LIMITS: CandleLimits = {
+  '1m': 1440,
+  '5m': 2016,
+  '15m': 2688,
+  '30m': 1440,
+  '1h': 720,
+  '4h': 540,
+  '1d': 365,
+};
+
+// Calculate days from candles for each timeframe
+function candlesToDays(candles: number, timeframe: string): number {
+  const minutesPerCandle: Record<string, number> = {
+    '1m': 1,
+    '5m': 5,
+    '15m': 15,
+    '30m': 30,
+    '1h': 60,
+    '4h': 240,
+    '1d': 1440,
+  };
+  const minutes = candles * (minutesPerCandle[timeframe] || 1);
+  return Math.round((minutes / 1440) * 10) / 10; // Round to 1 decimal
+}
+
+// Candle Limits Editor Component with local state
+function CandleLimitsEditor({ 
+  candleLimits, 
+  onSave 
+}: { 
+  candleLimits?: CandleLimits;
+  onSave: (limits: CandleLimits) => void;
+}) {
+  const [localLimits, setLocalLimits] = useState<CandleLimits>(() => ({
+    ...DEFAULT_CANDLE_LIMITS,
+    ...(candleLimits || {}),
+  }));
+
+  // Update local state when prop changes (e.g., after API fetch)
+  useEffect(() => {
+    if (candleLimits) {
+      setLocalLimits({ ...DEFAULT_CANDLE_LIMITS, ...candleLimits });
+    }
+  }, [candleLimits]);
+
+  const handleChange = (key: keyof CandleLimits, value: string) => {
+    const numValue = parseInt(value) || DEFAULT_CANDLE_LIMITS[key];
+    setLocalLimits(prev => ({ ...prev, [key]: numValue }));
+  };
+
+  const handleBlur = () => {
+    onSave(localLimits);
+  };
+
+  const applyPreset = (preset: 'fast' | 'balanced' | 'deep') => {
+    const presets: Record<string, CandleLimits> = {
+      fast: { '1m': 500, '5m': 500, '15m': 500, '30m': 500, '1h': 500, '4h': 300, '1d': 200 },
+      balanced: { '1m': 1440, '5m': 2016, '15m': 2688, '30m': 1440, '1h': 720, '4h': 540, '1d': 365 },
+      deep: { '1m': 5000, '5m': 5000, '15m': 5000, '30m': 3000, '1h': 2000, '4h': 1000, '1d': 500 },
+    };
+    const newLimits = presets[preset];
+    setLocalLimits(newLimits);
+    onSave(newLimits);
+  };
+
+  const timeframes: { key: keyof CandleLimits; label: string; min: number; max: number; step: number }[] = [
+    { key: '1m', label: '1 Minute', min: 100, max: 10000, step: 100 },
+    { key: '5m', label: '5 Minutes', min: 100, max: 10000, step: 100 },
+    { key: '15m', label: '15 Minutes', min: 100, max: 10000, step: 100 },
+    { key: '30m', label: '30 Minutes', min: 100, max: 5000, step: 100 },
+    { key: '1h', label: '1 Hour', min: 100, max: 5000, step: 50 },
+    { key: '4h', label: '4 Hours', min: 50, max: 2000, step: 50 },
+    { key: '1d', label: '1 Day', min: 30, max: 1000, step: 10 },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-[#12141c]/50 rounded-lg p-4 border border-gray-800/20 mb-4">
+        <p className="text-gray-400 text-sm">
+          Control how many candles each timeframe loads. Lower values = faster chart loading. 
+          These limits are applied per user chart request.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {timeframes.map(({ key, label, min, max, step }) => (
+          <div key={key} className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-yellow-400 font-medium text-sm">{label}</span>
+            </div>
+            <input
+              type="number"
+              min={min}
+              max={max}
+              step={step}
+              value={localLimits[key]}
+              onChange={(e) => handleChange(key, e.target.value)}
+              onBlur={handleBlur}
+              className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-yellow-500 focus:outline-none"
+            />
+            <div className="text-gray-500 text-xs mt-1">
+              ≈ {candlesToDays(localLimits[key], key)} days
+            </div>
+          </div>
+        ))}
+
+        {/* Quick Presets */}
+        <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30 flex flex-col justify-center">
+          <div className="text-gray-400 text-xs mb-2">Quick Presets</div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => applyPreset('fast')}
+              className="px-2 py-1 text-xs bg-green-600/20 text-green-400 rounded hover:bg-green-600/30 transition-colors"
+            >
+              ⚡ Fast
+            </button>
+            <button
+              onClick={() => applyPreset('balanced')}
+              className="px-2 py-1 text-xs bg-blue-600/20 text-blue-400 rounded hover:bg-blue-600/30 transition-colors"
+            >
+              📊 Balanced
+            </button>
+            <button
+              onClick={() => applyPreset('deep')}
+              className="px-2 py-1 text-xs bg-purple-600/20 text-purple-400 rounded hover:bg-purple-600/30 transition-colors"
+            >
+              📈 Deep History
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Performance Tip */}
+      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 flex items-start gap-3">
+        <span className="text-yellow-500 text-xl">💡</span>
+        <div>
+          <div className="text-yellow-400 font-medium text-sm">Performance Tip</div>
+          <p className="text-gray-400 text-xs mt-1">
+            Lower limits = faster chart loading. The &quot;Fast&quot; preset is recommended for production. 
+            Users can still scroll back in time - additional data loads on demand.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Collapsible Section Component
 function Section({ 
   title, 
@@ -694,212 +842,10 @@ export default function MarketDataSection() {
         defaultOpen={false}
       >
         {settings && (
-          <div className="space-y-5">
-            <div className="bg-[#12141c]/50 rounded-lg p-4 border border-gray-800/20 mb-4">
-              <p className="text-gray-400 text-sm">
-                Control how many candles each timeframe loads. Lower values = faster chart loading. 
-                These limits are applied per user chart request.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {/* 1m */}
-              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-yellow-400 font-medium text-sm">1 Minute</span>
-                </div>
-                <input
-                  type="number"
-                  min="100"
-                  max="10000"
-                  step="100"
-                  value={settings.candleLimits?.['1m'] || 1440}
-                  onChange={(e) => saveSettings({ 
-                    candleLimits: { ...settings.candleLimits, '1m': parseInt(e.target.value) || 1440 } 
-                  })}
-                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
-                />
-                <div className="text-gray-500 text-xs mt-1">
-                  ≈ {Math.round((settings.candleLimits?.['1m'] || 1440) / 60)} hours
-                </div>
-              </div>
-
-              {/* 5m */}
-              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-yellow-400 font-medium text-sm">5 Minutes</span>
-                </div>
-                <input
-                  type="number"
-                  min="100"
-                  max="10000"
-                  step="100"
-                  value={settings.candleLimits?.['5m'] || 2016}
-                  onChange={(e) => saveSettings({ 
-                    candleLimits: { ...settings.candleLimits, '5m': parseInt(e.target.value) || 2016 } 
-                  })}
-                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
-                />
-                <div className="text-gray-500 text-xs mt-1">
-                  ≈ {Math.round((settings.candleLimits?.['5m'] || 2016) * 5 / 60 / 24)} days
-                </div>
-              </div>
-
-              {/* 15m */}
-              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-yellow-400 font-medium text-sm">15 Minutes</span>
-                </div>
-                <input
-                  type="number"
-                  min="100"
-                  max="10000"
-                  step="100"
-                  value={settings.candleLimits?.['15m'] || 2688}
-                  onChange={(e) => saveSettings({ 
-                    candleLimits: { ...settings.candleLimits, '15m': parseInt(e.target.value) || 2688 } 
-                  })}
-                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
-                />
-                <div className="text-gray-500 text-xs mt-1">
-                  ≈ {Math.round((settings.candleLimits?.['15m'] || 2688) * 15 / 60 / 24)} days
-                </div>
-              </div>
-
-              {/* 30m */}
-              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-yellow-400 font-medium text-sm">30 Minutes</span>
-                </div>
-                <input
-                  type="number"
-                  min="100"
-                  max="5000"
-                  step="100"
-                  value={settings.candleLimits?.['30m'] || 1440}
-                  onChange={(e) => saveSettings({ 
-                    candleLimits: { ...settings.candleLimits, '30m': parseInt(e.target.value) || 1440 } 
-                  })}
-                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
-                />
-                <div className="text-gray-500 text-xs mt-1">
-                  ≈ {Math.round((settings.candleLimits?.['30m'] || 1440) * 30 / 60 / 24)} days
-                </div>
-              </div>
-
-              {/* 1h */}
-              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-yellow-400 font-medium text-sm">1 Hour</span>
-                </div>
-                <input
-                  type="number"
-                  min="100"
-                  max="5000"
-                  step="50"
-                  value={settings.candleLimits?.['1h'] || 720}
-                  onChange={(e) => saveSettings({ 
-                    candleLimits: { ...settings.candleLimits, '1h': parseInt(e.target.value) || 720 } 
-                  })}
-                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
-                />
-                <div className="text-gray-500 text-xs mt-1">
-                  ≈ {Math.round((settings.candleLimits?.['1h'] || 720) / 24)} days
-                </div>
-              </div>
-
-              {/* 4h */}
-              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-yellow-400 font-medium text-sm">4 Hours</span>
-                </div>
-                <input
-                  type="number"
-                  min="50"
-                  max="2000"
-                  step="50"
-                  value={settings.candleLimits?.['4h'] || 540}
-                  onChange={(e) => saveSettings({ 
-                    candleLimits: { ...settings.candleLimits, '4h': parseInt(e.target.value) || 540 } 
-                  })}
-                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
-                />
-                <div className="text-gray-500 text-xs mt-1">
-                  ≈ {Math.round((settings.candleLimits?.['4h'] || 540) * 4 / 24)} days
-                </div>
-              </div>
-
-              {/* 1d */}
-              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-yellow-400 font-medium text-sm">1 Day</span>
-                </div>
-                <input
-                  type="number"
-                  min="30"
-                  max="1000"
-                  step="10"
-                  value={settings.candleLimits?.['1d'] || 365}
-                  onChange={(e) => saveSettings({ 
-                    candleLimits: { ...settings.candleLimits, '1d': parseInt(e.target.value) || 365 } 
-                  })}
-                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
-                />
-                <div className="text-gray-500 text-xs mt-1">
-                  ≈ {Math.round((settings.candleLimits?.['1d'] || 365) / 30)} months
-                </div>
-              </div>
-
-              {/* Quick Presets */}
-              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30 flex flex-col justify-center">
-                <div className="text-gray-400 text-xs mb-2">Quick Presets</div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => saveSettings({ 
-                      candleLimits: {
-                        '1m': 500, '5m': 500, '15m': 500, '30m': 500, '1h': 500, '4h': 300, '1d': 200
-                      }
-                    })}
-                    className="px-2 py-1 text-xs bg-green-600/20 text-green-400 rounded hover:bg-green-600/30 transition-colors"
-                  >
-                    ⚡ Fast
-                  </button>
-                  <button
-                    onClick={() => saveSettings({ 
-                      candleLimits: {
-                        '1m': 1440, '5m': 2016, '15m': 2688, '30m': 1440, '1h': 720, '4h': 540, '1d': 365
-                      }
-                    })}
-                    className="px-2 py-1 text-xs bg-blue-600/20 text-blue-400 rounded hover:bg-blue-600/30 transition-colors"
-                  >
-                    📊 Balanced
-                  </button>
-                  <button
-                    onClick={() => saveSettings({ 
-                      candleLimits: {
-                        '1m': 5000, '5m': 5000, '15m': 5000, '30m': 3000, '1h': 2000, '4h': 1000, '1d': 500
-                      }
-                    })}
-                    className="px-2 py-1 text-xs bg-purple-600/20 text-purple-400 rounded hover:bg-purple-600/30 transition-colors"
-                  >
-                    📈 Deep History
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Performance Tip */}
-            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 flex items-start gap-3">
-              <span className="text-yellow-500 text-xl">💡</span>
-              <div>
-                <div className="text-yellow-400 font-medium text-sm">Performance Tip</div>
-                <p className="text-gray-400 text-xs mt-1">
-                  Lower limits = faster chart loading. The &quot;Fast&quot; preset is recommended for production. 
-                  Users can still scroll back in time - additional data loads on demand.
-                </p>
-              </div>
-            </div>
-          </div>
+          <CandleLimitsEditor 
+            candleLimits={settings.candleLimits}
+            onSave={(limits) => saveSettings({ candleLimits: limits })}
+          />
         )}
       </Section>
 
