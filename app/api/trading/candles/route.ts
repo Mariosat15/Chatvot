@@ -330,19 +330,44 @@ async function handleCandleRequest(symbol: string, timeframe: string, count: num
       
       // If user wants more candles than MongoDB has, fetch older data from Massive.com
       if (mongoCandles.length < limit && oldestMongoTimestamp) {
-        console.log(`🔄 [Candles API] MongoDB has ${mongoCandles.length} candles, user wants ${limit}. Fetching older data from Massive.com...`);
+        const missingCandles = limit - mongoCandles.length;
+        console.log(`🔄 [Candles API] MongoDB has ${mongoCandles.length} 1m candles, user wants ${limit} (missing ${missingCandles}). Fetching older data from Massive.com...`);
+        console.log(`   MongoDB oldest: ${new Date(oldestMongoTimestamp * 1000).toISOString()}`);
         
-        // Fetch from Massive.com API (this returns candles sorted newest first)
-        const apiCandles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit);
+        // Calculate exact range to fetch (from oldest MongoDB going backwards)
+        // This bypasses the 60-day limit of getRecentCandles!
+        const fromTimestampMs = (oldestMongoTimestamp - (missingCandles * 60)) * 1000;
+        const toTimestampMs = (oldestMongoTimestamp - 60) * 1000;
         
-        // Convert API candles to seconds (they come in seconds already from getRecentCandles)
+        console.log(`📅 [Candles API] Fetching 1m from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
+        
+        // Use fetchCandlesForRange for precise historical data (no day limit!)
+        const apiCandles = await fetchCandlesForRange(symbol as ForexSymbol, '1' as Timeframe, fromTimestampMs, toTimestampMs);
+        
+        console.log(`📊 [Candles API] API returned ${apiCandles.length} 1m candles`);
+        
+        // Convert API candles - fetchCandlesForRange returns time in MILLISECONDS
         const apiCandlesFormatted = apiCandles.map(c => ({
-          time: c.time, // Already in seconds
+          time: Math.floor(c.time / 1000), // Convert ms to seconds
           open: c.open,
           high: c.high,
           low: c.low,
           close: c.close,
         }));
+        
+        // Log the range of API data received
+        if (apiCandlesFormatted.length > 0) {
+          const apiOldest = Math.min(...apiCandlesFormatted.map(c => c.time));
+          const apiNewest = Math.max(...apiCandlesFormatted.map(c => c.time));
+          console.log(`   API data range: ${new Date(apiOldest * 1000).toISOString()} to ${new Date(apiNewest * 1000).toISOString()}`);
+          
+          // Check for gap between API newest and MongoDB oldest
+          const gapSeconds = oldestMongoTimestamp - apiNewest;
+          const gapMinutes = Math.floor(gapSeconds / 60);
+          if (gapMinutes > 5) {
+            console.log(`⚠️ [Candles API] GAP DETECTED: ${gapMinutes} minutes (${Math.floor(gapMinutes / 60 / 24)} days) between API data end and MongoDB start!`);
+          }
+        }
         
         // MERGE: Use MongoDB for recent data (authoritative), Massive.com for older data
         // MongoDB data takes priority for any overlapping timestamps
@@ -365,19 +390,20 @@ async function handleCandleRequest(symbol: string, timeframe: string, count: num
         if (olderApiCandles.length > 0 && oldestMongoTimestamp) {
           const newestApiTime = Math.max(...olderApiCandles.map(c => c.time));
           const gapMinutes = Math.floor((oldestMongoTimestamp - newestApiTime) / 60) - 1;
+          const gapDays = Math.floor(gapMinutes / 60 / 24);
           
-          // If gap is significant (> 5 minutes) but not a weekend (> 2 days), try to fill
-          if (gapMinutes > 5 && gapMinutes < 2880) { // 2880 = 2 days in minutes
-            console.log(`🔍 [Boundary Gap] Detected ${gapMinutes} minute gap between API data and MongoDB for ${symbol}`);
+          // If gap is significant (> 5 minutes), try to fill
+          // We now allow larger gaps - Massive.com API will return what it has
+          if (gapMinutes > 5) {
+            console.log(`🔍 [Boundary Gap] Detected ${gapMinutes} minutes (${gapDays} days) gap between API data and MongoDB for ${symbol}`);
             console.log(`   API ends at: ${new Date(newestApiTime * 1000).toISOString()}`);
             console.log(`   MongoDB starts at: ${new Date(oldestMongoTimestamp * 1000).toISOString()}`);
             
             // Fill gap in background (fire and forget)
+            // Note: Large gaps might be due to market closure or API data unavailability
             fillBoundaryGap(symbol, newestApiTime, oldestMongoTimestamp).catch(err =>
               console.error(`Failed to fill boundary gap for ${symbol}:`, err)
             );
-          } else if (gapMinutes > 5) {
-            console.log(`⏭️ [Boundary Gap] Skipping ${gapMinutes} minute gap for ${symbol} (likely weekend/holiday)`);
           }
         }
       } else if (mongoCandles.length === 0) {

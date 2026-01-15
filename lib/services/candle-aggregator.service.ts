@@ -314,6 +314,7 @@ export async function getAggregatedCandles(
         const toTimestampMs = (oldestMongoTime - 60) * 1000; // End just before MongoDB data
         
         console.log(`📅 [Aggregator] Fetching ${symbol} ${timeframe} from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
+        console.log(`   MongoDB oldest: ${new Date(oldestMongoTime * 1000).toISOString()}, requesting ${missingCandles} candles going back ${minutesBack} minutes`);
         
         // Use fetchCandlesForRange for precise historical data (no 2-day limit!)
         const apiCandles = await fetchCandlesForRange(
@@ -322,6 +323,8 @@ export async function getAggregatedCandles(
           fromTimestampMs, 
           toTimestampMs
         );
+        
+        console.log(`📊 [Aggregator] API returned ${apiCandles.length} candles for ${symbol} ${timeframe}`);
         
         // Convert API candles to our format
         // fetchCandlesForRange returns time in MILLISECONDS, need to convert to seconds
@@ -333,6 +336,22 @@ export async function getAggregatedCandles(
           close: c.close,
           volume: c.volume,
         }));
+        
+        // Log the range of API data received
+        if (apiCandlesFormatted.length > 0) {
+          const apiOldest = Math.min(...apiCandlesFormatted.map(c => c.time));
+          const apiNewest = Math.max(...apiCandlesFormatted.map(c => c.time));
+          console.log(`   API data range: ${new Date(apiOldest * 1000).toISOString()} to ${new Date(apiNewest * 1000).toISOString()}`);
+          
+          // Check for gap between API newest and MongoDB oldest
+          const gapSeconds = oldestMongoTime - apiNewest;
+          const gapMinutes = Math.floor(gapSeconds / 60);
+          if (gapMinutes > timeframeMinutes * 2) {
+            console.log(`⚠️ [Aggregator] GAP DETECTED: ${gapMinutes} minutes (${Math.floor(gapMinutes / 60 / 24)} days) between API data end and MongoDB start!`);
+            console.log(`   API ends at: ${new Date(apiNewest * 1000).toISOString()}`);
+            console.log(`   MongoDB starts at: ${new Date(oldestMongoTime * 1000).toISOString()}`);
+          }
+        }
         
         // Create a set of MongoDB times for deduplication
         const mongoTimeSet = new Set(aggregatedFromMongo.map(c => c.time));
