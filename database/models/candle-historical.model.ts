@@ -139,6 +139,7 @@ export function normalizeTimeframe(timeframe: string): HistoricalTimeframe | nul
 
 /**
  * Save historical candles to MongoDB (bulk upsert)
+ * Uses batching to avoid MongoDB timeout on large inserts
  */
 export async function saveHistoricalCandles(
   timeframe: HistoricalTimeframe,
@@ -149,29 +150,57 @@ export async function saveHistoricalCandles(
 
   const Model = getHistoricalCandleModel(timeframe);
   
-  const operations = candles.map(candle => ({
-    updateOne: {
-      filter: { 
-        symbol, 
-        timestamp: new Date(candle.time * 1000) 
-      },
-      update: {
-        $setOnInsert: {
-          symbol,
-          timestamp: new Date(candle.time * 1000),
-          open: candle.open,
-          high: candle.high,
-          low: candle.low,
-          close: candle.close,
-          volume: candle.volume || 0,
-        }
-      },
-      upsert: true,
-    }
-  }));
+  // Batch size - smaller batches to avoid MongoDB timeout
+  const BATCH_SIZE = 1000;
+  let totalUpserted = 0;
+  
+  // Process in batches
+  for (let i = 0; i < candles.length; i += BATCH_SIZE) {
+    const batch = candles.slice(i, i + BATCH_SIZE);
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(candles.length / BATCH_SIZE);
+    
+    const operations = batch.map(candle => ({
+      updateOne: {
+        filter: { 
+          symbol, 
+          timestamp: new Date(candle.time * 1000) 
+        },
+        update: {
+          $setOnInsert: {
+            symbol,
+            timestamp: new Date(candle.time * 1000),
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+            volume: candle.volume || 0,
+          }
+        },
+        upsert: true,
+      }
+    }));
 
-  const result = await Model.bulkWrite(operations, { ordered: false });
-  return result.upsertedCount;
+    try {
+      const result = await Model.bulkWrite(operations, { ordered: false });
+      totalUpserted += result.upsertedCount;
+      
+      // Log progress for large saves
+      if (totalBatches > 5 && batchNum % 5 === 0) {
+        console.log(`   📦 [Save Progress] ${symbol} ${timeframe}: batch ${batchNum}/${totalBatches} (${totalUpserted} new so far)`);
+      }
+    } catch (error) {
+      console.error(`   ❌ [Save Error] ${symbol} ${timeframe} batch ${batchNum}/${totalBatches}:`, error instanceof Error ? error.message : 'Unknown error');
+      // Continue with next batch even if one fails
+    }
+    
+    // Small delay between batches to avoid overwhelming MongoDB
+    if (i + BATCH_SIZE < candles.length) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+  
+  return totalUpserted;
 }
 
 /**
