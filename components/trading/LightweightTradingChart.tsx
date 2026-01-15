@@ -259,6 +259,10 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const [pollingIntervalMs, setPollingIntervalMs] = useState(200);
   const [websocketIntervalMs, setWebsocketIntervalMs] = useState(200);
   
+  // WebSocket connection status for debugging
+  const [wsStatus, setWsStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
+  
   // Fetch price update mode and intervals from server (cached for 10 seconds)
   useEffect(() => {
     let mounted = true;
@@ -1982,6 +1986,9 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     const updateChartWithCandle = (candle: { time: number; open: number; high: number; low: number; close: number }, price?: { bid: number; ask: number }) => {
       if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
       
+      // Track update time for sync debugging (works for both polling and websocket)
+      setLastUpdateTime(Date.now());
+      
       // Update bid/ask lines
       if (price && bidPriceLineRef.current && askPriceLineRef.current) {
         bidPriceLineRef.current.applyOptions({
@@ -2025,11 +2032,21 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       let reconnectTimeout: NodeJS.Timeout | null = null;
       let isCleanedUp = false;
       
+      setWsStatus('connecting');
+      
       const connect = () => {
         if (isCleanedUp) return;
         
+        setWsStatus('connecting');
+        
         try {
           ws = new WebSocket(wsUrl);
+          
+          ws.onopen = () => {
+            if (!isCleanedUp) {
+              setWsStatus('connected');
+            }
+          };
           
           ws.onmessage = (event) => {
             try {
@@ -2061,8 +2078,9 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           
           ws.onclose = () => {
             if (!isCleanedUp) {
-              // Reconnect after 2 seconds
-              reconnectTimeout = setTimeout(connect, 2000);
+              setWsStatus('disconnected');
+              // Reconnect faster (500ms instead of 2s) to minimize delay
+              reconnectTimeout = setTimeout(connect, 500);
             }
           };
           
@@ -2070,9 +2088,10 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             // Will trigger onclose
           };
         } catch {
-          // Retry after 3 seconds
+          // Retry faster (1s instead of 3s)
           if (!isCleanedUp) {
-            reconnectTimeout = setTimeout(connect, 3000);
+            setWsStatus('disconnected');
+            reconnectTimeout = setTimeout(connect, 1000);
           }
         }
       };
@@ -2092,6 +2111,9 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     }
     
     // ==== POLLING MODE (default) ====
+    // Reset WebSocket status when not using websocket
+    setWsStatus('disconnected');
+    
     const fetchFormingCandle = async () => {
       if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
       
@@ -2710,6 +2732,36 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               ⚠ STALE
             </button>
           )}
+          
+          {/* Connection Status Indicator (Debug) - Shows sync timestamp */}
+          <div 
+            className={cn(
+              "px-2 py-0.5 rounded text-[10px] font-mono flex items-center gap-1",
+              priceUpdateMode === 'websocket' 
+                ? wsStatus === 'connected' 
+                  ? "bg-green-500/20 text-green-400" 
+                  : wsStatus === 'connecting'
+                    ? "bg-yellow-500/20 text-yellow-400"
+                    : "bg-red-500/20 text-red-400"
+                : "bg-blue-500/20 text-blue-400"
+            )}
+            title={priceUpdateMode === 'websocket' 
+              ? `WebSocket: ${wsStatus} | Last update: ${lastUpdateTime ? new Date(lastUpdateTime).toLocaleTimeString() : 'never'}`
+              : `Polling every ${pollingIntervalMs}ms`
+            }
+          >
+            {priceUpdateMode === 'websocket' ? (
+              <>WS:{wsStatus === 'connected' ? '✓' : wsStatus === 'connecting' ? '...' : '✗'}</>
+            ) : (
+              <>POLL:{pollingIntervalMs}ms</>
+            )}
+            {/* Show milliseconds of last update for sync debugging */}
+            {lastUpdateTime > 0 && (
+              <span className="text-gray-500">
+                {new Date(lastUpdateTime).toLocaleTimeString('en-US', { hour12: false })}.{String(lastUpdateTime % 1000).padStart(3, '0')}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Center: Price Display */}
