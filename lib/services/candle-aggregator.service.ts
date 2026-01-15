@@ -382,10 +382,6 @@ export async function getAggregatedCandles(
     } else {
       finalAggregated = aggregatedFromMongo;
     }
-    } catch (apiError) {
-      console.error(`⚠️ [Aggregator] Failed to fetch from Massive.com for ${symbol} ${timeframe}:`, apiError);
-      finalAggregated = aggregatedFromMongo;
-    }
   } else if (candles1m.length === 0) {
     // No MongoDB data - fetch entirely from Massive.com API using getRecentCandles
     console.log(`⚠️ [Aggregator] ${symbol} ${timeframe}: No MongoDB data, fetching from Massive.com...`);
