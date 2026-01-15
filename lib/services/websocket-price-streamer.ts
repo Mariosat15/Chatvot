@@ -691,18 +691,24 @@ function handleQuoteMessage(msg: {
   // 📦 Queue price for MongoDB cache (Worker reads from here)
   queuePriceForMongoCache(symbol, roundedBid, roundedAsk, quote.timestamp);
   
-  // 🕯️ UPDATE FORMING CANDLE (current minute) - Server is authoritative source
-  updateFormingCandle(symbol, safeMid);
+  // 🕯️ UPDATE FORMING CANDLE using BID price (like MT4/MT5)
+  // This ensures candle close = BID line, candles never go above ASK line
+  updateFormingCandle(symbol, roundedBid);
 }
 
 /**
- * Update the forming candle for a symbol
- * This builds the current minute candle from real-time quotes
- * All browsers get this data = identical charts!
+ * Update the forming candle for a symbol using BID price
+ * 
+ * WHY BID PRICE? (Like MT4/MT5 and professional brokers)
+ * - Candle O/H/L/C = BID prices
+ * - BID line matches candle close exactly
+ * - ASK line = BID + spread (always above candle)
+ * - Candles never go above ASK line
+ * - All users see identical charts (server is single source of truth)
  * 
  * When a new minute starts, SAVE the completed candle to MongoDB
  */
-function updateFormingCandle(symbol: ForexSymbol, price: number): void {
+function updateFormingCandle(symbol: ForexSymbol, bidPrice: number): void {
   const state = getState();
   const now = Date.now();
   
@@ -723,17 +729,17 @@ function updateFormingCandle(symbol: ForexSymbol, price: number): void {
     state.formingCandles.set(symbol, {
       symbol,
       time: minuteTime,
-      open: price,
-      high: price,
-      low: price,
-      close: price,
+      open: bidPrice,
+      high: bidPrice,
+      low: bidPrice,
+      close: bidPrice,
       tickCount: 1,
     });
   } else {
-    // Same minute - update OHLC
-    existing.high = Math.max(existing.high, price);
-    existing.low = Math.min(existing.low, price);
-    existing.close = price;
+    // Same minute - update OHLC from BID price
+    existing.high = Math.max(existing.high, bidPrice);
+    existing.low = Math.min(existing.low, bidPrice);
+    existing.close = bidPrice;
     existing.tickCount++;
   }
 }
