@@ -299,25 +299,66 @@ async function fillBoundaryGap(symbol: string, apiEndTime: number, mongoStartTim
   }
 }
 
+// Default candle limits per timeframe (can be overridden by admin settings)
+const DEFAULT_CANDLE_LIMITS: Record<string, number> = {
+  '1m': 1440,    // 1 day
+  '1': 1440,
+  '5m': 2016,    // 1 week
+  '5': 2016,
+  '15m': 2688,   // 4 weeks
+  '15': 2688,
+  '30m': 1440,   // 1 month
+  '30': 1440,
+  '1h': 720,     // 1 month
+  '60': 720,
+  '4h': 540,     // 3 months
+  '240': 540,
+  '1d': 365,     // 1 year
+  'D': 365,
+  'W': 104,      // 2 years
+  'M': 60,       // 5 years
+};
+
+// Cache for admin candle limits (refresh every 60 seconds)
+let cachedCandleLimits: Record<string, number> | null = null;
+let candleLimitsCacheTime = 0;
+const CANDLE_LIMITS_CACHE_TTL = 60000; // 60 seconds
+
+async function getCandleLimits(): Promise<Record<string, number>> {
+  const now = Date.now();
+  if (cachedCandleLimits && (now - candleLimitsCacheTime < CANDLE_LIMITS_CACHE_TTL)) {
+    return cachedCandleLimits;
+  }
+  
+  try {
+    // Fetch from admin settings
+    const db = mongoose.connection.db;
+    if (db) {
+      const settings = await db.collection('marketdatasettings').findOne({ key: 'market_data_settings' });
+      if (settings?.candleLimits) {
+        const newLimits = { ...DEFAULT_CANDLE_LIMITS, ...settings.candleLimits };
+        cachedCandleLimits = newLimits;
+        candleLimitsCacheTime = now;
+        return newLimits;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch candle limits:', error);
+  }
+  
+  return DEFAULT_CANDLE_LIMITS;
+}
+
 /**
  * Shared handler for both GET and POST
  */
 async function handleCandleRequest(symbol: string, timeframe: string, count: number) {
-  // Calculate limit based on timeframe
-  // Higher limits for aggregated timeframes to ensure hybrid merge can work
-  let limit: number;
+  // Get admin-configured candle limits
+  const candleLimits = await getCandleLimits();
   
-  if (timeframe === '1m' || timeframe === '1') {
-    // 1m: up to 200k candles (~139 days)
-    limit = Math.min(count || 100000, 200000);
-  } else if (['5m', '5', '15m', '15', '30m', '30', '1h', '60', '4h', '240'].includes(timeframe)) {
-    // Aggregated timeframes: allow up to 50k candles for hybrid merge
-    // This ensures we request MORE than MongoDB has, triggering the merge
-    limit = Math.min(count || 50000, 50000);
-  } else {
-    // D, W, M: reasonable limit
-    limit = Math.min(count || 500, 5000);
-  }
+  // Use admin limit or default, capped by the configured limit
+  const configuredLimit = candleLimits[timeframe] || candleLimits['1m'] || 1440;
+  const limit = Math.min(count || configuredLimit, configuredLimit);
 
   // For 1-minute timeframe: HYBRID - MongoDB (recent) + Massive.com (older)
   if (timeframe === '1m' || timeframe === '1') {

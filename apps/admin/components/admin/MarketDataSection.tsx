@@ -10,6 +10,16 @@ interface Schedule {
   minute: number;      // 0-59
 }
 
+interface CandleLimits {
+  '1m': number;
+  '5m': number;
+  '15m': number;
+  '30m': number;
+  '1h': number;
+  '4h': number;
+  '1d': number;
+}
+
 interface MarketDataSettings {
   cleanup: {
     enabled: boolean;
@@ -27,6 +37,7 @@ interface MarketDataSettings {
   priceUpdateMode: 'polling' | 'websocket';
   pollingIntervalMs: number;
   websocketIntervalMs: number;
+  candleLimits: CandleLimits;
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -668,6 +679,224 @@ export default function MarketDataSection() {
                     <li>• Faster updates (~10ms)</li>
                   </ul>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {/* Chart History Limits Section */}
+      <Section 
+        title="Chart History Limits" 
+        icon="📊" 
+        badge="Performance"
+        badgeColor="yellow"
+        defaultOpen={false}
+      >
+        {settings && (
+          <div className="space-y-5">
+            <div className="bg-[#12141c]/50 rounded-lg p-4 border border-gray-800/20 mb-4">
+              <p className="text-gray-400 text-sm">
+                Control how many candles each timeframe loads. Lower values = faster chart loading. 
+                These limits are applied per user chart request.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {/* 1m */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-yellow-400 font-medium text-sm">1 Minute</span>
+                </div>
+                <input
+                  type="number"
+                  min="100"
+                  max="10000"
+                  step="100"
+                  value={settings.candleLimits?.['1m'] || 1440}
+                  onChange={(e) => saveSettings({ 
+                    candleLimits: { ...settings.candleLimits, '1m': parseInt(e.target.value) || 1440 } 
+                  })}
+                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                />
+                <div className="text-gray-500 text-xs mt-1">
+                  ≈ {Math.round((settings.candleLimits?.['1m'] || 1440) / 60)} hours
+                </div>
+              </div>
+
+              {/* 5m */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-yellow-400 font-medium text-sm">5 Minutes</span>
+                </div>
+                <input
+                  type="number"
+                  min="100"
+                  max="10000"
+                  step="100"
+                  value={settings.candleLimits?.['5m'] || 2016}
+                  onChange={(e) => saveSettings({ 
+                    candleLimits: { ...settings.candleLimits, '5m': parseInt(e.target.value) || 2016 } 
+                  })}
+                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                />
+                <div className="text-gray-500 text-xs mt-1">
+                  ≈ {Math.round((settings.candleLimits?.['5m'] || 2016) * 5 / 60 / 24)} days
+                </div>
+              </div>
+
+              {/* 15m */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-yellow-400 font-medium text-sm">15 Minutes</span>
+                </div>
+                <input
+                  type="number"
+                  min="100"
+                  max="10000"
+                  step="100"
+                  value={settings.candleLimits?.['15m'] || 2688}
+                  onChange={(e) => saveSettings({ 
+                    candleLimits: { ...settings.candleLimits, '15m': parseInt(e.target.value) || 2688 } 
+                  })}
+                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                />
+                <div className="text-gray-500 text-xs mt-1">
+                  ≈ {Math.round((settings.candleLimits?.['15m'] || 2688) * 15 / 60 / 24)} days
+                </div>
+              </div>
+
+              {/* 30m */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-yellow-400 font-medium text-sm">30 Minutes</span>
+                </div>
+                <input
+                  type="number"
+                  min="100"
+                  max="5000"
+                  step="100"
+                  value={settings.candleLimits?.['30m'] || 1440}
+                  onChange={(e) => saveSettings({ 
+                    candleLimits: { ...settings.candleLimits, '30m': parseInt(e.target.value) || 1440 } 
+                  })}
+                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                />
+                <div className="text-gray-500 text-xs mt-1">
+                  ≈ {Math.round((settings.candleLimits?.['30m'] || 1440) * 30 / 60 / 24)} days
+                </div>
+              </div>
+
+              {/* 1h */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-yellow-400 font-medium text-sm">1 Hour</span>
+                </div>
+                <input
+                  type="number"
+                  min="100"
+                  max="5000"
+                  step="50"
+                  value={settings.candleLimits?.['1h'] || 720}
+                  onChange={(e) => saveSettings({ 
+                    candleLimits: { ...settings.candleLimits, '1h': parseInt(e.target.value) || 720 } 
+                  })}
+                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                />
+                <div className="text-gray-500 text-xs mt-1">
+                  ≈ {Math.round((settings.candleLimits?.['1h'] || 720) / 24)} days
+                </div>
+              </div>
+
+              {/* 4h */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-yellow-400 font-medium text-sm">4 Hours</span>
+                </div>
+                <input
+                  type="number"
+                  min="50"
+                  max="2000"
+                  step="50"
+                  value={settings.candleLimits?.['4h'] || 540}
+                  onChange={(e) => saveSettings({ 
+                    candleLimits: { ...settings.candleLimits, '4h': parseInt(e.target.value) || 540 } 
+                  })}
+                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                />
+                <div className="text-gray-500 text-xs mt-1">
+                  ≈ {Math.round((settings.candleLimits?.['4h'] || 540) * 4 / 24)} days
+                </div>
+              </div>
+
+              {/* 1d */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-yellow-400 font-medium text-sm">1 Day</span>
+                </div>
+                <input
+                  type="number"
+                  min="30"
+                  max="1000"
+                  step="10"
+                  value={settings.candleLimits?.['1d'] || 365}
+                  onChange={(e) => saveSettings({ 
+                    candleLimits: { ...settings.candleLimits, '1d': parseInt(e.target.value) || 365 } 
+                  })}
+                  className="w-full bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                />
+                <div className="text-gray-500 text-xs mt-1">
+                  ≈ {Math.round((settings.candleLimits?.['1d'] || 365) / 30)} months
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30 flex flex-col justify-center">
+                <div className="text-gray-400 text-xs mb-2">Quick Presets</div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => saveSettings({ 
+                      candleLimits: {
+                        '1m': 500, '5m': 500, '15m': 500, '30m': 500, '1h': 500, '4h': 300, '1d': 200
+                      }
+                    })}
+                    className="px-2 py-1 text-xs bg-green-600/20 text-green-400 rounded hover:bg-green-600/30 transition-colors"
+                  >
+                    ⚡ Fast
+                  </button>
+                  <button
+                    onClick={() => saveSettings({ 
+                      candleLimits: {
+                        '1m': 1440, '5m': 2016, '15m': 2688, '30m': 1440, '1h': 720, '4h': 540, '1d': 365
+                      }
+                    })}
+                    className="px-2 py-1 text-xs bg-blue-600/20 text-blue-400 rounded hover:bg-blue-600/30 transition-colors"
+                  >
+                    📊 Balanced
+                  </button>
+                  <button
+                    onClick={() => saveSettings({ 
+                      candleLimits: {
+                        '1m': 5000, '5m': 5000, '15m': 5000, '30m': 3000, '1h': 2000, '4h': 1000, '1d': 500
+                      }
+                    })}
+                    className="px-2 py-1 text-xs bg-purple-600/20 text-purple-400 rounded hover:bg-purple-600/30 transition-colors"
+                  >
+                    📈 Deep History
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Performance Tip */}
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 flex items-start gap-3">
+              <span className="text-yellow-500 text-xl">💡</span>
+              <div>
+                <div className="text-yellow-400 font-medium text-sm">Performance Tip</div>
+                <p className="text-gray-400 text-xs mt-1">
+                  Lower limits = faster chart loading. The &quot;Fast&quot; preset is recommended for production. 
+                  Users can still scroll back in time - additional data loads on demand.
+                </p>
               </div>
             </div>
           </div>

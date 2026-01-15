@@ -51,6 +51,17 @@ const MarketDataSettingsSchema = new mongoose.Schema({
     min: 50,
     max: 2000,
   },
+  // Candle limits per timeframe - controls how many candles users can see
+  // Lower = faster loading, Higher = more history
+  candleLimits: {
+    '1m': { type: Number, default: 1440 },   // 1 day of 1m candles
+    '5m': { type: Number, default: 2016 },   // 1 week of 5m candles
+    '15m': { type: Number, default: 2688 },  // 4 weeks of 15m candles
+    '30m': { type: Number, default: 1440 },  // 1 month of 30m candles
+    '1h': { type: Number, default: 720 },    // 1 month of 1h candles
+    '4h': { type: Number, default: 540 },    // 3 months of 4h candles
+    '1d': { type: Number, default: 365 },    // 1 year of daily candles
+  },
 }, { timestamps: true });
 
 const MarketDataSettings = mongoose.models.MarketDataSettings || 
