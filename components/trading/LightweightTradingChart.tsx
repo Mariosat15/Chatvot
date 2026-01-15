@@ -253,6 +253,35 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     return true;
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  
+  // Price update mode from admin settings (polling or websocket)
+  const [priceUpdateMode, setPriceUpdateMode] = useState<'polling' | 'websocket'>('polling');
+  
+  // Fetch price update mode from server (cached for 10 seconds)
+  useEffect(() => {
+    let mounted = true;
+    
+    const fetchMode = async () => {
+      try {
+        const response = await fetch('/api/trading/price-update-mode');
+        if (response.ok && mounted) {
+          const data = await response.json();
+          setPriceUpdateMode(data.mode || 'polling');
+        }
+      } catch {
+        // Default to polling on error
+      }
+    };
+    
+    fetchMode();
+    // Re-check every 30 seconds in case admin changes the setting
+    const intervalId = setInterval(fetchMode, 30000);
+    
+    return () => {
+      mounted = false;
+      clearInterval(intervalId);
+    };
+  }, []);
 
   // Save settings to localStorage when they change
   useEffect(() => {
@@ -1927,15 +1956,83 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     }
   }, [prices, symbol, chartType, timeframe]);
 
-  // FAST POLL: Get forming candle from server every 200ms (for 1m timeframe)
-  // This ensures O/H/L updates in real-time from server (no local building!)
+  // REAL-TIME UPDATES: Get forming candle from server
+  // Mode is controlled by admin panel:
+  // - 'polling': Browsers poll every 200ms (reliable, more server load)
+  // - 'websocket': Server pushes updates (efficient, 99% less load)
   useEffect(() => {
     if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
     
-    // Only do fast polling for 1m timeframe
+    // Only do real-time updates for 1m timeframe
     const isOneMinute = timeframe === '1' || (timeframe as string) === '1m';
     if (!isOneMinute) return;
     
+    // Helper function to update chart with candle data
+    const updateChartWithCandle = (candle: { time: number; open: number; high: number; low: number; close: number }, price?: { bid: number; ask: number }) => {
+      if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
+      
+      // Update bid/ask lines
+      if (price && bidPriceLineRef.current && askPriceLineRef.current) {
+        bidPriceLineRef.current.applyOptions({
+          price: price.bid,
+          title: `BID ${price.bid.toFixed(5)}`,
+        });
+        askPriceLineRef.current.applyOptions({
+          price: price.ask,
+          title: `ASK ${price.ask.toFixed(5)}`,
+        });
+      }
+      
+      // Update candle
+      const candleData: CandlestickData<UTCTimestamp> = {
+        time: candle.time as UTCTimestamp,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+      };
+      
+      if (chartType === 'line') {
+        (candlestickSeriesRef.current as any).update({
+          time: candle.time as UTCTimestamp,
+          value: candle.close,
+        });
+      } else {
+        candlestickSeriesRef.current?.update(candleData);
+      }
+      
+      currentCandleRef.current = candleData;
+    };
+    
+    // ==== WEBSOCKET MODE ====
+    if (priceUpdateMode === 'websocket') {
+      // TODO: Implement WebSocket connection for browser forming candle updates
+      // For now, fall back to polling with lower frequency
+      console.log('📡 [Chart] WebSocket mode enabled - full implementation pending, using reduced polling');
+      
+      // Reduced polling as fallback until WebSocket is fully implemented
+      const fetchFormingCandle = async () => {
+        if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
+        try {
+          const response = await fetch(`/api/trading/forming-candle?symbol=${encodeURIComponent(symbol)}`);
+          if (!response.ok) return;
+          const data = await response.json();
+          if (data.candle) {
+            updateChartWithCandle(data.candle, data.price);
+          }
+        } catch {
+          // Ignore errors
+        }
+      };
+      
+      // Poll at 500ms in WebSocket mode (will be replaced by actual WebSocket)
+      const intervalId = setInterval(fetchFormingCandle, 500);
+      fetchFormingCandle();
+      
+      return () => clearInterval(intervalId);
+    }
+    
+    // ==== POLLING MODE (default) ====
     const fetchFormingCandle = async () => {
       if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
       
@@ -1944,57 +2041,22 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         if (!response.ok) return;
         
         const data = await response.json();
-        
-        // Update bid/ask lines from SAME source as candle (perfect sync!)
-        if (data.price && bidPriceLineRef.current && askPriceLineRef.current) {
-          bidPriceLineRef.current.applyOptions({
-            price: data.price.bid,
-            title: `BID ${data.price.bid.toFixed(5)}`,
-          });
-          askPriceLineRef.current.applyOptions({
-            price: data.price.ask,
-            title: `ASK ${data.price.ask.toFixed(5)}`,
-          });
+        if (data.candle) {
+          updateChartWithCandle(data.candle, data.price);
         }
-        
-        if (!data.candle) return;
-        
-        const serverCandle = data.candle;
-        
-        // Update the current candle with server's O/H/L/C
-        const candleData: CandlestickData<UTCTimestamp> = {
-          time: serverCandle.time as UTCTimestamp,
-          open: serverCandle.open,
-          high: serverCandle.high,
-          low: serverCandle.low,
-          close: serverCandle.close,
-        };
-        
-        if (chartType === 'line') {
-          (candlestickSeriesRef.current as any).update({
-            time: serverCandle.time as UTCTimestamp,
-            value: serverCandle.close,
-          });
-        } else {
-          candlestickSeriesRef.current?.update(candleData);
-        }
-        
-        // Update reference
-        currentCandleRef.current = candleData;
       } catch {
         // Ignore errors - forming candle updates are best-effort
       }
     };
     
     // Poll every 200ms for real-time updates (fast response)
-    // 1000 users × 5 req/sec = 5000 req/sec (still manageable with caching)
     const intervalId = setInterval(fetchFormingCandle, 200);
     
     // Fetch immediately
     fetchFormingCandle();
     
     return () => clearInterval(intervalId);
-  }, [symbol, timeframe, chartType]);
+  }, [symbol, timeframe, chartType, priceUpdateMode]);
 
   // Poll server for FULL candle history - SERVER IS SOURCE OF TRUTH
   // This runs less frequently and gets historical + new candles

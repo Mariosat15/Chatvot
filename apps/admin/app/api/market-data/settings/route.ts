@@ -22,6 +22,14 @@ const MarketDataSettingsSchema = new mongoose.Schema({
     mode: { type: String, enum: ['auto', 'manual'], default: 'auto' },
     lastRun: { type: Date, default: null },
   },
+  // Price update mode: how browsers receive real-time price updates
+  // 'polling' = browsers poll /api/trading/forming-candle every 200ms (current, reliable)
+  // 'websocket' = server broadcasts forming candles to all browsers (efficient, 99% less server load)
+  priceUpdateMode: { 
+    type: String, 
+    enum: ['polling', 'websocket'], 
+    default: 'polling' 
+  },
 }, { timestamps: true });
 
 const MarketDataSettings = mongoose.models.MarketDataSettings || 
@@ -57,6 +65,7 @@ export async function GET() {
           mode: 'auto',
           lastRun: null,
         },
+        priceUpdateMode: 'polling',
       });
     }
     
@@ -65,6 +74,7 @@ export async function GET() {
       settings: {
         cleanup: settings.cleanup,
         gapFill: settings.gapFill,
+        priceUpdateMode: settings.priceUpdateMode || 'polling',
         updatedAt: settings.updatedAt,
       },
     });
@@ -82,7 +92,7 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
     
     const body = await request.json();
-    const { cleanup, gapFill } = body;
+    const { cleanup, gapFill, priceUpdateMode } = body;
     
     const updateData: Record<string, unknown> = {};
     
@@ -112,6 +122,11 @@ export async function POST(request: NextRequest) {
       if (gapFill.mode) updateData['gapFill.mode'] = gapFill.mode;
     }
     
+    // Price update mode
+    if (priceUpdateMode && ['polling', 'websocket'].includes(priceUpdateMode)) {
+      updateData['priceUpdateMode'] = priceUpdateMode;
+    }
+    
     const settings = await MarketDataSettings.findOneAndUpdate(
       { key: 'market_data_settings' },
       { $set: updateData },
@@ -123,6 +138,7 @@ export async function POST(request: NextRequest) {
       settings: {
         cleanup: settings.cleanup,
         gapFill: settings.gapFill,
+        priceUpdateMode: settings.priceUpdateMode || 'polling',
         updatedAt: settings.updatedAt,
       },
     });

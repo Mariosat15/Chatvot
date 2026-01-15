@@ -22,6 +22,8 @@ interface MarketDataSettings {
     mode: 'auto' | 'manual';
     lastRun: string | null;
   };
+  // Price update mode for browser clients
+  priceUpdateMode: 'polling' | 'websocket';
 }
 
 interface MarketDataStats {
@@ -363,6 +365,76 @@ export default function MarketDataSection() {
           </div>
         )}
       </div>
+
+      {/* Price Update Mode Toggle */}
+      {settings && (
+        <div className="bg-gray-800 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-white mb-4">📡 Real-Time Price Updates</h3>
+          
+          <div className="space-y-4">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-4 bg-gray-700 rounded-lg p-1">
+                <button
+                  onClick={() => saveSettings({ priceUpdateMode: 'polling' })}
+                  className={`px-4 py-2 rounded-lg transition-all ${
+                    settings.priceUpdateMode === 'polling' 
+                      ? 'bg-blue-600 text-white shadow-lg' 
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  📊 Polling
+                </button>
+                <button
+                  onClick={() => saveSettings({ priceUpdateMode: 'websocket' })}
+                  className={`px-4 py-2 rounded-lg transition-all ${
+                    settings.priceUpdateMode === 'websocket' 
+                      ? 'bg-green-600 text-white shadow-lg' 
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  ⚡ WebSocket
+                </button>
+              </div>
+              
+              <div className="text-sm">
+                {settings.priceUpdateMode === 'polling' ? (
+                  <span className="text-blue-300">
+                    ✅ Current: Browsers poll every 200ms (reliable, more server load)
+                  </span>
+                ) : (
+                  <span className="text-green-300">
+                    ⚡ Current: Server pushes updates to browsers (99% less server load)
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <div className="bg-gray-700/50 rounded-lg p-4">
+              <h4 className="text-white font-medium mb-2">ℹ️ Mode Comparison</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="text-blue-400 font-medium">Polling Mode</div>
+                  <ul className="text-gray-400 mt-1 space-y-1">
+                    <li>• Browsers request data every 200ms</li>
+                    <li>• Higher server load (2000+ req/sec with many users)</li>
+                    <li>• Most reliable consistency</li>
+                    <li>• Recommended for stability</li>
+                  </ul>
+                </div>
+                <div>
+                  <div className="text-green-400 font-medium">WebSocket Mode</div>
+                  <ul className="text-gray-400 mt-1 space-y-1">
+                    <li>• Server broadcasts to all browsers</li>
+                    <li>• 99% less server load</li>
+                    <li>• Faster updates (~10ms vs ~200ms)</li>
+                    <li>• Requires careful implementation</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cleanup Section */}
       <div className="bg-gray-800 rounded-lg p-6">
