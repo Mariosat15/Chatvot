@@ -668,7 +668,14 @@ function handleAggregateMessage(msg: {
   // ❌ DO NOT update priceCache from aggregate messages!
   // Aggregate messages only have close price - deriving bid/ask causes flickering
   // Let C.* quote messages be the ONLY source for real-time prices (they have real bid/ask)
-  // This eliminates spread calculation issues and ensures accurate bid/ask for TP/SL
+  
+  // ⚡ BUT DO trigger TP/SL checks using CACHED bid/ask (from C.* quotes)
+  // This ensures TP/SL checks happen frequently (on every aggregate), 
+  // but use the real bid/ask from the last quote instead of derived values
+  const cachedQuote = priceCache.get(symbol);
+  if (cachedQuote && cachedQuote.bid && cachedQuote.ask) {
+    checkTPSLOnPriceUpdate(symbol, cachedQuote.bid, cachedQuote.ask);
+  }
   
   // 🕯️ SAVE CANDLE TO MONGODB (only for minute aggregates, not second)
   // This is the SERVER SOURCE OF TRUTH for candle data
