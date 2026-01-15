@@ -22,18 +22,12 @@ export async function GET() {
     
     const settings = await db.collection('marketdatasettings').findOne({ key: 'market_data_settings' });
     
-    const response = {
+    return NextResponse.json({
       mode: settings?.priceUpdateMode || 'polling',
       pollingIntervalMs: settings?.pollingIntervalMs || 200,
       websocketIntervalMs: settings?.websocketIntervalMs || 200,
-      // Cache for 10 seconds - client can re-check periodically
       cacheTTL: 10000,
-    };
-    
-    // Debug log
-    console.log('📡 [Price Update Mode API] Raw from DB:', settings?.priceUpdateMode, '| Returning:', response.mode);
-    
-    return NextResponse.json(response);
+    });
   } catch (error) {
     console.error('Error getting price update mode:', error);
     // Default to polling on error

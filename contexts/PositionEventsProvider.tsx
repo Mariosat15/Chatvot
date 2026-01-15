@@ -66,11 +66,10 @@ export function PositionEventsProvider({
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
-  const reconnectDelay = 2000; // Start with 2 seconds
+  const reconnectDelay = 2000;
 
   // Handle incoming position event
   const handlePositionEvent = useCallback((event: PositionEvent) => {
-    console.log('⚡ [SSE] Position event received:', event);
     setLastEvent(event);
     
     // Dispatch custom DOM event for components to listen
@@ -108,13 +107,11 @@ export function PositionEventsProvider({
       eventSourceRef.current.close();
     }
 
-    console.log('🔌 [SSE] Connecting to position events...');
     const url = `/api/trading/position-events?competitionId=${competitionId}`;
     const eventSource = new EventSource(url);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
-      console.log('✅ [SSE] Connected to position events');
       setIsConnected(true);
       setConnectionError(null);
       reconnectAttemptsRef.current = 0;
@@ -124,25 +121,21 @@ export function PositionEventsProvider({
       try {
         const data = JSON.parse(event.data);
         
-        if (data.type === 'connected') {
-          console.log('✅ [SSE] Session established:', data.sessionId);
-        } else if (data.type === 'position_event') {
+        if (data.type === 'position_event') {
           handlePositionEvent(data.event);
         }
-      } catch (error) {
-        console.error('[SSE] Error parsing event:', error);
+      } catch {
+        // Ignore parse errors
       }
     };
 
-    eventSource.onerror = (error) => {
-      console.error('❌ [SSE] Connection error:', error);
+    eventSource.onerror = () => {
       setIsConnected(false);
       eventSource.close();
       
       // Attempt reconnection with exponential backoff
       if (reconnectAttemptsRef.current < maxReconnectAttempts) {
         const delay = reconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
-        console.log(`🔄 [SSE] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})`);
         
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectAttemptsRef.current++;
@@ -150,7 +143,6 @@ export function PositionEventsProvider({
         }, delay);
       } else {
         setConnectionError('Connection lost. Please refresh the page.');
-        console.error('❌ [SSE] Max reconnection attempts reached');
       }
     };
   }, [competitionId, handlePositionEvent]);
@@ -160,7 +152,6 @@ export function PositionEventsProvider({
     connect();
 
     return () => {
-      console.log('🔌 [SSE] Disconnecting...');
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
@@ -211,4 +202,3 @@ export function usePositionEventListener(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }
-
