@@ -215,6 +215,8 @@ async function loadSymbolSpreadSettings(): Promise<void> {
     return;
   }
   
+  console.log(`📊 [Symbol Settings] Loading settings from database...`);
+  
   try {
     const { connectToDatabase } = await import('@/database/mongoose');
     const mongoose = await import('mongoose');
@@ -223,19 +225,44 @@ async function loadSymbolSpreadSettings(): Promise<void> {
     
     // Get TradingSymbol collection directly (it's in the main database)
     const db = mongoose.default.connection.db;
-    if (!db) return;
+    if (!db) {
+      console.error('⚠️ [Symbol Settings] No database connection');
+      return;
+    }
     
-    const symbols = await db.collection('tradingsymbols').find({}).toArray();
+    // List all collections to find the correct one
+    const collections = await db.listCollections().toArray();
+    const collectionNames = collections.map(c => c.name);
+    console.log(`📊 [Symbol Settings] Available collections:`, collectionNames.filter(n => n.includes('symbol') || n.includes('trading')));
     
-    console.log(`📊 [Symbol Settings] Found ${symbols.length} symbols in database`);
+    // Try different collection names
+    let symbols: unknown[] = [];
+    const tryCollections = ['tradingsymbols', 'TradingSymbols', 'trading_symbols'];
+    
+    for (const collName of tryCollections) {
+      try {
+        symbols = await db.collection(collName).find({}).toArray();
+        if (symbols.length > 0) {
+          console.log(`📊 [Symbol Settings] Found ${symbols.length} symbols in collection: ${collName}`);
+          break;
+        }
+      } catch {
+        // Collection doesn't exist, try next
+      }
+    }
+    
+    if (symbols.length === 0) {
+      console.warn(`⚠️ [Symbol Settings] No symbols found in any collection`);
+      return;
+    }
     
     const state = getState();
-    for (const sym of symbols) {
+    for (const sym of symbols as Record<string, unknown>[]) {
       if (sym.symbol) {
-        state.symbolSpreadSettings.set(sym.symbol, {
-          useFixedSpread: sym.useFixedSpread || false,
-          defaultSpread: sym.defaultSpread || 1.5,
-          pip: sym.pip || 0.0001,
+        state.symbolSpreadSettings.set(sym.symbol as string, {
+          useFixedSpread: (sym.useFixedSpread as boolean) || false,
+          defaultSpread: (sym.defaultSpread as number) || 1.5,
+          pip: (sym.pip as number) || 0.0001,
         });
         
         // Log each symbol with fixed spread enabled
@@ -252,10 +279,8 @@ async function loadSymbolSpreadSettings(): Promise<void> {
     const fixedCount = Array.from(state.symbolSpreadSettings.values()).filter(s => s.useFixedSpread).length;
     console.log(`📊 [Symbol Settings] Loaded ${symbols.length} symbols, ${fixedCount} using fixed spread`);
   } catch (error) {
-    // Silently fail - will use variable spread as fallback
-    if (Math.random() < 0.1) {
-      console.error('⚠️ [Symbol Settings] Failed to load:', error);
-    }
+    // ALWAYS log errors for debugging
+    console.error('⚠️ [Symbol Settings] Failed to load:', error);
   }
 }
 
