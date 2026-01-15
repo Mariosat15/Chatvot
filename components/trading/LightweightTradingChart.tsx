@@ -2545,7 +2545,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               <span className="text-[#f23645] font-bold">{currentPrice.ask.toFixed(5)}</span>
             </div>
             <div className="text-[#787b86] text-[10px]">
-              {((currentPrice.spread / currentPrice.mid) * 10000).toFixed(1)}p
+              {/* Calculate spread in pips: multiply by 10000 for standard pairs, 100 for JPY */}
+              {(currentPrice.spread * (symbol.includes('JPY') ? 100 : 10000)).toFixed(1)}p
             </div>
           </div>
         )}
