@@ -665,43 +665,10 @@ function handleAggregateMessage(msg: {
   const symbol = MASSIVE_TO_SYMBOL[symbolKey];
   if (!symbol || msg.c === undefined) return;
 
-  // Use close price to derive bid/ask with typical spread
-  const mid = msg.c;
-  const spread = getTypicalSpread(symbol);
-  const bid = mid - spread / 2;
-  const ask = mid + spread / 2;
-
-  // Round values
-  const roundedBid = Number(bid.toFixed(5));
-  const roundedAsk = Number(ask.toFixed(5));
-  const roundedMid = Number(mid.toFixed(5));
-  const roundedSpread = Number(spread.toFixed(5));
-
-  // CRITICAL: Ensure mid is between bid and ask after rounding
-  const safeMid = Math.max(roundedBid, Math.min(roundedAsk, roundedMid));
-
-  const quote: StreamingPriceQuote = {
-    symbol,
-    bid: roundedBid,
-    ask: roundedAsk,
-    mid: safeMid,
-    spread: roundedSpread,
-    timestamp: msg.e || msg.s || Date.now(),
-    source: 'websocket',
-  };
-
-  // Only update if we don't have a more recent quote
-  const existing = priceCache.get(symbol);
-  if (!existing || existing.timestamp <= quote.timestamp) {
-    priceCache.set(symbol, quote);
-    getState().lastUpdateTime = Date.now();
-    
-    // ⚡ REAL-TIME TP/SL CHECK - Also check on aggregate updates
-    checkTPSLOnPriceUpdate(symbol, roundedBid, roundedAsk);
-    
-    // 📦 Queue price for MongoDB cache (Worker reads from here)
-    queuePriceForMongoCache(symbol, roundedBid, roundedAsk, quote.timestamp);
-  }
+  // ❌ DO NOT update priceCache from aggregate messages!
+  // Aggregate messages only have close price - deriving bid/ask causes flickering
+  // Let C.* quote messages be the ONLY source for real-time prices (they have real bid/ask)
+  // This eliminates spread calculation issues and ensures accurate bid/ask for TP/SL
   
   // 🕯️ SAVE CANDLE TO MONGODB (only for minute aggregates, not second)
   // This is the SERVER SOURCE OF TRUTH for candle data
