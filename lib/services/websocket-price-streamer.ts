@@ -1195,9 +1195,62 @@ function shouldSkipWebSocket(): boolean {
 // Browsers just display - no local candle building needed!
 
 let broadcastTimer: NodeJS.Timeout | null = null;
-const BROADCAST_INTERVAL_MS = 200; // Broadcast every 200ms for smooth updates
+let currentBroadcastIntervalMs = 200; // Default, can be changed by admin
+let lastBroadcastSettingsCheck = 0;
+const BROADCAST_SETTINGS_CHECK_INTERVAL = 30000; // Check admin settings every 30 seconds
+
+/**
+ * Load broadcast interval from admin settings
+ */
+async function loadBroadcastInterval(): Promise<number> {
+  try {
+    await connectToDatabase();
+    
+    // Import mongoose model for MarketDataSettings
+    const mongoose = await import('mongoose');
+    const MarketDataSettings = mongoose.models.MarketDataSettings || 
+      mongoose.model('MarketDataSettings', new mongoose.Schema({
+        key: { type: String, unique: true },
+        websocketIntervalMs: { type: Number, default: 200 },
+      }));
+    
+    const settings = await MarketDataSettings.findOne({ key: 'market_data_settings' });
+    const interval = settings?.websocketIntervalMs || 200;
+    
+    // Validate range (50-2000ms)
+    return Math.max(50, Math.min(2000, interval));
+  } catch (error) {
+    console.warn('⚠️ [Broadcast] Failed to load interval setting, using default:', error instanceof Error ? error.message : error);
+    return 200;
+  }
+}
+
+/**
+ * Check if broadcast interval has changed and restart timer if needed
+ */
+async function checkAndUpdateBroadcastInterval(): Promise<void> {
+  const now = Date.now();
+  if (now - lastBroadcastSettingsCheck < BROADCAST_SETTINGS_CHECK_INTERVAL) return;
+  
+  lastBroadcastSettingsCheck = now;
+  
+  const newInterval = await loadBroadcastInterval();
+  
+  if (newInterval !== currentBroadcastIntervalMs) {
+    console.log(`📡 [Broadcast] Interval changed: ${currentBroadcastIntervalMs}ms → ${newInterval}ms`);
+    currentBroadcastIntervalMs = newInterval;
+    
+    // Restart timer with new interval
+    if (broadcastTimer) {
+      stopBroadcastTimer();
+      await startBroadcastTimer();
+    }
+  }
+}
 
 async function broadcastFormingCandles(): Promise<void> {
+  // Periodically check if admin changed the interval
+  checkAndUpdateBroadcastInterval().catch(() => {});
   const state = getState();
   
   // Get all forming candles
@@ -1245,11 +1298,14 @@ async function broadcastFormingCandles(): Promise<void> {
   }
 }
 
-function startBroadcastTimer(): void {
+async function startBroadcastTimer(): Promise<void> {
   if (broadcastTimer) return; // Already running
   
-  broadcastTimer = setInterval(broadcastFormingCandles, BROADCAST_INTERVAL_MS);
-  console.log(`📡 [Broadcast] Started broadcasting forming candles every ${BROADCAST_INTERVAL_MS}ms`);
+  // Load interval from admin settings
+  currentBroadcastIntervalMs = await loadBroadcastInterval();
+  
+  broadcastTimer = setInterval(broadcastFormingCandles, currentBroadcastIntervalMs);
+  console.log(`📡 [Broadcast] Started broadcasting forming candles every ${currentBroadcastIntervalMs}ms`);
 }
 
 function stopBroadcastTimer(): void {
@@ -1294,7 +1350,7 @@ async function autoInitialize(): Promise<void> {
     await initializeWebSocket();
     
     // Start broadcasting forming candles to WebSocket server
-    startBroadcastTimer();
+    await startBroadcastTimer();
     
     console.log('✅ [AUTO-INIT] WebSocket, TP/SL cache, and broadcast ready');
   } catch (error) {

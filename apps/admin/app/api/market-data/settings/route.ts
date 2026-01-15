@@ -23,12 +23,28 @@ const MarketDataSettingsSchema = new mongoose.Schema({
     lastRun: { type: Date, default: null },
   },
   // Price update mode: how browsers receive real-time price updates
-  // 'polling' = browsers poll /api/trading/forming-candle every 200ms (current, reliable)
+  // 'polling' = browsers poll /api/trading/forming-candle (reliable)
   // 'websocket' = server broadcasts forming candles to all browsers (efficient, 99% less server load)
   priceUpdateMode: { 
     type: String, 
     enum: ['polling', 'websocket'], 
     default: 'polling' 
+  },
+  // Polling interval in milliseconds (how often browsers poll for updates)
+  // Default: 200ms, Range: 50-2000ms
+  pollingIntervalMs: {
+    type: Number,
+    default: 200,
+    min: 50,
+    max: 2000,
+  },
+  // WebSocket broadcast interval in milliseconds (how often server pushes updates)
+  // Default: 200ms, Range: 50-2000ms
+  websocketIntervalMs: {
+    type: Number,
+    default: 200,
+    min: 50,
+    max: 2000,
   },
 }, { timestamps: true });
 
@@ -66,6 +82,8 @@ export async function GET() {
           lastRun: null,
         },
         priceUpdateMode: 'polling',
+        pollingIntervalMs: 200,
+        websocketIntervalMs: 200,
       });
     }
     
@@ -75,6 +93,8 @@ export async function GET() {
         cleanup: settings.cleanup,
         gapFill: settings.gapFill,
         priceUpdateMode: settings.priceUpdateMode || 'polling',
+        pollingIntervalMs: settings.pollingIntervalMs || 200,
+        websocketIntervalMs: settings.websocketIntervalMs || 200,
         updatedAt: settings.updatedAt,
       },
     });
@@ -92,7 +112,7 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
     
     const body = await request.json();
-    const { cleanup, gapFill, priceUpdateMode } = body;
+    const { cleanup, gapFill, priceUpdateMode, pollingIntervalMs, websocketIntervalMs } = body;
     
     const updateData: Record<string, unknown> = {};
     
@@ -127,6 +147,16 @@ export async function POST(request: NextRequest) {
       updateData['priceUpdateMode'] = priceUpdateMode;
     }
     
+    // Polling interval (50-2000ms)
+    if (typeof pollingIntervalMs === 'number') {
+      updateData['pollingIntervalMs'] = Math.max(50, Math.min(2000, pollingIntervalMs));
+    }
+    
+    // WebSocket broadcast interval (50-2000ms)
+    if (typeof websocketIntervalMs === 'number') {
+      updateData['websocketIntervalMs'] = Math.max(50, Math.min(2000, websocketIntervalMs));
+    }
+    
     const settings = await MarketDataSettings.findOneAndUpdate(
       { key: 'market_data_settings' },
       { $set: updateData },
@@ -139,6 +169,8 @@ export async function POST(request: NextRequest) {
         cleanup: settings.cleanup,
         gapFill: settings.gapFill,
         priceUpdateMode: settings.priceUpdateMode || 'polling',
+        pollingIntervalMs: settings.pollingIntervalMs || 200,
+        websocketIntervalMs: settings.websocketIntervalMs || 200,
         updatedAt: settings.updatedAt,
       },
     });

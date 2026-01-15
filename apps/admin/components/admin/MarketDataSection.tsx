@@ -24,6 +24,9 @@ interface MarketDataSettings {
   };
   // Price update mode for browser clients
   priceUpdateMode: 'polling' | 'websocket';
+  // Interval settings in milliseconds
+  pollingIntervalMs: number;
+  websocketIntervalMs: number;
 }
 
 interface MarketDataStats {
@@ -399,13 +402,68 @@ export default function MarketDataSection() {
               <div className="text-sm">
                 {settings.priceUpdateMode === 'polling' ? (
                   <span className="text-blue-300">
-                    ✅ Current: Browsers poll every 200ms (reliable, more server load)
+                    ✅ Current: Browsers poll every {settings.pollingIntervalMs}ms (reliable, more server load)
                   </span>
                 ) : (
                   <span className="text-green-300">
-                    ⚡ Current: Server pushes updates to browsers (99% less server load)
+                    ⚡ Current: Server pushes updates every {settings.websocketIntervalMs}ms (99% less server load)
                   </span>
                 )}
+              </div>
+            </div>
+            
+            {/* Interval Settings */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-700/50 rounded-lg p-4">
+                <label className="text-blue-400 font-medium block mb-2">
+                  📊 Polling Interval
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="50"
+                    max="2000"
+                    step="50"
+                    value={settings.pollingIntervalMs}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!Number.isNaN(val)) {
+                        saveSettings({ pollingIntervalMs: Math.max(50, Math.min(2000, val)) });
+                      }
+                    }}
+                    className="bg-gray-700 text-white rounded-lg px-3 py-2 w-24"
+                  />
+                  <span className="text-gray-400">ms</span>
+                </div>
+                <p className="text-gray-500 text-xs mt-1">
+                  How often browsers poll for updates (50-2000ms)
+                </p>
+              </div>
+              
+              <div className="bg-gray-700/50 rounded-lg p-4">
+                <label className="text-green-400 font-medium block mb-2">
+                  ⚡ WebSocket Interval
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="50"
+                    max="2000"
+                    step="50"
+                    value={settings.websocketIntervalMs}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!Number.isNaN(val)) {
+                        saveSettings({ websocketIntervalMs: Math.max(50, Math.min(2000, val)) });
+                      }
+                    }}
+                    className="bg-gray-700 text-white rounded-lg px-3 py-2 w-24"
+                  />
+                  <span className="text-gray-400">ms</span>
+                </div>
+                <p className="text-gray-500 text-xs mt-1">
+                  How often server broadcasts updates (50-2000ms)
+                </p>
               </div>
             </div>
             

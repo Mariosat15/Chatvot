@@ -254,10 +254,12 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
   
-  // Price update mode from admin settings (polling or websocket)
+  // Price update mode and intervals from admin settings
   const [priceUpdateMode, setPriceUpdateMode] = useState<'polling' | 'websocket'>('polling');
+  const [pollingIntervalMs, setPollingIntervalMs] = useState(200);
+  const [websocketIntervalMs, setWebsocketIntervalMs] = useState(200);
   
-  // Fetch price update mode from server (cached for 10 seconds)
+  // Fetch price update mode and intervals from server (cached for 10 seconds)
   useEffect(() => {
     let mounted = true;
     
@@ -267,6 +269,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         if (response.ok && mounted) {
           const data = await response.json();
           setPriceUpdateMode(data.mode || 'polling');
+          setPollingIntervalMs(data.pollingIntervalMs || 200);
+          setWebsocketIntervalMs(data.websocketIntervalMs || 200);
         }
       } catch {
         // Default to polling on error
@@ -2097,14 +2101,14 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       }
     };
     
-    // Poll every 200ms for real-time updates (fast response)
-    const intervalId = setInterval(fetchFormingCandle, 200);
+    // Poll at configured interval (admin can change via Market Data settings)
+    const intervalId = setInterval(fetchFormingCandle, pollingIntervalMs);
     
     // Fetch immediately
     fetchFormingCandle();
     
     return () => clearInterval(intervalId);
-  }, [symbol, timeframe, chartType, priceUpdateMode]);
+  }, [symbol, timeframe, chartType, priceUpdateMode, pollingIntervalMs]);
 
   // Poll server for FULL candle history - SERVER IS SOURCE OF TRUTH
   // This runs less frequently and gets historical + new candles
