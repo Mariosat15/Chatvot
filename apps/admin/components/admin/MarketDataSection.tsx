@@ -32,7 +32,7 @@ interface MarketDataSettings {
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_FULL_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// Schedule Picker Component
+// Unified Schedule Picker Component - Same layout for all uses
 function SchedulePicker({ 
   schedule, 
   onChange,
@@ -46,14 +46,18 @@ function SchedulePicker({
 }) {
   const colorClasses = {
     blue: {
-      active: 'bg-blue-600 text-white',
-      button: 'border-blue-600/30 text-blue-400 hover:bg-blue-600/10',
+      active: 'bg-blue-600 text-white border-blue-600',
       activeTab: 'bg-blue-600 text-white shadow-lg shadow-blue-600/20',
+      border: 'border-blue-600/30',
+      text: 'text-blue-400',
+      summary: 'border-blue-600/20 bg-blue-600/5',
     },
     purple: {
-      active: 'bg-purple-600 text-white',
-      button: 'border-purple-600/30 text-purple-400 hover:bg-purple-600/10',
+      active: 'bg-purple-600 text-white border-purple-600',
       activeTab: 'bg-purple-600 text-white shadow-lg shadow-purple-600/20',
+      border: 'border-purple-600/30',
+      text: 'text-purple-400',
+      summary: 'border-purple-600/20 bg-purple-600/5',
     },
   };
   
@@ -72,15 +76,22 @@ function SchedulePicker({
     return `${h}:${m}`;
   };
 
+  const getOrdinal = (n: number) => {
+    if (n === 1) return 'st';
+    if (n === 2) return 'nd';
+    if (n === 3) return 'rd';
+    return 'th';
+  };
+
   return (
     <div className={`space-y-4 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
-      {/* Schedule Type Toggle */}
-      <div className="flex items-center gap-2">
-        <span className="text-gray-400 text-sm w-20">Frequency:</span>
+      {/* Row 1: Frequency Toggle */}
+      <div className="flex items-center">
+        <span className="text-gray-400 text-sm w-24 shrink-0">Frequency</span>
         <div className="inline-flex bg-gray-900/50 rounded-lg p-0.5 border border-gray-800/50">
           <button
             onClick={() => onChange({ ...schedule, type: 'weekly' })}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+            className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
               schedule.type === 'weekly' ? colors.activeTab : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -88,7 +99,7 @@ function SchedulePicker({
           </button>
           <button
             onClick={() => onChange({ ...schedule, type: 'monthly' })}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+            className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
               schedule.type === 'monthly' ? colors.activeTab : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -97,90 +108,98 @@ function SchedulePicker({
         </div>
       </div>
 
-      {/* Day Selection */}
-      {schedule.type === 'weekly' ? (
-        <div className="space-y-2">
-          <span className="text-gray-400 text-sm">Run on days:</span>
-          <div className="flex flex-wrap gap-1.5">
-            {DAY_NAMES.map((day, index) => (
-              <button
-                key={day}
-                onClick={() => toggleDay(index)}
-                className={`w-10 h-8 rounded-md text-xs font-medium transition-all border ${
-                  schedule.weekDays.includes(index)
-                    ? colors.active
-                    : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-white'
-                }`}
-                title={DAY_FULL_NAMES[index]}
+      {/* Row 2: Day Selection (always same height container) */}
+      <div className="flex items-start">
+        <span className="text-gray-400 text-sm w-24 shrink-0 pt-1.5">
+          {schedule.type === 'weekly' ? 'Run on' : 'Day'}
+        </span>
+        <div className="flex-1">
+          {schedule.type === 'weekly' ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                {DAY_NAMES.map((day, index) => (
+                  <button
+                    key={day}
+                    onClick={() => toggleDay(index)}
+                    className={`w-10 h-8 rounded-md text-xs font-medium transition-all border ${
+                      schedule.weekDays.includes(index)
+                        ? colors.active
+                        : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-white'
+                    }`}
+                    title={DAY_FULL_NAMES[index]}
+                  >
+                    {day}
+                  </button>
+                ))}
+              </div>
+              {schedule.weekDays.length === 0 && (
+                <p className="text-yellow-500 text-xs">⚠️ Select at least one day</p>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <select
+                value={schedule.monthDay}
+                onChange={(e) => onChange({ ...schedule, monthDay: parseInt(e.target.value) })}
+                className="bg-gray-800 text-white rounded-lg px-3 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm w-20"
               >
-                {day}
-              </button>
-            ))}
-          </div>
-          {schedule.weekDays.length === 0 && (
-            <p className="text-yellow-500 text-xs">⚠️ Select at least one day</p>
+                {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
+                  <option key={day} value={day}>
+                    {day}{getOrdinal(day)}
+                  </option>
+                ))}
+              </select>
+              <span className="text-gray-500 text-xs">of each month</span>
+            </div>
           )}
         </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <span className="text-gray-400 text-sm">Day of month:</span>
-          <select
-            value={schedule.monthDay}
-            onChange={(e) => onChange({ ...schedule, monthDay: parseInt(e.target.value) })}
-            className="bg-gray-800 text-white rounded-lg px-3 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
-          >
-            {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
-              <option key={day} value={day}>
-                {day}{day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th'}
-              </option>
-            ))}
-          </select>
-          <span className="text-gray-500 text-xs">(1-28 to ensure all months have this day)</span>
-        </div>
-      )}
+      </div>
 
-      {/* Time Picker */}
-      <div className="flex items-center gap-2">
-        <span className="text-gray-400 text-sm w-20">Run at:</span>
-        <div className="flex items-center gap-1">
+      {/* Row 3: Time Picker */}
+      <div className="flex items-center">
+        <span className="text-gray-400 text-sm w-24 shrink-0">Time</span>
+        <div className="flex items-center gap-1.5">
           <select
             value={schedule.hour}
             onChange={(e) => onChange({ ...schedule, hour: parseInt(e.target.value) })}
-            className="bg-gray-800 text-white rounded-lg px-2 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm font-mono"
+            className="bg-gray-800 text-white rounded-lg px-2 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm font-mono w-14"
           >
             {Array.from({ length: 24 }, (_, i) => i).map(h => (
               <option key={h} value={h}>{h.toString().padStart(2, '0')}</option>
             ))}
           </select>
-          <span className="text-gray-400">:</span>
+          <span className="text-gray-500 font-bold">:</span>
           <select
             value={schedule.minute}
             onChange={(e) => onChange({ ...schedule, minute: parseInt(e.target.value) })}
-            className="bg-gray-800 text-white rounded-lg px-2 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm font-mono"
+            className="bg-gray-800 text-white rounded-lg px-2 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm font-mono w-14"
           >
             {[0, 15, 30, 45].map(m => (
               <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
             ))}
           </select>
-          <span className="text-gray-500 text-xs ml-2">(UTC)</span>
+          <span className="text-gray-500 text-xs ml-1">(UTC)</span>
         </div>
       </div>
 
-      {/* Schedule Summary */}
-      <div className="bg-gray-900/30 rounded-lg px-3 py-2 border border-gray-800/30">
-        <span className="text-gray-500 text-xs">
-          📅 Will run{' '}
-          {schedule.type === 'weekly' ? (
-            schedule.weekDays.length > 0 ? (
-              <>every <span className="text-white">{schedule.weekDays.map(d => DAY_NAMES[d]).join(', ')}</span></>
+      {/* Row 4: Schedule Summary */}
+      <div className={`rounded-lg px-3 py-2.5 border ${colors.summary}`}>
+        <div className="flex items-center gap-2">
+          <span className="text-base">📅</span>
+          <span className="text-gray-400 text-xs">
+            Will run{' '}
+            {schedule.type === 'weekly' ? (
+              schedule.weekDays.length > 0 ? (
+                <>every <span className={`font-medium ${colors.text}`}>{schedule.weekDays.map(d => DAY_NAMES[d]).join(', ')}</span></>
+              ) : (
+                <span className="text-yellow-400 font-medium">no days selected</span>
+              )
             ) : (
-              <span className="text-yellow-400">no days selected</span>
-            )
-          ) : (
-            <>on the <span className="text-white">{schedule.monthDay}{schedule.monthDay === 1 ? 'st' : schedule.monthDay === 2 ? 'nd' : schedule.monthDay === 3 ? 'rd' : 'th'}</span> of each month</>
-          )}
-          {' '}at <span className="text-white">{formatTime(schedule.hour, schedule.minute)} UTC</span>
-        </span>
+              <>on the <span className={`font-medium ${colors.text}`}>{schedule.monthDay}{getOrdinal(schedule.monthDay)}</span> of each month</>
+            )}
+            {' '}at <span className={`font-medium ${colors.text}`}>{formatTime(schedule.hour, schedule.minute)} UTC</span>
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -660,10 +679,11 @@ export default function MarketDataSection() {
       <Section title="Data Maintenance" icon="🔧" defaultOpen={false}>
         {settings && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Cleanup Card */}
-            <div className="bg-[#12141c] rounded-lg p-5 border border-gray-800/30">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-white font-semibold flex items-center gap-2">
+            {/* ==================== CLEANUP CARD ==================== */}
+            <div className="bg-[#12141c] rounded-xl p-5 border border-gray-800/30 flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-800/50">
+                <h4 className="text-white font-semibold text-lg flex items-center gap-2">
                   🗑️ Cleanup Old Data
                 </h4>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -673,14 +693,15 @@ export default function MarketDataSection() {
                     onChange={(e) => saveSettings({ cleanup: { ...settings.cleanup, enabled: e.target.checked } })}
                     className="sr-only peer"
                   />
-                  <div className="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                  <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
               </div>
               
-              <div className="space-y-4">
-                <div>
-                  <label className="text-gray-400 text-sm block mb-2">Keep data for</label>
+              <div className="space-y-5 flex-1">
+                {/* Settings Section */}
+                <div className="bg-gray-900/30 rounded-lg p-4 border border-gray-800/30">
                   <div className="flex items-center gap-3">
+                    <span className="text-gray-400 text-sm">Keep data for</span>
                     <input
                       type="number"
                       min="0"
@@ -690,25 +711,27 @@ export default function MarketDataSection() {
                         const val = parseInt(e.target.value);
                         saveSettings({ cleanup: { ...settings.cleanup, daysToKeep: Number.isNaN(val) ? 0 : Math.max(0, val) } });
                       }}
-                      className="bg-gray-800 text-white rounded-lg px-3 py-2 w-20 border border-gray-700 focus:border-blue-500 focus:outline-none"
+                      className="bg-gray-800 text-white rounded-lg px-3 py-2 w-20 border border-gray-700 focus:border-blue-500 focus:outline-none text-center font-mono"
                     />
-                    <span className="text-gray-400">days</span>
-                    <span className="text-gray-600 text-sm">
-                      (~{((settings.cleanup.daysToKeep * 9.5)).toFixed(0)} MB)
+                    <span className="text-gray-400 text-sm">days</span>
+                    <span className="text-gray-600 text-sm ml-auto">
+                      ~{((settings.cleanup.daysToKeep * 9.5)).toFixed(0)} MB
                     </span>
                   </div>
                   {settings.cleanup.daysToKeep === 0 && (
-                    <p className="text-red-400 text-xs mt-2">⚠️ Will delete ALL history!</p>
+                    <p className="text-red-400 text-xs mt-3 flex items-center gap-1">
+                      <span>⚠️</span> Will delete ALL history!
+                    </p>
                   )}
                 </div>
 
                 {/* Mode Toggle */}
-                <div className="flex items-center gap-2 pt-2 border-t border-gray-800/50">
-                  <span className="text-gray-400 text-sm">Mode:</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-400 text-sm w-12">Mode</span>
                   <div className="inline-flex bg-gray-900/50 rounded-lg p-0.5 border border-gray-800/50">
                     <button
                       onClick={() => saveSettings({ cleanup: { ...settings.cleanup, mode: 'manual' } })}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
                         settings.cleanup.mode === 'manual'
                           ? 'bg-gray-600 text-white shadow-lg'
                           : 'text-gray-400 hover:text-white'
@@ -718,9 +741,9 @@ export default function MarketDataSection() {
                     </button>
                     <button
                       onClick={() => saveSettings({ cleanup: { ...settings.cleanup, mode: 'auto' } })}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
                         settings.cleanup.mode === 'auto'
-                          ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
+                          ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
                           : 'text-gray-400 hover:text-white'
                       }`}
                     >
@@ -731,11 +754,11 @@ export default function MarketDataSection() {
 
                 {/* Schedule Picker (only when auto mode) */}
                 {settings.cleanup.mode === 'auto' && settings.cleanup.enabled && (
-                  <div className="pt-3 border-t border-gray-800/50">
+                  <div className="bg-gray-900/30 rounded-lg p-4 border border-gray-800/30">
                     <SchedulePicker
                       schedule={settings.cleanup.schedule || {
                         type: 'weekly',
-                        weekDays: [0], // Sunday
+                        weekDays: [0],
                         monthDay: 1,
                         hour: 3,
                         minute: 0,
@@ -746,29 +769,32 @@ export default function MarketDataSection() {
                   </div>
                 )}
 
+                {/* Last Run */}
                 {settings.cleanup.lastRun && (
-                  <p className="text-gray-500 text-xs">
-                    Last run: {new Date(settings.cleanup.lastRun).toLocaleString()}
+                  <p className="text-gray-500 text-xs flex items-center gap-1">
+                    <span>🕐</span> Last run: {new Date(settings.cleanup.lastRun).toLocaleString()}
                   </p>
                 )}
-                
-                <button
-                  onClick={runCleanup}
-                  disabled={cleanupRunning || saving}
-                  className="w-full px-4 py-2.5 bg-red-600/20 hover:bg-red-600/30 border border-red-600/30 text-red-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                >
-                  {cleanupRunning ? '⏳ Running...' : '🗑️ Run Cleanup Now'}
-                </button>
               </div>
+              
+              {/* Action Button */}
+              <button
+                onClick={runCleanup}
+                disabled={cleanupRunning || saving}
+                className="w-full mt-4 px-4 py-3 bg-red-600/20 hover:bg-red-600/30 border border-red-600/30 text-red-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {cleanupRunning ? '⏳ Running...' : '🗑️ Run Cleanup Now'}
+              </button>
             </div>
 
-            {/* Gap Fill Card */}
-            <div className="bg-[#12141c] rounded-lg p-5 border border-gray-800/30">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-white font-semibold flex items-center gap-2">
+            {/* ==================== GAP DETECTION CARD ==================== */}
+            <div className="bg-[#12141c] rounded-xl p-5 border border-gray-800/30 flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-800/50">
+                <h4 className="text-white font-semibold text-lg flex items-center gap-2">
                   🔧 Gap Detection
                   {gaps.length > 0 && (
-                    <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 text-xs rounded-full">
+                    <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 text-xs rounded-full font-normal">
                       {gaps.length} gaps
                     </span>
                   )}
@@ -780,40 +806,51 @@ export default function MarketDataSection() {
                     onChange={(e) => saveSettings({ gapFill: { ...settings.gapFill, enabled: e.target.checked } })}
                     className="sr-only peer"
                   />
-                  <div className="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                  <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
                 </label>
               </div>
               
-              <div className="space-y-4">
-                {gaps.length > 0 ? (
-                  <div className="bg-gray-800/50 rounded-lg p-3 max-h-32 overflow-y-auto">
-                    {gaps.slice(0, 8).map((gap, i) => {
-                      const startDate = new Date(gap.startTime * 1000);
-                      const endDate = new Date(gap.endTime * 1000);
-                      return (
-                        <div key={i} className="text-xs text-gray-400 py-1 border-b border-gray-800/50 last:border-0">
-                          <span className="text-white">{gap.symbol}</span>: {startDate.toLocaleDateString()} → {endDate.toLocaleDateString()} 
-                          <span className="text-yellow-400 ml-1">
-                            ({gap.missingMinutes >= 1440 ? `${Math.round(gap.missingMinutes / 1440)}d` : `${gap.missingMinutes}m`})
-                          </span>
+              <div className="space-y-5 flex-1">
+                {/* Gap List Section */}
+                <div className="bg-gray-900/30 rounded-lg p-4 border border-gray-800/30 min-h-[80px]">
+                  {gaps.length > 0 ? (
+                    <div className="max-h-28 overflow-y-auto space-y-1">
+                      {gaps.slice(0, 8).map((gap, i) => {
+                        const startDate = new Date(gap.startTime * 1000);
+                        const endDate = new Date(gap.endTime * 1000);
+                        return (
+                          <div key={i} className="text-xs text-gray-400 py-1 flex items-center justify-between">
+                            <span>
+                              <span className="text-white font-medium">{gap.symbol}</span>
+                              <span className="mx-1.5">:</span>
+                              {startDate.toLocaleDateString()} → {endDate.toLocaleDateString()}
+                            </span>
+                            <span className="text-yellow-400 text-[10px] px-1.5 py-0.5 bg-yellow-600/20 rounded">
+                              {gap.missingMinutes >= 1440 ? `${Math.round(gap.missingMinutes / 1440)}d` : `${gap.missingMinutes}m`}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {gaps.length > 8 && (
+                        <div className="text-gray-500 text-xs pt-1 text-center">
+                          +{gaps.length - 8} more gaps
                         </div>
-                      );
-                    })}
-                    {gaps.length > 8 && <div className="text-gray-500 text-xs pt-1">+{gaps.length - 8} more</div>}
-                  </div>
-                ) : (
-                  <div className="bg-green-600/10 border border-green-600/20 rounded-lg p-3 text-green-400 text-sm text-center">
-                    ✓ No gaps detected
-                  </div>
-                )}
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-green-400 text-sm gap-2">
+                      <span>✓</span> No gaps detected
+                    </div>
+                  )}
+                </div>
 
                 {/* Mode Toggle */}
-                <div className="flex items-center gap-2 pt-2 border-t border-gray-800/50">
-                  <span className="text-gray-400 text-sm">Mode:</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-400 text-sm w-12">Mode</span>
                   <div className="inline-flex bg-gray-900/50 rounded-lg p-0.5 border border-gray-800/50">
                     <button
                       onClick={() => saveSettings({ gapFill: { ...settings.gapFill, mode: 'manual' } })}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
                         settings.gapFill.mode === 'manual'
                           ? 'bg-gray-600 text-white shadow-lg'
                           : 'text-gray-400 hover:text-white'
@@ -823,7 +860,7 @@ export default function MarketDataSection() {
                     </button>
                     <button
                       onClick={() => saveSettings({ gapFill: { ...settings.gapFill, mode: 'auto' } })}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
                         settings.gapFill.mode === 'auto'
                           ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20'
                           : 'text-gray-400 hover:text-white'
@@ -836,11 +873,11 @@ export default function MarketDataSection() {
 
                 {/* Schedule Picker (only when auto mode) */}
                 {settings.gapFill.mode === 'auto' && settings.gapFill.enabled && (
-                  <div className="pt-3 border-t border-gray-800/50">
+                  <div className="bg-gray-900/30 rounded-lg p-4 border border-gray-800/30">
                     <SchedulePicker
                       schedule={settings.gapFill.schedule || {
                         type: 'weekly',
-                        weekDays: [1, 3, 5], // Mon, Wed, Fri
+                        weekDays: [1, 3, 5],
                         monthDay: 1,
                         hour: 4,
                         minute: 0,
@@ -851,20 +888,22 @@ export default function MarketDataSection() {
                   </div>
                 )}
 
+                {/* Last Run */}
                 {settings.gapFill.lastRun && (
-                  <p className="text-gray-500 text-xs">
-                    Last run: {new Date(settings.gapFill.lastRun).toLocaleString()}
+                  <p className="text-gray-500 text-xs flex items-center gap-1">
+                    <span>🕐</span> Last run: {new Date(settings.gapFill.lastRun).toLocaleString()}
                   </p>
                 )}
-                
-                <button
-                  onClick={runGapFill}
-                  disabled={gapFillRunning || saving || gaps.length === 0}
-                  className="w-full px-4 py-2.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-600/30 text-purple-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                >
-                  {gapFillRunning ? '⏳ Filling...' : '🔧 Fill Gaps Now'}
-                </button>
               </div>
+              
+              {/* Action Button */}
+              <button
+                onClick={runGapFill}
+                disabled={gapFillRunning || saving || gaps.length === 0}
+                className="w-full mt-4 px-4 py-3 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-600/30 text-purple-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {gapFillRunning ? '⏳ Filling...' : '🔧 Fill Gaps Now'}
+              </button>
             </div>
           </div>
         )}
