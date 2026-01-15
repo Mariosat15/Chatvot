@@ -135,7 +135,9 @@ export async function fetchHistoricalCandles(
  * - Starter/Business: All history
  * - Max 50,000 results per query
  * 
- * This function implements PAGINATION to fetch more than 50,000 candles
+ * This function implements:
+ * 1. CHUNKING: Splits large time ranges into smaller chunks to avoid API limits
+ * 2. PAGINATION: Fetches multiple pages if a single chunk exceeds 50,000 candles
  */
 export async function fetchCandlesForRange(
   symbol: ForexSymbol,
@@ -151,78 +153,163 @@ export async function fetchCandlesForRange(
   const ticker = symbolToMassiveFormat(symbol);
   const { multiplier, timespan } = TIMEFRAME_MAP[timeframe];
   
-  const allCandles: OHLCCandle[] = [];
-  let currentFrom = fromTimestampMs;
-  let pageCount = 0;
-  const MAX_PAGES = 10; // Safety limit: max 500,000 candles
+  // Calculate chunk size based on timeframe
+  // Smaller chunks for smaller timeframes to avoid API limits
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const ONE_MONTH_MS = 30 * ONE_DAY_MS;
+  const ONE_YEAR_MS = 365 * ONE_DAY_MS;
+  
+  let chunkSizeMs: number;
+  switch (timeframe) {
+    case '1':
+      chunkSizeMs = 7 * ONE_DAY_MS; // 1 week for 1m (10080 candles max)
+      break;
+    case '5':
+      chunkSizeMs = ONE_MONTH_MS; // 1 month for 5m (~8640 candles max)
+      break;
+    case '15':
+      chunkSizeMs = 3 * ONE_MONTH_MS; // 3 months for 15m (~8640 candles max)
+      break;
+    case '30':
+      chunkSizeMs = 6 * ONE_MONTH_MS; // 6 months for 30m (~8640 candles max)
+      break;
+    case '60':
+    case '120':
+      chunkSizeMs = ONE_YEAR_MS; // 1 year for 1h/2h (~8760/4380 candles max)
+      break;
+    case '240':
+      chunkSizeMs = 2 * ONE_YEAR_MS; // 2 years for 4h (~4380 candles max)
+      break;
+    case 'D':
+    case 'W':
+    case 'M':
+      chunkSizeMs = 5 * ONE_YEAR_MS; // 5 years for daily/weekly/monthly
+      break;
+    default:
+      chunkSizeMs = ONE_YEAR_MS;
+  }
+  
+  const totalRange = toTimestampMs - fromTimestampMs;
+  const estimatedChunks = Math.ceil(totalRange / chunkSizeMs);
   
   console.log(`📊 [Historical] Fetching ${symbol} ${timeframe} from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
+  console.log(`📊 [Historical] Will fetch in ~${estimatedChunks} chunks of ${Math.round(chunkSizeMs / ONE_DAY_MS)} days each`);
+  
+  const allCandles: OHLCCandle[] = [];
+  let chunkStart = fromTimestampMs;
+  let chunkCount = 0;
+  const MAX_CHUNKS = 50; // Safety limit
 
   try {
-    while (currentFrom < toTimestampMs && pageCount < MAX_PAGES) {
-      pageCount++;
+    while (chunkStart < toTimestampMs && chunkCount < MAX_CHUNKS) {
+      chunkCount++;
+      const chunkEnd = Math.min(chunkStart + chunkSizeMs, toTimestampMs);
       
-      const endpoint = `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${currentFrom}/${toTimestampMs}`;
-      const url = `${MASSIVE_API_BASE_URL}${endpoint}?adjusted=true&sort=asc&limit=50000&apiKey=${MASSIVE_API_KEY}`;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        cache: 'no-store'
-      });
-
-      if (!response.ok) {
-        console.error(`❌ [Historical] API error: ${response.status} ${response.statusText}`);
-        break;
-      }
-
-      const data = await response.json();
+      console.log(`📄 [Historical] Chunk ${chunkCount}/${estimatedChunks}: ${new Date(chunkStart).toISOString().split('T')[0]} to ${new Date(chunkEnd).toISOString().split('T')[0]}`);
       
-      if (!data.results || data.results.length === 0) {
-        console.log(`⚠️ [Historical] No more data for ${symbol} after page ${pageCount}`);
-        break;
-      }
-
-      // Convert to our format
-      const pageCandles: OHLCCandle[] = data.results.map((bar: {
-        t: number;
-        o: number;
-        h: number;
-        l: number;
-        c: number;
-        v?: number;
-      }) => ({
-        time: bar.t,
-        open: bar.o,
-        high: bar.h,
-        low: bar.l,
-        close: bar.c,
-        volume: bar.v || 0,
-      }));
-
-      allCandles.push(...pageCandles);
+      // Fetch this chunk with pagination
+      const chunkCandles = await fetchChunkWithPagination(
+        ticker,
+        multiplier,
+        timespan,
+        chunkStart,
+        chunkEnd
+      );
       
-      // If we got less than 50000, we've reached the end
-      if (pageCandles.length < 50000) {
-        console.log(`✅ [Historical] Page ${pageCount}: ${pageCandles.length} candles (last page)`);
-        break;
+      if (chunkCandles.length > 0) {
+        allCandles.push(...chunkCandles);
+        console.log(`   ✅ Got ${chunkCandles.length} candles (total: ${allCandles.length})`);
+      } else {
+        console.log(`   ⚠️ No data for this chunk`);
       }
       
-      // Update currentFrom to continue from after the last candle
-      const lastCandleTime = pageCandles[pageCandles.length - 1].time;
-      currentFrom = lastCandleTime + 1; // Start from next millisecond
+      // Move to next chunk
+      chunkStart = chunkEnd;
       
-      console.log(`📄 [Historical] Page ${pageCount}: ${pageCandles.length} candles, continuing from ${new Date(currentFrom).toISOString()}`);
-      
-      // Small delay between requests to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Small delay between chunks to avoid rate limiting
+      if (chunkStart < toTimestampMs) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
 
-    console.log(`✅ [Historical] Total: ${allCandles.length} candles for ${symbol} ${timeframe} in ${pageCount} pages`);
+    console.log(`✅ [Historical] Total: ${allCandles.length} candles for ${symbol} ${timeframe} in ${chunkCount} chunks`);
     return allCandles;
   } catch (err) {
     console.error('❌ [Historical] Error:', err instanceof Error ? err.message : 'Unknown error');
     return allCandles; // Return what we have so far
   }
+}
+
+/**
+ * Fetch a single time chunk with pagination support
+ */
+async function fetchChunkWithPagination(
+  ticker: string,
+  multiplier: number,
+  timespan: string,
+  fromMs: number,
+  toMs: number
+): Promise<OHLCCandle[]> {
+  const chunkCandles: OHLCCandle[] = [];
+  let currentFrom = fromMs;
+  let pageCount = 0;
+  const MAX_PAGES = 10;
+
+  while (currentFrom < toMs && pageCount < MAX_PAGES) {
+    pageCount++;
+    
+    const endpoint = `/v2/aggs/ticker/${ticker}/range/${multiplier}/${timespan}/${currentFrom}/${toMs}`;
+    const url = `${MASSIVE_API_BASE_URL}${endpoint}?adjusted=true&sort=asc&limit=50000&apiKey=${MASSIVE_API_KEY}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      console.error(`❌ [Historical] API error: ${response.status} ${response.statusText}`);
+      break;
+    }
+
+    const data = await response.json();
+    
+    if (!data.results || data.results.length === 0) {
+      break;
+    }
+
+    // Convert to our format
+    const pageCandles: OHLCCandle[] = data.results.map((bar: {
+      t: number;
+      o: number;
+      h: number;
+      l: number;
+      c: number;
+      v?: number;
+    }) => ({
+      time: bar.t,
+      open: bar.o,
+      high: bar.h,
+      low: bar.l,
+      close: bar.c,
+      volume: bar.v || 0,
+    }));
+
+    chunkCandles.push(...pageCandles);
+    
+    // If we got less than 50000, we've reached the end of this chunk
+    if (pageCandles.length < 50000) {
+      break;
+    }
+    
+    // Update currentFrom to continue from after the last candle
+    const lastCandleTime = pageCandles[pageCandles.length - 1].time;
+    currentFrom = lastCandleTime + 1;
+    
+    // Small delay between pages
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  return chunkCandles;
 }
 
 /**
