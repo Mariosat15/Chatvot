@@ -1918,32 +1918,15 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         });
       }
       
-      // Update ONLY the CLOSE price - NO local H/L building!
-      // Server builds candles, browser just displays
-      // This ensures ALL users see IDENTICAL candles
-      if (currentCandleRef.current && candlestickSeriesRef.current) {
-        const mid = currentPrice.mid;
-        const lastCandle = currentCandleRef.current;
-        
-        if (chartType === 'line') {
-          (candlestickSeriesRef.current as any).update({
-            time: lastCandle.time,
-            value: mid,
-          });
-        } else {
-          // ONLY update close - O/H/L come from server ONLY
-          // NO Math.max/min = NO divergence between users!
-          const updatedCandle: CandlestickData<UTCTimestamp> = {
-            time: lastCandle.time,
-            open: lastCandle.open,
-            high: lastCandle.high,   // From server only
-            low: lastCandle.low,     // From server only
-            close: mid,              // Only close updates from price
-          };
-          candlestickSeriesRef.current.update(updatedCandle);
-          // Don't update currentCandleRef.current - keep server's O/H/L values
-        }
-      }
+      // ❌ REMOVED: Don't update candle close from WebSocket prices!
+      // This was causing flickering because:
+      // 1. WebSocket price updates close to value X
+      // 2. Server forming candle poll updates close to value Y (slightly different)
+      // 3. They fight each other = FLICKER
+      //
+      // Solution: ONLY the forming candle poll (every 500ms) updates candles
+      // This ensures a single source of truth and eliminates flickering
+      // The bid/ask lines above still update in real-time from WebSocket
     } catch {
       // Chart may be disposed, ignore
     }
