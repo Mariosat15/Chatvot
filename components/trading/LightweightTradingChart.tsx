@@ -2006,30 +2006,78 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     
     // ==== WEBSOCKET MODE ====
     if (priceUpdateMode === 'websocket') {
-      // TODO: Implement WebSocket connection for browser forming candle updates
-      // For now, fall back to polling with lower frequency
-      console.log('📡 [Chart] WebSocket mode enabled - full implementation pending, using reduced polling');
+      console.log('📡 [Chart] WebSocket mode enabled - connecting to price stream');
       
-      // Reduced polling as fallback until WebSocket is fully implemented
-      const fetchFormingCandle = async () => {
-        if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
+      // Get WebSocket URL (same as useWebSocket hook)
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${window.location.host}/ws?token=price-viewer&type=user`;
+      
+      let ws: WebSocket | null = null;
+      let reconnectTimeout: NodeJS.Timeout | null = null;
+      let isCleanedUp = false;
+      
+      const connect = () => {
+        if (isCleanedUp) return;
+        
         try {
-          const response = await fetch(`/api/trading/forming-candle?symbol=${encodeURIComponent(symbol)}`);
-          if (!response.ok) return;
-          const data = await response.json();
-          if (data.candle) {
-            updateChartWithCandle(data.candle, data.price);
+          ws = new WebSocket(wsUrl);
+          
+          ws.onopen = () => {
+            console.log('✅ [Chart WebSocket] Connected for price updates');
+          };
+          
+          ws.onmessage = (event) => {
+            try {
+              const message = JSON.parse(event.data);
+              
+              // Handle price_update events
+              if (message.type === 'price_update' && message.data) {
+                const { prices, formingCandles } = message.data;
+                
+                // Find forming candle for current symbol
+                const candle = formingCandles?.find((c: { symbol: string }) => c.symbol === symbol);
+                const price = prices?.find((p: { symbol: string }) => p.symbol === symbol);
+                
+                if (candle) {
+                  updateChartWithCandle(candle, price);
+                }
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          };
+          
+          ws.onclose = () => {
+            if (!isCleanedUp) {
+              // Reconnect after 2 seconds
+              reconnectTimeout = setTimeout(connect, 2000);
+            }
+          };
+          
+          ws.onerror = () => {
+            // Will trigger onclose
+          };
+        } catch (error) {
+          console.warn('📡 [Chart WebSocket] Connection error:', error);
+          // Retry after 3 seconds
+          if (!isCleanedUp) {
+            reconnectTimeout = setTimeout(connect, 3000);
           }
-        } catch {
-          // Ignore errors
         }
       };
       
-      // Poll at 500ms in WebSocket mode (will be replaced by actual WebSocket)
-      const intervalId = setInterval(fetchFormingCandle, 500);
-      fetchFormingCandle();
+      // Initial connection
+      connect();
       
-      return () => clearInterval(intervalId);
+      // Cleanup
+      return () => {
+        isCleanedUp = true;
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
+        if (ws) {
+          ws.close(1000, 'Chart cleanup');
+          ws = null;
+        }
+      };
     }
     
     // ==== POLLING MODE (default) ====
