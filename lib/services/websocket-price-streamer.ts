@@ -227,6 +227,8 @@ async function loadSymbolSpreadSettings(): Promise<void> {
     
     const symbols = await db.collection('tradingsymbols').find({}).toArray();
     
+    console.log(`📊 [Symbol Settings] Found ${symbols.length} symbols in database`);
+    
     const state = getState();
     for (const sym of symbols) {
       if (sym.symbol) {
@@ -235,6 +237,11 @@ async function loadSymbolSpreadSettings(): Promise<void> {
           defaultSpread: sym.defaultSpread || 1.5,
           pip: sym.pip || 0.0001,
         });
+        
+        // Log each symbol with fixed spread enabled
+        if (sym.useFixedSpread) {
+          console.log(`  ✅ ${sym.symbol}: Fixed spread ${sym.defaultSpread} pips (pip=${sym.pip})`);
+        }
       }
     }
     
@@ -243,9 +250,7 @@ async function loadSymbolSpreadSettings(): Promise<void> {
     
     // Log fixed spread symbols
     const fixedCount = Array.from(state.symbolSpreadSettings.values()).filter(s => s.useFixedSpread).length;
-    if (fixedCount > 0) {
-      console.log(`📊 [Symbol Settings] Loaded ${symbols.length} symbols, ${fixedCount} using fixed spread`);
-    }
+    console.log(`📊 [Symbol Settings] Loaded ${symbols.length} symbols, ${fixedCount} using fixed spread`);
   } catch (error) {
     // Silently fail - will use variable spread as fallback
     if (Math.random() < 0.1) {
@@ -599,6 +604,11 @@ function handleQuoteMessage(msg: {
     bid = mid - halfSpread;
     ask = mid + halfSpread;
     spread = spreadSettings.defaultSpread * spreadSettings.pip;
+    
+    // Debug log (occasionally)
+    if (Math.random() < 0.01) {
+      console.log(`🔧 [Fixed Spread] ${symbol}: mid=${mid.toFixed(5)}, spread=${spreadSettings.defaultSpread}pip, bid=${bid.toFixed(5)}, ask=${ask.toFixed(5)}`);
+    }
   } else {
     // VARIABLE SPREAD: Use raw bid/ask from Massive.com
     bid = rawBid;
