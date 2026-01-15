@@ -280,10 +280,10 @@ async function loadSymbolSpreadSettings(): Promise<void> {
         // Log each symbol with fixed spread enabled
         if (sym.useFixedSpread) {
           console.log(`  ✅ ${sym.symbol}: Fixed spread ${sym.defaultSpread} pips (pip=${sym.pip})`);
-        }
-      }
     }
-    
+  }
+}
+
     symbolSettingsLoaded = true;
     symbolSettingsLoadTime = now;
     
@@ -983,7 +983,7 @@ async function saveCandleToMongoDB(
             volume: c.v,
           }))
         );
-        
+    
         // Log occasionally (not every batch to reduce noise)
         if (Math.random() < 0.1) {  // 10% of the time
           console.log(`🕯️ [Candle DB] Saved ${candlesToSave.length} candles to MongoDB`);

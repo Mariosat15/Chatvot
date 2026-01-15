@@ -245,26 +245,36 @@ export async function getRecentCandles(
   }
 
   // Apply minimum lookback based on timeframe
-  // Intraday data: Only go back 1-2 days (API limitation)
-  // Daily data: Can go back much further
+  // Massive.com Basic plan supports 2 years for all timeframes
+  // We use fetchCandlesForRange for hybrid merge (no limits there)
+  // These limits are for getRecentCandles (initial seed / fallback)
   const minDaysBack = new Date(now);
   
   switch (timeframe) {
     case '1':
+      // 1m: Max 60 days back (API can handle more, but reasonable for initial load)
+      minDaysBack.setDate(minDaysBack.getDate() - 60);
+      break;
     case '5':
+      // 5m: Max 180 days back
+      minDaysBack.setDate(minDaysBack.getDate() - 180);
+      break;
     case '15':
+      // 15m: Max 365 days back
+      minDaysBack.setDate(minDaysBack.getDate() - 365);
+      break;
     case '30':
-      // Intraday: Max 2 days back
-      minDaysBack.setDate(minDaysBack.getDate() - 2);
+      // 30m: Max 365 days back
+      minDaysBack.setDate(minDaysBack.getDate() - 365);
       break;
     case '60':
     case '120':
-      // 1h/2h: Max 7 days back
-      minDaysBack.setDate(minDaysBack.getDate() - 7);
+      // 1h/2h: Max 2 years back
+      minDaysBack.setDate(minDaysBack.getDate() - 730);
       break;
     case '240':
-      // 4h: Max 30 days back
-      minDaysBack.setDate(minDaysBack.getDate() - 30);
+      // 4h: Max 2 years back
+      minDaysBack.setDate(minDaysBack.getDate() - 730);
       break;
     case 'D':
       // Daily: Max 2 years back

@@ -20,7 +20,7 @@
 import { connectToDatabase } from '@/database/mongoose';
 import Candle1m, { CandleData } from '@/database/models/candle-1m.model';
 import { getFormingCandle, FormingCandle } from '@/lib/services/websocket-price-streamer';
-import { getRecentCandles, Timeframe } from '@/lib/services/forex-historical.service';
+import { getRecentCandles, fetchCandlesForRange, Timeframe } from '@/lib/services/forex-historical.service';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 
 // ============================================
@@ -296,17 +296,37 @@ export async function getAggregatedCandles(
   
   if (aggregatedFromMongo.length < count && candles1m.length > 0) {
     // MongoDB has some data but not enough - fetch older data from Massive.com
-    console.log(`🔄 [Aggregator] ${symbol} ${timeframe}: MongoDB has ${aggregatedFromMongo.length} candles, need ${count}. Fetching older from Massive.com...`);
+    const missingCandles = count - aggregatedFromMongo.length;
+    console.log(`🔄 [Aggregator] ${symbol} ${timeframe}: MongoDB has ${aggregatedFromMongo.length} candles, need ${count} (missing ${missingCandles}). Fetching older from Massive.com...`);
     
     try {
       const apiTimeframe = apiTimeframeMap[timeframeMinutes];
       if (apiTimeframe) {
-        // Fetch from Massive.com API
-        const apiCandles = await getRecentCandles(symbol as ForexSymbol, apiTimeframe, count);
+        // Find oldest time in MongoDB data (in seconds)
+        const oldestMongoTime = aggregatedFromMongo.length > 0 
+          ? Math.min(...aggregatedFromMongo.map(c => c.time))
+          : Math.floor(Date.now() / 1000);
+        
+        // Calculate how far back we need to go
+        // missingCandles * timeframeMinutes gives us minutes needed
+        const minutesBack = missingCandles * timeframeMinutes;
+        const fromTimestampMs = (oldestMongoTime - (minutesBack * 60)) * 1000;
+        const toTimestampMs = (oldestMongoTime - 60) * 1000; // End just before MongoDB data
+        
+        console.log(`📅 [Aggregator] Fetching ${symbol} ${timeframe} from ${new Date(fromTimestampMs).toISOString()} to ${new Date(toTimestampMs).toISOString()}`);
+        
+        // Use fetchCandlesForRange for precise historical data (no 2-day limit!)
+        const apiCandles = await fetchCandlesForRange(
+          symbol as ForexSymbol, 
+          apiTimeframe, 
+          fromTimestampMs, 
+          toTimestampMs
+        );
         
         // Convert API candles to our format
+        // fetchCandlesForRange returns time in MILLISECONDS, need to convert to seconds
         const apiCandlesFormatted: AggregatedCandle[] = apiCandles.map(c => ({
-          time: c.time, // Already in seconds
+          time: Math.floor(c.time / 1000), // Convert ms to seconds
           open: c.open,
           high: c.high,
           low: c.low,
@@ -314,19 +334,13 @@ export async function getAggregatedCandles(
           volume: c.volume,
         }));
         
-        // Find oldest time in MongoDB data
-        const oldestMongoTime = aggregatedFromMongo.length > 0 
-          ? Math.min(...aggregatedFromMongo.map(c => c.time))
-          : Infinity;
-        
-        // Get API candles that are OLDER than our MongoDB data
-        const olderApiCandles = apiCandlesFormatted.filter(c => c.time < oldestMongoTime);
-        
         // Create a set of MongoDB times for deduplication
         const mongoTimeSet = new Set(aggregatedFromMongo.map(c => c.time));
         
-        // Filter out any duplicates
-        const uniqueOlderCandles = olderApiCandles.filter(c => !mongoTimeSet.has(c.time));
+        // Filter to only candles OLDER than MongoDB and not duplicates
+        const uniqueOlderCandles = apiCandlesFormatted.filter(c => 
+          c.time < oldestMongoTime && !mongoTimeSet.has(c.time)
+        );
         
         // Merge: [older API data] + [MongoDB aggregated data]
         finalAggregated = [...uniqueOlderCandles, ...aggregatedFromMongo].sort((a, b) => a.time - b.time);
@@ -341,7 +355,7 @@ export async function getAggregatedCandles(
       finalAggregated = aggregatedFromMongo;
     }
   } else if (candles1m.length === 0) {
-    // No MongoDB data - fetch entirely from Massive.com API
+    // No MongoDB data - fetch entirely from Massive.com API using getRecentCandles
     console.log(`⚠️ [Aggregator] ${symbol} ${timeframe}: No MongoDB data, fetching from Massive.com...`);
     
     try {
@@ -349,7 +363,7 @@ export async function getAggregatedCandles(
       if (apiTimeframe) {
         const apiCandles = await getRecentCandles(symbol as ForexSymbol, apiTimeframe, count);
         finalAggregated = apiCandles.map(c => ({
-          time: c.time,
+          time: c.time, // getRecentCandles returns seconds
           open: c.open,
           high: c.high,
           low: c.low,
