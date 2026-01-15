@@ -891,6 +891,20 @@ function calculate1hFormingCandle(symbol: string): FormingCandle | null {
 }
 
 /**
+ * Calculate 4h forming candle from 1m candles
+ */
+function calculate4hFormingCandle(symbol: string): FormingCandle | null {
+  return calculateFormingCandleForTimeframe(symbol, 240);
+}
+
+/**
+ * Calculate 1d (daily) forming candle from 1m candles
+ */
+function calculate1dFormingCandle(symbol: string): FormingCandle | null {
+  return calculateFormingCandleForTimeframe(symbol, 1440);
+}
+
+/**
  * Handle aggregate messages (per-second or per-minute bars)
  * Format: {"ev":"CA","pair":"EUR-USD","o":1.05,"h":1.051,"l":1.049,"c":1.0505,"v":1000,"s":..,"e":..}
  * 
@@ -1249,6 +1263,20 @@ export function getForming30mCandle(symbol: string): FormingCandle | null {
  */
 export function getForming1hCandle(symbol: string): FormingCandle | null {
   return calculate1hFormingCandle(symbol);
+}
+
+/**
+ * Get 4h forming candle (calculated from buffer + 1m forming)
+ */
+export function getForming4hCandle(symbol: string): FormingCandle | null {
+  return calculate4hFormingCandle(symbol);
+}
+
+/**
+ * Get 1d (daily) forming candle (calculated from buffer + 1m forming)
+ */
+export function getForming1dCandle(symbol: string): FormingCandle | null {
+  return calculate1dFormingCandle(symbol);
 }
 
 /**

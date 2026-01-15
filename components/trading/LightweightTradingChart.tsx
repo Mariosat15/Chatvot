@@ -1967,14 +1967,16 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   useEffect(() => {
     if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
     
-    // Real-time updates for 1m, 5m, 15m, 30m, and 1h timeframes (server-aggregated)
+    // Real-time updates for 1m, 5m, 15m, 30m, 1h, 4h, and 1d timeframes (server-aggregated)
     // Other timeframes poll less frequently from /api/trading/candles
     const isOneMinute = timeframe === '1' || (timeframe as string) === '1m';
     const isFiveMinute = timeframe === '5' || (timeframe as string) === '5m';
     const isFifteenMinute = timeframe === '15' || (timeframe as string) === '15m';
     const isThirtyMinute = timeframe === '30' || (timeframe as string) === '30m';
     const isOneHour = timeframe === '60' || (timeframe as string) === '1h';
-    if (!isOneMinute && !isFiveMinute && !isFifteenMinute && !isThirtyMinute && !isOneHour) return;
+    const isFourHour = timeframe === '240' || (timeframe as string) === '4h';
+    const isDaily = timeframe === 'D' || (timeframe as string) === '1d';
+    if (!isOneMinute && !isFiveMinute && !isFifteenMinute && !isThirtyMinute && !isOneHour && !isFourHour && !isDaily) return;
     
     // Helper function to update chart with candle data
     const updateChartWithCandle = (candle: { time: number; open: number; high: number; low: number; close: number }, price?: { bid: number; ask: number }) => {
@@ -2134,6 +2136,24 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         } else if (isOneHour) {
           // For 1h, use dedicated forming candle endpoint
           const response = await fetch(`/api/trading/forming-candle-1h?symbol=${encodeURIComponent(symbol)}`);
+          if (!response.ok) return;
+          
+          const data = await response.json();
+          if (data.candle) {
+            updateChartWithCandle(data.candle, data.price);
+          }
+        } else if (isFourHour) {
+          // For 4h, use dedicated forming candle endpoint
+          const response = await fetch(`/api/trading/forming-candle-4h?symbol=${encodeURIComponent(symbol)}`);
+          if (!response.ok) return;
+          
+          const data = await response.json();
+          if (data.candle) {
+            updateChartWithCandle(data.candle, data.price);
+          }
+        } else if (isDaily) {
+          // For 1d, use dedicated forming candle endpoint
+          const response = await fetch(`/api/trading/forming-candle-1d?symbol=${encodeURIComponent(symbol)}`);
           if (!response.ok) return;
           
           const data = await response.json();

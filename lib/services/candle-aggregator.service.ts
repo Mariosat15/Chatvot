@@ -67,6 +67,8 @@ const TIMEFRAME_MINUTES: Record<string, number> = {
   '60': 60,
   '4h': 240,
   '240': 240,
+  '1d': 1440,
+  'D': 1440,
 };
 
 // Cache TTL in milliseconds (shorter = more up-to-date, longer = less computation)
@@ -81,6 +83,8 @@ const CACHE_TTL_MS: Record<string, number> = {
   '60': 120000,
   '4h': 300000,   // 5 minutes
   '240': 300000,
+  '1d': 600000,   // 10 minutes - daily candles change slowly
+  'D': 600000,
 };
 
 // ============================================
@@ -294,6 +298,7 @@ export async function getAggregatedCandles(
     30: '30',
     60: '60',
     240: '240',
+    1440: 'D',
   };
   
   // Calculate how many 1m candles we need
