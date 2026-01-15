@@ -321,13 +321,34 @@ const DEFAULT_CANDLE_LIMITS: Record<string, number> = {
 
 // Cache for admin candle limits (refresh every 60 seconds)
 let cachedCandleLimits: Record<string, number> | null = null;
+let cachedChartLimitsEnabled: boolean | null = null;
 let candleLimitsCacheTime = 0;
 const CANDLE_LIMITS_CACHE_TTL = 60000; // 60 seconds
 
-async function getCandleLimits(): Promise<Record<string, number>> {
+// When limits are disabled, use these very high limits (essentially unlimited)
+const UNLIMITED_CANDLE_LIMITS: Record<string, number> = {
+  '1m': 500000,
+  '1': 500000,
+  '5m': 100000,
+  '5': 100000,
+  '15m': 50000,
+  '15': 50000,
+  '30m': 25000,
+  '30': 25000,
+  '1h': 15000,
+  '60': 15000,
+  '4h': 5000,
+  '240': 5000,
+  '1d': 3650,
+  'D': 3650,
+  'W': 520,
+  'M': 240,
+};
+
+async function getCandleLimits(): Promise<{ limits: Record<string, number>; enabled: boolean }> {
   const now = Date.now();
-  if (cachedCandleLimits && (now - candleLimitsCacheTime < CANDLE_LIMITS_CACHE_TTL)) {
-    return cachedCandleLimits;
+  if (cachedCandleLimits && cachedChartLimitsEnabled !== null && (now - candleLimitsCacheTime < CANDLE_LIMITS_CACHE_TTL)) {
+    return { limits: cachedCandleLimits, enabled: cachedChartLimitsEnabled };
   }
   
   try {
@@ -335,30 +356,40 @@ async function getCandleLimits(): Promise<Record<string, number>> {
     const db = mongoose.connection.db;
     if (db) {
       const settings = await db.collection('marketdatasettings').findOne({ key: 'market_data_settings' });
+      const limitsEnabled = settings?.chartLimitsEnabled ?? true; // Default to enabled
+      cachedChartLimitsEnabled = limitsEnabled;
+      
       if (settings?.candleLimits) {
         const newLimits = { ...DEFAULT_CANDLE_LIMITS, ...settings.candleLimits };
         cachedCandleLimits = newLimits;
         candleLimitsCacheTime = now;
-        return newLimits;
+        return { limits: newLimits, enabled: limitsEnabled };
       }
+      
+      candleLimitsCacheTime = now;
+      cachedCandleLimits = DEFAULT_CANDLE_LIMITS;
+      return { limits: DEFAULT_CANDLE_LIMITS, enabled: limitsEnabled };
     }
   } catch (error) {
     console.error('Failed to fetch candle limits:', error);
   }
   
-  return DEFAULT_CANDLE_LIMITS;
+  return { limits: DEFAULT_CANDLE_LIMITS, enabled: true };
 }
 
 /**
  * Shared handler for both GET and POST
  */
 async function handleCandleRequest(symbol: string, timeframe: string, count: number) {
-  // Get admin-configured candle limits
-  const candleLimits = await getCandleLimits();
+  // Get admin-configured candle limits and enabled status
+  const { limits: candleLimits, enabled: limitsEnabled } = await getCandleLimits();
   
-  // Use admin limit or default, capped by the configured limit
-  const configuredLimit = candleLimits[timeframe] || candleLimits['1m'] || 1440;
-  const limit = Math.min(count || configuredLimit, configuredLimit);
+  // If limits are DISABLED, use unlimited limits (essentially no limit)
+  const activeLimits = limitsEnabled ? candleLimits : UNLIMITED_CANDLE_LIMITS;
+  
+  // Use admin limit or default, capped by the configured limit (or unlimited if disabled)
+  const configuredLimit = activeLimits[timeframe] || activeLimits['1m'] || 500000;
+  const limit = limitsEnabled ? Math.min(count || configuredLimit, configuredLimit) : (count || configuredLimit);
 
   // For 1-minute timeframe: HYBRID - MongoDB (recent) + Massive.com (older)
   if (timeframe === '1m' || timeframe === '1') {

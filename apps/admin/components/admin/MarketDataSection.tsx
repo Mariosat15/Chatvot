@@ -38,6 +38,7 @@ interface MarketDataSettings {
   pollingIntervalMs: number;
   websocketIntervalMs: number;
   candleLimits: CandleLimits;
+  chartLimitsEnabled: boolean;
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -842,10 +843,44 @@ export default function MarketDataSection() {
         defaultOpen={false}
       >
         {settings && (
-          <CandleLimitsEditor 
-            candleLimits={settings.candleLimits}
-            onSave={(limits) => saveSettings({ candleLimits: limits })}
-          />
+          <div className="space-y-4">
+            {/* Enable/Disable Toggle */}
+            <div className="flex items-center justify-between p-4 bg-[#12141c] rounded-xl border border-gray-800/30">
+              <div>
+                <h4 className="text-white font-medium flex items-center gap-2">
+                  <span>Enable Chart Limits</span>
+                  {settings.chartLimitsEnabled ? (
+                    <span className="px-2 py-0.5 text-xs bg-green-600/20 text-green-400 rounded-full">Active</span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-xs bg-gray-600/20 text-gray-400 rounded-full">Disabled</span>
+                  )}
+                </h4>
+                <p className="text-gray-500 text-sm mt-1">
+                  {settings.chartLimitsEnabled 
+                    ? 'Limits are applied - charts load faster with restricted history'
+                    : 'Limits disabled - charts will load ALL available historical data (slower)'
+                  }
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.chartLimitsEnabled ?? true}
+                  onChange={(e) => saveSettings({ chartLimitsEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-600"></div>
+              </label>
+            </div>
+            
+            {/* Limits Configuration - only show when enabled */}
+            <div className={settings.chartLimitsEnabled ? '' : 'opacity-50 pointer-events-none'}>
+              <CandleLimitsEditor 
+                candleLimits={settings.candleLimits}
+                onSave={(limits) => saveSettings({ candleLimits: limits })}
+              />
+            </div>
+          </div>
         )}
       </Section>
 

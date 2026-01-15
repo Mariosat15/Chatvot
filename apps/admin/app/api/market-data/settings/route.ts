@@ -62,6 +62,9 @@ const MarketDataSettingsSchema = new mongoose.Schema({
     '4h': { type: Number, default: 540 },    // 3 months of 4h candles
     '1d': { type: Number, default: 365 },    // 1 year of daily candles
   },
+  // Toggle to enable/disable chart limits
+  // When disabled, charts will load ALL available historical data
+  chartLimitsEnabled: { type: Boolean, default: true },
 }, { timestamps: true });
 
 const MarketDataSettings = mongoose.models.MarketDataSettings || 
@@ -128,6 +131,7 @@ export async function GET() {
           '4h': 540,
           '1d': 365,
         },
+        chartLimitsEnabled: settings.chartLimitsEnabled ?? true,
         updatedAt: settings.updatedAt,
       },
     });
@@ -145,7 +149,7 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
     
     const body = await request.json();
-    const { cleanup, gapFill, priceUpdateMode, pollingIntervalMs, websocketIntervalMs, candleLimits } = body;
+    const { cleanup, gapFill, priceUpdateMode, pollingIntervalMs, websocketIntervalMs, candleLimits, chartLimitsEnabled } = body;
     
     const updateData: Record<string, unknown> = {};
     
@@ -225,6 +229,11 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Chart limits enabled toggle
+    if (typeof chartLimitsEnabled === 'boolean') {
+      updateData['chartLimitsEnabled'] = chartLimitsEnabled;
+    }
+    
     const settings = await MarketDataSettings.findOneAndUpdate(
       { key: 'market_data_settings' },
       { $set: updateData },
@@ -248,6 +257,7 @@ export async function POST(request: NextRequest) {
           '4h': 540,
           '1d': 365,
         },
+        chartLimitsEnabled: settings.chartLimitsEnabled ?? true,
         updatedAt: settings.updatedAt,
       },
     });
