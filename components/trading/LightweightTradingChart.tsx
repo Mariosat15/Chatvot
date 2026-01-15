@@ -1967,11 +1967,12 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   useEffect(() => {
     if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
     
-    // Real-time updates for 1m and 5m timeframes (server-aggregated)
+    // Real-time updates for 1m, 5m, and 15m timeframes (server-aggregated)
     // Other timeframes poll less frequently from /api/trading/candles
     const isOneMinute = timeframe === '1' || (timeframe as string) === '1m';
     const isFiveMinute = timeframe === '5' || (timeframe as string) === '5m';
-    if (!isOneMinute && !isFiveMinute) return;
+    const isFifteenMinute = timeframe === '15' || (timeframe as string) === '15m';
+    if (!isOneMinute && !isFiveMinute && !isFifteenMinute) return;
     
     // Helper function to update chart with candle data
     const updateChartWithCandle = (candle: { time: number; open: number; high: number; low: number; close: number }, price?: { bid: number; ask: number }) => {
@@ -2032,12 +2033,13 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               
               // Handle price_update events
               if (message.type === 'price_update' && message.data) {
-                const { prices, formingCandles, formingCandles5m } = message.data;
+                const { prices, formingCandles, formingCandles5m, formingCandles15m } = message.data;
                 
                 // Select the correct forming candle based on timeframe
-                // For 1m: use formingCandles, for 5m: use formingCandles5m
+                // For 1m: use formingCandles, for 5m: use formingCandles5m, for 15m: use formingCandles15m
                 const is5m = timeframe === '5' || (timeframe as string) === '5m';
-                const candleSource = is5m ? formingCandles5m : formingCandles;
+                const is15m = timeframe === '15' || (timeframe as string) === '15m';
+                const candleSource = is15m ? formingCandles15m : (is5m ? formingCandles5m : formingCandles);
                 
                 // Find forming candle for current symbol
                 const candle = candleSource?.find((c: { symbol: string }) => c.symbol === symbol);
@@ -2102,6 +2104,15 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         } else if (isFiveMinute) {
           // For 5m, use dedicated forming candle endpoint
           const response = await fetch(`/api/trading/forming-candle-5m?symbol=${encodeURIComponent(symbol)}`);
+          if (!response.ok) return;
+          
+          const data = await response.json();
+          if (data.candle) {
+            updateChartWithCandle(data.candle, data.price);
+          }
+        } else if (isFifteenMinute) {
+          // For 15m, use dedicated forming candle endpoint
+          const response = await fetch(`/api/trading/forming-candle-15m?symbol=${encodeURIComponent(symbol)}`);
           if (!response.ok) return;
           
           const data = await response.json();

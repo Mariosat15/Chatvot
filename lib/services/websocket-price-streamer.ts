@@ -811,26 +811,28 @@ async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void
 }
 
 /**
- * Calculate 5m forming candle from completed 1m candles buffer + current 1m forming candle
- * Returns null if not enough data to build 5m candle
+ * Generic function to calculate forming candle for any timeframe from 1m candles
+ * @param symbol - Trading symbol
+ * @param timeframeMinutes - Target timeframe in minutes (5, 15, 30, 60)
+ * Returns null if 1m forming candle doesn't exist
  */
-function calculate5mFormingCandle(symbol: string): FormingCandle | null {
+function calculateFormingCandleForTimeframe(symbol: string, timeframeMinutes: number): FormingCandle | null {
   const state = getState();
   const forming1m = state.formingCandles.get(symbol);
   
   if (!forming1m) return null;
   
-  // Calculate 5m period boundary (seconds)
-  const FIVE_MIN_SECONDS = 5 * 60;
-  const currentPeriodStart = Math.floor(forming1m.time / FIVE_MIN_SECONDS) * FIVE_MIN_SECONDS;
+  // Calculate period boundary (seconds)
+  const periodSeconds = timeframeMinutes * 60;
+  const currentPeriodStart = Math.floor(forming1m.time / periodSeconds) * periodSeconds;
   
-  // Get all 1m candles in the current 5m period from buffer
+  // Get all 1m candles in the current period from buffer
   const buffer = state.completedCandlesBuffer.get(symbol) || [];
   const periodCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
   
-  // Add completed 1m candles from this 5m period
+  // Add completed 1m candles from this period
   for (const candle of buffer) {
-    if (candle.time >= currentPeriodStart && candle.time < currentPeriodStart + FIVE_MIN_SECONDS) {
+    if (candle.time >= currentPeriodStart && candle.time < currentPeriodStart + periodSeconds) {
       periodCandles.push(candle);
     }
   }
@@ -858,6 +860,20 @@ function calculate5mFormingCandle(symbol: string): FormingCandle | null {
     close: periodCandles[periodCandles.length - 1].close,
     tickCount: periodCandles.length, // Number of 1m candles aggregated
   };
+}
+
+/**
+ * Calculate 5m forming candle from 1m candles
+ */
+function calculate5mFormingCandle(symbol: string): FormingCandle | null {
+  return calculateFormingCandleForTimeframe(symbol, 5);
+}
+
+/**
+ * Calculate 15m forming candle from 1m candles
+ */
+function calculate15mFormingCandle(symbol: string): FormingCandle | null {
+  return calculateFormingCandleForTimeframe(symbol, 15);
 }
 
 /**
@@ -1201,6 +1217,13 @@ export function getForming5mCandle(symbol: string): FormingCandle | null {
 }
 
 /**
+ * Get 15m forming candle (calculated from buffer + 1m forming)
+ */
+export function getForming15mCandle(symbol: string): FormingCandle | null {
+  return calculate15mFormingCandle(symbol);
+}
+
+/**
  * Get all forming candles (current minute candles being built)
  */
 export function getAllFormingCandles(): Map<string, FormingCandle> {
@@ -1357,12 +1380,19 @@ async function broadcastFormingCandles(): Promise<void> {
   // Get all 1m forming candles
   const formingCandles = Array.from(state.formingCandles.values());
   
-  // Calculate 5m forming candles for each symbol
+  // Calculate 5m and 15m forming candles for each symbol
   const formingCandles5m: FormingCandle[] = [];
+  const formingCandles15m: FormingCandle[] = [];
+  
   for (const candle1m of formingCandles) {
     const candle5m = calculate5mFormingCandle(candle1m.symbol);
     if (candle5m) {
       formingCandles5m.push(candle5m);
+    }
+    
+    const candle15m = calculate15mFormingCandle(candle1m.symbol);
+    if (candle15m) {
+      formingCandles15m.push(candle15m);
     }
   }
   
@@ -1386,7 +1416,7 @@ async function broadcastFormingCandles(): Promise<void> {
           mid: p.mid,
           timestamp: p.timestamp,
         })),
-        // 1m forming candles (timeframe: '1m')
+        // 1m forming candles
         formingCandles: formingCandles.map(c => ({
           symbol: c.symbol,
           time: c.time,
@@ -1394,7 +1424,7 @@ async function broadcastFormingCandles(): Promise<void> {
           high: c.high,
           low: c.low,
           close: c.close,
-          timeframe: '1m', // Explicit timeframe marker
+          timeframe: '1m',
         })),
         // 5m forming candles (aggregated from 1m)
         formingCandles5m: formingCandles5m.map(c => ({
@@ -1404,7 +1434,17 @@ async function broadcastFormingCandles(): Promise<void> {
           high: c.high,
           low: c.low,
           close: c.close,
-          timeframe: '5m', // Explicit timeframe marker
+          timeframe: '5m',
+        })),
+        // 15m forming candles (aggregated from 1m)
+        formingCandles15m: formingCandles15m.map(c => ({
+          symbol: c.symbol,
+          time: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          timeframe: '15m',
         })),
       }),
     });
