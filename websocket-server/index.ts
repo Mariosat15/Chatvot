@@ -294,9 +294,9 @@ const server = createServer(async (req, res) => {
             break;
 
           case 'prices':
-            // Broadcast prices AND forming candles (1m + 5m + 15m + 30m + 1h) to ALL connected clients
-            // Called by websocket-price-streamer every ~200ms
-            if (data.prices || data.formingCandles || data.formingCandles5m || data.formingCandles15m || data.formingCandles30m || data.formingCandles1h) {
+            // Broadcast prices AND forming candles (1m + 5m + 15m + 30m + 1h) + closed candles to ALL connected clients
+            // Called by websocket-price-streamer every ~50ms
+            if (data.prices || data.formingCandles || data.formingCandles5m || data.formingCandles15m || data.formingCandles30m || data.formingCandles1h || data.closedCandles) {
               const priceEvent = {
                 type: 'price_update',
                 data: {
@@ -306,6 +306,7 @@ const server = createServer(async (req, res) => {
                   formingCandles15m: data.formingCandles15m || [],  // 15m forming candles
                   formingCandles30m: data.formingCandles30m || [],  // 30m forming candles
                   formingCandles1h: data.formingCandles1h || [],    // 1h forming candles
+                  closedCandles: data.closedCandles || [],          // Recently closed 1m candles (for instant sync)
                   timestamp: Date.now(),
                 },
               };
@@ -323,9 +324,10 @@ const server = createServer(async (req, res) => {
                 }
               });
               
-              // Log occasionally (every 10th broadcast)
+              // Log occasionally (every 10th broadcast) - include closed candles count
               if (Math.random() < 0.1) {
-                console.log(`📊 Broadcast ${data.prices?.length || 0} prices + ${data.formingCandles?.length || 0} 1m + ${data.formingCandles5m?.length || 0} 5m + ${data.formingCandles15m?.length || 0} 15m + ${data.formingCandles30m?.length || 0} 30m + ${data.formingCandles1h?.length || 0} 1h to ${clientCount} clients`);
+                const closedCount = data.closedCandles?.length || 0;
+                console.log(`📊 Broadcast ${data.prices?.length || 0} prices + ${data.formingCandles?.length || 0} 1m + ${data.formingCandles5m?.length || 0} 5m + ${closedCount} closed to ${clientCount} clients`);
               }
             }
             break;

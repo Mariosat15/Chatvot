@@ -2054,7 +2054,49 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               
               // Handle price_update events
               if (message.type === 'price_update' && message.data) {
-                const { prices, formingCandles, formingCandles5m, formingCandles15m, formingCandles30m, formingCandles1h } = message.data;
+                const { prices, formingCandles, formingCandles5m, formingCandles15m, formingCandles30m, formingCandles1h, closedCandles } = message.data;
+                
+                // 🔥 HANDLE CLOSED CANDLES FIRST - add them to the chart immediately
+                // This ensures all browsers see closed candles at the same time
+                if (closedCandles && closedCandles.length > 0 && candlestickSeriesRef.current) {
+                  const isOneMin = timeframe === '1' || (timeframe as string) === '1m';
+                  
+                  // Only add closed 1m candles if we're on 1m timeframe
+                  if (isOneMin) {
+                    for (const closed of closedCandles) {
+                      if (closed.symbol === symbol) {
+                        // Check if this candle is newer than what we have
+                        const existingCandles = candleDataRef.current;
+                        const alreadyExists = existingCandles.some(c => c.time === closed.time);
+                        
+                        if (!alreadyExists) {
+                          // Add the closed candle to our data
+                          const newCandle = {
+                            time: closed.time as UTCTimestamp,
+                            open: closed.open,
+                            high: closed.high,
+                            low: closed.low,
+                            close: closed.close,
+                          };
+                          candleDataRef.current.push(newCandle);
+                          candleDataRef.current.sort((a, b) => (a.time as number) - (b.time as number));
+                          
+                          // Update the chart series
+                          if (chartType === 'line') {
+                            (candlestickSeriesRef.current as ISeriesApi<'Line'>).update({
+                              time: closed.time as UTCTimestamp,
+                              value: closed.close,
+                            });
+                          } else {
+                            candlestickSeriesRef.current?.update(newCandle);
+                          }
+                          
+                          console.log(`🕯️ [WS] Added closed candle: ${symbol} @ ${new Date(closed.time * 1000).toISOString()}`);
+                        }
+                      }
+                    }
+                  }
+                }
                 
                 // Select the correct forming candle based on timeframe
                 const is5m = timeframe === '5' || (timeframe as string) === '5m';

@@ -74,6 +74,7 @@ interface WebSocketGlobalState {
   symbolSpreadSettings: Map<string, SymbolSpreadSettings>; // Fixed spread settings per symbol
   formingCandles: Map<string, FormingCandle>; // Current minute candles being built
   completedCandlesBuffer: Map<string, CompletedCandle[]>; // Recent completed 1m candles per symbol (for 5m aggregation)
+  recentlyClosedCandles: CompletedCandle[]; // Candles closed in the last 5 seconds - broadcast to sync browsers immediately
   lastUpdateTime: number;
   initialized: boolean;
   connectionId: string;
@@ -106,6 +107,7 @@ function getGlobalState(): WebSocketGlobalState {
       symbolSpreadSettings: new Map<string, SymbolSpreadSettings>(),
       formingCandles: new Map<string, FormingCandle>(),
       completedCandlesBuffer: new Map<string, CompletedCandle[]>(), // For 5m aggregation
+      recentlyClosedCandles: [], // Broadcast closed candles to sync browsers instantly
       lastUpdateTime: 0,
       initialized: false,
       connectionId: Math.random().toString(36).substring(7),
@@ -790,6 +792,14 @@ async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void
   if (buffer.length > MAX_BUFFER_SIZE) {
     buffer.shift(); // Remove oldest
   }
+  
+  // 🔥 ADD TO RECENTLY CLOSED CANDLES - broadcast to all browsers immediately!
+  // This ensures all browsers see the closed candle at the same time
+  state.recentlyClosedCandles.push(completedCandle);
+  
+  // Keep only candles from last 10 seconds (will be cleared after broadcast)
+  const TEN_SECONDS_AGO = Math.floor(Date.now() / 1000) - 10;
+  state.recentlyClosedCandles = state.recentlyClosedCandles.filter(c => c.time >= TEN_SECONDS_AGO);
   
   // Save to MongoDB
   try {
@@ -1535,6 +1545,16 @@ async function broadcastFormingCandles(): Promise<void> {
           low: c.low,
           close: c.close,
           timeframe: '1h',
+        })),
+        // 🔥 CLOSED CANDLES - broadcast recently closed 1m candles to sync all browsers
+        closedCandles: state.recentlyClosedCandles.map(c => ({
+          symbol: c.symbol,
+          time: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          timeframe: '1m',
         })),
       }),
     });
