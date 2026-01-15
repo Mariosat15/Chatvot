@@ -50,10 +50,52 @@ const forceReseed = args.includes('--force');
 // These match the indexes defined in Mongoose schemas
 
 const INDEXES = {
-  // 1-minute candles
+  // 1-minute candles (live data from WebSocket)
   candle1ms: [
     { keys: { symbol: 1, t: 1 }, options: { unique: true } },
     { keys: { symbol: 1, t: -1 } },
+  ],
+  
+  // Historical candles - 5m (permanent storage from Massive.com API)
+  candles_historical_5m: [
+    { keys: { symbol: 1, timestamp: 1 }, options: { unique: true } },
+    { keys: { symbol: 1 } },
+    { keys: { timestamp: 1 } },
+  ],
+  
+  // Historical candles - 15m
+  candles_historical_15m: [
+    { keys: { symbol: 1, timestamp: 1 }, options: { unique: true } },
+    { keys: { symbol: 1 } },
+    { keys: { timestamp: 1 } },
+  ],
+  
+  // Historical candles - 30m
+  candles_historical_30m: [
+    { keys: { symbol: 1, timestamp: 1 }, options: { unique: true } },
+    { keys: { symbol: 1 } },
+    { keys: { timestamp: 1 } },
+  ],
+  
+  // Historical candles - 1h
+  candles_historical_1h: [
+    { keys: { symbol: 1, timestamp: 1 }, options: { unique: true } },
+    { keys: { symbol: 1 } },
+    { keys: { timestamp: 1 } },
+  ],
+  
+  // Historical candles - 4h
+  candles_historical_4h: [
+    { keys: { symbol: 1, timestamp: 1 }, options: { unique: true } },
+    { keys: { symbol: 1 } },
+    { keys: { timestamp: 1 } },
+  ],
+  
+  // Historical candles - 1d (daily)
+  candles_historical_1d: [
+    { keys: { symbol: 1, timestamp: 1 }, options: { unique: true } },
+    { keys: { symbol: 1 } },
+    { keys: { timestamp: 1 } },
   ],
   
   // Trading positions
