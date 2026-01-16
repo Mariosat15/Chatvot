@@ -227,6 +227,10 @@ export default function GameModeTradingPage({
               availableCapital={participant.availableCapital}
               defaultLeverage={defaultLeverage}
               currentBalance={participant.currentCapital}
+              currentEquity={equity}
+              usedMargin={participant.usedMargin}
+              openPositionsCount={positions.length}
+              maxPositions={10}
               disabled={isDisqualified}
             />
           </div>
