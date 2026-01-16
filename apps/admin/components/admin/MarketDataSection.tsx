@@ -359,6 +359,10 @@ export default function MarketDataSection() {
   const [seedRunning, setSeedRunning] = useState(false);
   const [seedResults, setSeedResults] = useState<SeedResult[] | null>(null);
   
+  // Cleanup options state
+  const [cleanupMode, setCleanupMode] = useState<'deleteOldest' | 'keepRecent'>('deleteOldest');
+  const [cleanupIncludeHistorical, setCleanupIncludeHistorical] = useState(true);
+  
   // Historical data download state
   const [historyDownloadRunning, setHistoryDownloadRunning] = useState(false);
   const [historyDownloadResults, setHistoryDownloadResults] = useState<SeedResult[] | null>(null);
@@ -438,11 +442,19 @@ export default function MarketDataSection() {
       const res = await fetch('/api/market-data/cleanup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ daysToKeep: settings.cleanup.daysToKeep }),
+        body: JSON.stringify({ 
+          days: settings.cleanup.daysToKeep,
+          mode: cleanupMode,
+          includeHistorical: cleanupIncludeHistorical,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
-        setMessage({ type: 'success', text: `Deleted ${data.cleanup.deletedCount} candles, freed ${data.cleanup.freedMB} MB` });
+        const collectionsCount = Object.keys(data.cleanup.collections || {}).length;
+        setMessage({ 
+          type: 'success', 
+          text: `Deleted ${data.cleanup.deletedCount.toLocaleString()} candles from ${collectionsCount} collections, freed ${data.cleanup.freedMB} MB` 
+        });
         fetchData();
       } else {
         setMessage({ type: 'error', text: 'Cleanup failed' });
@@ -742,7 +754,7 @@ export default function MarketDataSection() {
               {/* Header */}
               <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-800/50">
                 <h4 className="text-white font-semibold text-lg flex items-center gap-2">
-                  🗑️ Cleanup Old Data
+                  🗑️ Cleanup Data
                 </h4>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -755,11 +767,45 @@ export default function MarketDataSection() {
                 </label>
               </div>
               
-              <div className="space-y-5 flex-1">
-                {/* Settings Section */}
-                <div className="bg-gray-900/30 rounded-lg p-4 border border-gray-800/30">
+              <div className="space-y-4 flex-1">
+                {/* Cleanup Type Toggle */}
+                <div className="bg-gray-900/30 rounded-lg p-3 border border-gray-800/30">
+                  <div className="text-gray-400 text-xs mb-2">Cleanup Type</div>
+                  <div className="inline-flex bg-gray-900/50 rounded-lg p-0.5 border border-gray-800/50 w-full">
+                    <button
+                      onClick={() => setCleanupMode('deleteOldest')}
+                      className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+                        cleanupMode === 'deleteOldest'
+                          ? 'bg-red-600 text-white shadow-lg'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Delete Oldest
+                    </button>
+                    <button
+                      onClick={() => setCleanupMode('keepRecent')}
+                      className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+                        cleanupMode === 'keepRecent'
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Keep Recent
+                    </button>
+                  </div>
+                  <p className="text-gray-500 text-xs mt-2">
+                    {cleanupMode === 'deleteOldest' 
+                      ? '🗑️ Removes oldest data first (keeps DB size constant)'
+                      : '📅 Keeps last X days, deletes older'}
+                  </p>
+                </div>
+
+                {/* Days Input */}
+                <div className="bg-gray-900/30 rounded-lg p-3 border border-gray-800/30">
                   <div className="flex items-center gap-3">
-                    <span className="text-gray-400 text-sm">Keep data for</span>
+                    <span className="text-gray-400 text-sm">
+                      {cleanupMode === 'deleteOldest' ? 'Delete' : 'Keep'}
+                    </span>
                     <input
                       type="number"
                       min="0"
@@ -772,20 +818,29 @@ export default function MarketDataSection() {
                       className="bg-gray-800 text-white rounded-lg px-3 py-2 w-20 border border-gray-700 focus:border-blue-500 focus:outline-none text-center font-mono"
                     />
                     <span className="text-gray-400 text-sm">days</span>
-                    <span className="text-gray-600 text-sm ml-auto">
-                      ~{((settings.cleanup.daysToKeep * 9.5)).toFixed(0)} MB
-                    </span>
                   </div>
-                  {settings.cleanup.daysToKeep === 0 && (
-                    <p className="text-red-400 text-xs mt-3 flex items-center gap-1">
-                      <span>⚠️</span> Will delete ALL history!
-                    </p>
-                  )}
                 </div>
 
-                {/* Mode Toggle */}
+                {/* Include Historical Toggle */}
+                <div className="flex items-center justify-between bg-gray-900/30 rounded-lg p-3 border border-gray-800/30">
+                  <div>
+                    <div className="text-white text-sm">Include Historical</div>
+                    <div className="text-gray-500 text-xs">Clean 1m + all historical collections</div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cleanupIncludeHistorical}
+                      onChange={(e) => setCleanupIncludeHistorical(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
+                  </label>
+                </div>
+
+                {/* Auto/Manual Mode Toggle */}
                 <div className="flex items-center gap-3">
-                  <span className="text-gray-400 text-sm w-12">Mode</span>
+                  <span className="text-gray-400 text-sm w-16">Schedule</span>
                   <div className="inline-flex bg-gray-900/50 rounded-lg p-0.5 border border-gray-800/50">
                     <button
                       onClick={() => saveSettings({ cleanup: { ...settings.cleanup, mode: 'manual' } })}
