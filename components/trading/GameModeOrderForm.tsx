@@ -389,11 +389,13 @@ export default function GameModeOrderForm({
       <div className="p-4 grid grid-cols-2 gap-3">
         <button
           onClick={() => handleTrade('long')}
-          disabled={disabled || isSubmitting || !currentPrice}
+          disabled={!canPlaceOrder || isSubmitting || !currentPrice}
           className={cn(
             "py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2",
             "bg-gradient-to-r from-green-500 to-emerald-600 text-white",
-            "hover:from-green-400 hover:to-emerald-500 hover:shadow-lg hover:shadow-green-500/50",
+            canPlaceOrder 
+              ? "hover:from-green-400 hover:to-emerald-500 hover:shadow-lg hover:shadow-green-500/50"
+              : "opacity-50 cursor-not-allowed",
             "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
           )}
         >
@@ -409,11 +411,13 @@ export default function GameModeOrderForm({
         
         <button
           onClick={() => handleTrade('short')}
-          disabled={disabled || isSubmitting || !currentPrice}
+          disabled={!canPlaceOrder || isSubmitting || !currentPrice}
           className={cn(
             "py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2",
             "bg-gradient-to-r from-red-500 to-rose-600 text-white",
-            "hover:from-red-400 hover:to-rose-500 hover:shadow-lg hover:shadow-red-500/50",
+            canPlaceOrder
+              ? "hover:from-red-400 hover:to-rose-500 hover:shadow-lg hover:shadow-red-500/50"
+              : "opacity-50 cursor-not-allowed",
             "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
           )}
         >

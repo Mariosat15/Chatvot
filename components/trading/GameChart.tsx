@@ -57,6 +57,13 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [hoverData, setHoverData] = useState<{
+    time: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+  } | null>(null);
   
   // Chart refs
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -144,20 +151,23 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         secondsVisible: timeframe === '1',
         tickMarkFormatter: (time: UTCTimestamp) => {
           const date = new Date(time * 1000);
+          const day = date.getUTCDate().toString().padStart(2, '0');
+          const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
           const hours = date.getUTCHours().toString().padStart(2, '0');
           const minutes = date.getUTCMinutes().toString().padStart(2, '0');
-          return `${hours}:${minutes}`;
+          return `${day}/${month} ${hours}:${minutes}`;
         },
       },
       localization: {
         priceFormatter: (price: number) => formatPrice(price, symbol),
         timeFormatter: (time: number) => {
           const date = new Date(time * 1000);
-          return date.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: false,
-          });
+          const day = date.getUTCDate().toString().padStart(2, '0');
+          const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+          const year = date.getUTCFullYear();
+          const hours = date.getUTCHours().toString().padStart(2, '0');
+          const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+          return `${day}/${month}/${year} ${hours}:${minutes}`;
         },
       },
       handleScroll: { vertTouchDrag: false },
@@ -214,6 +224,35 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         title: '⬆ ASK',
       });
     }
+    
+    // Subscribe to crosshair move for OHLC tooltip
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.time || !param.seriesData || param.seriesData.size === 0) {
+        setHoverData(null);
+        return;
+      }
+      
+      const data = param.seriesData.get(candlestickSeriesRef.current!);
+      if (data && 'open' in data) {
+        setHoverData({
+          time: param.time as number,
+          open: data.open,
+          high: data.high,
+          low: data.low,
+          close: data.close,
+        });
+      } else if (data && 'value' in data) {
+        // Line chart - only has value
+        const value = (data as any).value;
+        setHoverData({
+          time: param.time as number,
+          open: value,
+          high: value,
+          low: value,
+          close: value,
+        });
+      }
+    });
     
     // Handle resize
     const handleResize = () => {
@@ -646,6 +685,43 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
           ref={chartContainerRef} 
           className="absolute inset-0 game-chart-glow"
         />
+        
+        {/* OHLC Tooltip on Hover */}
+        {hoverData && (
+          <div className="absolute top-2 left-2 z-20 bg-[#1a1025]/95 border border-purple-500/50 rounded-lg p-2 pointer-events-none backdrop-blur-sm">
+            <div className="text-[10px] text-purple-300 mb-1 font-bold">
+              {(() => {
+                const date = new Date(hoverData.time * 1000);
+                const day = date.getUTCDate().toString().padStart(2, '0');
+                const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+                const year = date.getUTCFullYear();
+                const hours = date.getUTCHours().toString().padStart(2, '0');
+                const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+                return `📅 ${day}/${month}/${year} ${hours}:${minutes}`;
+              })()}
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] font-mono">
+              <div className="flex justify-between">
+                <span className="text-gray-400">O:</span>
+                <span className="text-white">{formatPrice(hoverData.open, symbol)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">H:</span>
+                <span className="text-green-400">{formatPrice(hoverData.high, symbol)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">L:</span>
+                <span className="text-red-400">{formatPrice(hoverData.low, symbol)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">C:</span>
+                <span className={hoverData.close >= hoverData.open ? "text-green-400" : "text-red-400"}>
+                  {formatPrice(hoverData.close, symbol)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Animated neon border effect */}
         <div className="absolute inset-0 pointer-events-none rounded-lg game-chart-border" />
