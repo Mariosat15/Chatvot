@@ -256,7 +256,7 @@ export default function GameModeTradingPage({
                     marginLevel < (marginThresholds?.WARNING || 300) ? "text-yellow-400" :
                     "text-green-400"
                   )}>
-                    {Number.isFinite(marginLevel) ? `${marginLevel.toFixed(0)}%` : '∞'}
+                    {Number.isFinite(marginLevel) ? `${marginLevel.toFixed(1)}%` : '∞'}
                   </div>
                 </div>
                 

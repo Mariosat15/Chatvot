@@ -163,7 +163,7 @@ export function MarginStatusIndicator({
                 )}
               >
                 {Number.isFinite(marginLevel)
-                  ? `${marginLevel.toFixed(0)}%`
+                  ? `${marginLevel.toFixed(1)}%`
                   : 'N/A'}
               </p>
             </div>
