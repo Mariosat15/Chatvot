@@ -83,21 +83,21 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
 
   const pipValue = FOREX_PAIRS[position.symbol].pip;
 
-  // Calculate TP price from pips
+  // Calculate TP price from pips (rounded to avoid floating point issues)
   const calculateTPFromPips = (pips: number): number => {
     if (position.side === 'long') {
-      return position.entryPrice + (pips * pipValue);
+      return Math.round((position.entryPrice + (pips * pipValue)) * 100000) / 100000;
     } else {
-      return position.entryPrice - (pips * pipValue);
+      return Math.round((position.entryPrice - (pips * pipValue)) * 100000) / 100000;
     }
   };
 
-  // Calculate SL price from pips
+  // Calculate SL price from pips (rounded to avoid floating point issues)
   const calculateSLFromPips = (pips: number): number => {
     if (position.side === 'long') {
-      return position.entryPrice - (pips * pipValue);
+      return Math.round((position.entryPrice - (pips * pipValue)) * 100000) / 100000;
     } else {
-      return position.entryPrice + (pips * pipValue);
+      return Math.round((position.entryPrice + (pips * pipValue)) * 100000) / 100000;
     }
   };
 

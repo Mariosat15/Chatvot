@@ -230,18 +230,20 @@ const OrderForm = ({
   const pipValue = FOREX_PAIRS[symbol].pip;
   
   const calculateTPFromPips = (pips: number): number => {
+    // Round to 5 decimal places to avoid floating point precision issues
     if (side === 'buy') {
-      return displayPrice + (pips * pipValue);
+      return Math.round((displayPrice + (pips * pipValue)) * 100000) / 100000;
     } else {
-      return displayPrice - (pips * pipValue);
+      return Math.round((displayPrice - (pips * pipValue)) * 100000) / 100000;
     }
   };
 
   const calculateSLFromPips = (pips: number): number => {
+    // Round to 5 decimal places to avoid floating point precision issues
     if (side === 'buy') {
-      return displayPrice - (pips * pipValue);
+      return Math.round((displayPrice - (pips * pipValue)) * 100000) / 100000;
     } else {
-      return displayPrice + (pips * pipValue);
+      return Math.round((displayPrice + (pips * pipValue)) * 100000) / 100000;
     }
   };
 
