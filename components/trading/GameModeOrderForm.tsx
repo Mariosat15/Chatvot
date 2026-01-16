@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
 import { usePrices } from '@/contexts/PriceProvider';
 import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
-import { openPosition } from '@/lib/actions/trading/position.actions';
+import { placeOrder } from '@/lib/actions/trading/order.actions';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { Loader2, TrendingUp, TrendingDown, Shield, Zap } from 'lucide-react';
@@ -67,7 +67,7 @@ export default function GameModeOrderForm({
   };
   
   // Handle trade execution
-  const handleTrade = async (side: 'long' | 'short') => {
+  const handleTrade = async (direction: 'long' | 'short') => {
     if (disabled || !currentPrice || isSubmitting) return;
     
     if (marginRequired > availableCapital) {
@@ -80,22 +80,31 @@ export default function GameModeOrderForm({
     setIsSubmitting(true);
     
     try {
-      const tp = useTp ? calculateTPFromPips(side, tpPips) : undefined;
-      const sl = useSl ? calculateSLFromPips(side, slPips) : undefined;
+      const tp = useTp ? calculateTPFromPips(direction, tpPips) : undefined;
+      const sl = useSl ? calculateSLFromPips(direction, slPips) : undefined;
       
-      const result = await openPosition({
+      // Convert long/short to buy/sell for the API
+      const side = direction === 'long' ? 'buy' : 'sell';
+      
+      const result = await placeOrder({
         competitionId,
-        symbol,
+        symbol: symbol as ForexSymbol,
         side,
+        orderType: 'market',
         quantity: lotSize,
         leverage,
         takeProfit: tp,
         stopLoss: sl,
+        lockedPrice: {
+          bid: currentPrice.bid,
+          ask: currentPrice.ask,
+          timestamp: Date.now(),
+        },
       });
       
       if (result.success) {
-        toast.success(side === 'long' ? '🚀 Attack launched!' : '🛡️ Defense deployed!', {
-          description: `${side === 'long' ? 'LONG' : 'SHORT'} position opened on ${symbol}`,
+        toast.success(direction === 'long' ? '🚀 Attack launched!' : '🛡️ Defense deployed!', {
+          description: `${direction === 'long' ? 'LONG' : 'SHORT'} position opened on ${symbol}`,
         });
       } else {
         toast.error('❌ Trade failed!', {
