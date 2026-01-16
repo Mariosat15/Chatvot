@@ -28,7 +28,6 @@ import CompetitionStatusMonitor from '@/components/trading/CompetitionStatusMoni
 import ParticipantStatusMonitor from '@/components/trading/ParticipantStatusMonitor';
 import TradingArsenalPanel from '@/components/trading/TradingArsenalPanel';
 import TradingPageContent from '@/components/trading/TradingPageContent';
-import ModeToggle from '@/components/trading/ModeToggle';
 import { ArrowLeft, Skull, Ban, History } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -249,9 +248,6 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                     </div>
                   </div>
                 </div>
-                
-                {/* Mode Toggle - Professional/Game */}
-                <ModeToggle />
               </div>
 
               {/* Competition Info Header */}

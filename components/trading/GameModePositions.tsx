@@ -28,13 +28,21 @@ export default function GameModePositions({ positions, competitionId }: GameMode
   const { prices } = usePrices();
   const [closingId, setClosingId] = useState<string | null>(null);
   
-  const handleClose = async (positionId: string) => {
+  const handleClose = async (positionId: string, symbol: string) => {
     setClosingId(positionId);
     try {
-      const result = await closePosition(positionId, competitionId);
+      // Get current price for locked execution
+      const currentPrice = prices.get(symbol);
+      const lockedPrice = currentPrice ? {
+        bid: currentPrice.bid,
+        ask: currentPrice.ask,
+        timestamp: Date.now(),
+      } : undefined;
+      
+      const result = await closePosition(positionId, lockedPrice);
       if (result.success) {
-        toast.success('🏆 Battle complete!', {
-          description: `Position closed successfully!`,
+        toast.success('✅ Position Closed!', {
+          description: result.message || 'Position closed successfully!',
         });
       } else {
         toast.error('❌ Failed to close!', {
@@ -53,8 +61,8 @@ export default function GameModePositions({ positions, competitionId }: GameMode
   if (positions.length === 0) {
     return (
       <div className="bg-dark-400/30 rounded-xl p-6 border border-dark-300 text-center">
-        <div className="text-4xl mb-3">⚔️</div>
-        <h3 className="text-gray-400 font-medium mb-1">No Active Battles</h3>
+        <div className="text-4xl mb-3">📊</div>
+        <h3 className="text-gray-400 font-medium mb-1">No Open Positions</h3>
         <p className="text-gray-500 text-sm">Open a position to start trading!</p>
       </div>
     );
@@ -98,7 +106,7 @@ export default function GameModePositions({ positions, competitionId }: GameMode
               </div>
               
               <button
-                onClick={() => handleClose(position._id)}
+                onClick={() => handleClose(position._id, position.symbol)}
                 disabled={closingId === position._id}
                 className="p-1.5 bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg transition-colors"
               >
@@ -125,7 +133,7 @@ export default function GameModePositions({ positions, competitionId }: GameMode
                   "font-bold",
                   isProfit ? "text-green-400" : "text-red-400"
                 )}>
-                  {isProfit ? '+' : ''}{pnl.toFixed(2)}
+                  {isProfit ? '+' : ''}${pnl.toFixed(2)}
                 </div>
               </div>
             </div>
