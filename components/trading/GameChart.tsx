@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, memo } from 'react';
+import { flushSync } from 'react-dom';
 import { TrendingUp, TrendingDown, Star, Zap, Trophy, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePrices } from '@/contexts/PriceProvider';
@@ -110,10 +111,13 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
               );
               
               if (priceData) {
-                setWsPrice({
-                  bid: priceData.bid,
-                  ask: priceData.ask,
-                  mid: (priceData.bid + priceData.ask) / 2,
+                // Use flushSync to force IMMEDIATE update (bypass React batching)
+                flushSync(() => {
+                  setWsPrice({
+                    bid: priceData.bid,
+                    ask: priceData.ask,
+                    mid: (priceData.bid + priceData.ask) / 2,
+                  });
                 });
               }
             }
@@ -829,6 +833,20 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
           ref={canvasRef}
           className="w-full h-[400px] sm:h-[450px] md:h-[500px] rounded-lg"
         />
+        
+        {/* REAL-TIME PRICE OVERLAY - Updates independently of canvas */}
+        {currentPrice && (
+          <div 
+            className="absolute right-6 md:right-8 top-1/2 transform -translate-y-1/2 z-10 pointer-events-none"
+          >
+            <div className={cn(
+              "px-2 py-1 rounded text-xs md:text-sm font-bold font-mono shadow-lg animate-pulse",
+              isGoingUp ? "bg-green-500 text-white" : "bg-red-500 text-white"
+            )}>
+              {currentPrice.mid.toFixed(5)}
+            </div>
+          </div>
+        )}
         
         {/* Chart Legend - MOBILE HIDDEN */}
         {chartType === 'candle' && (
