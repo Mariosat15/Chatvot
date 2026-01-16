@@ -307,6 +307,9 @@ const server = createServer(async (req, res) => {
               const allCandles5m = data.formingCandles5m || [];
               const allCandles15m = data.formingCandles15m || [];
               const allCandles30m = data.formingCandles30m || [];
+              const allCandles1h = data.formingCandles1h || [];
+              const allCandles4h = data.formingCandles4h || [];
+              const allCandlesD = data.formingCandlesD || [];
               const timestamp = Date.now();
               
               // OPTIMIZATION 2: Pre-stringify for unsubscribed clients (stringify once, use many)
@@ -332,6 +335,9 @@ const server = createServer(async (req, res) => {
                         formingCandles5m: allCandles5m.filter((c: {symbol: string}) => subs.has(c.symbol)),
                         formingCandles15m: allCandles15m.filter((c: {symbol: string}) => subs.has(c.symbol)),
                         formingCandles30m: allCandles30m.filter((c: {symbol: string}) => subs.has(c.symbol)),
+                        formingCandles1h: allCandles1h.filter((c: {symbol: string}) => subs.has(c.symbol)),
+                        formingCandles4h: allCandles4h.filter((c: {symbol: string}) => subs.has(c.symbol)),
+                        formingCandlesD: allCandlesD.filter((c: {symbol: string}) => subs.has(c.symbol)),
                         timestamp,
                       },
                     };
@@ -348,6 +354,9 @@ const server = createServer(async (req, res) => {
                           formingCandles5m: allCandles5m,
                           formingCandles15m: allCandles15m,
                           formingCandles30m: allCandles30m,
+                          formingCandles1h: allCandles1h,
+                          formingCandles4h: allCandles4h,
+                          formingCandlesD: allCandlesD,
                           timestamp,
                         },
                       });

@@ -88,6 +88,9 @@ interface WebSocketGlobalState {
   formingCandles5m: Map<string, CachedFormingCandle>;
   formingCandles15m: Map<string, CachedFormingCandle>;
   formingCandles30m: Map<string, CachedFormingCandle>;
+  formingCandles1h: Map<string, CachedFormingCandle>;
+  formingCandles4h: Map<string, CachedFormingCandle>;
+  formingCandlesD: Map<string, CachedFormingCandle>;
   changedSymbols: Set<string>; // Track symbols that changed since last broadcast
   lastUpdateTime: number;
   initialized: boolean;
@@ -124,6 +127,9 @@ function getGlobalState(): WebSocketGlobalState {
       formingCandles5m: new Map<string, CachedFormingCandle>(),
       formingCandles15m: new Map<string, CachedFormingCandle>(),
       formingCandles30m: new Map<string, CachedFormingCandle>(),
+      formingCandles1h: new Map<string, CachedFormingCandle>(),
+      formingCandles4h: new Map<string, CachedFormingCandle>(),
+      formingCandlesD: new Map<string, CachedFormingCandle>(),
       changedSymbols: new Set<string>(),
       lastUpdateTime: 0,
       initialized: false,
@@ -835,6 +841,64 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
     existing30m.low = Math.min(existing30m.low, price);
     existing30m.close = price;
   }
+  
+  // Update 1h cache
+  const period1h = Math.floor(currentTime / 3600) * 3600; // 1 hour = 3600 sec
+  const existing1h = state.formingCandles1h.get(symbol);
+  
+  if (!existing1h || existing1h.periodStart !== period1h) {
+    state.formingCandles1h.set(symbol, {
+      symbol,
+      periodStart: period1h,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+    });
+  } else {
+    existing1h.high = Math.max(existing1h.high, price);
+    existing1h.low = Math.min(existing1h.low, price);
+    existing1h.close = price;
+  }
+  
+  // Update 4h cache
+  const period4h = Math.floor(currentTime / 14400) * 14400; // 4 hours = 14400 sec
+  const existing4h = state.formingCandles4h.get(symbol);
+  
+  if (!existing4h || existing4h.periodStart !== period4h) {
+    state.formingCandles4h.set(symbol, {
+      symbol,
+      periodStart: period4h,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+    });
+  } else {
+    existing4h.high = Math.max(existing4h.high, price);
+    existing4h.low = Math.min(existing4h.low, price);
+    existing4h.close = price;
+  }
+  
+  // Update Daily cache (day starts at 00:00 UTC)
+  const now = new Date(currentTime * 1000);
+  const periodD = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000);
+  const existingD = state.formingCandlesD.get(symbol);
+  
+  if (!existingD || existingD.periodStart !== periodD) {
+    state.formingCandlesD.set(symbol, {
+      symbol,
+      periodStart: periodD,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+    });
+  } else {
+    existingD.high = Math.max(existingD.high, price);
+    existingD.low = Math.min(existingD.low, price);
+    existingD.close = price;
+  }
 }
 
 /**
@@ -1523,6 +1587,15 @@ async function broadcastFormingCandles(): Promise<void> {
   const formingCandles30m = Array.from(state.formingCandles30m.values())
     .filter(c => changedSymbols.has(c.symbol));
   
+  const formingCandles1h = Array.from(state.formingCandles1h.values())
+    .filter(c => changedSymbols.has(c.symbol));
+  
+  const formingCandles4h = Array.from(state.formingCandles4h.values())
+    .filter(c => changedSymbols.has(c.symbol));
+  
+  const formingCandlesD = Array.from(state.formingCandlesD.values())
+    .filter(c => changedSymbols.has(c.symbol));
+  
   const prices = Array.from(state.priceCache.values())
     .filter(p => changedSymbols.has(p.symbol));
   
@@ -1585,6 +1658,36 @@ async function broadcastFormingCandles(): Promise<void> {
           low: c.low,
           close: c.close,
           timeframe: '30m',
+        })),
+        // 1h forming candles (from cache - no calculation)
+        formingCandles1h: formingCandles1h.map(c => ({
+          symbol: c.symbol,
+          time: c.periodStart,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          timeframe: '1h',
+        })),
+        // 4h forming candles (from cache - no calculation)
+        formingCandles4h: formingCandles4h.map(c => ({
+          symbol: c.symbol,
+          time: c.periodStart,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          timeframe: '4h',
+        })),
+        // Daily forming candles (from cache - no calculation)
+        formingCandlesD: formingCandlesD.map(c => ({
+          symbol: c.symbol,
+          time: c.periodStart,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          timeframe: 'D',
         })),
       }),
     });
