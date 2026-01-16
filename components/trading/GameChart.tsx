@@ -126,6 +126,18 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
     loadHistoricalCandles();
   }, [symbol, visibleCandles, timeframe]);
 
+  // Get interval in milliseconds for the selected timeframe
+  const getTimeframeIntervalMs = useMemo(() => {
+    const intervals: Record<string, number> = {
+      '1m': 60000,      // 1 minute
+      '5m': 300000,     // 5 minutes
+      '15m': 900000,    // 15 minutes
+      '30m': 1800000,   // 30 minutes
+      '1h': 3600000,    // 1 hour
+    };
+    return intervals[timeframe] || 60000;
+  }, [timeframe]);
+
   // Update current candle with real-time price ticks (throttled for performance)
   useEffect(() => {
     const latestPrice = prices.get(symbol);
@@ -149,26 +161,30 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
     }
     lastPriceRef.current = mid;
 
-    // Update candles (throttled)
+    // Update candles (throttled) - use timeframe interval for candle boundaries
+    const intervalMs = getTimeframeIntervalMs;
+    
     setCandles((prev) => {
       if (prev.length === 0) return prev;
       
       const newCandles = [...prev];
       const lastCandle = newCandles[newCandles.length - 1];
-      const currentMinute = Math.floor(now / 60000) * 60000;
-      const lastCandleMinute = Math.floor(lastCandle.time / 60000) * 60000;
+      
+      // Calculate current candle boundary based on timeframe interval
+      const currentPeriod = Math.floor(now / intervalMs) * intervalMs;
+      const lastCandlePeriod = Math.floor(lastCandle.time / intervalMs) * intervalMs;
 
-      // If we're in the same minute, update the last candle
-      if (currentMinute === lastCandleMinute) {
+      // If we're in the same period, update the last candle
+      if (currentPeriod === lastCandlePeriod) {
         lastCandle.high = Math.max(lastCandle.high, ask);
         lastCandle.low = Math.min(lastCandle.low, bid);
         lastCandle.close = mid;
         lastCandle.isUp = lastCandle.close >= lastCandle.open;
       } else {
-        // New minute, create a new candle
+        // New period, create a new candle
         const previousClose = lastCandle.close;
         const newCandle: Candle = {
-          time: currentMinute,
+          time: currentPeriod,
           open: mid,
           high: ask,
           low: bid,
@@ -187,7 +203,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
       return newCandles;
     });
     // Note: setCandles triggers re-render automatically, no forceUpdate needed
-  }, [prices, symbol, candles.length, visibleCandles]);
+  }, [prices, symbol, candles.length, visibleCandles, getTimeframeIntervalMs]);
 
   // Draw gaming candles
   useEffect(() => {
@@ -447,18 +463,20 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
       }
     });
 
-    // Draw current price line with "NOW" indicator
-    if (candles.length > 0) {
+    // Draw current price line with "NOW" indicator - use LIVE price from PriceProvider
+    if (candles.length > 0 && currentPrice) {
       const lastCandle = candles[candles.length - 1];
-      const yPrice = paddingTop + chartHeight - ((lastCandle.close - minPrice) / priceRange) * chartHeight;
+      // Use actual current mid price for the price line, not lastCandle.close
+      const livePrice = currentPrice.mid;
+      const yPrice = paddingTop + chartHeight - ((livePrice - minPrice) / priceRange) * chartHeight;
       
-      // Determine color based on comparison with previous candle
+      // Determine color based on price direction
       let lineColor = '#6b7280'; // Default gray
       if (candles.length > 1) {
         const prevCandle = candles[candles.length - 2];
-        lineColor = lastCandle.close > prevCandle.close ? '#22c55e' : '#ef4444';
+        lineColor = livePrice > prevCandle.close ? '#22c55e' : '#ef4444';
       } else {
-        lineColor = lastCandle.isUp ? '#22c55e' : '#ef4444';
+        lineColor = livePrice >= lastCandle.open ? '#22c55e' : '#ef4444';
       }
       
       // Current price line - THIN & SUBTLE
@@ -474,11 +492,11 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
       ctx.setLineDash([]);
       ctx.shadowBlur = 0;
       
-      // Price label on the right (transparent background)
+      // Price label on the right - show LIVE price
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'left';
       ctx.fillStyle = lineColor;
-      ctx.fillText(lastCandle.close.toFixed(5), rect.width - paddingRight + 5, yPrice + 4);
+      ctx.fillText(livePrice.toFixed(5), rect.width - paddingRight + 5, yPrice + 4);
       
       // Time indicator at bottom showing "NOW" for the rightmost candle
       const lastCandleX = paddingLeft + (candles.length - 1) * candleSpacing + candleSpacing / 2;
@@ -522,7 +540,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
       ctx.fillText(`${month}/${day}`, x, yDate);
       ctx.fillStyle = '#d1d5db'; // Reset color
     }
-  }, [candles, hasPositions, totalPnL, symbolPositions, entryPrice, positionSide, visibleCandles, chartType, timeframe]);
+  }, [candles, hasPositions, totalPnL, symbolPositions, entryPrice, positionSide, visibleCandles, chartType, timeframe, currentPrice]);
 
   const lastCandle = candles.length > 0 ? candles[candles.length - 1] : null;
   const isGoingUp = lastCandle?.isUp ?? false;
