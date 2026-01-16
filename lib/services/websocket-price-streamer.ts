@@ -216,7 +216,10 @@ async function flushPricesToMongo(): Promise<void> {
     
     // Debug: Log occasionally (every ~10 seconds)
     if (Math.random() < 0.1) {
-      console.log(`📦 [MongoDB Cache] Wrote ${updates.length} prices to cache`);
+      // Log only occasionally (1% of writes)
+      if (Math.random() < 0.01) {
+        console.log(`📦 MongoDB cache: ${updates.length} prices`);
+      }
     }
   } catch (error) {
     // Don't log every error - just occasionally
@@ -242,8 +245,6 @@ async function loadSymbolSpreadSettings(): Promise<void> {
     return;
   }
   
-  console.log(`📊 [Symbol Settings] Loading settings from database...`);
-  
   try {
     const { connectToDatabase } = await import('@/database/mongoose');
     const mongoose = await import('mongoose');
@@ -253,14 +254,8 @@ async function loadSymbolSpreadSettings(): Promise<void> {
     // Get TradingSymbol collection directly (it's in the main database)
     const db = mongoose.default.connection.db;
     if (!db) {
-      console.error('⚠️ [Symbol Settings] No database connection');
       return;
     }
-    
-    // List all collections to find the correct one
-    const collections = await db.listCollections().toArray();
-    const collectionNames = collections.map(c => c.name);
-    console.log(`📊 [Symbol Settings] Available collections:`, collectionNames.filter(n => n.includes('symbol') || n.includes('trading')));
     
     // Try different collection names
     let symbols: unknown[] = [];
@@ -270,7 +265,6 @@ async function loadSymbolSpreadSettings(): Promise<void> {
       try {
         symbols = await db.collection(collName).find({}).toArray();
         if (symbols.length > 0) {
-          console.log(`📊 [Symbol Settings] Found ${symbols.length} symbols in collection: ${collName}`);
           break;
         }
       } catch {
@@ -292,19 +286,11 @@ async function loadSymbolSpreadSettings(): Promise<void> {
           pip: (sym.pip as number) || 0.0001,
         });
         
-        // Log each symbol with fixed spread enabled
-        if (sym.useFixedSpread) {
-          console.log(`  ✅ ${sym.symbol}: Fixed spread ${sym.defaultSpread} pips (pip=${sym.pip})`);
-        }
       }
     }
     
     symbolSettingsLoaded = true;
     symbolSettingsLoadTime = now;
-    
-    // Log fixed spread symbols
-    const fixedCount = Array.from(state.symbolSpreadSettings.values()).filter(s => s.useFixedSpread).length;
-    console.log(`📊 [Symbol Settings] Loaded ${symbols.length} symbols, ${fixedCount} using fixed spread`);
   } catch (error) {
     // ALWAYS log errors for debugging
     console.error('⚠️ [Symbol Settings] Failed to load:', error);
@@ -630,10 +616,9 @@ function handleQuoteMessage(msg: {
   
   if (rawBid === undefined || rawAsk === undefined) return;
 
-  // CRITICAL: Validate bid < ask (reject invalid data)
+  // CRITICAL: Validate bid < ask (reject invalid data silently)
   if (rawBid >= rawAsk) {
-    console.warn(`⚠️ Invalid quote for ${symbol}: bid (${rawBid}) >= ask (${rawAsk}) - skipping`);
-    return;
+    return; // Skip invalid quotes without logging
   }
 
   // Calculate mid price (always from real data)
@@ -659,7 +644,7 @@ function handleQuoteMessage(msg: {
     
     // Debug log (occasionally)
     if (Math.random() < 0.01) {
-      console.log(`🔧 [Fixed Spread] ${symbol}: mid=${mid.toFixed(5)}, spread=${spreadSettings.defaultSpread}pip, bid=${bid.toFixed(5)}, ask=${ask.toFixed(5)}`);
+      // Fixed spread applied (no logging - too noisy)
     }
   } else {
     // VARIABLE SPREAD: Use raw bid/ask from Massive.com
