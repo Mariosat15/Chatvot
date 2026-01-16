@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
 import { usePrices } from '@/contexts/PriceProvider';
 import { useTradingMode } from './TradingInterface';
@@ -11,8 +10,8 @@ import GameChart from './GameChart';
 import GameModeOrderForm from './GameModeOrderForm';
 import GameModeStatsPanel from './GameModeStatsPanel';
 import GameModePositions from './GameModePositions';
-import GameMarketWatch from './GameMarketWatch';
-import { ArrowLeft, Users, Swords, Monitor, Gamepad2, TrendingUp, TrendingDown } from 'lucide-react';
+import GameMarketWatchSidebar from './GameMarketWatchSidebar';
+import { ArrowLeft, Users, Swords, Monitor, Gamepad2 } from 'lucide-react';
 
 interface Position {
   _id: string;
@@ -62,8 +61,7 @@ export default function GameModeTradingPage({
   isDisqualified = false,
 }: GameModeTradingPageProps) {
   const { symbol } = useChartSymbol();
-  const { prices, marketOpen } = usePrices();
-  const [showMarketWatch, setShowMarketWatch] = useState(false);
+  const { marketOpen } = usePrices();
   
   const equity = participant.currentCapital + participant.unrealizedPnl;
   const marginLevel = participant.usedMargin > 0 
@@ -76,10 +74,6 @@ export default function GameModeTradingPage({
   const timeRemaining = endTime.getTime() - now.getTime();
   const daysRemaining = Math.max(0, Math.floor(timeRemaining / (1000 * 60 * 60 * 24)));
   const hoursRemaining = Math.max(0, Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
-  
-  // Get current price for display
-  const currentPrice = prices.get(symbol);
-  const decimals = symbol.includes('JPY') ? 3 : 5;
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f0f1a] via-[#1a1a2e] to-[#16213e]">
@@ -146,53 +140,6 @@ export default function GameModeTradingPage({
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
           {/* Left Column - Chart & Positions */}
           <div className="xl:col-span-8 space-y-4">
-            {/* Symbol Display Card - Click to open Market Watch */}
-            <button
-              onClick={() => setShowMarketWatch(true)}
-              className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-2xl border-2 border-purple-500/50 hover:border-purple-500 transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-2xl shadow-lg shadow-purple-500/30">
-                  🎮
-                </div>
-                <div className="text-left">
-                  <div className="text-white font-bold text-2xl">{symbol}</div>
-                  <div className="text-purple-300 text-xs">Click to change pair</div>
-                </div>
-              </div>
-              
-              {/* Live Price Display */}
-              {currentPrice && (
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <div className="text-gray-400 text-xs mb-1">BID</div>
-                    <div className="flex items-center gap-2">
-                      <TrendingDown className="w-4 h-4 text-red-400" />
-                      <span className="text-white font-mono font-bold text-xl">
-                        {currentPrice.bid.toFixed(decimals)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="w-px h-10 bg-purple-500/30" />
-                  <div className="text-right">
-                    <div className="text-gray-400 text-xs mb-1">ASK</div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-mono font-bold text-xl">
-                        {currentPrice.ask.toFixed(decimals)}
-                      </span>
-                      <TrendingUp className="w-4 h-4 text-green-400" />
-                    </div>
-                  </div>
-                  <div className="hidden sm:block px-3 py-1 bg-purple-500/20 rounded-lg">
-                    <div className="text-gray-400 text-xs">Spread</div>
-                    <div className="text-purple-400 font-bold">
-                      {((currentPrice.ask - currentPrice.bid) / (symbol.includes('JPY') ? 0.01 : 0.0001)).toFixed(1)} pips
-                    </div>
-                  </div>
-                </div>
-              )}
-            </button>
-            
             {/* Chart */}
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 overflow-hidden shadow-2xl shadow-purple-500/10">
               <GameChart 
@@ -213,6 +160,9 @@ export default function GameModeTradingPage({
           
           {/* Right Column - Trading Interface & Stats */}
           <div className="xl:col-span-4 space-y-4">
+            {/* Market Watch Sidebar */}
+            <GameMarketWatchSidebar />
+            
             {/* Stats Panel */}
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 p-4">
               <div className="flex items-center gap-2 mb-4">
@@ -246,11 +196,6 @@ export default function GameModeTradingPage({
         </div>
       </div>
       
-      {/* Market Watch Modal */}
-      <GameMarketWatch 
-        isOpen={showMarketWatch} 
-        onClose={() => setShowMarketWatch(false)} 
-      />
     </div>
   );
 }
