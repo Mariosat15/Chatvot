@@ -2301,6 +2301,185 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     return () => clearInterval(intervalId);
   }, [symbol, timeframe, chartType, priceUpdateMode, pollingIntervalMs]);
 
+  // ==== CLIENT-SIDE FORMING CANDLE FOR HIGHER TIMEFRAMES (1h, 4h, D) ====
+  // These timeframes use client-side calculation instead of server broadcast
+  // Historical data comes from MongoDB, forming candle calculated from price stream
+  useEffect(() => {
+    if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
+    
+    // Only for higher timeframes (1h, 4h, D)
+    const isOneHour = timeframe === '60' || (timeframe as string) === '1h';
+    const isFourHour = timeframe === '240' || (timeframe as string) === '4h';
+    const isDaily = timeframe === 'D' || (timeframe as string) === '1d' || (timeframe as string) === 'D';
+    
+    if (!isOneHour && !isFourHour && !isDaily) return;
+    
+    // Calculate period start time based on timeframe
+    const getPeriodStart = (): number => {
+      const now = new Date();
+      if (isDaily) {
+        // Start of today UTC
+        return Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000);
+      } else if (isFourHour) {
+        // Start of current 4h block
+        const hour = now.getUTCHours();
+        const block = Math.floor(hour / 4) * 4;
+        return Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), block) / 1000);
+      } else {
+        // Start of current hour
+        return Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours()) / 1000);
+      }
+    };
+    
+    // Local forming candle state
+    let formingCandle: { time: number; open: number; high: number; low: number; close: number } | null = null;
+    let currentPeriodStart = getPeriodStart();
+    
+    // Initialize forming candle from current candle ref (last historical close)
+    if (currentCandleRef.current) {
+      const lastClose = currentCandleRef.current.close;
+      formingCandle = {
+        time: currentPeriodStart,
+        open: lastClose,
+        high: lastClose,
+        low: lastClose,
+        close: lastClose,
+      };
+    }
+    
+    // Update chart with forming candle
+    const updateFormingCandle = (bid: number) => {
+      if (!isMountedRef.current || !chartRef.current || !candlestickSeriesRef.current) return;
+      
+      // Check if period changed (new hour/4h/day)
+      const newPeriodStart = getPeriodStart();
+      if (newPeriodStart !== currentPeriodStart) {
+        // New period started - reset forming candle
+        currentPeriodStart = newPeriodStart;
+        formingCandle = {
+          time: currentPeriodStart,
+          open: bid,
+          high: bid,
+          low: bid,
+          close: bid,
+        };
+      } else if (formingCandle) {
+        // Same period - update high/low/close
+        formingCandle.high = Math.max(formingCandle.high, bid);
+        formingCandle.low = Math.min(formingCandle.low, bid);
+        formingCandle.close = bid;
+      } else {
+        // First tick - initialize
+        formingCandle = {
+          time: currentPeriodStart,
+          open: bid,
+          high: bid,
+          low: bid,
+          close: bid,
+        };
+      }
+      
+      // Update chart
+      if (formingCandle) {
+        if (chartType === 'line') {
+          (candlestickSeriesRef.current as any).update({
+            time: formingCandle.time as UTCTimestamp,
+            value: formingCandle.close,
+          });
+        } else {
+          candlestickSeriesRef.current?.update({
+            time: formingCandle.time as UTCTimestamp,
+            open: formingCandle.open,
+            high: formingCandle.high,
+            low: formingCandle.low,
+            close: formingCandle.close,
+          });
+        }
+        currentCandleRef.current = {
+          time: formingCandle.time as UTCTimestamp,
+          open: formingCandle.open,
+          high: formingCandle.high,
+          low: formingCandle.low,
+          close: formingCandle.close,
+        };
+      }
+    };
+    
+    // Connect to WebSocket for price updates
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws?token=price-viewer&type=user`;
+    
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let isCleanedUp = false;
+    
+    const connect = () => {
+      if (isCleanedUp) return;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = () => {
+          // Subscribe to our symbol
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'subscribe_symbol', symbol }));
+          }
+        };
+        
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            if (message.type === 'price_update' && message.data?.prices) {
+              const price = message.data.prices.find((p: { symbol: string }) => p.symbol === symbol);
+              if (price?.bid) {
+                updateFormingCandle(price.bid);
+                
+                // Also update bid/ask lines
+                if (bidPriceLineRef.current && askPriceLineRef.current) {
+                  bidPriceLineRef.current.applyOptions({
+                    price: price.bid,
+                    title: `BID ${price.bid.toFixed(5)}`,
+                  });
+                  askPriceLineRef.current.applyOptions({
+                    price: price.ask,
+                    title: `ASK ${price.ask.toFixed(5)}`,
+                  });
+                }
+              }
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        };
+        
+        ws.onclose = () => {
+          if (!isCleanedUp) {
+            reconnectTimeout = setTimeout(connect, 2000);
+          }
+        };
+        
+        ws.onerror = () => {
+          // Will trigger onclose
+        };
+      } catch {
+        if (!isCleanedUp) {
+          reconnectTimeout = setTimeout(connect, 3000);
+        }
+      }
+    };
+    
+    connect();
+    
+    return () => {
+      isCleanedUp = true;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) {
+        ws.close(1000, 'Chart cleanup');
+        ws = null;
+      }
+    };
+  }, [symbol, timeframe, chartType]);
+
   // Poll server for FULL candle history - SERVER IS SOURCE OF TRUTH
   // This runs less frequently and gets historical + new candles
   useEffect(() => {
