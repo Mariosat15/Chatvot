@@ -65,6 +65,27 @@ interface SystemStats {
   uptime: number;
 }
 
+interface CollectionStats {
+  name: string;
+  documents: number;
+  sizeMB: number;
+  storageSizeMB: number;
+  indexSizeMB: number;
+}
+
+interface DatabaseStats {
+  database: {
+    name: string;
+    sizeMB: number;
+    storageSizeMB: number;
+    collections: number;
+    documents: number;
+    indexes: number;
+    indexSizeMB: number;
+  };
+  collections: CollectionStats[];
+}
+
 interface ServerStats {
   processes: ProcessStats[];
   system: SystemStats;
@@ -72,6 +93,7 @@ interface ServerStats {
     connections: number;
     subscribedSymbols: number;
   };
+  database: DatabaseStats | null;
   timestamp: number;
 }
 
@@ -326,6 +348,103 @@ export default function ServerMonitorSection() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Database Stats */}
+      {stats?.database && (
+        <Card className="bg-zinc-900/50 border-zinc-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <HardDrive className="h-5 w-5 text-cyan-400" />
+              Database Storage
+              <Badge variant="outline" className="ml-2 text-xs">
+                {stats.database.database.name}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Database Overview */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="bg-zinc-800/50 rounded-lg p-3">
+                <div className="text-zinc-400 text-xs mb-1">Data Size</div>
+                <div className="text-xl font-bold text-cyan-400">
+                  {stats.database.database.sizeMB.toFixed(2)} MB
+                </div>
+              </div>
+              <div className="bg-zinc-800/50 rounded-lg p-3">
+                <div className="text-zinc-400 text-xs mb-1">Storage Size</div>
+                <div className="text-xl font-bold text-blue-400">
+                  {stats.database.database.storageSizeMB.toFixed(2)} MB
+                </div>
+              </div>
+              <div className="bg-zinc-800/50 rounded-lg p-3">
+                <div className="text-zinc-400 text-xs mb-1">Index Size</div>
+                <div className="text-xl font-bold text-purple-400">
+                  {stats.database.database.indexSizeMB.toFixed(2)} MB
+                </div>
+              </div>
+              <div className="bg-zinc-800/50 rounded-lg p-3">
+                <div className="text-zinc-400 text-xs mb-1">Total Documents</div>
+                <div className="text-xl font-bold text-green-400">
+                  {stats.database.database.documents.toLocaleString()}
+                </div>
+              </div>
+            </div>
+            
+            {/* Collection Stats Table */}
+            <div className="text-zinc-400 text-xs mb-2">Candle Collections:</div>
+            <div className="bg-zinc-800/30 rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-zinc-500 text-xs border-b border-zinc-700/50">
+                    <th className="text-left px-3 py-2">Collection</th>
+                    <th className="text-right px-3 py-2">Documents</th>
+                    <th className="text-right px-3 py-2">Size</th>
+                    <th className="text-right px-3 py-2">Index</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.database.collections.map((col) => (
+                    <tr key={col.name} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                      <td className="px-3 py-2 font-mono text-zinc-300">{col.name}</td>
+                      <td className="px-3 py-2 text-right text-zinc-400">{col.documents.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right">
+                        <span className={cn(
+                          col.sizeMB > 100 ? 'text-yellow-400' : 
+                          col.sizeMB > 50 ? 'text-blue-400' : 'text-green-400'
+                        )}>
+                          {col.sizeMB.toFixed(2)} MB
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right text-zinc-500">{col.indexSizeMB.toFixed(2)} MB</td>
+                    </tr>
+                  ))}
+                  {stats.database.collections.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-4 text-center text-zinc-500">
+                        No candle collections found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-zinc-700/50 bg-zinc-800/30">
+                    <td className="px-3 py-2 font-medium text-zinc-300">Total</td>
+                    <td className="px-3 py-2 text-right font-medium text-zinc-300">
+                      {stats.database.collections.reduce((sum, c) => sum + c.documents, 0).toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium text-cyan-400">
+                      {stats.database.collections.reduce((sum, c) => sum + c.sizeMB, 0).toFixed(2)} MB
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium text-zinc-400">
+                      {stats.database.collections.reduce((sum, c) => sum + c.indexSizeMB, 0).toFixed(2)} MB
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Process Cards */}

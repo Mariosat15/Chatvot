@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { connectToDatabase } from '@/database/mongoose';
+import mongoose from 'mongoose';
 
 const execAsync = promisify(exec);
 
@@ -59,6 +61,90 @@ async function getWebSocketConnections(): Promise<{ connections: number; subscri
   }
 }
 
+interface DatabaseStats {
+  name: string;
+  sizeMB: number;
+  storageSizeMB: number;
+  collections: number;
+  documents: number;
+  indexes: number;
+  indexSizeMB: number;
+  // Atlas-specific (if available)
+  dataUsedMB?: number;
+  dataLimitMB?: number;
+  dataUsagePercent?: number;
+}
+
+interface CollectionStats {
+  name: string;
+  documents: number;
+  sizeMB: number;
+  storageSizeMB: number;
+  indexSizeMB: number;
+}
+
+async function getDatabaseStats(): Promise<{ database: DatabaseStats; collections: CollectionStats[] } | null> {
+  try {
+    await connectToDatabase();
+    const db = mongoose.connection.db;
+    if (!db) return null;
+    
+    // Get database stats
+    const dbStats = await db.stats();
+    
+    // Get collection stats for candle collections
+    const candleCollections = [
+      'candles_1m',
+      'candles_historical_1m',
+      'candles_historical_5m',
+      'candles_historical_15m',
+      'candles_historical_30m',
+      'candles_historical_1h',
+      'candles_historical_4h',
+      'candles_historical_1d',
+    ];
+    
+    const collectionStats: CollectionStats[] = [];
+    
+    for (const collName of candleCollections) {
+      try {
+        const collections = await db.listCollections({ name: collName }).toArray();
+        if (collections.length === 0) continue;
+        
+        const stats = await db.collection(collName).stats();
+        collectionStats.push({
+          name: collName,
+          documents: stats.count || 0,
+          sizeMB: Math.round((stats.size || 0) / (1024 * 1024) * 100) / 100,
+          storageSizeMB: Math.round((stats.storageSize || 0) / (1024 * 1024) * 100) / 100,
+          indexSizeMB: Math.round((stats.totalIndexSize || 0) / (1024 * 1024) * 100) / 100,
+        });
+      } catch {
+        // Collection doesn't exist or error
+      }
+    }
+    
+    // Sort by size descending
+    collectionStats.sort((a, b) => b.sizeMB - a.sizeMB);
+    
+    return {
+      database: {
+        name: db.databaseName,
+        sizeMB: Math.round((dbStats.dataSize || 0) / (1024 * 1024) * 100) / 100,
+        storageSizeMB: Math.round((dbStats.storageSize || 0) / (1024 * 1024) * 100) / 100,
+        collections: dbStats.collections || 0,
+        documents: dbStats.objects || 0,
+        indexes: dbStats.indexes || 0,
+        indexSizeMB: Math.round((dbStats.indexSize || 0) / (1024 * 1024) * 100) / 100,
+      },
+      collections: collectionStats,
+    };
+  } catch (error) {
+    console.error('Error getting database stats:', error);
+    return null;
+  }
+}
+
 export async function GET() {
   try {
     // Get PM2 process stats
@@ -66,6 +152,9 @@ export async function GET() {
     
     // Get WebSocket connection stats
     const wsStats = await getWebSocketConnections();
+    
+    // Get database stats
+    const dbStats = await getDatabaseStats();
     
     // Get system stats
     const totalMemory = os.totalmem();
@@ -102,6 +191,7 @@ export async function GET() {
       processes,
       system: systemStats,
       websocket: wsStats,
+      database: dbStats,
       timestamp: Date.now(),
     });
   } catch (error) {
