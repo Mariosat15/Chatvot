@@ -7,7 +7,9 @@ import {
   getFormingCandle, 
   getForming1hCandle,
   getForming4hCandle,
-  getFormingDailyCandle 
+  getFormingDailyCandle,
+  getFormingWeeklyCandle,
+  getFormingMonthlyCandle
 } from '@/lib/services/websocket-price-streamer';
 import { getAggregatedCandles, isAggregatorSupported } from '@/lib/services/candle-aggregator.service';
 import { 
@@ -561,7 +563,8 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
     '1h': '1h', '60': '1h',
     '4h': '4h', '240': '4h',
     '1d': '1d', 'D': '1d', '1440': '1d',
-    'W': 'W', 'M': 'M',
+    '1w': 'W', 'W': 'W', '10080': 'W',
+    '1M': 'M', 'M': 'M', '43200': 'M',
   };
   
   const normalizedTf = timeframeMap[timeframe];
@@ -573,10 +576,10 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
   }
   
   // For aggregator-supported timeframes, use hybrid approach
-  // EXCEPT for daily - aggregating 1440 * 500 = 720,000 1m candles is impractical
-  const useAggregator = isAggregatorSupported(normalizedTf) && normalizedTf !== '1d';
+  // EXCEPT for daily/weekly/monthly - aggregating too many 1m candles is impractical
+  const useAggregator = isAggregatorSupported(normalizedTf) && !['1d', 'W', 'M'].includes(normalizedTf);
   
-  if (useAggregator || ['5m', '15m', '30m', '1h', '4h', '1d'].includes(normalizedTf)) {
+  if (useAggregator || ['5m', '15m', '30m', '1h', '4h', '1d', 'W', 'M'].includes(normalizedTf)) {
     try {
       // Step 1: Get aggregated candles from 1m data (recent)
       // Skip for daily - too many 1m candles needed
@@ -588,8 +591,12 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         aggregatedCandles = result.candles;
         formingCandle = result.formingCandle;
       } else {
-        // For daily (and other non-aggregated timeframes), get forming candle from WebSocket cache
-        if (normalizedTf === '1d') {
+        // For daily/weekly/monthly (and other non-aggregated timeframes), get forming candle from WebSocket cache
+        if (normalizedTf === 'M') {
+          formingCandle = getFormingMonthlyCandle(symbol);
+        } else if (normalizedTf === 'W') {
+          formingCandle = getFormingWeeklyCandle(symbol);
+        } else if (normalizedTf === '1d') {
           formingCandle = getFormingDailyCandle(symbol);
         } else if (normalizedTf === '4h') {
           formingCandle = getForming4hCandle(symbol);
@@ -648,6 +655,7 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           const massiveTimeframeMap: Record<string, Timeframe> = {
             '5m': '5', '15m': '15', '30m': '30',
             '1h': '60', '4h': '240', '1d': 'D',
+            'W': 'W', 'M': 'M',
           };
           
           const massiveTf = massiveTimeframeMap[normalizedTf];
