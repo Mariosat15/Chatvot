@@ -66,6 +66,7 @@ function getHistoricalCandleModel(timeframe: string): Model<IHistoricalCandleDoc
 }
 
 // Export models for each timeframe
+export const HistoricalCandle1m = getHistoricalCandleModel('1m');
 export const HistoricalCandle5m = getHistoricalCandleModel('5m');
 export const HistoricalCandle15m = getHistoricalCandleModel('15m');
 export const HistoricalCandle30m = getHistoricalCandleModel('30m');
@@ -77,6 +78,9 @@ export const HistoricalCandle1d = getHistoricalCandleModel('1d');
 export function getHistoricalModel(timeframe: string | number): Model<IHistoricalCandleDocument> | null {
   const tf = String(timeframe);
   switch (tf) {
+    case '1':
+    case '1m':
+      return HistoricalCandle1m;
     case '5':
     case '5m':
       return HistoricalCandle5m;

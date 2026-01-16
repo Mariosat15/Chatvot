@@ -7,6 +7,7 @@ const MASSIVE_API_KEY = process.env.MASSIVE_API_KEY || process.env.NEXT_PUBLIC_M
 
 // Timeframe configuration
 const TIMEFRAME_CONFIG: Record<string, { minutes: number; collectionName: string; apiMultiplier: number; apiTimespan: string }> = {
+  '1m': { minutes: 1, collectionName: 'candles_historical_1m', apiMultiplier: 1, apiTimespan: 'minute' },
   '5m': { minutes: 5, collectionName: 'candles_historical_5m', apiMultiplier: 5, apiTimespan: 'minute' },
   '15m': { minutes: 15, collectionName: 'candles_historical_15m', apiMultiplier: 15, apiTimespan: 'minute' },
   '30m': { minutes: 30, collectionName: 'candles_historical_30m', apiMultiplier: 30, apiTimespan: 'minute' },

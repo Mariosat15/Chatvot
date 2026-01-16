@@ -362,7 +362,7 @@ export default function MarketDataSection() {
   // Historical data download state
   const [historyDownloadRunning, setHistoryDownloadRunning] = useState(false);
   const [historyDownloadResults, setHistoryDownloadResults] = useState<SeedResult[] | null>(null);
-  const [selectedHistoryTimeframes, setSelectedHistoryTimeframes] = useState<string[]>(['5m', '15m', '30m', '1h', '4h', '1d']);
+  const [selectedHistoryTimeframes, setSelectedHistoryTimeframes] = useState<string[]>(['1m', '5m', '15m', '30m', '1h', '4h', '1d']);
   const [historyYearsBack, setHistoryYearsBack] = useState(10);
 
   const fetchData = useCallback(async () => {
@@ -1081,9 +1081,17 @@ export default function MarketDataSection() {
           <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-4 text-sm">
             <span className="text-blue-400">💡 Step 2:</span>
             <span className="text-gray-300 ml-2">
-              After importing 1m data, download historical data for higher timeframes (5m, 15m, 30m, 1h, 4h, 1d).
-              This data will be stored in separate collections and served from your database.
+              Download historical data for all timeframes. This stores years of data in separate collections
+              (candles_historical_1m, candles_historical_5m, etc.) for fast chart scrolling without API calls.
             </span>
+          </div>
+          
+          <div className="bg-yellow-600/10 border border-yellow-600/20 rounded-lg p-3 text-xs text-gray-400">
+            <strong className="text-yellow-400">Architecture:</strong>
+            <ul className="mt-1 ml-4 list-disc space-y-0.5">
+              <li><span className="text-white">candles_1m</span> = Recent ~30 days (for real-time + aggregation)</li>
+              <li><span className="text-white">candles_historical_*</span> = Years of history (for chart scrolling)</li>
+            </ul>
           </div>
 
           {/* Years Back */}
@@ -1114,7 +1122,7 @@ export default function MarketDataSection() {
               <h4 className="text-white font-medium">Select Timeframes</h4>
               <div className="flex gap-3 text-sm">
                 <button 
-                  onClick={() => setSelectedHistoryTimeframes(['5m', '15m', '30m', '1h', '4h', '1d'])} 
+                  onClick={() => setSelectedHistoryTimeframes(['1m', '5m', '15m', '30m', '1h', '4h', '1d'])} 
                   className="text-blue-400 hover:text-blue-300"
                 >
                   Select All
@@ -1128,7 +1136,7 @@ export default function MarketDataSection() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {['5m', '15m', '30m', '1h', '4h', '1d'].map((tf) => (
+              {['1m', '5m', '15m', '30m', '1h', '4h', '1d'].map((tf) => (
                 <button
                   key={tf}
                   onClick={() => toggleHistoryTimeframe(tf)}

@@ -321,14 +321,48 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
   }
 
   // For 1-minute timeframe: Get from MongoDB (server source of truth)
+  // Recent data from candles_1m, older historical data from candles_historical_1m
   if (timeframe === '1m' || timeframe === '1') {
     try {
+      // First, get candles from candles_1m (recent data for aggregation)
       let candles = await Candle1m.getCandles(symbol, limit, before);
       
       // Apply history limit
       if (historyLimitDate && candles) {
         const limitTimestamp = Math.floor(historyLimitDate.getTime() / 1000);
         candles = candles.filter(c => c.time >= limitTimestamp);
+      }
+      
+      // If lazy loading and candles_1m doesn't have enough, also check candles_historical_1m
+      if (before && candles.length < limit && settings.useLocalHistory) {
+        const historicalModel = getHistoricalModel('1m');
+        if (historicalModel) {
+          const cutoffDate = new Date(before * 1000);
+          const historicalCandles = await getHistoricalCandles('1m', symbol, {
+            before: cutoffDate,
+            limit: limit - candles.length,
+          });
+          
+          // Convert historical candles to the same format
+          const historicalFormatted = historicalCandles.map(c => ({
+            time: Math.floor(new Date(c.timestamp).getTime() / 1000),
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume || 0,
+          }));
+          
+          // Combine: historical (older) + candles_1m (newer)
+          const candleMap = new Map<number, typeof candles[0]>();
+          for (const c of historicalFormatted) {
+            candleMap.set(c.time, c);
+          }
+          for (const c of candles) {
+            candleMap.set(c.time, c);
+          }
+          candles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
+        }
       }
       
       // If MongoDB has enough candles, add forming candle and return
@@ -370,7 +404,22 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         }
         
         // For lazy loading, indicate if there's more data
-        const hasMore = before ? candles.length === limit : undefined;
+        // Check both candles_1m and candles_historical_1m for more data
+        let hasMore = before ? candles.length === limit : undefined;
+        if (before && candles.length < limit && settings.useLocalHistory) {
+          // Check if there's more in historical
+          const historicalModel = getHistoricalModel('1m');
+          if (historicalModel) {
+            const oldestCandle = candles[0];
+            if (oldestCandle) {
+              const olderExists = await historicalModel.findOne({
+                symbol,
+                timestamp: { $lt: new Date(oldestCandle.time * 1000) }
+              }).lean();
+              hasMore = !!olderExists;
+            }
+          }
+        }
         const oldestTimestamp = candles.length > 0 ? candles[0].time : undefined;
         
         return NextResponse.json({ 
