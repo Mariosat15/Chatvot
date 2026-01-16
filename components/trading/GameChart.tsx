@@ -44,6 +44,8 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
   const [chartType, setChartType] = useState<ChartType>('candle');
   const [isLoading, setIsLoading] = useState(true);
   const [candlesLoaded, setCandlesLoaded] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
   
   // Chart refs
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -53,6 +55,8 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
   const askPriceLineRef = useRef<any>(null);
   const positionLinesRef = useRef<Map<string, any>>(new Map());
   const isMountedRef = useRef(true);
+  const oldestCandleTimeRef = useRef<number | null>(null);
+  const allCandlesRef = useRef<any[]>([]);
   
   // Get current price
   const currentPrice = prices.get(symbol);
@@ -172,6 +176,9 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     const loadCandles = async () => {
       setIsLoading(true);
       setCandlesLoaded(false);
+      setHasMoreHistory(true);
+      oldestCandleTimeRef.current = null;
+      allCandlesRef.current = [];
       
       try {
         const response = await fetch(
@@ -184,14 +191,23 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         
         if (!isMountedRef.current || !candlestickSeriesRef.current) return;
         
+        const candles = data.candles || [];
+        allCandlesRef.current = candles;
+        
+        // Track oldest candle for lazy loading
+        if (candles.length > 0) {
+          oldestCandleTimeRef.current = candles[0].time;
+          setHasMoreHistory(data.hasMore !== false);
+        }
+        
         if (chartType === 'line') {
-          const lineData = data.candles.map((c: any) => ({
+          const lineData = candles.map((c: any) => ({
             time: c.time as UTCTimestamp,
             value: c.close,
           }));
           (candlestickSeriesRef.current as any).setData(lineData);
         } else {
-          const candleData: CandlestickData<UTCTimestamp>[] = data.candles.map((c: any) => ({
+          const candleData: CandlestickData<UTCTimestamp>[] = candles.map((c: any) => ({
             time: c.time as UTCTimestamp,
             open: c.open,
             high: c.high,
@@ -330,6 +346,104 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
       if (ws) ws.close();
     };
   }, [symbol, timeframe, chartType, candlesLoaded]);
+  
+  // Load more candles when scrolling left (lazy loading)
+  const loadMoreCandles = useCallback(async () => {
+    if (isLoadingMore || !hasMoreHistory || !oldestCandleTimeRef.current) return;
+    if (!chartRef.current || !candlestickSeriesRef.current) return;
+    
+    setIsLoadingMore(true);
+    
+    try {
+      const response = await fetch('/api/trading/candles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol,
+          timeframe,
+          before: oldestCandleTimeRef.current,
+        }),
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch more candles');
+      
+      const data = await response.json();
+      const newCandles = data.candles || [];
+      
+      if (newCandles.length === 0) {
+        setHasMoreHistory(false);
+        return;
+      }
+      
+      // Update oldest candle time
+      oldestCandleTimeRef.current = newCandles[0].time;
+      setHasMoreHistory(data.hasMore !== false);
+      
+      // Merge new candles with existing
+      const existingCandles = allCandlesRef.current;
+      const mergedCandles = [...newCandles, ...existingCandles];
+      allCandlesRef.current = mergedCandles;
+      
+      // Update chart
+      if (chartType === 'line') {
+        const lineData = mergedCandles.map((c: any) => ({
+          time: c.time as UTCTimestamp,
+          value: c.close,
+        }));
+        (candlestickSeriesRef.current as any).setData(lineData);
+      } else {
+        const candleData: CandlestickData<UTCTimestamp>[] = mergedCandles.map((c: any) => ({
+          time: c.time as UTCTimestamp,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        }));
+        candlestickSeriesRef.current.setData(candleData);
+      }
+    } catch (error) {
+      console.error('Failed to load more candles:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [symbol, timeframe, isLoadingMore, hasMoreHistory, chartType]);
+  
+  // Subscribe to visible time range changes for lazy loading
+  useEffect(() => {
+    if (!chartRef.current || !candlesLoaded) return;
+    
+    const chart = chartRef.current;
+    
+    const handleVisibleTimeRangeChange = () => {
+      if (!hasMoreHistory || isLoadingMore || !oldestCandleTimeRef.current) return;
+      
+      const visibleRange = chart.timeScale().getVisibleRange();
+      if (!visibleRange) return;
+      
+      const oldestVisible = visibleRange.from as number;
+      const oldestCandle = oldestCandleTimeRef.current;
+      
+      // Calculate timeframe in minutes
+      const timeframeMinutes = timeframe === '1' ? 1 : (timeframe === '5' ? 5 : 15);
+      
+      // Load more when user scrolls close to the oldest loaded candle
+      const bufferTime = 50 * timeframeMinutes * 60; // 50 candles worth of time in seconds
+      
+      if (oldestVisible <= oldestCandle + bufferTime) {
+        loadMoreCandles();
+      }
+    };
+    
+    chart.timeScale().subscribeVisibleTimeRangeChange(handleVisibleTimeRangeChange);
+    
+    return () => {
+      try {
+        chart.timeScale().unsubscribeVisibleTimeRangeChange(handleVisibleTimeRangeChange);
+      } catch {
+        // Chart may be disposed
+      }
+    };
+  }, [hasMoreHistory, isLoadingMore, loadMoreCandles, timeframe, candlesLoaded]);
   
   // Draw position lines (entry, TP, SL)
   useEffect(() => {
@@ -489,6 +603,16 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
             <div className="flex flex-col items-center gap-2">
               <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-white/60 text-sm">Loading chart...</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Loading More Indicator */}
+        {isLoadingMore && (
+          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-10">
+            <div className="flex items-center gap-2 bg-purple-600/90 px-3 py-1 rounded-full">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span className="text-white text-xs">Loading history...</span>
             </div>
           </div>
         )}
