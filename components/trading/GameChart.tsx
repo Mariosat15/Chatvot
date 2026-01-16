@@ -165,47 +165,49 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     
     chartRef.current = chart;
     
-    // Create series based on chart type - NEON GAMING STYLE
+    // Create series based on chart type - ULTRA GAMING NEON STYLE
     if (chartType === 'line') {
       const series = chart.addLineSeries({
-        color: '#a855f7',
+        color: '#00ffff',
         lineWidth: 3,
         crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 8,
+        crosshairMarkerRadius: 10,
         crosshairMarkerBorderColor: '#ffffff',
-        crosshairMarkerBackgroundColor: '#a855f7',
+        crosshairMarkerBackgroundColor: '#00ffff',
         priceFormat,
       });
       candlestickSeriesRef.current = series as any;
     } else {
       const series = chart.addCandlestickSeries({
-        upColor: '#00ff88',
-        downColor: '#ff3366',
-        borderUpColor: '#00ff88',
-        borderDownColor: '#ff3366',
-        wickUpColor: '#00ff88',
-        wickDownColor: '#ff3366',
+        // Neon green for bullish - super bright
+        upColor: '#39FF14',
+        downColor: '#FF073A',
+        // Brighter borders for glow effect
+        borderUpColor: '#7FFF00',
+        borderDownColor: '#FF6B6B',
+        wickUpColor: '#39FF14',
+        wickDownColor: '#FF073A',
         priceFormat,
       });
       candlestickSeriesRef.current = series;
       
-      // Add bid/ask price lines with correct decimals
+      // Add bid/ask price lines - NEON GAMING STYLE
       bidPriceLineRef.current = series.createPriceLine({
         price: 0,
-        color: '#00d4ff',
+        color: '#00ffff', // Cyan neon
         lineWidth: 2,
-        lineStyle: 2,
+        lineStyle: 0, // Solid line
         axisLabelVisible: true,
-        title: 'BID',
+        title: '⬇ BID',
       });
       
       askPriceLineRef.current = series.createPriceLine({
         price: 0,
-        color: '#ff00ff',
+        color: '#ff00ff', // Magenta neon
         lineWidth: 2,
-        lineStyle: 2,
+        lineStyle: 0, // Solid line
         axisLabelVisible: true,
-        title: 'ASK',
+        title: '⬆ ASK',
       });
     }
     
@@ -291,18 +293,18 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     loadCandles();
   }, [symbol, timeframe, chartType]);
   
-  // Update bid/ask price lines with correct decimals
+  // Update bid/ask price lines - Gaming style
   useEffect(() => {
     if (!currentPrice || !bidPriceLineRef.current || !askPriceLineRef.current) return;
     
     bidPriceLineRef.current.applyOptions({
       price: currentPrice.bid,
-      title: `BID`,
+      title: `⬇ BID`,
     });
     
     askPriceLineRef.current.applyOptions({
       price: currentPrice.ask,
-      title: `ASK`,
+      title: `⬆ ASK`,
     });
   }, [currentPrice]);
   
@@ -341,11 +343,11 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
                 if (price && bidPriceLineRef.current && askPriceLineRef.current) {
                   bidPriceLineRef.current.applyOptions({
                     price: price.bid,
-                    title: `BID`,
+                    title: `⬇ BID`,
                   });
                   askPriceLineRef.current.applyOptions({
                     price: price.ask,
-                    title: `ASK`,
+                    title: `⬆ ASK`,
                   });
                 }
                 
@@ -549,29 +551,36 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     <div className="flex flex-col h-full bg-gradient-to-br from-[#0a0a15] via-[#0f0f1a] to-[#1a0a20] rounded-xl overflow-hidden">
       {/* Gaming Header */}
       <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-b border-purple-500/30">
-        {/* Live Price Display */}
+        {/* Live Price Display - Neon Gaming Style */}
         <div className="flex items-center gap-4">
           {currentPrice && (
             <>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-cyan-400 uppercase tracking-wider">Bid</span>
-                <span className="text-lg font-mono font-bold text-cyan-400 drop-shadow-[0_0_10px_rgba(0,255,255,0.5)]">
+              <div className="flex flex-col items-center px-3 py-1 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
+                <span className="text-[10px] text-cyan-300 uppercase tracking-wider font-bold">⬇ BID</span>
+                <span className="text-xl font-mono font-black text-cyan-400 animate-pulse-subtle" 
+                  style={{ textShadow: '0 0 10px rgba(0,255,255,0.8), 0 0 20px rgba(0,255,255,0.4)' }}>
                   {formatPrice(currentPrice.bid, symbol)}
                 </span>
               </div>
-              <div className="w-px h-8 bg-purple-500/30" />
-              <div className="flex flex-col">
-                <span className="text-[10px] text-pink-400 uppercase tracking-wider">Ask</span>
-                <span className="text-lg font-mono font-bold text-pink-400 drop-shadow-[0_0_10px_rgba(255,0,255,0.5)]">
+              <div className="flex flex-col items-center">
+                <div className="w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-pink-500 flex items-center justify-center animate-spin-slow">
+                  <div className="w-4 h-4 rounded-full bg-[#0a0a15]" />
+                </div>
+              </div>
+              <div className="flex flex-col items-center px-3 py-1 bg-pink-500/10 rounded-lg border border-pink-500/30">
+                <span className="text-[10px] text-pink-300 uppercase tracking-wider font-bold">⬆ ASK</span>
+                <span className="text-xl font-mono font-black text-pink-400 animate-pulse-subtle"
+                  style={{ textShadow: '0 0 10px rgba(255,0,255,0.8), 0 0 20px rgba(255,0,255,0.4)' }}>
                   {formatPrice(currentPrice.ask, symbol)}
                 </span>
               </div>
-              <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-purple-500/20 rounded-lg">
-                <Zap className="w-3 h-3 text-yellow-400" />
-                <span className="text-yellow-400 text-xs font-bold">
+              <div className="hidden sm:flex items-center gap-1 px-3 py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                <Zap className="w-4 h-4 text-yellow-400 animate-pulse" />
+                <span className="text-yellow-300 text-sm font-black"
+                  style={{ textShadow: '0 0 8px rgba(255,255,0,0.6)' }}>
                   {((currentPrice.ask - currentPrice.bid) / (decimals === 3 ? 0.01 : 0.0001)).toFixed(1)}
                 </span>
-                <span className="text-gray-500 text-[10px]">pips</span>
+                <span className="text-yellow-500/70 text-xs">pips</span>
               </div>
             </>
           )}
@@ -637,16 +646,20 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
       </div>
       
       {/* Chart Container with Neon Glow */}
-      <div className="relative flex-1 min-h-[350px]">
+      <div className="relative flex-1 min-h-[350px] game-chart-container">
         <div 
           ref={chartContainerRef} 
-          className="absolute inset-0"
+          className="absolute inset-0 game-chart-glow"
         />
         
-        {/* Neon border effect */}
-        <div className="absolute inset-0 pointer-events-none border border-purple-500/20 rounded-lg" 
-          style={{ boxShadow: 'inset 0 0 30px rgba(139, 92, 246, 0.1)' }} 
-        />
+        {/* Animated neon border effect */}
+        <div className="absolute inset-0 pointer-events-none rounded-lg game-chart-border" />
+        
+        {/* Corner accents */}
+        <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-400/60 rounded-tl-lg" />
+        <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-pink-400/60 rounded-tr-lg" />
+        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-pink-400/60 rounded-bl-lg" />
+        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-400/60 rounded-br-lg" />
         
         {/* Loading Overlay */}
         {isLoading && (
@@ -691,6 +704,46 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
           </div>
         </div>
       )}
+      
+      {/* Gaming Glow Styles */}
+      <style jsx global>{`
+        .game-chart-container {
+          background: radial-gradient(ellipse at center, rgba(139, 92, 246, 0.05) 0%, transparent 70%);
+        }
+        
+        .game-chart-glow {
+          filter: contrast(1.1) saturate(1.3);
+        }
+        
+        .game-chart-border {
+          border: 1px solid rgba(139, 92, 246, 0.3);
+          box-shadow: 
+            inset 0 0 30px rgba(139, 92, 246, 0.1),
+            inset 0 0 60px rgba(0, 255, 255, 0.05),
+            0 0 20px rgba(139, 92, 246, 0.2);
+          animation: borderPulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes borderPulse {
+          0%, 100% { 
+            box-shadow: 
+              inset 0 0 30px rgba(139, 92, 246, 0.1),
+              inset 0 0 60px rgba(0, 255, 255, 0.05),
+              0 0 20px rgba(139, 92, 246, 0.2);
+          }
+          50% { 
+            box-shadow: 
+              inset 0 0 40px rgba(139, 92, 246, 0.15),
+              inset 0 0 80px rgba(0, 255, 255, 0.08),
+              0 0 30px rgba(139, 92, 246, 0.3);
+          }
+        }
+        
+        /* Make candles glow */
+        .game-chart-glow canvas {
+          filter: drop-shadow(0 0 2px rgba(57, 255, 20, 0.3)) drop-shadow(0 0 2px rgba(255, 7, 58, 0.3));
+        }
+      `}</style>
     </div>
   );
 }
