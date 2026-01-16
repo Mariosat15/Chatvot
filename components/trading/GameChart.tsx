@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, memo } from 'react';
-import { flushSync } from 'react-dom';
 import { TrendingUp, TrendingDown, Star, Zap, Trophy, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePrices } from '@/contexts/PriceProvider';
@@ -112,14 +111,15 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
               );
               
               if (priceData) {
-                // Update price state - flushSync forces immediate render
-                flushSync(() => {
-                  setWsPrice({
-                    bid: priceData.bid,
-                    ask: priceData.ask,
-                    mid: (priceData.bid + priceData.ask) / 2,
-                  });
+                // Update price state immediately
+                setWsPrice({
+                  bid: priceData.bid,
+                  ask: priceData.ask,
+                  mid: (priceData.bid + priceData.ask) / 2,
                 });
+              } else {
+                // DEBUG: Log if symbol not found in prices array
+                console.log('🎮 WS: Symbol not found in prices', { symbol, pricesCount: prices?.length });
               }
             }
           } catch (e) {
@@ -134,6 +134,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
         };
         
         ws.onopen = () => {
+          console.log('🎮 GameChart WS connected! Subscribing to:', symbol);
           setWsConnected(true);
           // Subscribe to only the symbol this chart needs
           if (ws.readyState === WebSocket.OPEN) {
