@@ -309,11 +309,13 @@ const server = createServer(async (req, res) => {
               };
               
               // Broadcast to ALL connections (not just specific conversations)
+              // Stringify ONCE (not per client) for performance
+              const priceEventStr = JSON.stringify(priceEvent);
               let clientCount = 0;
               connections.forEach((conn) => {
                 if (conn.ws.readyState === WebSocket.OPEN) {
                   try {
-                    conn.ws.send(JSON.stringify(priceEvent));
+                    conn.ws.send(priceEventStr);
                     clientCount++;
                   } catch {
                     // Ignore send errors
