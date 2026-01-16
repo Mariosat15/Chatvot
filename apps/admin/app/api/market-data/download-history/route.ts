@@ -200,32 +200,47 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     for (const symbol of symbols) {
-      // Get the last 1m candle date for this symbol (to know where to start downloading backwards)
-      let endDate = new Date();
-      
-      if (startFromLastCandle) {
-        const db = mongoose.connection.db;
-        if (db) {
-          const lastCandle = await db.collection('candles_1m')
-            .findOne({ symbol }, { sort: { t: -1 }, projection: { t: 1 } });
+      for (const timeframe of validTimeframes) {
+        // For each timeframe, check if we already have historical data
+        // If yes, download backwards from the oldest candle we have
+        // If no, download backwards from the last 1m candle
+        
+        let endDate = new Date();
+        const Model = getHistoricalModel(timeframe);
+        
+        if (Model) {
+          // Check for existing historical data - get the OLDEST candle
+          const oldestHistorical = await Model.findOne({ symbol })
+            .sort({ timestamp: 1 })
+            .select('timestamp')
+            .lean();
           
-          if (lastCandle && lastCandle.t) {
-            // Convert timestamp (seconds) to Date
-            endDate = new Date(lastCandle.t * 1000);
-            console.log(`📊 [Download History] ${symbol}: Last 1m candle is at ${endDate.toISOString()}`);
+          if (oldestHistorical && oldestHistorical.timestamp) {
+            // We have data - download further back from the oldest
+            endDate = new Date(oldestHistorical.timestamp);
+            console.log(`📊 [Download History] ${symbol} ${timeframe}: Existing data found, oldest at ${endDate.toISOString()}`);
+          } else if (startFromLastCandle) {
+            // No historical data - start from last 1m candle
+            const db = mongoose.connection.db;
+            if (db) {
+              const lastCandle = await db.collection('candles_1m')
+                .findOne({ symbol }, { sort: { t: -1 }, projection: { t: 1 } });
+              
+              if (lastCandle && lastCandle.t) {
+                endDate = new Date(lastCandle.t * 1000);
+                console.log(`📊 [Download History] ${symbol} ${timeframe}: No history, starting from last 1m at ${endDate.toISOString()}`);
+              }
+            }
           }
         }
-      }
 
-      // Calculate start date (yearsBack years ago from endDate)
-      const startDate = new Date(endDate);
-      startDate.setFullYear(startDate.getFullYear() - yearsBack);
+        // Calculate start date (yearsBack years ago from endDate)
+        const startDate = new Date(endDate);
+        startDate.setFullYear(startDate.getFullYear() - yearsBack);
 
-      const startMs = startDate.getTime();
-      const endMs = endDate.getTime();
-
-      for (const timeframe of validTimeframes) {
-        const Model = getHistoricalModel(timeframe);
+        const startMs = startDate.getTime();
+        const endMs = endDate.getTime();
+        
         if (!Model) continue;
 
         try {
