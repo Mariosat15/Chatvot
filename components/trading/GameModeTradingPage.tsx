@@ -11,8 +11,8 @@ import GameChart from './GameChart';
 import GameModeOrderForm from './GameModeOrderForm';
 import GameModeStatsPanel from './GameModeStatsPanel';
 import GameModePositions from './GameModePositions';
-import { ArrowLeft, Clock, Users, Trophy, Timer, ChevronDown, Swords, Scroll, Monitor, Gamepad2 } from 'lucide-react';
-import { FOREX_PAIRS, type ForexSymbol } from '@/lib/services/pnl-calculator.service';
+import GameMarketWatch from './GameMarketWatch';
+import { ArrowLeft, Users, Swords, Monitor, Gamepad2, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface Position {
   _id: string;
@@ -61,9 +61,9 @@ export default function GameModeTradingPage({
   startingCapital,
   isDisqualified = false,
 }: GameModeTradingPageProps) {
-  const { symbol, setSymbol } = useChartSymbol();
+  const { symbol } = useChartSymbol();
   const { prices, marketOpen } = usePrices();
-  const [showSymbolPicker, setShowSymbolPicker] = useState(false);
+  const [showMarketWatch, setShowMarketWatch] = useState(false);
   
   const equity = participant.currentCapital + participant.unrealizedPnl;
   const marginLevel = participant.usedMargin > 0 
@@ -77,6 +77,9 @@ export default function GameModeTradingPage({
   const daysRemaining = Math.max(0, Math.floor(timeRemaining / (1000 * 60 * 60 * 24)));
   const hoursRemaining = Math.max(0, Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
   
+  // Get current price for display
+  const currentPrice = prices.get(symbol);
+  const decimals = symbol.includes('JPY') ? 3 : 5;
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f0f1a] via-[#1a1a2e] to-[#16213e]">
@@ -143,45 +146,52 @@ export default function GameModeTradingPage({
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
           {/* Left Column - Chart & Positions */}
           <div className="xl:col-span-8 space-y-4">
-            {/* Symbol Selector */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative">
-                <button
-                  onClick={() => setShowSymbolPicker(!showSymbolPicker)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-bold text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all"
-                >
-                  <span className="text-lg">🎮</span>
-                  <span>{symbol}</span>
-                  <ChevronDown className={cn("w-4 h-4 transition-transform", showSymbolPicker && "rotate-180")} />
-                </button>
-                
-                {showSymbolPicker && (
-                  <div className="absolute top-full left-0 mt-2 z-50 bg-[#1a1a2e] border-2 border-purple-500/50 rounded-xl shadow-2xl shadow-purple-500/20 p-3 min-w-[200px]">
-                    <div className="text-xs text-gray-500 mb-2 px-2">Popular Pairs</div>
-                    <div className="space-y-1">
-                      {Object.keys(FOREX_PAIRS).map((pair) => (
-                        <button
-                          key={pair}
-                          onClick={() => {
-                            setSymbol(pair);
-                            setShowSymbolPicker(false);
-                          }}
-                          className={cn(
-                            "w-full px-3 py-2 rounded-lg text-left font-medium text-sm transition-all",
-                            symbol === pair
-                              ? "bg-purple-500/30 text-purple-300"
-                              : "hover:bg-dark-400 text-gray-400"
-                          )}
-                        >
-                          {pair}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            {/* Symbol Display Card - Click to open Market Watch */}
+            <button
+              onClick={() => setShowMarketWatch(true)}
+              className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-2xl border-2 border-purple-500/50 hover:border-purple-500 transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-2xl shadow-lg shadow-purple-500/30">
+                  🎮
+                </div>
+                <div className="text-left">
+                  <div className="text-white font-bold text-2xl">{symbol}</div>
+                  <div className="text-purple-300 text-xs">Click to change pair</div>
+                </div>
               </div>
               
-            </div>
+              {/* Live Price Display */}
+              {currentPrice && (
+                <div className="flex items-center gap-6">
+                  <div className="text-right">
+                    <div className="text-gray-400 text-xs mb-1">BID</div>
+                    <div className="flex items-center gap-2">
+                      <TrendingDown className="w-4 h-4 text-red-400" />
+                      <span className="text-white font-mono font-bold text-xl">
+                        {currentPrice.bid.toFixed(decimals)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-px h-10 bg-purple-500/30" />
+                  <div className="text-right">
+                    <div className="text-gray-400 text-xs mb-1">ASK</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-mono font-bold text-xl">
+                        {currentPrice.ask.toFixed(decimals)}
+                      </span>
+                      <TrendingUp className="w-4 h-4 text-green-400" />
+                    </div>
+                  </div>
+                  <div className="hidden sm:block px-3 py-1 bg-purple-500/20 rounded-lg">
+                    <div className="text-gray-400 text-xs">Spread</div>
+                    <div className="text-purple-400 font-bold">
+                      {((currentPrice.ask - currentPrice.bid) / (symbol.includes('JPY') ? 0.01 : 0.0001)).toFixed(1)} pips
+                    </div>
+                  </div>
+                </div>
+              )}
+            </button>
             
             {/* Chart */}
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 overflow-hidden shadow-2xl shadow-purple-500/10">
@@ -191,11 +201,11 @@ export default function GameModeTradingPage({
               />
             </div>
             
-            {/* Positions - Collapsible on Mobile */}
+            {/* Positions */}
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 p-4">
               <div className="flex items-center gap-2 mb-4">
                 <Swords className="w-5 h-5 text-purple-400" />
-                <h2 className="text-white font-bold">Active Battles ({positions.length})</h2>
+                <h2 className="text-white font-bold">Open Positions ({positions.length})</h2>
               </div>
               <GameModePositions positions={positions} competitionId={competitionId} />
             </div>
@@ -236,13 +246,11 @@ export default function GameModeTradingPage({
         </div>
       </div>
       
-      {/* Click Outside Handler for Symbol Picker */}
-      {showSymbolPicker && (
-        <div 
-          className="fixed inset-0 z-40" 
-          onClick={() => setShowSymbolPicker(false)} 
-        />
-      )}
+      {/* Market Watch Modal */}
+      <GameMarketWatch 
+        isOpen={showMarketWatch} 
+        onClose={() => setShowMarketWatch(false)} 
+      />
     </div>
   );
 }
