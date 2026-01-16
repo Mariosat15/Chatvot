@@ -297,6 +297,10 @@ const server = createServer(async (req, res) => {
           case 'prices':
             // Broadcast prices AND forming candles to clients based on their subscriptions
             // Called by websocket-price-streamer every ~200ms
+            
+            // OPTIMIZATION 1: Skip if no clients connected
+            if (connections.size === 0) break;
+            
             if (data.prices || data.formingCandles || data.formingCandles5m || data.formingCandles15m || data.formingCandles30m) {
               const allPrices = data.prices || [];
               const allCandles1m = data.formingCandles || [];
@@ -305,6 +309,9 @@ const server = createServer(async (req, res) => {
               const allCandles30m = data.formingCandles30m || [];
               const timestamp = Date.now();
               
+              // OPTIMIZATION 2: Pre-stringify for unsubscribed clients (stringify once, use many)
+              let cachedFullDataStr: string | null = null;
+              
               let clientCount = 0;
               let filteredCount = 0;
               
@@ -312,15 +319,12 @@ const server = createServer(async (req, res) => {
                 if (conn.ws.readyState !== WebSocket.OPEN) return;
                 
                 try {
-                  // If client has subscriptions, filter data to only subscribed symbols
-                  // If no subscriptions, send everything (backward compatible)
                   const hasSubscriptions = conn.subscribedSymbols.size > 0;
                   
-                  let eventData;
                   if (hasSubscriptions) {
-                    // Filter to only subscribed symbols
+                    // Filter to only subscribed symbols (must stringify per client)
                     const subs = conn.subscribedSymbols;
-                    eventData = {
+                    const eventData = {
                       type: 'price_update',
                       data: {
                         prices: allPrices.filter((p: {symbol: string}) => subs.has(p.symbol)),
@@ -331,23 +335,25 @@ const server = createServer(async (req, res) => {
                         timestamp,
                       },
                     };
+                    conn.ws.send(JSON.stringify(eventData));
                     filteredCount++;
                   } else {
-                    // No subscriptions - send all data
-                    eventData = {
-                      type: 'price_update',
-                      data: {
-                        prices: allPrices,
-                        formingCandles: allCandles1m,
-                        formingCandles5m: allCandles5m,
-                        formingCandles15m: allCandles15m,
-                        formingCandles30m: allCandles30m,
-                        timestamp,
-                      },
-                    };
+                    // No subscriptions - use cached stringified data
+                    if (!cachedFullDataStr) {
+                      cachedFullDataStr = JSON.stringify({
+                        type: 'price_update',
+                        data: {
+                          prices: allPrices,
+                          formingCandles: allCandles1m,
+                          formingCandles5m: allCandles5m,
+                          formingCandles15m: allCandles15m,
+                          formingCandles30m: allCandles30m,
+                          timestamp,
+                        },
+                      });
+                    }
+                    conn.ws.send(cachedFullDataStr);
                   }
-                  
-                  conn.ws.send(JSON.stringify(eventData));
                   clientCount++;
                 } catch {
                   // Ignore send errors
