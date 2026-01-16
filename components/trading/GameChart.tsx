@@ -55,6 +55,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
   
   // Real-time WebSocket price (faster than PriceProvider polling)
   const [wsPrice, setWsPrice] = useState<RealtimePrice | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   
   // Memoize expensive position calculations
@@ -127,6 +128,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
         };
         
         ws.onopen = () => {
+          setWsConnected(true);
           // Subscribe to only the symbol this chart needs
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
@@ -137,6 +139,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
         };
         
         ws.onclose = () => {
+          setWsConnected(false);
           if (!isCleanedUp) {
             // Reconnect after 2 seconds
             reconnectTimeout = setTimeout(connect, 2000);
@@ -144,6 +147,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
         };
         
         ws.onerror = () => {
+          setWsConnected(false);
           ws.close();
         };
       } catch {
@@ -731,6 +735,11 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
             <div className="flex items-center gap-1.5">
               <Star className="size-4 text-yellow-400 animate-spin hidden sm:block" style={{ animationDuration: '3s' }} />
               <span className="text-white font-bold text-xs sm:text-sm">🎮 {symbol}</span>
+              {/* WebSocket status indicator */}
+              <span className={cn(
+                "w-2 h-2 rounded-full",
+                wsConnected ? "bg-green-400 animate-pulse" : "bg-red-400"
+              )} title={wsConnected ? "Live" : "Reconnecting..."} />
             </div>
             
             {currentPrice && (
@@ -761,7 +770,9 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
           <div className="md:hidden flex items-center justify-around gap-2">
             {/* Mid Price */}
             <div className="text-center flex-1">
-              <p className="text-xs text-dark-600 mb-0.5">💰 Price</p>
+              <p className="text-xs text-dark-600 mb-0.5">
+                💰 Price {wsPrice ? '⚡' : '📡'}
+              </p>
               <div className={cn(
                 "text-base font-bold font-mono",
                 isGoingUp ? "text-green-400" : "text-red-400"
@@ -787,7 +798,9 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
           <div className="hidden md:grid grid-cols-4 gap-4">
             {/* Mid Price */}
             <div className="text-center">
-              <p className="text-xs text-dark-600 mb-1">💰 Mid</p>
+              <p className="text-xs text-dark-600 mb-1">
+                💰 Mid {wsPrice ? '⚡ Live' : '📡 Poll'}
+              </p>
               <div className={cn(
                 "text-xl font-bold font-mono",
                 isGoingUp ? "text-green-400" : "text-red-400"
