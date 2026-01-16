@@ -88,6 +88,7 @@ interface WebSocketGlobalState {
   formingCandles5m: Map<string, CachedFormingCandle>;
   formingCandles15m: Map<string, CachedFormingCandle>;
   formingCandles30m: Map<string, CachedFormingCandle>;
+  changedSymbols: Set<string>; // Track symbols that changed since last broadcast
   lastUpdateTime: number;
   initialized: boolean;
   connectionId: string;
@@ -123,6 +124,7 @@ function getGlobalState(): WebSocketGlobalState {
       formingCandles5m: new Map<string, CachedFormingCandle>(),
       formingCandles15m: new Map<string, CachedFormingCandle>(),
       formingCandles30m: new Map<string, CachedFormingCandle>(),
+      changedSymbols: new Set<string>(),
       lastUpdateTime: 0,
       initialized: false,
       connectionId: Math.random().toString(36).substring(7),
@@ -756,6 +758,9 @@ function updateFormingCandle(symbol: ForexSymbol, bidPrice: number): void {
     existing.close = bidPrice;
     existing.tickCount++;
   }
+  
+  // Mark symbol as changed for delta broadcast
+  state.changedSymbols.add(symbol);
   
   // Update higher timeframe caches (fast - no recalculation)
   updateHigherTimeframeCaches(symbol, bidPrice, minuteTime);
@@ -1499,16 +1504,30 @@ async function broadcastFormingCandles(): Promise<void> {
   checkAndUpdateBroadcastInterval().catch(() => {});
   const state = getState();
   
-  // Get all 1m forming candles
-  const formingCandles = Array.from(state.formingCandles.values());
+  // Get only CHANGED symbols for delta broadcast
+  const changedSymbols = state.changedSymbols;
   
-  // Read 5m, 15m, 30m from CACHE (no calculation needed!)
-  const formingCandles5m = Array.from(state.formingCandles5m.values());
-  const formingCandles15m = Array.from(state.formingCandles15m.values());
-  const formingCandles30m = Array.from(state.formingCandles30m.values());
+  // Skip if nothing changed
+  if (changedSymbols.size === 0) return;
   
-  // Get all prices
-  const prices = Array.from(state.priceCache.values());
+  // Filter to only changed symbols
+  const formingCandles = Array.from(state.formingCandles.values())
+    .filter(c => changedSymbols.has(c.symbol));
+  
+  const formingCandles5m = Array.from(state.formingCandles5m.values())
+    .filter(c => changedSymbols.has(c.symbol));
+  
+  const formingCandles15m = Array.from(state.formingCandles15m.values())
+    .filter(c => changedSymbols.has(c.symbol));
+  
+  const formingCandles30m = Array.from(state.formingCandles30m.values())
+    .filter(c => changedSymbols.has(c.symbol));
+  
+  const prices = Array.from(state.priceCache.values())
+    .filter(p => changedSymbols.has(p.symbol));
+  
+  // Clear changed symbols BEFORE sending (so new changes during send are tracked)
+  state.changedSymbols = new Set<string>();
   
   if (formingCandles.length === 0 && prices.length === 0) return;
   
