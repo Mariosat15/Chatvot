@@ -211,8 +211,13 @@ export default function GameModeOrderForm({
     }
   };
   
-  // Quick lot size presets
-  const lotPresets = [0.01, 0.05, 0.1, 0.5, 1.0];
+  // Lot size controls
+  const incrementLot = () => setLotSize(prev => Math.min(10, +(prev + 0.01).toFixed(2)));
+  const decrementLot = () => setLotSize(prev => Math.max(0.01, +(prev - 0.01).toFixed(2)));
+  const handleLotChange = (value: number) => {
+    const rounded = Math.max(0.01, Math.min(10, +value.toFixed(2)));
+    setLotSize(rounded);
+  };
   
   return (
     <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/50 overflow-hidden">
@@ -253,30 +258,61 @@ export default function GameModeOrderForm({
         </div>
       </div>
       
-      {/* Lot Size Selection */}
+      {/* Lot Size Selection - Slider */}
       <div className="p-4 border-b border-purple-500/30">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-3">
           <span className="text-gray-400 text-sm flex items-center gap-1">
             <Zap className="w-4 h-4 text-yellow-400" />
             Position Size (Lots)
           </span>
-          <span className="text-white font-bold">{lotSize}</span>
-        </div>
-        <div className="flex gap-2">
-          {lotPresets.map((preset) => (
+          <div className="flex items-center gap-2">
+            {/* Decrement Button */}
             <button
-              key={preset}
-              onClick={() => setLotSize(preset)}
-              className={cn(
-                "flex-1 py-2 rounded-lg font-bold text-sm transition-all",
-                lotSize === preset
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-500/50"
-                  : "bg-dark-400 text-gray-400 hover:bg-dark-300"
-              )}
+              onClick={decrementLot}
+              disabled={lotSize <= 0.01}
+              className="w-8 h-8 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold text-lg flex items-center justify-center transition-all"
             >
-              {preset}
+              -
             </button>
-          ))}
+            
+            {/* Lot Size Input */}
+            <input
+              type="number"
+              value={lotSize}
+              onChange={(e) => handleLotChange(parseFloat(e.target.value) || 0.01)}
+              step="0.01"
+              min="0.01"
+              max="10"
+              className="w-20 px-2 py-1 bg-dark-400 border border-purple-500/50 rounded-lg text-white text-center font-bold text-lg focus:outline-none focus:border-purple-500"
+            />
+            
+            {/* Increment Button */}
+            <button
+              onClick={incrementLot}
+              disabled={lotSize >= 10}
+              className="w-8 h-8 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold text-lg flex items-center justify-center transition-all"
+            >
+              +
+            </button>
+          </div>
+        </div>
+        
+        {/* Slider */}
+        <input
+          type="range"
+          value={lotSize}
+          onChange={(e) => handleLotChange(parseFloat(e.target.value))}
+          step="0.01"
+          min="0.01"
+          max="2"
+          className="w-full h-2 bg-dark-400 rounded-lg appearance-none cursor-pointer slider-purple"
+        />
+        <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+          <span>0.01</span>
+          <span>0.5</span>
+          <span>1.0</span>
+          <span>1.5</span>
+          <span>2.0</span>
         </div>
       </div>
       
@@ -438,6 +474,34 @@ export default function GameModeOrderForm({
           <span className="text-red-400 text-sm">⚔️ Trading is disabled</span>
         </div>
       )}
+      
+      {/* Slider Styles */}
+      <style jsx global>{`
+        .slider-purple::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #9333ea, #ec4899);
+          cursor: pointer;
+          border: 2px solid #fff;
+          box-shadow: 0 0 10px rgba(147, 51, 234, 0.5);
+        }
+        .slider-purple::-moz-range-thumb {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #9333ea, #ec4899);
+          cursor: pointer;
+          border: 2px solid #fff;
+          box-shadow: 0 0 10px rgba(147, 51, 234, 0.5);
+        }
+        .slider-purple::-webkit-slider-runnable-track {
+          background: linear-gradient(90deg, #9333ea 0%, #ec4899 100%);
+          border-radius: 4px;
+        }
+      `}</style>
     </div>
   );
 }
