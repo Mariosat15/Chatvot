@@ -64,6 +64,9 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
   // Price display ref for direct DOM updates (bypasses React)
   const priceDisplayRef = useRef<HTMLDivElement>(null);
   
+  // Overlay canvas for price line (separate from main chart)
+  const priceOverlayRef = useRef<HTMLCanvasElement>(null);
+  
   // DEBUG: Count WebSocket messages received
   const wsMessageCountRef = useRef<number>(0);
   const [wsMessageCount, setWsMessageCount] = useState(0);
@@ -670,44 +673,50 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
   // Canvas redraws only on structural changes (candles, positions, settings)
   }, [candles, hasPositions, totalPnL, symbolPositions, entryPrice, positionSide, visibleCandles, chartType, timeframe]);
 
-  // FAST PRICE LINE UPDATE - runs frequently via requestAnimationFrame
-  // This only draws the price line, not the entire chart
+  // FAST PRICE LINE UPDATE - uses SEPARATE overlay canvas (no artifacts!)
   useEffect(() => {
-    if (!canvasRef.current || candles.length === 0) return;
+    if (!priceOverlayRef.current || !canvasRef.current || candles.length === 0) return;
+    
+    const overlay = priceOverlayRef.current;
+    const mainCanvas = canvasRef.current;
+    
+    // Match overlay size to main canvas
+    const rect = mainCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    overlay.width = rect.width * dpr;
+    overlay.height = rect.height * dpr;
+    overlay.style.width = `${rect.width}px`;
+    overlay.style.height = `${rect.height}px`;
+    
+    const ctx = overlay.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
     
     let animationFrameId: number;
     let lastDrawnPrice = 0;
     
     const updatePriceLine = () => {
       const price = wsPriceRef.current?.bid || prices.get(symbol)?.bid;
-      if (!price || !canvasRef.current) {
+      if (!price) {
         animationFrameId = requestAnimationFrame(updatePriceLine);
         return;
       }
       
-      // Only redraw if price changed significantly (0.00001)
-      if (Math.abs(price - lastDrawnPrice) < 0.00001) {
+      // Only redraw if price changed
+      if (Math.abs(price - lastDrawnPrice) < 0.000001) {
         animationFrameId = requestAnimationFrame(updatePriceLine);
         return;
       }
       lastDrawnPrice = price;
       
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        animationFrameId = requestAnimationFrame(updatePriceLine);
-        return;
-      }
-      
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
+      // Clear entire overlay (it's transparent, so no artifacts!)
+      ctx.clearRect(0, 0, rect.width, rect.height);
       
       // Calculate chart dimensions (must match main canvas)
       const paddingLeft = 50;
       const paddingRight = 80;
       const paddingTop = 20;
       const paddingBottom = 50;
-      const chartWidth = rect.width - paddingLeft - paddingRight;
       const chartHeight = rect.height - paddingTop - paddingBottom;
       
       // Calculate price range from candles
@@ -719,41 +728,33 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
       // Calculate Y position for current price
       const yPrice = paddingTop + chartHeight - ((price - minPrice) / priceRange) * chartHeight;
       
-      // Clear only the price line area (right side where price label is)
-      ctx.save();
-      ctx.fillStyle = '#1a1a2e'; // Background color
-      ctx.fillRect((rect.width - paddingRight) * dpr, 0, paddingRight * dpr, rect.height * dpr);
-      
       // Determine color
       const lastCandle = candles[candles.length - 1];
       const lineColor = price >= lastCandle.open ? '#22c55e' : '#ef4444';
       
       // Draw price line (dashed)
       ctx.strokeStyle = lineColor;
-      ctx.lineWidth = 2 * dpr;
-      ctx.setLineDash([4 * dpr, 4 * dpr]);
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      ctx.moveTo(paddingLeft * dpr, yPrice * dpr);
-      ctx.lineTo((rect.width - paddingRight) * dpr, yPrice * dpr);
+      ctx.moveTo(paddingLeft, yPrice);
+      ctx.lineTo(rect.width - paddingRight, yPrice);
       ctx.stroke();
       ctx.setLineDash([]);
       
       // Draw price label background
       ctx.fillStyle = lineColor;
-      ctx.fillRect((rect.width - paddingRight + 2) * dpr, (yPrice - 10) * dpr, 70 * dpr, 20 * dpr);
+      ctx.fillRect(rect.width - paddingRight + 2, yPrice - 10, 70, 20);
       
       // Draw price text
-      ctx.font = `bold ${11 * dpr}px monospace`;
+      ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(price.toFixed(5), (rect.width - paddingRight + 5) * dpr, (yPrice + 4) * dpr);
-      
-      ctx.restore();
+      ctx.fillText(price.toFixed(5), rect.width - paddingRight + 5, yPrice + 4);
       
       animationFrameId = requestAnimationFrame(updatePriceLine);
     };
     
-    // Start the animation loop
     animationFrameId = requestAnimationFrame(updatePriceLine);
     
     return () => {
@@ -922,9 +923,16 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
 
       {/* Gaming Chart - MOBILE OPTIMIZED */}
       <div className="relative bg-gradient-to-b from-dark-200 to-dark-300 border-x-2 md:border-x-4 border-purple-600 p-2 md:p-4">
+        {/* Main chart canvas */}
         <canvas
           ref={canvasRef}
           className="w-full h-[400px] sm:h-[450px] md:h-[500px] rounded-lg"
+        />
+        {/* Price line overlay (updates at 60fps, no artifacts) */}
+        <canvas
+          ref={priceOverlayRef}
+          className="absolute inset-0 w-full h-[400px] sm:h-[450px] md:h-[500px] pointer-events-none"
+          style={{ margin: 'inherit', padding: 'inherit' }}
         />
         
         {/* REAL-TIME BID PRICE OVERLAY - Updates independently of canvas */}
