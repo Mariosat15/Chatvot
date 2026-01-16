@@ -52,10 +52,17 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
   const lastPriceRef = useRef<number>(0);
   const lastUpdateRef = useRef<number>(0); // Throttle updates
   
-  // Real-time WebSocket price (faster than PriceProvider polling)
-  const [wsPrice, setWsPrice] = useState<RealtimePrice | null>(null);
+  // Real-time WebSocket price - use REF for fast updates (no React re-renders)
+  const wsPriceRef = useRef<RealtimePrice | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  
+  // Force update counter - only used to trigger re-renders when needed
+  const [, forceUpdate] = useState(0);
+  const lastForceUpdateRef = useRef<number>(0);
+  
+  // Price display ref for direct DOM updates (bypasses React)
+  const priceDisplayRef = useRef<HTMLDivElement>(null);
   
   // Memoize expensive position calculations
   const { symbolPositions, totalPnL, hasPositions, entryPrice, positionSide } = useMemo(() => {
@@ -72,7 +79,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
 
   // Get current price - prefer WebSocket price (faster), fallback to PriceProvider (polling)
   const pollPrice = prices.get(symbol);
-  const currentPrice = wsPrice || pollPrice;
+  const currentPrice = wsPriceRef.current || pollPrice;
 
   // Subscribe to price updates via PriceProvider (fallback)
   useEffect(() => {
@@ -111,15 +118,24 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
               );
               
               if (priceData) {
-                // Update price state immediately
-                setWsPrice({
+                // Update price REF (no React re-render!)
+                wsPriceRef.current = {
                   bid: priceData.bid,
                   ask: priceData.ask,
                   mid: (priceData.bid + priceData.ask) / 2,
-                });
-              } else {
-                // DEBUG: Log if symbol not found in prices array
-                console.log('🎮 WS: Symbol not found in prices', { symbol, pricesCount: prices?.length });
+                };
+                
+                // DIRECT DOM UPDATE for price display (bypasses React completely!)
+                if (priceDisplayRef.current) {
+                  priceDisplayRef.current.textContent = priceData.bid.toFixed(5);
+                }
+                
+                // Force React re-render only every 200ms (for other UI elements)
+                const now = Date.now();
+                if (now - lastForceUpdateRef.current > 200) {
+                  lastForceUpdateRef.current = now;
+                  forceUpdate(n => n + 1);
+                }
               }
             }
           } catch (e) {
@@ -169,7 +185,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
         wsRef.current.close();
         wsRef.current = null;
       }
-      setWsPrice(null);
+      wsPriceRef.current = null;
     };
   }, [symbol]);
 
@@ -741,16 +757,19 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
                 "w-2 h-2 rounded-full ml-1",
                 wsConnected ? "bg-green-400 animate-pulse" : "bg-red-400"
               )} title={wsConnected ? "Live" : "Reconnecting..."} />
-              <span className="text-[10px] text-white/70">{wsPrice ? '⚡' : '📡'}</span>
+              <span className="text-[10px] text-white/70">{wsPriceRef.current ? '⚡' : '📡'}</span>
             </div>
             
-            {/* Price display - BID is main price (same as Professional mode chart) */}
+            {/* Price display - BID is main price (DIRECT DOM UPDATE for speed!) */}
             {currentPrice && (
               <div className="flex items-center gap-2 md:gap-4 text-xs font-mono">
-                <div className={cn(
-                  "font-bold text-sm md:text-base",
-                  isGoingUp ? "text-green-400" : "text-red-400"
-                )}>
+                <div 
+                  ref={priceDisplayRef}
+                  className={cn(
+                    "font-bold text-sm md:text-base transition-colors",
+                    isGoingUp ? "text-green-400" : "text-red-400"
+                  )}
+                >
                   {currentPrice.bid.toFixed(5)}
                 </div>
                 <div className="flex items-center gap-1 text-white/60">
@@ -773,7 +792,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
             {/* Main BID Price */}
             <div className="text-center flex-1">
               <p className="text-[10px] text-dark-600">
-                BID {wsPrice ? '⚡' : '📡'}
+                BID {wsPriceRef.current ? '⚡' : '📡'}
               </p>
               <div className={cn(
                 "text-lg md:text-2xl font-bold font-mono",
