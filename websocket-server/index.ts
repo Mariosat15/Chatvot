@@ -102,6 +102,25 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // Stats endpoint for server monitor
+  if (req.url === '/stats') {
+    // Count all unique subscribed symbols across all connections
+    const allSubscribedSymbols = new Set<string>();
+    connections.forEach((conn) => {
+      conn.subscribedSymbols.forEach((symbol) => allSubscribedSymbols.add(symbol));
+    });
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      connections: connections.size,
+      subscribedSymbols: allSubscribedSymbols.size,
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      timestamp: Date.now(),
+    }));
+    return;
+  }
+
   // Stats endpoint
   if (req.url === '/stats') {
     const memUsage = process.memoryUsage();

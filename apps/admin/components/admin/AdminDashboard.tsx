@@ -89,6 +89,7 @@ import NotificationSystemSection from '@/components/admin/NotificationSystemSect
 import MarketplaceSection from '@/components/admin/MarketplaceSection';
 import LandingPageBuilder from '@/components/admin/LandingPageBuilder';
 import RedisSettingsSection from '@/components/admin/RedisSettingsSection';
+import ServerMonitorSection from '@/components/admin/ServerMonitorSection';
 import DevSettingsSection from '@/components/admin/DevSettingsSection';
 import TradingHistorySection from '@/components/admin/TradingHistorySection';
 import PerformanceSimulatorSection from '@/components/admin/PerformanceSimulatorSection';
@@ -444,6 +445,7 @@ const menuGroups: MenuGroup[] = [
         color: 'text-lime-400',
         bgColor: 'bg-lime-500/10 hover:bg-lime-500/20',
         children: [
+          { id: 'server-monitor', label: 'Server Monitor', icon: <Activity className="h-4 w-4" /> },
           { id: 'redis', label: 'Redis Cache', icon: <Server className="h-4 w-4" /> },
           { id: 'dev-settings', label: 'Test', icon: <Terminal className="h-4 w-4" /> },
           { id: 'performance-simulator', label: 'Performance Simulator', icon: <Activity className="h-4 w-4" /> },
@@ -787,6 +789,8 @@ export default function AdminDashboard({
         return <FeeSettingsSection key={currentRefreshKey} />;
       case 'payment-providers':
         return <PaymentProvidersSection key={currentRefreshKey} />;
+      case 'server-monitor':
+        return <ServerMonitorSection key={currentRefreshKey} />;
       case 'redis':
         return <RedisSettingsSection key={currentRefreshKey} />;
       case 'database':
