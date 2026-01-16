@@ -32,6 +32,13 @@ interface Participant {
   currentOpenPositions: number;
 }
 
+interface MarginThresholds {
+  LIQUIDATION: number;
+  MARGIN_CALL: number;
+  WARNING: number;
+  SAFE?: number;
+}
+
 interface TradingPageContentProps {
   // Props for game mode
   competition: Competition;
@@ -41,6 +48,7 @@ interface TradingPageContentProps {
   defaultLeverage: number;
   startingCapital: number;
   isDisqualified?: boolean;
+  marginThresholds?: MarginThresholds;
   // Children for professional mode (existing layout)
   children: ReactNode;
 }
@@ -53,6 +61,7 @@ export default function TradingPageContent({
   defaultLeverage,
   startingCapital,
   isDisqualified,
+  marginThresholds,
   children,
 }: TradingPageContentProps) {
   const { mode } = useTradingMode();
@@ -68,6 +77,7 @@ export default function TradingPageContent({
         defaultLeverage={defaultLeverage}
         startingCapital={startingCapital}
         isDisqualified={isDisqualified}
+        marginThresholds={marginThresholds}
       />
     );
   }

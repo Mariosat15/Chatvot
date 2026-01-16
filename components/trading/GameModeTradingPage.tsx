@@ -40,6 +40,13 @@ interface Participant {
   currentOpenPositions: number;
 }
 
+interface MarginThresholds {
+  LIQUIDATION: number;
+  MARGIN_CALL: number;
+  WARNING: number;
+  SAFE?: number;
+}
+
 interface GameModeTradingPageProps {
   competition: Competition;
   participant: Participant;
@@ -48,6 +55,7 @@ interface GameModeTradingPageProps {
   defaultLeverage: number;
   startingCapital: number;
   isDisqualified?: boolean;
+  marginThresholds?: MarginThresholds;
 }
 
 export default function GameModeTradingPage({
@@ -58,6 +66,7 @@ export default function GameModeTradingPage({
   defaultLeverage,
   startingCapital,
   isDisqualified = false,
+  marginThresholds,
 }: GameModeTradingPageProps) {
   const { symbol } = useChartSymbol();
   const { marketOpen } = usePrices();
@@ -232,6 +241,7 @@ export default function GameModeTradingPage({
               openPositionsCount={positions.length}
               maxPositions={10}
               disabled={isDisqualified}
+              marginThresholds={marginThresholds}
             />
           </div>
         </div>

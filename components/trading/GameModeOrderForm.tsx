@@ -10,6 +10,13 @@ import Image from 'next/image';
 import { Loader2, TrendingUp, TrendingDown, Zap, Target, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface MarginThresholds {
+  LIQUIDATION: number;
+  MARGIN_CALL: number;
+  WARNING: number;
+  SAFE?: number;
+}
+
 interface GameModeOrderFormProps {
   competitionId: string;
   availableCapital: number;
@@ -20,11 +27,13 @@ interface GameModeOrderFormProps {
   openPositionsCount?: number;
   maxPositions?: number;
   disabled?: boolean;
+  marginThresholds?: MarginThresholds;
 }
 
 // Default margin thresholds
 const DEFAULT_MARGIN_THRESHOLDS = {
-  MARGIN_CALL: 100,  // 100% - block new trades
+  SAFE_MARGIN: 260,  // 260% - block new trades (same as Pro)
+  MARGIN_CALL: 100,  // 100% - margin call level
   LIQUIDATION: 50,   // 50% - stop out
   WARNING: 150,      // 150% - warning
 };
@@ -39,6 +48,7 @@ export default function GameModeOrderForm({
   openPositionsCount = 0,
   maxPositions = 10,
   disabled = false,
+  marginThresholds: propMarginThresholds,
 }: GameModeOrderFormProps) {
   const { symbol } = useChartSymbol();
   const { prices } = usePrices();
@@ -49,8 +59,6 @@ export default function GameModeOrderForm({
   const [slPips, setSlPips] = useState<number>(10);
   const [useTp, setUseTp] = useState(true);
   const [useSl, setUseSl] = useState(true);
-  const [marginThresholds, setMarginThresholds] = useState(DEFAULT_MARGIN_THRESHOLDS);
-  
   // Use fixed leverage from admin
   const leverage = defaultLeverage;
   
@@ -61,27 +69,10 @@ export default function GameModeOrderForm({
   // Use current equity or fallback to balance
   const equity = currentEquity ?? currentBalance;
   
-  // Fetch margin thresholds from admin settings
-  useEffect(() => {
-    const fetchThresholds = async () => {
-      try {
-        const res = await fetch('/api/admin/settings/margin-thresholds');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.thresholds) {
-            setMarginThresholds({
-              MARGIN_CALL: data.thresholds.MARGIN_CALL || DEFAULT_MARGIN_THRESHOLDS.MARGIN_CALL,
-              LIQUIDATION: data.thresholds.LIQUIDATION || DEFAULT_MARGIN_THRESHOLDS.LIQUIDATION,
-              WARNING: data.thresholds.WARNING || DEFAULT_MARGIN_THRESHOLDS.WARNING,
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch margin thresholds:', error);
-      }
-    };
-    fetchThresholds();
-  }, []);
+  // Get margin thresholds from props or use defaults
+  // SAFE_MARGIN is the level below which new trades are blocked (same as Pro uses MARGIN_CALL)
+  const safeMarginThreshold = propMarginThresholds?.MARGIN_CALL || DEFAULT_MARGIN_THRESHOLDS.SAFE_MARGIN;
+  const warningThreshold = propMarginThresholds?.WARNING || DEFAULT_MARGIN_THRESHOLDS.WARNING;
   
   // Calculate margin required for this trade
   const marginRequired = useMemo(() => {
@@ -101,11 +92,11 @@ export default function GameModeOrderForm({
     return newTotalMargin > 0 ? (equity / newTotalMargin) * 100 : Infinity;
   }, [equity, newTotalMargin]);
   
-  // Check if current margin is already below margin call (block ALL trades)
-  const currentlyBelowMarginCall = usedMargin > 0 && currentMarginLevel < marginThresholds.MARGIN_CALL;
+  // Check if current margin is already below safe margin (block ALL new trades)
+  const currentlyBelowSafeMargin = usedMargin > 0 && currentMarginLevel < safeMarginThreshold;
   
-  // Check if trade would push margin below margin call
-  const wouldCauseMarginCall = marginLevelAfterTrade < marginThresholds.MARGIN_CALL;
+  // Check if trade would push margin below safe margin (uses admin MARGIN_CALL setting)
+  const wouldBreachSafeMargin = marginLevelAfterTrade < safeMarginThreshold;
   
   // Check if at max positions
   const atMaxPositions = openPositionsCount >= maxPositions;
@@ -115,8 +106,8 @@ export default function GameModeOrderForm({
     !disabled &&
     availableCapital >= marginRequired &&
     !atMaxPositions &&
-    !currentlyBelowMarginCall &&
-    !wouldCauseMarginCall;
+    !currentlyBelowSafeMargin &&
+    !wouldBreachSafeMargin;
   
   // Calculate TP/SL prices
   const calculateTPFromPips = (side: 'long' | 'short', pips: number) => {
@@ -151,11 +142,11 @@ export default function GameModeOrderForm({
       } else if (atMaxPositions) {
         errorMessage = `Maximum ${maxPositions} positions reached. Close some positions first.`;
         errorTitle = '🚫 Max Positions';
-      } else if (currentlyBelowMarginCall) {
-        errorMessage = `MARGIN CALL: Your margin level is ${currentMarginLevel.toFixed(1)}%, below the ${marginThresholds.MARGIN_CALL}% threshold. Close positions before opening new trades.`;
-        errorTitle = '🚨 Margin Call';
-      } else if (wouldCauseMarginCall) {
-        errorMessage = `This trade would drop your margin to ${marginLevelAfterTrade.toFixed(1)}%, below the ${marginThresholds.MARGIN_CALL}% threshold. Reduce lot size or close positions.`;
+      } else if (currentlyBelowSafeMargin) {
+        errorMessage = `Your margin level is ${currentMarginLevel.toFixed(1)}%, below the ${safeMarginThreshold}% threshold. Close positions before opening new trades.`;
+        errorTitle = '🚨 Low Margin';
+      } else if (wouldBreachSafeMargin) {
+        errorMessage = `This trade would drop your margin to ${marginLevelAfterTrade.toFixed(1)}%, below the ${safeMarginThreshold}% threshold. Reduce lot size or close positions.`;
         errorTitle = '⚠️ Margin Warning';
       } else if (marginRequired > availableCapital) {
         errorMessage = `Insufficient margin. Need $${marginRequired.toFixed(2)}, have $${availableCapital.toFixed(2)}.`;
@@ -199,7 +190,7 @@ export default function GameModeOrderForm({
         });
       } else {
         toast.error('❌ Trade failed!', {
-          description: result.error || 'Unknown error',
+          description: result.message || 'Unknown error',
         });
       }
     } catch (error) {
@@ -392,8 +383,8 @@ export default function GameModeOrderForm({
           <span className="text-gray-400">📊 Margin Level After</span>
           <span className={cn(
             "font-bold",
-            wouldCauseMarginCall ? "text-red-500" : 
-            marginLevelAfterTrade < marginThresholds.WARNING ? "text-yellow-500" : 
+            wouldBreachSafeMargin ? "text-red-500" : 
+            marginLevelAfterTrade < warningThreshold ? "text-yellow-500" : 
             "text-green-500"
           )}>
             {Number.isFinite(marginLevelAfterTrade) ? `${marginLevelAfterTrade.toFixed(1)}%` : '∞'}
@@ -401,16 +392,16 @@ export default function GameModeOrderForm({
         </div>
         
         {/* Warning Messages */}
-        {currentlyBelowMarginCall && (
+        {currentlyBelowSafeMargin && (
           <div className="flex items-center gap-2 p-2 bg-red-500/20 border border-red-500/50 rounded-lg text-xs text-red-400">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-            <span>🚨 Margin Call - {currentMarginLevel.toFixed(1)}% - Close positions to trade</span>
+            <span>🚨 Below safe margin - {currentMarginLevel.toFixed(1)}% - Close positions to trade</span>
           </div>
         )}
-        {!currentlyBelowMarginCall && wouldCauseMarginCall && (
+        {!currentlyBelowSafeMargin && wouldBreachSafeMargin && (
           <div className="flex items-center gap-2 p-2 bg-orange-500/20 border border-orange-500/50 rounded-lg text-xs text-orange-400">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-            <span>⚠️ Would drop below {marginThresholds.MARGIN_CALL}% - Reduce size</span>
+            <span>⚠️ Would drop below {safeMarginThreshold}% - Trade blocked</span>
           </div>
         )}
         {atMaxPositions && (

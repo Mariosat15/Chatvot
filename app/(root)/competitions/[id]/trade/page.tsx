@@ -176,6 +176,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
           defaultLeverage={defaultLeverage}
           startingCapital={competition.startingCapital}
           isDisqualified={isDisqualified}
+          marginThresholds={marginThresholds}
         >
         <div className="min-h-screen bg-gradient-to-br from-dark-100 via-dark-100 to-dark-200">
         {/* View-Only Banner for Completed Competitions */}
