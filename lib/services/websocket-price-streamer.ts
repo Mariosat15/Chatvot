@@ -61,6 +61,16 @@ interface CompletedCandle {
   close: number;
 }
 
+// Cached forming candle for higher timeframes (updated incrementally)
+interface CachedFormingCandle {
+  symbol: string;
+  periodStart: number;  // Unix timestamp in SECONDS (start of period)
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
 interface WebSocketGlobalState {
   ws: import('ws').WebSocket | null;
   isConnecting: boolean;
@@ -74,6 +84,9 @@ interface WebSocketGlobalState {
   symbolSpreadSettings: Map<string, SymbolSpreadSettings>; // Fixed spread settings per symbol
   formingCandles: Map<string, FormingCandle>; // Current minute candles being built
   completedCandlesBuffer: Map<string, CompletedCandle[]>; // Recent completed 1m candles per symbol (for 5m aggregation)
+  // Cached forming candles for higher timeframes (updated incrementally, not recalculated)
+  formingCandles5m: Map<string, CachedFormingCandle>;
+  formingCandles15m: Map<string, CachedFormingCandle>;
   lastUpdateTime: number;
   initialized: boolean;
   connectionId: string;
@@ -106,6 +119,8 @@ function getGlobalState(): WebSocketGlobalState {
       symbolSpreadSettings: new Map<string, SymbolSpreadSettings>(),
       formingCandles: new Map<string, FormingCandle>(),
       completedCandlesBuffer: new Map<string, CompletedCandle[]>(), // For 5m aggregation
+      formingCandles5m: new Map<string, CachedFormingCandle>(),
+      formingCandles15m: new Map<string, CachedFormingCandle>(),
       lastUpdateTime: 0,
       initialized: false,
       connectionId: Math.random().toString(36).substring(7),
@@ -754,6 +769,59 @@ function updateFormingCandle(symbol: ForexSymbol, bidPrice: number): void {
     existing.close = bidPrice;
     existing.tickCount++;
   }
+  
+  // Update higher timeframe caches (fast - no recalculation)
+  updateHigherTimeframeCaches(symbol, bidPrice, minuteTime);
+}
+
+/**
+ * Update cached forming candles for higher timeframes
+ * This is FAST - just updates high/low/close, no iteration needed
+ */
+function updateHigherTimeframeCaches(symbol: string, price: number, currentTime: number): void {
+  const state = getState();
+  
+  // Update 5m cache
+  const period5m = Math.floor(currentTime / 300) * 300; // 5 min = 300 sec
+  const existing5m = state.formingCandles5m.get(symbol);
+  
+  if (!existing5m || existing5m.periodStart !== period5m) {
+    // New 5m period - start fresh
+    state.formingCandles5m.set(symbol, {
+      symbol,
+      periodStart: period5m,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+    });
+  } else {
+    // Same period - just update high/low/close
+    existing5m.high = Math.max(existing5m.high, price);
+    existing5m.low = Math.min(existing5m.low, price);
+    existing5m.close = price;
+  }
+  
+  // Update 15m cache
+  const period15m = Math.floor(currentTime / 900) * 900; // 15 min = 900 sec
+  const existing15m = state.formingCandles15m.get(symbol);
+  
+  if (!existing15m || existing15m.periodStart !== period15m) {
+    // New 15m period - start fresh
+    state.formingCandles15m.set(symbol, {
+      symbol,
+      periodStart: period15m,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+    });
+  } else {
+    // Same period - just update high/low/close
+    existing15m.high = Math.max(existing15m.high, price);
+    existing15m.low = Math.min(existing15m.low, price);
+    existing15m.close = price;
+  }
 }
 
 /**
@@ -1210,17 +1278,41 @@ export function getFormingCandle(symbol: string): FormingCandle | null {
 }
 
 /**
- * Get 5m forming candle (calculated from buffer + 1m forming)
+ * Get 5m forming candle (from cache - fast!)
  */
 export function getForming5mCandle(symbol: string): FormingCandle | null {
-  return calculate5mFormingCandle(symbol);
+  const state = getState();
+  const cached = state.formingCandles5m.get(symbol);
+  if (!cached) return null;
+  
+  return {
+    symbol: cached.symbol,
+    time: cached.periodStart,
+    open: cached.open,
+    high: cached.high,
+    low: cached.low,
+    close: cached.close,
+    tickCount: 0,
+  };
 }
 
 /**
- * Get 15m forming candle (calculated from buffer + 1m forming)
+ * Get 15m forming candle (from cache - fast!)
  */
 export function getForming15mCandle(symbol: string): FormingCandle | null {
-  return calculate15mFormingCandle(symbol);
+  const state = getState();
+  const cached = state.formingCandles15m.get(symbol);
+  if (!cached) return null;
+  
+  return {
+    symbol: cached.symbol,
+    time: cached.periodStart,
+    open: cached.open,
+    high: cached.high,
+    low: cached.low,
+    close: cached.close,
+    tickCount: 0,
+  };
 }
 
 /**
@@ -1380,21 +1472,9 @@ async function broadcastFormingCandles(): Promise<void> {
   // Get all 1m forming candles
   const formingCandles = Array.from(state.formingCandles.values());
   
-  // Calculate 5m and 15m forming candles for each symbol
-  const formingCandles5m: FormingCandle[] = [];
-  const formingCandles15m: FormingCandle[] = [];
-  
-  for (const candle1m of formingCandles) {
-    const candle5m = calculate5mFormingCandle(candle1m.symbol);
-    if (candle5m) {
-      formingCandles5m.push(candle5m);
-    }
-    
-    const candle15m = calculate15mFormingCandle(candle1m.symbol);
-    if (candle15m) {
-      formingCandles15m.push(candle15m);
-    }
-  }
+  // Read 5m and 15m from CACHE (no calculation needed!)
+  const formingCandles5m = Array.from(state.formingCandles5m.values());
+  const formingCandles15m = Array.from(state.formingCandles15m.values());
   
   // Get all prices
   const prices = Array.from(state.priceCache.values());
@@ -1426,20 +1506,20 @@ async function broadcastFormingCandles(): Promise<void> {
           close: c.close,
           timeframe: '1m',
         })),
-        // 5m forming candles (aggregated from 1m)
+        // 5m forming candles (from cache - no calculation)
         formingCandles5m: formingCandles5m.map(c => ({
           symbol: c.symbol,
-          time: c.time,
+          time: c.periodStart,
           open: c.open,
           high: c.high,
           low: c.low,
           close: c.close,
           timeframe: '5m',
         })),
-        // 15m forming candles (aggregated from 1m)
+        // 15m forming candles (from cache - no calculation)
         formingCandles15m: formingCandles15m.map(c => ({
           symbol: c.symbol,
-          time: c.time,
+          time: c.periodStart,
           open: c.open,
           high: c.high,
           low: c.low,
