@@ -33,11 +33,12 @@ async function getPM2Processes(): Promise<PM2Process[]> {
 
 async function getWebSocketConnections(): Promise<{ connections: number; subscribedSymbols: number }> {
   try {
-    // Try to get stats from the websocket server
-    const wsServerUrl = process.env.NEXT_PUBLIC_WS_SERVER_URL || process.env.WS_SERVER_URL || 'http://localhost:8080';
-    const baseUrl = wsServerUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+    // The WebSocket server runs on WEBSOCKET_PORT (default 3003) internally
+    // Use localhost to access the internal HTTP /stats endpoint
+    const wsPort = process.env.WEBSOCKET_PORT || '3003';
+    const statsUrl = `http://localhost:${wsPort}/stats`;
     
-    const response = await fetch(`${baseUrl}/stats`, { 
+    const response = await fetch(statsUrl, { 
       method: 'GET',
       signal: AbortSignal.timeout(2000) 
     });
@@ -49,9 +50,11 @@ async function getWebSocketConnections(): Promise<{ connections: number; subscri
         subscribedSymbols: data.subscribedSymbols || 0,
       };
     }
+    console.log(`[Server Monitor] WebSocket stats fetch failed: ${response.status}`);
     return { connections: 0, subscribedSymbols: 0 };
-  } catch {
+  } catch (error) {
     // If we can't reach the websocket server, return 0
+    console.log(`[Server Monitor] WebSocket stats error:`, error instanceof Error ? error.message : error);
     return { connections: 0, subscribedSymbols: 0 };
   }
 }
