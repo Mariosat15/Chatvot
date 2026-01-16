@@ -364,6 +364,56 @@ export default function GameModeOrderForm({
       
       {/* Margin Info */}
       <div className="p-4 border-b border-purple-500/30 bg-dark-400/30 space-y-2">
+        {/* Current Margin Level - Gaming Style */}
+        {openPositionsCount > 0 && (
+          <div className={cn(
+            "p-3 rounded-lg border-2 mb-3",
+            currentMarginLevel < 100 ? "bg-gradient-to-r from-red-900/40 to-orange-900/40 border-red-500 animate-pulse" :
+            currentMarginLevel < safeMarginThreshold ? "bg-gradient-to-r from-red-900/30 to-pink-900/30 border-red-500/70" :
+            currentMarginLevel < warningThreshold ? "bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-yellow-500/50" :
+            "bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-green-500/50"
+          )}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {currentMarginLevel < 100 ? (
+                  <span className="text-2xl animate-bounce">💀</span>
+                ) : currentMarginLevel < safeMarginThreshold ? (
+                  <span className="text-2xl">🚨</span>
+                ) : currentMarginLevel < warningThreshold ? (
+                  <span className="text-2xl">⚠️</span>
+                ) : (
+                  <span className="text-2xl">🛡️</span>
+                )}
+                <div>
+                  <span className="text-xs text-gray-400 uppercase tracking-wider">Current Margin</span>
+                  <p className={cn(
+                    "text-xl font-black font-mono",
+                    currentMarginLevel < 100 ? "text-red-400" :
+                    currentMarginLevel < safeMarginThreshold ? "text-red-400" :
+                    currentMarginLevel < warningThreshold ? "text-yellow-400" :
+                    "text-green-400"
+                  )}>
+                    {Number.isFinite(currentMarginLevel) ? `${currentMarginLevel.toFixed(1)}%` : '∞'}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-gray-400">Safe: {safeMarginThreshold}%</span>
+              </div>
+            </div>
+            {/* Warning message */}
+            {currentMarginLevel < 100 && (
+              <p className="text-xs text-red-300 mt-2 font-semibold">💀 GAME OVER! Positions will be liquidated!</p>
+            )}
+            {currentMarginLevel >= 100 && currentMarginLevel < safeMarginThreshold && (
+              <p className="text-xs text-red-300 mt-2">🚨 DANGER! Close positions or reduce exposure!</p>
+            )}
+            {currentMarginLevel >= safeMarginThreshold && currentMarginLevel < warningThreshold && (
+              <p className="text-xs text-yellow-300 mt-2">⚠️ Running low - consider reducing positions</p>
+            )}
+          </div>
+        )}
+        
         <div className="flex justify-between text-sm">
           <span className="text-gray-400">💵 Required Margin</span>
           <span className={cn(
@@ -380,7 +430,7 @@ export default function GameModeOrderForm({
         
         {/* Margin Level After Trade */}
         <div className="flex justify-between text-sm pt-2 border-t border-purple-500/20">
-          <span className="text-gray-400">📊 Margin Level After</span>
+          <span className="text-gray-400">📊 After Trade</span>
           <span className={cn(
             "font-bold",
             wouldBreachSafeMargin ? "text-red-500" : 
@@ -391,13 +441,7 @@ export default function GameModeOrderForm({
           </span>
         </div>
         
-        {/* Warning Messages */}
-        {currentlyBelowSafeMargin && (
-          <div className="flex items-center gap-2 p-2 bg-red-500/20 border border-red-500/50 rounded-lg text-xs text-red-400">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-            <span>🚨 Below safe margin - {currentMarginLevel.toFixed(1)}% - Close positions to trade</span>
-          </div>
-        )}
+        {/* Trade blocking warnings */}
         {!currentlyBelowSafeMargin && wouldBreachSafeMargin && (
           <div className="flex items-center gap-2 p-2 bg-orange-500/20 border border-orange-500/50 rounded-lg text-xs text-orange-400">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />

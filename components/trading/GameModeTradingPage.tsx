@@ -11,6 +11,8 @@ import GameModeOrderForm from './GameModeOrderForm';
 import GameModePositions from './GameModePositions';
 import GameMarketWatchSidebar from './GameMarketWatchSidebar';
 import { ArrowLeft, Users, Swords, Monitor, Gamepad2 } from 'lucide-react';
+import { MarginStatusIndicator } from './MarginStatusIndicator';
+import { getMarginStatus } from '@/lib/services/risk-manager.service';
 
 interface Position {
   _id: string;
@@ -72,6 +74,23 @@ export default function GameModeTradingPage({
   const { marketOpen } = usePrices();
   
   const equity = participant.currentCapital + participant.unrealizedPnl;
+  
+  // Calculate margin level
+  const marginLevel = participant.usedMargin > 0 
+    ? (equity / participant.usedMargin) * 100 
+    : Infinity;
+  
+  // Get margin status for warning banner
+  const marginStatus = getMarginStatus(
+    participant.currentCapital,
+    participant.unrealizedPnl,
+    participant.usedMargin,
+    marginThresholds ? {
+      liquidation: marginThresholds.LIQUIDATION,
+      marginCall: marginThresholds.MARGIN_CALL,
+      warning: marginThresholds.WARNING,
+    } : undefined
+  );
   
   // Calculate time remaining
   const endTime = new Date(competition.endTime);
@@ -145,6 +164,15 @@ export default function GameModeTradingPage({
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
           {/* Left Column - Chart & Positions */}
           <div className="xl:col-span-8 space-y-4">
+            {/* Margin Warning Banner */}
+            <MarginStatusIndicator
+              status={marginStatus.status}
+              marginLevel={marginLevel}
+              message={marginStatus.message}
+              mode="game"
+              openPositionsCount={positions.length}
+            />
+            
             {/* Chart */}
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 overflow-hidden shadow-2xl shadow-purple-500/10">
               <GameChart 
@@ -204,10 +232,32 @@ export default function GameModeTradingPage({
                   </div>
                 </div>
                 
-                {/* Used Margin */}
-                <div className="bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 rounded-xl p-3 border border-yellow-500/30">
-                  <div className="text-[10px] text-yellow-300 uppercase tracking-wider mb-1">🔒 Margin</div>
-                  <div className="text-white font-bold text-lg">${participant.usedMargin.toFixed(2)}</div>
+                {/* Margin Level */}
+                <div className={cn(
+                  "rounded-xl p-3 border",
+                  marginLevel < 100 ? "bg-gradient-to-br from-red-500/30 to-red-600/20 border-red-500/50 animate-pulse" :
+                  marginLevel < (marginThresholds?.MARGIN_CALL || 260) ? "bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30" :
+                  marginLevel < (marginThresholds?.WARNING || 300) ? "bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border-yellow-500/30" :
+                  "bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30"
+                )}>
+                  <div className={cn(
+                    "text-[10px] uppercase tracking-wider mb-1",
+                    marginLevel < 100 ? "text-red-300" :
+                    marginLevel < (marginThresholds?.MARGIN_CALL || 260) ? "text-red-300" :
+                    marginLevel < (marginThresholds?.WARNING || 300) ? "text-yellow-300" :
+                    "text-green-300"
+                  )}>
+                    {marginLevel < 100 ? '💀' : marginLevel < (marginThresholds?.MARGIN_CALL || 260) ? '🚨' : '🛡️'} Margin Level
+                  </div>
+                  <div className={cn(
+                    "font-bold text-lg font-mono",
+                    marginLevel < 100 ? "text-red-400" :
+                    marginLevel < (marginThresholds?.MARGIN_CALL || 260) ? "text-red-400" :
+                    marginLevel < (marginThresholds?.WARNING || 300) ? "text-yellow-400" :
+                    "text-green-400"
+                  )}>
+                    {Number.isFinite(marginLevel) ? `${marginLevel.toFixed(0)}%` : '∞'}
+                  </div>
                 </div>
                 
                 {/* Available */}
