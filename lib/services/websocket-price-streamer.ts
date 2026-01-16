@@ -1415,6 +1415,63 @@ export function getForming30mCandle(symbol: string): FormingCandle | null {
 }
 
 /**
+ * Get 1h forming candle (from cache - fast!)
+ */
+export function getForming1hCandle(symbol: string): FormingCandle | null {
+  const state = getState();
+  const cached = state.formingCandles1h.get(symbol);
+  if (!cached) return null;
+  
+  return {
+    symbol: cached.symbol,
+    time: cached.periodStart,
+    open: cached.open,
+    high: cached.high,
+    low: cached.low,
+    close: cached.close,
+    tickCount: 0,
+  };
+}
+
+/**
+ * Get 4h forming candle (from cache - fast!)
+ */
+export function getForming4hCandle(symbol: string): FormingCandle | null {
+  const state = getState();
+  const cached = state.formingCandles4h.get(symbol);
+  if (!cached) return null;
+  
+  return {
+    symbol: cached.symbol,
+    time: cached.periodStart,
+    open: cached.open,
+    high: cached.high,
+    low: cached.low,
+    close: cached.close,
+    tickCount: 0,
+  };
+}
+
+/**
+ * Get Daily forming candle (from cache - fast!)
+ */
+export function getFormingDailyCandle(symbol: string): FormingCandle | null {
+  const state = getState();
+  const cached = state.formingCandlesD.get(symbol);
+  if (!cached) return null;
+  
+  return {
+    symbol: cached.symbol,
+    time: cached.periodStart,
+    open: cached.open,
+    high: cached.high,
+    low: cached.low,
+    close: cached.close,
+    tickCount: 0,
+  };
+}
+
+/**
  * Get all forming candles (current minute candles being built)
  */
 export function getAllFormingCandles(): Map<string, FormingCandle> {

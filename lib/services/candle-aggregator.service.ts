@@ -58,6 +58,10 @@ const TIMEFRAME_MINUTES: Record<string, number> = {
   '60': 60,
   '4h': 240,
   '240': 240,
+  '1d': 1440,
+  '1D': 1440,
+  'D': 1440,
+  '1440': 1440,
 };
 
 // Cache TTL in milliseconds (shorter = more up-to-date, longer = less computation)
@@ -72,6 +76,10 @@ const CACHE_TTL_MS: Record<string, number> = {
   '60': 120000,
   '4h': 300000,   // 5 minutes
   '240': 300000,
+  '1d': 600000,   // 10 minutes for daily
+  '1D': 600000,
+  'D': 600000,
+  '1440': 600000,
 };
 
 // ============================================

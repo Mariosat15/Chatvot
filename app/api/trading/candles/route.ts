@@ -3,7 +3,12 @@ import { connectToDatabase } from '@/database/mongoose';
 import Candle1m from '@/database/models/candle-1m.model';
 import { getRecentCandles, fetchCandlesForRange, Timeframe } from '@/lib/services/forex-historical.service';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
-import { getFormingCandle } from '@/lib/services/websocket-price-streamer';
+import { 
+  getFormingCandle, 
+  getForming1hCandle,
+  getForming4hCandle,
+  getFormingDailyCandle 
+} from '@/lib/services/websocket-price-streamer';
 import { getAggregatedCandles, isAggregatorSupported } from '@/lib/services/candle-aggregator.service';
 import { 
   getHistoricalCandles, 
@@ -568,16 +573,29 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
   }
   
   // For aggregator-supported timeframes, use hybrid approach
-  if (isAggregatorSupported(normalizedTf) || ['5m', '15m', '30m', '1h', '4h', '1d'].includes(normalizedTf)) {
+  // EXCEPT for daily - aggregating 1440 * 500 = 720,000 1m candles is impractical
+  const useAggregator = isAggregatorSupported(normalizedTf) && normalizedTf !== '1d';
+  
+  if (useAggregator || ['5m', '15m', '30m', '1h', '4h', '1d'].includes(normalizedTf)) {
     try {
       // Step 1: Get aggregated candles from 1m data (recent)
+      // Skip for daily - too many 1m candles needed
       let aggregatedCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
       let formingCandle = null;
       
-      if (isAggregatorSupported(normalizedTf)) {
+      if (useAggregator) {
         const result = await getAggregatedCandles(symbol, normalizedTf, limit);
         aggregatedCandles = result.candles;
         formingCandle = result.formingCandle;
+      } else {
+        // For daily (and other non-aggregated timeframes), get forming candle from WebSocket cache
+        if (normalizedTf === '1d') {
+          formingCandle = getFormingDailyCandle(symbol);
+        } else if (normalizedTf === '4h') {
+          formingCandle = getForming4hCandle(symbol);
+        } else if (normalizedTf === '1h') {
+          formingCandle = getForming1hCandle(symbol);
+        }
       }
       
       // Apply history limit to aggregated candles
