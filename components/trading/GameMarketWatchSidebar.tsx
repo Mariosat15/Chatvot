@@ -5,7 +5,7 @@ import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronRight, Search, Zap, Loader2, Swords, Gem, Globe, TrendingUp } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Zap, Loader2, Swords, Gem, Globe } from 'lucide-react';
 
 // Currency flag emojis
 const CURRENCY_FLAGS: Record<string, string> = {
@@ -142,7 +142,6 @@ export default function GameMarketWatchSidebar() {
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600/50 to-pink-600/50 px-3 py-2 flex items-center justify-between border-b border-purple-500/30">
         <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-purple-300" />
           <span className="text-white font-bold text-sm">🎮 Market Watch</span>
         </div>
         <span className="text-[10px] text-purple-300 bg-purple-500/20 px-1.5 py-0.5 rounded">

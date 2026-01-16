@@ -219,8 +219,8 @@ export default function GameModeOrderForm({
       {/* Header with Gaming Icon */}
       <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Image src="/game-icons/sword.png" alt="Trade" width={28} height={28} className="drop-shadow-lg" />
-          <span className="text-white font-bold text-lg">⚔️ Trade Station</span>
+          <Image src="/game-icons/sword.png" alt="Trade" width={24} height={24} className="drop-shadow-lg" />
+          <span className="text-white font-bold text-lg">Trade Station</span>
         </div>
         {currentPrice && (
           <div className="text-white font-mono font-bold">

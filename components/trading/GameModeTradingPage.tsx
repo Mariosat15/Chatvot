@@ -157,7 +157,7 @@ export default function GameModeTradingPage({
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 p-4">
               <div className="flex items-center gap-2 mb-4">
                 <Image src="/game-icons/chest.png" alt="Stats" width={20} height={20} />
-                <h2 className="text-white font-bold">📊 Account Stats</h2>
+                <h2 className="text-white font-bold">Account Stats</h2>
               </div>
               
               {/* Horizontal Stats Grid */}
