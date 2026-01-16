@@ -552,70 +552,100 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
   }, [symbolPositions, candlesLoaded]);
   
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-[#0a0a15] via-[#0f0f1a] to-[#1a0a20] rounded-xl overflow-hidden">
-      {/* Gaming Header */}
-      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-b border-purple-500/30">
-        {/* Live Price Display - Neon Gaming Style */}
-        <div className="flex items-center gap-4">
-          {currentPrice && (
-            <>
-              <div className="flex flex-col items-center px-3 py-1 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
-                <span className="text-[10px] text-cyan-300 uppercase tracking-wider font-bold">⬇ BID</span>
-                <span className="text-xl font-mono font-black text-cyan-400 animate-pulse-subtle" 
-                  style={{ textShadow: '0 0 10px rgba(0,255,255,0.8), 0 0 20px rgba(0,255,255,0.4)' }}>
-                  {formatPrice(currentPrice.bid, symbol)}
-                </span>
-              </div>
-              <div className="flex flex-col items-center px-3 py-1 bg-pink-500/10 rounded-lg border border-pink-500/30">
-                <span className="text-[10px] text-pink-300 uppercase tracking-wider font-bold">⬆ ASK</span>
-                <span className="text-xl font-mono font-black text-pink-400 animate-pulse-subtle"
-                  style={{ textShadow: '0 0 10px rgba(255,0,255,0.8), 0 0 20px rgba(255,0,255,0.4)' }}>
-                  {formatPrice(currentPrice.ask, symbol)}
-                </span>
-              </div>
-              <div className="hidden sm:flex items-center gap-1 px-3 py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                <Zap className="w-4 h-4 text-yellow-400 animate-pulse" />
-                <span className="text-yellow-300 text-sm font-black"
-                  style={{ textShadow: '0 0 8px rgba(255,255,0,0.6)' }}>
-                  {((currentPrice.ask - currentPrice.bid) / (decimals === 3 ? 0.01 : 0.0001)).toFixed(1)}
-                </span>
-                <span className="text-yellow-500/70 text-xs">pips</span>
-              </div>
-            </>
-          )}
+    <div className="flex flex-col h-full bg-gradient-to-br from-[#0a0a15] via-[#0f0f1a] to-[#1a0a20] rounded-lg sm:rounded-xl overflow-hidden">
+      {/* Gaming Header - Responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 sm:p-3 bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-b border-purple-500/30 gap-2">
+        {/* Top Row: Prices + Controls on mobile */}
+        <div className="flex items-center justify-between w-full sm:w-auto">
+          {/* Live Price Display - Compact on mobile */}
+          <div className="flex items-center gap-1 sm:gap-3">
+            {currentPrice && (
+              <>
+                <div className="flex flex-col items-center px-2 sm:px-3 py-0.5 sm:py-1 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
+                  <span className="text-[8px] sm:text-[10px] text-cyan-300 uppercase tracking-wider font-bold">⬇ BID</span>
+                  <span className="text-sm sm:text-xl font-mono font-black text-cyan-400" 
+                    style={{ textShadow: '0 0 10px rgba(0,255,255,0.8), 0 0 20px rgba(0,255,255,0.4)' }}>
+                    {formatPrice(currentPrice.bid, symbol)}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center px-2 sm:px-3 py-0.5 sm:py-1 bg-pink-500/10 rounded-lg border border-pink-500/30">
+                  <span className="text-[8px] sm:text-[10px] text-pink-300 uppercase tracking-wider font-bold">⬆ ASK</span>
+                  <span className="text-sm sm:text-xl font-mono font-black text-pink-400"
+                    style={{ textShadow: '0 0 10px rgba(255,0,255,0.8), 0 0 20px rgba(255,0,255,0.4)' }}>
+                    {formatPrice(currentPrice.ask, symbol)}
+                  </span>
+                </div>
+                {/* Pips - visible on mobile as small badge */}
+                <div className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-3 py-1 sm:py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                  <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400" />
+                  <span className="text-yellow-300 text-xs sm:text-sm font-black"
+                    style={{ textShadow: '0 0 8px rgba(255,255,0,0.6)' }}>
+                    {((currentPrice.ask - currentPrice.bid) / (decimals === 3 ? 0.01 : 0.0001)).toFixed(1)}
+                  </span>
+                  <span className="hidden sm:inline text-yellow-500/70 text-xs">pips</span>
+                </div>
+              </>
+            )}
+          </div>
+          
+          {/* Chart Type Toggle - Always visible */}
+          <div className="flex sm:hidden bg-dark-400/50 rounded-lg p-0.5 border border-purple-500/30">
+            <button
+              onClick={() => setChartType('candle')}
+              className={cn(
+                "p-1 rounded-md transition-all",
+                chartType === 'candle' 
+                  ? "bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg" 
+                  : "hover:bg-dark-400"
+              )}
+            >
+              <CandlestickChart className="w-3 h-3 text-white" />
+            </button>
+            <button
+              onClick={() => setChartType('line')}
+              className={cn(
+                "p-1 rounded-md transition-all",
+                chartType === 'line' 
+                  ? "bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg" 
+                  : "hover:bg-dark-400"
+              )}
+            >
+              <LineChart className="w-3 h-3 text-white" />
+            </button>
+          </div>
         </div>
         
-        {/* Controls */}
-        <div className="flex items-center gap-2">
-          {/* Current Time */}
-          <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-dark-400/50 rounded-lg">
+        {/* Bottom Row on Mobile: Timeframes */}
+        <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+          {/* Timeframe Selector - Compact on mobile */}
+          <div className="flex flex-1 sm:flex-none bg-dark-400/50 rounded-lg p-0.5 border border-purple-500/30">
+            {TIMEFRAMES.map((tf) => (
+              <button
+                key={tf.value}
+                onClick={() => setTimeframe(tf.value)}
+                className={cn(
+                  "flex-1 sm:flex-none px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all flex items-center justify-center gap-0.5 sm:gap-1",
+                  timeframe === tf.value
+                    ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30"
+                    : "text-gray-400 hover:text-white hover:bg-dark-400"
+                )}
+              >
+                <span className="hidden sm:inline">{tf.icon}</span>
+                <span>{tf.label}</span>
+              </button>
+            ))}
+          </div>
+          
+          {/* Current Time - Hidden on mobile */}
+          <div className="hidden md:flex items-center gap-1 px-2 py-1 bg-dark-400/50 rounded-lg">
             <Clock className="w-3 h-3 text-purple-400" />
             <span className="text-purple-300 text-xs font-mono">
               {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
             </span>
           </div>
           
-          {/* Timeframe Selector - Gaming Style */}
-          <div className="flex bg-dark-400/50 rounded-lg p-0.5 border border-purple-500/30">
-            {TIMEFRAMES.map((tf) => (
-              <button
-                key={tf.value}
-                onClick={() => setTimeframe(tf.value)}
-                className={cn(
-                  "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1",
-                  timeframe === tf.value
-                    ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30"
-                    : "text-gray-400 hover:text-white hover:bg-dark-400"
-                )}
-              >
-                <span>{tf.icon}</span>
-                <span>{tf.label}</span>
-              </button>
-            ))}
-          </div>
-          
-          {/* Chart Type Toggle */}
-          <div className="flex bg-dark-400/50 rounded-lg p-0.5 border border-purple-500/30">
+          {/* Chart Type Toggle - Desktop only */}
+          <div className="hidden sm:flex bg-dark-400/50 rounded-lg p-0.5 border border-purple-500/30">
             <button
               onClick={() => setChartType('candle')}
               className={cn(
@@ -644,8 +674,8 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         </div>
       </div>
       
-      {/* Chart Container with Neon Glow */}
-      <div className="relative flex-1 min-h-[350px] game-chart-container">
+      {/* Chart Container with Neon Glow - Responsive height */}
+      <div className="relative flex-1 min-h-[250px] sm:min-h-[350px] game-chart-container">
         <div 
           ref={chartContainerRef} 
           className="absolute inset-0 game-chart-glow"
@@ -654,11 +684,11 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         {/* Animated neon border effect */}
         <div className="absolute inset-0 pointer-events-none rounded-lg game-chart-border" />
         
-        {/* Corner accents */}
-        <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-400/60 rounded-tl-lg" />
-        <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-pink-400/60 rounded-tr-lg" />
-        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-pink-400/60 rounded-bl-lg" />
-        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-400/60 rounded-br-lg" />
+        {/* Corner accents - smaller on mobile */}
+        <div className="absolute top-0 left-0 w-4 h-4 sm:w-8 sm:h-8 border-t-2 border-l-2 border-cyan-400/60 rounded-tl-lg" />
+        <div className="absolute top-0 right-0 w-4 h-4 sm:w-8 sm:h-8 border-t-2 border-r-2 border-pink-400/60 rounded-tr-lg" />
+        <div className="absolute bottom-0 left-0 w-4 h-4 sm:w-8 sm:h-8 border-b-2 border-l-2 border-pink-400/60 rounded-bl-lg" />
+        <div className="absolute bottom-0 right-0 w-4 h-4 sm:w-8 sm:h-8 border-b-2 border-r-2 border-cyan-400/60 rounded-br-lg" />
         
         {/* Loading Overlay */}
         {isLoading && (
@@ -673,26 +703,26 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
           </div>
         )}
         
-        {/* Loading More Indicator */}
+        {/* Loading More Indicator - Responsive */}
         {isLoadingMore && (
-          <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10">
-            <div className="flex items-center gap-2 bg-purple-600/90 px-4 py-2 rounded-full shadow-lg shadow-purple-500/30">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span className="text-white text-xs font-medium">Loading history...</span>
+          <div className="absolute top-2 sm:top-3 left-1/2 transform -translate-x-1/2 z-10">
+            <div className="flex items-center gap-1 sm:gap-2 bg-purple-600/90 px-2 sm:px-4 py-1 sm:py-2 rounded-full shadow-lg shadow-purple-500/30">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span className="text-white text-[10px] sm:text-xs font-medium">Loading...</span>
             </div>
           </div>
         )}
       </div>
       
-      {/* Footer - Position Summary */}
+      {/* Footer - Position Summary - Responsive */}
       {symbolPositions.length > 0 && (
-        <div className="p-3 bg-gradient-to-r from-purple-900/30 to-pink-900/30 border-t border-purple-500/30">
+        <div className="p-2 sm:p-3 bg-gradient-to-r from-purple-900/30 to-pink-900/30 border-t border-purple-500/30">
           <div className="flex items-center justify-between">
-            <span className="text-purple-300 text-sm">
-              📊 {symbolPositions.length} position{symbolPositions.length > 1 ? 's' : ''} on {symbol}
+            <span className="text-purple-300 text-xs sm:text-sm">
+              📊 {symbolPositions.length} pos{symbolPositions.length > 1 ? '' : ''} on {symbol}
             </span>
             <span className={cn(
-              "font-bold font-mono",
+              "font-bold font-mono text-sm sm:text-base",
               symbolPositions.reduce((sum, p) => sum + p.unrealizedPnl, 0) >= 0
                 ? "text-green-400 drop-shadow-[0_0_10px_rgba(0,255,136,0.5)]"
                 : "text-red-400 drop-shadow-[0_0_10px_rgba(255,51,102,0.5)]"
