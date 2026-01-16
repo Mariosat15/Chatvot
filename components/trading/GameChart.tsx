@@ -562,11 +562,6 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
                   {formatPrice(currentPrice.bid, symbol)}
                 </span>
               </div>
-              <div className="flex flex-col items-center">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-pink-500 flex items-center justify-center animate-spin-slow">
-                  <div className="w-4 h-4 rounded-full bg-[#0a0a15]" />
-                </div>
-              </div>
               <div className="flex flex-col items-center px-3 py-1 bg-pink-500/10 rounded-lg border border-pink-500/30">
                 <span className="text-[10px] text-pink-300 uppercase tracking-wider font-bold">⬆ ASK</span>
                 <span className="text-xl font-mono font-black text-pink-400 animate-pulse-subtle"
