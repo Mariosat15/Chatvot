@@ -110,12 +110,23 @@ Candle1mSchema.statics.upsertCandle = async function (
 /**
  * Get recent candles for a symbol
  * Returns candles sorted ascending (oldest first) for chart display
+ * @param symbol - Trading pair symbol (e.g., "EUR/USD")
+ * @param limit - Maximum number of candles to return
+ * @param before - Optional timestamp in SECONDS; if provided, only return candles before this time (for lazy loading)
  */
 Candle1mSchema.statics.getCandles = async function (
   symbol: string,
-  limit: number = 500
+  limit: number = 500,
+  before?: number
 ): Promise<CandleData[]> {
-  const candles = await this.find({ symbol })
+  const query: { symbol: string; t?: { $lt: number } } = { symbol };
+  
+  // For lazy loading: only get candles before the specified timestamp
+  if (before) {
+    query.t = { $lt: before };
+  }
+  
+  const candles = await this.find(query)
     .sort({ t: -1 })  // Get most recent first
     .limit(limit)
     .lean();
@@ -213,7 +224,7 @@ interface ICandle1mModel extends Model<ICandle1m> {
     close: number,
     volume?: number
   ): Promise<void>;
-  getCandles(symbol: string, limit?: number): Promise<CandleData[]>;
+  getCandles(symbol: string, limit?: number, before?: number): Promise<CandleData[]>;
   bulkUpsertCandles(candles: Array<{
     symbol: string;
     time: number;

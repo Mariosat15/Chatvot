@@ -187,6 +187,11 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const [loading, setLoading] = useState(true);
   const [candlesLoaded, setCandlesLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Lazy loading state
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const oldestCandleTimeRef = useRef<number | null>(null);
   const [showVolume, setShowVolume] = useState(false);
   const [chartType, setChartType] = useState<'candlestick' | 'line' | 'renko' | 'heikinashi' | 'pointfigure'>('candlestick');
   const [showGrid, setShowGrid] = useState(true);
@@ -1791,6 +1796,13 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
         // Store last candle for updates
         currentCandleRef.current = chartData[chartData.length - 1];
+        
+        // Store oldest candle time for lazy loading
+        if (candles.length > 0) {
+          oldestCandleTimeRef.current = candles[0].time;
+          // Check if API indicated there's more history
+          setHasMoreHistory(data.hasMore !== false);
+        }
 
         // Initialize price lines with last candle's close price
         const lastClose = chartData[chartData.length - 1].close;
@@ -1868,6 +1880,140 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       }
     };
   }, [symbol, timeframe, showVolume, chartType, showBidAskLines, showPriceLabels]); // Chart reinitializes when these change
+
+  // Lazy loading: Load more candles when user scrolls to the left edge
+  const loadMoreCandles = useCallback(async () => {
+    if (isLoadingMore || !hasMoreHistory || !oldestCandleTimeRef.current) return;
+    if (!chartRef.current || !candlestickSeriesRef.current) return;
+    
+    setIsLoadingMore(true);
+    
+    try {
+      log(`📜 Loading more candles before ${oldestCandleTimeRef.current}...`);
+      
+      const response = await fetch('/api/trading/candles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          symbol, 
+          timeframe, 
+          count: 500, // Load batch
+          before: oldestCandleTimeRef.current 
+        }),
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to load more candles:', response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      const newCandles: OHLCCandle[] = data.candles.map((c: { time: number; open: number; high: number; low: number; close: number }) => ({
+        time: c.time,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      }));
+      
+      if (newCandles.length === 0) {
+        setHasMoreHistory(false);
+        return;
+      }
+      
+      // Update oldest candle time
+      oldestCandleTimeRef.current = newCandles[0].time;
+      setHasMoreHistory(data.hasMore !== false && newCandles.length >= 500);
+      
+      // Get current chart data
+      const currentData = candleDataRef.current || [];
+      
+      // Combine: new candles (older) + current candles (newer)
+      // Deduplicate by timestamp
+      const candleMap = new Map<number, OHLCCandle>();
+      for (const c of newCandles) {
+        candleMap.set(c.time, c);
+      }
+      for (const c of currentData) {
+        candleMap.set(c.time, c);
+      }
+      
+      const combinedCandles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
+      
+      // Update the chart
+      const chartData = combinedCandles.map(candle => ({
+        time: candle.time as UTCTimestamp,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+      }));
+      
+      candlestickSeriesRef.current?.setData(chartData);
+      candleDataRef.current = combinedCandles;
+      
+      // Update volume if enabled
+      if (showVolume && volumeSeriesRef.current) {
+        const volumeData = combinedCandles.map(candle => ({
+          time: candle.time as UTCTimestamp,
+          value: candle.volume || 0,
+          color: candle.close >= candle.open ? '#26a69a80' : '#ef535080',
+        }));
+        volumeSeriesRef.current.setData(volumeData);
+      }
+      
+      log(`✅ Loaded ${newCandles.length} more candles, total: ${combinedCandles.length}`);
+    } catch (error) {
+      console.error('Error loading more candles:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [symbol, timeframe, isLoadingMore, hasMoreHistory, showVolume]);
+  
+  // Subscribe to visible time range changes for lazy loading
+  useEffect(() => {
+    if (!chartRef.current) return;
+    
+    const chart = chartRef.current;
+    
+    const handleVisibleTimeRangeChange = () => {
+      if (!hasMoreHistory || isLoadingMore || !oldestCandleTimeRef.current) return;
+      
+      const visibleRange = chart.timeScale().getVisibleRange();
+      if (!visibleRange) return;
+      
+      // Check if user has scrolled close to the left edge (oldest candles)
+      const oldestVisible = visibleRange.from as number;
+      const oldestCandle = oldestCandleTimeRef.current;
+      
+      // If the oldest visible candle is within 50 candles of our oldest data, load more
+      // For 1m: 50 candles = 50 minutes
+      // For 5m: 50 candles = 250 minutes, etc.
+      const timeframeMinutes = timeframe === '1m' || timeframe === '1' ? 1 :
+                               timeframe === '5m' || timeframe === '5' ? 5 :
+                               timeframe === '15m' || timeframe === '15' ? 15 :
+                               timeframe === '30m' || timeframe === '30' ? 30 :
+                               timeframe === '1h' || timeframe === '60' ? 60 :
+                               timeframe === '4h' || timeframe === '240' ? 240 :
+                               timeframe === '1d' || timeframe === 'D' ? 1440 : 1;
+      
+      const bufferTime = 50 * timeframeMinutes * 60; // 50 candles worth of time in seconds
+      
+      if (oldestVisible <= oldestCandle + bufferTime) {
+        loadMoreCandles();
+      }
+    };
+    
+    chart.timeScale().subscribeVisibleTimeRangeChange(handleVisibleTimeRangeChange);
+    
+    return () => {
+      try {
+        chart.timeScale().unsubscribeVisibleTimeRangeChange(handleVisibleTimeRangeChange);
+      } catch {
+        // Chart may be disposed
+      }
+    };
+  }, [hasMoreHistory, isLoadingMore, loadMoreCandles, timeframe]);
 
   // Subscribe to crosshair move to show OHLCV data
   useEffect(() => {
@@ -3071,6 +3217,14 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                   <Loader2 className="h-8 w-8 animate-spin text-[#2962ff] mx-auto mb-2" />
                   <p className="text-sm text-[#787b86]">Loading...</p>
                 </div>
+              </div>
+            )}
+            
+            {/* Lazy loading indicator */}
+            {isLoadingMore && !loading && (
+              <div className="absolute top-2 left-2 z-20 flex items-center gap-2 bg-[#1e222d]/90 px-3 py-1.5 rounded-md border border-[#2a2e39]">
+                <Loader2 className="h-4 w-4 animate-spin text-[#2962ff]" />
+                <span className="text-xs text-[#787b86]">Loading history...</span>
               </div>
             )}
 

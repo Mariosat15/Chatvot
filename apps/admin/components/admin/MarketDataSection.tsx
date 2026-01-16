@@ -27,6 +27,14 @@ interface MarketDataSettings {
   priceUpdateMode: 'polling' | 'websocket';
   pollingIntervalMs: number;
   websocketIntervalMs: number;
+  // Historical data settings
+  useLocalHistory: boolean;
+  autoFetchHistory: boolean;
+  chartHistoryLimitEnabled: boolean;
+  chartHistoryLimitDays: number;
+  initialCandleCount: number;
+  lazyLoadBatchSize: number;
+  historicalYearsToDownload: number;
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -350,6 +358,12 @@ export default function MarketDataSection() {
   const [seedToDate, setSeedToDate] = useState('');
   const [seedRunning, setSeedRunning] = useState(false);
   const [seedResults, setSeedResults] = useState<SeedResult[] | null>(null);
+  
+  // Historical data download state
+  const [historyDownloadRunning, setHistoryDownloadRunning] = useState(false);
+  const [historyDownloadResults, setHistoryDownloadResults] = useState<SeedResult[] | null>(null);
+  const [selectedHistoryTimeframes, setSelectedHistoryTimeframes] = useState<string[]>(['5m', '15m', '30m', '1h', '4h', '1d']);
+  const [historyYearsBack, setHistoryYearsBack] = useState(10);
 
   const fetchData = useCallback(async () => {
     try {
@@ -501,6 +515,51 @@ export default function MarketDataSection() {
 
   const toggleSymbol = (symbol: string) => {
     setSelectedSymbols(prev => prev.includes(symbol) ? prev.filter(s => s !== symbol) : [...prev, symbol]);
+  };
+
+  const toggleHistoryTimeframe = (tf: string) => {
+    setSelectedHistoryTimeframes(prev => 
+      prev.includes(tf) ? prev.filter(t => t !== tf) : [...prev, tf]
+    );
+  };
+
+  const runHistoryDownload = async () => {
+    if (selectedSymbols.length === 0) {
+      setMessage({ type: 'error', text: 'Please select at least one symbol' });
+      return;
+    }
+    if (selectedHistoryTimeframes.length === 0) {
+      setMessage({ type: 'error', text: 'Please select at least one timeframe' });
+      return;
+    }
+    setHistoryDownloadRunning(true);
+    setHistoryDownloadResults(null);
+    try {
+      const res = await fetch('/api/market-data/download-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          symbols: selectedSymbols, 
+          timeframes: selectedHistoryTimeframes,
+          yearsBack: historyYearsBack,
+          startFromLastCandle: true,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHistoryDownloadResults(data.results);
+        setMessage({ type: 'success', text: `Download complete! Saved ${data.summary.totalSaved.toLocaleString()} candles` });
+        fetchData();
+      } else {
+        const error = await res.json();
+        setMessage({ type: 'error', text: error.error || 'Download failed' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Error downloading history' });
+    } finally {
+      setHistoryDownloadRunning(false);
+      setTimeout(() => setMessage(null), 10000);
+    }
   };
 
   if (loading) {
@@ -1014,6 +1073,245 @@ export default function MarketDataSection() {
             {seedRunning ? '⏳ Importing...' : '📥 Start Import'}
           </button>
         </div>
+      </Section>
+
+      {/* Download Higher Timeframe History Section */}
+      <Section title="Download Higher Timeframe History" icon="📊" defaultOpen={false}>
+        <div className="space-y-5">
+          <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-4 text-sm">
+            <span className="text-blue-400">💡 Step 2:</span>
+            <span className="text-gray-300 ml-2">
+              After importing 1m data, download historical data for higher timeframes (5m, 15m, 30m, 1h, 4h, 1d).
+              This data will be stored in separate collections and served from your database.
+            </span>
+          </div>
+
+          {/* Years Back */}
+          <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+            <h4 className="text-white font-medium mb-3">Years of History</h4>
+            <div className="flex items-center gap-4">
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={historyYearsBack}
+                onChange={(e) => setHistoryYearsBack(parseInt(e.target.value))}
+                className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+              <div className="w-20 text-right">
+                <span className="text-white font-mono text-lg">{historyYearsBack}</span>
+                <span className="text-gray-500 text-sm ml-1">years</span>
+              </div>
+            </div>
+            <p className="text-gray-500 text-xs mt-2">
+              Downloads history starting from the last 1m candle backwards
+            </p>
+          </div>
+
+          {/* Timeframe Selection */}
+          <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-white font-medium">Select Timeframes</h4>
+              <div className="flex gap-3 text-sm">
+                <button 
+                  onClick={() => setSelectedHistoryTimeframes(['5m', '15m', '30m', '1h', '4h', '1d'])} 
+                  className="text-blue-400 hover:text-blue-300"
+                >
+                  Select All
+                </button>
+                <button 
+                  onClick={() => setSelectedHistoryTimeframes([])} 
+                  className="text-gray-400 hover:text-gray-300"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {['5m', '15m', '30m', '1h', '4h', '1d'].map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => toggleHistoryTimeframe(tf)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedHistoryTimeframes.includes(tf)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Symbol Selection (reuse from above) */}
+          <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-white font-medium">
+                Select Symbols 
+                <span className="text-gray-500 font-normal ml-2">({selectedSymbols.length}/{availableSymbols.length})</span>
+              </h4>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-32 overflow-y-auto">
+              {availableSymbols.map((sym) => (
+                <button
+                  key={sym.symbol}
+                  onClick={() => toggleSymbol(sym.symbol)}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    selectedSymbols.includes(sym.symbol)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                  }`}
+                >
+                  {sym.symbol}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Estimation */}
+          {selectedSymbols.length > 0 && selectedHistoryTimeframes.length > 0 && (
+            <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-4 text-sm">
+              <span className="text-blue-400">📊 Will download:</span>
+              <span className="text-white ml-2">
+                {selectedSymbols.length} symbols × {selectedHistoryTimeframes.length} timeframes × {historyYearsBack} years
+              </span>
+              <span className="text-gray-500 ml-2">
+                (May take several minutes)
+              </span>
+            </div>
+          )}
+
+          {/* Results */}
+          {historyDownloadResults && (
+            <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30 max-h-40 overflow-y-auto">
+              <h4 className="text-white font-medium mb-2">Results</h4>
+              <div className="space-y-1">
+                {historyDownloadResults.map((result, i) => (
+                  <div key={i} className={`text-xs ${result.error ? 'text-red-400' : 'text-gray-400'}`}>
+                    <span className="text-white">{result.symbol} {(result as any).timeframe}</span>: {result.error ? `❌ ${result.error}` : `✓ ${result.saved} saved`}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={runHistoryDownload}
+            disabled={historyDownloadRunning || selectedSymbols.length === 0 || selectedHistoryTimeframes.length === 0}
+            className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          >
+            {historyDownloadRunning ? '⏳ Downloading...' : '📊 Download History'}
+          </button>
+        </div>
+      </Section>
+
+      {/* Historical Data Settings Section */}
+      <Section title="Historical Data Settings" icon="⚙️" defaultOpen={false}>
+        {settings && (
+          <div className="space-y-5">
+            <div className="bg-yellow-600/10 border border-yellow-600/20 rounded-lg p-4 text-sm">
+              <span className="text-yellow-400">💡 These settings control how charts load historical data.</span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Data Source Toggle */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-white font-medium">Data Source</h4>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.useLocalHistory}
+                      onChange={(e) => saveSettings({ useLocalHistory: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
+                  </label>
+                </div>
+                <p className="text-gray-500 text-xs">
+                  {settings.useLocalHistory 
+                    ? '✓ Using local database (fast, recommended)'
+                    : '⚠️ Fetching from Massive.com API (slower, uses API quota)'}
+                </p>
+              </div>
+
+              {/* Chart History Limit Toggle */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-white font-medium">Limit Chart History</h4>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.chartHistoryLimitEnabled}
+                      onChange={(e) => saveSettings({ chartHistoryLimitEnabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+                <p className="text-gray-500 text-xs mb-2">
+                  {settings.chartHistoryLimitEnabled 
+                    ? `Charts show max ${settings.chartHistoryLimitDays} days of history`
+                    : 'Charts can show all available history'}
+                </p>
+                {settings.chartHistoryLimitEnabled && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="number"
+                      min="1"
+                      max="3650"
+                      value={settings.chartHistoryLimitDays}
+                      onChange={(e) => saveSettings({ chartHistoryLimitDays: parseInt(e.target.value) || 365 })}
+                      className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-20 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                    />
+                    <span className="text-gray-500 text-sm">days</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Initial Candle Count */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <h4 className="text-white font-medium mb-3">Initial Load</h4>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="100"
+                    max="5000"
+                    step="100"
+                    value={settings.initialCandleCount}
+                    onChange={(e) => saveSettings({ initialCandleCount: parseInt(e.target.value) || 500 })}
+                    className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-24 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                  />
+                  <span className="text-gray-500 text-sm">candles</span>
+                </div>
+                <p className="text-gray-500 text-xs mt-2">
+                  How many candles to load when chart first opens
+                </p>
+              </div>
+
+              {/* Lazy Load Batch Size */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <h4 className="text-white font-medium mb-3">Scroll Load Batch</h4>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="100"
+                    max="2000"
+                    step="100"
+                    value={settings.lazyLoadBatchSize}
+                    onChange={(e) => saveSettings({ lazyLoadBatchSize: parseInt(e.target.value) || 500 })}
+                    className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-24 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                  />
+                  <span className="text-gray-500 text-sm">candles</span>
+                </div>
+                <p className="text-gray-500 text-xs mt-2">
+                  How many candles to load when user scrolls to load more
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </Section>
     </div>
   );

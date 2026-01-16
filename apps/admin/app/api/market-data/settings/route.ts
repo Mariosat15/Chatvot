@@ -51,6 +51,53 @@ const MarketDataSettingsSchema = new mongoose.Schema({
     min: 50,
     max: 2000,
   },
+  // --- Historical Data Settings ---
+  // If true, serve historical data from our database; if false, fetch from Massive.com API each time
+  useLocalHistory: {
+    type: Boolean,
+    default: true,
+  },
+  // If true, automatically fetch history when gaps are detected (resource intensive)
+  autoFetchHistory: {
+    type: Boolean,
+    default: false,
+  },
+  // --- Chart Display Settings ---
+  // If true, limit how far back charts can display
+  chartHistoryLimitEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  // Number of days to limit chart history (e.g., 365 = 1 year)
+  chartHistoryLimitDays: {
+    type: Number,
+    default: 365,
+    min: 1,
+    max: 3650,
+  },
+  // --- Lazy Loading Settings ---
+  // How many candles to load initially (default: 500)
+  initialCandleCount: {
+    type: Number,
+    default: 500,
+    min: 100,
+    max: 5000,
+  },
+  // How many candles to load when scrolling (default: 500)
+  lazyLoadBatchSize: {
+    type: Number,
+    default: 500,
+    min: 100,
+    max: 2000,
+  },
+  // --- Download Settings ---
+  // How many years of history to download (default: 10)
+  historicalYearsToDownload: {
+    type: Number,
+    default: 10,
+    min: 1,
+    max: 20,
+  },
 }, { timestamps: true });
 
 const MarketDataSettings = mongoose.models.MarketDataSettings || 
@@ -97,6 +144,13 @@ export async function GET() {
         priceUpdateMode: 'polling',
         pollingIntervalMs: 200,
         websocketIntervalMs: 200,
+        useLocalHistory: true,
+        autoFetchHistory: false,
+        chartHistoryLimitEnabled: false,
+        chartHistoryLimitDays: 365,
+        initialCandleCount: 500,
+        lazyLoadBatchSize: 500,
+        historicalYearsToDownload: 10,
       });
     }
     
@@ -108,6 +162,14 @@ export async function GET() {
         priceUpdateMode: settings.priceUpdateMode || 'polling',
         pollingIntervalMs: settings.pollingIntervalMs || 200,
         websocketIntervalMs: settings.websocketIntervalMs || 200,
+        // Historical data settings
+        useLocalHistory: settings.useLocalHistory ?? true,
+        autoFetchHistory: settings.autoFetchHistory ?? false,
+        chartHistoryLimitEnabled: settings.chartHistoryLimitEnabled ?? false,
+        chartHistoryLimitDays: settings.chartHistoryLimitDays ?? 365,
+        initialCandleCount: settings.initialCandleCount ?? 500,
+        lazyLoadBatchSize: settings.lazyLoadBatchSize ?? 500,
+        historicalYearsToDownload: settings.historicalYearsToDownload ?? 10,
         updatedAt: settings.updatedAt,
       },
     });
@@ -195,6 +257,29 @@ export async function POST(request: NextRequest) {
       updateData['websocketIntervalMs'] = Math.max(50, Math.min(2000, websocketIntervalMs));
     }
     
+    // Historical data settings
+    if (typeof body.useLocalHistory === 'boolean') {
+      updateData['useLocalHistory'] = body.useLocalHistory;
+    }
+    if (typeof body.autoFetchHistory === 'boolean') {
+      updateData['autoFetchHistory'] = body.autoFetchHistory;
+    }
+    if (typeof body.chartHistoryLimitEnabled === 'boolean') {
+      updateData['chartHistoryLimitEnabled'] = body.chartHistoryLimitEnabled;
+    }
+    if (typeof body.chartHistoryLimitDays === 'number') {
+      updateData['chartHistoryLimitDays'] = Math.max(1, Math.min(3650, body.chartHistoryLimitDays));
+    }
+    if (typeof body.initialCandleCount === 'number') {
+      updateData['initialCandleCount'] = Math.max(100, Math.min(5000, body.initialCandleCount));
+    }
+    if (typeof body.lazyLoadBatchSize === 'number') {
+      updateData['lazyLoadBatchSize'] = Math.max(100, Math.min(2000, body.lazyLoadBatchSize));
+    }
+    if (typeof body.historicalYearsToDownload === 'number') {
+      updateData['historicalYearsToDownload'] = Math.max(1, Math.min(20, body.historicalYearsToDownload));
+    }
+    
     const settings = await MarketDataSettings.findOneAndUpdate(
       { key: 'market_data_settings' },
       { $set: updateData },
@@ -209,6 +294,14 @@ export async function POST(request: NextRequest) {
         priceUpdateMode: settings.priceUpdateMode || 'polling',
         pollingIntervalMs: settings.pollingIntervalMs || 200,
         websocketIntervalMs: settings.websocketIntervalMs || 200,
+        // Historical data settings
+        useLocalHistory: settings.useLocalHistory ?? true,
+        autoFetchHistory: settings.autoFetchHistory ?? false,
+        chartHistoryLimitEnabled: settings.chartHistoryLimitEnabled ?? false,
+        chartHistoryLimitDays: settings.chartHistoryLimitDays ?? 365,
+        initialCandleCount: settings.initialCandleCount ?? 500,
+        lazyLoadBatchSize: settings.lazyLoadBatchSize ?? 500,
+        historicalYearsToDownload: settings.historicalYearsToDownload ?? 10,
         updatedAt: settings.updatedAt,
       },
     });
