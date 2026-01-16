@@ -6,7 +6,7 @@ import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service'
 import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
 import { cn } from '@/lib/utils';
-import { CandlestickChart, LineChart, Clock, Zap } from 'lucide-react';
+import { CandlestickChart, LineChart, Clock } from 'lucide-react';
 
 // Position interface for Game mode
 interface Position {
@@ -554,69 +554,35 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-[#0a0a15] via-[#0f0f1a] to-[#1a0a20] rounded-lg sm:rounded-xl overflow-hidden">
       {/* Gaming Header - Responsive */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 sm:p-3 bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-b border-purple-500/30 gap-2">
-        {/* Top Row: Prices + Controls on mobile */}
-        <div className="flex items-center justify-between w-full sm:w-auto">
-          {/* Live Price Display - Compact on mobile */}
-          <div className="flex items-center gap-1 sm:gap-3">
-            {currentPrice && (
-              <>
-                <div className="flex flex-col items-center px-2 sm:px-3 py-0.5 sm:py-1 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
-                  <span className="text-[8px] sm:text-[10px] text-cyan-300 uppercase tracking-wider font-bold">⬇ BID</span>
-                  <span className="text-sm sm:text-xl font-mono font-black text-cyan-400" 
-                    style={{ textShadow: '0 0 10px rgba(0,255,255,0.8), 0 0 20px rgba(0,255,255,0.4)' }}>
-                    {formatPrice(currentPrice.bid, symbol)}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center px-2 sm:px-3 py-0.5 sm:py-1 bg-pink-500/10 rounded-lg border border-pink-500/30">
-                  <span className="text-[8px] sm:text-[10px] text-pink-300 uppercase tracking-wider font-bold">⬆ ASK</span>
-                  <span className="text-sm sm:text-xl font-mono font-black text-pink-400"
-                    style={{ textShadow: '0 0 10px rgba(255,0,255,0.8), 0 0 20px rgba(255,0,255,0.4)' }}>
-                    {formatPrice(currentPrice.ask, symbol)}
-                  </span>
-                </div>
-                {/* Pips - visible on mobile as small badge */}
-                <div className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-3 py-1 sm:py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                  <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400" />
-                  <span className="text-yellow-300 text-xs sm:text-sm font-black"
-                    style={{ textShadow: '0 0 8px rgba(255,255,0,0.6)' }}>
-                    {((currentPrice.ask - currentPrice.bid) / (decimals === 3 ? 0.01 : 0.0001)).toFixed(1)}
-                  </span>
-                  <span className="hidden sm:inline text-yellow-500/70 text-xs">pips</span>
-                </div>
-              </>
+      <div className="flex items-center justify-between p-2 sm:p-3 bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-b border-purple-500/30">
+        {/* Chart Type Toggle - Mobile */}
+        <div className="flex sm:hidden bg-dark-400/50 rounded-lg p-0.5 border border-purple-500/30">
+          <button
+            onClick={() => setChartType('candle')}
+            className={cn(
+              "p-1 rounded-md transition-all",
+              chartType === 'candle' 
+                ? "bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg" 
+                : "hover:bg-dark-400"
             )}
-          </div>
-          
-          {/* Chart Type Toggle - Always visible */}
-          <div className="flex sm:hidden bg-dark-400/50 rounded-lg p-0.5 border border-purple-500/30">
-            <button
-              onClick={() => setChartType('candle')}
-              className={cn(
-                "p-1 rounded-md transition-all",
-                chartType === 'candle' 
-                  ? "bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg" 
-                  : "hover:bg-dark-400"
-              )}
-            >
-              <CandlestickChart className="w-3 h-3 text-white" />
-            </button>
-            <button
-              onClick={() => setChartType('line')}
-              className={cn(
-                "p-1 rounded-md transition-all",
-                chartType === 'line' 
-                  ? "bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg" 
-                  : "hover:bg-dark-400"
-              )}
-            >
-              <LineChart className="w-3 h-3 text-white" />
-            </button>
-          </div>
+          >
+            <CandlestickChart className="w-3 h-3 text-white" />
+          </button>
+          <button
+            onClick={() => setChartType('line')}
+            className={cn(
+              "p-1 rounded-md transition-all",
+              chartType === 'line' 
+                ? "bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg" 
+                : "hover:bg-dark-400"
+            )}
+          >
+            <LineChart className="w-3 h-3 text-white" />
+          </button>
         </div>
         
-        {/* Bottom Row on Mobile: Timeframes */}
-        <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+        {/* Controls */}
+        <div className="flex items-center gap-2">
           {/* Timeframe Selector - Compact on mobile */}
           <div className="flex flex-1 sm:flex-none bg-dark-400/50 rounded-lg p-0.5 border border-purple-500/30">
             {TIMEFRAMES.map((tf) => (
