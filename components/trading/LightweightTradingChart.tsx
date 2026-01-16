@@ -2119,10 +2119,12 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     const isFiveMinute = timeframe === '5' || (timeframe as string) === '5m';
     const isFifteenMinute = timeframe === '15' || (timeframe as string) === '15m';
     const isThirtyMinute = timeframe === '30' || (timeframe as string) === '30m';
-    const isOneHour = timeframe === '60' || (timeframe as string) === '1h';
-    const isFourHour = timeframe === '240' || (timeframe as string) === '4h';
-    const isDaily = timeframe === 'D' || (timeframe as string) === '1d';
-    if (!isOneMinute && !isFiveMinute && !isFifteenMinute && !isThirtyMinute && !isOneHour && !isFourHour && !isDaily) return;
+    const is1h = timeframe === '60' || (timeframe as string) === '1h';
+    const is4h = timeframe === '240' || (timeframe as string) === '4h';
+    const isD = timeframe === 'D' || (timeframe as string) === '1d';
+    const isW = timeframe === 'W' || (timeframe as string) === '1w';
+    const isM = timeframe === 'M' || (timeframe as string) === '1M';
+    // All timeframes now supported
     
     // Helper function to update chart with candle data
     const updateChartWithCandle = (candle: { time: number; open: number; high: number; low: number; close: number }, price?: { bid: number; ask: number }) => {
@@ -2301,6 +2303,51 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           if (data.candle) {
             updateChartWithCandle(data.candle, data.price);
           }
+        } else if (is1h) {
+          // For 1h, use dedicated forming candle endpoint
+          const response = await fetch(`/api/trading/forming-candle-1h?symbol=${encodeURIComponent(symbol)}`);
+          if (!response.ok) return;
+          
+          const data = await response.json();
+          if (data.candle) {
+            updateChartWithCandle(data.candle, data.price);
+          }
+        } else if (is4h) {
+          // For 4h, use dedicated forming candle endpoint
+          const response = await fetch(`/api/trading/forming-candle-4h?symbol=${encodeURIComponent(symbol)}`);
+          if (!response.ok) return;
+          
+          const data = await response.json();
+          if (data.candle) {
+            updateChartWithCandle(data.candle, data.price);
+          }
+        } else if (isD) {
+          // For Daily, use dedicated forming candle endpoint
+          const response = await fetch(`/api/trading/forming-candle-1d?symbol=${encodeURIComponent(symbol)}`);
+          if (!response.ok) return;
+          
+          const data = await response.json();
+          if (data.candle) {
+            updateChartWithCandle(data.candle, data.price);
+          }
+        } else if (isW) {
+          // For Weekly, use dedicated forming candle endpoint
+          const response = await fetch(`/api/trading/forming-candle-1w?symbol=${encodeURIComponent(symbol)}`);
+          if (!response.ok) return;
+          
+          const data = await response.json();
+          if (data.candle) {
+            updateChartWithCandle(data.candle, data.price);
+          }
+        } else if (isM) {
+          // For Monthly, use dedicated forming candle endpoint
+          const response = await fetch(`/api/trading/forming-candle-1M?symbol=${encodeURIComponent(symbol)}`);
+          if (!response.ok) return;
+          
+          const data = await response.json();
+          if (data.candle) {
+            updateChartWithCandle(data.candle, data.price);
+          }
         }
       } catch {
         // Ignore errors - forming candle updates are best-effort
@@ -2331,6 +2378,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       '60': 30000,    // 30 seconds for 1h
       '240': 60000,   // 1 minute for 4h
       'D': 300000,    // 5 minutes for daily
+      'W': 600000,    // 10 minutes for weekly
+      'M': 900000,    // 15 minutes for monthly
     };
     
     const pollInterval = pollIntervals[timeframe] || 5000;
