@@ -66,6 +66,9 @@ const TIMEFRAME_MINUTES: Record<string, number> = {
   '1W': 10080,
   'W': 10080,
   '10080': 10080,
+  '1M': 43200,   // 30 days * 24 hours * 60 minutes (approx)
+  'M': 43200,
+  '43200': 43200,
 };
 
 // Cache TTL in milliseconds (shorter = more up-to-date, longer = less computation)
@@ -88,6 +91,9 @@ const CACHE_TTL_MS: Record<string, number> = {
   '1W': 900000,
   'W': 900000,
   '10080': 900000,
+  '1M': 1800000,  // 30 minutes for monthly
+  'M': 1800000,
+  '43200': 1800000,
 };
 
 // ============================================

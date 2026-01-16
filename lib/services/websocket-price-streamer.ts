@@ -92,6 +92,7 @@ interface WebSocketGlobalState {
   formingCandles4h: Map<string, CachedFormingCandle>;
   formingCandlesD: Map<string, CachedFormingCandle>;
   formingCandlesW: Map<string, CachedFormingCandle>;
+  formingCandlesM: Map<string, CachedFormingCandle>;
   changedSymbols: Set<string>; // Track symbols that changed since last broadcast
   lastUpdateTime: number;
   initialized: boolean;
@@ -132,6 +133,7 @@ function getGlobalState(): WebSocketGlobalState {
       formingCandles4h: new Map<string, CachedFormingCandle>(),
       formingCandlesD: new Map<string, CachedFormingCandle>(),
       formingCandlesW: new Map<string, CachedFormingCandle>(),
+      formingCandlesM: new Map<string, CachedFormingCandle>(),
       changedSymbols: new Set<string>(),
       lastUpdateTime: 0,
       initialized: false,
@@ -926,6 +928,25 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
     existingW.low = Math.min(existingW.low, price);
     existingW.close = price;
   }
+  
+  // Update Monthly cache (month starts at 1st day 00:00 UTC)
+  const periodM = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) / 1000);
+  const existingM = state.formingCandlesM.get(symbol);
+  
+  if (!existingM || existingM.periodStart !== periodM) {
+    state.formingCandlesM.set(symbol, {
+      symbol,
+      periodStart: periodM,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+    });
+  } else {
+    existingM.high = Math.max(existingM.high, price);
+    existingM.low = Math.min(existingM.low, price);
+    existingM.close = price;
+  }
 }
 
 /**
@@ -1518,6 +1539,25 @@ export function getFormingWeeklyCandle(symbol: string): FormingCandle | null {
 }
 
 /**
+ * Get Monthly forming candle (from cache - fast!)
+ */
+export function getFormingMonthlyCandle(symbol: string): FormingCandle | null {
+  const state = getState();
+  const cached = state.formingCandlesM.get(symbol);
+  if (!cached) return null;
+  
+  return {
+    symbol: cached.symbol,
+    time: cached.periodStart,
+    open: cached.open,
+    high: cached.high,
+    low: cached.low,
+    close: cached.close,
+    tickCount: 0,
+  };
+}
+
+/**
  * Get all forming candles (current minute candles being built)
  */
 export function getAllFormingCandles(): Map<string, FormingCandle> {
@@ -1702,6 +1742,9 @@ async function broadcastFormingCandles(): Promise<void> {
   const formingCandlesW = Array.from(state.formingCandlesW.values())
     .filter(c => changedSymbols.has(c.symbol));
   
+  const formingCandlesM = Array.from(state.formingCandlesM.values())
+    .filter(c => changedSymbols.has(c.symbol));
+  
   const prices = Array.from(state.priceCache.values())
     .filter(p => changedSymbols.has(p.symbol));
   
@@ -1804,6 +1847,16 @@ async function broadcastFormingCandles(): Promise<void> {
           low: c.low,
           close: c.close,
           timeframe: 'W',
+        })),
+        // Monthly forming candles (from cache - no calculation)
+        formingCandlesM: formingCandlesM.map(c => ({
+          symbol: c.symbol,
+          time: c.periodStart,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          timeframe: 'M',
         })),
       }),
     });

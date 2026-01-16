@@ -2183,7 +2183,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               
               // Handle price_update events
               if (message.type === 'price_update' && message.data) {
-                const { prices, formingCandles, formingCandles5m, formingCandles15m, formingCandles30m, formingCandles1h, formingCandles4h, formingCandlesD, formingCandlesW } = message.data;
+                const { prices, formingCandles, formingCandles5m, formingCandles15m, formingCandles30m, formingCandles1h, formingCandles4h, formingCandlesD, formingCandlesW, formingCandlesM } = message.data;
                 
                 // Select the correct forming candle based on timeframe
                 const is5m = timeframe === '5' || (timeframe as string) === '5m';
@@ -2193,14 +2193,16 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                 const is4h = timeframe === '240' || (timeframe as string) === '4h';
                 const isD = timeframe === 'D' || (timeframe as string) === '1d';
                 const isW = timeframe === 'W' || (timeframe as string) === '1w';
+                const isM = timeframe === 'M' || (timeframe as string) === '1M';
                 
-                const candleSource = isW ? formingCandlesW :
+                const candleSource = isM ? formingCandlesM :
+                  (isW ? formingCandlesW :
                   (isD ? formingCandlesD : 
                   (is4h ? formingCandles4h : 
                   (is1h ? formingCandles1h : 
                   (is30m ? formingCandles30m : 
                   (is15m ? formingCandles15m : 
-                  (is5m ? formingCandles5m : formingCandles))))));
+                  (is5m ? formingCandles5m : formingCandles)))))));
                 
                 // Find forming candle for current symbol
                 const candle = candleSource?.find((c: { symbol: string }) => c.symbol === symbol);

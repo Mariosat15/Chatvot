@@ -1311,7 +1311,7 @@ export default function MarketDataSection() {
               <h4 className="text-white font-medium">Select Timeframes</h4>
               <div className="flex gap-3 text-sm">
                 <button 
-                  onClick={() => setSelectedHistoryTimeframes(['1m', '5m', '15m', '30m', '1h', '4h', '1d'])} 
+                  onClick={() => setSelectedHistoryTimeframes(['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M'])} 
                   className="text-blue-400 hover:text-blue-300"
                 >
                   Select All
@@ -1325,7 +1325,7 @@ export default function MarketDataSection() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {['1m', '5m', '15m', '30m', '1h', '4h', '1d'].map((tf) => (
+              {['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M'].map((tf) => (
                 <button
                   key={tf}
                   onClick={() => toggleHistoryTimeframe(tf)}

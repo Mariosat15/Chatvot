@@ -14,6 +14,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
  * - candles_historical_4h
  * - candles_historical_1d
  * - candles_historical_1w
+ * - candles_historical_1M
  */
 
 export interface IHistoricalCandle {
@@ -75,6 +76,7 @@ export const HistoricalCandle1h = getHistoricalCandleModel('1h');
 export const HistoricalCandle4h = getHistoricalCandleModel('4h');
 export const HistoricalCandle1d = getHistoricalCandleModel('1d');
 export const HistoricalCandle1w = getHistoricalCandleModel('1w');
+export const HistoricalCandle1M = getHistoricalCandleModel('1M');
 
 // Helper to get the right model based on timeframe
 export function getHistoricalModel(timeframe: string | number): Model<IHistoricalCandleDocument> | null {
@@ -106,6 +108,10 @@ export function getHistoricalModel(timeframe: string | number): Model<IHistorica
     case 'W':
     case '1w':
       return HistoricalCandle1w;
+    case '43200':
+    case 'M':
+    case '1M':
+      return HistoricalCandle1M;
     default:
       return null;
   }
