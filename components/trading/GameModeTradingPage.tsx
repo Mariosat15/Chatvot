@@ -163,13 +163,16 @@ export default function GameModeTradingPage({
             {/* Market Watch Sidebar */}
             <GameMarketWatchSidebar />
             
-            {/* Trade Station Header */}
-            <div className="flex items-center gap-2 px-2">
-              <Swords className="w-5 h-5 text-purple-400" />
-              <h2 className="text-white font-bold text-lg">⚔️ Trade Station</h2>
-            </div>
+            {/* Order Form (Trade Station) - ABOVE Account Stats */}
+            <GameModeOrderForm
+              competitionId={competitionId}
+              availableCapital={participant.availableCapital}
+              defaultLeverage={defaultLeverage}
+              currentBalance={participant.currentCapital}
+              disabled={isDisqualified}
+            />
             
-            {/* Stats Panel */}
+            {/* Stats Panel - BELOW Trade Station */}
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 p-4">
               <div className="flex items-center gap-2 mb-4">
                 <Image src="/game-icons/chest.png" alt="Stats" width={20} height={20} />
@@ -185,17 +188,6 @@ export default function GameModeTradingPage({
                 startingCapital={startingCapital}
                 positionCount={positions.length}
                 positions={positions}
-              />
-            </div>
-            
-            {/* Order Form */}
-            <div className="sticky top-4">
-              <GameModeOrderForm
-                competitionId={competitionId}
-                availableCapital={participant.availableCapital}
-                defaultLeverage={defaultLeverage}
-                currentBalance={participant.currentCapital}
-                disabled={isDisqualified}
               />
             </div>
           </div>
