@@ -362,6 +362,18 @@ export default function MarketDataSection() {
   // Cleanup options state
   const [cleanupMode, setCleanupMode] = useState<'deleteOldest' | 'keepRecent'>('deleteOldest');
   const [cleanupIncludeHistorical, setCleanupIncludeHistorical] = useState(true);
+  const [cleanupResults, setCleanupResults] = useState<{
+    mode: string;
+    days: number;
+    deletedCount: number;
+    collections: Record<string, {
+      deleted: number;
+      before: number;
+      after: number;
+      dataRange?: { oldest: string; newest: string };
+      cutoff?: string;
+    }>;
+  } | null>(null);
   
   // Historical data download state
   const [historyDownloadRunning, setHistoryDownloadRunning] = useState(false);
@@ -451,6 +463,7 @@ export default function MarketDataSection() {
       if (res.ok) {
         const data = await res.json();
         const collectionsCount = Object.keys(data.cleanup.collections || {}).length;
+        setCleanupResults(data.cleanup);
         setMessage({ 
           type: 'success', 
           text: `Deleted ${data.cleanup.deletedCount.toLocaleString()} candles from ${collectionsCount} collections, freed ${data.cleanup.freedMB} MB` 
@@ -458,6 +471,7 @@ export default function MarketDataSection() {
         fetchData();
       } else {
         setMessage({ type: 'error', text: 'Cleanup failed' });
+        setCleanupResults(null);
       }
     } catch {
       setMessage({ type: 'error', text: 'Error running cleanup' });
@@ -918,6 +932,40 @@ export default function MarketDataSection() {
               >
                 {cleanupRunning ? '⏳ Running...' : '🗑️ Run Cleanup Now'}
               </button>
+              
+              {/* Cleanup Results */}
+              {cleanupResults && (
+                <div className="mt-4 bg-gray-900/50 rounded-lg p-3 border border-gray-800/30 max-h-64 overflow-y-auto">
+                  <div className="text-white text-sm font-medium mb-2">
+                    Last Cleanup Results ({cleanupResults.mode === 'keepRecent' ? 'Keep Recent' : 'Delete Oldest'} {cleanupResults.days} days)
+                  </div>
+                  <div className="text-green-400 text-xs mb-2">
+                    Total deleted: {cleanupResults.deletedCount.toLocaleString()} candles
+                  </div>
+                  <div className="space-y-2">
+                    {Object.entries(cleanupResults.collections).map(([name, data]) => (
+                      <div key={name} className="bg-gray-800/30 rounded p-2 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-300 font-mono">{name}</span>
+                          <span className={data.deleted > 0 ? 'text-red-400' : 'text-gray-500'}>
+                            -{data.deleted} / {data.before}
+                          </span>
+                        </div>
+                        {data.dataRange && (
+                          <div className="text-gray-500 mt-1">
+                            Range: {new Date(data.dataRange.oldest).toLocaleDateString()} to {new Date(data.dataRange.newest).toLocaleDateString()}
+                          </div>
+                        )}
+                        {data.cutoff && (
+                          <div className="text-yellow-500/70 mt-0.5">
+                            Cutoff: {data.cutoff}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ==================== GAP DETECTION CARD ==================== */}

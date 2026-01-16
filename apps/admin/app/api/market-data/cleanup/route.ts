@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
     }
     
     console.log(`🧹 [Cleanup] Mode: ${mode}, Days: ${daysValue}, Include Historical: ${includeHistorical}`);
+    console.log(`🧹 [Cleanup] Request body:`, JSON.stringify(body));
     
     // Determine which collections to clean
     const collectionsToClean = includeHistorical 
@@ -61,7 +62,13 @@ export async function POST(request: NextRequest) {
     let totalDeleted = 0;
     let totalBefore = 0;
     let totalAfter = 0;
-    const results: Record<string, { deleted: number; before: number; after: number }> = {};
+    const results: Record<string, { 
+      deleted: number; 
+      before: number; 
+      after: number;
+      dataRange?: { oldest: string; newest: string };
+      cutoff?: string;
+    }> = {};
     
     for (const collectionName of collectionsToClean) {
       // Check if collection exists
@@ -82,20 +89,27 @@ export async function POST(request: NextRequest) {
       let deleteQuery: Record<string, unknown>;
       let cutoffDescription: string;
       
+      // Get oldest and newest documents for context
+      const oldestDoc = await collection.findOne({}, { sort: { [timeField]: 1 } });
+      const newestDoc = await collection.findOne({}, { sort: { [timeField]: -1 } });
+      
+      if (!oldestDoc || !newestDoc) continue;
+      
+      // Get timestamps
+      let oldestTime: number;
+      let newestTime: number;
+      if (isHistorical) {
+        oldestTime = new Date(oldestDoc.timestamp).getTime();
+        newestTime = new Date(newestDoc.timestamp).getTime();
+      } else {
+        oldestTime = oldestDoc.t * 1000;
+        newestTime = newestDoc.t * 1000;
+      }
+      
+      console.log(`🧹 [Cleanup] ${collectionName}: Data range: ${new Date(oldestTime).toISOString()} to ${new Date(newestTime).toISOString()}`);
+      
       if (mode === 'deleteOldest') {
         // DELETE OLDEST: Find the oldest data and delete X days from the start
-        const oldestDoc = await collection.findOne({}, { sort: { [timeField]: 1 } });
-        
-        if (!oldestDoc) continue;
-        
-        // Get oldest timestamp
-        let oldestTime: number;
-        if (isHistorical) {
-          oldestTime = new Date(oldestDoc.timestamp).getTime();
-        } else {
-          oldestTime = oldestDoc.t * 1000; // Convert seconds to ms
-        }
-        
         // Calculate cutoff: oldest + days to delete
         const cutoffTime = oldestTime + (daysValue * 24 * 60 * 60 * 1000);
         const cutoffDate = new Date(cutoffTime);
@@ -107,6 +121,7 @@ export async function POST(request: NextRequest) {
         }
         
         cutoffDescription = `oldest ${daysValue} days (before ${cutoffDate.toISOString()})`;
+        console.log(`🧹 [Cleanup] ${collectionName}: Will delete everything before ${cutoffDate.toISOString()}`);
         
       } else {
         // KEEP RECENT: Delete anything older than X days from now
@@ -120,13 +135,14 @@ export async function POST(request: NextRequest) {
         }
         
         cutoffDescription = `older than ${daysValue} days (before ${cutoffDate.toISOString()})`;
+        console.log(`🧹 [Cleanup] ${collectionName}: Will delete everything before ${cutoffDate.toISOString()}`);
       }
       
       // Delete
       const result = await collection.deleteMany(deleteQuery);
       const countAfter = await collection.countDocuments();
       
-      console.log(`🧹 [Cleanup] ${collectionName}: Deleted ${result.deletedCount} (${cutoffDescription})`);
+      console.log(`🧹 [Cleanup] ${collectionName}: Deleted ${result.deletedCount} of ${countBefore} (${cutoffDescription})`);
       
       totalDeleted += result.deletedCount;
       totalAfter += countAfter;
@@ -135,6 +151,11 @@ export async function POST(request: NextRequest) {
         deleted: result.deletedCount,
         before: countBefore,
         after: countAfter,
+        dataRange: {
+          oldest: new Date(oldestTime).toISOString(),
+          newest: new Date(newestTime).toISOString(),
+        },
+        cutoff: cutoffDescription,
       };
     }
     
