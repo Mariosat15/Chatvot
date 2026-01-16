@@ -380,6 +380,13 @@ export default function MarketDataSection() {
   const [historyDownloadResults, setHistoryDownloadResults] = useState<SeedResult[] | null>(null);
   const [selectedHistoryTimeframes, setSelectedHistoryTimeframes] = useState<string[]>(['1m', '5m', '15m', '30m', '1h', '4h', '1d']);
   const [historyYearsBack, setHistoryYearsBack] = useState(10);
+  const [downloadProgress, setDownloadProgress] = useState<{
+    current: number;
+    total: number;
+    currentSymbol: string;
+    currentTimeframe: string;
+    completed: Array<{ symbol: string; timeframe: string; saved: number }>;
+  } | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -558,32 +565,91 @@ export default function MarketDataSection() {
       setMessage({ type: 'error', text: 'Please select at least one timeframe' });
       return;
     }
+    
     setHistoryDownloadRunning(true);
     setHistoryDownloadResults(null);
+    
+    // Calculate total tasks (symbol × timeframe combinations)
+    const totalTasks = selectedSymbols.length * selectedHistoryTimeframes.length;
+    const completed: Array<{ symbol: string; timeframe: string; saved: number }> = [];
+    let currentTask = 0;
+    let totalSaved = 0;
+    
+    setDownloadProgress({
+      current: 0,
+      total: totalTasks,
+      currentSymbol: '',
+      currentTimeframe: '',
+      completed: [],
+    });
+    
     try {
-      const res = await fetch('/api/market-data/download-history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          symbols: selectedSymbols, 
-          timeframes: selectedHistoryTimeframes,
-          yearsBack: historyYearsBack,
-          startFromLastCandle: true,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setHistoryDownloadResults(data.results);
-        setMessage({ type: 'success', text: `Download complete! Saved ${data.summary.totalSaved.toLocaleString()} candles` });
-        fetchData();
-      } else {
-        const error = await res.json();
-        setMessage({ type: 'error', text: error.error || 'Download failed' });
+      // Download one symbol+timeframe at a time for progress tracking
+      for (const symbol of selectedSymbols) {
+        for (const timeframe of selectedHistoryTimeframes) {
+          currentTask++;
+          
+          setDownloadProgress({
+            current: currentTask,
+            total: totalTasks,
+            currentSymbol: symbol,
+            currentTimeframe: timeframe,
+            completed: [...completed],
+          });
+          
+          try {
+            const res = await fetch('/api/market-data/download-history', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                symbols: [symbol], 
+                timeframes: [timeframe],
+                yearsBack: historyYearsBack,
+                startFromLastCandle: true,
+              }),
+            });
+            
+            if (res.ok) {
+              const data = await res.json();
+              const saved = data.summary?.totalSaved || 0;
+              totalSaved += saved;
+              completed.push({ symbol, timeframe, saved });
+            } else {
+              completed.push({ symbol, timeframe, saved: 0 });
+            }
+          } catch {
+            completed.push({ symbol, timeframe, saved: 0 });
+          }
+          
+          // Update progress after each download
+          setDownloadProgress({
+            current: currentTask,
+            total: totalTasks,
+            currentSymbol: symbol,
+            currentTimeframe: timeframe,
+            completed: [...completed],
+          });
+        }
       }
+      
+      setHistoryDownloadResults(completed.map(c => ({
+        symbol: c.symbol,
+        timeframe: c.timeframe,
+        count: c.saved,
+        status: c.saved > 0 ? 'success' as const : 'skipped' as const,
+      })));
+      
+      setMessage({ 
+        type: 'success', 
+        text: `Download complete! Saved ${totalSaved.toLocaleString()} candles across ${completed.length} downloads` 
+      });
+      fetchData();
+      
     } catch {
       setMessage({ type: 'error', text: 'Error downloading history' });
     } finally {
       setHistoryDownloadRunning(false);
+      setDownloadProgress(null);
       setTimeout(() => setMessage(null), 10000);
     }
   };
@@ -1327,12 +1393,47 @@ export default function MarketDataSection() {
             </div>
           )}
 
+          {/* Progress Bar */}
+          {downloadProgress && (
+            <div className="w-full bg-gray-900/50 rounded-lg p-4 border border-blue-500/30 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-blue-400 text-sm font-medium">
+                  Downloading {downloadProgress.currentSymbol} {downloadProgress.currentTimeframe}...
+                </span>
+                <span className="text-gray-400 text-sm">
+                  {downloadProgress.current} / {downloadProgress.total}
+                </span>
+              </div>
+              <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-blue-500 to-blue-400 h-full rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}
+                />
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                {Math.round((downloadProgress.current / downloadProgress.total) * 100)}% complete
+                {downloadProgress.completed.length > 0 && (
+                  <span className="ml-2">
+                    • {downloadProgress.completed.reduce((sum, c) => sum + c.saved, 0).toLocaleString()} candles saved
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           <button
             onClick={runHistoryDownload}
             disabled={historyDownloadRunning || selectedSymbols.length === 0 || selectedHistoryTimeframes.length === 0}
             className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
-            {historyDownloadRunning ? '⏳ Downloading...' : '📊 Download History'}
+            {historyDownloadRunning ? (
+              <span className="flex items-center gap-2">
+                <span className="animate-spin">⏳</span>
+                Downloading... ({downloadProgress?.current || 0}/{downloadProgress?.total || 0})
+              </span>
+            ) : (
+              '📊 Download History'
+            )}
           </button>
         </div>
       </Section>
