@@ -670,6 +670,97 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
   // Canvas redraws only on structural changes (candles, positions, settings)
   }, [candles, hasPositions, totalPnL, symbolPositions, entryPrice, positionSide, visibleCandles, chartType, timeframe]);
 
+  // FAST PRICE LINE UPDATE - runs frequently via requestAnimationFrame
+  // This only draws the price line, not the entire chart
+  useEffect(() => {
+    if (!canvasRef.current || candles.length === 0) return;
+    
+    let animationFrameId: number;
+    let lastDrawnPrice = 0;
+    
+    const updatePriceLine = () => {
+      const price = wsPriceRef.current?.bid || prices.get(symbol)?.bid;
+      if (!price || !canvasRef.current) {
+        animationFrameId = requestAnimationFrame(updatePriceLine);
+        return;
+      }
+      
+      // Only redraw if price changed significantly (0.00001)
+      if (Math.abs(price - lastDrawnPrice) < 0.00001) {
+        animationFrameId = requestAnimationFrame(updatePriceLine);
+        return;
+      }
+      lastDrawnPrice = price;
+      
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        animationFrameId = requestAnimationFrame(updatePriceLine);
+        return;
+      }
+      
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      
+      // Calculate chart dimensions (must match main canvas)
+      const paddingLeft = 50;
+      const paddingRight = 80;
+      const paddingTop = 20;
+      const paddingBottom = 50;
+      const chartWidth = rect.width - paddingLeft - paddingRight;
+      const chartHeight = rect.height - paddingTop - paddingBottom;
+      
+      // Calculate price range from candles
+      const allPrices = candles.flatMap(c => [c.high, c.low]);
+      const minPrice = Math.min(...allPrices) * 0.9999;
+      const maxPrice = Math.max(...allPrices) * 1.0001;
+      const priceRange = maxPrice - minPrice || 1;
+      
+      // Calculate Y position for current price
+      const yPrice = paddingTop + chartHeight - ((price - minPrice) / priceRange) * chartHeight;
+      
+      // Clear only the price line area (right side where price label is)
+      ctx.save();
+      ctx.fillStyle = '#1a1a2e'; // Background color
+      ctx.fillRect((rect.width - paddingRight) * dpr, 0, paddingRight * dpr, rect.height * dpr);
+      
+      // Determine color
+      const lastCandle = candles[candles.length - 1];
+      const lineColor = price >= lastCandle.open ? '#22c55e' : '#ef4444';
+      
+      // Draw price line (dashed)
+      ctx.strokeStyle = lineColor;
+      ctx.lineWidth = 2 * dpr;
+      ctx.setLineDash([4 * dpr, 4 * dpr]);
+      ctx.beginPath();
+      ctx.moveTo(paddingLeft * dpr, yPrice * dpr);
+      ctx.lineTo((rect.width - paddingRight) * dpr, yPrice * dpr);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Draw price label background
+      ctx.fillStyle = lineColor;
+      ctx.fillRect((rect.width - paddingRight + 2) * dpr, (yPrice - 10) * dpr, 70 * dpr, 20 * dpr);
+      
+      // Draw price text
+      ctx.font = `bold ${11 * dpr}px monospace`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(price.toFixed(5), (rect.width - paddingRight + 5) * dpr, (yPrice + 4) * dpr);
+      
+      ctx.restore();
+      
+      animationFrameId = requestAnimationFrame(updatePriceLine);
+    };
+    
+    // Start the animation loop
+    animationFrameId = requestAnimationFrame(updatePriceLine);
+    
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [candles, symbol, prices]);
+
   const lastCandle = candles.length > 0 ? candles[candles.length - 1] : null;
   // Determine if price is going up based on BID price vs candle open (same as Professional mode)
   const isGoingUp = currentPrice && lastCandle 
