@@ -175,6 +175,8 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         crosshairMarkerBorderColor: '#ffffff',
         crosshairMarkerBackgroundColor: '#00ffff',
         priceFormat,
+        lastValueVisible: false, // Hide red price label
+        priceLineVisible: false,
       });
       candlestickSeriesRef.current = series as any;
     } else {
@@ -188,6 +190,8 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         wickUpColor: '#39FF14',
         wickDownColor: '#FF073A',
         priceFormat,
+        lastValueVisible: false, // Hide red price label
+        priceLineVisible: false,
       });
       candlestickSeriesRef.current = series;
       
