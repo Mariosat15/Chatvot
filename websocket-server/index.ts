@@ -31,6 +31,7 @@ interface Connection {
   participantType: 'user' | 'employee';
   participantName: string;
   conversationIds: Set<string>;
+  subscribedSymbols: Set<string>; // Symbols this client wants price updates for
   lastHeartbeat: number;
   isAlive: boolean;
 }
@@ -294,39 +295,68 @@ const server = createServer(async (req, res) => {
             break;
 
           case 'prices':
-            // Broadcast prices AND forming candles (1m + 5m + 15m + 30m) to ALL connected clients
+            // Broadcast prices AND forming candles to clients based on their subscriptions
             // Called by websocket-price-streamer every ~200ms
             if (data.prices || data.formingCandles || data.formingCandles5m || data.formingCandles15m || data.formingCandles30m) {
-              const priceEvent = {
-                type: 'price_update',
-                data: {
-                  prices: data.prices || [],
-                  formingCandles: data.formingCandles || [],        // 1m forming candles
-                  formingCandles5m: data.formingCandles5m || [],    // 5m forming candles
-                  formingCandles15m: data.formingCandles15m || [],  // 15m forming candles
-                  formingCandles30m: data.formingCandles30m || [],  // 30m forming candles
-                  timestamp: Date.now(),
-                },
-              };
+              const allPrices = data.prices || [];
+              const allCandles1m = data.formingCandles || [];
+              const allCandles5m = data.formingCandles5m || [];
+              const allCandles15m = data.formingCandles15m || [];
+              const allCandles30m = data.formingCandles30m || [];
+              const timestamp = Date.now();
               
-              // Broadcast to ALL connections (not just specific conversations)
-              // Stringify ONCE (not per client) for performance
-              const priceEventStr = JSON.stringify(priceEvent);
               let clientCount = 0;
+              let filteredCount = 0;
+              
               connections.forEach((conn) => {
-                if (conn.ws.readyState === WebSocket.OPEN) {
-                  try {
-                    conn.ws.send(priceEventStr);
-                    clientCount++;
-                  } catch {
-                    // Ignore send errors
+                if (conn.ws.readyState !== WebSocket.OPEN) return;
+                
+                try {
+                  // If client has subscriptions, filter data to only subscribed symbols
+                  // If no subscriptions, send everything (backward compatible)
+                  const hasSubscriptions = conn.subscribedSymbols.size > 0;
+                  
+                  let eventData;
+                  if (hasSubscriptions) {
+                    // Filter to only subscribed symbols
+                    const subs = conn.subscribedSymbols;
+                    eventData = {
+                      type: 'price_update',
+                      data: {
+                        prices: allPrices.filter((p: {symbol: string}) => subs.has(p.symbol)),
+                        formingCandles: allCandles1m.filter((c: {symbol: string}) => subs.has(c.symbol)),
+                        formingCandles5m: allCandles5m.filter((c: {symbol: string}) => subs.has(c.symbol)),
+                        formingCandles15m: allCandles15m.filter((c: {symbol: string}) => subs.has(c.symbol)),
+                        formingCandles30m: allCandles30m.filter((c: {symbol: string}) => subs.has(c.symbol)),
+                        timestamp,
+                      },
+                    };
+                    filteredCount++;
+                  } else {
+                    // No subscriptions - send all data
+                    eventData = {
+                      type: 'price_update',
+                      data: {
+                        prices: allPrices,
+                        formingCandles: allCandles1m,
+                        formingCandles5m: allCandles5m,
+                        formingCandles15m: allCandles15m,
+                        formingCandles30m: allCandles30m,
+                        timestamp,
+                      },
+                    };
                   }
+                  
+                  conn.ws.send(JSON.stringify(eventData));
+                  clientCount++;
+                } catch {
+                  // Ignore send errors
                 }
               });
               
-              // Log only every ~30 seconds (not every second)
-              if (Math.random() < 0.02) {
-                console.log(`📊 WS: ${clientCount} clients | ${data.prices?.length || 0} prices | 1m/5m/15m candles ✓`);
+              // Log only ~once per minute
+              if (Math.random() < 0.003) {
+                console.log(`📊 WS: ${clientCount} clients (${filteredCount} filtered) | ${allPrices.length} symbols`);
               }
             }
             break;
@@ -408,6 +438,7 @@ function handleConnection(ws: WebSocket, req: any) {
     participantType,
     participantName,
     conversationIds: new Set(),
+    subscribedSymbols: new Set(), // Start with no subscriptions
     lastHeartbeat: Date.now(),
     isAlive: true,
   };
@@ -485,6 +516,26 @@ function handleMessage(connectionId: string, message: any) {
       if (data.conversationId) {
         connection.conversationIds.delete(data.conversationId);
         removeSubscriber(data.conversationId, connectionId);
+      }
+      break;
+
+    case 'subscribe_symbol':
+      // Subscribe to price updates for specific symbol(s)
+      if (data.symbol) {
+        connection.subscribedSymbols.add(data.symbol);
+      }
+      if (data.symbols && Array.isArray(data.symbols)) {
+        data.symbols.forEach((s: string) => connection.subscribedSymbols.add(s));
+      }
+      break;
+
+    case 'unsubscribe_symbol':
+      // Unsubscribe from price updates
+      if (data.symbol) {
+        connection.subscribedSymbols.delete(data.symbol);
+      }
+      if (data.symbols && Array.isArray(data.symbols)) {
+        data.symbols.forEach((s: string) => connection.subscribedSymbols.delete(s));
       }
       break;
 

@@ -2202,6 +2202,16 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             }
           };
           
+          ws.onopen = () => {
+            // Subscribe to only the symbol this chart needs
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'subscribe_symbol',
+                symbol: symbol,
+              }));
+            }
+          };
+          
           ws.onclose = () => {
             if (!isCleanedUp) {
               // Reconnect after 2 seconds
