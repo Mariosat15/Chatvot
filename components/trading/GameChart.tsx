@@ -112,7 +112,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
               );
               
               if (priceData) {
-                // Use flushSync to force IMMEDIATE update (bypass React batching)
+                // Update price state - flushSync forces immediate render
                 flushSync(() => {
                   setWsPrice({
                     bid: priceData.bid,
@@ -122,9 +122,15 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
                 });
               }
             }
-          } catch {
-            // Ignore parse errors
+          } catch (e) {
+            console.error('🎮 GameChart WS parse error:', e);
           }
+        };
+        
+        ws.onerror = (e) => {
+          console.error('🎮 GameChart WS error:', e);
+          setWsConnected(false);
+          ws.close();
         };
         
         ws.onopen = () => {
@@ -144,11 +150,6 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
             // Reconnect after 2 seconds
             reconnectTimeout = setTimeout(connect, 2000);
           }
-        };
-        
-        ws.onerror = () => {
-          setWsConnected(false);
-          ws.close();
         };
       } catch {
         // Reconnect on error
