@@ -729,7 +729,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
         </Select>
       </div>
 
-        {/* Fun Gaming Header - MOBILE OPTIMIZED */}
+        {/* Fun Gaming Header - SAME FORMAT AS PROFESSIONAL MODE */}
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-2 border-x-2 border-purple-600">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
@@ -737,103 +737,73 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
               <span className="text-white font-bold text-xs sm:text-sm">🎮 {symbol}</span>
               {/* WebSocket status indicator */}
               <span className={cn(
-                "w-2 h-2 rounded-full",
+                "w-2 h-2 rounded-full ml-1",
                 wsConnected ? "bg-green-400 animate-pulse" : "bg-red-400"
               )} title={wsConnected ? "Live" : "Reconnecting..."} />
+              <span className="text-[10px] text-white/70">{wsPrice ? '⚡' : '📡'}</span>
             </div>
             
+            {/* Price display - SAME FORMAT AS PROFESSIONAL: B: / MID / A: */}
             {currentPrice && (
-              <div className={cn(
-                "flex items-center gap-1 px-2 py-1 rounded-full font-bold text-xs",
-                isGoingUp ? "bg-green-500" : "bg-red-500"
-              )}>
-                {isGoingUp ? (
-                  <>
-                    <TrendingUp className="size-3" />
-                    <span>{priceChange > 0 ? '+' : ''}{priceChange.toFixed(2)}%</span>
-                  </>
-                ) : (
-                  <>
-                    <TrendingDown className="size-3" />
-                    <span>{priceChange.toFixed(2)}%</span>
-                  </>
-                )}
+              <div className="flex items-center gap-2 md:gap-4 text-xs font-mono">
+                <div className="flex items-center gap-1">
+                  <span className="text-white/60">B:</span>
+                  <span className="text-[#2962ff] font-bold">{currentPrice.bid.toFixed(5)}</span>
+                </div>
+                <div className={cn(
+                  "font-bold text-sm md:text-base",
+                  isGoingUp ? "text-green-400" : "text-red-400"
+                )}>
+                  {currentPrice.mid.toFixed(5)}
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-white/60">A:</span>
+                  <span className="text-[#f23645] font-bold">{currentPrice.ask.toFixed(5)}</span>
+                </div>
               </div>
             )}
           </div>
         </div>
 
-      {/* Price Info Panel - MOBILE OPTIMIZED */}
-      {currentPrice && lastCandle && (
-        <div className="bg-gradient-to-r from-dark-200 to-dark-300 border-x-2 md:border-x-4 border-purple-600 p-2 md:p-4">
-          {/* Mobile: Show only Mid and Move in one row */}
-          <div className="md:hidden flex items-center justify-around gap-2">
-            {/* Mid Price */}
+      {/* Price Info Panel - Simplified, always show if price available */}
+      {currentPrice && (
+        <div className="bg-gradient-to-r from-dark-200 to-dark-300 border-x-2 md:border-x-4 border-purple-600 p-2 md:p-3">
+          {/* Show BID / MID / ASK and candle info */}
+          <div className="flex items-center justify-between gap-2">
+            {/* BID */}
             <div className="text-center flex-1">
-              <p className="text-xs text-dark-600 mb-0.5">
-                💰 Price {wsPrice ? '⚡' : '📡'}
+              <p className="text-[10px] text-dark-600">BID</p>
+              <div className="text-sm md:text-lg font-bold font-mono text-[#2962ff]">
+                {currentPrice.bid.toFixed(5)}
+              </div>
+            </div>
+            
+            {/* MID (main price) */}
+            <div className="text-center flex-1">
+              <p className="text-[10px] text-dark-600">
+                {wsPrice ? '⚡ LIVE' : '📡 POLL'}
               </p>
               <div className={cn(
-                "text-base font-bold font-mono",
+                "text-lg md:text-2xl font-bold font-mono",
                 isGoingUp ? "text-green-400" : "text-red-400"
               )}>
                 {currentPrice.mid.toFixed(5)}
               </div>
             </div>
             
-            {/* Movement */}
+            {/* ASK */}
             <div className="text-center flex-1">
-              <p className="text-xs text-dark-600 mb-0.5">📊 Change</p>
-              <div className={cn(
-                "text-base font-bold flex items-center justify-center gap-1",
-                isGoingUp ? "text-green-400" : "text-red-400"
-              )}>
-                {isGoingUp ? '📈' : '📉'}
-                <span>{isGoingUp ? '+' : ''}{priceChange.toFixed(2)}%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop: Show all 4 metrics */}
-          <div className="hidden md:grid grid-cols-4 gap-4">
-            {/* Mid Price */}
-            <div className="text-center">
-              <p className="text-xs text-dark-600 mb-1">
-                💰 Mid {wsPrice ? '⚡ Live' : '📡 Poll'}
-              </p>
-              <div className={cn(
-                "text-xl font-bold font-mono",
-                isGoingUp ? "text-green-400" : "text-red-400"
-              )}>
-                {currentPrice.mid.toFixed(5)}
+              <p className="text-[10px] text-dark-600">ASK</p>
+              <div className="text-sm md:text-lg font-bold font-mono text-[#f23645]">
+                {currentPrice.ask.toFixed(5)}
               </div>
             </div>
             
-            {/* High */}
-            <div className="text-center">
-              <p className="text-xs text-dark-600 mb-1">⬆️ High</p>
-              <div className="text-xl font-bold font-mono text-green-400">
-                {lastCandle.high.toFixed(5)}
-              </div>
-            </div>
-            
-            {/* Low */}
-            <div className="text-center">
-              <p className="text-xs text-dark-600 mb-1">⬇️ Low</p>
-              <div className="text-xl font-bold font-mono text-red-400">
-                {lastCandle.low.toFixed(5)}
-              </div>
-            </div>
-            
-            {/* Movement */}
-            <div className="text-center">
-              <p className="text-xs text-dark-600 mb-1">🎯 Move</p>
-              <div className={cn(
-                "text-xl font-bold flex items-center justify-center gap-1",
-                isGoingUp ? "text-green-400" : "text-red-400"
-              )}>
-                {isGoingUp ? <ArrowUp className="size-4" /> : <ArrowDown className="size-4" />}
-                {isGoingUp ? '📈' : '📉'}
+            {/* Spread */}
+            <div className="text-center flex-1">
+              <p className="text-[10px] text-dark-600">SPREAD</p>
+              <div className="text-sm md:text-lg font-bold font-mono text-yellow-400">
+                {((currentPrice.ask - currentPrice.bid) * (symbol.includes('JPY') ? 100 : 10000)).toFixed(1)}p
               </div>
             </div>
           </div>
