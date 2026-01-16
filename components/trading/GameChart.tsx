@@ -100,9 +100,12 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
           try {
             const message = JSON.parse(event.data);
             
-            if (message.type === 'prices' && message.data?.prices) {
+            // Handle price_update events (same format as Professional mode)
+            if (message.type === 'price_update' && message.data) {
+              const { prices } = message.data;
+              
               // Find our symbol's price
-              const priceData = message.data.prices.find(
+              const priceData = prices?.find(
                 (p: { symbol: string }) => p.symbol === symbol
               );
               
@@ -630,10 +633,15 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
       ctx.fillText(`${month}/${day}`, x, yDate);
       ctx.fillStyle = '#d1d5db'; // Reset color
     }
-  }, [candles, hasPositions, totalPnL, symbolPositions, entryPrice, positionSide, visibleCandles, chartType, timeframe, currentPrice]);
+  // Note: Don't include currentPrice in dependencies - price line updates via separate mechanism
+  // Canvas redraws only on structural changes (candles, positions, settings)
+  }, [candles, hasPositions, totalPnL, symbolPositions, entryPrice, positionSide, visibleCandles, chartType, timeframe]);
 
   const lastCandle = candles.length > 0 ? candles[candles.length - 1] : null;
-  const isGoingUp = lastCandle?.isUp ?? false;
+  // Determine if price is going up based on current price vs candle open (more responsive)
+  const isGoingUp = currentPrice && lastCandle 
+    ? currentPrice.mid >= lastCandle.open 
+    : (lastCandle?.isUp ?? false);
 
   return (
     <div className="relative space-y-2 md:space-y-3">
