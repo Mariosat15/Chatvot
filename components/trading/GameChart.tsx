@@ -79,27 +79,27 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     
     isMountedRef.current = true;
     
-    // Create chart
+    // Create chart - GAMING STYLE
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { color: '#131722' },
-        textColor: '#d1d4dc',
+        background: { color: '#0f0f1a' }, // Darker gaming background
+        textColor: '#e0e0e0',
       },
       grid: {
-        vertLines: { color: '#1e222d' },
-        horzLines: { color: '#1e222d' },
+        vertLines: { color: 'rgba(139, 92, 246, 0.1)' }, // Purple tint
+        horzLines: { color: 'rgba(139, 92, 246, 0.1)' },
       },
       crosshair: {
         mode: 1,
-        vertLine: { color: '#6b7280', width: 1, style: 2 },
-        horzLine: { color: '#6b7280', width: 1, style: 2 },
+        vertLine: { color: '#a855f7', width: 1, style: 2, labelBackgroundColor: '#a855f7' },
+        horzLine: { color: '#a855f7', width: 1, style: 2, labelBackgroundColor: '#a855f7' },
       },
       rightPriceScale: {
-        borderColor: '#2a2e39',
+        borderColor: 'rgba(139, 92, 246, 0.3)',
         scaleMargins: { top: 0.1, bottom: 0.1 },
       },
       timeScale: {
-        borderColor: '#2a2e39',
+        borderColor: 'rgba(139, 92, 246, 0.3)',
         timeVisible: true,
         secondsVisible: false,
       },
@@ -108,41 +108,46 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     
     chartRef.current = chart;
     
-    // Create series based on chart type
+    // Create series based on chart type - GAMING STYLE
     if (chartType === 'line') {
       const series = chart.addLineSeries({
-        color: '#2962ff',
-        lineWidth: 2,
+        color: '#a855f7', // Purple gaming color
+        lineWidth: 3,
+        crosshairMarkerVisible: true,
+        crosshairMarkerRadius: 6,
+        crosshairMarkerBorderColor: '#ffffff',
+        crosshairMarkerBackgroundColor: '#a855f7',
       });
       candlestickSeriesRef.current = series as any;
     } else {
       const series = chart.addCandlestickSeries({
-        upColor: '#26a69a',
-        downColor: '#ef5350',
-        borderUpColor: '#26a69a',
-        borderDownColor: '#ef5350',
-        wickUpColor: '#26a69a',
-        wickDownColor: '#ef5350',
+        // Bright gaming colors
+        upColor: '#22c55e', // Bright green
+        downColor: '#ef4444', // Bright red
+        borderUpColor: '#4ade80', // Lighter green border
+        borderDownColor: '#f87171', // Lighter red border
+        wickUpColor: '#22c55e',
+        wickDownColor: '#ef4444',
       });
       candlestickSeriesRef.current = series;
       
-      // Add bid/ask price lines
+      // Add bid/ask price lines - Gaming colors
       bidPriceLineRef.current = series.createPriceLine({
         price: 0,
-        color: '#2962ff',
-        lineWidth: 1,
+        color: '#3b82f6', // Bright blue
+        lineWidth: 2,
         lineStyle: 2,
         axisLabelVisible: true,
-        title: 'BID',
+        title: '💰 BID',
       });
       
       askPriceLineRef.current = series.createPriceLine({
         price: 0,
-        color: '#f23645',
-        lineWidth: 1,
+        color: '#f43f5e', // Bright rose
+        lineWidth: 2,
         lineStyle: 2,
         axisLabelVisible: true,
-        title: 'ASK',
+        title: '💎 ASK',
       });
     }
     
@@ -523,9 +528,9 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
             <SelectTrigger className="w-[120px] md:w-[140px] h-8 bg-dark-400 border-purple-500/50 text-white font-bold">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-dark-300 border-purple-500/50">
+            <SelectContent className="bg-[#1a1a2e] border-purple-500 shadow-xl shadow-purple-500/20 z-50">
               {Object.keys(FOREX_PAIRS).map((pair) => (
-                <SelectItem key={pair} value={pair} className="text-white hover:bg-purple-600/50">
+                <SelectItem key={pair} value={pair} className="text-white hover:bg-purple-600 focus:bg-purple-600 cursor-pointer">
                   🎮 {pair}
                 </SelectItem>
               ))}
@@ -593,9 +598,15 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         </div>
       </div>
       
-      {/* Chart Container */}
+      {/* Chart Container - Gaming Glow Effect */}
       <div className="relative flex-1 min-h-[300px] md:min-h-[400px]">
-        <div ref={chartContainerRef} className="absolute inset-0" />
+        <div 
+          ref={chartContainerRef} 
+          className="absolute inset-0"
+          style={{
+            filter: 'drop-shadow(0 0 2px rgba(168, 85, 247, 0.3))',
+          }}
+        />
         
         {/* Loading Overlay */}
         {isLoading && (

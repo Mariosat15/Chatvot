@@ -27,6 +27,8 @@ import { CompetitionInfoHeader } from '@/components/trading/CompetitionInfoHeade
 import CompetitionStatusMonitor from '@/components/trading/CompetitionStatusMonitor';
 import ParticipantStatusMonitor from '@/components/trading/ParticipantStatusMonitor';
 import TradingArsenalPanel from '@/components/trading/TradingArsenalPanel';
+import TradingPageContent from '@/components/trading/TradingPageContent';
+import ModeToggle from '@/components/trading/ModeToggle';
 import { ArrowLeft, Skull, Ban, History } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -155,6 +157,27 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
           />
         )}
         
+        <TradingPageContent
+          competition={{
+            _id: competitionId,
+            name: competition.name,
+            endTime: competition.endTime,
+            currentParticipants: competition.currentParticipants,
+            prizePool: competition.prizePool,
+          }}
+          participant={{
+            currentCapital: participant.currentCapital,
+            availableCapital: participant.availableCapital,
+            unrealizedPnl: participant.unrealizedPnl,
+            usedMargin: participant.usedMargin,
+            currentOpenPositions: participant.currentOpenPositions,
+          }}
+          positions={positions}
+          competitionId={competitionId}
+          defaultLeverage={defaultLeverage}
+          startingCapital={competition.startingCapital}
+          isDisqualified={isDisqualified}
+        >
         <div className="min-h-screen bg-gradient-to-br from-dark-100 via-dark-100 to-dark-200">
         {/* View-Only Banner for Completed Competitions */}
         {isViewOnly && (
@@ -226,6 +249,9 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                     </div>
                   </div>
                 </div>
+                
+                {/* Mode Toggle - Professional/Game */}
+                <ModeToggle />
               </div>
 
               {/* Competition Info Header */}
@@ -566,7 +592,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
           competitionId={competitionId}
         />
       )}
-      
+      </TradingPageContent>
       </TradingModeProvider>
         </PositionEventsProvider>
         </TradingArsenalProvider>
