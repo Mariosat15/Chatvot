@@ -64,6 +64,10 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
   // Price display ref for direct DOM updates (bypasses React)
   const priceDisplayRef = useRef<HTMLDivElement>(null);
   
+  // DEBUG: Count WebSocket messages received
+  const wsMessageCountRef = useRef<number>(0);
+  const [wsMessageCount, setWsMessageCount] = useState(0);
+  
   // Memoize expensive position calculations
   const { symbolPositions, totalPnL, hasPositions, entryPrice, positionSide } = useMemo(() => {
     const filtered = positions.filter((p) => p.symbol === symbol);
@@ -125,15 +129,19 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
                   mid: (priceData.bid + priceData.ask) / 2,
                 };
                 
+                // DEBUG: Count messages
+                wsMessageCountRef.current++;
+                
                 // DIRECT DOM UPDATE for price display (bypasses React completely!)
                 if (priceDisplayRef.current) {
                   priceDisplayRef.current.textContent = priceData.bid.toFixed(5);
                 }
                 
-                // Force React re-render only every 200ms (for other UI elements)
+                // Force React re-render only every 500ms (for other UI elements)
                 const now = Date.now();
-                if (now - lastForceUpdateRef.current > 200) {
+                if (now - lastForceUpdateRef.current > 500) {
                   lastForceUpdateRef.current = now;
+                  setWsMessageCount(wsMessageCountRef.current);
                   forceUpdate(n => n + 1);
                 }
               }
@@ -757,7 +765,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
                 "w-2 h-2 rounded-full ml-1",
                 wsConnected ? "bg-green-400 animate-pulse" : "bg-red-400"
               )} title={wsConnected ? "Live" : "Reconnecting..."} />
-              <span className="text-[10px] text-white/70">{wsPriceRef.current ? '⚡' : '📡'}</span>
+              <span className="text-[10px] text-white/70">{wsPriceRef.current ? `⚡${wsMessageCount}` : '📡0'}</span>
             </div>
             
             {/* Price display - BID is main price (DIRECT DOM UPDATE for speed!) */}
