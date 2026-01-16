@@ -13,6 +13,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
  * - candles_historical_1h
  * - candles_historical_4h
  * - candles_historical_1d
+ * - candles_historical_1w
  */
 
 export interface IHistoricalCandle {
@@ -73,6 +74,7 @@ export const HistoricalCandle30m = getHistoricalCandleModel('30m');
 export const HistoricalCandle1h = getHistoricalCandleModel('1h');
 export const HistoricalCandle4h = getHistoricalCandleModel('4h');
 export const HistoricalCandle1d = getHistoricalCandleModel('1d');
+export const HistoricalCandle1w = getHistoricalCandleModel('1w');
 
 // Helper to get the right model based on timeframe
 export function getHistoricalModel(timeframe: string | number): Model<IHistoricalCandleDocument> | null {
@@ -100,6 +102,10 @@ export function getHistoricalModel(timeframe: string | number): Model<IHistorica
     case 'D':
     case '1d':
       return HistoricalCandle1d;
+    case '10080':
+    case 'W':
+    case '1w':
+      return HistoricalCandle1w;
     default:
       return null;
   }

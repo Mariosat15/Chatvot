@@ -14,6 +14,7 @@ const TIMEFRAME_CONFIG: Record<string, { minutes: number; collectionName: string
   '1h': { minutes: 60, collectionName: 'candles_historical_1h', apiMultiplier: 1, apiTimespan: 'hour' },
   '4h': { minutes: 240, collectionName: 'candles_historical_4h', apiMultiplier: 4, apiTimespan: 'hour' },
   '1d': { minutes: 1440, collectionName: 'candles_historical_1d', apiMultiplier: 1, apiTimespan: 'day' },
+  '1w': { minutes: 10080, collectionName: 'candles_historical_1w', apiMultiplier: 1, apiTimespan: 'week' },
 };
 
 // Historical candle schema (matches database/models/candle-historical.model.ts)

@@ -329,6 +329,7 @@ const server = createServer(async (req, res) => {
               const allCandles1h = data.formingCandles1h || [];
               const allCandles4h = data.formingCandles4h || [];
               const allCandlesD = data.formingCandlesD || [];
+              const allCandlesW = data.formingCandlesW || [];
               const timestamp = Date.now();
               
               // OPTIMIZATION 2: Pre-stringify for unsubscribed clients (stringify once, use many)
@@ -357,6 +358,7 @@ const server = createServer(async (req, res) => {
                         formingCandles1h: allCandles1h.filter((c: {symbol: string}) => subs.has(c.symbol)),
                         formingCandles4h: allCandles4h.filter((c: {symbol: string}) => subs.has(c.symbol)),
                         formingCandlesD: allCandlesD.filter((c: {symbol: string}) => subs.has(c.symbol)),
+                        formingCandlesW: allCandlesW.filter((c: {symbol: string}) => subs.has(c.symbol)),
                         timestamp,
                       },
                     };
@@ -376,6 +378,7 @@ const server = createServer(async (req, res) => {
                           formingCandles1h: allCandles1h,
                           formingCandles4h: allCandles4h,
                           formingCandlesD: allCandlesD,
+                          formingCandlesW: allCandlesW,
                           timestamp,
                         },
                       });

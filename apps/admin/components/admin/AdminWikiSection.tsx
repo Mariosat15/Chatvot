@@ -576,6 +576,7 @@ export default function AdminWikiSection() {
                     <div><code className="text-cyan-400">candles_historical_1h</code></div>
                     <div><code className="text-cyan-400">candles_historical_4h</code></div>
                     <div><code className="text-cyan-400">candles_historical_1d</code></div>
+                    <div><code className="text-cyan-400">candles_historical_1w</code></div>
                   </div>
                 </div>
               </div>
@@ -627,9 +628,14 @@ export default function AdminWikiSection() {
                       <td>Aggregated from 1m + historical_4h</td>
                       <td>WebSocket cache (live)</td>
                     </tr>
-                    <tr>
+                    <tr className="border-b border-gray-800">
                       <td className="py-2 font-medium text-white">Daily</td>
                       <td><code className="text-xs text-cyan-400">historical_1d</code> or Massive.com API</td>
+                      <td>WebSocket cache (live)</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 font-medium text-white">Weekly</td>
+                      <td><code className="text-xs text-cyan-400">historical_1w</code> or Massive.com API</td>
                       <td>WebSocket cache (live)</td>
                     </tr>
                   </tbody>
@@ -862,6 +868,11 @@ export default function AdminWikiSection() {
                     <div className="text-xs text-gray-400">From historical_1d or API</div>
                     <div className="text-xs mt-1">Period: UTC midnight</div>
                   </div>
+                  <div>
+                    <div className="font-medium text-cyan-400 mb-2">Weekly Candle</div>
+                    <div className="text-xs text-gray-400">From historical_1w or API</div>
+                    <div className="text-xs mt-1">Period: Monday 00:00 UTC</div>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -937,6 +948,7 @@ export default function AdminWikiSection() {
                     <Badge variant="outline">1h</Badge>
                     <Badge variant="outline">4h</Badge>
                     <Badge variant="outline">1d</Badge>
+                    <Badge variant="outline">1w</Badge>
                   </div>
                 </div>
                 <div className="bg-gray-900 p-3 rounded">
@@ -1262,6 +1274,7 @@ export default function AdminWikiSection() {
                   <code className="bg-gray-900 p-1 rounded text-cyan-400">historical_1h</code>
                   <code className="bg-gray-900 p-1 rounded text-cyan-400">historical_4h</code>
                   <code className="bg-gray-900 p-1 rounded text-cyan-400">historical_1d</code>
+                  <code className="bg-gray-900 p-1 rounded text-cyan-400">historical_1w</code>
                 </div>
               </div>
             </CardContent>

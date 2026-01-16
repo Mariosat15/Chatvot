@@ -91,6 +91,7 @@ interface WebSocketGlobalState {
   formingCandles1h: Map<string, CachedFormingCandle>;
   formingCandles4h: Map<string, CachedFormingCandle>;
   formingCandlesD: Map<string, CachedFormingCandle>;
+  formingCandlesW: Map<string, CachedFormingCandle>;
   changedSymbols: Set<string>; // Track symbols that changed since last broadcast
   lastUpdateTime: number;
   initialized: boolean;
@@ -130,6 +131,7 @@ function getGlobalState(): WebSocketGlobalState {
       formingCandles1h: new Map<string, CachedFormingCandle>(),
       formingCandles4h: new Map<string, CachedFormingCandle>(),
       formingCandlesD: new Map<string, CachedFormingCandle>(),
+      formingCandlesW: new Map<string, CachedFormingCandle>(),
       changedSymbols: new Set<string>(),
       lastUpdateTime: 0,
       initialized: false,
@@ -899,6 +901,31 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
     existingD.low = Math.min(existingD.low, price);
     existingD.close = price;
   }
+  
+  // Update Weekly cache (week starts at Monday 00:00 UTC)
+  // Calculate Monday 00:00 UTC of the current week
+  const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 1 = Monday, ...
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday is 6 days from Monday
+  const mondayDate = new Date(now);
+  mondayDate.setUTCDate(now.getUTCDate() - daysFromMonday);
+  mondayDate.setUTCHours(0, 0, 0, 0);
+  const periodW = Math.floor(mondayDate.getTime() / 1000);
+  const existingW = state.formingCandlesW.get(symbol);
+  
+  if (!existingW || existingW.periodStart !== periodW) {
+    state.formingCandlesW.set(symbol, {
+      symbol,
+      periodStart: periodW,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+    });
+  } else {
+    existingW.high = Math.max(existingW.high, price);
+    existingW.low = Math.min(existingW.low, price);
+    existingW.close = price;
+  }
 }
 
 /**
@@ -1472,6 +1499,25 @@ export function getFormingDailyCandle(symbol: string): FormingCandle | null {
 }
 
 /**
+ * Get Weekly forming candle (from cache - fast!)
+ */
+export function getFormingWeeklyCandle(symbol: string): FormingCandle | null {
+  const state = getState();
+  const cached = state.formingCandlesW.get(symbol);
+  if (!cached) return null;
+  
+  return {
+    symbol: cached.symbol,
+    time: cached.periodStart,
+    open: cached.open,
+    high: cached.high,
+    low: cached.low,
+    close: cached.close,
+    tickCount: 0,
+  };
+}
+
+/**
  * Get all forming candles (current minute candles being built)
  */
 export function getAllFormingCandles(): Map<string, FormingCandle> {
@@ -1653,6 +1699,9 @@ async function broadcastFormingCandles(): Promise<void> {
   const formingCandlesD = Array.from(state.formingCandlesD.values())
     .filter(c => changedSymbols.has(c.symbol));
   
+  const formingCandlesW = Array.from(state.formingCandlesW.values())
+    .filter(c => changedSymbols.has(c.symbol));
+  
   const prices = Array.from(state.priceCache.values())
     .filter(p => changedSymbols.has(p.symbol));
   
@@ -1745,6 +1794,16 @@ async function broadcastFormingCandles(): Promise<void> {
           low: c.low,
           close: c.close,
           timeframe: 'D',
+        })),
+        // Weekly forming candles (from cache - no calculation)
+        formingCandlesW: formingCandlesW.map(c => ({
+          symbol: c.symbol,
+          time: c.periodStart,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          timeframe: 'W',
         })),
       }),
     });
