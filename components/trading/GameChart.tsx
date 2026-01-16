@@ -1,13 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, UTCTimestamp } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, UTCTimestamp, PriceFormat } from 'lightweight-charts';
 import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
 import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
 import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingUp, TrendingDown, BarChart3, LineChart, CandlestickChart } from 'lucide-react';
+import { CandlestickChart, LineChart, Clock, Zap } from 'lucide-react';
 
 // Position interface for Game mode
 interface Position {
@@ -28,16 +27,27 @@ interface GameChartProps {
 
 // Simple timeframes for Game mode
 const TIMEFRAMES = [
-  { value: '1', label: '1m' },
-  { value: '5', label: '5m' },
-  { value: '15', label: '15m' },
+  { value: '1', label: '1m', icon: '⚡' },
+  { value: '5', label: '5m', icon: '🔥' },
+  { value: '15', label: '15m', icon: '💎' },
 ] as const;
 
 type ChartType = 'candle' | 'line';
 
+// Get decimal places for symbol
+function getDecimals(symbol: string): number {
+  return symbol.includes('JPY') ? 3 : 5;
+}
+
+// Format price with correct decimals
+function formatPrice(price: number, symbol: string): string {
+  const decimals = getDecimals(symbol);
+  return price.toFixed(decimals);
+}
+
 export default function GameChart({ competitionId, positions = [] }: GameChartProps) {
   const { prices, subscribe, unsubscribe } = usePrices();
-  const { symbol, setSymbol } = useChartSymbol();
+  const { symbol } = useChartSymbol();
   
   // Chart state
   const [timeframe, setTimeframe] = useState<string>('1');
@@ -46,6 +56,7 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
   const [candlesLoaded, setCandlesLoaded] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [currentTime, setCurrentTime] = useState(new Date());
   
   // Chart refs
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +69,9 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
   const oldestCandleTimeRef = useRef<number | null>(null);
   const allCandlesRef = useRef<any[]>([]);
   
+  // Get decimal places for current symbol
+  const decimals = getDecimals(symbol);
+  
   // Get current price
   const currentPrice = prices.get(symbol);
   
@@ -66,6 +80,14 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     positions.filter(p => p.symbol === symbol), 
     [positions, symbol]
   );
+  
+  // Update current time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   
   // Subscribe to price updates
   useEffect(() => {
@@ -79,20 +101,38 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     
     isMountedRef.current = true;
     
-    // Create chart - GAMING STYLE
+    // Price format based on symbol
+    const priceFormat: PriceFormat = {
+      type: 'price',
+      precision: decimals,
+      minMove: decimals === 3 ? 0.001 : 0.00001,
+    };
+    
+    // Create chart - GAMING STYLE with neon effects
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { color: '#0f0f1a' }, // Darker gaming background
-        textColor: '#e0e0e0',
+        background: { color: 'transparent' },
+        textColor: '#a855f7',
+        fontFamily: "'JetBrains Mono', monospace",
       },
       grid: {
-        vertLines: { color: 'rgba(139, 92, 246, 0.1)' }, // Purple tint
-        horzLines: { color: 'rgba(139, 92, 246, 0.1)' },
+        vertLines: { color: 'rgba(139, 92, 246, 0.08)' },
+        horzLines: { color: 'rgba(139, 92, 246, 0.08)' },
       },
       crosshair: {
         mode: 1,
-        vertLine: { color: '#a855f7', width: 1, style: 2, labelBackgroundColor: '#a855f7' },
-        horzLine: { color: '#a855f7', width: 1, style: 2, labelBackgroundColor: '#a855f7' },
+        vertLine: { 
+          color: '#a855f7', 
+          width: 1, 
+          style: 2, 
+          labelBackgroundColor: '#7c3aed',
+        },
+        horzLine: { 
+          color: '#a855f7', 
+          width: 1, 
+          style: 2, 
+          labelBackgroundColor: '#7c3aed',
+        },
       },
       rightPriceScale: {
         borderColor: 'rgba(139, 92, 246, 0.3)',
@@ -101,53 +141,71 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
       timeScale: {
         borderColor: 'rgba(139, 92, 246, 0.3)',
         timeVisible: true,
-        secondsVisible: false,
+        secondsVisible: timeframe === '1',
+        tickMarkFormatter: (time: UTCTimestamp) => {
+          const date = new Date(time * 1000);
+          const hours = date.getUTCHours().toString().padStart(2, '0');
+          const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+          return `${hours}:${minutes}`;
+        },
+      },
+      localization: {
+        priceFormatter: (price: number) => formatPrice(price, symbol),
+        timeFormatter: (time: number) => {
+          const date = new Date(time * 1000);
+          return date.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false,
+          });
+        },
       },
       handleScroll: { vertTouchDrag: false },
     });
     
     chartRef.current = chart;
     
-    // Create series based on chart type - GAMING STYLE
+    // Create series based on chart type - NEON GAMING STYLE
     if (chartType === 'line') {
       const series = chart.addLineSeries({
-        color: '#a855f7', // Purple gaming color
+        color: '#a855f7',
         lineWidth: 3,
         crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 6,
+        crosshairMarkerRadius: 8,
         crosshairMarkerBorderColor: '#ffffff',
         crosshairMarkerBackgroundColor: '#a855f7',
+        priceFormat,
       });
       candlestickSeriesRef.current = series as any;
     } else {
       const series = chart.addCandlestickSeries({
-        // Bright gaming colors
-        upColor: '#22c55e', // Bright green
-        downColor: '#ef4444', // Bright red
-        borderUpColor: '#4ade80', // Lighter green border
-        borderDownColor: '#f87171', // Lighter red border
-        wickUpColor: '#22c55e',
-        wickDownColor: '#ef4444',
+        upColor: '#00ff88',
+        downColor: '#ff3366',
+        borderUpColor: '#00ff88',
+        borderDownColor: '#ff3366',
+        wickUpColor: '#00ff88',
+        wickDownColor: '#ff3366',
+        priceFormat,
       });
       candlestickSeriesRef.current = series;
       
-      // Add bid/ask price lines - Gaming colors
+      // Add bid/ask price lines with correct decimals
       bidPriceLineRef.current = series.createPriceLine({
         price: 0,
-        color: '#3b82f6', // Bright blue
+        color: '#00d4ff',
         lineWidth: 2,
         lineStyle: 2,
         axisLabelVisible: true,
-        title: '💰 BID',
+        title: 'BID',
       });
       
       askPriceLineRef.current = series.createPriceLine({
         price: 0,
-        color: '#f43f5e', // Bright rose
+        color: '#ff00ff',
         lineWidth: 2,
         lineStyle: 2,
         axisLabelVisible: true,
-        title: '💎 ASK',
+        title: 'ASK',
       });
     }
     
@@ -172,7 +230,7 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         chartRef.current = null;
       }
     };
-  }, [chartType]);
+  }, [chartType, symbol, decimals, timeframe]);
   
   // Load candles
   useEffect(() => {
@@ -199,7 +257,6 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         const candles = data.candles || [];
         allCandlesRef.current = candles;
         
-        // Track oldest candle for lazy loading
         if (candles.length > 0) {
           oldestCandleTimeRef.current = candles[0].time;
           setHasMoreHistory(data.hasMore !== false);
@@ -222,7 +279,6 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
           candlestickSeriesRef.current.setData(candleData);
         }
         
-        // Fit content
         chartRef.current?.timeScale().fitContent();
         setCandlesLoaded(true);
       } catch (error) {
@@ -235,18 +291,18 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     loadCandles();
   }, [symbol, timeframe, chartType]);
   
-  // Update bid/ask price lines
+  // Update bid/ask price lines with correct decimals
   useEffect(() => {
     if (!currentPrice || !bidPriceLineRef.current || !askPriceLineRef.current) return;
     
     bidPriceLineRef.current.applyOptions({
       price: currentPrice.bid,
-      title: `BID ${currentPrice.bid.toFixed(5)}`,
+      title: `BID`,
     });
     
     askPriceLineRef.current.applyOptions({
       price: currentPrice.ask,
-      title: `ASK ${currentPrice.ask.toFixed(5)}`,
+      title: `ASK`,
     });
   }, [currentPrice]);
   
@@ -274,29 +330,25 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
             if (message.type === 'price_update' && message.data) {
               const { prices, formingCandles, formingCandles5m, formingCandles15m } = message.data;
               
-              // Select candle source based on timeframe
               const is5m = timeframe === '5';
               const is15m = timeframe === '15';
               const candleSource = is15m ? formingCandles15m : (is5m ? formingCandles5m : formingCandles);
               
-              // Find candle for current symbol
               const candle = candleSource?.find((c: { symbol: string }) => c.symbol === symbol);
               const price = prices?.find((p: { symbol: string }) => p.symbol === symbol);
               
               if (candle && candlestickSeriesRef.current) {
-                // Update bid/ask lines
                 if (price && bidPriceLineRef.current && askPriceLineRef.current) {
                   bidPriceLineRef.current.applyOptions({
                     price: price.bid,
-                    title: `BID ${price.bid.toFixed(5)}`,
+                    title: `BID`,
                   });
                   askPriceLineRef.current.applyOptions({
                     price: price.ask,
-                    title: `ASK ${price.ask.toFixed(5)}`,
+                    title: `ASK`,
                   });
                 }
                 
-                // Update candle
                 if (chartType === 'line') {
                   (candlestickSeriesRef.current as any).update({
                     time: candle.time as UTCTimestamp,
@@ -333,9 +385,7 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
           }
         };
         
-        ws.onerror = () => {
-          // Will trigger onclose
-        };
+        ws.onerror = () => {};
       } catch {
         if (!isCleanedUp) {
           reconnectTimeout = setTimeout(connect, 3000);
@@ -352,7 +402,7 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     };
   }, [symbol, timeframe, chartType, candlesLoaded]);
   
-  // Load more candles when scrolling left (lazy loading)
+  // Load more candles when scrolling left
   const loadMoreCandles = useCallback(async () => {
     if (isLoadingMore || !hasMoreHistory || !oldestCandleTimeRef.current) return;
     if (!chartRef.current || !candlestickSeriesRef.current) return;
@@ -380,16 +430,13 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         return;
       }
       
-      // Update oldest candle time
       oldestCandleTimeRef.current = newCandles[0].time;
       setHasMoreHistory(data.hasMore !== false);
       
-      // Merge new candles with existing
       const existingCandles = allCandlesRef.current;
       const mergedCandles = [...newCandles, ...existingCandles];
       allCandlesRef.current = mergedCandles;
       
-      // Update chart
       if (chartType === 'line') {
         const lineData = mergedCandles.map((c: any) => ({
           time: c.time as UTCTimestamp,
@@ -427,12 +474,8 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
       
       const oldestVisible = visibleRange.from as number;
       const oldestCandle = oldestCandleTimeRef.current;
-      
-      // Calculate timeframe in minutes
       const timeframeMinutes = timeframe === '1' ? 1 : (timeframe === '5' ? 5 : 15);
-      
-      // Load more when user scrolls close to the oldest loaded candle
-      const bufferTime = 50 * timeframeMinutes * 60; // 50 candles worth of time in seconds
+      const bufferTime = 50 * timeframeMinutes * 60;
       
       if (oldestVisible <= oldestCandle + bufferTime) {
         loadMoreCandles();
@@ -444,19 +487,16 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     return () => {
       try {
         chart.timeScale().unsubscribeVisibleTimeRangeChange(handleVisibleTimeRangeChange);
-      } catch {
-        // Chart may be disposed
-      }
+      } catch {}
     };
   }, [hasMoreHistory, isLoadingMore, loadMoreCandles, timeframe, candlesLoaded]);
   
-  // Draw position lines (entry, TP, SL)
+  // Draw position lines
   useEffect(() => {
     if (!candlestickSeriesRef.current || !candlesLoaded) return;
     
     const series = candlestickSeriesRef.current;
     
-    // Clear old position lines
     positionLinesRef.current.forEach((lines) => {
       if (lines.entry) series.removePriceLine(lines.entry);
       if (lines.tp) series.removePriceLine(lines.tp);
@@ -464,28 +504,25 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     });
     positionLinesRef.current.clear();
     
-    // Draw new position lines
     symbolPositions.forEach((position) => {
       const isLong = position.side === 'long';
       const entryColor = isLong ? '#fbbf24' : '#a78bfa';
       
       const lines: any = {};
       
-      // Entry line
       lines.entry = series.createPriceLine({
         price: position.entryPrice,
         color: entryColor,
         lineWidth: 2,
         lineStyle: 2,
         axisLabelVisible: true,
-        title: isLong ? '📈 LONG' : '📉 SHORT',
+        title: isLong ? '📈 ENTRY' : '📉 ENTRY',
       });
       
-      // Take Profit line
       if (position.takeProfit) {
         lines.tp = series.createPriceLine({
           price: position.takeProfit,
-          color: '#22c55e',
+          color: '#00ff88',
           lineWidth: 2,
           lineStyle: 1,
           axisLabelVisible: true,
@@ -493,11 +530,10 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         });
       }
       
-      // Stop Loss line
       if (position.stopLoss) {
         lines.sl = series.createPriceLine({
           price: position.stopLoss,
-          color: '#ef4444',
+          color: '#ff3366',
           lineWidth: 2,
           lineStyle: 1,
           axisLabelVisible: true,
@@ -509,76 +545,76 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     });
   }, [symbolPositions, candlesLoaded]);
   
-  // Calculate price change
-  const priceChange = useMemo(() => {
-    if (!currentPrice) return 0;
-    // Simple approximation - in reality would need previous close
-    return 0;
-  }, [currentPrice]);
-  
-  const isGoingUp = currentPrice && currentPrice.bid > (currentPrice.ask - currentPrice.spread);
-
   return (
-    <div className="flex flex-col h-full bg-[#131722] rounded-lg overflow-hidden border-2 border-purple-500/50">
-      {/* Header */}
-      <div className="flex items-center justify-between p-2 md:p-3 bg-gradient-to-r from-purple-600 to-pink-600 border-b border-purple-500/50">
-        {/* Symbol Selector */}
-        <div className="flex items-center gap-2">
-          <Select value={symbol} onValueChange={(value) => setSymbol(value as ForexSymbol)}>
-            <SelectTrigger className="w-[120px] md:w-[140px] h-8 bg-dark-400 border-purple-500/50 text-white font-bold">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-[#1a1a2e] border-purple-500 shadow-xl shadow-purple-500/20 z-50">
-              {Object.keys(FOREX_PAIRS).map((pair) => (
-                <SelectItem key={pair} value={pair} className="text-white hover:bg-purple-600 focus:bg-purple-600 cursor-pointer">
-                  🎮 {pair}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          {/* Price Display */}
+    <div className="flex flex-col h-full bg-gradient-to-br from-[#0a0a15] via-[#0f0f1a] to-[#1a0a20] rounded-xl overflow-hidden">
+      {/* Gaming Header */}
+      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-b border-purple-500/30">
+        {/* Live Price Display */}
+        <div className="flex items-center gap-4">
           {currentPrice && (
-            <div className="hidden md:flex items-center gap-2 text-xs font-mono">
-              <span className={cn(
-                "font-bold text-sm",
-                isGoingUp ? "text-green-400" : "text-red-400"
-              )}>
-                {currentPrice.bid.toFixed(5)}
-              </span>
-              <span className="text-white/60">|</span>
-              <span className="text-[#f23645]">{currentPrice.ask.toFixed(5)}</span>
-            </div>
+            <>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-cyan-400 uppercase tracking-wider">Bid</span>
+                <span className="text-lg font-mono font-bold text-cyan-400 drop-shadow-[0_0_10px_rgba(0,255,255,0.5)]">
+                  {formatPrice(currentPrice.bid, symbol)}
+                </span>
+              </div>
+              <div className="w-px h-8 bg-purple-500/30" />
+              <div className="flex flex-col">
+                <span className="text-[10px] text-pink-400 uppercase tracking-wider">Ask</span>
+                <span className="text-lg font-mono font-bold text-pink-400 drop-shadow-[0_0_10px_rgba(255,0,255,0.5)]">
+                  {formatPrice(currentPrice.ask, symbol)}
+                </span>
+              </div>
+              <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-purple-500/20 rounded-lg">
+                <Zap className="w-3 h-3 text-yellow-400" />
+                <span className="text-yellow-400 text-xs font-bold">
+                  {((currentPrice.ask - currentPrice.bid) / (decimals === 3 ? 0.01 : 0.0001)).toFixed(1)}
+                </span>
+                <span className="text-gray-500 text-[10px]">pips</span>
+              </div>
+            </>
           )}
         </div>
         
         {/* Controls */}
-        <div className="flex items-center gap-1 md:gap-2">
-          {/* Timeframe Selector */}
-          <div className="flex bg-dark-400 rounded-md p-0.5">
+        <div className="flex items-center gap-2">
+          {/* Current Time */}
+          <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-dark-400/50 rounded-lg">
+            <Clock className="w-3 h-3 text-purple-400" />
+            <span className="text-purple-300 text-xs font-mono">
+              {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+            </span>
+          </div>
+          
+          {/* Timeframe Selector - Gaming Style */}
+          <div className="flex bg-dark-400/50 rounded-lg p-0.5 border border-purple-500/30">
             {TIMEFRAMES.map((tf) => (
               <button
                 key={tf.value}
                 onClick={() => setTimeframe(tf.value)}
                 className={cn(
-                  "px-2 py-1 text-xs font-bold rounded transition-all",
+                  "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1",
                   timeframe === tf.value
-                    ? "bg-purple-600 text-white"
-                    : "text-white/60 hover:text-white"
+                    ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30"
+                    : "text-gray-400 hover:text-white hover:bg-dark-400"
                 )}
               >
-                {tf.label}
+                <span>{tf.icon}</span>
+                <span>{tf.label}</span>
               </button>
             ))}
           </div>
           
           {/* Chart Type Toggle */}
-          <div className="flex bg-dark-400 rounded-md p-0.5">
+          <div className="flex bg-dark-400/50 rounded-lg p-0.5 border border-purple-500/30">
             <button
               onClick={() => setChartType('candle')}
               className={cn(
-                "p-1.5 rounded transition-all",
-                chartType === 'candle' ? "bg-purple-600" : "hover:bg-dark-500"
+                "p-1.5 rounded-md transition-all",
+                chartType === 'candle' 
+                  ? "bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg" 
+                  : "hover:bg-dark-400"
               )}
               title="Candlestick"
             >
@@ -587,8 +623,10 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
             <button
               onClick={() => setChartType('line')}
               className={cn(
-                "p-1.5 rounded transition-all",
-                chartType === 'line' ? "bg-purple-600" : "hover:bg-dark-500"
+                "p-1.5 rounded-md transition-all",
+                chartType === 'line' 
+                  ? "bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg" 
+                  : "hover:bg-dark-400"
               )}
               title="Line"
             >
@@ -598,44 +636,37 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         </div>
       </div>
       
-      {/* Chart Container - Gaming Glow Effect */}
-      <div className="relative flex-1 min-h-[300px] md:min-h-[400px]">
+      {/* Chart Container with Neon Glow */}
+      <div className="relative flex-1 min-h-[350px]">
         <div 
           ref={chartContainerRef} 
           className="absolute inset-0"
-          style={{
-            filter: 'drop-shadow(0 0 2px rgba(168, 85, 247, 0.3))',
-          }}
+        />
+        
+        {/* Neon border effect */}
+        <div className="absolute inset-0 pointer-events-none border border-purple-500/20 rounded-lg" 
+          style={{ boxShadow: 'inset 0 0 30px rgba(139, 92, 246, 0.1)' }} 
         />
         
         {/* Loading Overlay */}
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#131722]/80 z-10">
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-white/60 text-sm">Loading chart...</span>
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a15]/90 z-10">
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative">
+                <div className="w-12 h-12 border-4 border-purple-500/30 rounded-full" />
+                <div className="absolute inset-0 w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+              <span className="text-purple-400 text-sm font-medium">Loading chart...</span>
             </div>
           </div>
         )}
         
         {/* Loading More Indicator */}
         {isLoadingMore && (
-          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-10">
-            <div className="flex items-center gap-2 bg-purple-600/90 px-3 py-1 rounded-full">
+          <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10">
+            <div className="flex items-center gap-2 bg-purple-600/90 px-4 py-2 rounded-full shadow-lg shadow-purple-500/30">
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span className="text-white text-xs">Loading history...</span>
-            </div>
-          </div>
-        )}
-        
-        {/* Mobile Price Display */}
-        {currentPrice && (
-          <div className="absolute top-2 left-2 md:hidden z-10">
-            <div className={cn(
-              "px-2 py-1 rounded text-sm font-bold font-mono",
-              isGoingUp ? "bg-green-500/90 text-white" : "bg-red-500/90 text-white"
-            )}>
-              {currentPrice.bid.toFixed(5)}
+              <span className="text-white text-xs font-medium">Loading history...</span>
             </div>
           </div>
         )}
@@ -643,16 +674,16 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
       
       {/* Footer - Position Summary */}
       {symbolPositions.length > 0 && (
-        <div className="p-2 bg-dark-300 border-t border-purple-500/30">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-white/60">
-              {symbolPositions.length} position{symbolPositions.length > 1 ? 's' : ''} on {symbol}
+        <div className="p-3 bg-gradient-to-r from-purple-900/30 to-pink-900/30 border-t border-purple-500/30">
+          <div className="flex items-center justify-between">
+            <span className="text-purple-300 text-sm">
+              📊 {symbolPositions.length} position{symbolPositions.length > 1 ? 's' : ''} on {symbol}
             </span>
             <span className={cn(
-              "font-bold",
+              "font-bold font-mono",
               symbolPositions.reduce((sum, p) => sum + p.unrealizedPnl, 0) >= 0
-                ? "text-green-400"
-                : "text-red-400"
+                ? "text-green-400 drop-shadow-[0_0_10px_rgba(0,255,136,0.5)]"
+                : "text-red-400 drop-shadow-[0_0_10px_rgba(255,51,102,0.5)]"
             )}>
               {symbolPositions.reduce((sum, p) => sum + p.unrealizedPnl, 0) >= 0 ? '+' : ''}
               ${symbolPositions.reduce((sum, p) => sum + p.unrealizedPnl, 0).toFixed(2)}
