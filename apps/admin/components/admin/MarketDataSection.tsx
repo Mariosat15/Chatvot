@@ -822,20 +822,40 @@ export default function MarketDataSection() {
                 </div>
 
                 {/* Include Historical Toggle */}
-                <div className="flex items-center justify-between bg-gray-900/30 rounded-lg p-3 border border-gray-800/30">
-                  <div>
-                    <div className="text-white text-sm">Include Historical</div>
-                    <div className="text-gray-500 text-xs">Clean 1m + all historical collections</div>
+                <div className="bg-gray-900/30 rounded-lg p-3 border border-gray-800/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-white text-sm">Include Historical</div>
+                      <div className="text-gray-500 text-xs">Clean 1m + all historical collections</div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={cleanupIncludeHistorical}
+                        onChange={(e) => setCleanupIncludeHistorical(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
+                    </label>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cleanupIncludeHistorical}
-                      onChange={(e) => setCleanupIncludeHistorical(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
-                  </label>
+                  {/* Collections to clean list */}
+                  <div className="mt-2 pt-2 border-t border-gray-800/30">
+                    <div className="text-gray-500 text-xs mb-1">Collections to clean:</div>
+                    <div className="flex flex-wrap gap-1">
+                      <span className="text-xs bg-blue-900/30 text-blue-400 px-1.5 py-0.5 rounded">candles_1m</span>
+                      {cleanupIncludeHistorical && (
+                        <>
+                          <span className="text-xs bg-purple-900/30 text-purple-400 px-1.5 py-0.5 rounded">historical_1m</span>
+                          <span className="text-xs bg-purple-900/30 text-purple-400 px-1.5 py-0.5 rounded">historical_5m</span>
+                          <span className="text-xs bg-purple-900/30 text-purple-400 px-1.5 py-0.5 rounded">historical_15m</span>
+                          <span className="text-xs bg-purple-900/30 text-purple-400 px-1.5 py-0.5 rounded">historical_30m</span>
+                          <span className="text-xs bg-purple-900/30 text-purple-400 px-1.5 py-0.5 rounded">historical_1h</span>
+                          <span className="text-xs bg-purple-900/30 text-purple-400 px-1.5 py-0.5 rounded">historical_4h</span>
+                          <span className="text-xs bg-purple-900/30 text-purple-400 px-1.5 py-0.5 rounded">historical_1d</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Auto/Manual Mode Toggle */}
