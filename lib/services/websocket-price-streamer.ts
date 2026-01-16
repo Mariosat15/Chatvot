@@ -872,7 +872,10 @@ async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void
       0 // Volume - we don't track this from C.* quotes
     );
     
-    console.log(`💾 [Candle Saved] ${candle.symbol} @ ${new Date(candle.time * 1000).toISOString()} | O:${candle.open.toFixed(5)} H:${candle.high.toFixed(5)} L:${candle.low.toFixed(5)} C:${candle.close.toFixed(5)} (${candle.tickCount} ticks)`);
+    // Log only EUR/USD as sample (not all 33 symbols)
+    if (candle.symbol === 'EUR/USD') {
+      console.log(`💾 1m candles saved (33 symbols) | EUR/USD: ${candle.close.toFixed(5)} (${candle.tickCount} ticks)`);
+    }
   } catch (error) {
     console.error(`❌ [Candle Save Error] ${candle.symbol}:`, error instanceof Error ? error.message : error);
   }

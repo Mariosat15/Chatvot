@@ -323,9 +323,9 @@ const server = createServer(async (req, res) => {
                 }
               });
               
-              // Log occasionally (every 10th broadcast)
-              if (Math.random() < 0.1) {
-                console.log(`📊 Broadcast ${data.prices?.length || 0} prices + ${data.formingCandles?.length || 0} 1m + ${data.formingCandles5m?.length || 0} 5m + ${data.formingCandles15m?.length || 0} 15m to ${clientCount} clients`);
+              // Log only every ~30 seconds (not every second)
+              if (Math.random() < 0.02) {
+                console.log(`📊 WS: ${clientCount} clients | ${data.prices?.length || 0} prices | 1m/5m/15m candles ✓`);
               }
             }
             break;
