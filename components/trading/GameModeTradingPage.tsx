@@ -8,7 +8,6 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import GameChart from './GameChart';
 import GameModeOrderForm from './GameModeOrderForm';
-import GameModeStatsPanel from './GameModeStatsPanel';
 import GameModePositions from './GameModePositions';
 import GameMarketWatchSidebar from './GameMarketWatchSidebar';
 import { ArrowLeft, Users, Swords, Monitor, Gamepad2 } from 'lucide-react';
@@ -64,9 +63,6 @@ export default function GameModeTradingPage({
   const { marketOpen } = usePrices();
   
   const equity = participant.currentCapital + participant.unrealizedPnl;
-  const marginLevel = participant.usedMargin > 0 
-    ? (equity / participant.usedMargin) * 100 
-    : Infinity;
   
   // Calculate time remaining
   const endTime = new Date(competition.endTime);
@@ -156,14 +152,76 @@ export default function GameModeTradingPage({
               </div>
               <GameModePositions positions={positions} competitionId={competitionId} />
             </div>
+            
+            {/* Account Stats - Horizontal Layout */}
+            <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Image src="/game-icons/chest.png" alt="Stats" width={20} height={20} />
+                <h2 className="text-white font-bold">📊 Account Stats</h2>
+              </div>
+              
+              {/* Horizontal Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                {/* Balance */}
+                <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-xl p-3 border border-purple-500/30">
+                  <div className="text-[10px] text-purple-300 uppercase tracking-wider mb-1">💰 Balance</div>
+                  <div className="text-white font-bold text-lg">${participant.currentCapital.toFixed(2)}</div>
+                </div>
+                
+                {/* Equity */}
+                <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-xl p-3 border border-blue-500/30">
+                  <div className="text-[10px] text-blue-300 uppercase tracking-wider mb-1">💎 Equity</div>
+                  <div className="text-white font-bold text-lg">${equity.toFixed(2)}</div>
+                </div>
+                
+                {/* Unrealized P&L */}
+                <div className={cn(
+                  "rounded-xl p-3 border",
+                  participant.unrealizedPnl >= 0 
+                    ? "bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30"
+                    : "bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30"
+                )}>
+                  <div className={cn(
+                    "text-[10px] uppercase tracking-wider mb-1",
+                    participant.unrealizedPnl >= 0 ? "text-green-300" : "text-red-300"
+                  )}>
+                    {participant.unrealizedPnl >= 0 ? '📈' : '📉'} P&L
+                  </div>
+                  <div className={cn(
+                    "font-bold text-lg",
+                    participant.unrealizedPnl >= 0 ? "text-green-400" : "text-red-400"
+                  )}>
+                    {participant.unrealizedPnl >= 0 ? '+' : ''}${participant.unrealizedPnl.toFixed(2)}
+                  </div>
+                </div>
+                
+                {/* Used Margin */}
+                <div className="bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 rounded-xl p-3 border border-yellow-500/30">
+                  <div className="text-[10px] text-yellow-300 uppercase tracking-wider mb-1">🔒 Margin</div>
+                  <div className="text-white font-bold text-lg">${participant.usedMargin.toFixed(2)}</div>
+                </div>
+                
+                {/* Available */}
+                <div className="bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 rounded-xl p-3 border border-cyan-500/30">
+                  <div className="text-[10px] text-cyan-300 uppercase tracking-wider mb-1">💵 Available</div>
+                  <div className="text-white font-bold text-lg">${participant.availableCapital.toFixed(2)}</div>
+                </div>
+                
+                {/* Positions Count */}
+                <div className="bg-gradient-to-br from-pink-500/20 to-pink-600/10 rounded-xl p-3 border border-pink-500/30">
+                  <div className="text-[10px] text-pink-300 uppercase tracking-wider mb-1">⚔️ Positions</div>
+                  <div className="text-white font-bold text-lg">{positions.length}</div>
+                </div>
+              </div>
+            </div>
           </div>
           
-          {/* Right Column - Trading Interface & Stats */}
+          {/* Right Column - Market Watch & Trade Station */}
           <div className="xl:col-span-4 space-y-4">
             {/* Market Watch Sidebar */}
             <GameMarketWatchSidebar />
             
-            {/* Order Form (Trade Station) - ABOVE Account Stats */}
+            {/* Order Form (Trade Station) */}
             <GameModeOrderForm
               competitionId={competitionId}
               availableCapital={participant.availableCapital}
@@ -171,25 +229,6 @@ export default function GameModeTradingPage({
               currentBalance={participant.currentCapital}
               disabled={isDisqualified}
             />
-            
-            {/* Stats Panel - BELOW Trade Station */}
-            <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Image src="/game-icons/chest.png" alt="Stats" width={20} height={20} />
-                <h2 className="text-white font-bold">📊 Account Stats</h2>
-              </div>
-              <GameModeStatsPanel
-                balance={participant.currentCapital}
-                equity={equity}
-                unrealizedPnl={participant.unrealizedPnl}
-                usedMargin={participant.usedMargin}
-                availableCapital={participant.availableCapital}
-                marginLevel={marginLevel}
-                startingCapital={startingCapital}
-                positionCount={positions.length}
-                positions={positions}
-              />
-            </div>
           </div>
         </div>
       </div>
