@@ -5,7 +5,6 @@ import { TrendingUp, TrendingDown, Star, Zap, Trophy, ArrowUp, ArrowDown } from 
 import { cn } from '@/lib/utils';
 import { usePrices } from '@/contexts/PriceProvider';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
-import { getRecentCandles, OHLCCandle } from '@/lib/services/forex-historical.service';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FOREX_PAIRS, ForexSymbol } from '@/lib/services/pnl-calculator.service';
 
@@ -71,29 +70,38 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
     };
   }, [symbol, subscribe, unsubscribe]);
 
-  // Load historical candles with selected timeframe
+  // Load historical candles with selected timeframe - using same API as Professional mode
   useEffect(() => {
     const loadHistoricalCandles = async () => {
       try {
-        // Map timeframe to API format (Timeframe type from service)
-        const timeframeMap = {
-          '1m': '1' as const,
-          '5m': '5' as const,
-          '15m': '15' as const,
-          '30m': '30' as const,
-          '1h': '60' as const
+        // Map timeframe to API format (same as Professional mode)
+        const timeframeMap: Record<string, string> = {
+          '1m': '1',
+          '5m': '5',
+          '15m': '15',
+          '30m': '30',
+          '1h': '60'
         };
         
         const apiTimeframe = timeframeMap[timeframe];
+        const count = Math.max(60, visibleCandles + 10);
         
-        // Fetch enough candles to support zoom (fetch more than max zoom)
-        const historicalCandles = await getRecentCandles(symbol, apiTimeframe as any, Math.max(60, visibleCandles + 10));
+        // Use the same candles API as Professional mode for consistency
+        const response = await fetch(`/api/trading/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${apiTimeframe}&count=${count}`);
+        
+        if (!response.ok) {
+          console.error('❌ Game Mode: Failed to fetch candles:', response.status);
+          return;
+        }
+        
+        const data = await response.json();
+        const historicalCandles = data.candles || [];
         
         if (historicalCandles.length > 0) {
           // Convert to our Candle format and keep last N candles based on zoom
           const formattedCandles: Candle[] = historicalCandles
             .slice(-visibleCandles) // Show N candles based on zoom level
-            .map((c: OHLCCandle) => ({
+            .map((c: { time: number; open: number; high: number; low: number; close: number }) => ({
               time: c.time * 1000, // Convert to milliseconds
               open: c.open,
               high: c.high,
