@@ -253,16 +253,15 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
     if (now - lastUpdateRef.current < 500) return;
     lastUpdateRef.current = now;
 
-    const mid = latestPrice.mid;
     const bid = latestPrice.bid;
     const ask = latestPrice.ask;
-    
-    // Calculate price change
+
+    // Calculate price change based on BID (same as Professional mode)
     if (lastPriceRef.current > 0) {
-      const change = ((mid - lastPriceRef.current) / lastPriceRef.current) * 100;
+      const change = ((bid - lastPriceRef.current) / lastPriceRef.current) * 100;
       setPriceChange(change);
     }
-    lastPriceRef.current = mid;
+    lastPriceRef.current = bid;
 
     // Update candles (throttled) - use timeframe interval for candle boundaries
     const intervalMs = getTimeframeIntervalMs;
@@ -281,18 +280,18 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
       if (currentPeriod === lastCandlePeriod) {
         lastCandle.high = Math.max(lastCandle.high, ask);
         lastCandle.low = Math.min(lastCandle.low, bid);
-        lastCandle.close = mid;
+        lastCandle.close = bid; // Use BID for close (same as Professional mode)
         lastCandle.isUp = lastCandle.close >= lastCandle.open;
       } else {
         // New period, create a new candle
         const previousClose = lastCandle.close;
         const newCandle: Candle = {
           time: currentPeriod,
-          open: mid,
+          open: bid, // Use BID for open (same as Professional mode)
           high: ask,
           low: bid,
-          close: mid,
-          isUp: mid >= previousClose,
+          close: bid, // Use BID for close (same as Professional mode)
+          isUp: bid >= previousClose,
         };
         
         newCandles.push(newCandle);
@@ -569,8 +568,8 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
     // Draw current price line with "NOW" indicator - use LIVE price from PriceProvider
     if (candles.length > 0 && currentPrice) {
       const lastCandle = candles[candles.length - 1];
-      // Use actual current mid price for the price line, not lastCandle.close
-      const livePrice = currentPrice.mid;
+      // Use BID price for the price line (same as Professional mode)
+      const livePrice = currentPrice.bid;
       const yPrice = paddingTop + chartHeight - ((livePrice - minPrice) / priceRange) * chartHeight;
       
       // Determine color based on price direction
@@ -648,9 +647,9 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
   }, [candles, hasPositions, totalPnL, symbolPositions, entryPrice, positionSide, visibleCandles, chartType, timeframe]);
 
   const lastCandle = candles.length > 0 ? candles[candles.length - 1] : null;
-  // Determine if price is going up based on current price vs candle open (more responsive)
+  // Determine if price is going up based on BID price vs candle open (same as Professional mode)
   const isGoingUp = currentPrice && lastCandle 
-    ? currentPrice.mid >= lastCandle.open 
+    ? currentPrice.bid >= lastCandle.open 
     : (lastCandle?.isUp ?? false);
 
   return (
@@ -745,51 +744,42 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
               <span className="text-[10px] text-white/70">{wsPrice ? '⚡' : '📡'}</span>
             </div>
             
-            {/* Price display - SAME FORMAT AS PROFESSIONAL: B: / MID / A: */}
+            {/* Price display - BID is main price (same as Professional mode chart) */}
             {currentPrice && (
               <div className="flex items-center gap-2 md:gap-4 text-xs font-mono">
-                <div className="flex items-center gap-1">
-                  <span className="text-white/60">B:</span>
-                  <span className="text-[#2962ff] font-bold">{currentPrice.bid.toFixed(5)}</span>
-                </div>
                 <div className={cn(
                   "font-bold text-sm md:text-base",
                   isGoingUp ? "text-green-400" : "text-red-400"
                 )}>
-                  {currentPrice.mid.toFixed(5)}
+                  {currentPrice.bid.toFixed(5)}
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-white/60">A:</span>
-                  <span className="text-[#f23645] font-bold">{currentPrice.ask.toFixed(5)}</span>
+                <div className="flex items-center gap-1 text-white/60">
+                  <span>A:</span>
+                  <span className="text-[#f23645]">{currentPrice.ask.toFixed(5)}</span>
+                </div>
+                <div className="flex items-center gap-1 text-white/60">
+                  <span>S:</span>
+                  <span className="text-yellow-400">{((currentPrice.ask - currentPrice.bid) * (symbol.includes('JPY') ? 100 : 10000)).toFixed(1)}</span>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-      {/* Price Info Panel - Simplified, always show if price available */}
+      {/* Price Info Panel - BID is main price (same as Professional mode) */}
       {currentPrice && (
         <div className="bg-gradient-to-r from-dark-200 to-dark-300 border-x-2 md:border-x-4 border-purple-600 p-2 md:p-3">
-          {/* Show BID / MID / ASK and candle info */}
           <div className="flex items-center justify-between gap-2">
-            {/* BID */}
-            <div className="text-center flex-1">
-              <p className="text-[10px] text-dark-600">BID</p>
-              <div className="text-sm md:text-lg font-bold font-mono text-[#2962ff]">
-                {currentPrice.bid.toFixed(5)}
-              </div>
-            </div>
-            
-            {/* MID (main price) */}
+            {/* Main BID Price */}
             <div className="text-center flex-1">
               <p className="text-[10px] text-dark-600">
-                {wsPrice ? '⚡ LIVE' : '📡 POLL'}
+                BID {wsPrice ? '⚡' : '📡'}
               </p>
               <div className={cn(
                 "text-lg md:text-2xl font-bold font-mono",
                 isGoingUp ? "text-green-400" : "text-red-400"
               )}>
-                {currentPrice.mid.toFixed(5)}
+                {currentPrice.bid.toFixed(5)}
               </div>
             </div>
             
@@ -819,7 +809,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
           className="w-full h-[400px] sm:h-[450px] md:h-[500px] rounded-lg"
         />
         
-        {/* REAL-TIME PRICE OVERLAY - Updates independently of canvas */}
+        {/* REAL-TIME BID PRICE OVERLAY - Updates independently of canvas */}
         {currentPrice && (
           <div 
             className="absolute right-6 md:right-8 top-1/2 transform -translate-y-1/2 z-10 pointer-events-none"
@@ -828,7 +818,7 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
               "px-2 py-1 rounded text-xs md:text-sm font-bold font-mono shadow-lg animate-pulse",
               isGoingUp ? "bg-green-500 text-white" : "bg-red-500 text-white"
             )}>
-              {currentPrice.mid.toFixed(5)}
+              {currentPrice.bid.toFixed(5)}
             </div>
           </div>
         )}
