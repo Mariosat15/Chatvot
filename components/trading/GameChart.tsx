@@ -386,12 +386,14 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
       }
     }
 
-    // Draw chart based on type - PLAIN STYLE (like Professional mode for performance)
+    // Draw chart based on type
     if (chartType === 'line') {
-      // Simple line chart - no shadows, no gradients
+      // Draw smooth line chart
       ctx.beginPath();
-      ctx.strokeStyle = '#2962ff';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#8b5cf6'; // Purple
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#8b5cf6';
+      ctx.shadowBlur = 8;
       
       candles.forEach((candle, i) => {
         const x = paddingLeft + i * candleSpacing + candleSpacing / 2;
@@ -405,11 +407,38 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
       });
       
       ctx.stroke();
+      ctx.shadowBlur = 0;
+      
+      // Add gradient fill under the line
+      ctx.lineTo(paddingLeft + (candles.length - 1) * candleSpacing + candleSpacing / 2, paddingTop + chartHeight);
+      ctx.lineTo(paddingLeft + candleSpacing / 2, paddingTop + chartHeight);
+      ctx.closePath();
+      
+      const gradient = ctx.createLinearGradient(0, paddingTop, 0, paddingTop + chartHeight);
+      gradient.addColorStop(0, 'rgba(139, 92, 246, 0.3)');
+      gradient.addColorStop(1, 'rgba(139, 92, 246, 0.0)');
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      
+      // Draw dots on each data point
+      candles.forEach((candle, i) => {
+        const x = paddingLeft + i * candleSpacing + candleSpacing / 2;
+        const yClose = paddingTop + chartHeight - ((candle.close - minPrice) / priceRange) * chartHeight;
+        
+        ctx.beginPath();
+        ctx.arc(x, yClose, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = '#a78bfa';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
     } else {
-      // Plain candles - no shadows, no glows, no rounded corners
+      // Draw gaming candles
       candles.forEach((candle, i) => {
         const x = paddingLeft + i * candleSpacing + candleSpacing / 2;
         
+        // Calculate positions
         const yHigh = paddingTop + chartHeight - ((candle.high - minPrice) / priceRange) * chartHeight;
         const yLow = paddingTop + chartHeight - ((candle.low - minPrice) / priceRange) * chartHeight;
         const yOpen = paddingTop + chartHeight - ((candle.open - minPrice) / priceRange) * chartHeight;
@@ -417,95 +446,168 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
         
         const bodyTop = Math.min(yOpen, yClose);
         const bodyBottom = Math.max(yOpen, yClose);
-        const bodyHeight = Math.max(1, bodyBottom - bodyTop);
+        const bodyHeight = Math.max(2, bodyBottom - bodyTop);
 
-        // Simple colors
-        const upColor = '#26a69a';
-        const downColor = '#ef5350';
+        // Gaming colors
+        const upColor = '#22c55e'; // Bright green
+        const downColor = '#ef4444'; // Bright red
         const color = candle.isUp ? upColor : downColor;
         
-        // Draw wick
+        // Draw wick (thin line)
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(x, yHigh);
         ctx.lineTo(x, yLow);
         ctx.stroke();
         
-        // Draw body (simple rectangle)
+        // Draw body with rounded corners (gaming style)
+        const radius = 3;
         ctx.fillStyle = color;
-        ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+        ctx.beginPath();
+        ctx.roundRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight, radius);
+        ctx.fill();
+        
+        // Add glow effect
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // Add border for extra pop
+        ctx.strokeStyle = candle.isUp ? '#34d399' : '#f87171';
+        ctx.lineWidth = 2;
+        ctx.stroke();
       });
     }
 
-    // Draw position entry markers - PLAIN (no shadows)
+    // Draw gamified position entry markers 🎮
     symbolPositions.forEach((position) => {
       const entryPrice = position.entryPrice;
-      if (entryPrice < minPrice || entryPrice > maxPrice) return;
+      if (entryPrice < minPrice || entryPrice > maxPrice) return; // Out of visible range
       
       const yEntry = paddingTop + chartHeight - ((entryPrice - minPrice) / priceRange) * chartHeight;
+      const isProfit = position.unrealizedPnl >= 0;
       const isLong = position.side === 'long';
       
-      // Entry line (dashed)
-      ctx.strokeStyle = isLong ? '#fbbf24' : '#a78bfa';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8, 4]);
+      // Gaming style horizontal line (dashed) - ENTRY LINE
+      const entryColor = isLong ? '#fbbf24' : '#a78bfa'; // Yellow for long, purple for short
+      ctx.strokeStyle = entryColor;
+      ctx.lineWidth = 5; // Thicker for more prominence
+      ctx.shadowColor = entryColor;
+      ctx.shadowBlur = 12;
+      ctx.setLineDash([12, 6]); // Distinctive dash pattern
       ctx.beginPath();
       ctx.moveTo(paddingLeft, yEntry);
       ctx.lineTo(rect.width - paddingRight, yEntry);
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
       
-      // Draw Take Profit line
+      // Gaming badge on the left
+      const badgeX = paddingLeft - 30;
+      const badgeY = yEntry;
+      
+      // Badge background (circle with glow)
+      ctx.shadowColor = isLong ? '#fbbf24' : '#a78bfa';
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = isLong ? '#fbbf24' : '#a78bfa';
+      ctx.beginPath();
+      ctx.arc(badgeX, badgeY, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      
+      // Badge icon (emoji)
+      ctx.font = 'bold 18px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#000';
+      ctx.fillText(isLong ? '↑' : '↓', badgeX, badgeY);
+      
+      // Draw Take Profit line if set (NO LABEL)
       if (position.takeProfit) {
-        const yTP = paddingTop + chartHeight - ((position.takeProfit - minPrice) / priceRange) * chartHeight;
+        const tpValue = position.takeProfit;
+        // Draw TP line even if slightly outside range (for visibility)
+        const yTP = paddingTop + chartHeight - ((tpValue - minPrice) / priceRange) * chartHeight;
+        
+        // TP line (green dashed) - THICKER & MORE VISIBLE
         ctx.strokeStyle = '#22c55e';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([12, 6]);
+        ctx.lineWidth = 5;
+        ctx.shadowColor = '#22c55e';
+        ctx.shadowBlur = 15;
+        ctx.setLineDash([18, 10]); // Longer dashes for distinction
         ctx.beginPath();
         ctx.moveTo(paddingLeft, yTP);
         ctx.lineTo(rect.width - paddingRight, yTP);
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.shadowBlur = 0;
       }
       
-      // Draw Stop Loss line
+      // Draw Stop Loss line if set (NO LABEL)
       if (position.stopLoss) {
-        const ySL = paddingTop + chartHeight - ((position.stopLoss - minPrice) / priceRange) * chartHeight;
+        const slValue = position.stopLoss;
+        // Draw SL line even if slightly outside range (for visibility)
+        const ySL = paddingTop + chartHeight - ((slValue - minPrice) / priceRange) * chartHeight;
+        
+        // SL line (red dashed) - THICKER & MORE VISIBLE
         ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 8]);
+        ctx.lineWidth = 5;
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = 15;
+        ctx.setLineDash([6, 12]); // Short dashes, LONGER gaps for distinction
         ctx.beginPath();
         ctx.moveTo(paddingLeft, ySL);
         ctx.lineTo(rect.width - paddingRight, ySL);
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.shadowBlur = 0;
       }
     });
 
-    // Draw current price line - PLAIN (no shadows)
+    // Draw current price line with "NOW" indicator - use LIVE price from PriceProvider
     if (candles.length > 0 && currentPrice) {
+      const lastCandle = candles[candles.length - 1];
+      // Use BID price for the price line (same as Professional mode)
       const livePrice = currentPrice.bid;
       const yPrice = paddingTop + chartHeight - ((livePrice - minPrice) / priceRange) * chartHeight;
       
-      // Simple color
-      const lineColor = livePrice >= candles[candles.length - 1].open ? '#26a69a' : '#ef5350';
+      // Determine color based on price direction
+      let lineColor = '#6b7280'; // Default gray
+      if (candles.length > 1) {
+        const prevCandle = candles[candles.length - 2];
+        lineColor = livePrice > prevCandle.close ? '#22c55e' : '#ef4444';
+      } else {
+        lineColor = livePrice >= lastCandle.open ? '#22c55e' : '#ef4444';
+      }
       
-      // Simple price line
+      // Current price line - THIN & SUBTLE
       ctx.strokeStyle = lineColor;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 2]);
+      ctx.lineWidth = 2;
+      ctx.shadowColor = lineColor;
+      ctx.shadowBlur = 8;
+      ctx.setLineDash([4, 4]); // Short, tight dashes
       ctx.beginPath();
       ctx.moveTo(paddingLeft, yPrice);
       ctx.lineTo(rect.width - paddingRight, yPrice);
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
       
-      // Price label
-      ctx.font = '10px monospace';
+      // Price label on the right - show LIVE price
+      ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'left';
       ctx.fillStyle = lineColor;
-      ctx.fillText(livePrice.toFixed(5), rect.width - paddingRight + 5, yPrice + 3);
+      ctx.fillText(livePrice.toFixed(5), rect.width - paddingRight + 5, yPrice + 4);
+      
+      // Time indicator at bottom showing "NOW" for the rightmost candle
+      const lastCandleX = paddingLeft + (candles.length - 1) * candleSpacing + candleSpacing / 2;
+      const timeY = paddingTop + chartHeight + 15;
+      
+      ctx.fillStyle = lineColor;
+      ctx.font = 'bold 10px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('▼ NOW', lastCandleX, timeY);
     }
 
     // Draw time/date labels on X-axis for better context
