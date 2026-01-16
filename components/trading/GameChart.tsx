@@ -34,6 +34,12 @@ interface Candle {
   isUp: boolean;
 }
 
+interface RealtimePrice {
+  bid: number;
+  ask: number;
+  mid: number;
+}
+
 function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
   const { prices, subscribe, unsubscribe } = usePrices();
   const { symbol, setSymbol } = useChartSymbol();
@@ -45,6 +51,10 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastPriceRef = useRef<number>(0);
   const lastUpdateRef = useRef<number>(0); // Throttle updates
+  
+  // Real-time WebSocket price (faster than PriceProvider polling)
+  const [wsPrice, setWsPrice] = useState<RealtimePrice | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   
   // Memoize expensive position calculations
   const { symbolPositions, totalPnL, hasPositions, entryPrice, positionSide } = useMemo(() => {
@@ -59,16 +69,96 @@ function GameChartInner({ competitionId, positions = [] }: GameChartProps) {
     };
   }, [positions, symbol]);
 
-  // Get current price
-  const currentPrice = prices.get(symbol);
+  // Get current price - prefer WebSocket price (faster), fallback to PriceProvider (polling)
+  const pollPrice = prices.get(symbol);
+  const currentPrice = wsPrice || pollPrice;
 
-  // Subscribe to price updates (CRITICAL - same as Professional mode!)
+  // Subscribe to price updates via PriceProvider (fallback)
   useEffect(() => {
     subscribe(symbol);
     return () => {
       unsubscribe(symbol);
     };
   }, [symbol, subscribe, unsubscribe]);
+
+  // WebSocket connection for FAST real-time prices (same as Professional mode)
+  useEffect(() => {
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let isCleanedUp = false;
+    
+    const connect = () => {
+      if (isCleanedUp) return;
+      
+      try {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws?token=price-viewer&type=user`;
+        
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+        
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            
+            if (message.type === 'prices' && message.data?.prices) {
+              // Find our symbol's price
+              const priceData = message.data.prices.find(
+                (p: { symbol: string }) => p.symbol === symbol
+              );
+              
+              if (priceData) {
+                setWsPrice({
+                  bid: priceData.bid,
+                  ask: priceData.ask,
+                  mid: (priceData.bid + priceData.ask) / 2,
+                });
+              }
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        };
+        
+        ws.onopen = () => {
+          // Subscribe to only the symbol this chart needs
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'subscribe_symbol',
+              symbol: symbol,
+            }));
+          }
+        };
+        
+        ws.onclose = () => {
+          if (!isCleanedUp) {
+            // Reconnect after 2 seconds
+            reconnectTimeout = setTimeout(connect, 2000);
+          }
+        };
+        
+        ws.onerror = () => {
+          ws.close();
+        };
+      } catch {
+        // Reconnect on error
+        if (!isCleanedUp) {
+          reconnectTimeout = setTimeout(connect, 2000);
+        }
+      }
+    };
+    
+    connect();
+    
+    return () => {
+      isCleanedUp = true;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setWsPrice(null);
+    };
+  }, [symbol]);
 
   // Load historical candles with selected timeframe - using same API as Professional mode
   useEffect(() => {
