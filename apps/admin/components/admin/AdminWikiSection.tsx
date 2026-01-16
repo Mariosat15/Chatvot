@@ -10,7 +10,9 @@ import {
   CheckCircle, XCircle, Info, Lightbulb, Code, FileText, TrendingUp,
   Lock, Unlock, Eye, EyeOff, Globe, Cpu, Server, Activity,
   Bell, Mail, FileCheck, Receipt, Clock, Building, Key, RefreshCw,
-  UserCog, Ban, Wallet, PieChart, Download, Filter, Calendar
+  UserCog, Ban, Wallet, PieChart, Download, Filter, Calendar,
+  Radio, Wifi, HardDrive, ArrowDown, ArrowRight, Layers, Timer,
+  Trash2, Play, Pause, RefreshCcw, LineChart, CandlestickChart
 } from 'lucide-react';
 
 interface WikiTopic {
@@ -492,6 +494,919 @@ export default function AdminWikiSection() {
                   <div className="bg-gray-900 p-2 rounded">
                     <strong className="text-green-400">Dismiss:</strong> Mark as false positive, clear alert
                   </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+
+    // ==================== MARKET DATA ====================
+    {
+      id: 'market-data-overview',
+      title: 'Market Data Overview',
+      icon: CandlestickChart,
+      category: 'Market Data',
+      tags: ['charts', 'prices', 'candles', 'architecture', 'system'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-emerald-400 mb-3">Market Data System Architecture</h2>
+            <p className="text-gray-300 mb-4">
+              Complete overview of how real-time prices and candle data flow through the Chartvolt platform.
+            </p>
+          </div>
+
+          <div className="bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30 rounded-xl p-6">
+            <h3 className="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
+              <Layers className="h-5 w-5" />
+              System Flow Overview
+            </h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-500/20 px-3 py-2 rounded-lg text-blue-400 font-medium min-w-[140px]">Massive.com</div>
+                <ArrowRight className="h-4 w-4 text-gray-500" />
+                <div className="text-gray-300">External price feed provider (WebSocket)</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-purple-500/20 px-3 py-2 rounded-lg text-purple-400 font-medium min-w-[140px]">Price Streamer</div>
+                <ArrowRight className="h-4 w-4 text-gray-500" />
+                <div className="text-gray-300">Receives quotes, builds candles, updates caches</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-orange-500/20 px-3 py-2 rounded-lg text-orange-400 font-medium min-w-[140px]">WebSocket Server</div>
+                <ArrowRight className="h-4 w-4 text-gray-500" />
+                <div className="text-gray-300">Broadcasts to connected browsers (Port 3003)</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-green-500/20 px-3 py-2 rounded-lg text-green-400 font-medium min-w-[140px]">Browser Charts</div>
+                <ArrowRight className="h-4 w-4 text-gray-500" />
+                <div className="text-gray-300">Displays historical + real-time data</div>
+              </div>
+            </div>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400 flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                MongoDB Collections
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-gray-300">
+              <div>
+                <h4 className="font-semibold text-white mb-2">Real-Time Collections (Auto-Built)</h4>
+                <div className="bg-gray-900 p-3 rounded space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
+                    <code className="text-cyan-400">candles_1m</code>
+                    <span className="text-gray-400">1-minute candles (~30 days retention)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-white mb-2">Historical Collections (Downloaded)</h4>
+                <div className="bg-gray-900 p-3 rounded space-y-2 text-sm">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><code className="text-cyan-400">candles_historical_1m</code></div>
+                    <div><code className="text-cyan-400">candles_historical_5m</code></div>
+                    <div><code className="text-cyan-400">candles_historical_15m</code></div>
+                    <div><code className="text-cyan-400">candles_historical_30m</code></div>
+                    <div><code className="text-cyan-400">candles_historical_1h</code></div>
+                    <div><code className="text-cyan-400">candles_historical_4h</code></div>
+                    <div><code className="text-cyan-400">candles_historical_1d</code></div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">Timeframe Data Sources</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left py-2 text-gray-400">Timeframe</th>
+                      <th className="text-left py-2 text-gray-400">Historical Data</th>
+                      <th className="text-left py-2 text-gray-400">Forming Candle</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-300">
+                    <tr className="border-b border-gray-800">
+                      <td className="py-2 font-medium text-white">1m</td>
+                      <td><code className="text-xs text-cyan-400">candles_1m</code> + historical_1m</td>
+                      <td>WebSocket cache (live)</td>
+                    </tr>
+                    <tr className="border-b border-gray-800">
+                      <td className="py-2 font-medium text-white">5m</td>
+                      <td>Aggregated from 1m + historical_5m</td>
+                      <td>WebSocket cache (live)</td>
+                    </tr>
+                    <tr className="border-b border-gray-800">
+                      <td className="py-2 font-medium text-white">15m</td>
+                      <td>Aggregated from 1m + historical_15m</td>
+                      <td>WebSocket cache (live)</td>
+                    </tr>
+                    <tr className="border-b border-gray-800">
+                      <td className="py-2 font-medium text-white">30m</td>
+                      <td>Aggregated from 1m + historical_30m</td>
+                      <td>WebSocket cache (live)</td>
+                    </tr>
+                    <tr className="border-b border-gray-800">
+                      <td className="py-2 font-medium text-white">1h</td>
+                      <td>Aggregated from 1m + historical_1h</td>
+                      <td>WebSocket cache (live)</td>
+                    </tr>
+                    <tr className="border-b border-gray-800">
+                      <td className="py-2 font-medium text-white">4h</td>
+                      <td>Aggregated from 1m + historical_4h</td>
+                      <td>WebSocket cache (live)</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 font-medium text-white">Daily</td>
+                      <td><code className="text-xs text-cyan-400">historical_1d</code> or Massive.com API</td>
+                      <td>WebSocket cache (live)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Lightbulb className="h-5 w-5 text-blue-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-blue-400 mb-1">Key Concept: Hybrid Data Loading</h4>
+                <p className="text-sm text-gray-300">
+                  Charts load data from multiple sources: <strong>Recent data</strong> is aggregated from 1-minute candles in real-time. 
+                  <strong>Older data</strong> comes from pre-downloaded historical collections. This ensures fast chart loading with complete history.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    },
+
+    {
+      id: 'market-data-streaming',
+      title: 'Price Streaming',
+      icon: Radio,
+      category: 'Market Data',
+      tags: ['websocket', 'prices', 'real-time', 'streaming', 'quotes'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-emerald-400 mb-3">Real-Time Price Streaming</h2>
+            <p className="text-gray-300 mb-4">
+              How prices flow from Massive.com to your users' charts in real-time.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400 flex items-center gap-2">
+                <Wifi className="h-5 w-5" />
+                Step 1: Massive.com WebSocket
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm">
+                The system connects to Massive.com's WebSocket server to receive live price quotes.
+              </p>
+              <div className="bg-gray-900 p-3 rounded space-y-2 text-sm">
+                <div><strong>Connection:</strong> <code className="text-cyan-400">wss://massive.com/ws</code></div>
+                <div><strong>Message Type:</strong> <code className="text-cyan-400">CA.*</code> (price quotes)</div>
+                <div><strong>Frequency:</strong> ~50-200ms per symbol</div>
+                <div><strong>Data:</strong> symbol, bid, ask, timestamp</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400 flex items-center gap-2">
+                <Cpu className="h-5 w-5" />
+                Step 2: Price Streamer Processing
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm">
+                The <code className="text-cyan-400">websocket-price-streamer.ts</code> service processes each price tick:
+              </p>
+              <div className="space-y-2 text-sm">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-2">On Each Price Tick (O(1) Operations):</div>
+                  <ul className="space-y-1 text-gray-300">
+                    <li>✓ Update forming 1m candle cache</li>
+                    <li>✓ Update forming 5m candle cache</li>
+                    <li>✓ Update forming 15m candle cache</li>
+                    <li>✓ Update forming 30m candle cache</li>
+                    <li>✓ Update forming 1h candle cache</li>
+                    <li>✓ Update forming 4h candle cache</li>
+                    <li>✓ Update forming Daily candle cache</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400 flex items-center gap-2">
+                <Server className="h-5 w-5" />
+                Step 3: WebSocket Server Broadcast
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm">
+                The WebSocket server (Port 3003) broadcasts to all connected browsers:
+              </p>
+              <div className="bg-gray-900 p-3 rounded text-sm font-mono">
+                <div className="text-gray-400 mb-2">// Broadcast payload</div>
+                <div className="text-cyan-400">{'{'}</div>
+                <div className="ml-4 text-green-400">type: 'prices',</div>
+                <div className="ml-4 text-green-400">prices: [...],              <span className="text-gray-500">// Current bid/ask</span></div>
+                <div className="ml-4 text-green-400">formingCandles: [...],      <span className="text-gray-500">// 1m forming</span></div>
+                <div className="ml-4 text-green-400">formingCandles5m: [...],    <span className="text-gray-500">// 5m forming</span></div>
+                <div className="ml-4 text-green-400">formingCandles15m: [...],   <span className="text-gray-500">// 15m forming</span></div>
+                <div className="ml-4 text-green-400">formingCandles30m: [...],   <span className="text-gray-500">// 30m forming</span></div>
+                <div className="ml-4 text-green-400">formingCandles1h: [...],    <span className="text-gray-500">// 1h forming</span></div>
+                <div className="ml-4 text-green-400">formingCandles4h: [...],    <span className="text-gray-500">// 4h forming</span></div>
+                <div className="ml-4 text-green-400">formingCandlesDaily: [...]  <span className="text-gray-500">// Daily forming</span></div>
+                <div className="text-cyan-400">{'}'}</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">Performance Optimizations</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-green-500/10 border border-green-500/30 rounded p-3">
+                  <div className="font-medium text-green-400 mb-1">Delta Broadcasting</div>
+                  <p className="text-xs">Only sends data for symbols that changed</p>
+                </div>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+                  <div className="font-medium text-blue-400 mb-1">Client Subscription</div>
+                  <p className="text-xs">Each client only receives symbols they subscribed to</p>
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded p-3">
+                  <div className="font-medium text-purple-400 mb-1">Skip Empty Broadcasts</div>
+                  <p className="text-xs">No broadcast if zero clients connected</p>
+                </div>
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded p-3">
+                  <div className="font-medium text-orange-400 mb-1">Cache Stringify</div>
+                  <p className="text-xs">JSON stringified once for all unsubscribed clients</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+
+    {
+      id: 'market-data-candles',
+      title: 'Candle Building',
+      icon: BarChart3,
+      category: 'Market Data',
+      tags: ['candles', 'ohlc', 'aggregation', 'timeframes', 'building'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-emerald-400 mb-3">How Candles Are Built</h2>
+            <p className="text-gray-300 mb-4">
+              Understanding how OHLC candles are constructed from raw price data.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">1-Minute Candle Building</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-gray-300">
+              <p className="text-sm">
+                1-minute candles are the foundation. All other timeframes are built from them.
+              </p>
+              <div className="bg-gray-900 p-4 rounded space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded text-sm font-medium">Price Tick</div>
+                  <ArrowRight className="h-4 w-4 text-gray-500" />
+                  <div className="text-sm">Update forming candle's high/low/close</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-sm font-medium">Minute Ends</div>
+                  <ArrowRight className="h-4 w-4 text-gray-500" />
+                  <div className="text-sm">Save candle to MongoDB, start new candle</div>
+                </div>
+              </div>
+
+              <div className="text-sm">
+                <div className="font-medium text-white mb-2">Candle Structure (OHLCV):</div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-gray-900 p-2 rounded"><strong className="text-green-400">O</strong>pen: First price of the period</div>
+                  <div className="bg-gray-900 p-2 rounded"><strong className="text-green-400">H</strong>igh: Highest price of the period</div>
+                  <div className="bg-gray-900 p-2 rounded"><strong className="text-green-400">L</strong>ow: Lowest price of the period</div>
+                  <div className="bg-gray-900 p-2 rounded"><strong className="text-green-400">C</strong>lose: Last price of the period</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">Higher Timeframe Aggregation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-gray-300">
+              <p className="text-sm">
+                5m, 15m, 30m, 1h, and 4h candles are aggregated from 1-minute data:
+              </p>
+              <div className="bg-gray-900 p-4 rounded text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="font-medium text-cyan-400 mb-2">5-Minute Candle</div>
+                    <div className="text-xs text-gray-400">Combines 5 × 1m candles</div>
+                    <div className="text-xs mt-1">Period: 0, 5, 10, 15... minutes</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-cyan-400 mb-2">15-Minute Candle</div>
+                    <div className="text-xs text-gray-400">Combines 15 × 1m candles</div>
+                    <div className="text-xs mt-1">Period: 0, 15, 30, 45 minutes</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-cyan-400 mb-2">30-Minute Candle</div>
+                    <div className="text-xs text-gray-400">Combines 30 × 1m candles</div>
+                    <div className="text-xs mt-1">Period: 0, 30 minutes</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-cyan-400 mb-2">1-Hour Candle</div>
+                    <div className="text-xs text-gray-400">Combines 60 × 1m candles</div>
+                    <div className="text-xs mt-1">Period: Start of each hour</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-cyan-400 mb-2">4-Hour Candle</div>
+                    <div className="text-xs text-gray-400">Combines 240 × 1m candles</div>
+                    <div className="text-xs mt-1">Period: 0, 4, 8, 12, 16, 20 hours</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-cyan-400 mb-2">Daily Candle</div>
+                    <div className="text-xs text-gray-400">From historical_1d or API</div>
+                    <div className="text-xs mt-1">Period: UTC midnight</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400 flex items-center gap-2">
+                <Timer className="h-5 w-5" />
+                Forming Candles (Real-Time)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm">
+                "Forming" candles are candles currently being built. They update on every price tick.
+              </p>
+              <div className="bg-gray-900 p-3 rounded text-sm space-y-2">
+                <div className="font-medium text-white">Cache Update Logic (O(1) per tick):</div>
+                <div className="font-mono text-xs text-gray-400 space-y-1">
+                  <div>currentPeriod = floor(now / periodSeconds) * periodSeconds</div>
+                  <div>if (same period):</div>
+                  <div className="ml-4">cache.high = max(cache.high, price)</div>
+                  <div className="ml-4">cache.low = min(cache.low, price)</div>
+                  <div className="ml-4">cache.close = price</div>
+                  <div>else:</div>
+                  <div className="ml-4">cache = {'{ open: price, high: price, low: price, close: price }'}</div>
+                </div>
+              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 text-sm">
+                <strong className="text-yellow-400">Note:</strong> Forming candles are calculated server-side and broadcast to all clients.
+                This ensures all users see the same candle data.
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+
+    {
+      id: 'market-data-historical',
+      title: 'Historical Data',
+      icon: HardDrive,
+      category: 'Market Data',
+      tags: ['historical', 'download', 'history', 'storage', 'years'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-emerald-400 mb-3">Historical Data Management</h2>
+            <p className="text-gray-300 mb-4">
+              Download and store years of historical candle data for complete chart history.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400 flex items-center gap-2">
+                <Download className="h-5 w-5" />
+                Downloading Historical Data
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-gray-300">
+              <p className="text-sm">
+                In Admin Panel → Dev Zone → Market Data Settings, use the "Download Higher Timeframe History" section.
+              </p>
+              <div className="space-y-3">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-2">Step 1: Select Timeframes</div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <Badge variant="outline">1m</Badge>
+                    <Badge variant="outline">5m</Badge>
+                    <Badge variant="outline">15m</Badge>
+                    <Badge variant="outline">30m</Badge>
+                    <Badge variant="outline">1h</Badge>
+                    <Badge variant="outline">4h</Badge>
+                    <Badge variant="outline">1d</Badge>
+                  </div>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-2">Step 2: Set Years Back</div>
+                  <p className="text-xs text-gray-400">Choose how many years of history to download (1-10 years)</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-2">Step 3: Click Download</div>
+                  <p className="text-xs text-gray-400">System fetches from Massive.com API and saves to MongoDB</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">Incremental Downloads</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm">
+                The system intelligently handles repeated downloads:
+              </p>
+              <div className="space-y-2 text-sm">
+                <div className="bg-green-500/10 border border-green-500/30 rounded p-3">
+                  <div className="font-medium text-green-400 mb-1">✓ Incremental Fetching</div>
+                  <p className="text-xs">Checks oldest existing candle and downloads backward from that point</p>
+                </div>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+                  <div className="font-medium text-blue-400 mb-1">✓ No Duplicates</div>
+                  <p className="text-xs">Uses unique index on (symbol + timestamp) to prevent duplicate data</p>
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded p-3">
+                  <div className="font-medium text-purple-400 mb-1">✓ Batch Processing</div>
+                  <p className="text-xs">Data is saved in batches of 1,000 candles to avoid timeouts</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">Storage Estimates</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left py-2 text-gray-400">Timeframe</th>
+                      <th className="text-left py-2 text-gray-400">Candles/Year</th>
+                      <th className="text-left py-2 text-gray-400">~Size/Symbol/Year</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-300">
+                    <tr className="border-b border-gray-800">
+                      <td className="py-2">1m</td>
+                      <td>~525,600</td>
+                      <td>~50 MB</td>
+                    </tr>
+                    <tr className="border-b border-gray-800">
+                      <td className="py-2">5m</td>
+                      <td>~105,120</td>
+                      <td>~10 MB</td>
+                    </tr>
+                    <tr className="border-b border-gray-800">
+                      <td className="py-2">15m</td>
+                      <td>~35,040</td>
+                      <td>~3 MB</td>
+                    </tr>
+                    <tr className="border-b border-gray-800">
+                      <td className="py-2">1h</td>
+                      <td>~8,760</td>
+                      <td>~1 MB</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2">Daily</td>
+                      <td>~260</td>
+                      <td>~25 KB</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Lightbulb className="h-5 w-5 text-yellow-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-yellow-400 mb-1">Recommendation</h4>
+                <p className="text-sm text-gray-300">
+                  Download 5m, 15m, 1h, 4h, and 1d history for complete chart coverage. 
+                  1m history is optional due to large size - recent 1m data is auto-collected in real-time.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    },
+
+    {
+      id: 'market-data-settings',
+      title: 'Market Data Settings',
+      icon: Settings,
+      category: 'Market Data',
+      tags: ['settings', 'configuration', 'lazy loading', 'limits'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-emerald-400 mb-3">Market Data Settings</h2>
+            <p className="text-gray-300 mb-4">
+              Configure chart behavior, loading, and data retention in Admin → Dev Zone → Market Data Settings.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">Historical Data Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <div className="space-y-2 text-sm">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-white">Use Local History</span>
+                    <Badge variant="outline" className="text-xs">Toggle</Badge>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    When ON: Charts load from downloaded historical collections first.
+                    When OFF: Always fetch from Massive.com API.
+                  </p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-white">Auto Fetch History</span>
+                    <Badge variant="outline" className="text-xs">Toggle</Badge>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    When ON: Automatically download missing historical data in background.
+                    When OFF: Only use existing local data.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">Chart Display Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <div className="space-y-2 text-sm">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-white">Initial Candle Count</span>
+                    <Badge variant="outline" className="text-xs">Number</Badge>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    How many candles to load initially when chart opens. Default: 500.
+                    Lower = faster initial load. Higher = more history visible immediately.
+                  </p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-white">Lazy Load Batch Size</span>
+                    <Badge variant="outline" className="text-xs">Number</Badge>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    How many candles to load when user scrolls left. Default: 500.
+                    Charts implement lazy loading - more data loads on demand.
+                  </p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-white">Chart History Limit</span>
+                    <Badge variant="outline" className="text-xs">Toggle + Days</Badge>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    When ON: Limit how far back charts can scroll (e.g., 365 days).
+                    When OFF: Load all available history (may be slow with years of data).
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">Price Update Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <div className="space-y-2 text-sm">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-white">Update Mode</span>
+                    <Badge variant="outline" className="text-xs">WebSocket / Polling</Badge>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    <strong>WebSocket:</strong> Real-time updates via persistent connection. Recommended.
+                    <br />
+                    <strong>Polling:</strong> Regular HTTP requests. Fallback if WebSocket fails.
+                  </p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-white">WebSocket Interval</span>
+                    <Badge variant="outline" className="text-xs">Milliseconds</Badge>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Broadcast frequency to clients. Default: 50ms.
+                    Lower = more responsive but more CPU. Higher = less load but slower updates.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+
+    {
+      id: 'market-data-maintenance',
+      title: 'Data Maintenance',
+      icon: Trash2,
+      category: 'Market Data',
+      tags: ['cleanup', 'maintenance', 'retention', 'storage', 'delete'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-emerald-400 mb-3">Data Maintenance & Cleanup</h2>
+            <p className="text-gray-300 mb-4">
+              Manage database size by cleaning old candle data while preserving consistent history.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400 flex items-center gap-2">
+                <Trash2 className="h-5 w-5" />
+                Cleanup Old Data
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-gray-300">
+              <p className="text-sm">
+                In Admin → Dev Zone → Market Data Settings, use the "Cleanup Old Data" section.
+              </p>
+
+              <div className="space-y-3">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-2">Cleanup Type</div>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-blue-500/20 text-blue-400">Delete Oldest</Badge>
+                      <span className="text-gray-400">Remove X days starting from the oldest data</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-orange-500/20 text-orange-400">Keep Recent</Badge>
+                      <span className="text-gray-400">Keep only the last X days, delete everything older</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-2">Include Historical</div>
+                  <p className="text-xs text-gray-400">
+                    When ON: Also cleans <code className="text-cyan-400">candles_historical_*</code> collections.
+                    <br />
+                    When OFF: Only cleans <code className="text-cyan-400">candles_1m</code> real-time data.
+                  </p>
+                </div>
+
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-2">Days to Process</div>
+                  <p className="text-xs text-gray-400">
+                    Number of days to delete (Delete Oldest) or keep (Keep Recent).
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">Cleanup Examples</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <div className="space-y-3 text-sm">
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+                  <div className="font-medium text-blue-400 mb-1">Example 1: Delete Oldest 30 Days</div>
+                  <p className="text-xs">
+                    If you have data from Jan 1 to Dec 31, this deletes Jan 1 - Jan 30.
+                    Useful for trimming old data monthly.
+                  </p>
+                </div>
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded p-3">
+                  <div className="font-medium text-orange-400 mb-1">Example 2: Keep Recent 365 Days</div>
+                  <p className="text-xs">
+                    Keeps only the last year of data, deletes everything older.
+                    Useful for maintaining a fixed database size.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">Affected Collections</CardTitle>
+            </CardHeader>
+            <CardContent className="text-gray-300">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="bg-gray-900 p-2 rounded text-xs">
+                  <strong>Always cleaned:</strong> candles_1m
+                </div>
+                <div className="bg-gray-900 p-2 rounded text-xs">
+                  <strong>If Include Historical ON:</strong>
+                </div>
+                <div className="col-span-2 grid grid-cols-4 gap-1 text-xs">
+                  <code className="bg-gray-900 p-1 rounded text-cyan-400">historical_1m</code>
+                  <code className="bg-gray-900 p-1 rounded text-cyan-400">historical_5m</code>
+                  <code className="bg-gray-900 p-1 rounded text-cyan-400">historical_15m</code>
+                  <code className="bg-gray-900 p-1 rounded text-cyan-400">historical_30m</code>
+                  <code className="bg-gray-900 p-1 rounded text-cyan-400">historical_1h</code>
+                  <code className="bg-gray-900 p-1 rounded text-cyan-400">historical_4h</code>
+                  <code className="bg-gray-900 p-1 rounded text-cyan-400">historical_1d</code>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-yellow-400 mb-1">Important</h4>
+                <p className="text-sm text-gray-300">
+                  Cleanup is permanent. Deleted candles cannot be recovered.
+                  You can re-download historical data from Massive.com if needed.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    },
+
+    {
+      id: 'market-data-troubleshooting',
+      title: 'Troubleshooting',
+      icon: AlertTriangle,
+      category: 'Market Data',
+      tags: ['troubleshooting', 'issues', 'problems', 'debug', 'errors'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-emerald-400 mb-3">Market Data Troubleshooting</h2>
+            <p className="text-gray-300 mb-4">
+              Common issues and solutions for chart and price data problems.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400">Charts Not Loading</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="space-y-2">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-1">❓ Symptom: Chart shows spinner forever</div>
+                  <div className="text-gray-400 mt-2">
+                    <strong>Check:</strong>
+                    <ul className="mt-1 space-y-1">
+                      <li>• WebSocket server running? (pm2 status chartvolt-websocket)</li>
+                      <li>• MongoDB connected? (Check server logs)</li>
+                      <li>• API returning data? (Browser DevTools → Network)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400">Price Delays Between Charts</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="space-y-2">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-1">❓ Symptom: One chart updates before another</div>
+                  <div className="text-gray-400 mt-2">
+                    <strong>Causes:</strong>
+                    <ul className="mt-1 space-y-1">
+                      <li>• Different WebSocket connections have slight timing differences</li>
+                      <li>• Browser tab throttling (inactive tabs may update slower)</li>
+                    </ul>
+                    <strong className="block mt-2">Solution:</strong>
+                    <ul className="mt-1 space-y-1">
+                      <li>• This is normal - differences should be &lt;100ms</li>
+                      <li>• Keep charts in same browser window for best sync</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400">Missing Historical Data</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="space-y-2">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-1">❓ Symptom: Charts only show recent data</div>
+                  <div className="text-gray-400 mt-2">
+                    <strong>Fix:</strong>
+                    <ol className="mt-1 space-y-1">
+                      <li>1. Go to Admin → Dev Zone → Market Data Settings</li>
+                      <li>2. Download historical data for desired timeframes</li>
+                      <li>3. Enable "Use Local History" toggle</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400">Database Growing Too Large</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="space-y-2">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-1">❓ Symptom: MongoDB storage filling up</div>
+                  <div className="text-gray-400 mt-2">
+                    <strong>Fix:</strong>
+                    <ol className="mt-1 space-y-1">
+                      <li>1. Use "Cleanup Old Data" with "Keep Recent" mode</li>
+                      <li>2. Set reasonable retention (e.g., 365 days)</li>
+                      <li>3. Enable "Include Historical" to clean all collections</li>
+                      <li>4. Schedule monthly cleanup</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400">Server Monitoring</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <p>
+                Check Admin → Dev Zone → Server Monitor for live stats:
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-gray-900 p-2 rounded">
+                  <strong>CPU Usage:</strong> Should be &lt;70%
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  <strong>Memory:</strong> Should have headroom
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  <strong>WS Connections:</strong> Number of clients
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  <strong>DB Storage:</strong> Monitor growth
                 </div>
               </div>
             </CardContent>

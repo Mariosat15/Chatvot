@@ -92,40 +92,69 @@ async function getDatabaseStats(): Promise<{ database: DatabaseStats; collection
     // Get database stats
     const dbStats = await db.stats();
     
-    // Get collection stats for candle collections
-    const candleCollections = [
-      'candles_1m',
-      'candles_historical_1m',
-      'candles_historical_5m',
-      'candles_historical_15m',
-      'candles_historical_30m',
-      'candles_historical_1h',
-      'candles_historical_4h',
-      'candles_historical_1d',
-    ];
+    // Get all collections from database
+    const allCollections = await db.listCollections().toArray();
+    
+    // Filter for candle-related collections (both exact matches and pattern matches)
+    const candlePatterns = ['candles_1m', 'candles_historical_'];
+    const candleCollectionNames = allCollections
+      .map(c => c.name)
+      .filter(name => candlePatterns.some(pattern => name.startsWith(pattern) || name === pattern));
     
     const collectionStats: CollectionStats[] = [];
     
-    for (const collName of candleCollections) {
+    for (const collName of candleCollectionNames) {
       try {
-        const collections = await db.listCollections({ name: collName }).toArray();
-        if (collections.length === 0) continue;
+        const collection = db.collection(collName);
         
-        const stats = await db.collection(collName).stats();
+        // Use countDocuments for accurate count (works on all MongoDB versions)
+        const docCount = await collection.countDocuments();
+        
+        // Try to get collection stats using aggregate $collStats (works on Atlas)
+        let sizeMB = 0;
+        let storageSizeMB = 0;
+        let indexSizeMB = 0;
+        
+        try {
+          // Method 1: Try collStats command
+          const statsResult = await db.command({ collStats: collName });
+          sizeMB = Math.round((statsResult.size || 0) / (1024 * 1024) * 100) / 100;
+          storageSizeMB = Math.round((statsResult.storageSize || 0) / (1024 * 1024) * 100) / 100;
+          indexSizeMB = Math.round((statsResult.totalIndexSize || 0) / (1024 * 1024) * 100) / 100;
+        } catch {
+          // Method 2: Try aggregate $collStats (Atlas-compatible)
+          try {
+            const aggStats = await collection.aggregate([
+              { $collStats: { storageStats: {} } }
+            ]).toArray();
+            
+            if (aggStats.length > 0 && aggStats[0].storageStats) {
+              const storage = aggStats[0].storageStats;
+              sizeMB = Math.round((storage.size || 0) / (1024 * 1024) * 100) / 100;
+              storageSizeMB = Math.round((storage.storageSize || 0) / (1024 * 1024) * 100) / 100;
+              indexSizeMB = Math.round((storage.totalIndexSize || 0) / (1024 * 1024) * 100) / 100;
+            }
+          } catch {
+            // Method 3: Estimate size from document count (rough estimate)
+            // Assume ~200 bytes per candle document
+            sizeMB = Math.round((docCount * 200) / (1024 * 1024) * 100) / 100;
+          }
+        }
+        
         collectionStats.push({
           name: collName,
-          documents: stats.count || 0,
-          sizeMB: Math.round((stats.size || 0) / (1024 * 1024) * 100) / 100,
-          storageSizeMB: Math.round((stats.storageSize || 0) / (1024 * 1024) * 100) / 100,
-          indexSizeMB: Math.round((stats.totalIndexSize || 0) / (1024 * 1024) * 100) / 100,
+          documents: docCount,
+          sizeMB,
+          storageSizeMB,
+          indexSizeMB,
         });
-      } catch {
-        // Collection doesn't exist or error
+      } catch (err) {
+        console.error(`Error getting stats for ${collName}:`, err);
       }
     }
     
-    // Sort by size descending
-    collectionStats.sort((a, b) => b.sizeMB - a.sizeMB);
+    // Sort by document count descending
+    collectionStats.sort((a, b) => b.documents - a.documents);
     
     return {
       database: {
