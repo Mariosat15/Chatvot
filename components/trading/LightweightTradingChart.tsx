@@ -1655,10 +1655,11 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         // For other TFs: Server gets from Massive.com REST API
         // Request ALL available history - cleanup script manages how much is kept
         log(`📊 Loading candles from server: ${symbol} (${timeframe})`);
+        // Don't send count - let server use admin settings (initialCandleCount)
         const response = await fetch('/api/trading/candles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol, timeframe, count: 100000 }), // Get all available history
+          body: JSON.stringify({ symbol, timeframe }), // Server uses admin settings for count
         });
         
         if (!response.ok) {

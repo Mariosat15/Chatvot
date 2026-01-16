@@ -25,6 +25,24 @@ const GAP_FILL_CHECK_INTERVAL = 60000; // Check for gaps every 60 seconds per sy
 const DEFAULT_INITIAL_CANDLE_COUNT = 500;
 const DEFAULT_LAZY_LOAD_BATCH_SIZE = 500;
 
+// MarketDataSettings schema (must match admin app)
+const MarketDataSettingsSchema = new mongoose.Schema({
+  key: { type: String, unique: true, default: 'market_data_settings' },
+  useLocalHistory: { type: Boolean, default: true },
+  autoFetchHistory: { type: Boolean, default: false },
+  chartHistoryLimitEnabled: { type: Boolean, default: false },
+  chartHistoryLimitDays: { type: Number, default: 365 },
+  initialCandleCount: { type: Number, default: 500 },
+  lazyLoadBatchSize: { type: Number, default: 500 },
+  historicalYearsToDownload: { type: Number, default: 10 },
+}, { timestamps: true });
+
+// Get or create the model
+function getMarketDataSettingsModel() {
+  return mongoose.models.MarketDataSettings || 
+    mongoose.model('MarketDataSettings', MarketDataSettingsSchema);
+}
+
 /**
  * Get market data settings from database
  */
@@ -37,8 +55,11 @@ async function getMarketDataSettings(): Promise<{
   lazyLoadBatchSize: number;
 }> {
   try {
-    const MarketDataSettings = mongoose.models.MarketDataSettings;
-    if (!MarketDataSettings) {
+    const MarketDataSettings = getMarketDataSettingsModel();
+    const settings = await MarketDataSettings.findOne({ key: 'market_data_settings' });
+    
+    if (!settings) {
+      console.log('📋 [Settings] No settings found, using defaults');
       return {
         useLocalHistory: true,
         autoFetchHistory: false,
@@ -49,16 +70,18 @@ async function getMarketDataSettings(): Promise<{
       };
     }
     
-    const settings = await MarketDataSettings.findOne({ key: 'market_data_settings' });
+    console.log(`📋 [Settings] Loaded: limit=${settings.chartHistoryLimitEnabled ? settings.chartHistoryLimitDays + 'd' : 'OFF'}, initial=${settings.initialCandleCount}, batch=${settings.lazyLoadBatchSize}`);
+    
     return {
-      useLocalHistory: settings?.useLocalHistory ?? true,
-      autoFetchHistory: settings?.autoFetchHistory ?? false,
-      chartHistoryLimitEnabled: settings?.chartHistoryLimitEnabled ?? false,
-      chartHistoryLimitDays: settings?.chartHistoryLimitDays ?? 365,
-      initialCandleCount: settings?.initialCandleCount ?? DEFAULT_INITIAL_CANDLE_COUNT,
-      lazyLoadBatchSize: settings?.lazyLoadBatchSize ?? DEFAULT_LAZY_LOAD_BATCH_SIZE,
+      useLocalHistory: settings.useLocalHistory ?? true,
+      autoFetchHistory: settings.autoFetchHistory ?? false,
+      chartHistoryLimitEnabled: settings.chartHistoryLimitEnabled ?? false,
+      chartHistoryLimitDays: settings.chartHistoryLimitDays ?? 365,
+      initialCandleCount: settings.initialCandleCount ?? DEFAULT_INITIAL_CANDLE_COUNT,
+      lazyLoadBatchSize: settings.lazyLoadBatchSize ?? DEFAULT_LAZY_LOAD_BATCH_SIZE,
     };
-  } catch {
+  } catch (error) {
+    console.error('❌ [Settings] Error loading settings:', error);
     return {
       useLocalHistory: true,
       autoFetchHistory: false,
@@ -313,11 +336,14 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
   // If no count specified, use settings for initial load vs lazy load batch
   const limit = count || (before ? settings.lazyLoadBatchSize : settings.initialCandleCount);
   
+  console.log(`📊 [Candles] Request: ${symbol} ${timeframe}, count=${count || 'none'}, limit=${limit}, before=${before || 'none'}`);
+  
   // Apply history limit if enabled
   let historyLimitDate: Date | undefined;
   if (settings.chartHistoryLimitEnabled) {
     historyLimitDate = new Date();
     historyLimitDate.setDate(historyLimitDate.getDate() - settings.chartHistoryLimitDays);
+    console.log(`📊 [Candles] History limit enabled: ${settings.chartHistoryLimitDays} days (since ${historyLimitDate.toISOString()})`);
   }
 
   // For 1-minute timeframe: Get from MongoDB (server source of truth)
