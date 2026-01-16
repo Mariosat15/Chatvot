@@ -1,9 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { usePrices } from '@/contexts/PriceProvider';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Target, Clock, Trophy, Coins, Shield } from 'lucide-react';
+import { TrendingUp, TrendingDown, Shield, DollarSign, Wallet, Activity } from 'lucide-react';
+
+interface Position {
+  _id: string;
+  symbol: string;
+  side: 'long' | 'short';
+  entryPrice: number;
+  quantity: number;
+  unrealizedPnl: number;
+}
 
 interface GameModeStatsPanelProps {
   balance: number;
@@ -14,19 +24,51 @@ interface GameModeStatsPanelProps {
   marginLevel: number;
   startingCapital: number;
   positionCount: number;
+  positions?: Position[];
 }
 
 export default function GameModeStatsPanel({
   balance,
   equity,
-  unrealizedPnl,
+  unrealizedPnl: initialUnrealizedPnl,
   usedMargin,
   availableCapital,
   marginLevel,
   startingCapital,
   positionCount,
+  positions = [],
 }: GameModeStatsPanelProps) {
-  const totalPnl = equity - startingCapital;
+  const { prices } = usePrices();
+  const [liveUnrealizedPnl, setLiveUnrealizedPnl] = useState(initialUnrealizedPnl);
+  
+  // Calculate live unrealized P&L from positions
+  useEffect(() => {
+    if (positions.length === 0) {
+      setLiveUnrealizedPnl(0);
+      return;
+    }
+    
+    let totalPnl = 0;
+    positions.forEach((position) => {
+      const currentPrice = prices.get(position.symbol);
+      if (currentPrice) {
+        const contractSize = 100000; // Standard forex lot
+        if (position.side === 'long') {
+          totalPnl += (currentPrice.bid - position.entryPrice) * position.quantity * contractSize;
+        } else {
+          totalPnl += (position.entryPrice - currentPrice.ask) * position.quantity * contractSize;
+        }
+      } else {
+        // Fallback to stored unrealizedPnl
+        totalPnl += position.unrealizedPnl;
+      }
+    });
+    
+    setLiveUnrealizedPnl(totalPnl);
+  }, [prices, positions]);
+  
+  const liveEquity = balance + liveUnrealizedPnl;
+  const totalPnl = liveEquity - startingCapital;
   const pnlPercent = ((totalPnl / startingCapital) * 100);
   const isProfit = totalPnl >= 0;
   
@@ -44,26 +86,26 @@ export default function GameModeStatsPanel({
     <div className="space-y-3">
       {/* Main Stats Cards */}
       <div className="grid grid-cols-2 gap-3">
-        {/* Gold (Balance) */}
-        <div className="bg-gradient-to-br from-yellow-900/40 to-yellow-800/20 rounded-xl p-3 border border-yellow-600/30">
+        {/* Balance */}
+        <div className="bg-gradient-to-br from-blue-900/40 to-blue-800/20 rounded-xl p-3 border border-blue-600/30">
           <div className="flex items-center gap-2 mb-1">
-            <Image src="/game-icons/coin.png" alt="Gold" width={20} height={20} />
-            <span className="text-yellow-400 text-xs font-medium">Gold</span>
+            <Wallet className="w-5 h-5 text-blue-400" />
+            <span className="text-blue-400 text-xs font-medium">Balance</span>
           </div>
           <div className="text-white font-bold text-lg">${balance.toFixed(2)}</div>
         </div>
         
-        {/* Total Worth (Equity) */}
+        {/* Equity */}
         <div className="bg-gradient-to-br from-purple-900/40 to-purple-800/20 rounded-xl p-3 border border-purple-600/30">
           <div className="flex items-center gap-2 mb-1">
-            <Image src="/game-icons/gems.png" alt="Worth" width={20} height={20} />
-            <span className="text-purple-400 text-xs font-medium">Total Worth</span>
+            <DollarSign className="w-5 h-5 text-purple-400" />
+            <span className="text-purple-400 text-xs font-medium">Equity</span>
           </div>
-          <div className="text-white font-bold text-lg">${equity.toFixed(2)}</div>
+          <div className="text-white font-bold text-lg">${liveEquity.toFixed(2)}</div>
         </div>
       </div>
       
-      {/* P&L Display */}
+      {/* Total P&L Display */}
       <div className={cn(
         "rounded-xl p-4 border",
         isProfit 
@@ -81,7 +123,7 @@ export default function GameModeStatsPanel({
               "text-sm font-medium",
               isProfit ? "text-green-400" : "text-red-400"
             )}>
-              {isProfit ? '📈 Winning!' : '📉 Behind...'}
+              {isProfit ? '📈 Profit' : '📉 Loss'}
             </span>
           </div>
           <span className={cn(
@@ -96,9 +138,29 @@ export default function GameModeStatsPanel({
             "text-2xl font-bold",
             isProfit ? "text-green-400" : "text-red-400"
           )}>
-            {isProfit ? '+' : ''}{totalPnl.toFixed(2)}
+            {isProfit ? '+' : ''}${totalPnl.toFixed(2)}
           </span>
-          <span className="text-gray-500 text-sm">gold</span>
+        </div>
+      </div>
+      
+      {/* Unrealized P&L - Live Tracking */}
+      <div className={cn(
+        "rounded-xl p-3 border",
+        liveUnrealizedPnl >= 0 
+          ? "bg-gradient-to-r from-green-900/20 to-transparent border-green-600/20"
+          : "bg-gradient-to-r from-red-900/20 to-transparent border-red-600/20"
+      )}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-cyan-400 animate-pulse" />
+            <span className="text-gray-400 text-sm">Unrealized P&L</span>
+          </div>
+          <span className={cn(
+            "font-bold text-lg",
+            liveUnrealizedPnl >= 0 ? "text-green-400" : "text-red-400"
+          )}>
+            {liveUnrealizedPnl >= 0 ? '+' : ''}${liveUnrealizedPnl.toFixed(2)}
+          </span>
         </div>
       </div>
       
@@ -133,20 +195,15 @@ export default function GameModeStatsPanel({
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-dark-400/50 rounded-lg p-2 text-center border border-dark-300">
-          <div className="text-gray-500 text-[10px] mb-1">Unrealized</div>
-          <div className={cn(
-            "font-bold text-sm",
-            unrealizedPnl >= 0 ? "text-green-400" : "text-red-400"
-          )}>
-            {unrealizedPnl >= 0 ? '+' : ''}{unrealizedPnl.toFixed(2)}
-          </div>
-        </div>
-        <div className="bg-dark-400/50 rounded-lg p-2 text-center border border-dark-300">
-          <div className="text-gray-500 text-[10px] mb-1">In Use</div>
+          <div className="text-gray-500 text-[10px] mb-1">Used Margin</div>
           <div className="text-blue-400 font-bold text-sm">${usedMargin.toFixed(2)}</div>
         </div>
         <div className="bg-dark-400/50 rounded-lg p-2 text-center border border-dark-300">
-          <div className="text-gray-500 text-[10px] mb-1">Battles</div>
+          <div className="text-gray-500 text-[10px] mb-1">Available</div>
+          <div className="text-yellow-400 font-bold text-sm">${availableCapital.toFixed(2)}</div>
+        </div>
+        <div className="bg-dark-400/50 rounded-lg p-2 text-center border border-dark-300">
+          <div className="text-gray-500 text-[10px] mb-1">Positions</div>
           <div className="text-purple-400 font-bold text-sm">{positionCount}</div>
         </div>
       </div>

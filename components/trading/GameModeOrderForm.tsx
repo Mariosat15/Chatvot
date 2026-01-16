@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useChartSymbol } from '@/contexts/ChartSymbolContext';
 import { usePrices } from '@/contexts/PriceProvider';
 import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
 import { placeOrder } from '@/lib/actions/trading/order.actions';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-import { Loader2, TrendingUp, TrendingDown, Shield, Zap } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Zap, Target, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface GameModeOrderFormProps {
@@ -29,12 +29,14 @@ export default function GameModeOrderForm({
   const { prices } = usePrices();
   
   const [lotSize, setLotSize] = useState(0.01);
-  const [leverage, setLeverage] = useState(defaultLeverage);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tpPips, setTpPips] = useState<number>(20);
   const [slPips, setSlPips] = useState<number>(10);
   const [useTp, setUseTp] = useState(true);
   const [useSl, setUseSl] = useState(true);
+  
+  // Use fixed leverage from admin
+  const leverage = defaultLeverage;
   
   const currentPrice = prices.get(symbol);
   const symbolInfo = FOREX_PAIRS[symbol as ForexSymbol];
@@ -71,7 +73,7 @@ export default function GameModeOrderForm({
     if (disabled || !currentPrice || isSubmitting) return;
     
     if (marginRequired > availableCapital) {
-      toast.error('⚠️ Not enough gold!', {
+      toast.error('⚠️ Insufficient funds!', {
         description: 'You need more capital to make this trade.',
       });
       return;
@@ -103,8 +105,8 @@ export default function GameModeOrderForm({
       });
       
       if (result.success) {
-        toast.success(direction === 'long' ? '🚀 Attack launched!' : '🛡️ Defense deployed!', {
-          description: `${direction === 'long' ? 'LONG' : 'SHORT'} position opened on ${symbol}`,
+        toast.success(direction === 'long' ? '🚀 Position Opened!' : '📉 Position Opened!', {
+          description: `${direction === 'long' ? 'BUY' : 'SELL'} ${lotSize} lots on ${symbol}`,
         });
       } else {
         toast.error('❌ Trade failed!', {
@@ -112,7 +114,7 @@ export default function GameModeOrderForm({
         });
       }
     } catch (error) {
-      toast.error('❌ Battle error!', {
+      toast.error('❌ Error!', {
         description: 'Something went wrong. Try again!',
       });
     } finally {
@@ -129,7 +131,7 @@ export default function GameModeOrderForm({
       <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Image src="/game-icons/sword.png" alt="Trade" width={28} height={28} className="drop-shadow-lg" />
-          <span className="text-white font-bold text-lg">⚔️ Battle Station</span>
+          <span className="text-white font-bold text-lg">⚔️ Trade Station</span>
         </div>
         {currentPrice && (
           <div className="text-white font-mono font-bold">
@@ -145,14 +147,20 @@ export default function GameModeOrderForm({
             <span className="text-2xl">🎮</span>
             <span className="text-white font-bold text-xl">{symbol}</span>
           </div>
-          {currentPrice && (
-            <div className="text-right">
-              <div className="text-xs text-gray-400">Spread</div>
-              <div className="text-yellow-400 font-bold">
-                {((currentPrice.ask - currentPrice.bid) / pipValue).toFixed(1)} pips
+          <div className="flex items-center gap-3">
+            {currentPrice && (
+              <div className="text-right">
+                <div className="text-xs text-gray-400">Spread</div>
+                <div className="text-yellow-400 font-bold">
+                  {((currentPrice.ask - currentPrice.bid) / pipValue).toFixed(1)} pips
+                </div>
               </div>
+            )}
+            <div className="text-right px-2 py-1 bg-purple-500/20 rounded-lg border border-purple-500/30">
+              <div className="text-xs text-gray-400">Leverage</div>
+              <div className="text-purple-400 font-bold">{leverage}x</div>
             </div>
-          )}
+          </div>
         </div>
       </div>
       
@@ -161,7 +169,7 @@ export default function GameModeOrderForm({
         <div className="flex items-center justify-between mb-2">
           <span className="text-gray-400 text-sm flex items-center gap-1">
             <Zap className="w-4 h-4 text-yellow-400" />
-            Army Size (Lots)
+            Position Size (Lots)
           </span>
           <span className="text-white font-bold">{lotSize}</span>
         </div>
@@ -183,29 +191,6 @@ export default function GameModeOrderForm({
         </div>
       </div>
       
-      {/* Leverage Selection */}
-      <div className="p-4 border-b border-purple-500/30">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-gray-400 text-sm flex items-center gap-1">
-            <Shield className="w-4 h-4 text-blue-400" />
-            Power Level (Leverage)
-          </span>
-          <span className="text-white font-bold">{leverage}x</span>
-        </div>
-        <input
-          type="range"
-          min={1}
-          max={100}
-          value={leverage}
-          onChange={(e) => setLeverage(Number(e.target.value))}
-          className="w-full h-2 bg-dark-400 rounded-lg appearance-none cursor-pointer accent-purple-500"
-        />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>1x Safe</span>
-          <span>100x Risky</span>
-        </div>
-      </div>
-      
       {/* TP/SL Quick Settings */}
       <div className="p-4 border-b border-purple-500/30 space-y-3">
         {/* Take Profit */}
@@ -217,7 +202,9 @@ export default function GameModeOrderForm({
               onChange={(e) => setUseTp(e.target.checked)}
               className="w-4 h-4 accent-green-500"
             />
-            <span className="text-green-400 text-sm font-medium">🎯 Take Profit</span>
+            <span className="text-green-400 text-sm font-medium flex items-center gap-1">
+              <Target className="w-4 h-4" /> Take Profit
+            </span>
           </label>
           {useTp && (
             <div className="flex items-center gap-2">
@@ -241,7 +228,9 @@ export default function GameModeOrderForm({
               onChange={(e) => setUseSl(e.target.checked)}
               className="w-4 h-4 accent-red-500"
             />
-            <span className="text-red-400 text-sm font-medium">🛑 Stop Loss</span>
+            <span className="text-red-400 text-sm font-medium flex items-center gap-1">
+              <ShieldAlert className="w-4 h-4" /> Stop Loss
+            </span>
           </label>
           {useSl && (
             <div className="flex items-center gap-2">
@@ -260,7 +249,7 @@ export default function GameModeOrderForm({
       {/* Margin Info */}
       <div className="p-4 border-b border-purple-500/30 bg-dark-400/30">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-400">💰 Required Gold</span>
+          <span className="text-gray-400">💵 Required Margin</span>
           <span className={cn(
             "font-bold",
             marginRequired > availableCapital ? "text-red-400" : "text-green-400"
@@ -269,7 +258,7 @@ export default function GameModeOrderForm({
           </span>
         </div>
         <div className="flex justify-between text-sm mt-1">
-          <span className="text-gray-400">🏦 Available Gold</span>
+          <span className="text-gray-400">💰 Available</span>
           <span className="text-yellow-400 font-bold">${availableCapital.toFixed(2)}</span>
         </div>
       </div>

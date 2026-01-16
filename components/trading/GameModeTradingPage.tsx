@@ -77,8 +77,6 @@ export default function GameModeTradingPage({
   const daysRemaining = Math.max(0, Math.floor(timeRemaining / (1000 * 60 * 60 * 24)));
   const hoursRemaining = Math.max(0, Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
   
-  // Popular symbols for quick access
-  const popularSymbols = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'XAU/USD', 'USD/CHF'];
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f0f1a] via-[#1a1a2e] to-[#16213e]">
@@ -183,16 +181,6 @@ export default function GameModeTradingPage({
                 )}
               </div>
               
-              {/* Quick Symbol Buttons */}
-              {popularSymbols.filter(s => s !== symbol).slice(0, 4).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSymbol(s)}
-                  className="px-3 py-2 bg-dark-400/50 hover:bg-dark-400 border border-dark-300 rounded-lg text-gray-400 text-sm font-medium transition-colors"
-                >
-                  {s}
-                </button>
-              ))}
             </div>
             
             {/* Chart */}
@@ -219,7 +207,7 @@ export default function GameModeTradingPage({
             <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border-2 border-purple-500/30 p-4">
               <div className="flex items-center gap-2 mb-4">
                 <Image src="/game-icons/chest.png" alt="Stats" width={20} height={20} />
-                <h2 className="text-white font-bold">Your Treasury</h2>
+                <h2 className="text-white font-bold">📊 Account Stats</h2>
               </div>
               <GameModeStatsPanel
                 balance={participant.currentCapital}
@@ -230,6 +218,7 @@ export default function GameModeTradingPage({
                 marginLevel={marginLevel}
                 startingCapital={startingCapital}
                 positionCount={positions.length}
+                positions={positions}
               />
             </div>
             
