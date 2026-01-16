@@ -1384,11 +1384,15 @@ export default function MarketDataSection() {
             <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30 max-h-40 overflow-y-auto">
               <h4 className="text-white font-medium mb-2">Results</h4>
               <div className="space-y-1">
-                {historyDownloadResults.map((result, i) => (
-                  <div key={i} className={`text-xs ${result.error ? 'text-red-400' : 'text-gray-400'}`}>
-                    <span className="text-white">{result.symbol} {(result as any).timeframe}</span>: {result.error ? `❌ ${result.error}` : `✓ ${result.saved} saved`}
-                  </div>
-                ))}
+                {historyDownloadResults.map((result, i) => {
+                  const r = result as any;
+                  const savedCount = r.count ?? r.saved ?? r.inserted ?? 0;
+                  return (
+                    <div key={i} className={`text-xs ${result.error ? 'text-red-400' : 'text-gray-400'}`}>
+                      <span className="text-white">{result.symbol} {r.timeframe}</span>: {result.error ? `❌ ${result.error}` : `✓ ${savedCount.toLocaleString()} saved`}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
