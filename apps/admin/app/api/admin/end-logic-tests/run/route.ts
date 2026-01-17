@@ -340,34 +340,49 @@ async function runCompetitionTest(
 ) {
   const competitionsCollection = db.collection('competitions');
   const participantsCollection = db.collection('competitionparticipants');
-  const platformTransactionsCollection = db.collection('platformtransactions');
 
   const now = new Date();
   const prizePool = 300; // Test prize pool
+  const entryFee = 100;
+  const startingCapital = 10000;
   
   // Set end time based on test type
   const endTime = scenario.endType === 'early' 
     ? new Date(now.getTime() + 60 * 60 * 1000) // 1 hour from now (still time remaining)
     : new Date(now.getTime() - 1000); // Already ended
 
-  // Create test competition
+  // Create test competition with ALL required fields
   const competitionId = new mongoose.Types.ObjectId();
+  const testAdminId = new mongoose.Types.ObjectId();
   testDataIds.push(`competition:${competitionId}`);
 
   await competitionsCollection.insertOne({
     _id: competitionId,
     name: `${testPrefix}_Competition`,
     slug: `test-${testPrefix.toLowerCase()}`,
+    description: 'Test competition for end logic verification',
     status: 'active',
     startTime: new Date(now.getTime() - 60 * 60 * 1000),
     endTime,
+    registrationDeadline: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hours ago
+    entryFee,
+    startingCapital,
     prizePool,
+    platformFeePercentage: 20,
+    createdBy: testAdminId.toString(),
     rules: {
       rankingMethod: 'pnl',
+      tieBreaker1: 'trades_count',
       minimumTrades: 1,
       disqualifyOnLiquidation: scenario.disqualifyOnLiquidation,
     },
-    prizeDistribution: [{ position: 1, percentage: 100 }],
+    prizeDistribution: [{ rank: 1, percentage: 100 }],
+    maxParticipants: 100,
+    minParticipants: 2,
+    currentParticipants: scenario.participants.length,
+    assetClasses: ['forex'],
+    allowedSymbols: [],
+    blockedSymbols: [],
     createdAt: now,
     updatedAt: now,
     isTest: true,

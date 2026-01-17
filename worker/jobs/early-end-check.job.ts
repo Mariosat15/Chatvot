@@ -45,6 +45,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
     const activeCompetitions = await competitionsCollection.find({
       status: 'active',
       endTime: { $gt: now }, // Still has time remaining
+      isTest: { $ne: true }, // Skip test data
     }).toArray();
 
     for (const competition of activeCompetitions) {
@@ -153,6 +154,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
     const activeChallenges = await challengesCollection.find({
       status: 'active',
       endTime: { $gt: now }, // Still has time remaining
+      isTest: { $ne: true }, // Skip test data
     }).toArray();
 
     for (const challenge of activeChallenges) {
