@@ -51,32 +51,67 @@ export async function POST(request: NextRequest) {
       'challengeparticipants',
       'creditwallets',
       'platformtransactions',
+      'tradingpositions', // Also clean up test positions
+      'wallettransactions', // Clean up wallet transactions
     ];
     
     for (const collectionName of collections) {
       try {
-        // Delete by testRunId field
+        // Delete by testRunId field (string starts with TEST_)
         const result1 = await db.collection(collectionName).deleteMany({ 
-          testRunId: { $regex: /^TEST_/ } 
+          testRunId: { $exists: true, $regex: /^TEST_/ } 
         });
         deletedCount += result1.deletedCount;
+        if (result1.deletedCount > 0) {
+          console.log(`Deleted ${result1.deletedCount} from ${collectionName} by testRunId`);
+        }
 
         // Also cleanup by isTest flag
         const result2 = await db.collection(collectionName).deleteMany({ isTest: true });
         deletedCount += result2.deletedCount;
+        if (result2.deletedCount > 0) {
+          console.log(`Deleted ${result2.deletedCount} from ${collectionName} by isTest`);
+        }
 
-        // Also cleanup by name/slug prefix
+        // Also cleanup by name/slug prefix (case insensitive)
         const result3 = await db.collection(collectionName).deleteMany({
           $or: [
-            { name: { $regex: /^TEST_/ } },
+            { name: { $regex: /^TEST_/i } },
             { slug: { $regex: /^test-test_/i } },
-            { username: { $regex: /^TEST_/ } },
+            { username: { $regex: /^TEST_/i } },
           ]
         });
         deletedCount += result3.deletedCount;
+        if (result3.deletedCount > 0) {
+          console.log(`Deleted ${result3.deletedCount} from ${collectionName} by name/slug/username`);
+        }
       } catch (e) {
         console.warn(`Failed to cleanup ${collectionName}:`, e);
       }
+    }
+    
+    // Extra safety: Delete any competition/challenge with TEST_ in name directly
+    try {
+      const compResult = await db.collection('competitions').deleteMany({
+        name: { $regex: /TEST_/i }
+      });
+      if (compResult.deletedCount > 0) {
+        console.log(`Extra cleanup: Deleted ${compResult.deletedCount} competitions with TEST_ in name`);
+        deletedCount += compResult.deletedCount;
+      }
+      
+      const challengeResult = await db.collection('challenges').deleteMany({
+        $or: [
+          { challengerName: { $regex: /TEST_/i } },
+          { challengedName: { $regex: /TEST_/i } },
+        ]
+      });
+      if (challengeResult.deletedCount > 0) {
+        console.log(`Extra cleanup: Deleted ${challengeResult.deletedCount} challenges with TEST_ names`);
+        deletedCount += challengeResult.deletedCount;
+      }
+    } catch (e) {
+      console.warn('Extra cleanup failed:', e);
     }
 
     return NextResponse.json({ 
