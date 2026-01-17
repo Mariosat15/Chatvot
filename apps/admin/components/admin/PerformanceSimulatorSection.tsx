@@ -47,6 +47,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import EndLogicTestsTab from './EndLogicTestsTab';
 import {
   LineChart,
   Line,
@@ -716,6 +717,10 @@ export default function PerformanceSimulatorSection() {
           <TabsTrigger value="history" className="data-[state=active]:bg-gray-700">
             <Clock className="h-4 w-4 mr-2" />
             History
+          </TabsTrigger>
+          <TabsTrigger value="end-logic" className="data-[state=active]:bg-gray-700">
+            <Trophy className="h-4 w-4 mr-2" />
+            End Logic
           </TabsTrigger>
         </TabsList>
 
@@ -2094,6 +2099,11 @@ export default function PerformanceSimulatorSection() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* End Logic Tests Tab */}
+        <TabsContent value="end-logic">
+          <EndLogicTestsTab />
         </TabsContent>
       </Tabs>
     </div>
