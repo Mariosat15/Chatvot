@@ -584,17 +584,18 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'disqualified', equity: 7000, totalTrades: 0 }, // Disqualified (no trades)
     ],
     // 4 × 100 = 400 pool, 20% fee = 80, net = 320
-    // Only 2 active, 3rd place prize goes to unclaimed (no 3rd winner)
-    // 1st: 320 × 70% = 224, 2nd: 320 × 20% = 64, 3rd: 320 × 10% = 32 → unclaimed
+    // Only 2 active winners - production code REDISTRIBUTES 3rd place prize to existing winners
+    // 10% unclaimed ÷ 2 winners = 5% bonus each
+    // 1st: 320 × (70% + 5%) = 240, 2nd: 320 × (20% + 5%) = 80
     expected: { 
       shouldEndEarly: false, 
-      toUnclaimedPool: false, // Main pool distributed, but 3rd place unclaimed
+      toUnclaimedPool: false, // Prize redistribution, not unclaimed
       statusAfter: 'completed',
       expectedPrizePool: 400,
       expectedPlatformFee: 80,
       expectedRanking: [0, 1], // Only 2 winners
-      expectedPrizes: [224, 64], // 3rd place prize (32) goes to unclaimed
-      expectedUnclaimedAmount: 32, // 3rd place prize not distributed
+      expectedPrizes: [240, 80], // Redistributed: 75% and 25% of net pool
+      // No unclaimed - 3rd place prize redistributed to winners as bonus
     },
   },
 };
