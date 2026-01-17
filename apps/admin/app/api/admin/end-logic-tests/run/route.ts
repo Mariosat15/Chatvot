@@ -291,7 +291,9 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'challenged', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
+    // With flag ON, both liquidated = both disqualified = pool to platform (no winner)
+    // NOTE: Early-end logic picks higher equity, but normal-end treats both as disqualified
+    expected: { shouldEndEarly: false, toUnclaimedPool: true, statusAfter: 'completed' },
   },
   'CH-N4': {
     type: 'challenge',
@@ -691,7 +693,7 @@ async function runRealCompetitionTest(
     rules: {
       rankingMethod: 'pnl',
       tieBreaker1: 'trades_count',
-      minimumTrades: 0, // Set to 0 for tests - we want to test disqualification logic, not trade counts
+      minimumTrades: 1, // Participants with 0 trades get disqualified (matches real behavior)
       disqualifyOnLiquidation: scenario.disqualifyOnLiquidation,
     },
     prizeDistribution,
@@ -760,48 +762,50 @@ async function runRealCompetitionTest(
       updatedAt: now,
     });
     
-    // Create a closed position to generate the correct P&L
-    // finalizeCompetition recalculates P&L from positions, so we need actual position records
-    const positionsCollection = db.collection('tradingpositions');
-    const positionId = new mongoose.Types.ObjectId();
-    testDataIds.push(`position:${positionId}`);
-    
-    // IMPORTANT: Production calculates PNL as: priceDiff * quantity * 100000 (forex contract size)
-    // To get the desired participantPnl, we need: priceDiff = participantPnl / (quantity * 100000)
-    // Using quantity = 1 for simplicity: priceDiff = participantPnl / 100000
-    const quantity = 1;
-    const contractSize = 100000;
-    const priceDiff = participantPnl / (quantity * contractSize);
-    
-    await positionsCollection.insertOne({
-      _id: positionId,
-      oddsPositionId: positionId.toString(),
-      oddsUserId: userId.toString(),
-      userId: userId.toString(),
-      competitionId: competitionId.toString(),
-      symbol: 'EUR/USD',
-      side: 'long',
-      orderType: 'market',
-      quantity: quantity,
-      entryPrice: 1.1000,
-      exitPrice: 1.1000 + priceDiff,
-      currentPrice: 1.1000 + priceDiff,
-      unrealizedPnl: 0,
-      unrealizedPnlPercentage: 0,
-      realizedPnl: participantPnl, // Not used by production, but kept for reference
-      leverage: 1,
-      marginUsed: 1000,
-      maintenanceMargin: 500,
-      status: 'closed',
-      openOrderId: `test-order-${i}`,
-      lastPriceUpdate: now,
-      priceUpdateCount: 1,
-      openedAt: new Date(now.getTime() - 60 * 60 * 1000),
-      closedAt: new Date(now.getTime() - 30 * 60 * 1000),
-      testRunId,
-      createdAt: now,
-      updatedAt: now,
-    });
+    // ONLY create positions for participants with totalTrades > 0
+    // Participants with totalTrades: 0 should remain disqualified due to insufficient trades
+    if (p.totalTrades > 0) {
+      const positionsCollection = db.collection('tradingpositions');
+      const positionId = new mongoose.Types.ObjectId();
+      testDataIds.push(`position:${positionId}`);
+      
+      // IMPORTANT: Production calculates PNL as: priceDiff * quantity * 100000 (forex contract size)
+      // To get the desired participantPnl, we need: priceDiff = participantPnl / (quantity * 100000)
+      // Using quantity = 1 for simplicity: priceDiff = participantPnl / 100000
+      const quantity = 1;
+      const contractSize = 100000;
+      const priceDiff = participantPnl / (quantity * contractSize);
+      
+      await positionsCollection.insertOne({
+        _id: positionId,
+        oddsPositionId: positionId.toString(),
+        oddsUserId: userId.toString(),
+        userId: userId.toString(),
+        competitionId: competitionId.toString(),
+        symbol: 'EUR/USD',
+        side: 'long',
+        orderType: 'market',
+        quantity: quantity,
+        entryPrice: 1.1000,
+        exitPrice: 1.1000 + priceDiff,
+        currentPrice: 1.1000 + priceDiff,
+        unrealizedPnl: 0,
+        unrealizedPnlPercentage: 0,
+        realizedPnl: participantPnl, // Not used by production, but kept for reference
+        leverage: 1,
+        marginUsed: 1000,
+        maintenanceMargin: 500,
+        status: 'closed',
+        openOrderId: `test-order-${i}`,
+        lastPriceUpdate: now,
+        priceUpdateCount: 1,
+        openedAt: new Date(now.getTime() - 60 * 60 * 1000),
+        closedAt: new Date(now.getTime() - 30 * 60 * 1000),
+        testRunId,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
   }
 
   // Now run the ACTUAL production code
@@ -1301,47 +1305,49 @@ async function runRealChallengeTest(
       updatedAt: now,
     });
     
-    // Create a closed position to generate the correct P&L
-    // finalizeChallenge recalculates P&L from positions
-    const positionsCollection = db.collection('tradingpositions');
-    const positionId = new mongoose.Types.ObjectId();
-    testDataIds.push(`position:${positionId}`);
-    
-    // IMPORTANT: Production calculates PNL as: priceDiff * quantity * 100000 (forex contract size)
-    // Also: Challenge finalization queries positions by competitionId, not challengeId!
-    const quantity = 1;
-    const contractSize = 100000;
-    const priceDiff = participantPnl / (quantity * contractSize);
-    
-    await positionsCollection.insertOne({
-      _id: positionId,
-      oddsPositionId: positionId.toString(),
-      oddsUserId: userId.toString(),
-      userId: userId.toString(),
-      competitionId: challengeId.toString(), // Challenge finalization queries competitionId!
-      symbol: 'EUR/USD',
-      side: 'long',
-      orderType: 'market',
-      quantity: quantity,
-      entryPrice: 1.1000,
-      exitPrice: 1.1000 + priceDiff,
-      currentPrice: 1.1000 + priceDiff,
-      unrealizedPnl: 0,
-      unrealizedPnlPercentage: 0,
-      realizedPnl: participantPnl, // Not used by production, but kept for reference
-      leverage: 1,
-      marginUsed: 1000,
-      maintenanceMargin: 500,
-      status: 'closed',
-      openOrderId: `test-order-${p.role}`,
-      lastPriceUpdate: now,
-      priceUpdateCount: 1,
-      openedAt: new Date(now.getTime() - 60 * 60 * 1000),
-      closedAt: new Date(now.getTime() - 30 * 60 * 1000),
-      testRunId,
-      createdAt: now,
-      updatedAt: now,
-    });
+    // ONLY create positions for participants with totalTrades > 0
+    // Participants with totalTrades: 0 should remain disqualified due to insufficient trades
+    if (p.totalTrades > 0) {
+      const positionsCollection = db.collection('tradingpositions');
+      const positionId = new mongoose.Types.ObjectId();
+      testDataIds.push(`position:${positionId}`);
+      
+      // IMPORTANT: Production calculates PNL as: priceDiff * quantity * 100000 (forex contract size)
+      // Also: Challenge finalization queries positions by competitionId, not challengeId!
+      const quantity = 1;
+      const contractSize = 100000;
+      const priceDiff = participantPnl / (quantity * contractSize);
+      
+      await positionsCollection.insertOne({
+        _id: positionId,
+        oddsPositionId: positionId.toString(),
+        oddsUserId: userId.toString(),
+        userId: userId.toString(),
+        competitionId: challengeId.toString(), // Challenge finalization queries competitionId!
+        symbol: 'EUR/USD',
+        side: 'long',
+        orderType: 'market',
+        quantity: quantity,
+        entryPrice: 1.1000,
+        exitPrice: 1.1000 + priceDiff,
+        currentPrice: 1.1000 + priceDiff,
+        unrealizedPnl: 0,
+        unrealizedPnlPercentage: 0,
+        realizedPnl: participantPnl, // Not used by production, but kept for reference
+        leverage: 1,
+        marginUsed: 1000,
+        maintenanceMargin: 500,
+        status: 'closed',
+        openOrderId: `test-order-${p.role}`,
+        lastPriceUpdate: now,
+        priceUpdateCount: 1,
+        openedAt: new Date(now.getTime() - 60 * 60 * 1000),
+        closedAt: new Date(now.getTime() - 30 * 60 * 1000),
+        testRunId,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
   }
 
   // Run ACTUAL production code

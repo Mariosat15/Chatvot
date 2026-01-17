@@ -39,8 +39,9 @@ export async function finalizeCompetition(competitionId: string) {
     console.log(`📊 Closing all open positions and calculating P&L...`);
     
     // First, get all participants to track their stats
+    // NOTE: competitionId in schema is String, so we must convert ObjectId to string
     const allParticipants = await CompetitionParticipant.find({
-      competitionId: competition._id,
+      competitionId: competition._id.toString(),
     }).session(session);
 
     // Create a map to track participant stats in memory
@@ -61,8 +62,9 @@ export async function finalizeCompetition(competitionId: string) {
     }
 
     // Get all positions (both open and closed) for recalculation
+    // NOTE: competitionId in schema is String, so we must convert ObjectId to string
     const allPositions = await TradingPosition.find({
-      competitionId: competition._id,
+      competitionId: competition._id.toString(),
     }).session(session);
 
     console.log(`Found ${allPositions.length} total positions (open and closed)`);
@@ -295,7 +297,7 @@ export async function finalizeCompetition(competitionId: string) {
     // STEP 2: Calculate final rankings using new rules system
     console.log(`📈 Calculating final rankings...`);
     const participants = await CompetitionParticipant.find({
-      competitionId: competition._id,
+      competitionId: competition._id.toString(),
     })
       .session(session)
       .lean();
@@ -600,28 +602,28 @@ export async function finalizeCompetition(competitionId: string) {
         const winner = leaderboard.find((l) => l.userId === dist.userId);
         if (winner) {
           if (dist.rank === 1) {
-            // Winner notification
+            // Winner notification - signature: (userId, competitionName, prize, position)
             notificationService.notifyCompetitionWon(
               winner.userId,
               competition.name,
-              dist.prizeAmount
+              dist.prizeAmount,
+              dist.rank
             ).catch(e => console.error('Failed to send winner notification:', e));
           } else if (dist.rank <= 3) {
-            // Podium notification
+            // Podium notification - signature: (userId, competitionName, prize, position)
             notificationService.notifyPodiumFinish(
               winner.userId,
               competition.name,
-              dist.rank,
-              dist.prizeAmount
+              dist.prizeAmount,
+              dist.rank
             ).catch(e => console.error('Failed to send podium notification:', e));
           }
           
-          // Send prize received notification to all winners
+          // Send prize received notification to all winners - signature: (userId, competitionName, prize)
           notificationService.notifyPrizeReceived(
             winner.userId,
             competition.name,
-            dist.prizeAmount,
-            dist.rank
+            dist.prizeAmount
           ).catch(e => console.error('Failed to send prize notification:', e));
         }
       }
@@ -645,14 +647,12 @@ export async function finalizeCompetition(competitionId: string) {
       }
 
       // Notify all participants about competition end - non-blocking
+      // Signature: (userId, competitionName, finalPosition)
       for (const participant of leaderboard) {
-        const pnl = participant.pnl || 0;
         notificationService.notifyCompetitionEnded(
           participant.userId,
-          competition._id.toString(),
           competition.name,
-          participant.rank || 0,
-          pnl
+          participant.rank || 0
         ).catch(e => console.error('Failed to send competition end notification:', e));
       }
       
