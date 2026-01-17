@@ -465,7 +465,7 @@ async function runRealCompetitionTest(
   try {
     if (scenario.endType === 'early') {
       // Import and run the ACTUAL early end check (test-specific version)
-      const { runEarlyEndCheckForTest } = await import('../../../../../worker/jobs/early-end-check.job');
+      const { runEarlyEndCheckForTest } = await import('../../../../../../../worker/jobs/early-end-check.job');
       
       // Run early end check for THIS test run only
       const earlyEndResult = await runEarlyEndCheckForTest(testRunId);
@@ -533,7 +533,7 @@ async function runRealCompetitionTest(
       };
     } else {
       // Normal end - call finalizeCompetition directly
-      const { finalizeCompetition } = await import('../../../../../lib/actions/trading/competition-end.actions');
+      const { finalizeCompetition } = await import('../../../../../../../lib/actions/trading/competition-end.actions');
       const finalizeResult = await finalizeCompetition(competitionId.toString());
 
       // Check results
@@ -732,7 +732,7 @@ async function runRealChallengeTest(
   try {
     if (scenario.endType === 'early') {
       // Run early end check (test-specific version)
-      const { runEarlyEndCheckForTest } = await import('../../../../../worker/jobs/early-end-check.job');
+      const { runEarlyEndCheckForTest } = await import('../../../../../../../worker/jobs/early-end-check.job');
       const earlyEndResult = await runEarlyEndCheckForTest(testRunId);
 
       // Check results
@@ -786,7 +786,7 @@ async function runRealChallengeTest(
       };
     } else {
       // Normal end - call finalizeChallenge directly
-      const { finalizeChallenge } = await import('../../../../../lib/actions/trading/challenge-finalize.actions');
+      const { finalizeChallenge } = await import('../../../../../../../lib/actions/trading/challenge-finalize.actions');
       const finalizeResult = await finalizeChallenge(challengeId.toString());
 
       // Check results
