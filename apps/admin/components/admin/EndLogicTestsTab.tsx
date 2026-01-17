@@ -25,13 +25,14 @@ import { cn } from '@/lib/utils';
 // Test case definition
 interface TestCase {
   id: string;
-  category: 'competition-early' | 'competition-normal' | 'challenge-early' | 'challenge-normal';
+  category: 'competition-early' | 'competition-normal' | 'competition-prize' | 'competition-journey' | 'challenge-early' | 'challenge-normal' | 'challenge-prize';
   name: string;
   description: string;
   disqualifyOnLiquidation: boolean;
   scenario: string;
   expectedResult: string;
   status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+  isLegacy?: boolean; // For tests that cover legacy/locked scenarios
   result?: {
     success: boolean;
     message: string;
@@ -312,6 +313,71 @@ const TEST_CASES: TestCase[] = [
     scenario: 'A=Liquidated, B=Liquidated',
     expectedResult: 'Higher equity wins',
     status: 'pending',
+    isLegacy: true, // NOTE: In production, challenges always have disqualifyOnLiquidation=true
+  },
+
+  // ============ PRIZE DISTRIBUTION TESTS ============
+  {
+    id: 'C-P1',
+    category: 'competition-prize',
+    name: 'Winner Gets Prize',
+    description: 'Verify winner receives correct prize amount',
+    disqualifyOnLiquidation: true,
+    scenario: '3 active players, winner highest equity',
+    expectedResult: '$240 prize (pool $300 - 20% fee)',
+    status: 'pending',
+  },
+  {
+    id: 'C-P2',
+    category: 'competition-prize',
+    name: 'All Disqualified → Unclaimed',
+    description: 'Verify all disqualified = pool goes to platform',
+    disqualifyOnLiquidation: true,
+    scenario: 'All disqualified (no trades)',
+    expectedResult: '$160 to unclaimed pools',
+    status: 'pending',
+  },
+  {
+    id: 'CH-P1',
+    category: 'challenge-prize',
+    name: 'Challenge Winner Prize',
+    description: 'Verify challenge winner receives full prize',
+    disqualifyOnLiquidation: true,
+    scenario: 'Challenger wins with higher equity',
+    expectedResult: '$200 prize (full pool)',
+    status: 'pending',
+  },
+  {
+    id: 'CH-P2',
+    category: 'challenge-prize',
+    name: 'Both Disqualified → Unclaimed',
+    description: 'Verify both disqualified = pool goes to platform',
+    disqualifyOnLiquidation: true,
+    scenario: 'Both disqualified (no trades)',
+    expectedResult: '$200 to unclaimed pools',
+    status: 'pending',
+  },
+
+  // ============ FULL JOURNEY TESTS ============
+  {
+    id: 'C-J1',
+    category: 'competition-journey',
+    name: 'Liquidated Win Journey',
+    description: 'Verify: no early end → finalize → liquidated wins',
+    disqualifyOnLiquidation: false,
+    scenario: 'All liquidated, flag OFF',
+    expectedResult: 'Step 1: No early end → Step 2: Finalize → Higher equity wins $160',
+    status: 'pending',
+  },
+  {
+    id: 'C-J2',
+    category: 'competition-journey',
+    name: 'Liq vs Disq Journey',
+    description: 'Verify: liquidated beats disqualified after full journey',
+    disqualifyOnLiquidation: false,
+    scenario: 'One liquidated, one disqualified, flag OFF',
+    expectedResult: 'Step 1: No early end → Step 2: Finalize → Liquidated wins $160',
+    status: 'pending',
   },
 ];
 
@@ -319,8 +385,11 @@ const TEST_CASES: TestCase[] = [
 const CATEGORIES = [
   { id: 'competition-early', name: 'Competition Early End', icon: Trophy, color: 'text-yellow-400' },
   { id: 'competition-normal', name: 'Competition Normal End', icon: Trophy, color: 'text-blue-400' },
+  { id: 'competition-prize', name: 'Competition Prize Distribution', icon: DollarSign, color: 'text-emerald-400' },
+  { id: 'competition-journey', name: 'Competition Full Journey', icon: Clock, color: 'text-purple-400' },
   { id: 'challenge-early', name: 'Challenge Early End', icon: Swords, color: 'text-orange-400' },
   { id: 'challenge-normal', name: 'Challenge Normal End', icon: Swords, color: 'text-green-400' },
+  { id: 'challenge-prize', name: 'Challenge Prize Distribution', icon: DollarSign, color: 'text-cyan-400' },
 ];
 
 export default function EndLogicTestsTab() {

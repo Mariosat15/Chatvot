@@ -343,32 +343,24 @@ export default function ChallengeCreateDialog({
             </p>
           </div>
 
-          {/* Disqualify on Liquidation Toggle */}
-          <div className="flex items-center justify-between bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+          {/* Disqualify on Liquidation - LOCKED to ON for challenges */}
+          <div className="flex items-center justify-between bg-gray-800/50 rounded-lg p-3 border border-gray-700 opacity-75">
             <div className="flex-1">
-              <Label className="text-gray-300 flex items-center gap-2 cursor-pointer">
+              <Label className="text-gray-300 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-orange-400" />
                 Disqualify on Liquidation
+                <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded">LOCKED</span>
               </Label>
               <p className="text-xs text-gray-500 mt-1">
-                {formData.disqualifyOnLiquidation 
-                  ? 'If a player gets liquidated, they automatically lose' 
-                  : 'Liquidated players can still win based on final equity'}
+                If a player gets liquidated, they automatically lose (always enabled for 1v1 challenges)
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setFormData({ ...formData, disqualifyOnLiquidation: !formData.disqualifyOnLiquidation })}
-              className={`relative w-12 h-6 rounded-full transition-colors ${
-                formData.disqualifyOnLiquidation ? 'bg-orange-500' : 'bg-gray-600'
-              }`}
+            <div
+              className="relative w-12 h-6 rounded-full bg-orange-500 cursor-not-allowed"
+              title="This setting is locked for challenges"
             >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                  formData.disqualifyOnLiquidation ? 'translate-x-6' : 'translate-x-0'
-                }`}
-              />
-            </button>
+              <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full translate-x-6" />
+            </div>
           </div>
 
           {/* Prize Pool Summary */}

@@ -18,7 +18,7 @@ import { nanoid } from 'nanoid';
 // Test scenarios configuration
 const TEST_SCENARIOS: Record<string, {
   type: 'competition' | 'challenge';
-  endType: 'early' | 'normal';
+  endType: 'early' | 'normal' | 'journey'; // 'journey' = test early end (should NOT trigger) then finalize
   disqualifyOnLiquidation: boolean;
   participants: Array<{
     role: 'participant' | 'challenger' | 'challenged';
@@ -32,6 +32,11 @@ const TEST_SCENARIOS: Record<string, {
     winnerRole?: string;
     toUnclaimedPool: boolean;
     statusAfter: 'completed' | 'active';
+    // Prize distribution verification (optional)
+    expectedPrizePool?: number;
+    expectedPlatformFee?: number;
+    expectedWinnerPrize?: number;
+    expectedUnclaimedAmount?: number;
   };
 }> = {
   // ============ COMPETITION EARLY END TESTS ============
@@ -298,12 +303,138 @@ const TEST_SCENARIOS: Record<string, {
   'CH-N5': {
     type: 'challenge',
     endType: 'normal',
-    disqualifyOnLiquidation: false,
+    disqualifyOnLiquidation: false, // NOTE: In production this is always true, but kept for legacy test coverage
     participants: [
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'challenged', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
     expected: { shouldEndEarly: false, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
+  },
+
+  // ============ PRIZE DISTRIBUTION TESTS ============
+  // These verify correct prize amounts, platform fees, and wallet updates
+  
+  'C-P1': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 5 }, // Winner - highest equity
+      { role: 'participant', status: 'active', equity: 5500, totalTrades: 3 }, // 2nd place
+      { role: 'participant', status: 'active', equity: 4000, totalTrades: 4 }, // 3rd place
+    ],
+    // 3 participants × 100 entry = 300 prize pool
+    // 20% platform fee = 60, winner gets 240
+    expected: { 
+      shouldEndEarly: false, 
+      winnerId: 0, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      // Prize verification
+      expectedPrizePool: 300,
+      expectedPlatformFee: 60,
+      expectedWinnerPrize: 240,
+    },
+  },
+  
+  'C-P2': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      { role: 'participant', status: 'disqualified', equity: 8000, totalTrades: 0 }, // Disqualified (no trades)
+      { role: 'participant', status: 'disqualified', equity: 6000, totalTrades: 0 }, // Disqualified (no trades)
+    ],
+    // All disqualified - entire pool goes to platform (unclaimed)
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: true, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedUnclaimedAmount: 160,
+    },
+  },
+  
+  'CH-P1': {
+    type: 'challenge',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      { role: 'challenger', status: 'active', equity: 6500, totalTrades: 5 }, // Winner
+      { role: 'challenged', status: 'active', equity: 5000, totalTrades: 3 },
+    ],
+    // 2 × 100 = 200 prize pool, winner takes all (no platform fee on challenges in this test)
+    expected: { 
+      shouldEndEarly: false, 
+      winnerRole: 'challenger', 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedWinnerPrize: 200,
+    },
+  },
+  
+  'CH-P2': {
+    type: 'challenge',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      { role: 'challenger', status: 'disqualified', equity: 5000, totalTrades: 0 },
+      { role: 'challenged', status: 'disqualified', equity: 4000, totalTrades: 0 },
+    ],
+    // Both disqualified - pool goes to platform
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: true, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedUnclaimedAmount: 200,
+    },
+  },
+
+  // ============ FULL JOURNEY TESTS ============
+  // These test scenarios that DON'T end early, then manually finalize to verify distribution
+  
+  'C-J1': {
+    type: 'competition',
+    endType: 'journey', // Special: first checks early end (should NOT trigger), then finalizes
+    disqualifyOnLiquidation: false,
+    participants: [
+      { role: 'participant', status: 'liquidated', equity: 6000, totalTrades: 5 }, // Winner (higher equity despite liquidation)
+      { role: 'participant', status: 'liquidated', equity: 4000, totalTrades: 3 },
+    ],
+    // Flag OFF: liquidated players are still eligible, ranked by equity
+    expected: { 
+      shouldEndEarly: false, // First check: should NOT end early
+      winnerId: 0, // After finalization: participant 0 wins
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedWinnerPrize: 160,
+    },
+  },
+  
+  'C-J2': {
+    type: 'competition',
+    endType: 'journey',
+    disqualifyOnLiquidation: false,
+    participants: [
+      { role: 'participant', status: 'liquidated', equity: 5000, totalTrades: 5 },
+      { role: 'participant', status: 'disqualified', equity: 7000, totalTrades: 0 }, // Disqualified (no trades) - even higher equity but out
+    ],
+    // Flag OFF: liquidated can still win, disqualified cannot
+    // Only participant 0 is eligible
+    expected: { 
+      shouldEndEarly: false, // Should NOT end early (liquidated player can still win)
+      winnerId: 0, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedWinnerPrize: 160,
+    },
   },
 };
 
@@ -544,6 +675,121 @@ async function runRealCompetitionTest(
           winnerFound,
         },
       };
+    } else if (scenario.endType === 'journey') {
+      // JOURNEY TEST: First verify early end does NOT trigger, then finalize and verify distribution
+      const { runEarlyEndCheckForTest } = await import('../../../../../../../worker/jobs/early-end-check.job');
+      const { finalizeCompetition } = await import('../../../../../../../lib/actions/trading/competition-end.actions');
+      
+      console.log(`\n🧪 [JOURNEY TEST] Step 1: Checking early end does NOT trigger for ${competitionId}`);
+      
+      // Step 1: Run early end check - should NOT end early
+      const earlyEndResult = await runEarlyEndCheckForTest(testRunId);
+      
+      // Verify competition is still active
+      let compAfterEarlyCheck = await competitionsCollection.findOne({ _id: competitionId });
+      if (compAfterEarlyCheck?.status === 'completed') {
+        actualResult = {
+          passed: false,
+          message: '❌ Test FAILED: Competition ended early when it should have continued',
+          actualOutcome: 'Competition ended early unexpectedly',
+          details: { earlyEndResult, status: compAfterEarlyCheck.status },
+        };
+      } else {
+        console.log(`🧪 [JOURNEY TEST] Step 1 PASSED: Competition still active`);
+        
+        // Step 2: Now set end time to past and finalize
+        await competitionsCollection.updateOne(
+          { _id: competitionId },
+          { $set: { endTime: new Date(Date.now() - 1000) } }
+        );
+        
+        console.log(`🧪 [JOURNEY TEST] Step 2: Running finalizeCompetition`);
+        const finalizeResult = await finalizeCompetition(competitionId.toString());
+        console.log(`🧪 [TEST] finalizeCompetition result:`, JSON.stringify(finalizeResult, null, 2));
+
+        // Check results
+        const updatedComp = await competitionsCollection.findOne({ _id: competitionId });
+        const actualStatus = updatedComp?.status || 'active';
+        
+        // Check wallets for prize distribution
+        let winnerFound = false;
+        let winnerUserId = '';
+        let winnerIndex = -1;
+        let winnerBalance = 0;
+        for (let i = 0; i < participantUserIds.length; i++) {
+          const wallet = await walletsCollection.findOne({ userId: participantUserIds[i].toString() });
+          console.log(`🧪 [TEST] Wallet for user ${i}:`, wallet?.creditBalance);
+          if (wallet && wallet.creditBalance > 0) {
+            winnerFound = true;
+            winnerUserId = participantUserIds[i].toString();
+            winnerIndex = i;
+            winnerBalance = wallet.creditBalance;
+            break;
+          }
+        }
+        
+        // Check platform transactions
+        const platformFeeTransaction = await platformTransactionsCollection.findOne({
+          sourceId: competitionId.toString(),
+          transactionType: 'competition_fee',
+        });
+        const unclaimedTransaction = await platformTransactionsCollection.findOne({
+          sourceId: competitionId.toString(),
+          transactionType: 'unclaimed_pool',
+        });
+
+        let passed = true;
+        const issues: string[] = [];
+
+        if (actualStatus !== 'completed') {
+          passed = false;
+          issues.push(`Status: expected 'completed', got '${actualStatus}'`);
+        }
+
+        if (scenario.expected.winnerId !== undefined && winnerIndex !== scenario.expected.winnerId) {
+          passed = false;
+          issues.push(`Winner: expected participant ${scenario.expected.winnerId}, got ${winnerIndex}`);
+        }
+        
+        // Verify prize amounts if specified
+        if (scenario.expected.expectedWinnerPrize !== undefined && winnerFound) {
+          const expectedPrize = scenario.expected.expectedWinnerPrize;
+          if (Math.abs(winnerBalance - expectedPrize) > 1) { // Allow $1 tolerance
+            passed = false;
+            issues.push(`Winner prize: expected $${expectedPrize}, got $${winnerBalance}`);
+          }
+        }
+        
+        if (scenario.expected.expectedPlatformFee !== undefined && platformFeeTransaction) {
+          const actualFee = platformFeeTransaction.amount || 0;
+          const expectedFee = scenario.expected.expectedPlatformFee;
+          if (Math.abs(actualFee - expectedFee) > 1) {
+            passed = false;
+            issues.push(`Platform fee: expected $${expectedFee}, got $${actualFee}`);
+          }
+        }
+
+        actualResult = {
+          passed,
+          message: passed ? '✅ Test PASSED - Journey test completed correctly' : `❌ Test FAILED: ${issues.join(', ')}`,
+          actualOutcome: `Journey: Early check ✓ → Finalize → Status: ${actualStatus}, Winner: participant ${winnerIndex}, Prize: $${winnerBalance}`,
+          prizeDistribution: winnerFound 
+            ? { winnerId: winnerUserId, winnerPrize: winnerBalance }
+            : unclaimedTransaction
+              ? { unclaimedPool: unclaimedTransaction.amount }
+              : undefined,
+          details: {
+            journeySteps: ['Early end check (should NOT trigger)', 'Manual finalization', 'Prize distribution'],
+            earlyEndResult,
+            finalizeResult,
+            competitionStatus: actualStatus,
+            winnerIndex,
+            winnerBalance,
+            platformFee: platformFeeTransaction?.amount,
+            unclaimedAmount: unclaimedTransaction?.amount,
+          },
+        };
+      }
     } else {
       // Normal end - call finalizeCompetition directly
       const { finalizeCompetition } = await import('../../../../../../../lib/actions/trading/competition-end.actions');
@@ -570,6 +816,7 @@ async function runRealCompetitionTest(
       let winnerFound = false;
       let winnerUserId = '';
       let winnerIndex = -1;
+      let winnerBalance = 0;
       for (let i = 0; i < participantUserIds.length; i++) {
         const wallet = await walletsCollection.findOne({ userId: participantUserIds[i].toString() });
         console.log(`🧪 [TEST] Wallet for user ${i}:`, wallet?.creditBalance);
@@ -577,9 +824,20 @@ async function runRealCompetitionTest(
           winnerFound = true;
           winnerUserId = participantUserIds[i].toString();
           winnerIndex = i;
+          winnerBalance = wallet.creditBalance;
           break;
         }
       }
+      
+      // Check platform transactions for prize verification
+      const platformFeeTransaction = await platformTransactionsCollection.findOne({
+        sourceId: competitionId.toString(),
+        transactionType: 'competition_fee',
+      });
+      const unclaimedTransaction = await platformTransactionsCollection.findOne({
+        sourceId: competitionId.toString(),
+        transactionType: 'unclaimed_pool',
+      });
 
       let passed = true;
       const issues: string[] = [];
@@ -593,20 +851,43 @@ async function runRealCompetitionTest(
         passed = false;
         issues.push(`Winner: expected participant ${scenario.expected.winnerId}, got ${winnerIndex}`);
       }
+      
+      // Verify prize amounts if specified
+      if (scenario.expected.expectedWinnerPrize !== undefined && winnerFound) {
+        const expectedPrize = scenario.expected.expectedWinnerPrize;
+        if (Math.abs(winnerBalance - expectedPrize) > 1) { // Allow $1 tolerance
+          passed = false;
+          issues.push(`Winner prize: expected $${expectedPrize}, got $${winnerBalance}`);
+        }
+      }
+      
+      if (scenario.expected.expectedUnclaimedAmount !== undefined && scenario.expected.toUnclaimedPool) {
+        const actualUnclaimed = unclaimedTransaction?.amount || 0;
+        const expectedUnclaimed = scenario.expected.expectedUnclaimedAmount;
+        if (Math.abs(actualUnclaimed - expectedUnclaimed) > 1) {
+          passed = false;
+          issues.push(`Unclaimed pool: expected $${expectedUnclaimed}, got $${actualUnclaimed}`);
+        }
+      }
 
       actualResult = {
         passed,
         message: passed ? '✅ Test PASSED - Real finalization executed correctly' : `❌ Test FAILED: ${issues.join(', ')}`,
-        actualOutcome: `Status: ${actualStatus}, Winner: participant ${winnerIndex} (${winnerFound ? winnerUserId.slice(-6) : 'none'})`,
+        actualOutcome: `Status: ${actualStatus}, Winner: participant ${winnerIndex} (${winnerFound ? winnerUserId.slice(-6) : 'none'}), Prize: $${winnerBalance}`,
         prizeDistribution: winnerFound 
-          ? { winnerId: winnerUserId, winnerPrize: prizePool * 0.8 }
-          : undefined,
+          ? { winnerId: winnerUserId, winnerPrize: winnerBalance }
+          : unclaimedTransaction
+            ? { unclaimedPool: unclaimedTransaction.amount }
+            : undefined,
         details: {
           finalizeResult,
           finalizeSuccess: finalizeResult?.success,
           finalizeMessage: finalizeResult?.message,
           competitionStatus: actualStatus,
           winnerIndex,
+          winnerBalance,
+          platformFee: platformFeeTransaction?.amount,
+          unclaimedAmount: unclaimedTransaction?.amount,
           participantsCount: finalParticipants.length,
         },
       };
