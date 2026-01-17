@@ -445,6 +445,7 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
               winnersCount: 0,
               expectedWinnersCount: competition.prizeDistribution?.length || 1,
               description: `All participants disqualified - pool goes to platform`,
+              testRunId, // Mark for cleanup
               createdAt: now,
               updatedAt: now,
             });
@@ -576,6 +577,7 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
               winnersCount: 0,
               expectedWinnersCount: 1,
               description: `Both players disqualified - pool goes to platform`,
+              testRunId, // Mark for cleanup
               createdAt: now,
               updatedAt: now,
             });
