@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
                                    collection === 'challenge' ? 'challenges' :
                                    collection === 'participant' ? 'competitionparticipants' :
                                    collection === 'challengeparticipant' ? 'challengeparticipants' :
+                                   collection === 'wallet' ? 'creditwallets' :
                                    collection;
             
             const result = await db.collection(collectionName).deleteOne({
@@ -42,31 +43,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Also cleanup any test data with isTest flag
-    const collections = ['competitions', 'challenges', 'competitionparticipants', 'challengeparticipants'];
+    // Cleanup by testRunId prefix (TEST_)
+    const collections = [
+      'competitions', 
+      'challenges', 
+      'competitionparticipants', 
+      'challengeparticipants',
+      'creditwallets',
+      'platformtransactions',
+    ];
     
     for (const collectionName of collections) {
       try {
-        const result = await db.collection(collectionName).deleteMany({ isTest: true });
-        deletedCount += result.deletedCount;
-      } catch (e) {
-        console.warn(`Failed to cleanup ${collectionName}:`, e);
-      }
-    }
+        // Delete by testRunId field
+        const result1 = await db.collection(collectionName).deleteMany({ 
+          testRunId: { $regex: /^TEST_/ } 
+        });
+        deletedCount += result1.deletedCount;
 
-    // Also cleanup any documents with TEST_ prefix in name/slug
-    for (const collectionName of collections) {
-      try {
-        const result = await db.collection(collectionName).deleteMany({
+        // Also cleanup by isTest flag
+        const result2 = await db.collection(collectionName).deleteMany({ isTest: true });
+        deletedCount += result2.deletedCount;
+
+        // Also cleanup by name/slug prefix
+        const result3 = await db.collection(collectionName).deleteMany({
           $or: [
             { name: { $regex: /^TEST_/ } },
-            { slug: { $regex: /^test-test_/ } },
+            { slug: { $regex: /^test-test_/i } },
             { username: { $regex: /^TEST_/ } },
           ]
         });
-        deletedCount += result.deletedCount;
+        deletedCount += result3.deletedCount;
       } catch (e) {
-        console.warn(`Failed to cleanup ${collectionName} by name:`, e);
+        console.warn(`Failed to cleanup ${collectionName}:`, e);
       }
     }
 

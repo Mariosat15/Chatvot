@@ -4,10 +4,15 @@ import mongoose from 'mongoose';
 import { nanoid } from 'nanoid';
 
 /**
- * End Logic Tests API
+ * End Logic Tests API - REAL TESTS
  * 
- * Creates test competitions/challenges with specific participant states
- * and verifies the end logic works correctly.
+ * Creates test competitions/challenges and runs the ACTUAL production code
+ * to verify end logic works correctly.
+ * 
+ * Tests call:
+ * - runEarlyEndCheck() for early end scenarios
+ * - finalizeCompetition() for normal competition end
+ * - finalizeChallenge() for normal challenge end
  */
 
 // Test scenarios configuration
@@ -23,11 +28,13 @@ const TEST_SCENARIOS: Record<string, {
   }>;
   expected: {
     shouldEndEarly: boolean;
+    winnerId?: number; // Index of winner in participants array (0, 1, 2...)
     winnerRole?: string;
     toUnclaimedPool: boolean;
+    statusAfter: 'completed' | 'active';
   };
 }> = {
-  // Competition Early End Tests
+  // ============ COMPETITION EARLY END TESTS ============
   'C-E1': {
     type: 'competition',
     endType: 'early',
@@ -37,7 +44,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'liquidated', equity: 3000, totalTrades: 3 },
       { role: 'participant', status: 'liquidated', equity: 4000, totalTrades: 4 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'highest-equity', toUnclaimedPool: false },
+    expected: { shouldEndEarly: true, winnerId: 0, toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'C-E2': {
     type: 'competition',
@@ -47,7 +54,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'disqualified', equity: 5000, totalTrades: 0 },
       { role: 'participant', status: 'disqualified', equity: 3000, totalTrades: 0 },
     ],
-    expected: { shouldEndEarly: true, toUnclaimedPool: true },
+    expected: { shouldEndEarly: true, toUnclaimedPool: true, statusAfter: 'completed' },
   },
   'C-E3': {
     type: 'competition',
@@ -57,7 +64,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'participant', status: 'disqualified', equity: 3000, totalTrades: 0 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'liquidated-only', toUnclaimedPool: false },
+    expected: { shouldEndEarly: true, winnerId: 0, toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'C-E4': {
     type: 'competition',
@@ -67,7 +74,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'participant', status: 'liquidated', equity: 3000, totalTrades: 3 },
     ],
-    expected: { shouldEndEarly: false, toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, toUnclaimedPool: false, statusAfter: 'active' },
   },
   'C-E5': {
     type: 'competition',
@@ -77,7 +84,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'disqualified', equity: 5000, totalTrades: 0 },
       { role: 'participant', status: 'disqualified', equity: 3000, totalTrades: 0 },
     ],
-    expected: { shouldEndEarly: true, toUnclaimedPool: true },
+    expected: { shouldEndEarly: true, toUnclaimedPool: true, statusAfter: 'completed' },
   },
   'C-E6': {
     type: 'competition',
@@ -87,10 +94,10 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'participant', status: 'disqualified', equity: 3000, totalTrades: 0 },
     ],
-    expected: { shouldEndEarly: false, toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, toUnclaimedPool: false, statusAfter: 'active' },
   },
 
-  // Competition Normal End Tests
+  // ============ COMPETITION NORMAL END TESTS ============
   'C-N1': {
     type: 'competition',
     endType: 'normal',
@@ -99,7 +106,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
       { role: 'participant', status: 'liquidated', equity: 3000, totalTrades: 3 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'active-only', toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, winnerId: 0, toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'C-N2': {
     type: 'competition',
@@ -109,7 +116,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
       { role: 'participant', status: 'disqualified', equity: 8000, totalTrades: 0 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'active-only', toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, winnerId: 0, toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'C-N3': {
     type: 'competition',
@@ -119,7 +126,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'active', equity: 4000, totalTrades: 5 },
       { role: 'participant', status: 'liquidated', equity: 6000, totalTrades: 3 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'highest-equity-all', toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, winnerId: 1, toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'C-N4': {
     type: 'competition',
@@ -129,10 +136,10 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'participant', status: 'liquidated', equity: 3000, totalTrades: 3 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'highest-equity-all', toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, winnerId: 0, toUnclaimedPool: false, statusAfter: 'completed' },
   },
 
-  // Challenge Early End Tests
+  // ============ CHALLENGE EARLY END TESTS ============
   'CH-E1': {
     type: 'challenge',
     endType: 'early',
@@ -141,7 +148,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'liquidated', equity: 3000, totalTrades: 5 },
       { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'opponent', toUnclaimedPool: false },
+    expected: { shouldEndEarly: true, winnerRole: 'opponent', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-E2': {
     type: 'challenge',
@@ -151,7 +158,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'active', equity: 6000, totalTrades: 5 },
       { role: 'opponent', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false },
+    expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-E3': {
     type: 'challenge',
@@ -161,7 +168,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'opponent', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false }, // Higher equity
+    expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-E4': {
     type: 'challenge',
@@ -171,7 +178,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'disqualified', equity: 5000, totalTrades: 0 },
       { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'opponent', toUnclaimedPool: false },
+    expected: { shouldEndEarly: true, winnerRole: 'opponent', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-E5': {
     type: 'challenge',
@@ -181,7 +188,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'disqualified', equity: 5000, totalTrades: 0 },
       { role: 'opponent', status: 'disqualified', equity: 6000, totalTrades: 0 },
     ],
-    expected: { shouldEndEarly: true, toUnclaimedPool: true },
+    expected: { shouldEndEarly: true, toUnclaimedPool: true, statusAfter: 'completed' },
   },
   'CH-E6': {
     type: 'challenge',
@@ -191,7 +198,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'opponent', status: 'disqualified', equity: 6000, totalTrades: 0 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false },
+    expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-E7': {
     type: 'challenge',
@@ -201,7 +208,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'liquidated', equity: 3000, totalTrades: 5 },
       { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: false, toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, toUnclaimedPool: false, statusAfter: 'active' },
   },
   'CH-E8': {
     type: 'challenge',
@@ -211,7 +218,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'opponent', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: false, toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, toUnclaimedPool: false, statusAfter: 'active' },
   },
   'CH-E9': {
     type: 'challenge',
@@ -221,7 +228,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'disqualified', equity: 5000, totalTrades: 0 },
       { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'opponent', toUnclaimedPool: false },
+    expected: { shouldEndEarly: true, winnerRole: 'opponent', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-E10': {
     type: 'challenge',
@@ -231,7 +238,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'disqualified', equity: 5000, totalTrades: 0 },
       { role: 'opponent', status: 'disqualified', equity: 6000, totalTrades: 0 },
     ],
-    expected: { shouldEndEarly: true, toUnclaimedPool: true },
+    expected: { shouldEndEarly: true, toUnclaimedPool: true, statusAfter: 'completed' },
   },
   'CH-E11': {
     type: 'challenge',
@@ -241,10 +248,10 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'opponent', status: 'disqualified', equity: 6000, totalTrades: 0 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false },
+    expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
 
-  // Challenge Normal End Tests
+  // ============ CHALLENGE NORMAL END TESTS ============
   'CH-N1': {
     type: 'challenge',
     endType: 'normal',
@@ -253,7 +260,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'active', equity: 5000, totalTrades: 5 },
       { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'opponent', toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, winnerRole: 'opponent', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-N2': {
     type: 'challenge',
@@ -263,7 +270,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'liquidated', equity: 3000, totalTrades: 5 },
       { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'opponent', toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, winnerRole: 'opponent', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-N3': {
     type: 'challenge',
@@ -273,7 +280,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'opponent', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'challenger', toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-N4': {
     type: 'challenge',
@@ -283,7 +290,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'liquidated', equity: 3000, totalTrades: 5 },
       { role: 'opponent', status: 'active', equity: 2000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'challenger', toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-N5': {
     type: 'challenge',
@@ -293,7 +300,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'opponent', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'challenger', toUnclaimedPool: false },
+    expected: { shouldEndEarly: false, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
 };
 
@@ -313,14 +320,14 @@ export async function POST(request: NextRequest) {
 
     const scenario = TEST_SCENARIOS[testId];
     const testDataIds: string[] = [];
-    const testPrefix = `TEST_${testId}_${nanoid(6)}`;
+    const testRunId = `TEST_${testId}_${nanoid(6)}`;
 
-    // Create test data based on scenario type
+    // Create test data and run ACTUAL production code
     if (scenario.type === 'competition') {
-      const result = await runCompetitionTest(db, testPrefix, scenario, testDataIds);
+      const result = await runRealCompetitionTest(db, testRunId, scenario, testDataIds);
       return NextResponse.json({ success: true, result, testDataIds });
     } else {
-      const result = await runChallengeTest(db, testPrefix, scenario, testDataIds);
+      const result = await runRealChallengeTest(db, testRunId, scenario, testDataIds);
       return NextResponse.json({ success: true, result, testDataIds });
     }
   } catch (error) {
@@ -332,39 +339,45 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function runCompetitionTest(
+/**
+ * Run REAL competition test using actual production code
+ */
+async function runRealCompetitionTest(
   db: mongoose.mongo.Db,
-  testPrefix: string,
+  testRunId: string,
   scenario: typeof TEST_SCENARIOS[keyof typeof TEST_SCENARIOS],
   testDataIds: string[]
 ) {
   const competitionsCollection = db.collection('competitions');
   const participantsCollection = db.collection('competitionparticipants');
+  const platformTransactionsCollection = db.collection('platformtransactions');
+  const walletsCollection = db.collection('creditwallets');
 
   const now = new Date();
-  const prizePool = 300; // Test prize pool
+  const prizePool = 300;
   const entryFee = 100;
   const startingCapital = 10000;
   
-  // Set end time based on test type
+  // For early end tests: end time is in the future (1 hour)
+  // For normal end tests: end time is in the past
   const endTime = scenario.endType === 'early' 
-    ? new Date(now.getTime() + 60 * 60 * 1000) // 1 hour from now (still time remaining)
-    : new Date(now.getTime() - 1000); // Already ended
+    ? new Date(now.getTime() + 60 * 60 * 1000)
+    : new Date(now.getTime() - 1000);
 
-  // Create test competition with ALL required fields
+  // Create test competition - NO isTest flag so real code processes it
   const competitionId = new mongoose.Types.ObjectId();
   const testAdminId = new mongoose.Types.ObjectId();
   testDataIds.push(`competition:${competitionId}`);
 
   await competitionsCollection.insertOne({
     _id: competitionId,
-    name: `${testPrefix}_Competition`,
-    slug: `test-${testPrefix.toLowerCase()}`,
-    description: 'Test competition for end logic verification',
+    name: `${testRunId}_Competition`,
+    slug: `test-${testRunId.toLowerCase()}`,
+    description: 'Real test competition for end logic verification',
     status: 'active',
-    startTime: new Date(now.getTime() - 60 * 60 * 1000),
+    startTime: new Date(now.getTime() - 2 * 60 * 60 * 1000),
     endTime,
-    registrationDeadline: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hours ago
+    registrationDeadline: new Date(now.getTime() - 3 * 60 * 60 * 1000),
     entryFee,
     startingCapital,
     prizePool,
@@ -383,38 +396,60 @@ async function runCompetitionTest(
     assetClasses: ['forex'],
     allowedSymbols: [],
     blockedSymbols: [],
+    testRunId, // Mark for cleanup
     createdAt: now,
     updatedAt: now,
-    isTest: true,
   });
 
-  // Create participants
+  // Create test participants and wallets
+  const participantUserIds: mongoose.Types.ObjectId[] = [];
+  
   for (let i = 0; i < scenario.participants.length; i++) {
     const p = scenario.participants[i];
     const participantId = new mongoose.Types.ObjectId();
-    const testUserId = new mongoose.Types.ObjectId();
+    const userId = new mongoose.Types.ObjectId();
+    participantUserIds.push(userId);
     testDataIds.push(`participant:${participantId}`);
+    testDataIds.push(`wallet:${userId}`);
+
+    // Create wallet for this test user
+    await walletsCollection.insertOne({
+      _id: new mongoose.Types.ObjectId(),
+      userId,
+      creditBalance: 0,
+      totalDeposited: 0,
+      totalWithdrawn: 0,
+      testRunId,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     await participantsCollection.insertOne({
       _id: participantId,
       competitionId,
-      userId: testUserId,
-      username: `${testPrefix}_User${i + 1}`,
+      oddsCompetitionId: competitionId, // Required field
+      oddsParticipantId: participantId,
+      oddsUserId: userId,
+      oddsUsername: `${testRunId}_User${i + 1}`,
+      userId,
+      username: `${testRunId}_User${i + 1}`,
       status: p.status,
       currentCapital: p.equity,
-      startingCapital: 10000,
-      pnl: p.equity - 10000,
+      startingCapital,
+      pnl: p.equity - startingCapital,
+      pnlPercentage: ((p.equity - startingCapital) / startingCapital) * 100,
       totalTrades: p.totalTrades,
       winningTrades: Math.floor(p.totalTrades * 0.6),
       losingTrades: Math.floor(p.totalTrades * 0.4),
+      winRate: p.totalTrades > 0 ? 60 : 0,
       enteredAt: now,
+      testRunId,
       createdAt: now,
       updatedAt: now,
-      isTest: true,
     });
   }
 
-  // Run the appropriate logic based on endType
+  // Now run the ACTUAL production code
   let actualResult: {
     passed: boolean;
     message: string;
@@ -424,278 +459,382 @@ async function runCompetitionTest(
       winnerPrize?: number;
       unclaimedPool?: number;
     };
+    details?: Record<string, unknown>;
   };
 
-  if (scenario.endType === 'early') {
-    // Simulate early end check logic
-    const participants = await participantsCollection.find({ competitionId }).toArray();
-    const activeCount = participants.filter(p => p.status === 'active').length;
-    const liquidatedCount = participants.filter(p => p.status === 'liquidated').length;
-    const disqualifiedCount = participants.filter(p => p.status === 'disqualified').length;
-
-    let shouldEndEarly = false;
-    let toUnclaimedPool = false;
-
-    if (scenario.disqualifyOnLiquidation) {
-      // If flag is ON, liquidated = out
-      if (activeCount === 0) {
-        shouldEndEarly = true;
-        toUnclaimedPool = disqualifiedCount === participants.length;
+  try {
+    if (scenario.endType === 'early') {
+      // Import and run the ACTUAL early end check (test-specific version)
+      const { runEarlyEndCheckForTest } = await import('../../../../../worker/jobs/early-end-check.job');
+      
+      // Run early end check for THIS test run only
+      const earlyEndResult = await runEarlyEndCheckForTest(testRunId);
+      
+      // Check results in database
+      const updatedComp = await competitionsCollection.findOne({ _id: competitionId });
+      const unclaimedTxn = await platformTransactionsCollection.findOne({
+        sourceId: competitionId.toString(),
+        transactionType: 'unclaimed_pool',
+        testRunId: { $exists: false }, // Real transactions don't have testRunId
+      });
+      
+      // Also check if any prize was distributed (check wallets)
+      let winnerFound = false;
+      let winnerUserId = '';
+      for (const userId of participantUserIds) {
+        const wallet = await walletsCollection.findOne({ userId });
+        if (wallet && wallet.creditBalance > 0) {
+          winnerFound = true;
+          winnerUserId = userId.toString();
+          break;
+        }
       }
+
+      const actualStatus = updatedComp?.status || 'active';
+      const expectedStatus = scenario.expected.statusAfter;
+      const hadUnclaimed = !!unclaimedTxn || updatedComp?.noWinners === true;
+      
+      // Determine if test passed
+      let passed = true;
+      const issues: string[] = [];
+
+      if (actualStatus !== expectedStatus) {
+        passed = false;
+        issues.push(`Status: expected '${expectedStatus}', got '${actualStatus}'`);
+      }
+
+      if (scenario.expected.toUnclaimedPool && !hadUnclaimed) {
+        passed = false;
+        issues.push('Expected unclaimed pool but none recorded');
+      }
+
+      if (!scenario.expected.toUnclaimedPool && scenario.expected.winnerId !== undefined) {
+        if (!winnerFound) {
+          passed = false;
+          issues.push('Expected winner but no prize distributed');
+        }
+      }
+
+      actualResult = {
+        passed,
+        message: passed ? '✅ Test PASSED - Real code executed correctly' : `❌ Test FAILED: ${issues.join(', ')}`,
+        actualOutcome: `Status: ${actualStatus}, Winner: ${winnerFound ? winnerUserId.slice(-6) : 'none'}, Unclaimed: ${hadUnclaimed}`,
+        prizeDistribution: hadUnclaimed 
+          ? { unclaimedPool: prizePool }
+          : winnerFound 
+            ? { winnerId: winnerUserId, winnerPrize: prizePool * 0.8 }
+            : undefined,
+        details: {
+          earlyEndResult,
+          competitionStatus: actualStatus,
+          hadUnclaimed,
+          winnerFound,
+        },
+      };
     } else {
-      // If flag is OFF, only disqualified are out
-      if (activeCount === 0 && liquidatedCount === 0) {
-        shouldEndEarly = true;
-        toUnclaimedPool = true;
-      } else if (activeCount === 0 && disqualifiedCount === participants.length) {
-        shouldEndEarly = true;
-        toUnclaimedPool = true;
+      // Normal end - call finalizeCompetition directly
+      const { finalizeCompetition } = await import('../../../../../lib/actions/trading/competition-end.actions');
+      const finalizeResult = await finalizeCompetition(competitionId.toString());
+
+      // Check results
+      const updatedComp = await competitionsCollection.findOne({ _id: competitionId });
+      const actualStatus = updatedComp?.status || 'active';
+      
+      // Check wallets for prize distribution
+      let winnerFound = false;
+      let winnerUserId = '';
+      let winnerIndex = -1;
+      for (let i = 0; i < participantUserIds.length; i++) {
+        const wallet = await walletsCollection.findOne({ userId: participantUserIds[i] });
+        if (wallet && wallet.creditBalance > 0) {
+          winnerFound = true;
+          winnerUserId = participantUserIds[i].toString();
+          winnerIndex = i;
+          break;
+        }
       }
+
+      let passed = true;
+      const issues: string[] = [];
+
+      if (actualStatus !== 'completed') {
+        passed = false;
+        issues.push(`Status: expected 'completed', got '${actualStatus}'`);
+      }
+
+      if (scenario.expected.winnerId !== undefined && winnerIndex !== scenario.expected.winnerId) {
+        passed = false;
+        issues.push(`Winner: expected participant ${scenario.expected.winnerId}, got ${winnerIndex}`);
+      }
+
+      actualResult = {
+        passed,
+        message: passed ? '✅ Test PASSED - Real finalization executed correctly' : `❌ Test FAILED: ${issues.join(', ')}`,
+        actualOutcome: `Status: ${actualStatus}, Winner: participant ${winnerIndex} (${winnerFound ? winnerUserId.slice(-6) : 'none'})`,
+        prizeDistribution: winnerFound 
+          ? { winnerId: winnerUserId, winnerPrize: prizePool * 0.8 }
+          : undefined,
+        details: {
+          finalizeResult,
+          competitionStatus: actualStatus,
+          winnerIndex,
+        },
+      };
     }
-
-    const passed = shouldEndEarly === scenario.expected.shouldEndEarly && 
-                   toUnclaimedPool === scenario.expected.toUnclaimedPool;
-
+  } catch (error) {
     actualResult = {
-      passed,
-      message: passed ? 'Test passed' : 'Test failed - unexpected outcome',
-      actualOutcome: `shouldEndEarly=${shouldEndEarly}, toUnclaimedPool=${toUnclaimedPool}`,
-      prizeDistribution: toUnclaimedPool ? { unclaimedPool: prizePool } : undefined,
-    };
-  } else {
-    // Simulate normal end logic
-    const participants = await participantsCollection.find({ competitionId }).toArray();
-    
-    // Filter eligible participants based on disqualifyOnLiquidation flag
-    const eligible = participants.filter(p => {
-      if (p.status === 'disqualified') return false;
-      if (scenario.disqualifyOnLiquidation && p.status === 'liquidated') return false;
-      return true;
-    });
-
-    // Rank by equity
-    eligible.sort((a, b) => b.currentCapital - a.currentCapital);
-    
-    const winner = eligible[0];
-    const hasWinner = !!winner;
-    const toUnclaimedPool = !hasWinner;
-
-    const passed = toUnclaimedPool === scenario.expected.toUnclaimedPool;
-
-    actualResult = {
-      passed,
-      message: passed ? 'Test passed' : 'Test failed - unexpected outcome',
-      actualOutcome: hasWinner 
-        ? `Winner: ${winner.username} with $${winner.currentCapital}` 
-        : 'No winner - prize to unclaimed pools',
-      prizeDistribution: hasWinner 
-        ? { winnerId: winner.userId.toString(), winnerPrize: prizePool }
-        : { unclaimedPool: prizePool },
+      passed: false,
+      message: `❌ Test ERROR: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      details: { error: error instanceof Error ? error.stack : String(error) },
     };
   }
 
   return actualResult;
 }
 
-async function runChallengeTest(
+/**
+ * Run REAL challenge test using actual production code
+ */
+async function runRealChallengeTest(
   db: mongoose.mongo.Db,
-  testPrefix: string,
+  testRunId: string,
   scenario: typeof TEST_SCENARIOS[keyof typeof TEST_SCENARIOS],
   testDataIds: string[]
 ) {
   const challengesCollection = db.collection('challenges');
   const participantsCollection = db.collection('challengeparticipants');
+  const walletsCollection = db.collection('creditwallets');
 
   const now = new Date();
   const entryFee = 100;
   const prizePool = entryFee * 2;
+  const winnerPrize = prizePool; // No platform fee for simplicity
 
-  // Set end time based on test type
+  // For early end tests: end time is in the future
+  // For normal end tests: end time is in the past
   const endTime = scenario.endType === 'early' 
-    ? new Date(now.getTime() + 60 * 60 * 1000) // 1 hour from now
-    : new Date(now.getTime() - 1000); // Already ended
+    ? new Date(now.getTime() + 60 * 60 * 1000)
+    : new Date(now.getTime() - 1000);
 
-  // Create test challenge
+  // Create test challenge - NO isTest flag
   const challengeId = new mongoose.Types.ObjectId();
   const challengerUserId = new mongoose.Types.ObjectId();
   const opponentUserId = new mongoose.Types.ObjectId();
   testDataIds.push(`challenge:${challengeId}`);
+  testDataIds.push(`wallet:${challengerUserId}`);
+  testDataIds.push(`wallet:${opponentUserId}`);
+
+  // Create wallets
+  await walletsCollection.insertOne({
+    _id: new mongoose.Types.ObjectId(),
+    userId: challengerUserId,
+    creditBalance: 0,
+    totalDeposited: 0,
+    totalWithdrawn: 0,
+    testRunId,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await walletsCollection.insertOne({
+    _id: new mongoose.Types.ObjectId(),
+    userId: opponentUserId,
+    creditBalance: 0,
+    totalDeposited: 0,
+    totalWithdrawn: 0,
+    testRunId,
+    createdAt: now,
+    updatedAt: now,
+  });
 
   await challengesCollection.insertOne({
     _id: challengeId,
-    slug: `test-${testPrefix.toLowerCase()}`,
+    slug: `test-${testRunId.toLowerCase()}`,
     challengerId: challengerUserId,
-    challengerName: `${testPrefix}_Challenger`,
+    challengerName: `${testRunId}_Challenger`,
+    challengerEmail: 'test@test.com',
     challengedId: opponentUserId,
-    challengedName: `${testPrefix}_Opponent`,
+    challengedName: `${testRunId}_Opponent`,
+    challengedEmail: 'test2@test.com',
     status: 'active',
     entryFee,
     prizePool,
-    winnerPrize: prizePool,
-    startTime: new Date(now.getTime() - 60 * 60 * 1000),
+    winnerPrize,
+    platformFeePercentage: 0,
+    platformFeeAmount: 0,
+    startingCapital: 10000,
+    startTime: new Date(now.getTime() - 2 * 60 * 60 * 1000),
     endTime,
+    duration: 60,
+    acceptDeadline: new Date(now.getTime() - 3 * 60 * 60 * 1000),
     rules: {
       rankingMethod: 'pnl',
+      tieBreaker1: 'trades_count',
       minimumTrades: 1,
       disqualifyOnLiquidation: scenario.disqualifyOnLiquidation,
     },
+    assetClasses: ['forex'],
+    allowedSymbols: [],
+    blockedSymbols: [],
+    testRunId,
     createdAt: now,
     updatedAt: now,
-    isTest: true,
   });
 
   // Create participants
+  const userIdMap: Record<string, mongoose.Types.ObjectId> = {
+    challenger: challengerUserId,
+    opponent: opponentUserId,
+  };
+
   for (const p of scenario.participants) {
     const participantId = new mongoose.Types.ObjectId();
+    const userId = userIdMap[p.role as 'challenger' | 'opponent'];
     testDataIds.push(`challengeparticipant:${participantId}`);
-
-    const userId = p.role === 'challenger' ? challengerUserId : opponentUserId;
 
     await participantsCollection.insertOne({
       _id: participantId,
       challengeId,
+      oddsUserId: userId,
+      oddsUsername: `${testRunId}_${p.role}`,
       userId,
-      username: `${testPrefix}_${p.role}`,
+      username: `${testRunId}_${p.role}`,
       role: p.role,
       status: p.status,
       currentCapital: p.equity,
       startingCapital: 10000,
       pnl: p.equity - 10000,
+      pnlPercentage: ((p.equity - 10000) / 10000) * 100,
       totalTrades: p.totalTrades,
       winningTrades: Math.floor(p.totalTrades * 0.6),
       losingTrades: Math.floor(p.totalTrades * 0.4),
+      winRate: p.totalTrades > 0 ? 60 : 0,
       enteredAt: now,
+      testRunId,
       createdAt: now,
       updatedAt: now,
-      isTest: true,
     });
   }
 
-  // Run the challenge end logic simulation
-  const participants = await participantsCollection.find({ challengeId }).toArray();
-  const challenger = participants.find(p => p.role === 'challenger');
-  const opponent = participants.find(p => p.role === 'opponent');
-
-  if (!challenger || !opponent) {
-    return { passed: false, message: 'Failed to create test participants' };
-  }
-
-  let actualWinner: string | null = null;
-  let shouldEndEarly = false;
-  let toUnclaimedPool = false;
-
-  const challengerActive = challenger.status === 'active';
-  const opponentActive = opponent.status === 'active';
-  const challengerLiquidated = challenger.status === 'liquidated';
-  const opponentLiquidated = opponent.status === 'liquidated';
-  const challengerDisqualified = challenger.status === 'disqualified';
-  const opponentDisqualified = opponent.status === 'disqualified';
-
-  if (scenario.endType === 'early') {
-    // Early end logic
-    if (challengerActive && opponentActive) {
-      shouldEndEarly = false;
-    } else if (!scenario.disqualifyOnLiquidation) {
-      // Flag OFF - liquidated can still win
-      const challengerCanWin = challengerActive || challengerLiquidated;
-      const opponentCanWin = opponentActive || opponentLiquidated;
-
-      if (challengerCanWin && opponentCanWin) {
-        shouldEndEarly = false;
-      } else if (challengerDisqualified && opponentDisqualified) {
-        shouldEndEarly = true;
-        toUnclaimedPool = true;
-      } else if (challengerDisqualified && opponentCanWin) {
-        shouldEndEarly = true;
-        actualWinner = 'opponent';
-      } else if (opponentDisqualified && challengerCanWin) {
-        shouldEndEarly = true;
-        actualWinner = 'challenger';
-      }
-    } else {
-      // Flag ON - liquidated = out
-      if (challengerDisqualified && opponentDisqualified) {
-        shouldEndEarly = true;
-        toUnclaimedPool = true;
-      } else if (challengerDisqualified && (opponentActive || opponentLiquidated)) {
-        shouldEndEarly = true;
-        actualWinner = 'opponent';
-      } else if (opponentDisqualified && (challengerActive || challengerLiquidated)) {
-        shouldEndEarly = true;
-        actualWinner = 'challenger';
-      } else if (challengerLiquidated && opponentActive) {
-        shouldEndEarly = true;
-        actualWinner = 'opponent';
-      } else if (opponentLiquidated && challengerActive) {
-        shouldEndEarly = true;
-        actualWinner = 'challenger';
-      } else if (challengerLiquidated && opponentLiquidated) {
-        shouldEndEarly = true;
-        // Compare equity
-        actualWinner = challenger.currentCapital >= opponent.currentCapital ? 'challenger' : 'opponent';
-      } else if (challengerLiquidated && opponentDisqualified) {
-        shouldEndEarly = true;
-        actualWinner = 'challenger';
-      } else if (opponentLiquidated && challengerDisqualified) {
-        shouldEndEarly = true;
-        actualWinner = 'opponent';
-      }
-    }
-  } else {
-    // Normal end logic - time expired
-    shouldEndEarly = false;
-
-    // Check disqualification
-    const challengerDQ = challengerDisqualified || 
-      (scenario.disqualifyOnLiquidation && challengerLiquidated) ||
-      challenger.totalTrades < 1;
-    const opponentDQ = opponentDisqualified || 
-      (scenario.disqualifyOnLiquidation && opponentLiquidated) ||
-      opponent.totalTrades < 1;
-
-    if (challengerDQ && opponentDQ) {
-      toUnclaimedPool = true;
-    } else if (challengerDQ) {
-      actualWinner = 'opponent';
-    } else if (opponentDQ) {
-      actualWinner = 'challenger';
-    } else {
-      // Compare equity
-      actualWinner = challenger.currentCapital >= opponent.currentCapital ? 'challenger' : 'opponent';
-    }
-  }
-
-  // Verify against expected
-  const expectedEndEarly = scenario.expected.shouldEndEarly;
-  const expectedWinner = scenario.expected.winnerRole;
-  const expectedUnclaimed = scenario.expected.toUnclaimedPool;
-
-  let passed = true;
-  let failReason = '';
-
-  if (shouldEndEarly !== expectedEndEarly) {
-    passed = false;
-    failReason = `shouldEndEarly: expected ${expectedEndEarly}, got ${shouldEndEarly}`;
-  } else if (toUnclaimedPool !== expectedUnclaimed) {
-    passed = false;
-    failReason = `toUnclaimedPool: expected ${expectedUnclaimed}, got ${toUnclaimedPool}`;
-  } else if (expectedWinner && actualWinner !== expectedWinner) {
-    passed = false;
-    failReason = `winner: expected ${expectedWinner}, got ${actualWinner}`;
-  }
-
-  return {
-    passed,
-    message: passed ? 'Test passed' : `Test failed - ${failReason}`,
-    actualOutcome: toUnclaimedPool 
-      ? 'No winner - prize to unclaimed pools'
-      : actualWinner 
-        ? `Winner: ${actualWinner}` 
-        : 'Continue to end time',
-    prizeDistribution: toUnclaimedPool 
-      ? { unclaimedPool: prizePool }
-      : actualWinner
-        ? { winnerId: actualWinner === 'challenger' ? challengerUserId.toString() : opponentUserId.toString(), winnerPrize: prizePool }
-        : undefined,
+  // Run ACTUAL production code
+  let actualResult: {
+    passed: boolean;
+    message: string;
+    actualOutcome?: string;
+    prizeDistribution?: {
+      winnerId?: string;
+      winnerPrize?: number;
+      unclaimedPool?: number;
+    };
+    details?: Record<string, unknown>;
   };
+
+  try {
+    if (scenario.endType === 'early') {
+      // Run early end check (test-specific version)
+      const { runEarlyEndCheckForTest } = await import('../../../../../worker/jobs/early-end-check.job');
+      const earlyEndResult = await runEarlyEndCheckForTest(testRunId);
+
+      // Check results
+      const updatedChallenge = await challengesCollection.findOne({ _id: challengeId });
+      const actualStatus = updatedChallenge?.status || 'active';
+      const actualWinnerRole = updatedChallenge?.winnerRole;
+      const hadNoWinner = updatedChallenge?.noWinner === true;
+
+      // Check wallets
+      const challengerWallet = await walletsCollection.findOne({ userId: challengerUserId });
+      const opponentWallet = await walletsCollection.findOne({ userId: opponentUserId });
+      const challengerGotPrize = (challengerWallet?.creditBalance || 0) > 0;
+      const opponentGotPrize = (opponentWallet?.creditBalance || 0) > 0;
+
+      let actualWinner = challengerGotPrize ? 'challenger' : opponentGotPrize ? 'opponent' : null;
+
+      let passed = true;
+      const issues: string[] = [];
+
+      if (actualStatus !== scenario.expected.statusAfter) {
+        passed = false;
+        issues.push(`Status: expected '${scenario.expected.statusAfter}', got '${actualStatus}'`);
+      }
+
+      if (scenario.expected.toUnclaimedPool && !hadNoWinner) {
+        passed = false;
+        issues.push('Expected unclaimed pool but challenge has winner');
+      }
+
+      if (scenario.expected.winnerRole && actualWinner !== scenario.expected.winnerRole) {
+        passed = false;
+        issues.push(`Winner: expected '${scenario.expected.winnerRole}', got '${actualWinner}'`);
+      }
+
+      actualResult = {
+        passed,
+        message: passed ? '✅ Test PASSED - Real early end executed correctly' : `❌ Test FAILED: ${issues.join(', ')}`,
+        actualOutcome: `Status: ${actualStatus}, Winner: ${actualWinner || 'none'}, NoWinner: ${hadNoWinner}`,
+        prizeDistribution: hadNoWinner 
+          ? { unclaimedPool: prizePool }
+          : actualWinner 
+            ? { winnerId: actualWinner === 'challenger' ? challengerUserId.toString() : opponentUserId.toString(), winnerPrize: prizePool }
+            : undefined,
+        details: {
+          earlyEndResult,
+          challengeStatus: actualStatus,
+          actualWinnerRole,
+          challengerBalance: challengerWallet?.creditBalance,
+          opponentBalance: opponentWallet?.creditBalance,
+        },
+      };
+    } else {
+      // Normal end - call finalizeChallenge directly
+      const { finalizeChallenge } = await import('../../../../../lib/actions/trading/challenge-finalize.actions');
+      const finalizeResult = await finalizeChallenge(challengeId.toString());
+
+      // Check results
+      const updatedChallenge = await challengesCollection.findOne({ _id: challengeId });
+      const actualStatus = updatedChallenge?.status || 'active';
+
+      // Check wallets
+      const challengerWallet = await walletsCollection.findOne({ userId: challengerUserId });
+      const opponentWallet = await walletsCollection.findOne({ userId: opponentUserId });
+      const challengerGotPrize = (challengerWallet?.creditBalance || 0) > 0;
+      const opponentGotPrize = (opponentWallet?.creditBalance || 0) > 0;
+      const actualWinner = challengerGotPrize ? 'challenger' : opponentGotPrize ? 'opponent' : null;
+
+      let passed = true;
+      const issues: string[] = [];
+
+      if (actualStatus !== 'completed') {
+        passed = false;
+        issues.push(`Status: expected 'completed', got '${actualStatus}'`);
+      }
+
+      if (scenario.expected.winnerRole && actualWinner !== scenario.expected.winnerRole) {
+        passed = false;
+        issues.push(`Winner: expected '${scenario.expected.winnerRole}', got '${actualWinner}'`);
+      }
+
+      actualResult = {
+        passed,
+        message: passed ? '✅ Test PASSED - Real finalization executed correctly' : `❌ Test FAILED: ${issues.join(', ')}`,
+        actualOutcome: `Status: ${actualStatus}, Winner: ${actualWinner || 'none'}`,
+        prizeDistribution: actualWinner 
+          ? { winnerId: actualWinner === 'challenger' ? challengerUserId.toString() : opponentUserId.toString(), winnerPrize: prizePool }
+          : undefined,
+        details: {
+          finalizeResult,
+          challengeStatus: actualStatus,
+          challengerBalance: challengerWallet?.creditBalance,
+          opponentBalance: opponentWallet?.creditBalance,
+        },
+      };
+    }
+  } catch (error) {
+    actualResult = {
+      passed: false,
+      message: `❌ Test ERROR: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      details: { error: error instanceof Error ? error.stack : String(error) },
+    };
+  }
+
+  return actualResult;
 }
