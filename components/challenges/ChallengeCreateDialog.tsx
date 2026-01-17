@@ -60,6 +60,7 @@ export default function ChallengeCreateDialog({
     tieBreaker1: 'trades_count',
     tieBreaker2: '',
     minimumTrades: 1,
+    disqualifyOnLiquidation: true, // Default: liquidated players lose
   });
 
   // Market status state - challenges require market to be open
@@ -169,6 +170,7 @@ export default function ChallengeCreateDialog({
           tieBreaker1: formData.tieBreaker1,
           tieBreaker2: formData.tieBreaker2 || undefined,
           minimumTrades: formData.minimumTrades,
+          disqualifyOnLiquidation: formData.disqualifyOnLiquidation,
         }),
       });
 
@@ -339,6 +341,34 @@ export default function ChallengeCreateDialog({
             <p className="text-xs text-gray-500">
               Players must complete at least this many trades or be disqualified
             </p>
+          </div>
+
+          {/* Disqualify on Liquidation Toggle */}
+          <div className="flex items-center justify-between bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+            <div className="flex-1">
+              <Label className="text-gray-300 flex items-center gap-2 cursor-pointer">
+                <AlertTriangle className="h-4 w-4 text-orange-400" />
+                Disqualify on Liquidation
+              </Label>
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.disqualifyOnLiquidation 
+                  ? 'If a player gets liquidated, they automatically lose' 
+                  : 'Liquidated players can still win based on final equity'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, disqualifyOnLiquidation: !formData.disqualifyOnLiquidation })}
+              className={`relative w-12 h-6 rounded-full transition-colors ${
+                formData.disqualifyOnLiquidation ? 'bg-orange-500' : 'bg-gray-600'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                  formData.disqualifyOnLiquidation ? 'translate-x-6' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
 
           {/* Prize Pool Summary */}

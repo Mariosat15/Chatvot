@@ -282,21 +282,40 @@ export async function finalizeChallenge(challengeId: string) {
     // Get settings for tie resolution
     const settings = await (ChallengeSettings as any).getSingleton();
 
-    // Check for disqualification (minimum trades)
+    // Check for disqualification (minimum trades OR liquidation if flag is set)
     const minTrades = challenge.rules.minimumTrades || 1;
-    const challengerDisqualified = challenger.totalTrades < minTrades;
-    const challengedDisqualified = challenged.totalTrades < minTrades;
+    const disqualifyOnLiquidation = challenge.rules.disqualifyOnLiquidation !== false; // Default true
+    
+    // Minimum trades check
+    const challengerMinTradesFail = challenger.totalTrades < minTrades;
+    const challengedMinTradesFail = challenged.totalTrades < minTrades;
+    
+    // Liquidation check (only if flag is enabled)
+    const challengerLiquidated = disqualifyOnLiquidation && challenger.status === 'liquidated';
+    const challengedLiquidated = disqualifyOnLiquidation && challenged.status === 'liquidated';
+    
+    // Combined disqualification check
+    const challengerDisqualified = challengerMinTradesFail || challengerLiquidated;
+    const challengedDisqualified = challengedMinTradesFail || challengedLiquidated;
 
     // Update participant statuses
-    if (challengerDisqualified) {
+    if (challengerDisqualified && challenger.status !== 'disqualified') {
       challenger.status = 'disqualified';
-      challenger.disqualificationReason = `Did not make minimum ${minTrades} trade(s)`;
+      if (challengerLiquidated) {
+        challenger.disqualificationReason = 'Account liquidated';
+      } else if (challengerMinTradesFail) {
+        challenger.disqualificationReason = `Did not make minimum ${minTrades} trade(s)`;
+      }
       await challenger.save({ session });
     }
 
-    if (challengedDisqualified) {
+    if (challengedDisqualified && challenged.status !== 'disqualified') {
       challenged.status = 'disqualified';
-      challenged.disqualificationReason = `Did not make minimum ${minTrades} trade(s)`;
+      if (challengedLiquidated) {
+        challenged.disqualificationReason = 'Account liquidated';
+      } else if (challengedMinTradesFail) {
+        challenged.disqualificationReason = `Did not make minimum ${minTrades} trade(s)`;
+      }
       await challenged.save({ session });
     }
 

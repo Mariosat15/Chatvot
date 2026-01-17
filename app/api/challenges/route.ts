@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
       tieBreaker1,
       tieBreaker2,
       minimumTrades,
+      disqualifyOnLiquidation = true, // Default: liquidated players lose
     } = body;
     
     // VALIDATION: Early check for required fields
@@ -362,7 +363,7 @@ export async function POST(request: NextRequest) {
         tieBreaker1: tieBreaker1 || 'trades_count',
         tieBreaker2: tieBreaker2 || undefined,
         minimumTrades: Math.max(1, minimumTrades || 1), // At least 1 trade required
-        disqualifyOnLiquidation: true,
+        disqualifyOnLiquidation: disqualifyOnLiquidation, // User can choose if liquidation = disqualification
       },
       maxPositionSize: tradingRiskSettings.maxPositionSize,
       maxOpenPositions: tradingRiskSettings.maxOpenPositions,
