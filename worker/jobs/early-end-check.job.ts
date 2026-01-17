@@ -56,17 +56,30 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
 
         if (participants.length === 0) continue;
 
+        // Check if disqualifyOnLiquidation is enabled for this competition
+        const disqualifyOnLiquidation = competition.rules?.disqualifyOnLiquidation !== false; // Default true
+
         // Count by status
         const activeCount = participants.filter(p => p.status === 'active').length;
         const liquidatedCount = participants.filter(p => p.status === 'liquidated').length;
         const disqualifiedCount = participants.filter(p => p.status === 'disqualified').length;
 
-        // If there are still active players, continue normally
-        if (activeCount > 0) continue;
+        // If disqualifyOnLiquidation is OFF, liquidated players can still win
+        // Only end early if NO players can win (all explicitly disqualified)
+        if (!disqualifyOnLiquidation) {
+          // Liquidated players are still eligible - only end if all are disqualified
+          if (activeCount > 0 || liquidatedCount > 0) continue;
+          // All players are disqualified (not liquidated) - end early
+        } else {
+          // disqualifyOnLiquidation is ON - liquidated = out
+          // If there are still active players, continue normally
+          if (activeCount > 0) continue;
+        }
 
         // All players are out - need to end early
         console.log(`\n   🏁 [EARLY END] Competition "${competition.name}" - All players eliminated!`);
         console.log(`      Active: ${activeCount}, Liquidated: ${liquidatedCount}, Disqualified: ${disqualifiedCount}`);
+        console.log(`      disqualifyOnLiquidation: ${disqualifyOnLiquidation}`);
 
         if (disqualifiedCount === participants.length) {
           // ALL players disqualified - prize pool goes to platform (unclaimed pools)
@@ -156,7 +169,10 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
 
         if (!challenger || !opponent) continue;
 
-        // Check if both are still active
+        // Check if disqualifyOnLiquidation is enabled for this challenge
+        const disqualifyOnLiquidation = challenge.rules?.disqualifyOnLiquidation !== false; // Default true
+
+        // Check statuses
         const challengerActive = challenger.status === 'active';
         const opponentActive = opponent.status === 'active';
         const challengerLiquidated = challenger.status === 'liquidated';
@@ -167,8 +183,23 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
         // If both still active, continue normally
         if (challengerActive && opponentActive) continue;
 
+        // If disqualifyOnLiquidation is OFF, liquidated players are still "in the game"
+        // Only trigger early end if a player is explicitly disqualified
+        if (!disqualifyOnLiquidation) {
+          // Treat liquidated as still eligible
+          const challengerCanWin = challengerActive || challengerLiquidated;
+          const opponentCanWin = opponentActive || opponentLiquidated;
+          
+          // If both can still win, let the challenge run until end time
+          if (challengerCanWin && opponentCanWin) continue;
+          
+          // If neither is disqualified but both are out somehow, continue
+          if (!challengerDisqualified && !opponentDisqualified) continue;
+        }
+
         console.log(`\n   ⚔️ [EARLY END] Challenge ${challenge._id}`);
         console.log(`      Challenger: ${challenger.status}, Opponent: ${opponent.status}`);
+        console.log(`      disqualifyOnLiquidation: ${disqualifyOnLiquidation}`);
 
         let winnerId: string | null = null;
         let winnerRole: 'challenger' | 'opponent' | null = null;
@@ -176,37 +207,39 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
         let noWinner = false;
 
         // Determine winner based on scenarios
+        // Key: If disqualifyOnLiquidation is OFF, liquidated players DON'T auto-lose
+        
         if (challengerDisqualified && opponentDisqualified) {
-          // Both disqualified - prize pool goes to platform (unclaimed pools)
+          // Both explicitly disqualified - prize pool goes to platform
           endReason = 'Both players disqualified - prize to platform';
           noWinner = true;
           console.log(`      ❌ Both disqualified - prize goes to unclaimed pools`);
-        } else if (challengerDisqualified && opponentActive) {
-          // Challenger disqualified, opponent wins
+        } else if (challengerDisqualified && (opponentActive || (!disqualifyOnLiquidation && opponentLiquidated))) {
+          // Challenger disqualified, opponent wins (opponent is active OR liquidated when disqualifyOnLiquidation=false)
           winnerId = opponent.userId.toString();
           winnerRole = 'opponent';
           endReason = 'Challenger disqualified';
           console.log(`      🏆 Opponent wins (challenger disqualified)`);
-        } else if (opponentDisqualified && challengerActive) {
+        } else if (opponentDisqualified && (challengerActive || (!disqualifyOnLiquidation && challengerLiquidated))) {
           // Opponent disqualified, challenger wins
           winnerId = challenger.userId.toString();
           winnerRole = 'challenger';
           endReason = 'Opponent disqualified';
           console.log(`      🏆 Challenger wins (opponent disqualified)`);
-        } else if (challengerLiquidated && opponentActive) {
-          // Challenger liquidated, opponent wins
+        } else if (disqualifyOnLiquidation && challengerLiquidated && opponentActive) {
+          // Only if disqualifyOnLiquidation is ON: Challenger liquidated = out, opponent wins
           winnerId = opponent.userId.toString();
           winnerRole = 'opponent';
-          endReason = 'Challenger liquidated';
+          endReason = 'Challenger liquidated (disqualifyOnLiquidation enabled)';
           console.log(`      🏆 Opponent wins (challenger liquidated)`);
-        } else if (opponentLiquidated && challengerActive) {
-          // Opponent liquidated, challenger wins
+        } else if (disqualifyOnLiquidation && opponentLiquidated && challengerActive) {
+          // Only if disqualifyOnLiquidation is ON: Opponent liquidated = out, challenger wins
           winnerId = challenger.userId.toString();
           winnerRole = 'challenger';
-          endReason = 'Opponent liquidated';
+          endReason = 'Opponent liquidated (disqualifyOnLiquidation enabled)';
           console.log(`      🏆 Challenger wins (opponent liquidated)`);
-        } else if (challengerLiquidated && opponentLiquidated) {
-          // Both liquidated - compare final equity
+        } else if (disqualifyOnLiquidation && challengerLiquidated && opponentLiquidated) {
+          // Both liquidated with disqualifyOnLiquidation ON - compare final equity
           const challengerEquity = challenger.currentCapital + (challenger.unrealizedPnl || 0);
           const opponentEquity = opponent.currentCapital + (opponent.unrealizedPnl || 0);
           
@@ -225,19 +258,21 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
           }
           console.log(`      ${noWinner ? '❌' : '🏆'} Both liquidated - ${endReason}`);
         } else if (challengerLiquidated && opponentDisqualified) {
-          // Challenger liquidated but played fair, opponent disqualified
+          // Challenger liquidated but played fair, opponent explicitly disqualified
           winnerId = challenger.userId.toString();
           winnerRole = 'challenger';
           endReason = 'Opponent disqualified (challenger liquidated but played fair)';
           console.log(`      🏆 Challenger wins (liquidated > disqualified)`);
         } else if (opponentLiquidated && challengerDisqualified) {
-          // Opponent liquidated but played fair, challenger disqualified
+          // Opponent liquidated but played fair, challenger explicitly disqualified
           winnerId = opponent.userId.toString();
           winnerRole = 'opponent';
           endReason = 'Challenger disqualified (opponent liquidated but played fair)';
           console.log(`      🏆 Opponent wins (liquidated > disqualified)`);
         } else {
-          // Unknown state, skip
+          // No early end condition met - let challenge continue
+          // This happens when disqualifyOnLiquidation is OFF and both are liquidated (wait for end time)
+          console.log(`      ⏳ No early end - challenge continues to end time`);
           continue;
         }
 
