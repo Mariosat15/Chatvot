@@ -45,6 +45,7 @@ import { runBadgeEvaluation } from './jobs/evaluate-badges.job';
 import { defineWithdrawalProcessJob, scheduleWithdrawalJobs } from './jobs/withdrawal-process.job';
 import { runKYCExpiryCheck } from './jobs/kyc-expiry-check.job';
 import { runMarketDataMaintenance } from './jobs/market-data-maintenance.job';
+import { runEarlyEndCheck } from './jobs/early-end-check.job';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -275,6 +276,36 @@ agenda.define('market-data-maintenance', async () => {
   }
 });
 
+/**
+ * Early End Check Job
+ * Checks if all players eliminated/disqualified and ends competition/challenge early
+ * - Competitions: All liquidated → rank by equity, all disqualified → no winners
+ * - Challenges: One out → other wins, both out → compare equity or refund
+ */
+agenda.define('early-end-check', async () => {
+  try {
+    const result = await runEarlyEndCheck();
+    
+    // Only log if something happened
+    if (result.competitionsEnded > 0 || result.challengesEnded > 0) {
+      console.log(`\n🏁 [EARLY END CHECK]`);
+      if (result.competitionsEnded > 0) {
+        console.log(`   Competitions ended early: ${result.competitionsEnded}`);
+      }
+      if (result.challengesEnded > 0) {
+        console.log(`   Challenges ended early: ${result.challengesEnded}`);
+      }
+    }
+    
+    if (result.errors.length > 0) {
+      console.log(`   Errors: ${result.errors.length}`);
+      result.errors.forEach(e => console.log(`     - ${e}`));
+    }
+  } catch (error) {
+    console.error(`🏁 [EARLY END CHECK] Failed:`, error);
+  }
+});
+
 // Define withdrawal processing jobs
 defineWithdrawalProcessJob(agenda);
 
@@ -327,6 +358,7 @@ async function startWorker(): Promise<void> {
     await agenda.every('5 minutes', 'margin-check');
     await agenda.every('1 minute', 'competition-end');  // BACKUP - client-side auto-finalizes on access
     await agenda.every('1 minute', 'challenge-finalize');  // BACKUP - client-side auto-finalizes on access
+    await agenda.every('1 minute', 'early-end-check');  // Check if all players eliminated
     await agenda.every('1 minute', 'trade-queue');  // BACKUP sweep - real-time happens in main app
     await agenda.every('1 minute', 'price-cache');
     await agenda.every('1 hour', 'evaluate-badges');
@@ -340,6 +372,7 @@ async function startWorker(): Promise<void> {
     console.log('   • margin-check: every 5 minutes');
     console.log('   • competition-end: every 1 minute (backup - client auto-finalizes on access)');
     console.log('   • challenge-finalize: every 1 minute (backup - client auto-finalizes on access)');
+    console.log('   • early-end-check: every 1 minute (end if all players eliminated)');
     console.log('   • trade-queue: every 1 minute (backup TP/SL sweep & limit orders)');
     console.log('   • price-cache: every 1 minute');
     console.log('   • evaluate-badges: every 1 hour');
@@ -357,6 +390,7 @@ async function startWorker(): Promise<void> {
     await agenda.now('margin-check', {});
     await agenda.now('competition-end', {});
     await agenda.now('challenge-finalize', {});
+    await agenda.now('early-end-check', {});
     await agenda.now('trade-queue', {});
     await agenda.now('price-cache', {});
 
