@@ -728,10 +728,12 @@ async function runRealCompetitionTest(
       updatedAt: now,
     });
 
-    // IMPORTANT: Set startingCapital = equity so finalization calculates correct final capital
-    // (finalizeCompetition does: currentCapital = startingCapital + position_P&L)
-    // With no positions, currentCapital = startingCapital = equity
-    const participantStartingCapital = p.equity;
+    // IMPORTANT: Use COMMON starting capital so PNL differences reflect equity differences
+    // PNL = currentCapital - startingCapital = equity - startingCapital
+    // Example: startingCapital=5000, equity=6000 → PNL=+1000, equity=4000 → PNL=-1000
+    const commonStartingCapital = startingCapital; // Use competition's starting capital (5000)
+    const participantPnl = p.equity - commonStartingCapital;
+    const participantPnlPercentage = (participantPnl / commonStartingCapital) * 100;
     
     await participantsCollection.insertOne({
       _id: participantId,
@@ -744,23 +746,54 @@ async function runRealCompetitionTest(
       username: `${testRunId}_User${i + 1}`,
       status: p.status,
       currentCapital: p.equity,
-      startingCapital: participantStartingCapital, // Use equity as starting capital for correct ranking
-      pnl: 0, // No P&L from positions
-      pnlPercentage: 0,
-      totalTrades: 0, // No trades (minimumTrades is 0)
-      winningTrades: 0,
-      losingTrades: 0,
-      winRate: 0,
+      startingCapital: commonStartingCapital, // Common starting capital for all
+      pnl: participantPnl, // Calculated PNL based on equity difference
+      pnlPercentage: participantPnlPercentage,
+      totalTrades: p.totalTrades || 1, // At least 1 trade to avoid disqualification
+      winningTrades: p.totalTrades > 0 ? Math.ceil(p.totalTrades / 2) : 1,
+      losingTrades: p.totalTrades > 0 ? Math.floor(p.totalTrades / 2) : 0,
+      winRate: 50,
       enteredAt: now,
       testRunId,
       createdAt: now,
       updatedAt: now,
     });
     
-    // NOTE: Not creating positions because:
-    // 1. We're testing disqualification/early-end logic, not actual trade mechanics
-    // 2. finalizeCompetition recalculates currentCapital from startingCapital + position P&L
-    // 3. By setting startingCapital = expected equity and having no positions, we get the correct ranking
+    // Create a closed position to generate the correct P&L
+    // finalizeCompetition recalculates P&L from positions, so we need actual position records
+    const positionsCollection = db.collection('tradingpositions');
+    const positionId = new mongoose.Types.ObjectId();
+    testDataIds.push(`position:${positionId}`);
+    
+    await positionsCollection.insertOne({
+      _id: positionId,
+      oddsPositionId: positionId.toString(),
+      oddsUserId: userId.toString(),
+      userId: userId.toString(),
+      competitionId: competitionId.toString(),
+      symbol: 'EUR/USD',
+      side: 'long',
+      orderType: 'market',
+      quantity: 10000,
+      entryPrice: 1.1000,
+      exitPrice: participantPnl >= 0 ? 1.1000 + (participantPnl / 10000) : 1.1000 + (participantPnl / 10000),
+      currentPrice: 1.1000 + (participantPnl / 10000),
+      unrealizedPnl: 0,
+      unrealizedPnlPercentage: 0,
+      realizedPnl: participantPnl, // The PNL we want
+      leverage: 1,
+      marginUsed: 1000,
+      maintenanceMargin: 500,
+      status: 'closed',
+      openOrderId: `test-order-${i}`,
+      lastPriceUpdate: now,
+      priceUpdateCount: 1,
+      openedAt: new Date(now.getTime() - 60 * 60 * 1000),
+      closedAt: new Date(now.getTime() - 30 * 60 * 1000),
+      testRunId,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
   // Now run the ACTUAL production code
@@ -1206,7 +1239,7 @@ async function runRealChallengeTest(
     rules: {
       rankingMethod: 'pnl',
       tieBreaker1: 'trades_count',
-      minimumTrades: 0, // Set to 0 for tests since we don't want trade count to affect disqualification
+      minimumTrades: 1, // Schema requires min 1
       disqualifyOnLiquidation: scenario.disqualifyOnLiquidation,
     },
     assetClasses: ['forex'],
@@ -1229,9 +1262,12 @@ async function runRealChallengeTest(
     const userId = userIdMap[p.role as 'challenger' | 'challenged'];
     testDataIds.push(`challengeparticipant:${participantId}`);
 
-    // IMPORTANT: Set startingCapital = equity so finalization calculates correct final capital
-    // (finalizeChallenge does: currentCapital = startingCapital + position_P&L)
-    // With no positions, currentCapital = startingCapital = equity
+    // IMPORTANT: Use common starting capital so PNL differences reflect equity differences
+    // PNL = currentCapital - startingCapital = equity - 10000
+    const commonStartingCapital = 10000; // Challenge starting capital
+    const participantPnl = p.equity - commonStartingCapital;
+    const participantPnlPercentage = (participantPnl / commonStartingCapital) * 100;
+    
     await participantsCollection.insertOne({
       _id: participantId,
       challengeId: challengeId.toString(), // Must be string to match schema
@@ -1244,14 +1280,50 @@ async function runRealChallengeTest(
       status: p.status,
       currentCapital: p.equity,
       availableCapital: p.equity, // Required field
-      startingCapital: p.equity, // Use equity as starting capital for correct ranking
-      pnl: 0, // No P&L from positions
-      pnlPercentage: 0,
-      totalTrades: 0, // No trades (minimumTrades is 0)
-      winningTrades: 0,
-      losingTrades: 0,
-      winRate: 0,
+      startingCapital: commonStartingCapital, // Common starting capital for proper PNL
+      pnl: participantPnl, // Calculated PNL
+      pnlPercentage: participantPnlPercentage,
+      totalTrades: p.totalTrades || 1, // At least 1 trade (schema requires min 1)
+      winningTrades: p.totalTrades > 0 ? Math.ceil(p.totalTrades / 2) : 1,
+      losingTrades: p.totalTrades > 0 ? Math.floor(p.totalTrades / 2) : 0,
+      winRate: 50,
       enteredAt: now,
+      testRunId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    
+    // Create a closed position to generate the correct P&L
+    // finalizeChallenge recalculates P&L from positions
+    const positionsCollection = db.collection('tradingpositions');
+    const positionId = new mongoose.Types.ObjectId();
+    testDataIds.push(`position:${positionId}`);
+    
+    await positionsCollection.insertOne({
+      _id: positionId,
+      oddsPositionId: positionId.toString(),
+      oddsUserId: userId.toString(),
+      userId: userId.toString(),
+      challengeId: challengeId.toString(),
+      symbol: 'EUR/USD',
+      side: 'long',
+      orderType: 'market',
+      quantity: 10000,
+      entryPrice: 1.1000,
+      exitPrice: 1.1000 + (participantPnl / 10000),
+      currentPrice: 1.1000 + (participantPnl / 10000),
+      unrealizedPnl: 0,
+      unrealizedPnlPercentage: 0,
+      realizedPnl: participantPnl, // The PNL we want
+      leverage: 1,
+      marginUsed: 1000,
+      maintenanceMargin: 500,
+      status: 'closed',
+      openOrderId: `test-order-${p.role}`,
+      lastPriceUpdate: now,
+      priceUpdateCount: 1,
+      openedAt: new Date(now.getTime() - 60 * 60 * 1000),
+      closedAt: new Date(now.getTime() - 30 * 60 * 1000),
       testRunId,
       createdAt: now,
       updatedAt: now,
