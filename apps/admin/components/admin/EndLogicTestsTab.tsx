@@ -54,7 +54,7 @@ const TEST_CASES: TestCase[] = [
     description: 'All players liquidated with disqualifyOnLiquidation=true',
     disqualifyOnLiquidation: true,
     scenario: 'All players LIQUIDATED',
-    expectedResult: 'End early → Rank by equity → Distribute prizes',
+    expectedResult: 'End early → All lost → Unclaimed Pools',
     status: 'pending',
   },
   {
@@ -64,7 +64,7 @@ const TEST_CASES: TestCase[] = [
     description: 'All players disqualified with disqualifyOnLiquidation=true',
     disqualifyOnLiquidation: true,
     scenario: 'All players DISQUALIFIED',
-    expectedResult: 'End early → Prize to Unclaimed Pools',
+    expectedResult: 'End early → Unclaimed Pools',
     status: 'pending',
   },
   {
@@ -74,7 +74,7 @@ const TEST_CASES: TestCase[] = [
     description: 'Some liquidated, some disqualified with disqualifyOnLiquidation=true',
     disqualifyOnLiquidation: true,
     scenario: 'Mix LIQUIDATED + DISQUALIFIED',
-    expectedResult: 'End early → Rank liquidated only',
+    expectedResult: 'End early → All out (liq=disq) → Unclaimed Pools',
     status: 'pending',
   },
   {

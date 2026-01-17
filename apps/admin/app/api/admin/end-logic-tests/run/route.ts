@@ -44,7 +44,8 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'liquidated', equity: 3000, totalTrades: 3 },
       { role: 'participant', status: 'liquidated', equity: 4000, totalTrades: 4 },
     ],
-    expected: { shouldEndEarly: true, winnerId: 0, toUnclaimedPool: false, statusAfter: 'completed' },
+    // Flag ON + all liquidated = all lost = unclaimed pool
+    expected: { shouldEndEarly: true, toUnclaimedPool: true, statusAfter: 'completed' },
   },
   'C-E2': {
     type: 'competition',
@@ -54,6 +55,7 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'disqualified', equity: 5000, totalTrades: 0 },
       { role: 'participant', status: 'disqualified', equity: 3000, totalTrades: 0 },
     ],
+    // All disqualified = unclaimed pool
     expected: { shouldEndEarly: true, toUnclaimedPool: true, statusAfter: 'completed' },
   },
   'C-E3': {
@@ -64,7 +66,8 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'liquidated', equity: 5000, totalTrades: 5 },
       { role: 'participant', status: 'disqualified', equity: 3000, totalTrades: 0 },
     ],
-    expected: { shouldEndEarly: true, winnerId: 0, toUnclaimedPool: false, statusAfter: 'completed' },
+    // Flag ON: liquidated = disqualified, so ALL are disqualified = unclaimed pool
+    expected: { shouldEndEarly: true, toUnclaimedPool: true, statusAfter: 'completed' },
   },
   'C-E4': {
     type: 'competition',
