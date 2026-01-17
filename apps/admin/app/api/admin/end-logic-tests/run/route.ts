@@ -647,8 +647,9 @@ async function runRealCompetitionTest(
   const walletsCollection = db.collection('creditwallets');
 
   const now = new Date();
-  const prizePool = 300;
   const entryFee = 100;
+  // Calculate prizePool based on number of participants (must match test expectations)
+  const prizePool = entryFee * scenario.participants.length;
   const startingCapital = 10000;
   
   // For early end tests: end time is in the future (1 hour)
@@ -765,6 +766,13 @@ async function runRealCompetitionTest(
     const positionId = new mongoose.Types.ObjectId();
     testDataIds.push(`position:${positionId}`);
     
+    // IMPORTANT: Production calculates PNL as: priceDiff * quantity * 100000 (forex contract size)
+    // To get the desired participantPnl, we need: priceDiff = participantPnl / (quantity * 100000)
+    // Using quantity = 1 for simplicity: priceDiff = participantPnl / 100000
+    const quantity = 1;
+    const contractSize = 100000;
+    const priceDiff = participantPnl / (quantity * contractSize);
+    
     await positionsCollection.insertOne({
       _id: positionId,
       oddsPositionId: positionId.toString(),
@@ -774,13 +782,13 @@ async function runRealCompetitionTest(
       symbol: 'EUR/USD',
       side: 'long',
       orderType: 'market',
-      quantity: 10000,
+      quantity: quantity,
       entryPrice: 1.1000,
-      exitPrice: participantPnl >= 0 ? 1.1000 + (participantPnl / 10000) : 1.1000 + (participantPnl / 10000),
-      currentPrice: 1.1000 + (participantPnl / 10000),
+      exitPrice: 1.1000 + priceDiff,
+      currentPrice: 1.1000 + priceDiff,
       unrealizedPnl: 0,
       unrealizedPnlPercentage: 0,
-      realizedPnl: participantPnl, // The PNL we want
+      realizedPnl: participantPnl, // Not used by production, but kept for reference
       leverage: 1,
       marginUsed: 1000,
       maintenanceMargin: 500,
@@ -1299,22 +1307,28 @@ async function runRealChallengeTest(
     const positionId = new mongoose.Types.ObjectId();
     testDataIds.push(`position:${positionId}`);
     
+    // IMPORTANT: Production calculates PNL as: priceDiff * quantity * 100000 (forex contract size)
+    // Also: Challenge finalization queries positions by competitionId, not challengeId!
+    const quantity = 1;
+    const contractSize = 100000;
+    const priceDiff = participantPnl / (quantity * contractSize);
+    
     await positionsCollection.insertOne({
       _id: positionId,
       oddsPositionId: positionId.toString(),
       oddsUserId: userId.toString(),
       userId: userId.toString(),
-      challengeId: challengeId.toString(),
+      competitionId: challengeId.toString(), // Challenge finalization queries competitionId!
       symbol: 'EUR/USD',
       side: 'long',
       orderType: 'market',
-      quantity: 10000,
+      quantity: quantity,
       entryPrice: 1.1000,
-      exitPrice: 1.1000 + (participantPnl / 10000),
-      currentPrice: 1.1000 + (participantPnl / 10000),
+      exitPrice: 1.1000 + priceDiff,
+      currentPrice: 1.1000 + priceDiff,
       unrealizedPnl: 0,
       unrealizedPnlPercentage: 0,
-      realizedPnl: participantPnl, // The PNL we want
+      realizedPnl: participantPnl, // Not used by production, but kept for reference
       leverage: 1,
       marginUsed: 1000,
       maintenanceMargin: 500,
