@@ -534,11 +534,24 @@ async function runRealCompetitionTest(
     } else {
       // Normal end - call finalizeCompetition directly
       const { finalizeCompetition } = await import('../../../../../../../lib/actions/trading/competition-end.actions');
+      
+      console.log(`\n🧪 [TEST] Running finalizeCompetition for ${competitionId}`);
       const finalizeResult = await finalizeCompetition(competitionId.toString());
+      console.log(`🧪 [TEST] finalizeCompetition result:`, JSON.stringify(finalizeResult, null, 2));
 
       // Check results
       const updatedComp = await competitionsCollection.findOne({ _id: competitionId });
       const actualStatus = updatedComp?.status || 'active';
+      
+      // Check participants to see their final status
+      const finalParticipants = await participantsCollection.find({ competitionId }).toArray();
+      console.log(`🧪 [TEST] Participants after finalization:`, finalParticipants.map(p => ({
+        username: p.username,
+        status: p.status,
+        currentCapital: p.currentCapital,
+        isWinner: p.isWinner,
+        prizeWon: p.prizeWon,
+      })));
       
       // Check wallets for prize distribution
       let winnerFound = false;
@@ -546,6 +559,7 @@ async function runRealCompetitionTest(
       let winnerIndex = -1;
       for (let i = 0; i < participantUserIds.length; i++) {
         const wallet = await walletsCollection.findOne({ userId: participantUserIds[i] });
+        console.log(`🧪 [TEST] Wallet for user ${i}:`, wallet?.creditBalance);
         if (wallet && wallet.creditBalance > 0) {
           winnerFound = true;
           winnerUserId = participantUserIds[i].toString();
@@ -576,8 +590,11 @@ async function runRealCompetitionTest(
           : undefined,
         details: {
           finalizeResult,
+          finalizeSuccess: finalizeResult?.success,
+          finalizeMessage: finalizeResult?.message,
           competitionStatus: actualStatus,
           winnerIndex,
+          participantsCount: finalParticipants.length,
         },
       };
     }
@@ -787,15 +804,30 @@ async function runRealChallengeTest(
     } else {
       // Normal end - call finalizeChallenge directly
       const { finalizeChallenge } = await import('../../../../../../../lib/actions/trading/challenge-finalize.actions');
+      
+      console.log(`\n🧪 [TEST] Running finalizeChallenge for ${challengeId}`);
       const finalizeResult = await finalizeChallenge(challengeId.toString());
+      console.log(`🧪 [TEST] finalizeChallenge result:`, JSON.stringify(finalizeResult, null, 2));
 
       // Check results
       const updatedChallenge = await challengesCollection.findOne({ _id: challengeId });
       const actualStatus = updatedChallenge?.status || 'active';
+      
+      // Check participants
+      const finalParticipants = await participantsCollection.find({ challengeId }).toArray();
+      console.log(`🧪 [TEST] Challenge participants after finalization:`, finalParticipants.map(p => ({
+        username: p.username,
+        role: p.role,
+        status: p.status,
+        currentCapital: p.currentCapital,
+        isWinner: p.isWinner,
+      })));
 
       // Check wallets
       const challengerWallet = await walletsCollection.findOne({ userId: challengerUserId });
       const opponentWallet = await walletsCollection.findOne({ userId: opponentUserId });
+      console.log(`🧪 [TEST] Wallets - Challenger: ${challengerWallet?.creditBalance}, Opponent: ${opponentWallet?.creditBalance}`);
+      
       const challengerGotPrize = (challengerWallet?.creditBalance || 0) > 0;
       const opponentGotPrize = (opponentWallet?.creditBalance || 0) > 0;
       const actualWinner = challengerGotPrize ? 'challenger' : opponentGotPrize ? 'opponent' : null;
@@ -822,9 +854,12 @@ async function runRealChallengeTest(
           : undefined,
         details: {
           finalizeResult,
+          finalizeSuccess: finalizeResult?.success,
+          finalizeMessage: finalizeResult?.message,
           challengeStatus: actualStatus,
           challengerBalance: challengerWallet?.creditBalance,
           opponentBalance: opponentWallet?.creditBalance,
+          participantsCount: finalParticipants.length,
         },
       };
     }
