@@ -415,10 +415,10 @@ async function runRealCompetitionTest(
     testDataIds.push(`participant:${participantId}`);
     testDataIds.push(`wallet:${userId}`);
 
-    // Create wallet for this test user
+    // Create wallet for this test user (userId must be string to match schema)
     await walletsCollection.insertOne({
       _id: new mongoose.Types.ObjectId(),
-      userId,
+      userId: userId.toString(),
       creditBalance: 0,
       totalDeposited: 0,
       totalWithdrawn: 0,
@@ -429,12 +429,12 @@ async function runRealCompetitionTest(
 
     await participantsCollection.insertOne({
       _id: participantId,
-      competitionId,
-      oddsCompetitionId: competitionId, // Required field
-      oddsParticipantId: participantId,
-      oddsUserId: userId,
+      competitionId: competitionId.toString(), // Must be string to match schema
+      oddsCompetitionId: competitionId.toString(),
+      oddsParticipantId: participantId.toString(),
+      oddsUserId: userId.toString(),
       oddsUsername: `${testRunId}_User${i + 1}`,
-      userId,
+      userId: userId.toString(), // Must be string to match schema
       username: `${testRunId}_User${i + 1}`,
       status: p.status,
       currentCapital: p.equity,
@@ -485,7 +485,7 @@ async function runRealCompetitionTest(
       let winnerFound = false;
       let winnerUserId = '';
       for (const userId of participantUserIds) {
-        const wallet = await walletsCollection.findOne({ userId });
+        const wallet = await walletsCollection.findOne({ userId: userId.toString() });
         if (wallet && wallet.creditBalance > 0) {
           winnerFound = true;
           winnerUserId = userId.toString();
@@ -547,7 +547,7 @@ async function runRealCompetitionTest(
       const actualStatus = updatedComp?.status || 'active';
       
       // Check participants to see their final status
-      const finalParticipants = await participantsCollection.find({ competitionId }).toArray();
+      const finalParticipants = await participantsCollection.find({ competitionId: competitionId.toString() }).toArray();
       console.log(`🧪 [TEST] Participants after finalization:`, finalParticipants.map(p => ({
         username: p.username,
         status: p.status,
@@ -561,7 +561,7 @@ async function runRealCompetitionTest(
       let winnerUserId = '';
       let winnerIndex = -1;
       for (let i = 0; i < participantUserIds.length; i++) {
-        const wallet = await walletsCollection.findOne({ userId: participantUserIds[i] });
+        const wallet = await walletsCollection.findOne({ userId: participantUserIds[i].toString() });
         console.log(`🧪 [TEST] Wallet for user ${i}:`, wallet?.creditBalance);
         if (wallet && wallet.creditBalance > 0) {
           winnerFound = true;
@@ -644,10 +644,10 @@ async function runRealChallengeTest(
   testDataIds.push(`wallet:${challengerUserId}`);
   testDataIds.push(`wallet:${opponentUserId}`);
 
-  // Create wallets
+  // Create wallets (userId must be string to match schema)
   await walletsCollection.insertOne({
     _id: new mongoose.Types.ObjectId(),
-    userId: challengerUserId,
+    userId: challengerUserId.toString(),
     creditBalance: 0,
     totalDeposited: 0,
     totalWithdrawn: 0,
@@ -658,7 +658,7 @@ async function runRealChallengeTest(
 
   await walletsCollection.insertOne({
     _id: new mongoose.Types.ObjectId(),
-    userId: opponentUserId,
+    userId: opponentUserId.toString(),
     creditBalance: 0,
     totalDeposited: 0,
     totalWithdrawn: 0,
@@ -670,10 +670,10 @@ async function runRealChallengeTest(
   await challengesCollection.insertOne({
     _id: challengeId,
     slug: `test-${testRunId.toLowerCase()}`,
-    challengerId: challengerUserId,
+    challengerId: challengerUserId.toString(),
     challengerName: `${testRunId}_Challenger`,
     challengerEmail: 'test@test.com',
-    challengedId: opponentUserId,
+    challengedId: opponentUserId.toString(),
     challengedName: `${testRunId}_Opponent`,
     challengedEmail: 'test2@test.com',
     status: 'active',
@@ -714,10 +714,10 @@ async function runRealChallengeTest(
 
     await participantsCollection.insertOne({
       _id: participantId,
-      challengeId,
-      oddsUserId: userId,
+      challengeId: challengeId.toString(), // Must be string to match schema
+      oddsUserId: userId.toString(),
       oddsUsername: `${testRunId}_${p.role}`,
-      userId,
+      userId: userId.toString(), // Must be string to match schema
       username: `${testRunId}_${p.role}`,
       role: p.role,
       status: p.status,
@@ -762,8 +762,8 @@ async function runRealChallengeTest(
       const hadNoWinner = updatedChallenge?.noWinner === true;
 
       // Check wallets
-      const challengerWallet = await walletsCollection.findOne({ userId: challengerUserId });
-      const opponentWallet = await walletsCollection.findOne({ userId: opponentUserId });
+      const challengerWallet = await walletsCollection.findOne({ userId: challengerUserId.toString() });
+      const opponentWallet = await walletsCollection.findOne({ userId: opponentUserId.toString() });
       const challengerGotPrize = (challengerWallet?.creditBalance || 0) > 0;
       const opponentGotPrize = (opponentWallet?.creditBalance || 0) > 0;
 
@@ -817,7 +817,7 @@ async function runRealChallengeTest(
       const actualStatus = updatedChallenge?.status || 'active';
       
       // Check participants
-      const finalParticipants = await participantsCollection.find({ challengeId }).toArray();
+      const finalParticipants = await participantsCollection.find({ challengeId: challengeId.toString() }).toArray();
       console.log(`🧪 [TEST] Challenge participants after finalization:`, finalParticipants.map(p => ({
         username: p.username,
         role: p.role,
@@ -827,8 +827,8 @@ async function runRealChallengeTest(
       })));
 
       // Check wallets
-      const challengerWallet = await walletsCollection.findOne({ userId: challengerUserId });
-      const opponentWallet = await walletsCollection.findOne({ userId: opponentUserId });
+      const challengerWallet = await walletsCollection.findOne({ userId: challengerUserId.toString() });
+      const opponentWallet = await walletsCollection.findOne({ userId: opponentUserId.toString() });
       console.log(`🧪 [TEST] Wallets - Challenger: ${challengerWallet?.creditBalance}, Opponent: ${opponentWallet?.creditBalance}`);
       
       const challengerGotPrize = (challengerWallet?.creditBalance || 0) > 0;
