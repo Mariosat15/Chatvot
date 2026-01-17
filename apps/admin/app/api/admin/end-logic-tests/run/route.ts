@@ -858,7 +858,6 @@ async function runRealChallengeTest(
         details: {
           finalizeResult,
           finalizeSuccess: finalizeResult?.success,
-          finalizeMessage: finalizeResult?.message,
           challengeStatus: actualStatus,
           challengerBalance: challengerWallet?.creditBalance,
           opponentBalance: opponentWallet?.creditBalance,
