@@ -457,20 +457,31 @@ async function runRealCompetitionTest(
       for (let t = 0; t < p.totalTrades; t++) {
         const positionId = new mongoose.Types.ObjectId();
         testDataIds.push(`position:${positionId}`);
+        const isProfitable = t % 3 === 0;
         await positionsCollection.insertOne({
           _id: positionId,
           competitionId: competitionId.toString(),
           userId: userId.toString(),
           participantId: participantId.toString(),
           symbol: 'EUR/USD',
-          side: t % 2 === 0 ? 'buy' : 'sell',
+          side: t % 2 === 0 ? 'long' : 'short', // Schema uses long/short
           quantity: 0.1,
+          orderType: 'market',
           entryPrice: 1.1000,
-          exitPrice: t % 3 === 0 ? 1.1010 : 1.0990, // Mix of wins and losses
-          realizedPnl: t % 3 === 0 ? 10 : -10,
+          currentPrice: isProfitable ? 1.1010 : 1.0990,
+          unrealizedPnl: isProfitable ? 10 : -10,
+          unrealizedPnlPercentage: isProfitable ? 0.9 : -0.9,
+          leverage: 30,
+          marginUsed: 3.67,
+          maintenanceMargin: 1.83,
           status: 'closed',
+          closeReason: 'user',
           openedAt: new Date(now.getTime() - 60000 * (t + 1)),
           closedAt: new Date(now.getTime() - 30000 * (t + 1)),
+          holdingTimeSeconds: 30,
+          openOrderId: `test_order_${positionId}`,
+          lastPriceUpdate: now,
+          priceUpdateCount: 1,
           testRunId,
           createdAt: now,
           updatedAt: now,
@@ -747,9 +758,11 @@ async function runRealChallengeTest(
       oddsUsername: `${testRunId}_${p.role}`,
       userId: userId.toString(), // Must be string to match schema
       username: `${testRunId}_${p.role}`,
+      email: `test_${p.role}@test.com`, // Required field
       role: p.role,
       status: p.status,
       currentCapital: p.equity,
+      availableCapital: p.equity, // Required field
       startingCapital: 10000,
       pnl: p.equity - 10000,
       pnlPercentage: ((p.equity - 10000) / 10000) * 100,

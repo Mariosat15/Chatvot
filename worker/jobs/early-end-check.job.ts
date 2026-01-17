@@ -169,7 +169,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
         if (participants.length !== 2) continue;
 
         const challenger = participants.find(p => p.role === 'challenger');
-        const opponent = participants.find(p => p.role === 'opponent');
+        const opponent = participants.find(p => p.role === 'challenged');
 
         if (!challenger || !opponent) continue;
 
@@ -206,7 +206,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
         console.log(`      disqualifyOnLiquidation: ${disqualifyOnLiquidation}`);
 
         let winnerId: string | null = null;
-        let winnerRole: 'challenger' | 'opponent' | null = null;
+        let winnerRole: 'challenger' | 'challenged' | null = null;
         let endReason = '';
         let noWinner = false;
 
@@ -221,7 +221,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
         } else if (challengerDisqualified && (opponentActive || (!disqualifyOnLiquidation && opponentLiquidated))) {
           // Challenger disqualified, opponent wins (opponent is active OR liquidated when disqualifyOnLiquidation=false)
           winnerId = opponent.userId.toString();
-          winnerRole = 'opponent';
+          winnerRole = 'challenged';
           endReason = 'Challenger disqualified';
           console.log(`      🏆 Opponent wins (challenger disqualified)`);
         } else if (opponentDisqualified && (challengerActive || (!disqualifyOnLiquidation && challengerLiquidated))) {
@@ -233,7 +233,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
         } else if (disqualifyOnLiquidation && challengerLiquidated && opponentActive) {
           // Only if disqualifyOnLiquidation is ON: Challenger liquidated = out, opponent wins
           winnerId = opponent.userId.toString();
-          winnerRole = 'opponent';
+          winnerRole = 'challenged';
           endReason = 'Challenger liquidated (disqualifyOnLiquidation enabled)';
           console.log(`      🏆 Opponent wins (challenger liquidated)`);
         } else if (disqualifyOnLiquidation && opponentLiquidated && challengerActive) {
@@ -253,7 +253,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
             endReason = `Both liquidated - challenger had higher equity ($${challengerEquity.toFixed(2)} vs $${opponentEquity.toFixed(2)})`;
           } else if (opponentEquity > challengerEquity) {
             winnerId = opponent.userId.toString();
-            winnerRole = 'opponent';
+            winnerRole = 'challenged';
             endReason = `Both liquidated - opponent had higher equity ($${opponentEquity.toFixed(2)} vs $${challengerEquity.toFixed(2)})`;
           } else {
             // Tie - no winner (very rare)
@@ -270,7 +270,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
         } else if (opponentLiquidated && challengerDisqualified) {
           // Opponent liquidated but played fair, challenger explicitly disqualified
           winnerId = opponent.userId.toString();
-          winnerRole = 'opponent';
+          winnerRole = 'challenged';
           endReason = 'Challenger disqualified (opponent liquidated but played fair)';
           console.log(`      🏆 Opponent wins (liquidated > disqualified)`);
         } else {
@@ -322,7 +322,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
           const walletsCollection = db.collection('creditwallets');
           
           await walletsCollection.updateOne(
-            { userId: new mongoose.Types.ObjectId(winnerId) },
+            { userId: winnerId }, // userId is stored as string in schema
             { $inc: { creditBalance: prizePool } }
           );
           
@@ -408,8 +408,9 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
 
     for (const competition of testCompetitions) {
       try {
+        // Query using string ID to match schema (competitionId is stored as string)
         const participants = await participantsCollection.find({
-          competitionId: competition._id,
+          competitionId: competition._id.toString(),
         }).toArray();
 
         if (participants.length === 0) continue;
@@ -491,14 +492,15 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
 
     for (const challenge of testChallenges) {
       try {
+        // Query using string ID to match schema (challengeId is stored as string)
         const participants = await challengeParticipantsCollection.find({
-          challengeId: challenge._id,
+          challengeId: challenge._id.toString(),
         }).toArray();
 
         if (participants.length !== 2) continue;
 
         const challenger = participants.find(p => p.role === 'challenger');
-        const opponent = participants.find(p => p.role === 'opponent');
+        const opponent = participants.find(p => p.role === 'challenged');
         if (!challenger || !opponent) continue;
 
         const disqualifyOnLiquidation = challenge.rules?.disqualifyOnLiquidation !== false;
@@ -522,7 +524,7 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
         console.log(`\n   🧪 [TEST EARLY END] Challenge ${challenge._id}`);
 
         let winnerId: string | null = null;
-        let winnerRole: 'challenger' | 'opponent' | null = null;
+        let winnerRole: 'challenger' | 'challenged' | null = null;
         let noWinner = false;
 
         // Determine winner (same logic as main function)
@@ -530,13 +532,13 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
           noWinner = true;
         } else if (challengerDisqualified && (opponentActive || (!disqualifyOnLiquidation && opponentLiquidated))) {
           winnerId = opponent.userId.toString();
-          winnerRole = 'opponent';
+          winnerRole = 'challenged';
         } else if (opponentDisqualified && (challengerActive || (!disqualifyOnLiquidation && challengerLiquidated))) {
           winnerId = challenger.userId.toString();
           winnerRole = 'challenger';
         } else if (disqualifyOnLiquidation && challengerLiquidated && opponentActive) {
           winnerId = opponent.userId.toString();
-          winnerRole = 'opponent';
+          winnerRole = 'challenged';
         } else if (disqualifyOnLiquidation && opponentLiquidated && challengerActive) {
           winnerId = challenger.userId.toString();
           winnerRole = 'challenger';
@@ -548,14 +550,14 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
             winnerRole = 'challenger';
           } else {
             winnerId = opponent.userId.toString();
-            winnerRole = 'opponent';
+            winnerRole = 'challenged';
           }
         } else if (challengerLiquidated && opponentDisqualified) {
           winnerId = challenger.userId.toString();
           winnerRole = 'challenger';
         } else if (opponentLiquidated && challengerDisqualified) {
           winnerId = opponent.userId.toString();
-          winnerRole = 'opponent';
+          winnerRole = 'challenged';
         } else {
           continue; // No early end condition
         }
@@ -596,7 +598,7 @@ export async function runEarlyEndCheckForTest(testRunId: string): Promise<EarlyE
         } else if (winnerId && winnerRole) {
           const walletsCollection = db.collection('creditwallets');
           await walletsCollection.updateOne(
-            { userId: new mongoose.Types.ObjectId(winnerId) },
+            { userId: winnerId }, // userId is stored as string in schema
             { $inc: { creditBalance: prizePool } }
           );
           
