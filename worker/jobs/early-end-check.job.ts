@@ -69,8 +69,30 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
         console.log(`      Active: ${activeCount}, Liquidated: ${liquidatedCount}, Disqualified: ${disqualifiedCount}`);
 
         if (disqualifiedCount === participants.length) {
-          // ALL players disqualified - no winners
-          console.log(`      ❌ All players disqualified - ending with no winners`);
+          // ALL players disqualified - prize pool goes to platform (unclaimed pools)
+          console.log(`      ❌ All players disqualified - prize goes to unclaimed pools`);
+          
+          // Record unclaimed pool for platform
+          const prizePool = competition.prizePool || 0;
+          if (prizePool > 0) {
+            const platformTransactionsCollection = db.collection('platformtransactions');
+            await platformTransactionsCollection.insertOne({
+              transactionType: 'unclaimed_pool',
+              amount: prizePool,
+              amountEUR: prizePool, // Simplified - in production use conversion rate
+              sourceType: 'competition',
+              sourceId: competition._id.toString(),
+              sourceName: competition.name,
+              unclaimedReason: 'all_disqualified',
+              originalPoolAmount: prizePool,
+              winnersCount: 0,
+              expectedWinnersCount: competition.prizeDistribution?.length || 3,
+              description: `All participants disqualified in ${competition.name} - pool goes to platform`,
+              createdAt: now,
+              updatedAt: now,
+            });
+            console.log(`      💰 Recorded ${prizePool} credits to unclaimed pools`);
+          }
           
           await competitionsCollection.updateOne(
             { _id: competition._id },
@@ -78,7 +100,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
               $set: {
                 status: 'completed',
                 completedAt: now,
-                earlyEndReason: 'All participants disqualified',
+                earlyEndReason: 'All participants disqualified - prize to platform',
                 noWinners: true,
               }
             }
@@ -155,10 +177,10 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
 
         // Determine winner based on scenarios
         if (challengerDisqualified && opponentDisqualified) {
-          // Both disqualified - no winner
-          endReason = 'Both players disqualified';
+          // Both disqualified - prize pool goes to platform (unclaimed pools)
+          endReason = 'Both players disqualified - prize to platform';
           noWinner = true;
-          console.log(`      ❌ Both disqualified - no winner`);
+          console.log(`      ❌ Both disqualified - prize goes to unclaimed pools`);
         } else if (challengerDisqualified && opponentActive) {
           // Challenger disqualified, opponent wins
           winnerId = opponent.userId.toString();
@@ -221,17 +243,28 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
 
         // End the challenge early
         if (noWinner) {
-          // Refund both players
-          const walletsCollection = db.collection('creditwallets');
+          // Both disqualified - prize pool goes to platform (NO refund)
+          const prizePool = (challenge.entryFee || 0) * 2;
           
-          await walletsCollection.updateOne(
-            { userId: challenger.userId },
-            { $inc: { creditBalance: challenge.entryFee || 0 } }
-          );
-          await walletsCollection.updateOne(
-            { userId: opponent.userId },
-            { $inc: { creditBalance: challenge.entryFee || 0 } }
-          );
+          if (prizePool > 0) {
+            const platformTransactionsCollection = db.collection('platformtransactions');
+            await platformTransactionsCollection.insertOne({
+              transactionType: 'unclaimed_pool',
+              amount: prizePool,
+              amountEUR: prizePool, // Simplified - in production use conversion rate
+              sourceType: 'challenge',
+              sourceId: challenge._id.toString(),
+              sourceName: `${challenge.challengerName || 'Challenger'} vs ${challenge.challengedName || 'Opponent'}`,
+              unclaimedReason: 'all_disqualified',
+              originalPoolAmount: prizePool,
+              winnersCount: 0,
+              expectedWinnersCount: 1,
+              description: `Both players disqualified in challenge - pool goes to platform`,
+              createdAt: now,
+              updatedAt: now,
+            });
+            console.log(`      💰 Recorded ${prizePool} credits to unclaimed pools`);
+          }
           
           await challengesCollection.updateOne(
             { _id: challenge._id },
@@ -244,8 +277,6 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
               }
             }
           );
-          
-          console.log(`      💰 Refunded both players`);
         } else if (winnerId && winnerRole) {
           // Award winner the prize pool
           const prizePool = (challenge.entryFee || 0) * 2;
