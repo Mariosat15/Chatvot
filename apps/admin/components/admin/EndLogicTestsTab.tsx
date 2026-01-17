@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 // Test case definition
 interface TestCase {
   id: string;
-  category: 'competition-early' | 'competition-normal' | 'competition-prize' | 'competition-journey' | 'challenge-early' | 'challenge-normal' | 'challenge-prize';
+  category: 'competition-early' | 'competition-normal' | 'competition-prize' | 'competition-distribution' | 'competition-journey' | 'challenge-early' | 'challenge-normal' | 'challenge-prize';
   name: string;
   description: string;
   disqualifyOnLiquidation: boolean;
@@ -358,6 +358,69 @@ const TEST_CASES: TestCase[] = [
     status: 'pending',
   },
 
+  // ============ MULTI-WINNER DISTRIBUTION TESTS ============
+  // Prize split: 1st=70%, 2nd=20%, 3rd=10%
+  {
+    id: 'C-D1',
+    category: 'competition-distribution',
+    name: '5 Active → Top 3 Prizes',
+    description: 'Verify 70/20/10 split with 5 active players',
+    disqualifyOnLiquidation: true,
+    scenario: '5 active players ranked by equity',
+    expectedResult: '1st: $280 (70%), 2nd: $80 (20%), 3rd: $40 (10%)',
+    status: 'pending',
+  },
+  {
+    id: 'C-D2',
+    category: 'competition-distribution',
+    name: '3 Active + 2 Disqualified',
+    description: 'Only active players get prizes',
+    disqualifyOnLiquidation: true,
+    scenario: '3 active (lower equity) vs 2 disqualified (higher equity)',
+    expectedResult: '3 active get all prizes, disqualified excluded',
+    status: 'pending',
+  },
+  {
+    id: 'C-D3',
+    category: 'competition-distribution',
+    name: '2 Active + 4 Liquidated (Flag OFF)',
+    description: 'Liquidated player can win 3rd place!',
+    disqualifyOnLiquidation: false,
+    scenario: '2 active + 4 liquidated, ranked by equity',
+    expectedResult: '1st: Active, 2nd: Active, 3rd: Liquidated! ($48)',
+    status: 'pending',
+  },
+  {
+    id: 'C-D4',
+    category: 'competition-distribution',
+    name: '1 Active + 5 Liquidated (Flag OFF)',
+    description: 'Liquidated compete for 2nd and 3rd',
+    disqualifyOnLiquidation: false,
+    scenario: '1 active + 5 liquidated, all ranked by equity',
+    expectedResult: '1st: Active, 2nd: Liquidated ($96), 3rd: Liquidated ($48)',
+    status: 'pending',
+  },
+  {
+    id: 'C-D5',
+    category: 'competition-distribution',
+    name: '3 Active + 3 Liquidated (Flag ON)',
+    description: 'Liquidated excluded even with higher equity',
+    disqualifyOnLiquidation: true,
+    scenario: '3 active (lower equity) vs 3 liquidated (higher equity)',
+    expectedResult: 'Only active players get prizes',
+    status: 'pending',
+  },
+  {
+    id: 'C-D6',
+    category: 'competition-distribution',
+    name: 'Only 2 Winners → 3rd Unclaimed',
+    description: 'Missing winners → prize to unclaimed pool',
+    disqualifyOnLiquidation: true,
+    scenario: '2 active only, no 3rd winner',
+    expectedResult: '1st: $224, 2nd: $64, 3rd: $32 → unclaimed',
+    status: 'pending',
+  },
+
   // ============ FULL JOURNEY TESTS ============
   {
     id: 'C-J1',
@@ -386,6 +449,7 @@ const CATEGORIES = [
   { id: 'competition-early', name: 'Competition Early End', icon: Trophy, color: 'text-yellow-400' },
   { id: 'competition-normal', name: 'Competition Normal End', icon: Trophy, color: 'text-blue-400' },
   { id: 'competition-prize', name: 'Competition Prize Distribution', icon: DollarSign, color: 'text-emerald-400' },
+  { id: 'competition-distribution', name: 'Multi-Winner Distribution', icon: DollarSign, color: 'text-pink-400' },
   { id: 'competition-journey', name: 'Competition Full Journey', icon: Clock, color: 'text-purple-400' },
   { id: 'challenge-early', name: 'Challenge Early End', icon: Swords, color: 'text-orange-400' },
   { id: 'challenge-normal', name: 'Challenge Normal End', icon: Swords, color: 'text-green-400' },

@@ -37,6 +37,9 @@ const TEST_SCENARIOS: Record<string, {
     expectedPlatformFee?: number;
     expectedWinnerPrize?: number;
     expectedUnclaimedAmount?: number;
+    // Multi-winner distribution (optional)
+    expectedRanking?: number[]; // Array of participant indices in order [1st, 2nd, 3rd...]
+    expectedPrizes?: number[]; // Array of prize amounts for each rank
   };
 }> = {
   // ============ COMPETITION EARLY END TESTS ============
@@ -436,6 +439,162 @@ const TEST_SCENARIOS: Record<string, {
       expectedWinnerPrize: 160,
     },
   },
+
+  // ============ MULTI-WINNER DISTRIBUTION TESTS ============
+  // Prize split: 1st=70%, 2nd=20%, 3rd=10%
+  // Pool = participants × 100 entry fee, minus 20% platform fee
+  
+  'C-D1': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      { role: 'participant', status: 'active', equity: 8000, totalTrades: 5 }, // 1st place
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 4 }, // 2nd place
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 3 }, // 3rd place
+      { role: 'participant', status: 'active', equity: 5000, totalTrades: 2 }, // 4th (no prize)
+      { role: 'participant', status: 'active', equity: 4000, totalTrades: 1 }, // 5th (no prize)
+    ],
+    // 5 × 100 = 500 pool, 20% fee = 100, net = 400
+    // 1st: 400 × 70% = 280, 2nd: 400 × 20% = 80, 3rd: 400 × 10% = 40
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 500,
+      expectedPlatformFee: 100,
+      expectedRanking: [0, 1, 2], // participant indices by rank
+      expectedPrizes: [280, 80, 40], // prizes for 1st, 2nd, 3rd
+    },
+  },
+  
+  'C-D2': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      { role: 'participant', status: 'active', equity: 7500, totalTrades: 5 }, // 1st place
+      { role: 'participant', status: 'active', equity: 6500, totalTrades: 4 }, // 2nd place
+      { role: 'participant', status: 'active', equity: 5500, totalTrades: 3 }, // 3rd place
+      { role: 'participant', status: 'disqualified', equity: 9000, totalTrades: 0 }, // Disqualified (no trades)
+      { role: 'participant', status: 'disqualified', equity: 8500, totalTrades: 0 }, // Disqualified (no trades)
+    ],
+    // 5 × 100 = 500 pool, 20% fee = 100, net = 400
+    // Only 3 active, they get all prizes: 280, 80, 40
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 500,
+      expectedPlatformFee: 100,
+      expectedRanking: [0, 1, 2], // Only active players ranked
+      expectedPrizes: [280, 80, 40],
+    },
+  },
+  
+  'C-D3': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: false, // Liquidated players still eligible!
+    participants: [
+      { role: 'participant', status: 'active', equity: 8000, totalTrades: 5 }, // 1st place
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 4 }, // 2nd place
+      { role: 'participant', status: 'liquidated', equity: 6500, totalTrades: 3 }, // 3rd place (liquidated but eligible!)
+      { role: 'participant', status: 'liquidated', equity: 6000, totalTrades: 2 }, // 4th (liquidated)
+      { role: 'participant', status: 'liquidated', equity: 5500, totalTrades: 1 }, // 5th (liquidated)
+      { role: 'participant', status: 'liquidated', equity: 5000, totalTrades: 1 }, // 6th (liquidated)
+    ],
+    // 6 × 100 = 600 pool, 20% fee = 120, net = 480
+    // Flag OFF: 2 active + 4 liquidated, ALL ranked by equity
+    // 1st (active): 480 × 70% = 336
+    // 2nd (active): 480 × 20% = 96
+    // 3rd (liquidated!): 480 × 10% = 48
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 600,
+      expectedPlatformFee: 120,
+      expectedRanking: [0, 1, 2], // 3rd place is liquidated participant!
+      expectedPrizes: [336, 96, 48],
+    },
+  },
+  
+  'C-D4': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: false, // Liquidated players compete for all positions!
+    participants: [
+      { role: 'participant', status: 'active', equity: 8000, totalTrades: 5 }, // 1st place (only active)
+      { role: 'participant', status: 'liquidated', equity: 7500, totalTrades: 4 }, // 2nd place (liquidated!)
+      { role: 'participant', status: 'liquidated', equity: 7000, totalTrades: 3 }, // 3rd place (liquidated!)
+      { role: 'participant', status: 'liquidated', equity: 6000, totalTrades: 2 }, // 4th 
+      { role: 'participant', status: 'liquidated', equity: 5000, totalTrades: 1 }, // 5th
+      { role: 'participant', status: 'liquidated', equity: 4000, totalTrades: 1 }, // 6th
+    ],
+    // 6 × 100 = 600 pool, 20% fee = 120, net = 480
+    // 1 active + 5 liquidated, flag OFF = all ranked by equity
+    // 1st (active): 336, 2nd (liquidated): 96, 3rd (liquidated): 48
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 600,
+      expectedPlatformFee: 120,
+      expectedRanking: [0, 1, 2], // All liquidated for 2nd and 3rd
+      expectedPrizes: [336, 96, 48],
+    },
+  },
+  
+  'C-D5': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true, // Flag ON - liquidated are OUT
+    participants: [
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 }, // 1st place
+      { role: 'participant', status: 'active', equity: 5500, totalTrades: 4 }, // 2nd place
+      { role: 'participant', status: 'active', equity: 5000, totalTrades: 3 }, // 3rd place
+      { role: 'participant', status: 'liquidated', equity: 8000, totalTrades: 2 }, // Liquidated (disqualified) - even higher equity!
+      { role: 'participant', status: 'liquidated', equity: 7500, totalTrades: 1 }, // Liquidated (disqualified)
+      { role: 'participant', status: 'liquidated', equity: 7000, totalTrades: 1 }, // Liquidated (disqualified)
+    ],
+    // 6 × 100 = 600 pool, 20% fee = 120, net = 480
+    // Flag ON: only 3 active are eligible, liquidated are disqualified even with higher equity!
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 600,
+      expectedPlatformFee: 120,
+      expectedRanking: [0, 1, 2], // Only active players, liquidated excluded
+      expectedPrizes: [336, 96, 48],
+    },
+  },
+  
+  'C-D6': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 }, // 1st place
+      { role: 'participant', status: 'active', equity: 5000, totalTrades: 4 }, // 2nd place
+      { role: 'participant', status: 'liquidated', equity: 8000, totalTrades: 2 }, // Liquidated - disqualified
+      { role: 'participant', status: 'disqualified', equity: 7000, totalTrades: 0 }, // Disqualified (no trades)
+    ],
+    // 4 × 100 = 400 pool, 20% fee = 80, net = 320
+    // Only 2 active, 3rd place prize goes to unclaimed (no 3rd winner)
+    // 1st: 320 × 70% = 224, 2nd: 320 × 20% = 64, 3rd: 320 × 10% = 32 → unclaimed
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, // Main pool distributed, but 3rd place unclaimed
+      statusAfter: 'completed',
+      expectedPrizePool: 400,
+      expectedPlatformFee: 80,
+      expectedRanking: [0, 1], // Only 2 winners
+      expectedPrizes: [224, 64], // 3rd place prize (32) goes to unclaimed
+      expectedUnclaimedAmount: 32, // 3rd place prize not distributed
+    },
+  },
 };
 
 export async function POST(request: NextRequest) {
@@ -503,6 +662,17 @@ async function runRealCompetitionTest(
   const testAdminId = new mongoose.Types.ObjectId();
   testDataIds.push(`competition:${competitionId}`);
 
+  // Determine prize distribution based on test type
+  // Multi-winner tests (C-D*) use 70/20/10 split, others use winner-takes-all
+  const isMultiWinnerTest = scenario.expected.expectedRanking && scenario.expected.expectedRanking.length > 1;
+  const prizeDistribution = isMultiWinnerTest
+    ? [
+        { rank: 1, percentage: 70 },
+        { rank: 2, percentage: 20 },
+        { rank: 3, percentage: 10 },
+      ]
+    : [{ rank: 1, percentage: 100 }];
+
   await competitionsCollection.insertOne({
     _id: competitionId,
     name: `${testRunId}_Competition`,
@@ -523,7 +693,7 @@ async function runRealCompetitionTest(
       minimumTrades: 0, // Set to 0 for tests - we want to test disqualification logic, not trade counts
       disqualifyOnLiquidation: scenario.disqualifyOnLiquidation,
     },
-    prizeDistribution: [{ rank: 1, percentage: 100 }],
+    prizeDistribution,
     maxParticipants: 100,
     minParticipants: 2,
     currentParticipants: scenario.participants.length,
@@ -810,24 +980,26 @@ async function runRealCompetitionTest(
         currentCapital: p.currentCapital,
         isWinner: p.isWinner,
         prizeWon: p.prizeWon,
+        finalRank: p.finalRank,
       })));
       
-      // Check wallets for prize distribution
-      let winnerFound = false;
-      let winnerUserId = '';
-      let winnerIndex = -1;
-      let winnerBalance = 0;
+      // Check ALL wallets for multi-winner distribution
+      const walletBalances: { participantIndex: number; userId: string; balance: number }[] = [];
       for (let i = 0; i < participantUserIds.length; i++) {
         const wallet = await walletsCollection.findOne({ userId: participantUserIds[i].toString() });
-        console.log(`🧪 [TEST] Wallet for user ${i}:`, wallet?.creditBalance);
-        if (wallet && wallet.creditBalance > 0) {
-          winnerFound = true;
-          winnerUserId = participantUserIds[i].toString();
-          winnerIndex = i;
-          winnerBalance = wallet.creditBalance;
-          break;
+        const balance = wallet?.creditBalance || 0;
+        console.log(`🧪 [TEST] Wallet for participant ${i}: $${balance}`);
+        if (balance > 0) {
+          walletBalances.push({ participantIndex: i, userId: participantUserIds[i].toString(), balance });
         }
       }
+      
+      // Sort by balance descending to get ranking order
+      walletBalances.sort((a, b) => b.balance - a.balance);
+      const actualRanking = walletBalances.map(w => w.participantIndex);
+      const actualPrizes = walletBalances.map(w => w.balance);
+      
+      console.log(`🧪 [TEST] Prize distribution: ranking=${actualRanking.join(',')}, prizes=${actualPrizes.join(',')}`);
       
       // Check platform transactions for prize verification
       const platformFeeTransaction = await platformTransactionsCollection.findOne({
@@ -847,21 +1019,64 @@ async function runRealCompetitionTest(
         issues.push(`Status: expected 'completed', got '${actualStatus}'`);
       }
 
-      if (scenario.expected.winnerId !== undefined && winnerIndex !== scenario.expected.winnerId) {
+      // Single winner tests
+      if (scenario.expected.winnerId !== undefined && actualRanking[0] !== scenario.expected.winnerId) {
         passed = false;
-        issues.push(`Winner: expected participant ${scenario.expected.winnerId}, got ${winnerIndex}`);
+        issues.push(`Winner: expected participant ${scenario.expected.winnerId}, got ${actualRanking[0] ?? 'none'}`);
       }
       
-      // Verify prize amounts if specified
-      if (scenario.expected.expectedWinnerPrize !== undefined && winnerFound) {
+      // Verify single winner prize amounts if specified
+      if (scenario.expected.expectedWinnerPrize !== undefined && walletBalances.length > 0) {
         const expectedPrize = scenario.expected.expectedWinnerPrize;
-        if (Math.abs(winnerBalance - expectedPrize) > 1) { // Allow $1 tolerance
+        const actualWinnerPrize = walletBalances[0]?.balance || 0;
+        if (Math.abs(actualWinnerPrize - expectedPrize) > 1) { // Allow $1 tolerance
           passed = false;
-          issues.push(`Winner prize: expected $${expectedPrize}, got $${winnerBalance}`);
+          issues.push(`Winner prize: expected $${expectedPrize}, got $${actualWinnerPrize}`);
         }
       }
       
-      if (scenario.expected.expectedUnclaimedAmount !== undefined && scenario.expected.toUnclaimedPool) {
+      // Multi-winner ranking verification
+      if (scenario.expected.expectedRanking) {
+        const expectedRanking = scenario.expected.expectedRanking;
+        if (actualRanking.length < expectedRanking.length) {
+          passed = false;
+          issues.push(`Winners count: expected ${expectedRanking.length}, got ${actualRanking.length}`);
+        } else {
+          // Check each rank position
+          for (let r = 0; r < expectedRanking.length; r++) {
+            if (actualRanking[r] !== expectedRanking[r]) {
+              passed = false;
+              issues.push(`Rank ${r + 1}: expected participant ${expectedRanking[r]}, got ${actualRanking[r]}`);
+            }
+          }
+        }
+      }
+      
+      // Multi-winner prize verification
+      if (scenario.expected.expectedPrizes) {
+        const expectedPrizes = scenario.expected.expectedPrizes;
+        for (let p = 0; p < expectedPrizes.length; p++) {
+          const expectedPrize = expectedPrizes[p];
+          const actualPrize = actualPrizes[p] || 0;
+          if (Math.abs(actualPrize - expectedPrize) > 1) { // Allow $1 tolerance
+            passed = false;
+            issues.push(`Prize ${p + 1}: expected $${expectedPrize}, got $${actualPrize}`);
+          }
+        }
+      }
+      
+      // Platform fee verification
+      if (scenario.expected.expectedPlatformFee !== undefined && platformFeeTransaction) {
+        const actualFee = platformFeeTransaction.amount || 0;
+        const expectedFee = scenario.expected.expectedPlatformFee;
+        if (Math.abs(actualFee - expectedFee) > 1) {
+          passed = false;
+          issues.push(`Platform fee: expected $${expectedFee}, got $${actualFee}`);
+        }
+      }
+      
+      // Unclaimed pool verification (for missing winners or all disqualified)
+      if (scenario.expected.expectedUnclaimedAmount !== undefined) {
         const actualUnclaimed = unclaimedTransaction?.amount || 0;
         const expectedUnclaimed = scenario.expected.expectedUnclaimedAmount;
         if (Math.abs(actualUnclaimed - expectedUnclaimed) > 1) {
@@ -870,12 +1085,21 @@ async function runRealCompetitionTest(
         }
       }
 
+      // Build prize distribution summary
+      const winnerSummary = walletBalances.length > 0 
+        ? walletBalances.map((w, i) => `${i + 1}st: P${w.participantIndex} ($${w.balance})`).join(', ')
+        : 'No winners';
+
       actualResult = {
         passed,
         message: passed ? '✅ Test PASSED - Real finalization executed correctly' : `❌ Test FAILED: ${issues.join(', ')}`,
-        actualOutcome: `Status: ${actualStatus}, Winner: participant ${winnerIndex} (${winnerFound ? winnerUserId.slice(-6) : 'none'}), Prize: $${winnerBalance}`,
-        prizeDistribution: winnerFound 
-          ? { winnerId: winnerUserId, winnerPrize: winnerBalance }
+        actualOutcome: `Status: ${actualStatus}, Winners: ${winnerSummary}`,
+        prizeDistribution: walletBalances.length > 0
+          ? { 
+              winnerId: walletBalances[0].userId, 
+              winnerPrize: walletBalances[0].balance,
+              unclaimedPool: unclaimedTransaction?.amount,
+            }
           : unclaimedTransaction
             ? { unclaimedPool: unclaimedTransaction.amount }
             : undefined,
@@ -884,11 +1108,12 @@ async function runRealCompetitionTest(
           finalizeSuccess: finalizeResult?.success,
           finalizeMessage: finalizeResult?.message,
           competitionStatus: actualStatus,
-          winnerIndex,
-          winnerBalance,
+          actualRanking,
+          actualPrizes,
           platformFee: platformFeeTransaction?.amount,
           unclaimedAmount: unclaimedTransaction?.amount,
           participantsCount: finalParticipants.length,
+          winnersCount: walletBalances.length,
         },
       };
     }
