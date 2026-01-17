@@ -21,7 +21,7 @@ const TEST_SCENARIOS: Record<string, {
   endType: 'early' | 'normal';
   disqualifyOnLiquidation: boolean;
   participants: Array<{
-    role: 'participant' | 'challenger' | 'opponent';
+    role: 'participant' | 'challenger' | 'challenged';
     status: 'active' | 'liquidated' | 'disqualified';
     equity: number;
     totalTrades: number;
@@ -149,9 +149,9 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: true,
     participants: [
       { role: 'challenger', status: 'liquidated', equity: 3000, totalTrades: 5 },
-      { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'challenged', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'opponent', toUnclaimedPool: false, statusAfter: 'completed' },
+    expected: { shouldEndEarly: true, winnerRole: 'challenged', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-E2': {
     type: 'challenge',
@@ -159,7 +159,7 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: true,
     participants: [
       { role: 'challenger', status: 'active', equity: 6000, totalTrades: 5 },
-      { role: 'opponent', status: 'liquidated', equity: 3000, totalTrades: 5 },
+      { role: 'challenged', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
     expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
@@ -169,7 +169,7 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: true,
     participants: [
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
-      { role: 'opponent', status: 'liquidated', equity: 3000, totalTrades: 5 },
+      { role: 'challenged', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
     expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
@@ -179,9 +179,9 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: true,
     participants: [
       { role: 'challenger', status: 'disqualified', equity: 5000, totalTrades: 0 },
-      { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'challenged', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'opponent', toUnclaimedPool: false, statusAfter: 'completed' },
+    expected: { shouldEndEarly: true, winnerRole: 'challenged', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-E5': {
     type: 'challenge',
@@ -189,7 +189,7 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: true,
     participants: [
       { role: 'challenger', status: 'disqualified', equity: 5000, totalTrades: 0 },
-      { role: 'opponent', status: 'disqualified', equity: 6000, totalTrades: 0 },
+      { role: 'challenged', status: 'disqualified', equity: 6000, totalTrades: 0 },
     ],
     expected: { shouldEndEarly: true, toUnclaimedPool: true, statusAfter: 'completed' },
   },
@@ -199,7 +199,7 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: true,
     participants: [
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
-      { role: 'opponent', status: 'disqualified', equity: 6000, totalTrades: 0 },
+      { role: 'challenged', status: 'disqualified', equity: 6000, totalTrades: 0 },
     ],
     expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
@@ -209,7 +209,7 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: false,
     participants: [
       { role: 'challenger', status: 'liquidated', equity: 3000, totalTrades: 5 },
-      { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'challenged', status: 'active', equity: 6000, totalTrades: 5 },
     ],
     expected: { shouldEndEarly: false, toUnclaimedPool: false, statusAfter: 'active' },
   },
@@ -219,7 +219,7 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: false,
     participants: [
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
-      { role: 'opponent', status: 'liquidated', equity: 3000, totalTrades: 5 },
+      { role: 'challenged', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
     expected: { shouldEndEarly: false, toUnclaimedPool: false, statusAfter: 'active' },
   },
@@ -229,9 +229,9 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: false,
     participants: [
       { role: 'challenger', status: 'disqualified', equity: 5000, totalTrades: 0 },
-      { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'challenged', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: true, winnerRole: 'opponent', toUnclaimedPool: false, statusAfter: 'completed' },
+    expected: { shouldEndEarly: true, winnerRole: 'challenged', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-E10': {
     type: 'challenge',
@@ -239,7 +239,7 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: false,
     participants: [
       { role: 'challenger', status: 'disqualified', equity: 5000, totalTrades: 0 },
-      { role: 'opponent', status: 'disqualified', equity: 6000, totalTrades: 0 },
+      { role: 'challenged', status: 'disqualified', equity: 6000, totalTrades: 0 },
     ],
     expected: { shouldEndEarly: true, toUnclaimedPool: true, statusAfter: 'completed' },
   },
@@ -249,7 +249,7 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: false,
     participants: [
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
-      { role: 'opponent', status: 'disqualified', equity: 6000, totalTrades: 0 },
+      { role: 'challenged', status: 'disqualified', equity: 6000, totalTrades: 0 },
     ],
     expected: { shouldEndEarly: true, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
@@ -261,9 +261,9 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: true,
     participants: [
       { role: 'challenger', status: 'active', equity: 5000, totalTrades: 5 },
-      { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'challenged', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'opponent', toUnclaimedPool: false, statusAfter: 'completed' },
+    expected: { shouldEndEarly: false, winnerRole: 'challenged', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-N2': {
     type: 'challenge',
@@ -271,9 +271,9 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: true,
     participants: [
       { role: 'challenger', status: 'liquidated', equity: 3000, totalTrades: 5 },
-      { role: 'opponent', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'challenged', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    expected: { shouldEndEarly: false, winnerRole: 'opponent', toUnclaimedPool: false, statusAfter: 'completed' },
+    expected: { shouldEndEarly: false, winnerRole: 'challenged', toUnclaimedPool: false, statusAfter: 'completed' },
   },
   'CH-N3': {
     type: 'challenge',
@@ -281,7 +281,7 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: true,
     participants: [
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
-      { role: 'opponent', status: 'liquidated', equity: 3000, totalTrades: 5 },
+      { role: 'challenged', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
     expected: { shouldEndEarly: false, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
@@ -291,7 +291,7 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: false,
     participants: [
       { role: 'challenger', status: 'liquidated', equity: 3000, totalTrades: 5 },
-      { role: 'opponent', status: 'active', equity: 2000, totalTrades: 5 },
+      { role: 'challenged', status: 'active', equity: 2000, totalTrades: 5 },
     ],
     expected: { shouldEndEarly: false, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
@@ -301,7 +301,7 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: false,
     participants: [
       { role: 'challenger', status: 'liquidated', equity: 5000, totalTrades: 5 },
-      { role: 'opponent', status: 'liquidated', equity: 3000, totalTrades: 5 },
+      { role: 'challenged', status: 'liquidated', equity: 3000, totalTrades: 5 },
     ],
     expected: { shouldEndEarly: false, winnerRole: 'challenger', toUnclaimedPool: false, statusAfter: 'completed' },
   },
@@ -406,6 +406,7 @@ async function runRealCompetitionTest(
 
   // Create test participants and wallets
   const participantUserIds: mongoose.Types.ObjectId[] = [];
+  const positionsCollection = db.collection('tradingpositions');
   
   for (let i = 0; i < scenario.participants.length; i++) {
     const p = scenario.participants[i];
@@ -450,6 +451,32 @@ async function runRealCompetitionTest(
       createdAt: now,
       updatedAt: now,
     });
+
+    // Create closed positions for participants with trades (so finalization counts them)
+    if (p.totalTrades > 0) {
+      for (let t = 0; t < p.totalTrades; t++) {
+        const positionId = new mongoose.Types.ObjectId();
+        testDataIds.push(`position:${positionId}`);
+        await positionsCollection.insertOne({
+          _id: positionId,
+          competitionId: competitionId.toString(),
+          userId: userId.toString(),
+          participantId: participantId.toString(),
+          symbol: 'EUR/USD',
+          side: t % 2 === 0 ? 'buy' : 'sell',
+          quantity: 0.1,
+          entryPrice: 1.1000,
+          exitPrice: t % 3 === 0 ? 1.1010 : 1.0990, // Mix of wins and losses
+          realizedPnl: t % 3 === 0 ? 10 : -10,
+          status: 'closed',
+          openedAt: new Date(now.getTime() - 60000 * (t + 1)),
+          closedAt: new Date(now.getTime() - 30000 * (t + 1)),
+          testRunId,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    }
   }
 
   // Now run the ACTUAL production code
@@ -704,12 +731,13 @@ async function runRealChallengeTest(
   // Create participants
   const userIdMap: Record<string, mongoose.Types.ObjectId> = {
     challenger: challengerUserId,
-    opponent: opponentUserId,
+    challenged: challengerUserId, // Map 'challenged' to opponentUserId below
   };
+  userIdMap['challenged'] = opponentUserId;
 
   for (const p of scenario.participants) {
     const participantId = new mongoose.Types.ObjectId();
-    const userId = userIdMap[p.role as 'challenger' | 'opponent'];
+    const userId = userIdMap[p.role as 'challenger' | 'challenged'];
     testDataIds.push(`challengeparticipant:${participantId}`);
 
     await participantsCollection.insertOne({
@@ -767,7 +795,7 @@ async function runRealChallengeTest(
       const challengerGotPrize = (challengerWallet?.creditBalance || 0) > 0;
       const opponentGotPrize = (opponentWallet?.creditBalance || 0) > 0;
 
-      let actualWinner = challengerGotPrize ? 'challenger' : opponentGotPrize ? 'opponent' : null;
+      let actualWinner = challengerGotPrize ? 'challenger' : opponentGotPrize ? 'challenged' : null;
 
       let passed = true;
       const issues: string[] = [];
@@ -833,7 +861,7 @@ async function runRealChallengeTest(
       
       const challengerGotPrize = (challengerWallet?.creditBalance || 0) > 0;
       const opponentGotPrize = (opponentWallet?.creditBalance || 0) > 0;
-      const actualWinner = challengerGotPrize ? 'challenger' : opponentGotPrize ? 'opponent' : null;
+      const actualWinner = challengerGotPrize ? 'challenger' : opponentGotPrize ? 'challenged' : null;
 
       let passed = true;
       const issues: string[] = [];
