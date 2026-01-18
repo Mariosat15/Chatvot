@@ -761,14 +761,15 @@ const TEST_SCENARIOS: Record<string, {
     endType: 'normal',
     disqualifyOnLiquidation: true,
     participants: [
-      // Both have EXACTLY same equity - challenger advantage
+      // Both have EXACTLY same equity - true tie
       { role: 'challenger', status: 'active', equity: 6000, totalTrades: 5 },
       { role: 'challenged', status: 'active', equity: 6000, totalTrades: 5 },
     ],
-    // Tied PNL - challenger gets advantage and wins
+    // Default: split_equally - both players split prize, no single winner
+    // isTie=true, winnerId=null, both get half the prize
     expected: { 
       shouldEndEarly: false, 
-      winnerRole: 'challenger', // Challenger advantage on tie
+      winnerRole: 'tie', // Both players tie - prize split equally (default admin setting)
       toUnclaimedPool: false, 
       statusAfter: 'completed',
     },
@@ -993,6 +994,8 @@ async function runRealCompetitionTest(
       winnerId?: string;
       winnerPrize?: number;
       unclaimedPool?: number;
+      tie?: boolean; // True if both participants got prize (split_equally)
+      splitPrize?: number; // Prize per participant when tied
     };
     details?: Record<string, unknown>;
   };
@@ -1535,6 +1538,8 @@ async function runRealChallengeTest(
       winnerId?: string;
       winnerPrize?: number;
       unclaimedPool?: number;
+      tie?: boolean; // True if both participants got prize (split_equally)
+      splitPrize?: number; // Prize per participant when tied
     };
     details?: Record<string, unknown>;
   };
@@ -1557,7 +1562,17 @@ async function runRealChallengeTest(
       const challengerGotPrize = (challengerWallet?.creditBalance || 0) > 0;
       const opponentGotPrize = (opponentWallet?.creditBalance || 0) > 0;
 
-      let actualWinner = challengerGotPrize ? 'challenger' : opponentGotPrize ? 'challenged' : null;
+      // Determine winner - if BOTH got prize, it's a tie (split_equally)
+      let actualWinner: string | null;
+      if (challengerGotPrize && opponentGotPrize) {
+        actualWinner = 'tie'; // Both got prize = tie with split_equally
+      } else if (challengerGotPrize) {
+        actualWinner = 'challenger';
+      } else if (opponentGotPrize) {
+        actualWinner = 'challenged';
+      } else {
+        actualWinner = null;
+      }
 
       let passed = true;
       const issues: string[] = [];
@@ -1583,9 +1598,11 @@ async function runRealChallengeTest(
         actualOutcome: `Status: ${actualStatus}, Winner: ${actualWinner || 'none'}, NoWinner: ${hadNoWinner}`,
         prizeDistribution: hadNoWinner 
           ? { unclaimedPool: prizePool }
-          : actualWinner 
-            ? { winnerId: actualWinner === 'challenger' ? challengerUserId.toString() : opponentUserId.toString(), winnerPrize: prizePool }
-            : undefined,
+          : actualWinner === 'tie'
+            ? { tie: true, splitPrize: prizePool / 2 }
+            : actualWinner 
+              ? { winnerId: actualWinner === 'challenger' ? challengerUserId.toString() : opponentUserId.toString(), winnerPrize: prizePool }
+              : undefined,
         details: {
           earlyEndResult,
           challengeStatus: actualStatus,
@@ -1623,7 +1640,18 @@ async function runRealChallengeTest(
       
       const challengerGotPrize = (challengerWallet?.creditBalance || 0) > 0;
       const opponentGotPrize = (opponentWallet?.creditBalance || 0) > 0;
-      const actualWinner = challengerGotPrize ? 'challenger' : opponentGotPrize ? 'challenged' : null;
+      
+      // Determine winner - if BOTH got prize, it's a tie (split_equally)
+      let actualWinner: string | null;
+      if (challengerGotPrize && opponentGotPrize) {
+        actualWinner = 'tie'; // Both got prize = tie with split_equally
+      } else if (challengerGotPrize) {
+        actualWinner = 'challenger';
+      } else if (opponentGotPrize) {
+        actualWinner = 'challenged';
+      } else {
+        actualWinner = null;
+      }
 
       let passed = true;
       const issues: string[] = [];
@@ -1642,9 +1670,11 @@ async function runRealChallengeTest(
         passed,
         message: passed ? '✅ Test PASSED - Real finalization executed correctly' : `❌ Test FAILED: ${issues.join(', ')}`,
         actualOutcome: `Status: ${actualStatus}, Winner: ${actualWinner || 'none'}`,
-        prizeDistribution: actualWinner 
-          ? { winnerId: actualWinner === 'challenger' ? challengerUserId.toString() : opponentUserId.toString(), winnerPrize: prizePool }
-          : undefined,
+        prizeDistribution: actualWinner === 'tie'
+          ? { tie: true, splitPrize: prizePool / 2 }
+          : actualWinner 
+            ? { winnerId: actualWinner === 'challenger' ? challengerUserId.toString() : opponentUserId.toString(), winnerPrize: prizePool }
+            : undefined,
         details: {
           finalizeResult,
           finalizeSuccess: finalizeResult?.success,

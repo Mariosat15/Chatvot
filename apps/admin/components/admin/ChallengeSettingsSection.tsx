@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
   Swords,
@@ -18,6 +19,7 @@ import {
   Shield,
   Zap,
   Info,
+  Scale,
 } from 'lucide-react';
 
 interface ChallengeSettings {
@@ -38,6 +40,7 @@ interface ChallengeSettings {
   challengeCooldownMinutes: number;
   maxPendingChallenges: number;
   maxActiveChallenges: number;
+  tiePrizeDistribution: 'split_equally' | 'challenger_wins' | 'both_lose';
 }
 
 export default function ChallengeSettingsSection() {
@@ -396,6 +399,64 @@ export default function ChallengeSettingsSection() {
                 className="bg-gray-800 border-gray-600 text-white"
               />
               <p className="text-xs text-gray-500 mt-1">Between challenges to same user (0 = no cooldown)</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tie Resolution Card */}
+        <Card className="bg-gradient-to-br from-orange-900/30 to-red-900/30 border-orange-500/50">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Scale className="h-5 w-5 text-orange-400" />
+              Tie Resolution
+            </CardTitle>
+            <CardDescription>What happens when both players have exact same performance</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label className="text-gray-400">Prize Distribution on Tie</Label>
+              <Select
+                value={settings.tiePrizeDistribution || 'split_equally'}
+                onValueChange={(value: 'split_equally' | 'challenger_wins' | 'both_lose') => 
+                  updateSetting('tiePrizeDistribution', value)
+                }
+              >
+                <SelectTrigger className="bg-gray-800 border-gray-600 text-white mt-2">
+                  <SelectValue placeholder="Select tie resolution" />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-600">
+                  <SelectItem value="split_equally" className="text-white hover:bg-gray-700">
+                    <div className="flex items-center gap-2">
+                      <span>🤝</span>
+                      <div>
+                        <div className="font-medium">Split Equally</div>
+                        <div className="text-xs text-gray-400">Both players share the prize 50/50</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="challenger_wins" className="text-white hover:bg-gray-700">
+                    <div className="flex items-center gap-2">
+                      <span>⚔️</span>
+                      <div>
+                        <div className="font-medium">Challenger Wins</div>
+                        <div className="text-xs text-gray-400">Challenger gets full prize (challenger advantage)</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="both_lose" className="text-white hover:bg-gray-700">
+                    <div className="flex items-center gap-2">
+                      <span>❌</span>
+                      <div>
+                        <div className="font-medium">Both Lose</div>
+                        <div className="text-xs text-gray-400">No winner - prize goes to platform</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-2">
+                This setting applies when both players finish with identical P&L after all tiebreakers
+              </p>
             </div>
           </CardContent>
         </Card>

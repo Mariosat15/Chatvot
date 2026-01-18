@@ -49,6 +49,9 @@ export interface IChallengeSettings extends Document {
   maxPendingChallenges: number; // Max pending challenges a user can have
   maxActiveChallenges: number; // Max active challenges at once
   
+  // Tie Resolution (when both players have exact same performance)
+  tiePrizeDistribution: 'split_equally' | 'challenger_wins' | 'both_lose';
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -154,6 +157,13 @@ const ChallengeSettingsSchema = new Schema<IChallengeSettings>(
       required: true,
       default: 3,
       min: 1,
+    },
+    // Tie Resolution - how to handle ties when both players have exact same performance
+    tiePrizeDistribution: {
+      type: String,
+      enum: ['split_equally', 'challenger_wins', 'both_lose'],
+      required: true,
+      default: 'split_equally', // Fair default: both players split the prize
     },
   },
   {

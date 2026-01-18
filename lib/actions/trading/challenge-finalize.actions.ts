@@ -598,8 +598,8 @@ export async function finalizeChallenge(challengeId: string) {
       loserParticipant.status = 'completed';
       await loserParticipant.save({ session });
     } else if (isTie) {
-      // Handle tie based on settings (default to challenger_wins if not set)
-      const tiePrizeDistribution = settings?.tiePrizeDistribution || 'challenger_wins';
+      // Handle tie based on admin settings (default to split_equally for fairness)
+      const tiePrizeDistribution = settings?.tiePrizeDistribution || 'split_equally';
       
       if (tiePrizeDistribution === 'split_equally') {
         const splitPrize = Math.floor(winnerPrize / 2);
@@ -725,7 +725,7 @@ export async function finalizeChallenge(challengeId: string) {
         }
       } else if (isTie) {
         // Notify both about tie
-        const tieDistribution = settings?.tiePrizeDistribution || 'challenger_wins';
+        const tieDistribution = settings?.tiePrizeDistribution || 'split_equally';
         const tieResolution =
           tieDistribution === 'split_equally'
             ? 'Prize has been split equally.'
