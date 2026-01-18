@@ -870,9 +870,9 @@ async function runRealCompetitionTest(
     rules: {
       rankingMethod: 'pnl',
       tieBreaker1: 'trades_count',
-      tieBreaker2: 'join_time', // Secondary tiebreaker
+      // No tieBreaker2 - so participants with same PNL and trades are truly tied
       minimumTrades: 1, // Participants with 0 trades get disqualified (matches real behavior)
-      tiePrizeDistribution: 'first_gets_all', // Winner takes all when tiebreaker resolves the tie
+      tiePrizeDistribution: 'split_equally', // When truly tied after all tiebreakers, split equally
       disqualifyOnLiquidation: scenario.disqualifyOnLiquidation,
     },
     prizeDistribution,
