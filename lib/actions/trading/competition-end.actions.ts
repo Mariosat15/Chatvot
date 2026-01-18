@@ -593,7 +593,14 @@ export async function finalizeCompetition(competitionId: string) {
 
     // Send notifications to all participants about competition end (fire and forget - non-blocking)
     try {
-      const { notificationService } = await import('@/lib/services/notification.service');
+      // Import the module and get the default export (the notificationService instance)
+      const notificationModule = await import('@/lib/services/notification.service');
+      const notificationService = notificationModule.notificationService || notificationModule.default;
+      
+      if (!notificationService || typeof notificationService.notifyCompetitionWon !== 'function') {
+        console.error('❌ notificationService not properly loaded, skipping notifications');
+        throw new Error('notificationService methods not available');
+      }
       
       console.log(`🔔 Sending competition end notifications...`);
       
@@ -608,7 +615,7 @@ export async function finalizeCompetition(competitionId: string) {
               competition.name,
               dist.prizeAmount,
               dist.rank
-            ).catch(e => console.error('Failed to send winner notification:', e));
+            ).catch((e: Error) => console.error('Failed to send winner notification:', e));
           } else if (dist.rank <= 3) {
             // Podium notification - signature: (userId, competitionName, prize, position)
             notificationService.notifyPodiumFinish(
@@ -616,7 +623,7 @@ export async function finalizeCompetition(competitionId: string) {
               competition.name,
               dist.prizeAmount,
               dist.rank
-            ).catch(e => console.error('Failed to send podium notification:', e));
+            ).catch((e: Error) => console.error('Failed to send podium notification:', e));
           }
           
           // Send prize received notification to all winners - signature: (userId, competitionName, prize)
@@ -624,26 +631,28 @@ export async function finalizeCompetition(competitionId: string) {
             winner.userId,
             competition.name,
             dist.prizeAmount
-          ).catch(e => console.error('Failed to send prize notification:', e));
+          ).catch((e: Error) => console.error('Failed to send prize notification:', e));
         }
       }
       
       // Notify disqualified participants - non-blocking
       const disqualifiedParticipants = leaderboard.filter(p => p.qualificationStatus === 'disqualified');
-      const { sendNotification } = await import('@/lib/services/notification.service');
-      for (const participant of disqualifiedParticipants) {
-        sendNotification({
-          userId: participant.userId,
-          type: 'competition_disqualified',
-          metadata: {
-            competitionId: competition._id.toString(),
-            competitionName: competition.name,
-            reason: participant.disqualificationReason || 'Did not meet competition requirements',
-          },
-        }).catch(e => console.error('Failed to send disqualification notification:', e));
-      }
-      if (disqualifiedParticipants.length > 0) {
-        console.log(`🔔 Sent ${disqualifiedParticipants.length} disqualification notifications`);
+      const sendNotification = notificationModule.sendNotification;
+      if (typeof sendNotification === 'function') {
+        for (const participant of disqualifiedParticipants) {
+          sendNotification({
+            userId: participant.userId,
+            type: 'competition_disqualified',
+            metadata: {
+              competitionId: competition._id.toString(),
+              competitionName: competition.name,
+              reason: participant.disqualificationReason || 'Did not meet competition requirements',
+            },
+          }).catch((e: Error) => console.error('Failed to send disqualification notification:', e));
+        }
+        if (disqualifiedParticipants.length > 0) {
+          console.log(`🔔 Sent ${disqualifiedParticipants.length} disqualification notifications`);
+        }
       }
 
       // Notify all participants about competition end - non-blocking
@@ -653,7 +662,7 @@ export async function finalizeCompetition(competitionId: string) {
           participant.userId,
           competition.name,
           participant.rank || 0
-        ).catch(e => console.error('Failed to send competition end notification:', e));
+        ).catch((e: Error) => console.error('Failed to send competition end notification:', e));
       }
       
       console.log(`🔔 Queued ${leaderboard.length} competition end notifications`);
