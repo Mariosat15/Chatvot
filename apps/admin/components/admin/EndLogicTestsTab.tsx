@@ -511,11 +511,11 @@ const TEST_CASES: TestCase[] = [
   {
     id: 'CH-T1',
     category: 'challenge-ties',
-    name: 'Exact Tie - Challenger Advantage',
-    description: 'Both same equity - challenger wins',
+    name: 'Exact Tie - Split Equally',
+    description: 'Both same equity - prize split 50/50 (admin default)',
     disqualifyOnLiquidation: true,
     scenario: 'Both players have exact same equity',
-    expectedResult: 'Challenger wins (challenger advantage rule)',
+    expectedResult: 'Tie - both players split prize (default admin setting)',
     status: 'pending',
   },
 ];

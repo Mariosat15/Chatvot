@@ -634,12 +634,14 @@ export async function finalizeCompetition(competitionId: string) {
 
       // Notify all participants about competition end - non-blocking
       for (const participant of leaderboard) {
-        const pnl = participant.pnl || 0;
+        // Ensure pnl is a valid number (not undefined, null, or NaN)
+        const pnl = typeof participant.pnl === 'number' && !isNaN(participant.pnl) ? participant.pnl : 0;
+        const rank = typeof participant.rank === 'number' ? participant.rank : 0;
         notificationService.notifyCompetitionEnded(
           participant.userId,
           competition._id.toString(),
           competition.name,
-          participant.rank || 0,
+          rank,
           pnl
         ).catch(e => console.error('Failed to send competition end notification:', e));
       }

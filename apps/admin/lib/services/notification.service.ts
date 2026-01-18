@@ -407,14 +407,16 @@ class NotificationService {
   }
 
   async notifyCompetitionEnded(userId: string, competitionId: string, competitionName: string, finalRank: number, pnl: number) {
+    // Safety check: ensure pnl is a valid number
+    const safePnl = typeof pnl === 'number' && !isNaN(pnl) ? pnl : 0;
     return this.send({
       userId,
       templateId: 'competition_ended',
       variables: {
         competitionId,
         competitionName,
-        finalRank,
-        pnl: pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2),
+        finalRank: finalRank?.toString() || '0',
+        pnl: safePnl >= 0 ? `+${safePnl.toFixed(2)}` : safePnl.toFixed(2),
       },
     });
   }
