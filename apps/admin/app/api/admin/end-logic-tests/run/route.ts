@@ -843,8 +843,10 @@ async function runRealCompetitionTest(
   testDataIds.push(`competition:${competitionId}`);
 
   // Determine prize distribution based on test type
-  // Multi-winner tests (C-D*) use 70/20/10 split, others use winner-takes-all
-  const isMultiWinnerTest = scenario.expected.expectedRanking && scenario.expected.expectedRanking.length > 1;
+  // Multi-winner tests use 70/20/10 split (where expectedPrizes has multiple non-zero values)
+  // Others use winner-takes-all (100% to rank 1)
+  const nonZeroPrizes = scenario.expected.expectedPrizes?.filter(p => p > 0).length || 0;
+  const isMultiWinnerTest = nonZeroPrizes > 1;
   const prizeDistribution = isMultiWinnerTest
     ? [
         { rank: 1, percentage: 70 },
