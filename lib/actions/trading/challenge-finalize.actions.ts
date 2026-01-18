@@ -598,8 +598,10 @@ export async function finalizeChallenge(challengeId: string) {
       loserParticipant.status = 'completed';
       await loserParticipant.save({ session });
     } else if (isTie) {
-      // Handle tie based on settings
-      if (settings.tiePrizeDistribution === 'split_equally') {
+      // Handle tie based on settings (default to challenger_wins if not set)
+      const tiePrizeDistribution = settings?.tiePrizeDistribution || 'challenger_wins';
+      
+      if (tiePrizeDistribution === 'split_equally') {
         const splitPrize = Math.floor(winnerPrize / 2);
 
         // Give half to each
@@ -637,8 +639,13 @@ export async function finalizeChallenge(challengeId: string) {
             await participant.save({ session });
           }
         }
-      } else if (settings.tiePrizeDistribution === 'challenger_wins') {
-        // Challenger gets the prize
+      } else if (tiePrizeDistribution === 'challenger_wins') {
+        // Challenger gets the prize (challenger advantage on ties)
+        winnerId = challenger.userId;
+        winnerName = challenger.username;
+        loserId = challenged.userId;
+        loserName = challenged.username;
+        
         const chalWallet = await CreditWallet.findOne({
           userId: challenger.userId,
         }).session(session);
@@ -718,10 +725,11 @@ export async function finalizeChallenge(challengeId: string) {
         }
       } else if (isTie) {
         // Notify both about tie
+        const tieDistribution = settings?.tiePrizeDistribution || 'challenger_wins';
         const tieResolution =
-          settings.tiePrizeDistribution === 'split_equally'
+          tieDistribution === 'split_equally'
             ? 'Prize has been split equally.'
-            : settings.tiePrizeDistribution === 'challenger_wins'
+            : tieDistribution === 'challenger_wins'
             ? 'Challenger wins by default.'
             : 'No prize awarded.';
 

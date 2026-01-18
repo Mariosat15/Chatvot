@@ -41,6 +41,7 @@ const TEST_SCENARIOS: Record<string, {
     expectedRanking?: number[]; // Array of participant indices in order [1st, 2nd, 3rd...]
     expectedPrizes?: number[]; // Array of prize amounts for each rank
     expectedTiedRanks?: boolean; // Flag to indicate all participants are tied
+    expectedWinners?: number; // Number of winners expected (for verification)
   };
 }> = {
   // ============ COMPETITION EARLY END TESTS ============
@@ -609,19 +610,19 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: true,
     participants: [
       // Two players with EXACTLY same equity (same PNL)
-      // Tie-breaker: totalTrades (higher wins)
-      { role: 'participant', status: 'active', equity: 6000, totalTrades: 10 }, // Winner (more trades)
-      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },  // 2nd place
+      // Tie-breaker: trades_count = FEWER trades wins (more efficient trader)
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 3 },  // Winner (fewer trades = more efficient)
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 10 }, // 2nd place (more trades)
     ],
     // 2 × 100 = 200 pool, 20% fee = 40, net = 160
-    // Both have same PNL (+1000), tie-breaker = trades_count
+    // Both have same PNL (+1000), tie-breaker = fewer trades wins
     expected: { 
       shouldEndEarly: false, 
       toUnclaimedPool: false, 
       statusAfter: 'completed',
       expectedPrizePool: 200,
       expectedPlatformFee: 40,
-      expectedRanking: [0, 1], // P0 wins due to more trades
+      expectedRanking: [0, 1], // P0 wins due to fewer trades
       expectedPrizes: [160, 0], // Winner takes all (single prize position)
     },
   },
@@ -665,9 +666,9 @@ const TEST_SCENARIOS: Record<string, {
       { role: 'participant', status: 'active', equity: 5000, totalTrades: 5 }, // 4th (no prize)
     ],
     // 4 × 100 = 400 pool, 20% fee = 80, net = 320
-    // 1st: 70% = 224
-    // 2nd tied: Split 20% = 32 each
-    // 3rd: goes to tied 2nd place players as bonus (redistribute)
+    // 3rd place is EMPTY (P1&P2 tie for 2nd, skip to rank 4)
+    // 10% unclaimed is redistributed equally to ALL 3 winners
+    // Bonus per winner: 10% ÷ 3 = 3.33%
     expected: { 
       shouldEndEarly: false, 
       toUnclaimedPool: false, 
@@ -675,9 +676,11 @@ const TEST_SCENARIOS: Record<string, {
       expectedPrizePool: 400,
       expectedPlatformFee: 80,
       expectedRanking: [0, 1, 2, 3], // P0=1st, P1&P2 tied for 2nd, P3=4th
-      // P0 gets 70% = 224
-      // P1 & P2 split (20% + 10%) = 30% ÷ 2 = 15% each = 48 each
-      expectedPrizes: [224, 48, 48, 0],
+      // P0: 70% + 3.33% bonus = 73.33% × 320 = 234.66
+      // P1: (20%÷2) + 3.33% = 13.33% × 320 = 42.66
+      // P2: (20%÷2) + 3.33% = 13.33% × 320 = 42.66
+      expectedPrizes: [234.66, 42.66, 42.66, 0],
+      expectedWinners: 3, // Only 3 people get prizes
     },
   },
 
