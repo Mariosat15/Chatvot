@@ -304,6 +304,7 @@ export const closePosition = async (
       // Update position
       position.status = 'closed';
       position.closeReason = 'user';
+      position.exitPrice = exitPrice;      // Actual closing price (for accurate PNL history)
       position.currentPrice = exitPrice;
       position.closedAt = new Date();
       position.holdingTimeSeconds = Math.floor(
@@ -812,6 +813,7 @@ export async function closePositionAutomatic(
     // Update position
     position.status = closeReason === 'margin_call' ? 'liquidated' : 'closed';
     position.closeReason = closeReason;
+    position.exitPrice = exitPrice;      // Actual closing price (for accurate PNL history)
     position.currentPrice = exitPrice;
     position.closedAt = new Date();
     position.holdingTimeSeconds = Math.floor(
