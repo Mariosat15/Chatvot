@@ -870,7 +870,9 @@ async function runRealCompetitionTest(
     rules: {
       rankingMethod: 'pnl',
       tieBreaker1: 'trades_count',
+      tieBreaker2: 'join_time', // Secondary tiebreaker
       minimumTrades: 1, // Participants with 0 trades get disqualified (matches real behavior)
+      tiePrizeDistribution: 'first_gets_all', // Winner takes all when tiebreaker resolves the tie
       disqualifyOnLiquidation: scenario.disqualifyOnLiquidation,
     },
     prizeDistribution,
@@ -1207,18 +1209,17 @@ async function runRealCompetitionTest(
         finalRank: p.finalRank,
       })));
       
-      // Check ALL wallets for multi-winner distribution
+      // Check ALL wallets for multi-winner distribution (include $0 prizes for ranking)
       const walletBalances: { participantIndex: number; userId: string; balance: number }[] = [];
       for (let i = 0; i < participantUserIds.length; i++) {
         const wallet = await walletsCollection.findOne({ userId: participantUserIds[i].toString() });
         const balance = wallet?.creditBalance || 0;
         console.log(`🧪 [TEST] Wallet for participant ${i}: $${balance}`);
-        if (balance > 0) {
-          walletBalances.push({ participantIndex: i, userId: participantUserIds[i].toString(), balance });
-        }
+        // Include ALL participants for full ranking (even those with $0 prize)
+        walletBalances.push({ participantIndex: i, userId: participantUserIds[i].toString(), balance });
       }
       
-      // Sort by balance descending to get ranking order
+      // Sort by balance descending to get ranking order (higher prize = higher rank)
       walletBalances.sort((a, b) => b.balance - a.balance);
       const actualRanking = walletBalances.map(w => w.participantIndex);
       const actualPrizes = walletBalances.map(w => w.balance);

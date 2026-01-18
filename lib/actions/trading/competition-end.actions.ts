@@ -325,14 +325,18 @@ export async function finalizeCompetition(competitionId: string) {
       startingCapital: p.startingCapital,
     }));
 
-    // Use competition rules or defaults
-    const rules = competition.rules || {
+    // Use competition rules merged with defaults (ensure all required fields exist)
+    const defaultRules = {
       rankingMethod: 'pnl' as const,
       tieBreaker1: 'win_rate' as const,
       tieBreaker2: 'join_time' as const, // Secondary tiebreaker to ensure ranking
       minimumTrades: 0,
       tiePrizeDistribution: 'split_equally' as const,
       disqualifyOnLiquidation: true,
+    };
+    const rules = {
+      ...defaultRules,
+      ...(competition.rules || {}),
     };
 
     // Calculate rankings with tie-breaking
