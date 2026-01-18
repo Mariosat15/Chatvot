@@ -192,12 +192,16 @@ export function calculateRankings(
   const disqualified = qualifiedParticipants.filter((p) => p.qualificationStatus === 'disqualified');
 
   // Step 2: Sort qualified participants
+  // Use epsilon for floating point comparisons to handle precision issues
+  const sortEpsilon = 0.01; // $0.01 difference is negligible for ranking purposes
+  
   qualified.sort((a, b) => {
     // Primary ranking method
     const aValue = getRankingValue(a, rules.rankingMethod);
     const bValue = getRankingValue(b, rules.rankingMethod);
 
-    if (aValue !== bValue) {
+    // Use epsilon comparison for floating point values
+    if (Math.abs(aValue - bValue) >= sortEpsilon) {
       return bValue - aValue; // Higher is better (descending)
     }
 
@@ -206,8 +210,9 @@ export function calculateRankings(
       const aTie1 = getTieBreakerValue(a, rules.tieBreaker1);
       const bTie1 = getTieBreakerValue(b, rules.tieBreaker1);
 
-      if (aTie1 !== bTie1) {
-        return bTie1 - aTie1;
+      // Trade counts are integers, but use epsilon for safety
+      if (Math.abs(aTie1 - bTie1) >= 0.5) {
+        return bTie1 - aTie1; // Higher is better (for trades_count, value is negative so fewer trades wins)
       }
     }
 
@@ -216,7 +221,7 @@ export function calculateRankings(
       const aTie2 = getTieBreakerValue(a, rules.tieBreaker2);
       const bTie2 = getTieBreakerValue(b, rules.tieBreaker2);
 
-      if (aTie2 !== bTie2) {
+      if (Math.abs(aTie2 - bTie2) >= 0.5) {
         return bTie2 - aTie2;
       }
     }

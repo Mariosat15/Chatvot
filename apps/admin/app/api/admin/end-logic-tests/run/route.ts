@@ -829,7 +829,7 @@ async function runRealCompetitionTest(
   const entryFee = 100;
   // Calculate prizePool based on number of participants (must match test expectations)
   const prizePool = entryFee * scenario.participants.length;
-  const startingCapital = 10000;
+  const startingCapital = 5000; // 5000 so equity 6000 = PNL +1000 (positive profit)
   
   // For early end tests: end time is in the future (1 hour)
   // For normal end tests: end time is in the past
@@ -914,7 +914,7 @@ async function runRealCompetitionTest(
 
     // IMPORTANT: Use COMMON starting capital so PNL differences reflect equity differences
     // PNL = currentCapital - startingCapital = equity - startingCapital
-    // Example: startingCapital=5000, equity=6000 → PNL=+1000, equity=4000 → PNL=-1000
+    // Example: startingCapital=5000, equity=6000 → PNL=+1000 (profit), equity=4000 → PNL=-1000 (loss)
     const commonStartingCapital = startingCapital; // Use competition's starting capital (5000)
     const participantPnl = p.equity - commonStartingCapital;
     const participantPnlPercentage = (participantPnl / commonStartingCapital) * 100;
