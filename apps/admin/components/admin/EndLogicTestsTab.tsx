@@ -451,7 +451,7 @@ const TEST_CASES: TestCase[] = [
     description: 'Same PNL, different trades - tie-breaker decides',
     disqualifyOnLiquidation: true,
     scenario: 'Two players with exact same equity, different trade count',
-    expectedResult: 'Player with more trades wins (tie-breaker)',
+    expectedResult: 'Player with FEWER trades wins (more efficient trader)',
     status: 'pending',
   },
   {
