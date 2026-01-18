@@ -945,47 +945,55 @@ async function runRealCompetitionTest(
     
     // ONLY create positions for participants with totalTrades > 0
     // Participants with totalTrades: 0 should remain disqualified due to insufficient trades
+    // IMPORTANT: Create MULTIPLE positions to match totalTrades count!
+    // Production recalculates totalTrades from actual position count (stats.closedPositionsCount)
     if (p.totalTrades > 0) {
       const positionsCollection = db.collection('tradingpositions');
-      const positionId = new mongoose.Types.ObjectId();
-      testDataIds.push(`position:${positionId}`);
+      const numPositions = p.totalTrades;
+      
+      // Split total PNL across all positions evenly
+      const pnlPerPosition = participantPnl / numPositions;
       
       // IMPORTANT: Production calculates PNL as: priceDiff * quantity * 100000 (forex contract size)
-      // To get the desired participantPnl, we need: priceDiff = participantPnl / (quantity * 100000)
-      // Using quantity = 1 for simplicity: priceDiff = participantPnl / 100000
+      // To get the desired pnlPerPosition, we need: priceDiff = pnlPerPosition / (quantity * 100000)
       const quantity = 1;
       const contractSize = 100000;
-      const priceDiff = participantPnl / (quantity * contractSize);
+      const priceDiff = pnlPerPosition / (quantity * contractSize);
       
-      await positionsCollection.insertOne({
-        _id: positionId,
-        oddsPositionId: positionId.toString(),
-        oddsUserId: userId.toString(),
-        userId: userId.toString(),
-        competitionId: competitionId.toString(),
-        symbol: 'EUR/USD',
-        side: 'long',
-        orderType: 'market',
-        quantity: quantity,
-        entryPrice: 1.1000,
-        exitPrice: 1.1000 + priceDiff,
-        currentPrice: 1.1000 + priceDiff,
-        unrealizedPnl: 0,
-        unrealizedPnlPercentage: 0,
-        realizedPnl: participantPnl, // Not used by production, but kept for reference
-        leverage: 1,
-        marginUsed: 1000,
-        maintenanceMargin: 500,
-        status: 'closed',
-        openOrderId: `test-order-${i}`,
-        lastPriceUpdate: now,
-        priceUpdateCount: 1,
-        openedAt: new Date(now.getTime() - 60 * 60 * 1000),
-        closedAt: new Date(now.getTime() - 30 * 60 * 1000),
-        testRunId,
-        createdAt: now,
-        updatedAt: now,
-      });
+      for (let posIdx = 0; posIdx < numPositions; posIdx++) {
+        const positionId = new mongoose.Types.ObjectId();
+        testDataIds.push(`position:${positionId}`);
+        
+        await positionsCollection.insertOne({
+          _id: positionId,
+          oddsPositionId: positionId.toString(),
+          oddsUserId: userId.toString(),
+          userId: userId.toString(),
+          competitionId: competitionId.toString(),
+          symbol: 'EUR/USD',
+          side: 'long',
+          orderType: 'market',
+          quantity: quantity,
+          entryPrice: 1.1000,
+          exitPrice: 1.1000 + priceDiff,
+          currentPrice: 1.1000 + priceDiff,
+          unrealizedPnl: 0,
+          unrealizedPnlPercentage: 0,
+          realizedPnl: pnlPerPosition, // PNL for this position
+          leverage: 1,
+          marginUsed: 1000,
+          maintenanceMargin: 500,
+          status: 'closed',
+          openOrderId: `test-order-${i}-${posIdx}`,
+          lastPriceUpdate: now,
+          priceUpdateCount: 1,
+          openedAt: new Date(now.getTime() - (60 + posIdx) * 60 * 1000), // Stagger open times
+          closedAt: new Date(now.getTime() - (30 + posIdx) * 60 * 1000), // Stagger close times
+          testRunId,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
     }
   }
 
@@ -1489,46 +1497,55 @@ async function runRealChallengeTest(
     
     // ONLY create positions for participants with totalTrades > 0
     // Participants with totalTrades: 0 should remain disqualified due to insufficient trades
+    // IMPORTANT: Create MULTIPLE positions to match totalTrades count!
+    // Production recalculates totalTrades from actual position count (stats.totalTrades++)
     if (p.totalTrades > 0) {
       const positionsCollection = db.collection('tradingpositions');
-      const positionId = new mongoose.Types.ObjectId();
-      testDataIds.push(`position:${positionId}`);
+      const numPositions = p.totalTrades;
+      
+      // Split total PNL across all positions evenly
+      const pnlPerPosition = participantPnl / numPositions;
       
       // IMPORTANT: Production calculates PNL as: priceDiff * quantity * 100000 (forex contract size)
       // Also: Challenge finalization queries positions by competitionId, not challengeId!
       const quantity = 1;
       const contractSize = 100000;
-      const priceDiff = participantPnl / (quantity * contractSize);
+      const priceDiff = pnlPerPosition / (quantity * contractSize);
       
-      await positionsCollection.insertOne({
-        _id: positionId,
-        oddsPositionId: positionId.toString(),
-        oddsUserId: userId.toString(),
-        userId: userId.toString(),
-        competitionId: challengeId.toString(), // Challenge finalization queries competitionId!
-        symbol: 'EUR/USD',
-        side: 'long',
-        orderType: 'market',
-        quantity: quantity,
-        entryPrice: 1.1000,
-        exitPrice: 1.1000 + priceDiff,
-        currentPrice: 1.1000 + priceDiff,
-        unrealizedPnl: 0,
-        unrealizedPnlPercentage: 0,
-        realizedPnl: participantPnl, // Not used by production, but kept for reference
-        leverage: 1,
-        marginUsed: 1000,
-        maintenanceMargin: 500,
-        status: 'closed',
-        openOrderId: `test-order-${p.role}`,
-        lastPriceUpdate: now,
-        priceUpdateCount: 1,
-        openedAt: new Date(now.getTime() - 60 * 60 * 1000),
-        closedAt: new Date(now.getTime() - 30 * 60 * 1000),
-        testRunId,
-        createdAt: now,
-        updatedAt: now,
-      });
+      for (let posIdx = 0; posIdx < numPositions; posIdx++) {
+        const positionId = new mongoose.Types.ObjectId();
+        testDataIds.push(`position:${positionId}`);
+        
+        await positionsCollection.insertOne({
+          _id: positionId,
+          oddsPositionId: positionId.toString(),
+          oddsUserId: userId.toString(),
+          userId: userId.toString(),
+          competitionId: challengeId.toString(), // Challenge finalization queries competitionId!
+          symbol: 'EUR/USD',
+          side: 'long',
+          orderType: 'market',
+          quantity: quantity,
+          entryPrice: 1.1000,
+          exitPrice: 1.1000 + priceDiff,
+          currentPrice: 1.1000 + priceDiff,
+          unrealizedPnl: 0,
+          unrealizedPnlPercentage: 0,
+          realizedPnl: pnlPerPosition, // PNL for this position
+          leverage: 1,
+          marginUsed: 1000,
+          maintenanceMargin: 500,
+          status: 'closed',
+          openOrderId: `test-order-${p.role}-${posIdx}`,
+          lastPriceUpdate: now,
+          priceUpdateCount: 1,
+          openedAt: new Date(now.getTime() - (60 + posIdx) * 60 * 1000), // Stagger open times
+          closedAt: new Date(now.getTime() - (30 + posIdx) * 60 * 1000), // Stagger close times
+          testRunId,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
     }
   }
 
