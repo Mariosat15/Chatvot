@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 // Test case definition
 interface TestCase {
   id: string;
-  category: 'competition-early' | 'competition-normal' | 'competition-prize' | 'competition-distribution' | 'competition-journey' | 'challenge-early' | 'challenge-normal' | 'challenge-prize';
+  category: 'competition-early' | 'competition-normal' | 'competition-prize' | 'competition-distribution' | 'competition-journey' | 'competition-ties' | 'competition-edge' | 'challenge-early' | 'challenge-normal' | 'challenge-prize' | 'challenge-ties';
   name: string;
   description: string;
   disqualifyOnLiquidation: boolean;
@@ -442,6 +442,82 @@ const TEST_CASES: TestCase[] = [
     expectedResult: 'Step 1: No early end → Step 2: Finalize → Liquidated wins $160',
     status: 'pending',
   },
+
+  // ============ TIE SCENARIO TESTS ============
+  {
+    id: 'C-T1',
+    category: 'competition-ties',
+    name: 'Two Players Tied - Tie-breaker',
+    description: 'Same PNL, different trades - tie-breaker decides',
+    disqualifyOnLiquidation: true,
+    scenario: 'Two players with exact same equity, different trade count',
+    expectedResult: 'Player with more trades wins (tie-breaker)',
+    status: 'pending',
+  },
+  {
+    id: 'C-T2',
+    category: 'competition-ties',
+    name: 'Three-Way Tie - Equal Split',
+    description: 'All same stats - split prize equally',
+    disqualifyOnLiquidation: true,
+    scenario: 'Three players with identical stats',
+    expectedResult: 'Prize split equally: $80 each (240 ÷ 3)',
+    status: 'pending',
+  },
+  {
+    id: 'C-T3',
+    category: 'competition-ties',
+    name: 'Two Tied for 2nd Place',
+    description: 'Clear winner, but 2nd place tied',
+    disqualifyOnLiquidation: true,
+    scenario: 'P0 wins, P1 & P2 tied for 2nd',
+    expectedResult: '1st: $224, 2nd tied: $48 each (split 20%+10%)',
+    status: 'pending',
+  },
+
+  // ============ EDGE CASE TESTS ============
+  {
+    id: 'C-EC1',
+    category: 'competition-edge',
+    name: 'All Negative PNL',
+    description: 'Everyone loses money - least negative wins',
+    disqualifyOnLiquidation: true,
+    scenario: 'All players have negative PNL',
+    expectedResult: 'Least negative PNL wins (-1000 beats -2000)',
+    status: 'pending',
+  },
+  {
+    id: 'C-EC2',
+    category: 'competition-edge',
+    name: 'Single Participant',
+    description: 'Only one player - auto wins',
+    disqualifyOnLiquidation: true,
+    scenario: 'Single participant in competition',
+    expectedResult: 'Single player wins full prize ($80)',
+    status: 'pending',
+  },
+  {
+    id: 'C-EC3',
+    category: 'competition-edge',
+    name: 'All Liquidated Compete (Flag OFF)',
+    description: 'Everyone liquidated but still compete',
+    disqualifyOnLiquidation: false,
+    scenario: 'All liquidated, flag OFF - they compete by equity',
+    expectedResult: 'Highest equity liquidated player wins',
+    status: 'pending',
+  },
+
+  // ============ CHALLENGE TIE TESTS ============
+  {
+    id: 'CH-T1',
+    category: 'challenge-ties',
+    name: 'Exact Tie - Challenger Advantage',
+    description: 'Both same equity - challenger wins',
+    disqualifyOnLiquidation: true,
+    scenario: 'Both players have exact same equity',
+    expectedResult: 'Challenger wins (challenger advantage rule)',
+    status: 'pending',
+  },
 ];
 
 // Category info
@@ -451,9 +527,12 @@ const CATEGORIES = [
   { id: 'competition-prize', name: 'Competition Prize Distribution', icon: DollarSign, color: 'text-emerald-400' },
   { id: 'competition-distribution', name: 'Multi-Winner Distribution', icon: DollarSign, color: 'text-pink-400' },
   { id: 'competition-journey', name: 'Competition Full Journey', icon: Clock, color: 'text-purple-400' },
+  { id: 'competition-ties', name: '🤝 Tie Scenarios', icon: Trophy, color: 'text-amber-400' },
+  { id: 'competition-edge', name: '⚠️ Edge Cases', icon: AlertCircle, color: 'text-red-400' },
   { id: 'challenge-early', name: 'Challenge Early End', icon: Swords, color: 'text-orange-400' },
   { id: 'challenge-normal', name: 'Challenge Normal End', icon: Swords, color: 'text-green-400' },
   { id: 'challenge-prize', name: 'Challenge Prize Distribution', icon: DollarSign, color: 'text-cyan-400' },
+  { id: 'challenge-ties', name: '🤝 Challenge Ties', icon: Swords, color: 'text-amber-400' },
 ];
 
 export default function EndLogicTestsTab() {

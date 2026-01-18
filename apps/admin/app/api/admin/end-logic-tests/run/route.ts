@@ -40,6 +40,7 @@ const TEST_SCENARIOS: Record<string, {
     // Multi-winner distribution (optional)
     expectedRanking?: number[]; // Array of participant indices in order [1st, 2nd, 3rd...]
     expectedPrizes?: number[]; // Array of prize amounts for each rank
+    expectedTiedRanks?: boolean; // Flag to indicate all participants are tied
   };
 }> = {
   // ============ COMPETITION EARLY END TESTS ============
@@ -596,6 +597,177 @@ const TEST_SCENARIOS: Record<string, {
       expectedRanking: [0, 1], // Only 2 winners
       expectedPrizes: [240, 80], // Redistributed: 75% and 25% of net pool
       // No unclaimed - 3rd place prize redistributed to winners as bonus
+    },
+  },
+
+  // ============ TIE SCENARIO TESTS ============
+  // Test exact tied PNL and tie-breaker logic
+  
+  'C-T1': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      // Two players with EXACTLY same equity (same PNL)
+      // Tie-breaker: totalTrades (higher wins)
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 10 }, // Winner (more trades)
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },  // 2nd place
+    ],
+    // 2 × 100 = 200 pool, 20% fee = 40, net = 160
+    // Both have same PNL (+1000), tie-breaker = trades_count
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedRanking: [0, 1], // P0 wins due to more trades
+      expectedPrizes: [160, 0], // Winner takes all (single prize position)
+    },
+  },
+  
+  'C-T2': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      // Three players tied for 1st place with EXACT same stats
+      // All have same equity AND same trades - should split 1st prize equally
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
+    ],
+    // 3 × 100 = 300 pool, 20% fee = 60, net = 240
+    // All tied for 1st - should split 70% equally = 56 each
+    // 2nd place (20%) and 3rd place (10%) go to... same people (they're all 1st)
+    // Actually: 3 tied for rank 1 = split ALL prize money equally
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 300,
+      expectedPlatformFee: 60,
+      expectedRanking: [0, 1, 2], // All rank 1 (tied)
+      expectedPrizes: [80, 80, 80], // Equal split of 240 net pool
+      expectedTiedRanks: true, // Flag to indicate tie handling
+    },
+  },
+  
+  'C-T3': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      // Two players tied for 2nd place
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 5 }, // Clear 1st
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 }, // Tied 2nd
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 }, // Tied 2nd
+      { role: 'participant', status: 'active', equity: 5000, totalTrades: 5 }, // 4th (no prize)
+    ],
+    // 4 × 100 = 400 pool, 20% fee = 80, net = 320
+    // 1st: 70% = 224
+    // 2nd tied: Split 20% = 32 each
+    // 3rd: goes to tied 2nd place players as bonus (redistribute)
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 400,
+      expectedPlatformFee: 80,
+      expectedRanking: [0, 1, 2, 3], // P0=1st, P1&P2 tied for 2nd, P3=4th
+      // P0 gets 70% = 224
+      // P1 & P2 split (20% + 10%) = 30% ÷ 2 = 15% each = 48 each
+      expectedPrizes: [224, 48, 48, 0],
+    },
+  },
+
+  // ============ EDGE CASE TESTS ============
+  
+  'C-EC1': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      // All participants have NEGATIVE PNL - worst performer
+      { role: 'participant', status: 'active', equity: 4000, totalTrades: 5 }, // -1000 PNL (best of worst)
+      { role: 'participant', status: 'active', equity: 3000, totalTrades: 5 }, // -2000 PNL
+      { role: 'participant', status: 'active', equity: 2000, totalTrades: 5 }, // -3000 PNL (worst)
+    ],
+    // 3 × 100 = 300 pool, 20% fee = 60, net = 240
+    // Ranking by PNL: P0 (-1000) > P1 (-2000) > P2 (-3000)
+    // Even with negative PNL, highest wins
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 300,
+      expectedPlatformFee: 60,
+      expectedRanking: [0, 1, 2],
+      expectedPrizes: [168, 48, 24], // 70%, 20%, 10% of 240
+    },
+  },
+  
+  'C-EC2': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      // Single participant - they win by default
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
+    ],
+    // 1 × 100 = 100 pool, 20% fee = 20, net = 80
+    // Single participant wins everything
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 100,
+      expectedPlatformFee: 20,
+      expectedRanking: [0],
+      expectedPrizes: [80], // Winner takes all
+    },
+  },
+  
+  'C-EC3': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: false, // Flag OFF - liquidated can win
+    participants: [
+      // All liquidated, but flag is OFF so they compete by equity
+      { role: 'participant', status: 'liquidated', equity: 500, totalTrades: 5 },  // Best liquidated
+      { role: 'participant', status: 'liquidated', equity: 300, totalTrades: 5 },  // 2nd
+      { role: 'participant', status: 'liquidated', equity: 100, totalTrades: 5 },  // Worst
+    ],
+    // 3 × 100 = 300 pool, 20% fee = 60, net = 240
+    // With flag OFF, liquidated players still compete
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 300,
+      expectedPlatformFee: 60,
+      expectedRanking: [0, 1, 2],
+      expectedPrizes: [168, 48, 24],
+    },
+  },
+
+  // ============ CHALLENGE TIE TESTS ============
+  
+  'CH-T1': {
+    type: 'challenge',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    participants: [
+      // Both have EXACTLY same equity - challenger advantage
+      { role: 'challenger', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'challenged', status: 'active', equity: 6000, totalTrades: 5 },
+    ],
+    // Tied PNL - challenger gets advantage and wins
+    expected: { 
+      shouldEndEarly: false, 
+      winnerRole: 'challenger', // Challenger advantage on tie
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
     },
   },
 };
