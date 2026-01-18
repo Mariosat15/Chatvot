@@ -70,20 +70,28 @@ function getRankingValue(participant: ParticipantData, method: string): number {
  * Get tiebreaker value
  */
 function getTieBreakerValue(participant: ParticipantData, tieBreaker: string): number {
+  let value: number;
   switch (tieBreaker) {
     case 'trades_count':
-      return -participant.totalTrades; // Negative because fewer is better (more efficient)
+      value = -participant.totalTrades; // Negative because fewer is better (more efficient)
+      break;
     case 'win_rate':
-      return participant.winRate;
+      value = participant.winRate;
+      break;
     case 'total_capital':
-      return participant.currentCapital;
+      value = participant.currentCapital;
+      break;
     case 'roi':
-      return participant.pnlPercentage;
+      value = participant.pnlPercentage;
+      break;
     case 'join_time':
-      return -new Date(participant.enteredAt).getTime(); // Negative because earlier is better
+      value = -new Date(participant.enteredAt).getTime(); // Negative because earlier is better
+      break;
     default:
-      return 0;
+      value = 0;
   }
+  console.log(`  🔍 TieBreaker[${tieBreaker}] for ${participant.username}: totalTrades=${participant.totalTrades}, value=${value}`);
+  return value;
 }
 
 /**
