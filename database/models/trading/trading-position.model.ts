@@ -16,6 +16,7 @@ export interface ITradingPosition extends Document {
   // Pricing
   entryPrice: number; // Price when position opened (actual execution price)
   currentPrice: number; // Updated real-time
+  exitPrice?: number; // Price when position closed (actual closing price)
   
   // P&L
   unrealizedPnl: number; // Current profit/loss
@@ -106,6 +107,10 @@ const TradingPositionSchema = new Schema<ITradingPosition>(
     currentPrice: {
       type: Number,
       required: true,
+      min: 0,
+    },
+    exitPrice: {
+      type: Number,
       min: 0,
     },
     unrealizedPnl: {
