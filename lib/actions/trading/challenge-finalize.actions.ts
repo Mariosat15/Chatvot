@@ -97,14 +97,16 @@ export async function finalizeChallenge(challengeId: string) {
         const userId = position.userId.toString();
         const stats = participantStats.get(userId);
         if (stats) {
-          // Calculate P&L from entry/exit prices (currentPrice = exitPrice for closed positions)
+          // Calculate P&L from entry/exit prices
+          // Use exitPrice if available (set when position was closed), otherwise use currentPrice
           // FOREX: contractSize = 100,000 units per standard lot
+          const exitPrice = position.exitPrice ?? position.currentPrice ?? position.entryPrice;
           const priceDiff = position.side === 'long'
-            ? position.currentPrice - position.entryPrice
-            : position.entryPrice - position.currentPrice;
+            ? exitPrice - position.entryPrice
+            : position.entryPrice - exitPrice;
           const positionPnL = priceDiff * position.quantity * 100000; // Fixed: was 10000
           
-          console.log(`  Closed position: ${position.symbol} ${position.side}, Entry: ${position.entryPrice}, Exit: ${position.currentPrice}, P&L: $${positionPnL.toFixed(2)}`);
+          console.log(`  Closed position: ${position.symbol} ${position.side}, Entry: ${position.entryPrice}, Exit: ${exitPrice}, P&L: $${positionPnL.toFixed(2)}`);
           
           stats.totalPnL += positionPnL;
           stats.currentCapital += positionPnL;
