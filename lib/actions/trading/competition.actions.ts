@@ -10,6 +10,10 @@ import CompetitionParticipant from '@/database/models/trading/competition-partic
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import mongoose from 'mongoose';
+// Static imports for better performance (no dynamic import overhead)
+import { calculateRankings } from '@/lib/services/competition-ranking.service';
+import { getUsersWithTitles } from '@/lib/services/xp-level.service';
+import { getTitleByXP } from '@/lib/constants/levels';
 
 // Get all competitions with filters
 export const getCompetitions = async (filters?: {
@@ -559,6 +563,7 @@ export const enterCompetition = async (competitionId: string) => {
 };
 
 // Get competition leaderboard
+// OPTIMIZED: Static imports, O(n) lookups with Map, selective field loading
 export const getCompetitionLeaderboard = async (competitionId: string, limit: number = 100) => {
   'use no memo'; // CRITICAL: Disable Next.js caching for real-time data
   
@@ -571,20 +576,24 @@ export const getCompetitionLeaderboard = async (competitionId: string, limit: nu
     await connectToDatabase();
 
     // Get competition to access rules
-    const competition = await Competition.findById(competitionId).lean() as any;
+    const competition = await Competition.findById(competitionId)
+      .select('rules status')
+      .lean() as { rules?: Record<string, unknown>; status: string } | null;
     if (!competition) {
       throw new Error('Competition not found');
     }
 
+    // OPTIMIZATION: Only select needed fields
     const participants = await CompetitionParticipant.find({
       competitionId: competitionId,
     })
+      .select('userId username currentCapital pnl pnlPercentage totalTrades winningTrades losingTrades status enteredAt startingCapital')
       .lean();
 
-    // Import ranking service and level service
-    const { calculateRankings } = await import('@/lib/services/competition-ranking.service');
-    const { getUsersWithTitles } = await import('@/lib/services/xp-level.service');
-    const { getTitleByXP } = await import('@/lib/constants/levels');
+    // OPTIMIZATION: Create Map for O(1) lookups instead of O(n) .find()
+    const participantMap = new Map(
+      participants.map(p => [p.userId, p])
+    );
 
     // Prepare participant data
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -604,7 +613,7 @@ export const getCompetitionLeaderboard = async (competitionId: string, limit: nu
     }));
 
     // Use competition rules or defaults
-    const rules = competition.rules || {
+    const rules = (competition.rules as Record<string, unknown>) || {
       rankingMethod: 'pnl' as const,
       tieBreaker1: 'trades_count' as const,
       minimumTrades: 0,
@@ -613,8 +622,7 @@ export const getCompetitionLeaderboard = async (competitionId: string, limit: nu
     };
 
     // Calculate rankings with tie-breaking
-    // Only check minimum trades when competition is completed
-    const rankedParticipants = calculateRankings(participantData, rules, {
+    const rankedParticipants = calculateRankings(participantData, rules as Parameters<typeof calculateRankings>[1], {
       competitionStatus: competition.status as 'upcoming' | 'active' | 'completed' | 'cancelled',
     });
 
@@ -625,19 +633,11 @@ export const getCompetitionLeaderboard = async (competitionId: string, limit: nu
     const userIds = limitedParticipants.map(p => p.userId);
     const userLevels = await getUsersWithTitles(userIds);
 
-    // Map to include tie information and titles
+    // OPTIMIZATION: O(n) mapping with Map lookup instead of O(n²) with .find()
     const result = limitedParticipants.map((p) => {
-      const originalParticipant = participants.find(orig => orig.userId === p.userId);
+      const originalParticipant = participantMap.get(p.userId); // O(1) instead of O(n)
       const userLevel = userLevels.get(p.userId);
-      
-      // Get title info - always show at least default level
-      let titleLevel;
-      if (userLevel) {
-        titleLevel = getTitleByXP(userLevel.currentXP);
-      } else {
-        // Default to Novice Trader for users without levels
-        titleLevel = getTitleByXP(0);
-      }
+      const titleLevel = userLevel ? getTitleByXP(userLevel.currentXP) : getTitleByXP(0);
 
       return {
         ...originalParticipant,

@@ -5,14 +5,34 @@ import { connectToDatabase } from '@/database/mongoose';
 import mongoose from 'mongoose';
 
 // Define required indexes for optimal performance
+// COMPREHENSIVE LIST - includes leaderboard, trading, and all critical queries
 const REQUIRED_INDEXES = {
+  // ============================================
+  // USER & AUTH INDEXES
+  // ============================================
   users: [
     { keys: { email: 1 }, options: { unique: true, name: 'email_1' } },
     { keys: { username: 1 }, options: { name: 'username_1' } },
+    { keys: { role: 1 }, options: { name: 'role_1' } }, // For getAllUsers filtering
     { keys: { createdAt: -1 }, options: { name: 'createdAt_-1' } },
   ],
+  userlevels: [
+    { keys: { odod: 1 }, options: { unique: true, name: 'userId_1' } },
+    { keys: { currentXP: -1 }, options: { name: 'currentXP_-1' } },
+    { keys: { level: -1 }, options: { name: 'level_-1' } },
+  ],
+  userbadges: [
+    { keys: { userId: 1 }, options: { name: 'userId_1' } },
+    { keys: { userId: 1, badgeId: 1 }, options: { unique: true, name: 'userId_1_badgeId_1' } },
+    { keys: { badgeId: 1 }, options: { name: 'badgeId_1' } },
+  ],
+  
+  // ============================================
+  // COMPETITION INDEXES (LEADERBOARD CRITICAL)
+  // ============================================
   competitions: [
     { keys: { status: 1, startTime: 1 }, options: { name: 'status_1_startTime_1' } },
+    { keys: { status: 1, endTime: 1 }, options: { name: 'status_1_endTime_1' } },
     { keys: { slug: 1 }, options: { unique: true, name: 'slug_1' } },
     { keys: { endTime: 1 }, options: { name: 'endTime_1' } },
     { keys: { createdAt: -1 }, options: { name: 'createdAt_-1' } },
@@ -20,9 +40,16 @@ const REQUIRED_INDEXES = {
   competitionparticipants: [
     { keys: { competitionId: 1, userId: 1 }, options: { unique: true, name: 'competitionId_1_userId_1' } },
     { keys: { competitionId: 1, status: 1 }, options: { name: 'competitionId_1_status_1' } },
-    { keys: { userId: 1 }, options: { name: 'userId_1' } },
+    { keys: { competitionId: 1, pnl: -1 }, options: { name: 'competitionId_1_pnl_-1' } }, // Leaderboard sorting
     { keys: { competitionId: 1, currentCapital: -1 }, options: { name: 'competitionId_1_currentCapital_-1' } },
+    { keys: { userId: 1 }, options: { name: 'userId_1' } },
+    { keys: { userId: 1, currentRank: 1 }, options: { name: 'userId_1_currentRank_1' } }, // Global leaderboard
+    { keys: { currentRank: 1 }, options: { name: 'currentRank_1' } }, // Winner queries
   ],
+  
+  // ============================================
+  // CHALLENGE INDEXES
+  // ============================================
   challenges: [
     { keys: { status: 1, endTime: 1 }, options: { name: 'status_1_endTime_1' } },
     { keys: { challengerId: 1 }, options: { name: 'challengerId_1' } },
@@ -33,13 +60,19 @@ const REQUIRED_INDEXES = {
     { keys: { challengeId: 1, role: 1 }, options: { name: 'challengeId_1_role_1' } },
     { keys: { challengeId: 1, status: 1 }, options: { name: 'challengeId_1_status_1' } },
     { keys: { userId: 1 }, options: { name: 'userId_1' } },
+    { keys: { userId: 1, isWinner: 1 }, options: { name: 'userId_1_isWinner_1' } }, // Global leaderboard
   ],
+  
+  // ============================================
+  // TRADING INDEXES
+  // ============================================
   tradingpositions: [
     { keys: { participantId: 1, status: 1 }, options: { name: 'participantId_1_status_1' } },
     { keys: { competitionId: 1, status: 1 }, options: { name: 'competitionId_1_status_1' } },
     { keys: { userId: 1, status: 1 }, options: { name: 'userId_1_status_1' } },
     { keys: { symbol: 1, status: 1 }, options: { name: 'symbol_1_status_1' } },
     { keys: { createdAt: -1 }, options: { name: 'createdAt_-1' } },
+    { keys: { closedAt: -1 }, options: { name: 'closedAt_-1' } }, // Recent trades
   ],
   tradingorders: [
     { keys: { participantId: 1, status: 1 }, options: { name: 'participantId_1_status_1' } },
@@ -47,31 +80,51 @@ const REQUIRED_INDEXES = {
     { keys: { userId: 1 }, options: { name: 'userId_1' } },
     { keys: { createdAt: -1 }, options: { name: 'createdAt_-1' } },
   ],
+  
+  // ============================================
+  // WALLET & FINANCIAL INDEXES
+  // ============================================
   wallets: [
     { keys: { userId: 1 }, options: { unique: true, name: 'userId_1' } },
     { keys: { balance: -1 }, options: { name: 'balance_-1' } },
+  ],
+  creditwallets: [
+    { keys: { odod: 1 }, options: { unique: true, name: 'userId_1' } },
   ],
   wallettransactions: [
     { keys: { userId: 1, createdAt: -1 }, options: { name: 'userId_1_createdAt_-1' } },
     { keys: { walletId: 1, type: 1 }, options: { name: 'walletId_1_type_1' } },
     { keys: { status: 1 }, options: { name: 'status_1' } },
     { keys: { createdAt: -1 }, options: { name: 'createdAt_-1' } },
+    { keys: { competitionId: 1 }, options: { name: 'competitionId_1' } },
+    { keys: { challengeId: 1 }, options: { name: 'challengeId_1' } },
   ],
   platformtransactions: [
     { keys: { type: 1, createdAt: -1 }, options: { name: 'type_1_createdAt_-1' } },
     { keys: { competitionId: 1 }, options: { name: 'competitionId_1' } },
     { keys: { challengeId: 1 }, options: { name: 'challengeId_1' } },
+    { keys: { createdAt: -1 }, options: { name: 'createdAt_-1' } },
   ],
+  
+  // ============================================
+  // NOTIFICATION INDEXES
+  // ============================================
   notifications: [
     { keys: { userId: 1, read: 1 }, options: { name: 'userId_1_read_1' } },
     { keys: { userId: 1, createdAt: -1 }, options: { name: 'userId_1_createdAt_-1' } },
+    { keys: { createdAt: -1 }, options: { name: 'createdAt_-1' } },
   ],
+  
+  // ============================================
+  // MARKET DATA INDEXES (PRICE & CANDLES)
+  // ============================================
   pricelogs: [
     { keys: { symbol: 1, timestamp: -1 }, options: { name: 'symbol_1_timestamp_-1' } },
     { keys: { timestamp: 1 }, options: { expireAfterSeconds: 86400, name: 'timestamp_1_ttl' } }, // TTL index - 24 hours
   ],
   candles_1m: [
     { keys: { symbol: 1, timestamp: -1 }, options: { name: 'symbol_1_timestamp_-1' } },
+    { keys: { symbol: 1, timestamp: 1 }, options: { name: 'symbol_1_timestamp_1' } },
   ],
   candles_historical_1m: [
     { keys: { symbol: 1, timestamp: -1 }, options: { name: 'symbol_1_timestamp_-1' } },
@@ -79,15 +132,54 @@ const REQUIRED_INDEXES = {
   ],
   candles_historical_5m: [
     { keys: { symbol: 1, timestamp: -1 }, options: { name: 'symbol_1_timestamp_-1' } },
+    { keys: { symbol: 1, timestamp: 1 }, options: { name: 'symbol_1_timestamp_1' } },
   ],
   candles_historical_15m: [
     { keys: { symbol: 1, timestamp: -1 }, options: { name: 'symbol_1_timestamp_-1' } },
+    { keys: { symbol: 1, timestamp: 1 }, options: { name: 'symbol_1_timestamp_1' } },
   ],
   candles_historical_30m: [
     { keys: { symbol: 1, timestamp: -1 }, options: { name: 'symbol_1_timestamp_-1' } },
+    { keys: { symbol: 1, timestamp: 1 }, options: { name: 'symbol_1_timestamp_1' } },
   ],
   candles_historical_1h: [
     { keys: { symbol: 1, timestamp: -1 }, options: { name: 'symbol_1_timestamp_-1' } },
+    { keys: { symbol: 1, timestamp: 1 }, options: { name: 'symbol_1_timestamp_1' } },
+  ],
+  candles_historical_4h: [
+    { keys: { symbol: 1, timestamp: -1 }, options: { name: 'symbol_1_timestamp_-1' } },
+    { keys: { symbol: 1, timestamp: 1 }, options: { name: 'symbol_1_timestamp_1' } },
+  ],
+  candles_historical_1d: [
+    { keys: { symbol: 1, timestamp: -1 }, options: { name: 'symbol_1_timestamp_-1' } },
+    { keys: { symbol: 1, timestamp: 1 }, options: { name: 'symbol_1_timestamp_1' } },
+  ],
+  
+  // ============================================
+  // MARKETPLACE INDEXES
+  // ============================================
+  marketplaceitems: [
+    { keys: { slug: 1 }, options: { unique: true, name: 'slug_1' } },
+    { keys: { category: 1, isActive: 1 }, options: { name: 'category_1_isActive_1' } },
+    { keys: { isActive: 1 }, options: { name: 'isActive_1' } },
+  ],
+  userpurchases: [
+    { keys: { odod: 1, itemId: 1 }, options: { unique: true, name: 'userId_1_itemId_1' } },
+    { keys: { userId: 1 }, options: { name: 'userId_1' } },
+  ],
+  
+  // ============================================
+  // AUDIT & SECURITY INDEXES
+  // ============================================
+  auditlogs: [
+    { keys: { userId: 1, createdAt: -1 }, options: { name: 'userId_1_createdAt_-1' } },
+    { keys: { action: 1, createdAt: -1 }, options: { name: 'action_1_createdAt_-1' } },
+    { keys: { createdAt: -1 }, options: { name: 'createdAt_-1' } },
+  ],
+  fraudevents: [
+    { keys: { userId: 1, createdAt: -1 }, options: { name: 'userId_1_createdAt_-1' } },
+    { keys: { type: 1, createdAt: -1 }, options: { name: 'type_1_createdAt_-1' } },
+    { keys: { createdAt: -1 }, options: { name: 'createdAt_-1' } },
   ],
 };
 
