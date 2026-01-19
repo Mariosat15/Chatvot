@@ -90,7 +90,7 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
         const response = await fetch('/api/trading/candles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol, timeframe, count: 100 }),
+          body: JSON.stringify({ symbol, timeframe }), // Server uses admin settings for count
         });
 
         if (response.ok) {

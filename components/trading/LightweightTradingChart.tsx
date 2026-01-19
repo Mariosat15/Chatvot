@@ -1946,7 +1946,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         body: JSON.stringify({ 
           symbol, 
           timeframe, 
-          count: 500, // Load batch
+          // No count - server uses admin lazyLoadBatchSize setting
           before: oldestCandleTimeRef.current 
         }),
       });

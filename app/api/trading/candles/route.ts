@@ -579,9 +579,8 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
   }
   
   // For aggregator-supported timeframes, use hybrid approach
-  // EXCEPT for 1h+/daily/weekly/monthly - aggregating too many 1m candles is slow
-  // 1h with count=100 would need 6,000 1m candles, 4h would need 24,000!
-  const useAggregator = isAggregatorSupported(normalizedTf) && !['1h', '4h', '1d', 'W', 'M'].includes(normalizedTf);
+  // EXCEPT for daily/weekly/monthly - aggregating too many 1m candles is impractical
+  const useAggregator = isAggregatorSupported(normalizedTf) && !['1d', 'W', 'M'].includes(normalizedTf);
   
   if (useAggregator || ['5m', '15m', '30m', '1h', '4h', '1d', 'W', 'M'].includes(normalizedTf)) {
     try {
@@ -654,8 +653,8 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           }
         }
         
-        // If local DB doesn't have enough, fetch from Massive.com API as fallback
-        if (historicalCandles.length < limit) {
+        // If local DB doesn't have enough, fetch from Massive.com API
+        if (historicalCandles.length < limit && !settings.useLocalHistory) {
           const massiveTimeframeMap: Record<string, Timeframe> = {
             '5m': '5', '15m': '15', '30m': '30',
             '1h': '60', '4h': '240', '1d': 'D',
