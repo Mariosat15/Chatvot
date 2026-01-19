@@ -30,11 +30,16 @@ export async function POST(request: NextRequest) {
     try {
       console.log('📋 Finding test data to cleanup...');
       
+      // Use string-based regex for better MongoDB compatibility
+      const testPattern = { $regex: 'TEST_', $options: 'i' };
+      const testStartPattern = { $regex: '^TEST', $options: 'i' };
+      
       // Get user IDs and competition IDs from test participants
       const testParticipants = await db.collection('competitionparticipants').find({
         $or: [
-          { testRunId: { $exists: true, $regex: /^TEST_/i } },
-          { username: { $regex: /^TEST_/i } },
+          { testRunId: testPattern },
+          { username: testPattern },
+          { username: testStartPattern },
         ]
       }).toArray();
       testParticipants.forEach(p => {
@@ -46,8 +51,9 @@ export async function POST(request: NextRequest) {
       // Get user IDs and challenge IDs from test challenge participants
       const testChallengeParticipants = await db.collection('challengeparticipants').find({
         $or: [
-          { testRunId: { $exists: true, $regex: /^TEST_/i } },
-          { username: { $regex: /^TEST_/i } },
+          { testRunId: testPattern },
+          { username: testPattern },
+          { username: testStartPattern },
         ]
       }).toArray();
       testChallengeParticipants.forEach(p => {
@@ -56,20 +62,21 @@ export async function POST(request: NextRequest) {
       });
       console.log(`   Found ${testChallengeParticipants.length} test challenge participants`);
       
-      // Get user IDs from test wallets (search by testRunId only - userId is ObjectId string)
+      // Get user IDs from test wallets
       const testWallets = await db.collection('creditwallets').find({
-        testRunId: { $exists: true, $regex: /^TEST_/i }
+        testRunId: testPattern
       }).toArray();
       testWallets.forEach(w => {
         if (w.userId) testUserIds.push(w.userId.toString());
       });
       console.log(`   Found ${testWallets.length} test wallets`);
       
-      // Get test competition IDs directly
+      // Get test competition IDs directly - search by name containing TEST
       const testCompetitions = await db.collection('competitions').find({
         $or: [
-          { testRunId: { $exists: true, $regex: /^TEST_/i } },
-          { name: { $regex: /^TEST_/i } },
+          { testRunId: testPattern },
+          { name: testPattern },
+          { name: testStartPattern },
         ]
       }).toArray();
       testCompetitions.forEach(c => {
@@ -80,9 +87,11 @@ export async function POST(request: NextRequest) {
       // Get test challenge IDs directly
       const testChallenges = await db.collection('challenges').find({
         $or: [
-          { testRunId: { $exists: true, $regex: /^TEST_/i } },
-          { challengerName: { $regex: /^TEST_/i } },
-          { challengedName: { $regex: /^TEST_/i } },
+          { testRunId: testPattern },
+          { challengerName: testPattern },
+          { challengedName: testPattern },
+          { challengerName: testStartPattern },
+          { challengedName: testStartPattern },
         ]
       }).toArray();
       testChallenges.forEach(c => {
@@ -141,11 +150,15 @@ export async function POST(request: NextRequest) {
       'platformtransactions',
     ];
     
+    // Use string-based regex patterns for delete operations
+    const testPatternDel = { $regex: 'TEST_', $options: 'i' };
+    const testStartPatternDel = { $regex: '^TEST', $options: 'i' };
+    
     for (const collectionName of mainCollections) {
       try {
         // Delete by testRunId field (string contains TEST_)
         const result1 = await db.collection(collectionName).deleteMany({ 
-          testRunId: { $exists: true, $regex: /TEST_/i } 
+          testRunId: testPatternDel
         });
         deletedCount += result1.deletedCount;
         if (result1.deletedCount > 0) {
@@ -163,18 +176,17 @@ export async function POST(request: NextRequest) {
         // This catches old test data that was created before testRunId was added
         const result3 = await db.collection(collectionName).deleteMany({
           $or: [
-            { name: { $regex: /TEST_/i } },
-            { name: { $regex: /^TEST/i } },
-            { slug: { $regex: /test_/i } },
-            { slug: { $regex: /test-test/i } },
-            { username: { $regex: /TEST_/i } },
-            { username: { $regex: /^TEST/i } },
-            { challengerName: { $regex: /TEST_/i } },
-            { challengedName: { $regex: /TEST_/i } },
-            { oddsUsername: { $regex: /TEST_/i } },
-            // Catch participants with TEST_ in competitionId/challengeId string
-            { 'competitionName': { $regex: /TEST_/i } },
-            { 'challengeName': { $regex: /TEST_/i } },
+            { name: testPatternDel },
+            { name: testStartPatternDel },
+            { slug: { $regex: 'test_', $options: 'i' } },
+            { slug: { $regex: 'test-test', $options: 'i' } },
+            { username: testPatternDel },
+            { username: testStartPatternDel },
+            { challengerName: testPatternDel },
+            { challengedName: testPatternDel },
+            { oddsUsername: testPatternDel },
+            { competitionName: testPatternDel },
+            { challengeName: testPatternDel },
           ]
         });
         deletedCount += result3.deletedCount;
