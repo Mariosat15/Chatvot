@@ -60,6 +60,7 @@ import {
   UserCircle,
   MessageCircle,
   Headphones,
+  Image,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -91,6 +92,7 @@ import LandingPageBuilder from '@/components/admin/LandingPageBuilder';
 import RedisSettingsSection from '@/components/admin/RedisSettingsSection';
 import ServerMonitorSection from '@/components/admin/ServerMonitorSection';
 import DevSettingsSection from '@/components/admin/DevSettingsSection';
+import ImageOptimizerSection from '@/components/admin/ImageOptimizerSection';
 import TradingHistorySection from '@/components/admin/TradingHistorySection';
 import PerformanceSimulatorSection from '@/components/admin/PerformanceSimulatorSection';
 import WithdrawalSettingsSection from '@/components/admin/WithdrawalSettingsSection';
@@ -449,6 +451,7 @@ const menuGroups: MenuGroup[] = [
           { id: 'redis', label: 'Redis Cache', icon: <Server className="h-4 w-4" /> },
           { id: 'dev-settings', label: 'Test', icon: <Terminal className="h-4 w-4" /> },
           { id: 'performance-simulator', label: 'Performance Simulator', icon: <Activity className="h-4 w-4" /> },
+          { id: 'image-optimizer', label: 'Image Optimizer', icon: <Image className="h-4 w-4" /> },
           { id: 'dependency-updates', label: 'Dependency Updates', icon: <Package className="h-4 w-4" /> },
         ],
       },
@@ -803,6 +806,8 @@ export default function AdminDashboard({
         return <PerformanceSimulatorSection key={currentRefreshKey} />;
       case 'dependency-updates':
         return <DependencyUpdatesSection key={currentRefreshKey} />;
+      case 'image-optimizer':
+        return <ImageOptimizerSection key={currentRefreshKey} />;
       case 'ai-agent':
         return <AIAgentSection key={currentRefreshKey} />;
       case 'ai-knowledge':
