@@ -7,6 +7,8 @@ import { constants } from 'fs';
  * GET /api/assets/marketplace/[filename]
  * Serve marketplace cosmetic images from the uploads directory
  * This allows the admin panel and user app to access uploaded cosmetic images
+ * 
+ * Smart fallback: If original file not found, tries .webp version (after optimization)
  */
 export async function GET(
   req: NextRequest,
@@ -19,45 +21,59 @@ export async function GET(
     // Also strip query params
     const sanitizedFilename = path.basename(filename.split('?')[0]);
     
-    console.log(`🖼️ [Marketplace Serve] Request for image: ${filename} -> ${sanitizedFilename}`);
+    // Generate WebP fallback filename (for optimized images)
+    const webpFilename = sanitizedFilename.replace(/\.(jpg|jpeg|png|gif|bmp|tiff)$/i, '.webp');
     
-    // Try multiple possible locations for the file
-    // Production path comes first for speed in production
-    const possiblePaths = [
+    // Filenames to try: original first, then webp version
+    const filenamesToTry = [sanitizedFilename];
+    if (webpFilename !== sanitizedFilename) {
+      filenamesToTry.push(webpFilename);
+    }
+    
+    // Base directories to search
+    const baseDirs = [
       // Production: /var/www/chartvolt/public/uploads/marketplace (main upload location)
-      path.join('/var/www/chartvolt', 'public', 'uploads', 'marketplace', sanitizedFilename),
+      path.join('/var/www/chartvolt', 'public', 'uploads', 'marketplace'),
       // Production admin fallback
-      path.join('/var/www/chartvolt', 'apps', 'admin', 'public', 'uploads', 'marketplace', sanitizedFilename),
+      path.join('/var/www/chartvolt', 'apps', 'admin', 'public', 'uploads', 'marketplace'),
       // Local dev: main app's public folder (monorepo, from apps/admin)
-      path.join(process.cwd(), '..', '..', 'public', 'uploads', 'marketplace', sanitizedFilename),
+      path.join(process.cwd(), '..', '..', 'public', 'uploads', 'marketplace'),
       // Local dev: admin app's own public folder
-      path.join(process.cwd(), 'public', 'uploads', 'marketplace', sanitizedFilename),
+      path.join(process.cwd(), 'public', 'uploads', 'marketplace'),
     ];
     
     let filePath: string | null = null;
+    let actualFilename: string = sanitizedFilename;
     
-    for (const possiblePath of possiblePaths) {
-      try {
-        await access(possiblePath, constants.R_OK);
-        filePath = possiblePath;
-        console.log(`✅ [Marketplace Serve] Found image at: ${possiblePath}`);
-        break;
-      } catch {
-        // File doesn't exist at this path, try next
+    // Try each filename in each directory
+    outer: for (const fname of filenamesToTry) {
+      for (const baseDir of baseDirs) {
+        const possiblePath = path.join(baseDir, fname);
+        try {
+          await access(possiblePath, constants.R_OK);
+          filePath = possiblePath;
+          actualFilename = fname;
+          break outer;
+        } catch {
+          // File doesn't exist at this path, try next
+        }
       }
     }
     
     if (!filePath) {
-      console.error(`❌ [Marketplace Serve] Image not found: ${sanitizedFilename}`);
-      console.error(`   Searched paths:`, possiblePaths);
+      console.error(`❌ [Marketplace Serve] Image not found: ${sanitizedFilename} (also tried: ${webpFilename})`);
       return NextResponse.json({ error: 'Image not found' }, { status: 404 });
     }
     
-    const fileBuffer = await readFile(filePath);
-    console.log(`📦 [Marketplace Serve] Serving ${fileBuffer.length} bytes from ${filePath}`);
+    // Log if we used the webp fallback
+    if (actualFilename !== sanitizedFilename) {
+      console.log(`📷 [Marketplace Serve] Serving optimized WebP instead of: ${sanitizedFilename}`);
+    }
     
-    // Determine content type
-    const ext = sanitizedFilename.split('.').pop()?.toLowerCase();
+    const fileBuffer = await readFile(filePath);
+    
+    // Determine content type from actual file (may be webp fallback)
+    const ext = actualFilename.split('.').pop()?.toLowerCase();
     const contentTypes: Record<string, string> = {
       'jpg': 'image/jpeg',
       'jpeg': 'image/jpeg',
