@@ -449,9 +449,10 @@ export default function TradingTestsTab() {
                 disabled={isRunning}
                 variant="outline"
                 className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                title="Cleanup all trading test data (including old tests)"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Cleanup
+                Cleanup All Test Data
               </Button>
             </div>
           </div>

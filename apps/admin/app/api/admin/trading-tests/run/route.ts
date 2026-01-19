@@ -6,19 +6,18 @@ import mongoose from 'mongoose';
 
 // =====================================================
 // TRADING FUNCTIONALITY TESTS
-// Tests: Open Position, Close Position, PNL Calculation
+// ⚡ TESTS ACTUAL PRODUCTION CODE - NOT ISOLATED COPIES!
 // =====================================================
 
-// PNL Calculator (copied from main app for isolated testing)
-const FOREX_PAIRS: Record<string, { name: string; pip: number; contractSize: number }> = {
-  'EUR/USD': { name: 'Euro vs US Dollar', pip: 0.0001, contractSize: 100000 },
-  'GBP/USD': { name: 'British Pound vs US Dollar', pip: 0.0001, contractSize: 100000 },
-  'USD/JPY': { name: 'US Dollar vs Japanese Yen', pip: 0.01, contractSize: 100000 },
-  'AUD/USD': { name: 'Australian Dollar vs US Dollar', pip: 0.0001, contractSize: 100000 },
-};
+// Import ACTUAL production PNL calculator functions
+import {
+  calculateUnrealizedPnL as productionCalculateUnrealizedPnL,
+  calculateMarginRequired as productionCalculateMarginRequired,
+  FOREX_PAIRS,
+  type ForexSymbol,
+} from '@/lib/services/pnl-calculator.service';
 
-type ForexSymbol = keyof typeof FOREX_PAIRS;
-
+// Wrapper functions that call production code
 function calculateUnrealizedPnL(
   side: 'long' | 'short',
   entryPrice: number,
@@ -26,15 +25,8 @@ function calculateUnrealizedPnL(
   quantity: number,
   symbol: string
 ): number {
-  const pairConfig = FOREX_PAIRS[symbol];
-  if (!pairConfig) throw new Error(`Unknown forex pair: ${symbol}`);
-  
-  const { contractSize } = pairConfig;
-  const priceChange = side === 'long'
-    ? currentPrice - entryPrice
-    : entryPrice - currentPrice;
-  
-  return Number((priceChange * quantity * contractSize).toFixed(2));
+  // ⚡ CALLS ACTUAL PRODUCTION FUNCTION
+  return productionCalculateUnrealizedPnL(side, entryPrice, currentPrice, quantity, symbol as ForexSymbol);
 }
 
 function calculateMarginRequired(
@@ -43,14 +35,8 @@ function calculateMarginRequired(
   leverage: number,
   symbol: string
 ): number {
-  const pairConfig = FOREX_PAIRS[symbol];
-  if (!pairConfig) throw new Error(`Unknown forex pair: ${symbol}`);
-  
-  const { contractSize } = pairConfig;
-  const positionValue = quantity * contractSize * entryPrice;
-  const margin = positionValue / leverage;
-  
-  return Number(margin.toFixed(2));
+  // ⚡ CALLS ACTUAL PRODUCTION FUNCTION  
+  return productionCalculateMarginRequired(quantity, entryPrice, leverage, symbol as ForexSymbol);
 }
 
 // Test scenarios
