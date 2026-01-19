@@ -1516,11 +1516,11 @@ export default function MarketDataSection() {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    min="50"
+                    min="10"
                     max="1000"
-                    step="50"
+                    step="10"
                     value={settings.initialCandleCount}
-                    onChange={(e) => saveSettings({ initialCandleCount: parseInt(e.target.value) || 500 })}
+                    onChange={(e) => saveSettings({ initialCandleCount: parseInt(e.target.value) || 100 })}
                     className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-24 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
                   />
                   <span className="text-gray-500 text-sm">candles</span>
@@ -1528,37 +1528,76 @@ export default function MarketDataSection() {
                 <p className="text-gray-500 text-xs mt-2">
                   How many candles to load when chart first opens
                 </p>
-                {/* Performance Impact Table */}
+                {/* Performance Impact Table - All Aggregator Timeframes */}
                 <div className="mt-3 bg-gray-900/50 rounded-lg p-3 border border-gray-800/20">
-                  <div className="text-yellow-400 text-xs font-medium mb-2">⚡ Performance Impact (1h chart):</div>
-                  <div className="grid grid-cols-4 gap-2 text-xs">
-                    <div className="text-gray-500">Count</div>
-                    <div className="text-gray-500">Query</div>
-                    <div className="text-gray-500">Time</div>
-                    <div className="text-gray-500">Visible</div>
-                    
-                    <div className={settings.initialCandleCount <= 100 ? 'text-green-400 font-medium' : 'text-gray-400'}>100</div>
-                    <div className={settings.initialCandleCount <= 100 ? 'text-green-400' : 'text-gray-400'}>6K</div>
-                    <div className={settings.initialCandleCount <= 100 ? 'text-green-400' : 'text-gray-400'}>~2s</div>
-                    <div className={settings.initialCandleCount <= 100 ? 'text-green-400' : 'text-gray-400'}>4 days</div>
-                    
-                    <div className={settings.initialCandleCount > 100 && settings.initialCandleCount <= 200 ? 'text-blue-400 font-medium' : 'text-gray-400'}>200</div>
-                    <div className={settings.initialCandleCount > 100 && settings.initialCandleCount <= 200 ? 'text-blue-400' : 'text-gray-400'}>12K</div>
-                    <div className={settings.initialCandleCount > 100 && settings.initialCandleCount <= 200 ? 'text-blue-400' : 'text-gray-400'}>~5s</div>
-                    <div className={settings.initialCandleCount > 100 && settings.initialCandleCount <= 200 ? 'text-blue-400' : 'text-gray-400'}>8 days</div>
-                    
-                    <div className={settings.initialCandleCount > 200 && settings.initialCandleCount <= 500 ? 'text-yellow-400 font-medium' : 'text-gray-400'}>500</div>
-                    <div className={settings.initialCandleCount > 200 && settings.initialCandleCount <= 500 ? 'text-yellow-400' : 'text-gray-400'}>30K</div>
-                    <div className={settings.initialCandleCount > 200 && settings.initialCandleCount <= 500 ? 'text-yellow-400' : 'text-gray-400'}>~30s</div>
-                    <div className={settings.initialCandleCount > 200 && settings.initialCandleCount <= 500 ? 'text-yellow-400' : 'text-gray-400'}>21 days</div>
-                    
-                    <div className={settings.initialCandleCount > 500 ? 'text-red-400 font-medium' : 'text-gray-400'}>1000</div>
-                    <div className={settings.initialCandleCount > 500 ? 'text-red-400' : 'text-gray-400'}>60K</div>
-                    <div className={settings.initialCandleCount > 500 ? 'text-red-400' : 'text-gray-400'}>~60s+</div>
-                    <div className={settings.initialCandleCount > 500 ? 'text-red-400' : 'text-gray-400'}>42 days</div>
+                  <div className="text-yellow-400 text-xs font-medium mb-2">⚡ Performance Impact (all aggregator timeframes):</div>
+                  <div className="text-xs">
+                    <div className="grid grid-cols-6 gap-1 mb-1 text-gray-500 border-b border-gray-700 pb-1">
+                      <div>TF</div>
+                      <div>×</div>
+                      <div>Query</div>
+                      <div>Est. Time</div>
+                      <div>Visible</div>
+                      <div></div>
+                    </div>
+                    {/* 5m */}
+                    <div className="grid grid-cols-6 gap-1 py-0.5">
+                      <div className="text-cyan-400">5m</div>
+                      <div className="text-gray-500">×5</div>
+                      <div className="text-white">{(settings.initialCandleCount * 5).toLocaleString()}</div>
+                      <div className={settings.initialCandleCount * 5 <= 1000 ? 'text-green-400' : settings.initialCandleCount * 5 <= 5000 ? 'text-yellow-400' : 'text-red-400'}>
+                        {settings.initialCandleCount * 5 <= 1000 ? '~0.5s' : settings.initialCandleCount * 5 <= 5000 ? '~2s' : '~5s+'}
+                      </div>
+                      <div className="text-gray-400">{Math.round(settings.initialCandleCount * 5 / 60 / 24)}d</div>
+                      <div>{settings.initialCandleCount * 5 <= 1000 ? '🟢' : settings.initialCandleCount * 5 <= 5000 ? '🟡' : '🔴'}</div>
+                    </div>
+                    {/* 15m */}
+                    <div className="grid grid-cols-6 gap-1 py-0.5">
+                      <div className="text-cyan-400">15m</div>
+                      <div className="text-gray-500">×15</div>
+                      <div className="text-white">{(settings.initialCandleCount * 15).toLocaleString()}</div>
+                      <div className={settings.initialCandleCount * 15 <= 3000 ? 'text-green-400' : settings.initialCandleCount * 15 <= 10000 ? 'text-yellow-400' : 'text-red-400'}>
+                        {settings.initialCandleCount * 15 <= 3000 ? '~1s' : settings.initialCandleCount * 15 <= 10000 ? '~5s' : '~15s+'}
+                      </div>
+                      <div className="text-gray-400">{Math.round(settings.initialCandleCount * 15 / 60 / 24)}d</div>
+                      <div>{settings.initialCandleCount * 15 <= 3000 ? '🟢' : settings.initialCandleCount * 15 <= 10000 ? '🟡' : '🔴'}</div>
+                    </div>
+                    {/* 30m */}
+                    <div className="grid grid-cols-6 gap-1 py-0.5">
+                      <div className="text-cyan-400">30m</div>
+                      <div className="text-gray-500">×30</div>
+                      <div className="text-white">{(settings.initialCandleCount * 30).toLocaleString()}</div>
+                      <div className={settings.initialCandleCount * 30 <= 6000 ? 'text-green-400' : settings.initialCandleCount * 30 <= 15000 ? 'text-yellow-400' : 'text-red-400'}>
+                        {settings.initialCandleCount * 30 <= 6000 ? '~2s' : settings.initialCandleCount * 30 <= 15000 ? '~8s' : '~20s+'}
+                      </div>
+                      <div className="text-gray-400">{Math.round(settings.initialCandleCount * 30 / 60 / 24)}d</div>
+                      <div>{settings.initialCandleCount * 30 <= 6000 ? '🟢' : settings.initialCandleCount * 30 <= 15000 ? '🟡' : '🔴'}</div>
+                    </div>
+                    {/* 1h */}
+                    <div className="grid grid-cols-6 gap-1 py-0.5 bg-blue-500/10 rounded">
+                      <div className="text-blue-400 font-medium">1h</div>
+                      <div className="text-gray-500">×60</div>
+                      <div className="text-white font-medium">{(settings.initialCandleCount * 60).toLocaleString()}</div>
+                      <div className={settings.initialCandleCount * 60 <= 6000 ? 'text-green-400' : settings.initialCandleCount * 60 <= 20000 ? 'text-yellow-400' : 'text-red-400'}>
+                        {settings.initialCandleCount * 60 <= 6000 ? '~3s' : settings.initialCandleCount * 60 <= 20000 ? '~15s' : '~30s+'}
+                      </div>
+                      <div className="text-gray-400">{Math.round(settings.initialCandleCount / 24)}d</div>
+                      <div>{settings.initialCandleCount * 60 <= 6000 ? '🟢' : settings.initialCandleCount * 60 <= 20000 ? '🟡' : '🔴'}</div>
+                    </div>
+                    {/* 4h */}
+                    <div className="grid grid-cols-6 gap-1 py-0.5 bg-purple-500/10 rounded">
+                      <div className="text-purple-400 font-medium">4h</div>
+                      <div className="text-gray-500">×240</div>
+                      <div className="text-white font-medium">{(settings.initialCandleCount * 240).toLocaleString()}</div>
+                      <div className={settings.initialCandleCount * 240 <= 12000 ? 'text-green-400' : settings.initialCandleCount * 240 <= 50000 ? 'text-yellow-400' : 'text-red-400'}>
+                        {settings.initialCandleCount * 240 <= 12000 ? '~5s' : settings.initialCandleCount * 240 <= 50000 ? '~30s' : '~60s+'}
+                      </div>
+                      <div className="text-gray-400">{Math.round(settings.initialCandleCount * 4 / 24)}d</div>
+                      <div>{settings.initialCandleCount * 240 <= 12000 ? '🟢' : settings.initialCandleCount * 240 <= 50000 ? '🟡' : '🔴'}</div>
+                    </div>
                   </div>
                   <p className="text-gray-500 text-[10px] mt-2">
-                    For 1h: count × 60 = 1m candles needed • count ÷ 24 = days visible
+                    Formula: count × multiplier = 1m candles queried for aggregation
                   </p>
                 </div>
               </div>

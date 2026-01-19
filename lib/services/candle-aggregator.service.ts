@@ -242,7 +242,7 @@ function calculateFormingCandle(
 export async function getAggregatedCandles(
   symbol: string,
   timeframe: string,
-  count: number = 500
+  count: number = 100
 ): Promise<{
   candles: AggregatedCandle[];
   formingCandle: AggregatedCandle | null;

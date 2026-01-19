@@ -29,8 +29,8 @@ const lastGapFillCheck = new Map<string, number>();
 const GAP_FILL_CHECK_INTERVAL = 60000; // Check for gaps every 60 seconds per symbol
 
 // Default settings (fallback if DB settings not available)
-const DEFAULT_INITIAL_CANDLE_COUNT = 500;
-const DEFAULT_LAZY_LOAD_BATCH_SIZE = 500;
+const DEFAULT_INITIAL_CANDLE_COUNT = 100;
+const DEFAULT_LAZY_LOAD_BATCH_SIZE = 100;
 
 // MarketDataSettings schema (must match admin app)
 const MarketDataSettingsSchema = new mongoose.Schema({
@@ -39,8 +39,8 @@ const MarketDataSettingsSchema = new mongoose.Schema({
   autoFetchHistory: { type: Boolean, default: false },
   chartHistoryLimitEnabled: { type: Boolean, default: false },
   chartHistoryLimitDays: { type: Number, default: 365 },
-  initialCandleCount: { type: Number, default: 500 },
-  lazyLoadBatchSize: { type: Number, default: 500 },
+  initialCandleCount: { type: Number, default: 100 },
+  lazyLoadBatchSize: { type: Number, default: 100 },
   historicalYearsToDownload: { type: Number, default: 10 },
 }, { timestamps: true });
 
