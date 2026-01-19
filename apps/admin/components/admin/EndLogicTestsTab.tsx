@@ -811,12 +811,12 @@ export default function EndLogicTestsTab() {
 
             <Button
               onClick={cleanupTestData}
-              disabled={isRunning || testDataIds.length === 0}
+              disabled={isRunning}
               variant="outline"
               className="border-red-500/50 text-red-400 hover:bg-red-500/10"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Cleanup Test Data ({testDataIds.length})
+              Cleanup All Test Data
             </Button>
 
             <Button
