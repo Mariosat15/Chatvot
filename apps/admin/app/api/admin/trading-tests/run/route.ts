@@ -10,6 +10,7 @@ import mongoose from 'mongoose';
 // =====================================================
 
 // ⚡ Import ACTUAL production functions (not copies!)
+// Note: Admin app uses same pnl-calculator.service that exists in admin/lib
 import {
   calculateUnrealizedPnL as productionCalculateUnrealizedPnL,
   calculateMarginRequired as productionCalculateMarginRequired,
@@ -29,11 +30,54 @@ import {
   getMarginStatus as productionGetMarginStatus,
 } from '@/lib/services/risk-manager.service';
 
-// ⚡ Import market hours service
-import { isMarketOpen as productionIsMarketOpen } from '@/lib/services/market-hours.service';
+// ⚡ Market hours and price services - loaded dynamically from main app
+// These don't exist in admin app, so we use fetch to call the main app's APIs
+async function productionIsMarketOpen(assetClass: string = 'forex'): Promise<{ isOpen: boolean; reason?: string; isHoliday?: boolean; holidayName?: string }> {
+  try {
+    // Call the main app's market status endpoint
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/market-status`);
+    if (!response.ok) throw new Error('Failed to fetch market status');
+    return await response.json();
+  } catch (error) {
+    // Fallback: Use time-based check
+    const now = new Date();
+    const day = now.getUTCDay();
+    const hour = now.getUTCHours();
+    
+    // Forex is closed on weekends (Saturday after 22:00 UTC until Sunday 22:00 UTC)
+    const isWeekend = day === 0 || day === 6;
+    const isOpen = !isWeekend || (day === 0 && hour >= 22) || (day === 5 && hour < 22);
+    
+    return {
+      isOpen,
+      reason: isOpen ? 'Market is open' : 'Weekend - Forex market closed',
+    };
+  }
+}
 
-// ⚡ Import price service
-import { getRealPrice as productionGetRealPrice } from '@/lib/services/real-forex-prices.service';
+async function productionGetRealPrice(symbol: string): Promise<{ bid: number; ask: number; mid: number; spread: number; timestamp: number } | null> {
+  try {
+    // Call the main app's price endpoint
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/trading/prices?symbols=${symbol}`);
+    if (!response.ok) throw new Error('Failed to fetch price');
+    const data = await response.json();
+    
+    if (data.prices && data.prices[symbol]) {
+      const price = data.prices[symbol];
+      return {
+        bid: price.bid,
+        ask: price.ask,
+        mid: (price.bid + price.ask) / 2,
+        spread: price.ask - price.bid,
+        timestamp: price.timestamp || Date.now(),
+      };
+    }
+    return null;
+  } catch (error) {
+    console.warn(`Could not fetch real price for ${symbol}:`, error);
+    return null;
+  }
+}
 
 // Wrapper functions that call production code (for cleaner test code)
 function calculateUnrealizedPnL(
