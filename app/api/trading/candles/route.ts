@@ -335,15 +335,19 @@ async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): P
  * @param before - Timestamp in SECONDS for lazy loading (get candles before this time)
  */
 async function handleCandleRequest(symbol: string, timeframe: string, count?: number, before?: number) {
+  const startTime = Date.now();
+  
   await connectToDatabase();
+  const dbConnectTime = Date.now() - startTime;
   
   const settings = await getMarketDataSettings();
+  const settingsTime = Date.now() - startTime - dbConnectTime;
   
   // Determine how many candles to fetch
   // If no count specified, use settings for initial load vs lazy load batch
   const limit = count || (before ? settings.lazyLoadBatchSize : settings.initialCandleCount);
   
-  console.log(`📊 [Candles] Request: ${symbol} ${timeframe}, count=${count || 'none'}, limit=${limit}, before=${before || 'none'}`);
+  console.log(`📊 [Candles] Request: ${symbol} ${timeframe}, count=${count || 'none'}, limit=${limit}, before=${before || 'none'} | DB: ${dbConnectTime}ms, Settings: ${settingsTime}ms`);
   
   // Apply history limit if enabled
   let historyLimitDate: Date | undefined;
@@ -358,7 +362,10 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
   if (timeframe === '1m' || timeframe === '1') {
     try {
       // First, get candles from candles_1m (recent data for aggregation)
+      const queryStart = Date.now();
       let candles = await Candle1m.getCandles(symbol, limit, before);
+      const queryTime = Date.now() - queryStart;
+      console.log(`📊 [Candles] Query for ${symbol}: ${queryTime}ms, found ${candles?.length || 0} candles`);
       
       // Apply history limit
       if (historyLimitDate && candles) {
@@ -470,6 +477,9 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       const oldestTimestamp = candles && candles.length > 0 ? candles[0].time : undefined;
       
       // Return immediately with whatever we have
+      const totalTime = Date.now() - startTime;
+      console.log(`✅ [Candles] Response for ${symbol} ${timeframe}: ${responseCandles.length} candles in ${totalTime}ms (query: ${queryTime}ms)`);
+      
       return NextResponse.json({ 
         candles: responseCandles,
         formingCandle: formingCandle ? {
@@ -486,6 +496,7 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         oldestTimestamp,
         // Tell client if more data is being loaded in background
         backgroundSeeding: needsSeeding,
+        _debug: { totalMs: totalTime, queryMs: queryTime },
       });
       
     } catch (dbError) {
