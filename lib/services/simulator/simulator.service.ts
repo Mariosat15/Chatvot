@@ -80,81 +80,156 @@ const TEST_CASES: TestCase[] = [
       };
 
       ctx.log('info', `Starting registration of ${ctx.config.virtualUsers} virtual users`);
+      
+      // Check if concurrent mode is enabled
+      const concurrentMode = ctx.config.concurrentMode || false;
+      const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
 
-      const batchSize = Math.min(20, ctx.config.virtualUsers); // Smaller batches for stability
-      const batches = Math.ceil(ctx.config.virtualUsers / batchSize);
-
-      for (let batch = 0; batch < batches; batch++) {
-        const startIdx = batch * batchSize;
-        const endIdx = Math.min(startIdx + batchSize, ctx.config.virtualUsers);
-
-        // Create batch of users
-        const batchUsers = [];
-        for (let i = startIdx; i < endIdx; i++) {
-          batchUsers.push({
-            email: `simuser_${Date.now()}_${i}@test.simulator`,
-            password: 'SimTest123!',
-            name: `Sim User ${i}`,
-          });
-        }
-
-        const start = Date.now();
-        const url = `${ctx.baseUrl}/api/simulator/users`;
-        console.log(`🧪 [SIMULATOR] Calling ${url} with ${batchUsers.length} users`);
+      if (concurrentMode) {
+        // ⚡ CONCURRENT MODE: Fire all requests in parallel batches
+        ctx.log('info', `🚀 CONCURRENT MODE: Running ${concurrentBatchSize} parallel requests`);
         
-        try {
-          // Use the dedicated simulator users endpoint
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Simulator-Mode': 'true',
-            },
-            body: JSON.stringify({ batch: batchUsers }),
+        const allUserBatches: { email: string; password: string; name: string }[][] = [];
+        const batchSize = Math.min(20, ctx.config.virtualUsers);
+        
+        // Prepare all batches
+        for (let i = 0; i < ctx.config.virtualUsers; i += batchSize) {
+          const batch = [];
+          for (let j = i; j < Math.min(i + batchSize, ctx.config.virtualUsers); j++) {
+            batch.push({
+              email: `simuser_${Date.now()}_${j}@test.simulator`,
+              password: 'SimTest123!',
+              name: `Sim User ${j}`,
+            });
+          }
+          allUserBatches.push(batch);
+        }
+        
+        // Process in concurrent waves
+        for (let wave = 0; wave < allUserBatches.length; wave += concurrentBatchSize) {
+          const waveBatches = allUserBatches.slice(wave, wave + concurrentBatchSize);
+          
+          const promises = waveBatches.map(async (batchUsers) => {
+            const start = Date.now();
+            const url = `${ctx.baseUrl}/api/simulator/users`;
+            
+            try {
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
+                body: JSON.stringify({ batch: batchUsers }),
+              });
+              
+              const elapsed = Date.now() - start;
+              results.responseTimes.push(elapsed);
+              
+              if (response.ok) {
+                const data = await response.json();
+                if (data.users && Array.isArray(data.users)) {
+                  for (const userResult of data.users) {
+                    if (userResult.success && userResult.userId) {
+                      ctx.testUsers.push({ id: userResult.userId, email: userResult.email, password: 'SimTest123!' });
+                      results.createdIds!.users!.push(userResult.userId);
+                      results.successCount++;
+                    } else {
+                      results.failureCount++;
+                    }
+                  }
+                }
+              } else {
+                results.failureCount += batchUsers.length;
+              }
+            } catch (error) {
+              results.failureCount += batchUsers.length;
+              results.responseTimes.push(Date.now() - start);
+            }
           });
           
-          console.log(`🧪 [SIMULATOR] Response status: ${response.status}`);
+          // Fire all requests in this wave concurrently
+          await Promise.all(promises);
+          
+          await ctx.updateProgress('User Registration (Concurrent)', 
+            Math.min((wave + concurrentBatchSize) * 20, ctx.config.virtualUsers), 
+            ctx.config.virtualUsers,
+            `Registered ${results.successCount} users (${results.failureCount} failed)`);
+        }
+      } else {
+        // SEQUENTIAL MODE (original behavior)
+        const batchSize = Math.min(20, ctx.config.virtualUsers);
+        const batches = Math.ceil(ctx.config.virtualUsers / batchSize);
 
-          const elapsed = Date.now() - start;
-          results.responseTimes.push(elapsed);
+        for (let batch = 0; batch < batches; batch++) {
+          const startIdx = batch * batchSize;
+          const endIdx = Math.min(startIdx + batchSize, ctx.config.virtualUsers);
 
-          if (response.ok) {
-            const data = await response.json();
+          // Create batch of users
+          const batchUsers = [];
+          for (let i = startIdx; i < endIdx; i++) {
+            batchUsers.push({
+              email: `simuser_${Date.now()}_${i}@test.simulator`,
+              password: 'SimTest123!',
+              name: `Sim User ${i}`,
+            });
+          }
+
+          const start = Date.now();
+          const url = `${ctx.baseUrl}/api/simulator/users`;
+          console.log(`🧪 [SIMULATOR] Calling ${url} with ${batchUsers.length} users`);
+          
+          try {
+            // Use the dedicated simulator users endpoint
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Simulator-Mode': 'true',
+              },
+              body: JSON.stringify({ batch: batchUsers }),
+            });
             
-            if (data.users && Array.isArray(data.users)) {
-              for (const userResult of data.users) {
-                if (userResult.success && userResult.userId) {
-                  ctx.testUsers.push({
-                    id: userResult.userId,
-                    email: userResult.email,
-                    password: 'SimTest123!',
-                  });
-                  results.createdIds!.users!.push(userResult.userId);
-                  results.successCount++;
-                } else {
-                  results.failureCount++;
+            console.log(`🧪 [SIMULATOR] Response status: ${response.status}`);
+
+            const elapsed = Date.now() - start;
+            results.responseTimes.push(elapsed);
+
+            if (response.ok) {
+              const data = await response.json();
+              
+              if (data.users && Array.isArray(data.users)) {
+                for (const userResult of data.users) {
+                  if (userResult.success && userResult.userId) {
+                    ctx.testUsers.push({
+                      id: userResult.userId,
+                      email: userResult.email,
+                      password: 'SimTest123!',
+                    });
+                    results.createdIds!.users!.push(userResult.userId);
+                    results.successCount++;
+                  } else {
+                    results.failureCount++;
+                  }
                 }
               }
+            } else {
+              const errorData = await response.text();
+              console.log(`🧪 [SIMULATOR] Batch failed: ${response.status} - ${errorData}`);
+              ctx.log('error', `Batch registration failed: ${errorData}`);
+              results.failureCount += batchUsers.length;
             }
-          } else {
-            const errorData = await response.text();
-            console.log(`🧪 [SIMULATOR] Batch failed: ${response.status} - ${errorData}`);
-            ctx.log('error', `Batch registration failed: ${errorData}`);
+          } catch (error) {
+            console.log(`🧪 [SIMULATOR] Fetch error:`, error);
+            ctx.log('error', `Registration error: ${error instanceof Error ? error.message : 'Unknown'}`);
             results.failureCount += batchUsers.length;
+            results.responseTimes.push(Date.now() - start);
           }
-        } catch (error) {
-          console.log(`🧪 [SIMULATOR] Fetch error:`, error);
-          ctx.log('error', `Registration error: ${error instanceof Error ? error.message : 'Unknown'}`);
-          results.failureCount += batchUsers.length;
-          results.responseTimes.push(Date.now() - start);
-        }
 
-        await ctx.updateProgress('User Registration', endIdx, ctx.config.virtualUsers, 
-          `Registered ${results.successCount} users (${results.failureCount} failed)`);
+          await ctx.updateProgress('User Registration', endIdx, ctx.config.virtualUsers, 
+            `Registered ${results.successCount} users (${results.failureCount} failed)`);
 
-        // Rate limiting delay between batches
-        if (ctx.config.userRegistrationRate > 0 && batch < batches - 1) {
-          await sleep(Math.max(100, 1000 / ctx.config.userRegistrationRate * batchSize));
+          // Rate limiting delay between batches
+          if (ctx.config.userRegistrationRate > 0 && batch < batches - 1) {
+            await sleep(Math.max(100, 1000 / ctx.config.userRegistrationRate * batchSize));
+          }
         }
       }
 
@@ -589,68 +664,145 @@ const TEST_CASES: TestCase[] = [
 
       // Use correct format with slashes to match FOREX_PAIRS and price cache
       const symbols = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD'];
-      let tradeCount = 0;
+      
+      // Check if concurrent mode is enabled
+      const concurrentMode = ctx.config.concurrentMode || false;
+      const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
 
-      for (const user of ctx.testUsers) {
-        // Get user's competition participation
-        const userComp = ctx.testCompetitions[0]; // Simplified - use first comp
-
-        for (let t = 0; t < ctx.config.tradesPerUser; t++) {
-          const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-          const side = Math.random() > 0.5 ? 'long' : 'short';
-          const lotSize = (Math.random() * 0.9 + 0.1).toFixed(2); // 0.1 to 1.0
-
-          // AI-generated trading pattern if enabled
-          let tradeParams: Record<string, unknown> = { symbol, side, lotSize };
-          if (ctx.config.useAIPatterns && ctx.aiGeneratePattern) {
-            tradeParams = { ...tradeParams, ...(await ctx.aiGeneratePattern('trade_params')) };
-          }
-
-          // Add TP/SL based on config
-          const hasTPSL = Math.random() < ctx.config.tpSlPercentage / 100;
-          if (hasTPSL) {
-            tradeParams.takeProfit = side === 'long' ? 1.005 : 0.995; // Simplified
-            tradeParams.stopLoss = side === 'long' ? 0.995 : 1.005;
-          }
-
-          const start = Date.now();
-
-          try {
-            // Use simulator endpoint for order creation
-            const response = await fetch(`${ctx.baseUrl}/api/simulator/orders`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Simulator-Mode': 'true',
-              },
-              body: JSON.stringify({
-                userId: user.id,
-                ...tradeParams,
-                competitionId: userComp?.id,
-              }),
+      if (concurrentMode) {
+        // ⚡ CONCURRENT MODE: Prepare all trades then fire in parallel batches
+        ctx.log('info', `🚀 CONCURRENT MODE: Executing trades with ${concurrentBatchSize} parallel requests`);
+        
+        // Prepare all trade requests
+        const allTradeRequests: { userId: string; symbol: string; side: string; lotSize: string; competitionId?: string; takeProfit?: number; stopLoss?: number }[] = [];
+        
+        for (const user of ctx.testUsers) {
+          const userComp = ctx.testCompetitions[0];
+          
+          for (let t = 0; t < ctx.config.tradesPerUser; t++) {
+            const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+            const side = Math.random() > 0.5 ? 'long' : 'short';
+            const lotSize = (Math.random() * 0.9 + 0.1).toFixed(2);
+            const hasTPSL = Math.random() < ctx.config.tpSlPercentage / 100;
+            
+            allTradeRequests.push({
+              userId: user.id,
+              symbol,
+              side,
+              lotSize,
+              competitionId: userComp?.id,
+              ...(hasTPSL ? { 
+                takeProfit: side === 'long' ? 1.005 : 0.995,
+                stopLoss: side === 'long' ? 0.995 : 1.005 
+              } : {}),
             });
-
-            const elapsed = Date.now() - start;
-            results.responseTimes.push(elapsed);
-
-            if (response.ok) {
-              const data = await response.json();
-              if (data.position?._id) {
-                results.createdIds!.positions!.push(data.position._id);
-              }
-              results.successCount++;
-            } else {
-              results.failureCount++;
-            }
-          } catch {
-            results.failureCount++;
-            results.responseTimes.push(Date.now() - start);
           }
+        }
+        
+        // Execute in concurrent waves
+        for (let wave = 0; wave < allTradeRequests.length; wave += concurrentBatchSize) {
+          const waveTrades = allTradeRequests.slice(wave, wave + concurrentBatchSize);
+          
+          const promises = waveTrades.map(async (tradeParams) => {
+            const start = Date.now();
+            
+            try {
+              const response = await fetch(`${ctx.baseUrl}/api/simulator/orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
+                body: JSON.stringify(tradeParams),
+              });
+              
+              const elapsed = Date.now() - start;
+              results.responseTimes.push(elapsed);
+              
+              if (response.ok) {
+                const data = await response.json();
+                if (data.position?._id) {
+                  results.createdIds!.positions!.push(data.position._id);
+                }
+                results.successCount++;
+              } else {
+                results.failureCount++;
+              }
+            } catch {
+              results.failureCount++;
+              results.responseTimes.push(Date.now() - start);
+            }
+          });
+          
+          await Promise.all(promises);
+          
+          await ctx.updateProgress('Trading (Concurrent)', 
+            Math.min(wave + concurrentBatchSize, totalTrades), 
+            totalTrades,
+            `Executed ${results.successCount + results.failureCount} trades`);
+        }
+      } else {
+        // SEQUENTIAL MODE (original behavior)
+        let tradeCount = 0;
 
-          tradeCount++;
-          if (tradeCount % 500 === 0) {
-            await ctx.updateProgress('Trading', tradeCount, totalTrades, 
-              `Executed ${tradeCount} trades`);
+        for (const user of ctx.testUsers) {
+          // Get user's competition participation
+          const userComp = ctx.testCompetitions[0]; // Simplified - use first comp
+
+          for (let t = 0; t < ctx.config.tradesPerUser; t++) {
+            const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+            const side = Math.random() > 0.5 ? 'long' : 'short';
+            const lotSize = (Math.random() * 0.9 + 0.1).toFixed(2); // 0.1 to 1.0
+
+            // AI-generated trading pattern if enabled
+            let tradeParams: Record<string, unknown> = { symbol, side, lotSize };
+            if (ctx.config.useAIPatterns && ctx.aiGeneratePattern) {
+              tradeParams = { ...tradeParams, ...(await ctx.aiGeneratePattern('trade_params')) };
+            }
+
+            // Add TP/SL based on config
+            const hasTPSL = Math.random() < ctx.config.tpSlPercentage / 100;
+            if (hasTPSL) {
+              tradeParams.takeProfit = side === 'long' ? 1.005 : 0.995; // Simplified
+              tradeParams.stopLoss = side === 'long' ? 0.995 : 1.005;
+            }
+
+            const start = Date.now();
+
+            try {
+              // Use simulator endpoint for order creation
+              const response = await fetch(`${ctx.baseUrl}/api/simulator/orders`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Simulator-Mode': 'true',
+                },
+                body: JSON.stringify({
+                  userId: user.id,
+                  ...tradeParams,
+                  competitionId: userComp?.id,
+                }),
+              });
+
+              const elapsed = Date.now() - start;
+              results.responseTimes.push(elapsed);
+
+              if (response.ok) {
+                const data = await response.json();
+                if (data.position?._id) {
+                  results.createdIds!.positions!.push(data.position._id);
+                }
+                results.successCount++;
+              } else {
+                results.failureCount++;
+              }
+            } catch {
+              results.failureCount++;
+              results.responseTimes.push(Date.now() - start);
+            }
+
+            tradeCount++;
+            if (tradeCount % 500 === 0) {
+              await ctx.updateProgress('Trading', tradeCount, totalTrades, 
+                `Executed ${tradeCount} trades`);
+            }
           }
         }
       }

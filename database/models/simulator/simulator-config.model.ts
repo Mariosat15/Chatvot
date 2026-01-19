@@ -46,6 +46,10 @@ export interface ISimulatorConfig extends Document {
   useAIPatterns: boolean;
   useAIAnalysis: boolean;
   
+  // Concurrent Testing Mode
+  concurrentMode: boolean; // Run tests in parallel instead of sequentially
+  concurrentBatchSize: number; // Number of concurrent operations per batch
+  
   // Presets
   presets: {
     small: { users: number; competitions: number; challenges: number; trades: number };
@@ -100,6 +104,10 @@ const SimulatorConfigSchema = new Schema<ISimulatorConfig>({
   
   useAIPatterns: { type: Boolean, default: true },
   useAIAnalysis: { type: Boolean, default: true },
+  
+  // Concurrent Testing Mode
+  concurrentMode: { type: Boolean, default: false },
+  concurrentBatchSize: { type: Number, default: 50 }, // Max concurrent operations
   
   presets: {
     type: Object,

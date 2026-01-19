@@ -45,10 +45,12 @@ import {
   MemoryStick,
   Timer,
   Loader2,
+  Database,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EndLogicTestsTab from './EndLogicTestsTab';
 import TradingTestsTab from './TradingTestsTab';
+import DatabaseIndexesTab from './DatabaseIndexesTab';
 import {
   LineChart,
   Line,
@@ -93,6 +95,8 @@ interface SimulatorConfig {
   memoryStressLevel: number;
   useAIPatterns: boolean;
   useAIAnalysis: boolean;
+  concurrentMode: boolean;
+  concurrentBatchSize: number;
   presets: {
     small: { users: number; competitions: number; challenges: number; trades: number };
     medium: { users: number; competitions: number; challenges: number; trades: number };
@@ -727,6 +731,10 @@ export default function PerformanceSimulatorSection() {
             <TrendingUp className="h-4 w-4 mr-2" />
             Trading Tests
           </TabsTrigger>
+          <TabsTrigger value="db-indexes" className="data-[state=active]:bg-gray-700">
+            <Database className="h-4 w-4 mr-2" />
+            DB Indexes
+          </TabsTrigger>
         </TabsList>
 
         {/* Configuration Tab */}
@@ -948,6 +956,52 @@ export default function PerformanceSimulatorSection() {
                           <p className="text-xs text-gray-500 mt-1">Level {config.memoryStressLevel}/10</p>
                         </div>
                       </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Concurrent Mode (Load Testing) */}
+                <Card className="bg-gray-800/50 border-gray-700 border-orange-500/30">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-white text-lg flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-orange-400" />
+                      Concurrent Mode (Real Load Testing)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg mb-4">
+                      <p className="text-xs text-orange-300">
+                        ⚡ <strong>Concurrent Mode</strong> sends multiple requests simultaneously, simulating real production load.
+                        Use this to stress test your server and find actual performance limits.
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-gray-300">Enable Concurrent Mode</Label>
+                        <p className="text-xs text-gray-500">Fire requests in parallel instead of sequentially</p>
+                      </div>
+                      <Switch
+                        checked={config.concurrentMode || false}
+                        onCheckedChange={(v) => setConfig({ ...config, concurrentMode: v })}
+                      />
+                    </div>
+                    {config.concurrentMode && (
+                      <div>
+                        <Label className="text-gray-300">Concurrent Batch Size</Label>
+                        <p className="text-xs text-gray-500 mb-2">Number of parallel requests per wave</p>
+                        <Slider
+                          value={[config.concurrentBatchSize || 50]}
+                          onValueChange={([v]) => setConfig({ ...config, concurrentBatchSize: v })}
+                          min={10}
+                          max={200}
+                          step={10}
+                          className="mt-2"
+                        />
+                        <p className="text-xs text-orange-400 mt-1">
+                          {config.concurrentBatchSize || 50} parallel requests/wave
+                          {(config.concurrentBatchSize || 50) > 100 && ' ⚠️ High load!'}
+                        </p>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -2114,6 +2168,11 @@ export default function PerformanceSimulatorSection() {
         {/* Trading Tests Tab */}
         <TabsContent value="trading-tests">
           <TradingTestsTab />
+        </TabsContent>
+
+        {/* Database Indexes Tab */}
+        <TabsContent value="db-indexes">
+          <DatabaseIndexesTab />
         </TabsContent>
       </Tabs>
     </div>
