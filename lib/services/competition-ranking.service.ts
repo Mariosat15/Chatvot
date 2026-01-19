@@ -195,27 +195,44 @@ export function calculateRankings(
   // Use epsilon for floating point comparisons to handle precision issues
   const sortEpsilon = 0.01; // $0.01 difference is negligible for ranking purposes
   
+  console.log(`🔄 [SORT] Sorting ${qualified.length} participants with rules:`, {
+    method: rules.rankingMethod,
+    tieBreaker1: rules.tieBreaker1,
+    tieBreaker2: rules.tieBreaker2,
+  });
+  
   qualified.sort((a, b) => {
     // Primary ranking method
     const aValue = getRankingValue(a, rules.rankingMethod);
     const bValue = getRankingValue(b, rules.rankingMethod);
 
+    console.log(`   🔄 Compare ${a.username} vs ${b.username}:`);
+    console.log(`      Primary (${rules.rankingMethod}): ${aValue.toFixed(4)} vs ${bValue.toFixed(4)}, diff=${Math.abs(aValue - bValue).toFixed(6)}`);
+
     // Use epsilon comparison for floating point values
     if (Math.abs(aValue - bValue) >= sortEpsilon) {
-      return bValue - aValue; // Higher is better (descending)
+      const result = bValue - aValue;
+      console.log(`      → Primary decides: ${result > 0 ? 'b wins' : 'a wins'}`);
+      return result; // Higher is better (descending)
     }
+    console.log(`      → Primary TIED (diff < ${sortEpsilon})`);
 
     // Tie on primary! Apply tiebreaker 1
     if (rules.tieBreaker1 !== 'split_prize') {
       const aTie1 = getTieBreakerValue(a, rules.tieBreaker1);
       const bTie1 = getTieBreakerValue(b, rules.tieBreaker1);
 
+      console.log(`      TieBreaker1 (${rules.tieBreaker1}): ${aTie1} vs ${bTie1}`);
+
       // Use epsilon for floating-point tiebreakers (win_rate, roi)
       // Use 0.5 threshold for integer-like values (trades_count, join_time)
       const tie1Epsilon = ['win_rate', 'roi', 'total_capital'].includes(rules.tieBreaker1) ? 0.01 : 0.5;
       if (Math.abs(aTie1 - bTie1) >= tie1Epsilon) {
-        return bTie1 - aTie1; // Higher is better (for trades_count, value is negative so fewer trades wins)
+        const result = bTie1 - aTie1;
+        console.log(`      → TieBreaker1 decides: ${result > 0 ? 'b wins' : 'a wins'}`);
+        return result; // Higher is better (for trades_count, value is negative so fewer trades wins)
       }
+      console.log(`      → TieBreaker1 TIED`);
     }
 
     // Still tied! Apply tiebreaker 2
@@ -223,14 +240,23 @@ export function calculateRankings(
       const aTie2 = getTieBreakerValue(a, rules.tieBreaker2);
       const bTie2 = getTieBreakerValue(b, rules.tieBreaker2);
 
+      console.log(`      TieBreaker2 (${rules.tieBreaker2}): ${aTie2} vs ${bTie2}`);
+
       const tie2Epsilon = ['win_rate', 'roi', 'total_capital'].includes(rules.tieBreaker2) ? 0.01 : 0.5;
       if (Math.abs(aTie2 - bTie2) >= tie2Epsilon) {
-        return bTie2 - aTie2;
+        const result = bTie2 - aTie2;
+        console.log(`      → TieBreaker2 decides: ${result > 0 ? 'b wins' : 'a wins'}`);
+        return result;
       }
+      console.log(`      → TieBreaker2 TIED`);
+    } else {
+      console.log(`      → No TieBreaker2 defined (tieBreaker2=${rules.tieBreaker2})`);
     }
 
     // Ultimate tiebreaker: join time (earlier is better)
-    return new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime();
+    const joinTimeResult = new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime();
+    console.log(`      → Ultimate (join_time): ${a.enteredAt} vs ${b.enteredAt}, ${joinTimeResult < 0 ? 'a wins' : 'b wins'}`);
+    return joinTimeResult;
   });
 
   // Step 3: Assign ranks and detect TRUE ties (same across ALL criteria)

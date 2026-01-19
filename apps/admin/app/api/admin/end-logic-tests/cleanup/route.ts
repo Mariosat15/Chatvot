@@ -187,6 +187,11 @@ export async function POST(request: NextRequest) {
             { oddsUsername: testPatternDel },
             { competitionName: testPatternDel },
             { challengeName: testPatternDel },
+            // Platform transactions have description field
+            { description: testPatternDel },
+            { description: testStartPatternDel },
+            // Also check source field
+            { source: testPatternDel },
           ]
         });
         deletedCount += result3.deletedCount;
@@ -195,6 +200,27 @@ export async function POST(request: NextRequest) {
         }
       } catch (e) {
         console.warn(`Failed to cleanup ${collectionName}:`, e);
+      }
+    }
+    
+    // ==========================================
+    // EXTRA: Delete platform transactions by competition/challenge ID
+    // ==========================================
+    if (uniqueCompetitionIds.length > 0 || uniqueChallengeIds.length > 0) {
+      try {
+        const ptResult = await db.collection('platformtransactions').deleteMany({
+          $or: [
+            { competitionId: { $in: uniqueCompetitionIds } },
+            { challengeId: { $in: uniqueChallengeIds } },
+            { sourceId: { $in: [...uniqueCompetitionIds, ...uniqueChallengeIds] } },
+          ]
+        });
+        if (ptResult.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${ptResult.deletedCount} platform transactions by competition/challenge ID`);
+          deletedCount += ptResult.deletedCount;
+        }
+      } catch (e) {
+        console.warn('Failed to delete platform transactions by ID:', e);
       }
     }
     
