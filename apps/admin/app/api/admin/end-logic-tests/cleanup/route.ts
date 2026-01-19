@@ -44,15 +44,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Cleanup by testRunId prefix (TEST_)
+    // IMPORTANT: Include ALL collections that can be created during tests
     const collections = [
+      // Core test data
       'competitions', 
       'challenges', 
       'competitionparticipants', 
       'challengeparticipants',
       'creditwallets',
+      'tradingpositions',
+      'tradingorders', // Orders created when positions are closed
+      
+      // Financial records
       'platformtransactions',
-      'tradingpositions', // Also clean up test positions
-      'wallettransactions', // Clean up wallet transactions
+      'wallettransactions',
+      
+      // Side effects from finalization (badges, notifications, levels)
+      'notifications', // Created when notifying winners
+      'userbadges', // Created when evaluating badges after competition
+      'userlevels', // Created/updated when awarding XP for badges
     ];
     
     for (const collectionName of collections) {
@@ -112,6 +122,90 @@ export async function POST(request: NextRequest) {
       }
     } catch (e) {
       console.warn('Extra cleanup failed:', e);
+    }
+    
+    // Cleanup side effects (notifications, badges, levels) for test users
+    // First, find all test user IDs from wallets and participants
+    try {
+      const testUserIds: string[] = [];
+      
+      // Get user IDs from test wallets
+      const testWallets = await db.collection('creditwallets').find({
+        $or: [
+          { testRunId: { $exists: true, $regex: /^TEST_/i } },
+          { userId: { $regex: /^TEST_/i } },
+        ]
+      }).toArray();
+      testWallets.forEach(w => {
+        if (w.userId) testUserIds.push(w.userId.toString());
+      });
+      
+      // Get user IDs from test participants
+      const testParticipants = await db.collection('competitionparticipants').find({
+        $or: [
+          { testRunId: { $exists: true, $regex: /^TEST_/i } },
+          { username: { $regex: /^TEST_/i } },
+        ]
+      }).toArray();
+      testParticipants.forEach(p => {
+        if (p.userId) testUserIds.push(p.userId.toString());
+      });
+      
+      // Get user IDs from test challenge participants
+      const testChallengeParticipants = await db.collection('challengeparticipants').find({
+        $or: [
+          { testRunId: { $exists: true, $regex: /^TEST_/i } },
+          { username: { $regex: /^TEST_/i } },
+        ]
+      }).toArray();
+      testChallengeParticipants.forEach(p => {
+        if (p.userId) testUserIds.push(p.userId.toString());
+      });
+      
+      // Dedupe user IDs
+      const uniqueUserIds = [...new Set(testUserIds)];
+      
+      if (uniqueUserIds.length > 0) {
+        console.log(`Found ${uniqueUserIds.length} test user IDs to clean up side effects`);
+        
+        // Delete notifications for test users
+        const notifResult = await db.collection('notifications').deleteMany({
+          userId: { $in: uniqueUserIds }
+        });
+        if (notifResult.deletedCount > 0) {
+          console.log(`Deleted ${notifResult.deletedCount} notifications for test users`);
+          deletedCount += notifResult.deletedCount;
+        }
+        
+        // Delete badges for test users
+        const badgeResult = await db.collection('userbadges').deleteMany({
+          userId: { $in: uniqueUserIds }
+        });
+        if (badgeResult.deletedCount > 0) {
+          console.log(`Deleted ${badgeResult.deletedCount} badges for test users`);
+          deletedCount += badgeResult.deletedCount;
+        }
+        
+        // Delete user levels for test users
+        const levelResult = await db.collection('userlevels').deleteMany({
+          userId: { $in: uniqueUserIds }
+        });
+        if (levelResult.deletedCount > 0) {
+          console.log(`Deleted ${levelResult.deletedCount} user levels for test users`);
+          deletedCount += levelResult.deletedCount;
+        }
+        
+        // Delete trading orders for test users
+        const orderResult = await db.collection('tradingorders').deleteMany({
+          userId: { $in: uniqueUserIds }
+        });
+        if (orderResult.deletedCount > 0) {
+          console.log(`Deleted ${orderResult.deletedCount} trading orders for test users`);
+          deletedCount += orderResult.deletedCount;
+        }
+      }
+    } catch (e) {
+      console.warn('Side effects cleanup failed:', e);
     }
 
     return NextResponse.json({ 
