@@ -132,20 +132,68 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     })));
   }, [positions]);
 
-  // ⚡ State to track TP/SL updates for immediate UI refresh
+  // ⚡ State to track TP/SL updates and position closures for immediate UI refresh
   const [tpslVersion, setTpslVersion] = useState(0);
+  const closedPositionIdsRef = useRef<Set<string>>(new Set());
   
-  // Listen for TP/SL updates to immediately redraw position lines
+  // Listen for TP/SL updates and position closures to immediately redraw position lines
   useEffect(() => {
     const handleTPSLUpdate = (event: CustomEvent) => {
       log('⚡ Chart received tpslUpdated event:', event.detail);
       // Increment version to trigger position line redraw
       setTpslVersion(v => v + 1);
     };
+    
+    const handlePositionClosed = (event: CustomEvent) => {
+      const { positionId, symbol: closedSymbol } = event.detail;
+      log('⚡ Chart received positionClosed event:', positionId, closedSymbol);
+      
+      // Track this position as closed
+      closedPositionIdsRef.current.add(positionId);
+      
+      // Immediately remove position lines from chart
+      const series = candlestickSeriesRef.current;
+      const entryLine = positionLinesRef.current.get(positionId);
+      const tpLine = positionLinesRef.current.get(`${positionId}-tp`);
+      const slLine = positionLinesRef.current.get(`${positionId}-sl`);
+      const tpArea = tpSlSeriesRef.current.get(`${positionId}-tp-area`);
+      const slArea = tpSlSeriesRef.current.get(`${positionId}-sl-area`);
+      
+      if (series) {
+        try {
+          if (entryLine) series.removePriceLine(entryLine);
+          if (tpLine) series.removePriceLine(tpLine);
+          if (slLine) series.removePriceLine(slLine);
+        } catch {
+          // Lines may already be removed
+        }
+      }
+      
+      if (chartRef.current) {
+        try {
+          if (tpArea) chartRef.current.removeSeries(tpArea);
+          if (slArea) chartRef.current.removeSeries(slArea);
+        } catch {
+          // Series may already be removed  
+        }
+      }
+      
+      // Clean up refs
+      positionLinesRef.current.delete(positionId);
+      positionLinesRef.current.delete(`${positionId}-tp`);
+      positionLinesRef.current.delete(`${positionId}-sl`);
+      tpSlSeriesRef.current.delete(`${positionId}-tp-area`);
+      tpSlSeriesRef.current.delete(`${positionId}-sl-area`);
+      
+      // Increment version to trigger full redraw
+      setTpslVersion(v => v + 1);
+    };
 
     window.addEventListener('tpslUpdated', handleTPSLUpdate as EventListener);
+    window.addEventListener('positionClosed', handlePositionClosed as EventListener);
     return () => {
       window.removeEventListener('tpslUpdated', handleTPSLUpdate as EventListener);
+      window.removeEventListener('positionClosed', handlePositionClosed as EventListener);
     };
   }, []);
 

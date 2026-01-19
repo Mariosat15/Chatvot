@@ -188,6 +188,19 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
         toast.success('Position updated successfully!', {
           description: 'Your TP/SL levels have been set'
         });
+        
+        // ⚡ Dispatch event for immediate chart update
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('tpslUpdated', {
+            detail: {
+              positionId: position._id,
+              symbol: position.symbol,
+              takeProfit: result.position?.takeProfit,
+              stopLoss: result.position?.stopLoss,
+            }
+          }));
+        }
+        
         // Pass updated TP/SL values back to parent for immediate UI update
         onSuccess({
           takeProfit: result.position?.takeProfit,
@@ -280,7 +293,10 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
                     />
                     {takeProfitPips && (
                       <p className="text-xs text-dark-600 mt-1">
-                        Price: {calculateTPFromPips(parseFloat(takeProfitPips)).toFixed(5)}
+                        Triggers at: {calculateTPFromPips(parseFloat(takeProfitPips)).toFixed(5)}
+                        <span className="text-emerald-400 ml-1">
+                          ({position.side === 'long' ? 'BID' : 'ASK'} price)
+                        </span>
                       </p>
                     )}
                   </TabsContent>
@@ -295,6 +311,9 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
                       placeholder={position.entryPrice.toFixed(5)}
                       className="bg-[#131722] border-[#2b2b43] text-white mt-2"
                     />
+                    <p className="text-xs text-dark-600 mt-1">
+                      Triggers when <span className="text-emerald-400">{position.side === 'long' ? 'BID' : 'ASK'}</span> reaches this price
+                    </p>
                   </TabsContent>
                 </Tabs>
 
@@ -347,7 +366,10 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
                     />
                     {stopLossPips && (
                       <p className="text-xs text-dark-600 mt-1">
-                        Price: {calculateSLFromPips(parseFloat(stopLossPips)).toFixed(5)}
+                        Triggers at: {calculateSLFromPips(parseFloat(stopLossPips)).toFixed(5)}
+                        <span className="text-red-400 ml-1">
+                          ({position.side === 'long' ? 'BID' : 'ASK'} price)
+                        </span>
                       </p>
                     )}
                   </TabsContent>
@@ -362,6 +384,9 @@ const EditPositionModal = ({ position, isOpen, onClose, onSuccess }: EditPositio
                       placeholder={position.entryPrice.toFixed(5)}
                       className="bg-[#131722] border-[#2b2b43] text-white mt-2"
                     />
+                    <p className="text-xs text-dark-600 mt-1">
+                      Triggers when <span className="text-red-400">{position.side === 'long' ? 'BID' : 'ASK'}</span> reaches this price
+                    </p>
                   </TabsContent>
                 </Tabs>
 

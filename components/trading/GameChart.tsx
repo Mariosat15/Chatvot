@@ -25,6 +25,13 @@ interface GameChartProps {
   positions?: Position[];
 }
 
+// Position events - must match PositionsTable.tsx
+const POSITION_EVENTS = {
+  POSITION_CLOSED: 'positionClosed',
+  TPSL_UPDATED: 'tpslUpdated',
+  POSITIONS_CHANGED: 'positionsChanged',
+};
+
 // Simple timeframes for Game mode
 const TIMEFRAMES = [
   { value: '1', label: '1m', icon: '⚡' },
@@ -65,6 +72,13 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     close: number;
   } | null>(null);
   
+  // ⚡ Live positions state - tracks positions with real-time updates
+  const [livePositions, setLivePositions] = useState<Position[]>(positions);
+  const closedPositionIdsRef = useRef<Set<string>>(new Set());
+  
+  // ⚡ Version counter to force position line redraws
+  const [positionLinesVersion, setPositionLinesVersion] = useState(0);
+  
   // Chart refs
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -82,11 +96,89 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
   // Get current price
   const currentPrice = prices.get(symbol);
   
-  // Filter positions for current symbol
+  // Get pip value for current symbol
+  const pipValue = FOREX_PAIRS[symbol as ForexSymbol]?.pip || 0.0001;
+  
+  // Filter LIVE positions for current symbol (excludes closed ones)
   const symbolPositions = useMemo(() => 
-    positions.filter(p => p.symbol === symbol), 
-    [positions, symbol]
+    livePositions.filter(p => p.symbol === symbol && !closedPositionIdsRef.current.has(p._id)), 
+    [livePositions, symbol, positionLinesVersion] // positionLinesVersion triggers re-filter when positions change
   );
+  
+  // ⚡ Sync positions from props when they change
+  useEffect(() => {
+    // Filter out any positions that were closed locally
+    const filteredPositions = positions.filter(p => !closedPositionIdsRef.current.has(p._id));
+    setLivePositions(filteredPositions);
+  }, [positions]);
+  
+  // ⚡ Listen for position closed events - immediately remove lines
+  useEffect(() => {
+    const handlePositionClosed = (event: CustomEvent) => {
+      const { positionId, symbol: closedSymbol } = event.detail;
+      console.log('🎮 [GameChart] Position closed:', positionId, closedSymbol);
+      
+      // Track this position as closed
+      closedPositionIdsRef.current.add(positionId);
+      
+      // Immediately remove position lines from chart
+      const series = candlestickSeriesRef.current;
+      const lines = positionLinesRef.current.get(positionId);
+      if (series && lines) {
+        try {
+          if (lines.entry) series.removePriceLine(lines.entry);
+          if (lines.tp) series.removePriceLine(lines.tp);
+          if (lines.sl) series.removePriceLine(lines.sl);
+        } catch (e) {
+          // Lines may already be removed
+        }
+        positionLinesRef.current.delete(positionId);
+      }
+      
+      // Update live positions state
+      setLivePositions(prev => prev.filter(p => p._id !== positionId));
+      setPositionLinesVersion(v => v + 1);
+    };
+    
+    const handleTPSLUpdated = (event: CustomEvent) => {
+      const { positionId, takeProfit, stopLoss } = event.detail;
+      console.log('🎮 [GameChart] TP/SL updated:', positionId, { takeProfit, stopLoss });
+      
+      // Update live positions with new TP/SL values
+      setLivePositions(prev => prev.map(p => {
+        if (p._id === positionId) {
+          return { ...p, takeProfit, stopLoss };
+        }
+        return p;
+      }));
+      
+      // Force redraw of position lines
+      setPositionLinesVersion(v => v + 1);
+    };
+    
+    const handlePositionsChanged = (event: CustomEvent) => {
+      const { closedPositions } = event.detail;
+      console.log('🎮 [GameChart] Positions changed, closed:', closedPositions);
+      
+      // Mark closed positions
+      if (closedPositions && Array.isArray(closedPositions)) {
+        closedPositions.forEach((id: string) => {
+          closedPositionIdsRef.current.add(id);
+        });
+        setPositionLinesVersion(v => v + 1);
+      }
+    };
+    
+    window.addEventListener(POSITION_EVENTS.POSITION_CLOSED, handlePositionClosed as EventListener);
+    window.addEventListener(POSITION_EVENTS.TPSL_UPDATED, handleTPSLUpdated as EventListener);
+    window.addEventListener(POSITION_EVENTS.POSITIONS_CHANGED, handlePositionsChanged as EventListener);
+    
+    return () => {
+      window.removeEventListener(POSITION_EVENTS.POSITION_CLOSED, handlePositionClosed as EventListener);
+      window.removeEventListener(POSITION_EVENTS.TPSL_UPDATED, handleTPSLUpdated as EventListener);
+      window.removeEventListener(POSITION_EVENTS.POSITIONS_CHANGED, handlePositionsChanged as EventListener);
+    };
+  }, []);
   
   // Update current time every second
   useEffect(() => {
@@ -536,25 +628,32 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
     };
   }, [hasMoreHistory, isLoadingMore, loadMoreCandles, timeframe, candlesLoaded]);
   
-  // Draw position lines
+  // Draw position lines - now with bid/ask awareness
   useEffect(() => {
     if (!candlestickSeriesRef.current || !candlesLoaded) return;
     
     const series = candlestickSeriesRef.current;
     
+    // Clear old lines
     positionLinesRef.current.forEach((lines) => {
-      if (lines.entry) series.removePriceLine(lines.entry);
-      if (lines.tp) series.removePriceLine(lines.tp);
-      if (lines.sl) series.removePriceLine(lines.sl);
+      try {
+        if (lines.entry) series.removePriceLine(lines.entry);
+        if (lines.tp) series.removePriceLine(lines.tp);
+        if (lines.sl) series.removePriceLine(lines.sl);
+      } catch {
+        // Line might already be removed
+      }
     });
     positionLinesRef.current.clear();
     
+    // Draw lines for each position
     symbolPositions.forEach((position) => {
       const isLong = position.side === 'long';
       const entryColor = isLong ? '#fbbf24' : '#a78bfa';
       
       const lines: any = {};
       
+      // Entry line
       lines.entry = series.createPriceLine({
         price: position.entryPrice,
         color: entryColor,
@@ -564,31 +663,49 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
         title: isLong ? '📈 ENTRY' : '📉 ENTRY',
       });
       
+      // Take Profit line
+      // LONG: Closes at BID - TP triggers when BID >= takeProfit
+      // SHORT: Closes at ASK - TP triggers when ASK <= takeProfit
       if (position.takeProfit) {
+        // Calculate pips from entry to TP
+        const tpPips = isLong 
+          ? (position.takeProfit - position.entryPrice) / pipValue
+          : (position.entryPrice - position.takeProfit) / pipValue;
+        
         lines.tp = series.createPriceLine({
           price: position.takeProfit,
           color: '#00ff88',
           lineWidth: 2,
           lineStyle: 1,
           axisLabelVisible: true,
-          title: '🎯 TP',
+          // Show pips in title - and which price triggers it
+          title: `🎯 TP ${tpPips > 0 ? '+' : ''}${tpPips.toFixed(0)}p`,
         });
       }
       
+      // Stop Loss line
+      // LONG: Closes at BID - SL triggers when BID <= stopLoss  
+      // SHORT: Closes at ASK - SL triggers when ASK >= stopLoss
       if (position.stopLoss) {
+        // Calculate pips from entry to SL
+        const slPips = isLong 
+          ? (position.entryPrice - position.stopLoss) / pipValue
+          : (position.stopLoss - position.entryPrice) / pipValue;
+        
         lines.sl = series.createPriceLine({
           price: position.stopLoss,
           color: '#ff3366',
           lineWidth: 2,
           lineStyle: 1,
           axisLabelVisible: true,
-          title: '🛑 SL',
+          // Show pips in title
+          title: `🛑 SL ${slPips.toFixed(0)}p`,
         });
       }
       
       positionLinesRef.current.set(position._id, lines);
     });
-  }, [symbolPositions, candlesLoaded]);
+  }, [symbolPositions, candlesLoaded, pipValue, positionLinesVersion]);
   
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-[#0a0a15] via-[#0f0f1a] to-[#1a0a20] rounded-lg sm:rounded-xl overflow-hidden">
