@@ -16,7 +16,7 @@ export async function register() {
     // Small delay to ensure MongoDB connection is ready
     setTimeout(async () => {
       try {
-        const { warmCache } = await import('@/lib/services/candle-aggregator.service');
+        const { warmCache } = await import('./lib/services/candle-aggregator.service');
         await warmCache();
       } catch (err) {
         console.error('❌ [Instrumentation] Failed to warm cache:', err);

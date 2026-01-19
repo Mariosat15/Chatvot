@@ -415,7 +415,7 @@ async function getEnabledSymbols(): Promise<string[]> {
   } catch (err) {
     console.warn('⚠️ [Aggregator] Failed to fetch symbols, using fallback:', err);
     // Fallback to common symbols if DB query fails
-    return ['EUR/USD', 'GBP/USD', 'USD/JPY', 'XAU/USD'];
+    return ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CAD', 'USD/CHF', 'AUD/USD', 'NZD/USD', 'EUR/GBP', 'EUR/JPY', 'GBP/JPY', 'EUR/CHF', 'EUR/AUD', 'EUR/CAD', 'EUR/NZD', 'GBP/CHF', 'GBP/AUD', 'GBP/CAD', 'GBP/NZD', 'AUD/JPY', 'AUD/CHF', 'AUD/CAD', 'AUD/NZD', 'CAD/JPY', 'CAD/CHF', 'CHF/JPY', 'NZD/JPY', 'NZD/CHF'];
   }
 }
 
