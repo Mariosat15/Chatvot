@@ -205,13 +205,15 @@ export function calculateRankings(
       return bValue - aValue; // Higher is better (descending)
     }
 
-    // Tie! Apply tiebreaker 1
+    // Tie on primary! Apply tiebreaker 1
     if (rules.tieBreaker1 !== 'split_prize') {
       const aTie1 = getTieBreakerValue(a, rules.tieBreaker1);
       const bTie1 = getTieBreakerValue(b, rules.tieBreaker1);
 
-      // Trade counts are integers, but use epsilon for safety
-      if (Math.abs(aTie1 - bTie1) >= 0.5) {
+      // Use epsilon for floating-point tiebreakers (win_rate, roi)
+      // Use 0.5 threshold for integer-like values (trades_count, join_time)
+      const tie1Epsilon = ['win_rate', 'roi', 'total_capital'].includes(rules.tieBreaker1) ? 0.01 : 0.5;
+      if (Math.abs(aTie1 - bTie1) >= tie1Epsilon) {
         return bTie1 - aTie1; // Higher is better (for trades_count, value is negative so fewer trades wins)
       }
     }
@@ -221,7 +223,8 @@ export function calculateRankings(
       const aTie2 = getTieBreakerValue(a, rules.tieBreaker2);
       const bTie2 = getTieBreakerValue(b, rules.tieBreaker2);
 
-      if (Math.abs(aTie2 - bTie2) >= 0.5) {
+      const tie2Epsilon = ['win_rate', 'roi', 'total_capital'].includes(rules.tieBreaker2) ? 0.01 : 0.5;
+      if (Math.abs(aTie2 - bTie2) >= tie2Epsilon) {
         return bTie2 - aTie2;
       }
     }

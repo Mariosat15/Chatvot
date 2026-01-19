@@ -159,15 +159,22 @@ export async function POST(request: NextRequest) {
           console.log(`🗑️ Deleted ${result2.deletedCount} from ${collectionName} by isTest`);
         }
 
-        // Also cleanup by name/slug prefix (case insensitive)
+        // Also cleanup by name/slug prefix (case insensitive) - VERY AGGRESSIVE
+        // This catches old test data that was created before testRunId was added
         const result3 = await db.collection(collectionName).deleteMany({
           $or: [
             { name: { $regex: /TEST_/i } },
+            { name: { $regex: /^TEST/i } },
             { slug: { $regex: /test_/i } },
+            { slug: { $regex: /test-test/i } },
             { username: { $regex: /TEST_/i } },
+            { username: { $regex: /^TEST/i } },
             { challengerName: { $regex: /TEST_/i } },
             { challengedName: { $regex: /TEST_/i } },
             { oddsUsername: { $regex: /TEST_/i } },
+            // Catch participants with TEST_ in competitionId/challengeId string
+            { 'competitionName': { $regex: /TEST_/i } },
+            { 'challengeName': { $regex: /TEST_/i } },
           ]
         });
         deletedCount += result3.deletedCount;
