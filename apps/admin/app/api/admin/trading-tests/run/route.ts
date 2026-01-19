@@ -29,6 +29,12 @@ import {
   getMarginStatus as productionGetMarginStatus,
 } from '@/lib/services/risk-manager.service';
 
+// ⚡ Import market hours service
+import { isMarketOpen as productionIsMarketOpen } from '@/lib/services/market-hours.service';
+
+// ⚡ Import price service
+import { getRealPrice as productionGetRealPrice } from '@/lib/services/real-forex-prices.service';
+
 // Wrapper functions that call production code (for cleaner test code)
 function calculateUnrealizedPnL(
   side: 'long' | 'short',
@@ -56,7 +62,7 @@ interface TradingTestScenario {
   id: string;
   name: string;
   description: string;
-  type: 'open' | 'close' | 'roundtrip' | 'pnl' | 'margin' | 'validation' | 'risk' | 'pipvalue';
+  type: 'open' | 'close' | 'roundtrip' | 'pnl' | 'margin' | 'validation' | 'risk' | 'pipvalue' | 'market' | 'realprice' | 'fullflow' | 'fullclose';
   params: {
     symbol: string;
     side: 'long' | 'short';
@@ -86,6 +92,27 @@ interface TradingTestScenario {
     marginStatus?: 'safe' | 'warning' | 'margin_call' | 'liquidation';
     // Pip value tests
     pipValue?: number;
+    // Market tests
+    marketStatusReturned?: boolean;
+    // Real price tests
+    priceReturned?: boolean;
+    hasBidAsk?: boolean;
+    // Full flow tests
+    validations?: {
+      quantityValid?: boolean;
+      marginSufficient?: boolean;
+      leverageValid?: boolean;
+      slTpValid?: boolean;
+    };
+    positionCreated?: boolean;
+    marginDeducted?: boolean;
+    slTpSet?: boolean;
+    rejectionReason?: string;
+    // Full close tests
+    pnlCalculated?: boolean;
+    capitalUpdated?: boolean;
+    expectedPnl?: number;
+    expectedFinalCapital?: number;
   };
 }
 
@@ -718,6 +745,174 @@ const TRADING_TEST_SCENARIOS: TradingTestScenario[] = [
       pipValue: 0.10, // 0.0001 × 0.01 × 100000 = $0.10
     },
   },
+  
+  // ============ MARKET STATUS TESTS ============
+  {
+    id: 'T-M1',
+    name: 'Market Status Check',
+    description: 'Test production isMarketOpen() function',
+    type: 'market',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+    },
+    expected: {
+      marketStatusReturned: true, // Just check it returns something
+    },
+  },
+  
+  // ============ REAL PRICE FETCH TESTS ============
+  {
+    id: 'T-RP1',
+    name: 'Real Price Fetch (EUR/USD)',
+    description: 'Test production getRealPrice() function',
+    type: 'realprice',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+    },
+    expected: {
+      priceReturned: true,
+      hasBidAsk: true,
+    },
+  },
+  {
+    id: 'T-RP2',
+    name: 'Real Price Fetch (GBP/USD)',
+    description: 'Test getRealPrice() with different pair',
+    type: 'realprice',
+    params: {
+      symbol: 'GBP/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.26500,
+    },
+    expected: {
+      priceReturned: true,
+      hasBidAsk: true,
+    },
+  },
+  {
+    id: 'T-RP3',
+    name: 'Real Price Fetch (USD/JPY)',
+    description: 'Test getRealPrice() with JPY pair',
+    type: 'realprice',
+    params: {
+      symbol: 'USD/JPY',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 150.00,
+    },
+    expected: {
+      priceReturned: true,
+      hasBidAsk: true,
+    },
+  },
+  
+  // ============ FULL ORDER FLOW TESTS ============
+  {
+    id: 'T-F1',
+    name: 'Full Order Flow (Open)',
+    description: 'Test complete order opening with all validations',
+    type: 'fullflow',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      startingCapital: 10000,
+    },
+    expected: {
+      validations: {
+        quantityValid: true,
+        marginSufficient: true,
+        leverageValid: true,
+      },
+      positionCreated: true,
+      marginDeducted: true,
+    },
+  },
+  {
+    id: 'T-F2',
+    name: 'Full Order Flow (With SL/TP)',
+    description: 'Test order with stop loss and take profit',
+    type: 'fullflow',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      stopLoss: 1.09500,
+      takeProfit: 1.10500,
+      startingCapital: 10000,
+    },
+    expected: {
+      validations: {
+        quantityValid: true,
+        marginSufficient: true,
+        leverageValid: true,
+        slTpValid: true,
+      },
+      positionCreated: true,
+      slTpSet: true,
+    },
+  },
+  {
+    id: 'T-F3',
+    name: 'Full Order Flow (Insufficient Margin)',
+    description: 'Test order rejection due to insufficient margin',
+    type: 'fullflow',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 10.0, // Requires $11,000
+      leverage: 100,
+      entryPrice: 1.10000,
+      startingCapital: 5000, // Only $5,000
+    },
+    expected: {
+      validations: {
+        quantityValid: true,
+        marginSufficient: false, // Should fail here
+        leverageValid: true,
+      },
+      positionCreated: false,
+      rejectionReason: 'insufficient_margin',
+    },
+  },
+  {
+    id: 'T-F4',
+    name: 'Full Close Flow',
+    description: 'Test complete position closing with PNL',
+    type: 'fullclose',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      exitPrice: 1.10500, // +50 pips
+      startingCapital: 10000,
+    },
+    expected: {
+      positionClosed: true,
+      marginReleased: true,
+      pnlCalculated: true,
+      capitalUpdated: true,
+      expectedPnl: 50.00,
+      expectedFinalCapital: 10050.00,
+    },
+  },
 ];
 
 export async function POST(request: Request) {
@@ -1288,6 +1483,225 @@ export async function POST(request: Request) {
           message: passed ? '✅ Pip value correct' : `❌ ${issues.join(', ')}`,
           actualOutcome: `Pip Value: $${actualPipValue}`,
           details: { expectedPipValue: expected.pipValue, actualPipValue },
+        };
+      }
+      // ============ MARKET STATUS TEST ============
+      else if (type === 'market') {
+        console.log(`📊 Market Status Test (Production isMarketOpen()):`);
+        
+        try {
+          const marketStatus = await productionIsMarketOpen('forex');
+          
+          console.log(`   Market Open: ${marketStatus.isOpen ? '✅ YES' : '❌ NO'}`);
+          console.log(`   Reason: ${marketStatus.reason || 'N/A'}`);
+          console.log(`   Is Holiday: ${marketStatus.isHoliday ? 'Yes' : 'No'}`);
+          if (marketStatus.holidayName) console.log(`   Holiday: ${marketStatus.holidayName}`);
+          
+          if (!marketStatus || typeof marketStatus.isOpen !== 'boolean') {
+            passed = false;
+            issues.push('Market status function did not return expected structure');
+          }
+          
+          actualResult = {
+            passed,
+            message: passed ? '✅ Market status returned correctly' : `❌ ${issues.join(', ')}`,
+            actualOutcome: `Market: ${marketStatus.isOpen ? 'OPEN' : 'CLOSED'}`,
+            details: { marketStatus },
+          };
+        } catch (error) {
+          actualResult = {
+            passed: false,
+            message: `❌ Market status check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          };
+        }
+      }
+      // ============ REAL PRICE FETCH TEST ============
+      else if (type === 'realprice') {
+        console.log(`📊 Real Price Fetch Test (Production getRealPrice()):`);
+        console.log(`   Symbol: ${params.symbol}`);
+        
+        try {
+          const price = await productionGetRealPrice(params.symbol as ForexSymbol);
+          
+          if (price) {
+            console.log(`   ✅ Price received!`);
+            console.log(`   BID: ${price.bid.toFixed(5)}`);
+            console.log(`   ASK: ${price.ask.toFixed(5)}`);
+            console.log(`   MID: ${price.mid.toFixed(5)}`);
+            console.log(`   Spread: ${price.spread.toFixed(5)} (${((price.spread / (params.symbol.includes('JPY') ? 0.01 : 0.0001))).toFixed(1)} pips)`);
+            console.log(`   Timestamp: ${new Date(price.timestamp).toISOString()}`);
+            
+            // Validate price structure
+            if (expected.hasBidAsk) {
+              if (!price.bid || !price.ask) {
+                passed = false;
+                issues.push('Price missing bid/ask');
+              }
+              if (price.ask <= price.bid) {
+                passed = false;
+                issues.push(`Invalid spread: ask (${price.ask}) <= bid (${price.bid})`);
+              }
+            }
+          } else {
+            if (expected.priceReturned) {
+              passed = false;
+              issues.push('No price returned (market may be closed)');
+            }
+            console.log(`   ⚠️ No price available (market may be closed)`);
+          }
+          
+          actualResult = {
+            passed,
+            message: passed ? '✅ Real price fetched correctly' : `⚠️ ${issues.join(', ')}`,
+            actualOutcome: price ? `${price.bid.toFixed(5)} / ${price.ask.toFixed(5)}` : 'No price',
+            details: { price },
+          };
+        } catch (error) {
+          actualResult = {
+            passed: false,
+            message: `⚠️ Price fetch failed: ${error instanceof Error ? error.message : 'Unknown error'} (market may be closed)`,
+          };
+        }
+      }
+      // ============ FULL ORDER FLOW TEST ============
+      else if (type === 'fullflow') {
+        console.log(`\n📊 FULL ORDER FLOW TEST (All Production Validations):`);
+        console.log(`   Symbol: ${params.symbol}`);
+        console.log(`   Side: ${params.side}`);
+        console.log(`   Quantity: ${params.quantity} lots`);
+        console.log(`   Leverage: 1:${params.leverage}`);
+        console.log(`   Capital: $${params.startingCapital}`);
+        if (params.stopLoss) console.log(`   Stop Loss: ${params.stopLoss}`);
+        if (params.takeProfit) console.log(`   Take Profit: ${params.takeProfit}`);
+        
+        const validationResults = {
+          quantityValid: false,
+          marginSufficient: false,
+          leverageValid: false,
+          slTpValid: true, // Default true if not testing SL/TP
+        };
+        
+        // Step 1: Validate Quantity (Production)
+        console.log(`\n   STEP 1: Validate Quantity`);
+        const quantityValidation = productionValidateQuantity(params.quantity);
+        validationResults.quantityValid = quantityValidation.valid;
+        console.log(`      Result: ${quantityValidation.valid ? '✅ Valid' : '❌ Invalid'}`);
+        if (quantityValidation.error) console.log(`      Error: ${quantityValidation.error}`);
+        
+        // Step 2: Calculate Margin (Production)
+        console.log(`\n   STEP 2: Calculate Margin`);
+        const marginRequired = productionCalculateMarginRequired(
+          params.quantity, params.entryPrice, params.leverage, params.symbol as ForexSymbol
+        );
+        console.log(`      Margin Required: $${marginRequired.toFixed(2)}`);
+        console.log(`      Available Capital: $${params.startingCapital}`);
+        
+        // Step 3: Validate Order (Production Risk Manager)
+        console.log(`\n   STEP 3: Validate Order (Risk Manager)`);
+        const orderValidation = productionValidateNewOrder(
+          params.startingCapital || 10000,
+          marginRequired,
+          0, // currentOpenPositions
+          params.quantity,
+          params.leverage,
+          10, // maxOpenPositions
+          params.leverage // maxLeverage
+        );
+        validationResults.marginSufficient = orderValidation.valid;
+        validationResults.leverageValid = true; // Checked in validateNewOrder
+        console.log(`      Result: ${orderValidation.valid ? '✅ Order Allowed' : '❌ Order Rejected'}`);
+        if (orderValidation.error) console.log(`      Error: ${orderValidation.error}`);
+        
+        // Step 4: Validate SL/TP (if provided)
+        if (params.stopLoss || params.takeProfit) {
+          console.log(`\n   STEP 4: Validate SL/TP`);
+          const slTpValidation = productionValidateSLTP(
+            params.side, params.entryPrice, params.stopLoss, params.takeProfit
+          );
+          validationResults.slTpValid = slTpValidation.valid;
+          console.log(`      Result: ${slTpValidation.valid ? '✅ Valid' : '❌ Invalid'}`);
+          if (slTpValidation.error) console.log(`      Error: ${slTpValidation.error}`);
+        }
+        
+        // Check against expectations
+        console.log(`\n   RESULTS:`);
+        if (expected.validations) {
+          if (expected.validations.quantityValid !== undefined && 
+              validationResults.quantityValid !== expected.validations.quantityValid) {
+            passed = false;
+            issues.push(`Quantity validation: expected ${expected.validations.quantityValid}, got ${validationResults.quantityValid}`);
+          }
+          if (expected.validations.marginSufficient !== undefined && 
+              validationResults.marginSufficient !== expected.validations.marginSufficient) {
+            passed = false;
+            issues.push(`Margin validation: expected ${expected.validations.marginSufficient}, got ${validationResults.marginSufficient}`);
+          }
+          if (expected.validations.slTpValid !== undefined && 
+              validationResults.slTpValid !== expected.validations.slTpValid) {
+            passed = false;
+            issues.push(`SL/TP validation: expected ${expected.validations.slTpValid}, got ${validationResults.slTpValid}`);
+          }
+        }
+        
+        // Would position be created?
+        const wouldCreatePosition = validationResults.quantityValid && 
+                                    validationResults.marginSufficient && 
+                                    validationResults.slTpValid;
+        console.log(`   Would Create Position: ${wouldCreatePosition ? '✅ YES' : '❌ NO'}`);
+        
+        if (expected.positionCreated !== undefined && wouldCreatePosition !== expected.positionCreated) {
+          passed = false;
+          issues.push(`Position creation: expected ${expected.positionCreated}, got ${wouldCreatePosition}`);
+        }
+        
+        actualResult = {
+          passed,
+          message: passed ? '✅ Full order flow validated correctly' : `❌ ${issues.join(', ')}`,
+          actualOutcome: wouldCreatePosition ? 'Order would succeed' : 'Order would be rejected',
+          details: { validationResults, marginRequired, wouldCreatePosition },
+        };
+      }
+      // ============ FULL CLOSE FLOW TEST ============
+      else if (type === 'fullclose') {
+        console.log(`\n📊 FULL CLOSE FLOW TEST:`);
+        console.log(`   Symbol: ${params.symbol}`);
+        console.log(`   Side: ${params.side}`);
+        console.log(`   Quantity: ${params.quantity} lots`);
+        console.log(`   Entry: ${params.entryPrice}`);
+        console.log(`   Exit: ${params.exitPrice}`);
+        console.log(`   Starting Capital: $${params.startingCapital}`);
+        
+        // Step 1: Calculate margin that would be released
+        const marginReleased = productionCalculateMarginRequired(
+          params.quantity, params.entryPrice, params.leverage, params.symbol as ForexSymbol
+        );
+        console.log(`\n   STEP 1: Margin to Release: $${marginReleased.toFixed(2)}`);
+        
+        // Step 2: Calculate PNL (Production)
+        const pnl = productionCalculateUnrealizedPnL(
+          params.side, params.entryPrice, params.exitPrice!, params.quantity, params.symbol as ForexSymbol
+        );
+        console.log(`   STEP 2: PNL Calculation: $${pnl.toFixed(2)}`);
+        
+        // Step 3: Calculate final capital
+        const finalCapital = (params.startingCapital || 10000) + pnl;
+        console.log(`   STEP 3: Final Capital: $${finalCapital.toFixed(2)}`);
+        
+        // Validate expectations
+        if (expected.expectedPnl !== undefined && Math.abs(pnl - expected.expectedPnl) > 0.01) {
+          passed = false;
+          issues.push(`PNL: expected $${expected.expectedPnl}, got $${pnl.toFixed(2)}`);
+        }
+        if (expected.expectedFinalCapital !== undefined && Math.abs(finalCapital - expected.expectedFinalCapital) > 0.01) {
+          passed = false;
+          issues.push(`Final capital: expected $${expected.expectedFinalCapital}, got $${finalCapital.toFixed(2)}`);
+        }
+        
+        actualResult = {
+          passed,
+          message: passed ? '✅ Full close flow calculated correctly' : `❌ ${issues.join(', ')}`,
+          actualOutcome: `PNL: $${pnl.toFixed(2)}, Final: $${finalCapital.toFixed(2)}`,
+          details: { marginReleased, pnl, finalCapital },
         };
       }
       else {

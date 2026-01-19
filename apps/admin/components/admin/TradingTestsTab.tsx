@@ -20,13 +20,15 @@ import {
   DollarSign,
   Calculator,
   ArrowRightLeft,
+  Clock,
+  Wifi,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Test case definition
 interface TradingTestCase {
   id: string;
-  category: 'open' | 'pnl' | 'margin' | 'roundtrip' | 'validation' | 'risk' | 'pipvalue';
+  category: 'open' | 'pnl' | 'margin' | 'roundtrip' | 'validation' | 'risk' | 'pipvalue' | 'market' | 'realprice' | 'fullflow';
   name: string;
   description: string;
   scenario: string;
@@ -361,6 +363,84 @@ const TEST_CASES: TradingTestCase[] = [
     expectedResult: '$0.10 per pip',
     status: 'pending',
   },
+  
+  // ============ MARKET STATUS TESTS ============
+  {
+    id: 'T-M1',
+    category: 'market',
+    name: 'Market Status Check',
+    description: 'Test isMarketOpen() production function',
+    scenario: 'Call isMarketOpen("forex")',
+    expectedResult: 'Returns open/closed status',
+    status: 'pending',
+  },
+  
+  // ============ REAL PRICE TESTS ============
+  {
+    id: 'T-RP1',
+    category: 'realprice',
+    name: 'Real Price (EUR/USD)',
+    description: 'Test getRealPrice() production function',
+    scenario: 'Fetch live EUR/USD price',
+    expectedResult: 'Returns bid/ask/spread',
+    status: 'pending',
+  },
+  {
+    id: 'T-RP2',
+    category: 'realprice',
+    name: 'Real Price (GBP/USD)',
+    description: 'Test getRealPrice() with GBP/USD',
+    scenario: 'Fetch live GBP/USD price',
+    expectedResult: 'Returns bid/ask/spread',
+    status: 'pending',
+  },
+  {
+    id: 'T-RP3',
+    category: 'realprice',
+    name: 'Real Price (USD/JPY)',
+    description: 'Test getRealPrice() with JPY pair',
+    scenario: 'Fetch live USD/JPY price',
+    expectedResult: 'Returns bid/ask/spread',
+    status: 'pending',
+  },
+  
+  // ============ FULL FLOW TESTS ============
+  {
+    id: 'T-F1',
+    category: 'fullflow',
+    name: 'Full Order Flow (Open)',
+    description: 'Complete order with all validations',
+    scenario: '0.1 lot EUR/USD, $10000 capital',
+    expectedResult: '✅ All validations pass',
+    status: 'pending',
+  },
+  {
+    id: 'T-F2',
+    category: 'fullflow',
+    name: 'Full Order Flow (With SL/TP)',
+    description: 'Order with stop loss and take profit',
+    scenario: 'Long + SL=1.095 + TP=1.105',
+    expectedResult: '✅ SL/TP validated',
+    status: 'pending',
+  },
+  {
+    id: 'T-F3',
+    category: 'fullflow',
+    name: 'Full Order Flow (Rejected)',
+    description: 'Order rejected for insufficient margin',
+    scenario: '10 lots, only $5000 capital',
+    expectedResult: '❌ Margin insufficient',
+    status: 'pending',
+  },
+  {
+    id: 'T-F4',
+    category: 'fullflow',
+    name: 'Full Close Flow',
+    description: 'Complete position closing with PNL',
+    scenario: 'Entry 1.10, Exit 1.105 (+50 pips)',
+    expectedResult: 'PNL: +$50, Final: $10050',
+    status: 'pending',
+  },
 ];
 
 // Category info
@@ -372,6 +452,9 @@ const CATEGORIES = [
   { id: 'validation', name: '✅ Validation', icon: CheckCircle, color: 'text-cyan-400' },
   { id: 'risk', name: '⚠️ Risk Manager', icon: AlertCircle, color: 'text-orange-400' },
   { id: 'pipvalue', name: '📈 Pip Value', icon: TrendingUp, color: 'text-pink-400' },
+  { id: 'market', name: '🕐 Market Status', icon: Clock, color: 'text-emerald-400' },
+  { id: 'realprice', name: '📡 Real Prices', icon: Wifi, color: 'text-rose-400' },
+  { id: 'fullflow', name: '🚀 Full Flow', icon: Play, color: 'text-indigo-400' },
 ];
 
 export default function TradingTestsTab() {
