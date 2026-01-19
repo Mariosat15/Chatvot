@@ -742,7 +742,9 @@ const TRADING_TEST_SCENARIOS: TradingTestScenario[] = [
       unrealizedPnl: -1000, // $1000 loss, equity = $1000
     },
     expected: {
-      marginStatus: 'warning', // 1000/1100 = 90.9%, below 100%
+      // Thresholds: <50%=liquidation, <100%=danger (margin call), <150%=warning
+      // 1000/1100 = 90.9%, below 100% = DANGER (margin call)
+      marginStatus: 'danger',
     },
   },
   

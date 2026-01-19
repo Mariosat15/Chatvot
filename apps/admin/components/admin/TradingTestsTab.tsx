@@ -329,9 +329,9 @@ const TEST_CASES: TradingTestCase[] = [
     id: 'T-R4',
     category: 'risk',
     name: 'Margin Call Detection',
-    description: 'Test getMarginStatus() detects warning',
+    description: 'Test getMarginStatus() detects danger',
     scenario: 'Capital=$2000, PNL=-$1000, Margin=$1100',
-    expectedResult: 'Status: Warning (~91%)',
+    expectedResult: 'Status: Danger (~91% < 100%)',
     status: 'pending',
   },
   
