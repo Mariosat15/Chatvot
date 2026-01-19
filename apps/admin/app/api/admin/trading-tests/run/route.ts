@@ -594,15 +594,24 @@ export async function POST(request: Request) {
           params.symbol
         );
         
-        // Create competition
+        // Create competition with all required fields
+        const slug = `test-trade-${testRunId.toLowerCase().replace(/_/g, '-')}-${Date.now()}`;
         await db.collection('competitions').insertOne({
           _id: competitionId,
           name: `${testRunId}_Competition`,
+          slug: slug,
+          description: 'Trading test competition',
           testRunId,
           isTest: true,
           status: 'active',
-          startingCapital: params.startingCapital,
+          startingCapital: params.startingCapital || 10000,
+          entryFee: 100,
+          prizePool: 200,
+          maxParticipants: 10,
+          startTime: new Date(Date.now() - 86400000), // Started yesterday
+          endTime: new Date(Date.now() + 86400000), // Ends tomorrow
           createdAt: new Date(),
+          updatedAt: new Date(),
         });
         
         // Create participant
@@ -611,16 +620,26 @@ export async function POST(request: Request) {
           competitionId: competitionId.toString(),
           userId: userId.toString(),
           username: `${testRunId}_User`,
+          email: `${testRunId}@test.com`,
           testRunId,
           isTest: true,
           status: 'active',
-          startingCapital: params.startingCapital,
-          currentCapital: params.startingCapital,
-          availableCapital: params.startingCapital,
+          startingCapital: params.startingCapital || 10000,
+          currentCapital: params.startingCapital || 10000,
+          availableCapital: params.startingCapital || 10000,
           usedMargin: 0,
           currentOpenPositions: 0,
           totalTrades: 0,
+          winningTrades: 0,
+          losingTrades: 0,
+          realizedPnl: 0,
+          unrealizedPnl: 0,
+          pnl: 0,
+          pnlPercentage: 0,
+          winRate: 0,
+          enteredAt: new Date(),
           createdAt: new Date(),
+          updatedAt: new Date(),
         });
         
         // Create position
@@ -714,15 +733,24 @@ export async function POST(request: Request) {
         
         const expectedFinalCapital = (params.startingCapital || 10000) + expectedPnl;
         
-        // Create competition
+        // Create competition with all required fields
+        const slug = `test-trade-${testRunId.toLowerCase().replace(/_/g, '-')}-${Date.now()}`;
         await db.collection('competitions').insertOne({
           _id: competitionId,
           name: `${testRunId}_Competition`,
+          slug: slug,
+          description: 'Trading test competition',
           testRunId,
           isTest: true,
           status: 'active',
-          startingCapital: params.startingCapital,
+          startingCapital: params.startingCapital || 10000,
+          entryFee: 100,
+          prizePool: 200,
+          maxParticipants: 10,
+          startTime: new Date(Date.now() - 86400000), // Started yesterday
+          endTime: new Date(Date.now() + 86400000), // Ends tomorrow
           createdAt: new Date(),
+          updatedAt: new Date(),
         });
         
         // Create participant
@@ -731,18 +759,26 @@ export async function POST(request: Request) {
           competitionId: competitionId.toString(),
           userId: userId.toString(),
           username: `${testRunId}_User`,
+          email: `${testRunId}@test.com`,
           testRunId,
           isTest: true,
           status: 'active',
-          startingCapital: params.startingCapital,
-          currentCapital: params.startingCapital,
-          availableCapital: params.startingCapital,
+          startingCapital: params.startingCapital || 10000,
+          currentCapital: params.startingCapital || 10000,
+          availableCapital: params.startingCapital || 10000,
           usedMargin: 0,
           currentOpenPositions: 0,
           totalTrades: 0,
+          winningTrades: 0,
+          losingTrades: 0,
           realizedPnl: 0,
+          unrealizedPnl: 0,
           pnl: 0,
+          pnlPercentage: 0,
+          winRate: 0,
+          enteredAt: new Date(),
           createdAt: new Date(),
+          updatedAt: new Date(),
         });
         
         // STEP 1: OPEN POSITION
