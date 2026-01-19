@@ -537,8 +537,9 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
   }
   
   // For aggregator-supported timeframes, use hybrid approach
-  // EXCEPT for daily/weekly/monthly - aggregating too many 1m candles is impractical
-  const useAggregator = isAggregatorSupported(normalizedTf) && !['1d', 'W', 'M'].includes(normalizedTf);
+  // EXCEPT for 1h+/daily/weekly/monthly - aggregating too many 1m candles is impractical
+  // 1h needs 500*60=30,000 1m candles (too slow), 4h needs 500*240=120,000 (way too slow)
+  const useAggregator = isAggregatorSupported(normalizedTf) && !['1h', '4h', '1d', 'W', 'M'].includes(normalizedTf);
   
   if (useAggregator || ['5m', '15m', '30m', '1h', '4h', '1d', 'W', 'M'].includes(normalizedTf)) {
     try {
@@ -547,10 +548,12 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       let aggregatedCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
       let formingCandle = null;
       
+      const aggStart = Date.now();
       if (useAggregator) {
         const result = await getAggregatedCandles(symbol, normalizedTf, limit);
         aggregatedCandles = result.candles;
         formingCandle = result.formingCandle;
+        console.log(`📊 [Candles] Aggregator for ${symbol} ${normalizedTf}: ${Date.now() - aggStart}ms, ${aggregatedCandles.length} candles`);
       } else {
         // For daily/weekly/monthly (and other non-aggregated timeframes), get forming candle from WebSocket cache
         if (normalizedTf === 'M') {
@@ -596,10 +599,12 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           const historicalModel = getHistoricalModel(normalizedTf);
           
           if (historicalModel) {
+            const histStart = Date.now();
             const dbCandles = await getHistoricalCandles(normalizedTf, symbol, {
               before: cutoffDate,
               limit: limit,
             });
+            console.log(`📊 [Candles] Historical DB for ${symbol} ${normalizedTf}: ${Date.now() - histStart}ms, ${dbCandles.length} candles`);
             
             historicalCandles = dbCandles.map(c => ({
               time: Math.floor(new Date(c.timestamp).getTime() / 1000),
@@ -611,8 +616,8 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           }
         }
         
-        // If local DB doesn't have enough, fetch from Massive.com API
-        if (historicalCandles.length < limit && !settings.useLocalHistory) {
+        // If local DB doesn't have enough, fetch from Massive.com API as fallback
+        if (historicalCandles.length < limit) {
           const massiveTimeframeMap: Record<string, Timeframe> = {
             '5m': '5', '15m': '15', '30m': '30',
             '1h': '60', '4h': '240', '1d': 'D',
@@ -621,7 +626,9 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           
           const massiveTf = massiveTimeframeMap[normalizedTf];
           if (massiveTf) {
+            const apiStart = Date.now();
             const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
+            console.log(`📊 [Candles] Massive API for ${symbol} ${normalizedTf}: ${Date.now() - apiStart}ms, ${apiCandles.length} candles`);
             
             // Filter to only candles before the cutoff
             historicalCandles = apiCandles
@@ -671,6 +678,9 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       const hasMore = before ? combinedCandles.length === limit : undefined;
       const oldestTimestamp = combinedCandles.length > 0 ? combinedCandles[0].time : undefined;
       
+      const totalTime = Date.now() - startTime;
+      console.log(`✅ [Candles] Response for ${symbol} ${normalizedTf}: ${combinedCandles.length} candles in ${totalTime}ms`);
+      
       return NextResponse.json({
         candles: combinedCandles,
         formingCandle: before ? null : formingCandle,
@@ -678,6 +688,7 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         lastUpdate: Date.now(),
         hasMore,
         oldestTimestamp,
+        _debug: { totalMs: totalTime },
       });
     } catch (error) {
       console.error(`❌ [Candles API] Hybrid approach failed for ${symbol} ${timeframe}:`, error);
