@@ -313,53 +313,68 @@ const TEST_CASES: TestCase[] = [
 
       ctx.log('info', `Simulating deposits for ${ctx.testUsers.length} users`);
 
-      // Use AI to generate realistic deposit amounts if enabled
-      // Ensure users have enough credits for all simulator tests (competitions, challenges, etc.)
-      const depositAmounts = ctx.config.useAIPatterns && ctx.aiGeneratePattern
-        ? await ctx.aiGeneratePattern('deposit_amounts')
-        : { amounts: [500, 1000, 2000, 5000] }; // Higher amounts to cover all test scenarios
+      const amounts = [500, 1000, 2000, 5000];
+      const concurrentMode = ctx.config.concurrentMode || false;
+      const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
 
-      const amounts = (depositAmounts as { amounts: number[] }).amounts || [1000];
-
-      for (let i = 0; i < ctx.testUsers.length; i++) {
-        const user = ctx.testUsers[i];
-        const amount = amounts[Math.floor(Math.random() * amounts.length)];
-
-        const start = Date.now();
-        try {
-          // Use simulator endpoint for direct credit deposit
-          const response = await fetch(`${ctx.baseUrl}/api/simulator/deposit`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Simulator-Mode': 'true',
-            },
-            body: JSON.stringify({
-              userId: user.id,
-              amount,
-            }),
-          });
-
-          const elapsed = Date.now() - start;
-          results.responseTimes.push(elapsed);
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data.transactionId) {
-              results.createdIds!.transactions!.push(data.transactionId);
+      if (concurrentMode) {
+        // ⚡ CONCURRENT MODE
+        for (let i = 0; i < ctx.testUsers.length; i += concurrentBatchSize) {
+          const batch = ctx.testUsers.slice(i, i + concurrentBatchSize);
+          
+          const promises = batch.map(async (user) => {
+            const amount = amounts[Math.floor(Math.random() * amounts.length)];
+            const start = Date.now();
+            try {
+              const response = await fetch(`${ctx.baseUrl}/api/simulator/deposit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
+                body: JSON.stringify({ userId: user.id, amount }),
+              });
+              results.responseTimes.push(Date.now() - start);
+              if (response.ok) {
+                const data = await response.json();
+                if (data.transactionId) results.createdIds!.transactions!.push(data.transactionId);
+                results.successCount++;
+              } else {
+                results.failureCount++;
+              }
+            } catch {
+              results.failureCount++;
+              results.responseTimes.push(Date.now() - start);
             }
-            results.successCount++;
-          } else {
-            results.failureCount++;
-          }
-        } catch {
-          results.failureCount++;
-          results.responseTimes.push(Date.now() - start);
+          });
+          
+          await Promise.all(promises);
+          await ctx.updateProgress('Deposits (Concurrent)', Math.min(i + concurrentBatchSize, ctx.testUsers.length), ctx.testUsers.length, `Processed ${results.successCount} deposits`);
         }
-
-        if (i % 100 === 0) {
-          await ctx.updateProgress('Deposits', i, ctx.testUsers.length, 
-            `Processed ${i} deposit requests`);
+      } else {
+        // SEQUENTIAL MODE
+        for (let i = 0; i < ctx.testUsers.length; i++) {
+          const user = ctx.testUsers[i];
+          const amount = amounts[Math.floor(Math.random() * amounts.length)];
+          const start = Date.now();
+          try {
+            const response = await fetch(`${ctx.baseUrl}/api/simulator/deposit`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
+              body: JSON.stringify({ userId: user.id, amount }),
+            });
+            results.responseTimes.push(Date.now() - start);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.transactionId) results.createdIds!.transactions!.push(data.transactionId);
+              results.successCount++;
+            } else {
+              results.failureCount++;
+            }
+          } catch {
+            results.failureCount++;
+            results.responseTimes.push(Date.now() - start);
+          }
+          if (i % 100 === 0) {
+            await ctx.updateProgress('Deposits', i, ctx.testUsers.length, `Processed ${i} deposit requests`);
+          }
         }
       }
 
@@ -387,51 +402,95 @@ const TEST_CASES: TestCase[] = [
       ctx.log('info', `Creating ${ctx.config.competitions} competitions`);
 
       const types = ctx.config.competitionTypes;
+      const concurrentMode = ctx.config.concurrentMode || false;
+      const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
 
-      for (let i = 0; i < ctx.config.competitions; i++) {
-        const type = types[i % types.length];
-        const start = Date.now();
+      // Prepare all competition data
+      const allCompetitions = Array.from({ length: ctx.config.competitions }, (_, i) => ({
+        index: i,
+        type: types[i % types.length],
+        name: `Sim Competition ${i + 1} - ${types[i % types.length]}`,
+        entryFee: [10, 25, 50, 100][Math.floor(Math.random() * 4)],
+      }));
 
-        try {
-          // Use simulator endpoint for competition creation
-          const response = await fetch(`${ctx.baseUrl}/api/simulator/competitions`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Simulator-Mode': 'true',
-            },
-            body: JSON.stringify({
-              name: `Sim Competition ${i + 1} - ${type}`,
-              description: `Simulator test competition (${type})`,
-              type,
-              entryFee: [10, 25, 50, 100][Math.floor(Math.random() * 4)],
-              maxParticipants: ctx.config.tradersPerCompetition,
-              startDate: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 min from now
-              endDate: new Date(Date.now() + ctx.config.tradingDuration * 60 * 1000 + 10 * 60 * 1000).toISOString(),
-            }),
-          });
-
-          const elapsed = Date.now() - start;
-          results.responseTimes.push(elapsed);
-
-          if (response.ok) {
-            const data = await response.json();
-            const compId = data.competition?._id || data._id;
-            if (compId) {
-              ctx.testCompetitions.push({ id: compId, name: `Sim Competition ${i + 1}`, type });
-              results.createdIds!.competitions!.push(compId);
+      if (concurrentMode) {
+        // ⚡ CONCURRENT MODE
+        for (let i = 0; i < allCompetitions.length; i += concurrentBatchSize) {
+          const batch = allCompetitions.slice(i, i + concurrentBatchSize);
+          
+          const promises = batch.map(async (comp) => {
+            const start = Date.now();
+            try {
+              const response = await fetch(`${ctx.baseUrl}/api/simulator/competitions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
+                body: JSON.stringify({
+                  name: comp.name,
+                  description: `Simulator test competition (${comp.type})`,
+                  type: comp.type,
+                  entryFee: comp.entryFee,
+                  maxParticipants: ctx.config.tradersPerCompetition,
+                  startDate: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+                  endDate: new Date(Date.now() + ctx.config.tradingDuration * 60 * 1000 + 10 * 60 * 1000).toISOString(),
+                }),
+              });
+              results.responseTimes.push(Date.now() - start);
+              if (response.ok) {
+                const data = await response.json();
+                const compId = data.competition?._id || data._id;
+                if (compId) {
+                  ctx.testCompetitions.push({ id: compId, name: comp.name, type: comp.type });
+                  results.createdIds!.competitions!.push(compId);
+                }
+                results.successCount++;
+              } else {
+                results.failureCount++;
+              }
+            } catch {
+              results.failureCount++;
+              results.responseTimes.push(Date.now() - start);
             }
-            results.successCount++;
-          } else {
-            results.failureCount++;
-          }
-        } catch {
-          results.failureCount++;
-          results.responseTimes.push(Date.now() - start);
+          });
+          
+          await Promise.all(promises);
+          await ctx.updateProgress('Competition Creation (Concurrent)', Math.min(i + concurrentBatchSize, ctx.config.competitions), ctx.config.competitions, `Created ${results.successCount} competitions`);
         }
-
-        await ctx.updateProgress('Competition Creation', i + 1, ctx.config.competitions, 
-          `Created ${i + 1} competitions`);
+      } else {
+        // SEQUENTIAL MODE
+        for (const comp of allCompetitions) {
+          const start = Date.now();
+          try {
+            const response = await fetch(`${ctx.baseUrl}/api/simulator/competitions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Simulator-Mode': 'true' },
+              body: JSON.stringify({
+                name: comp.name,
+                description: `Simulator test competition (${comp.type})`,
+                type: comp.type,
+                entryFee: comp.entryFee,
+                maxParticipants: ctx.config.tradersPerCompetition,
+                startDate: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+                endDate: new Date(Date.now() + ctx.config.tradingDuration * 60 * 1000 + 10 * 60 * 1000).toISOString(),
+              }),
+            });
+            results.responseTimes.push(Date.now() - start);
+            if (response.ok) {
+              const data = await response.json();
+              const compId = data.competition?._id || data._id;
+              if (compId) {
+                ctx.testCompetitions.push({ id: compId, name: comp.name, type: comp.type });
+                results.createdIds!.competitions!.push(compId);
+              }
+              results.successCount++;
+            } else {
+              results.failureCount++;
+            }
+          } catch {
+            results.failureCount++;
+            results.responseTimes.push(Date.now() - start);
+          }
+          await ctx.updateProgress('Competition Creation', comp.index + 1, ctx.config.competitions, `Created ${comp.index + 1} competitions`);
+        }
       }
 
       results.success = results.successCount > 0;
@@ -458,39 +517,63 @@ const TEST_CASES: TestCase[] = [
 
       ctx.log('info', `Processing ${totalJoins} competition joins (${ctx.testUsers.length} users × ${ctx.testCompetitions.length} competitions)`);
 
-      let joinCount = 0;
+      const concurrentMode = ctx.config.concurrentMode || false;
+      const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
+
+      // Prepare all join requests
+      const allJoins: { userId: string; compId: string }[] = [];
       for (const user of ctx.testUsers) {
         for (const comp of ctx.testCompetitions) {
-          const start = Date.now();
+          allJoins.push({ userId: user.id, compId: comp.id });
+        }
+      }
 
-          try {
-            const response = await fetch(`${ctx.baseUrl}/api/competitions/${comp.id}/join`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Simulator-User-Id': user.id,
-                'X-Simulator-Mode': 'true',
-              },
-            });
-
-            const elapsed = Date.now() - start;
-            results.responseTimes.push(elapsed);
-
-            if (response.ok) {
-              results.successCount++;
-            } else {
+      if (concurrentMode) {
+        // ⚡ CONCURRENT MODE
+        for (let i = 0; i < allJoins.length; i += concurrentBatchSize) {
+          const batch = allJoins.slice(i, i + concurrentBatchSize);
+          
+          const promises = batch.map(async (join) => {
+            const start = Date.now();
+            try {
+              const response = await fetch(`${ctx.baseUrl}/api/competitions/${join.compId}/join`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Simulator-User-Id': join.userId, 'X-Simulator-Mode': 'true' },
+              });
+              results.responseTimes.push(Date.now() - start);
+              if (response.ok) results.successCount++;
+              else results.failureCount++;
+            } catch {
               results.failureCount++;
+              results.responseTimes.push(Date.now() - start);
             }
+          });
+          
+          await Promise.all(promises);
+          await ctx.updateProgress('Competition Join (Concurrent)', Math.min(i + concurrentBatchSize, totalJoins), totalJoins, `${results.successCount} joins completed`);
+        }
+      } else {
+        // SEQUENTIAL MODE
+        let joinCount = 0;
+        for (const join of allJoins) {
+          const start = Date.now();
+          try {
+            const response = await fetch(`${ctx.baseUrl}/api/competitions/${join.compId}/join`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Simulator-User-Id': join.userId, 'X-Simulator-Mode': 'true' },
+            });
+            results.responseTimes.push(Date.now() - start);
+            if (response.ok) results.successCount++;
+            else results.failureCount++;
           } catch {
             results.failureCount++;
             results.responseTimes.push(Date.now() - start);
           }
-
           joinCount++;
+          if (joinCount % 50 === 0) {
+            await ctx.updateProgress('Competition Join', joinCount, totalJoins, `${joinCount} joins completed`);
+          }
         }
-
-        await ctx.updateProgress('Competition Join', joinCount, totalJoins, 
-          `${joinCount} joins completed`);
       }
 
       results.success = results.successCount > totalJoins * 0.5;
@@ -840,37 +923,53 @@ const TEST_CASES: TestCase[] = [
 
       ctx.log('info', `Testing TP/SL modifications on ${actualIterations} users`);
 
-      // Test modifying TP/SL on existing positions
-      for (let i = 0; i < actualIterations; i++) {
-        const user = ctx.testUsers[i];
-        const start = Date.now();
+      const concurrentMode = ctx.config.concurrentMode || false;
+      const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
+      const usersToTest = ctx.testUsers.slice(0, actualIterations);
 
-        try {
-          const response = await fetch(`${ctx.baseUrl}/api/simulator/positions/tpsl`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Simulator-User-Id': user.id,
-              'X-Simulator-Mode': 'true',
-            },
-            body: JSON.stringify({
-              userId: user.id,
-              takeProfit: 1.01,
-              stopLoss: 0.99,
-            }),
+      if (concurrentMode) {
+        // ⚡ CONCURRENT MODE
+        for (let i = 0; i < usersToTest.length; i += concurrentBatchSize) {
+          const batch = usersToTest.slice(i, i + concurrentBatchSize);
+          
+          const promises = batch.map(async (user) => {
+            const start = Date.now();
+            try {
+              const response = await fetch(`${ctx.baseUrl}/api/simulator/positions/tpsl`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Simulator-User-Id': user.id, 'X-Simulator-Mode': 'true' },
+                body: JSON.stringify({ userId: user.id, takeProfit: 1.01, stopLoss: 0.99 }),
+              });
+              results.responseTimes.push(Date.now() - start);
+              if (response.ok || response.status === 404) results.successCount++;
+              else results.failureCount++;
+            } catch {
+              results.failureCount++;
+              results.responseTimes.push(Date.now() - start);
+            }
           });
-
-          const elapsed = Date.now() - start;
-          results.responseTimes.push(elapsed);
-
-          if (response.ok || response.status === 404) { // 404 = no position is ok
-            results.successCount++;
-          } else {
+          
+          await Promise.all(promises);
+          await ctx.updateProgress('TP/SL Management (Concurrent)', Math.min(i + concurrentBatchSize, actualIterations), actualIterations, `Modified ${results.successCount} positions`);
+        }
+      } else {
+        // SEQUENTIAL MODE
+        for (let i = 0; i < actualIterations; i++) {
+          const user = ctx.testUsers[i];
+          const start = Date.now();
+          try {
+            const response = await fetch(`${ctx.baseUrl}/api/simulator/positions/tpsl`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Simulator-User-Id': user.id, 'X-Simulator-Mode': 'true' },
+              body: JSON.stringify({ userId: user.id, takeProfit: 1.01, stopLoss: 0.99 }),
+            });
+            results.responseTimes.push(Date.now() - start);
+            if (response.ok || response.status === 404) results.successCount++;
+            else results.failureCount++;
+          } catch {
             results.failureCount++;
+            results.responseTimes.push(Date.now() - start);
           }
-        } catch {
-          results.failureCount++;
-          results.responseTimes.push(Date.now() - start);
         }
       }
 
@@ -907,41 +1006,55 @@ const TEST_CASES: TestCase[] = [
 
       ctx.log('info', 'Admin approving payments');
 
-      // Simulate payment approval with configured delay
-      for (let i = 0; i < ctx.testUsers.length; i++) {
-        await sleep(ctx.config.paymentApprovalDelay * 10); // Scaled down delay
+      const concurrentMode = ctx.config.concurrentMode || false;
+      const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
 
-        const start = Date.now();
-        try {
-          const response = await fetch(`${ctx.baseUrl}/api/simulator/payments/approve`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Admin-Token': ctx.adminToken || '',
-              'X-Simulator-Mode': 'true',
-            },
-            body: JSON.stringify({
-              userId: ctx.testUsers[i].id,
-              simulatorMode: true,
-            }),
+      if (concurrentMode) {
+        // ⚡ CONCURRENT MODE
+        for (let i = 0; i < ctx.testUsers.length; i += concurrentBatchSize) {
+          const batch = ctx.testUsers.slice(i, i + concurrentBatchSize);
+          
+          const promises = batch.map(async (user) => {
+            const start = Date.now();
+            try {
+              const response = await fetch(`${ctx.baseUrl}/api/simulator/payments/approve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ctx.adminToken || '', 'X-Simulator-Mode': 'true' },
+                body: JSON.stringify({ userId: user.id, simulatorMode: true }),
+              });
+              results.responseTimes.push(Date.now() - start);
+              if (response.ok) results.successCount++;
+              else results.failureCount++;
+            } catch {
+              results.failureCount++;
+              results.responseTimes.push(Date.now() - start);
+            }
           });
-
-          const elapsed = Date.now() - start;
-          results.responseTimes.push(elapsed);
-
-          if (response.ok) {
-            results.successCount++;
-          } else {
-            results.failureCount++;
-          }
-        } catch {
-          results.failureCount++;
-          results.responseTimes.push(Date.now() - start);
+          
+          await Promise.all(promises);
+          await ctx.updateProgress('Payment Approval (Concurrent)', Math.min(i + concurrentBatchSize, ctx.testUsers.length), ctx.testUsers.length, `Approved ${results.successCount} payments`);
         }
-
-        if (i % 100 === 0) {
-          await ctx.updateProgress('Payment Approval', i, ctx.testUsers.length, 
-            `Approved ${i} payments`);
+      } else {
+        // SEQUENTIAL MODE
+        for (let i = 0; i < ctx.testUsers.length; i++) {
+          await sleep(ctx.config.paymentApprovalDelay * 10);
+          const start = Date.now();
+          try {
+            const response = await fetch(`${ctx.baseUrl}/api/simulator/payments/approve`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ctx.adminToken || '', 'X-Simulator-Mode': 'true' },
+              body: JSON.stringify({ userId: ctx.testUsers[i].id, simulatorMode: true }),
+            });
+            results.responseTimes.push(Date.now() - start);
+            if (response.ok) results.successCount++;
+            else results.failureCount++;
+          } catch {
+            results.failureCount++;
+            results.responseTimes.push(Date.now() - start);
+          }
+          if (i % 100 === 0) {
+            await ctx.updateProgress('Payment Approval', i, ctx.testUsers.length, `Approved ${i} payments`);
+          }
         }
       }
 
