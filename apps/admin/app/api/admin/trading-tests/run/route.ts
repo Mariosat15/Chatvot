@@ -44,9 +44,15 @@ async function productionIsMarketOpen(assetClass: string = 'forex'): Promise<{ i
     const day = now.getUTCDay();
     const hour = now.getUTCHours();
     
-    // Forex is closed on weekends (Saturday after 22:00 UTC until Sunday 22:00 UTC)
-    const isWeekend = day === 0 || day === 6;
-    const isOpen = !isWeekend || (day === 0 && hour >= 22) || (day === 5 && hour < 22);
+    // Forex market hours: Opens Sunday 22:00 UTC, Closes Friday 22:00 UTC
+    let isOpen = true;
+    
+    // Closed on Saturday (all day)
+    if (day === 6) isOpen = false;
+    // Closed on Sunday before 22:00 UTC
+    else if (day === 0 && hour < 22) isOpen = false;
+    // Closed on Friday after 22:00 UTC
+    else if (day === 5 && hour >= 22) isOpen = false;
     
     return {
       isOpen,
