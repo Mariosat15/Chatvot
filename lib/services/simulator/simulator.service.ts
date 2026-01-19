@@ -1400,6 +1400,52 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Fetch with automatic retry on transient errors
+ * Handles WriteConflict, NetworkTimeout, and other temporary failures
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      
+      // Retry on server errors that might be transient (502, 503, 504)
+      if (response.status >= 502 && response.status <= 504 && attempt < maxRetries) {
+        console.warn(`⚠️ [Fetch Retry] ${url} returned ${response.status}, attempt ${attempt}/${maxRetries}`);
+        await sleep(100 * Math.pow(2, attempt - 1) + Math.random() * 50);
+        continue;
+      }
+      
+      return response;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Retry on network errors
+      if (attempt < maxRetries) {
+        const isNetworkError = lastError.message.includes('fetch') || 
+                               lastError.message.includes('ECONNRESET') ||
+                               lastError.message.includes('socket');
+        
+        if (isNetworkError) {
+          console.warn(`⚠️ [Fetch Retry] ${url} network error, attempt ${attempt}/${maxRetries}: ${lastError.message}`);
+          await sleep(100 * Math.pow(2, attempt - 1) + Math.random() * 50);
+          continue;
+        }
+      }
+      
+      throw lastError;
+    }
+  }
+  
+  throw lastError || new Error('Unknown fetch error');
+}
+
+/**
  * Save queue to prevent ParallelSaveError
  * Debounces saves and ensures only one save at a time
  */
