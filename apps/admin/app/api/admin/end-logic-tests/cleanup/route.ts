@@ -18,8 +18,95 @@ export async function POST(request: NextRequest) {
     }
 
     let deletedCount = 0;
+    
+    // ==========================================
+    // STEP 1: FIND ALL TEST USER IDS FIRST!
+    // (Before deleting anything, collect userIds for side effects cleanup)
+    // ==========================================
+    const testUserIds: string[] = [];
+    const testCompetitionIds: string[] = [];
+    const testChallengeIds: string[] = [];
+    
+    try {
+      console.log('📋 Finding test data to cleanup...');
+      
+      // Get user IDs and competition IDs from test participants
+      const testParticipants = await db.collection('competitionparticipants').find({
+        $or: [
+          { testRunId: { $exists: true, $regex: /^TEST_/i } },
+          { username: { $regex: /^TEST_/i } },
+        ]
+      }).toArray();
+      testParticipants.forEach(p => {
+        if (p.userId) testUserIds.push(p.userId.toString());
+        if (p.competitionId) testCompetitionIds.push(p.competitionId.toString());
+      });
+      console.log(`   Found ${testParticipants.length} test competition participants`);
+      
+      // Get user IDs and challenge IDs from test challenge participants
+      const testChallengeParticipants = await db.collection('challengeparticipants').find({
+        $or: [
+          { testRunId: { $exists: true, $regex: /^TEST_/i } },
+          { username: { $regex: /^TEST_/i } },
+        ]
+      }).toArray();
+      testChallengeParticipants.forEach(p => {
+        if (p.userId) testUserIds.push(p.userId.toString());
+        if (p.challengeId) testChallengeIds.push(p.challengeId.toString());
+      });
+      console.log(`   Found ${testChallengeParticipants.length} test challenge participants`);
+      
+      // Get user IDs from test wallets
+      const testWallets = await db.collection('creditwallets').find({
+        $or: [
+          { testRunId: { $exists: true, $regex: /^TEST_/i } },
+          { userId: { $regex: /^TEST_/i } },
+        ]
+      }).toArray();
+      testWallets.forEach(w => {
+        if (w.userId) testUserIds.push(w.userId.toString());
+      });
+      console.log(`   Found ${testWallets.length} test wallets`);
+      
+      // Get test competition IDs directly
+      const testCompetitions = await db.collection('competitions').find({
+        $or: [
+          { testRunId: { $exists: true, $regex: /^TEST_/i } },
+          { name: { $regex: /^TEST_/i } },
+        ]
+      }).toArray();
+      testCompetitions.forEach(c => {
+        testCompetitionIds.push(c._id.toString());
+      });
+      console.log(`   Found ${testCompetitions.length} test competitions`);
+      
+      // Get test challenge IDs directly
+      const testChallenges = await db.collection('challenges').find({
+        $or: [
+          { testRunId: { $exists: true, $regex: /^TEST_/i } },
+          { challengerName: { $regex: /^TEST_/i } },
+          { challengedName: { $regex: /^TEST_/i } },
+        ]
+      }).toArray();
+      testChallenges.forEach(c => {
+        testChallengeIds.push(c._id.toString());
+      });
+      console.log(`   Found ${testChallenges.length} test challenges`);
+      
+    } catch (e) {
+      console.warn('Error finding test data:', e);
+    }
+    
+    // Dedupe all IDs
+    const uniqueUserIds = [...new Set(testUserIds)];
+    const uniqueCompetitionIds = [...new Set(testCompetitionIds)];
+    const uniqueChallengeIds = [...new Set(testChallengeIds)];
+    
+    console.log(`📊 Summary: ${uniqueUserIds.length} users, ${uniqueCompetitionIds.length} competitions, ${uniqueChallengeIds.length} challenges`);
 
-    // Delete by specific IDs if provided
+    // ==========================================
+    // STEP 2: DELETE BY SPECIFIC IDS (if provided)
+    // ==========================================
     if (testDataIds && testDataIds.length > 0) {
       for (const idString of testDataIds) {
         const [collection, id] = idString.split(':');
@@ -43,29 +130,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Cleanup by testRunId prefix (TEST_)
-    // IMPORTANT: Include ALL collections that can be created during tests
-    const collections = [
-      // Core test data
+    // ==========================================
+    // STEP 3: DELETE MAIN TEST DATA COLLECTIONS
+    // ==========================================
+    const mainCollections = [
       'competitions', 
       'challenges', 
       'competitionparticipants', 
       'challengeparticipants',
       'creditwallets',
       'tradingpositions',
-      'tradingorders', // Orders created when positions are closed
-      
-      // Financial records
+      'tradingorders',
       'platformtransactions',
-      'wallettransactions',
-      
-      // Side effects from finalization (badges, notifications, levels)
-      'notifications', // Created when notifying winners
-      'userbadges', // Created when evaluating badges after competition
-      'userlevels', // Created/updated when awarding XP for badges
     ];
     
-    for (const collectionName of collections) {
+    for (const collectionName of mainCollections) {
       try {
         // Delete by testRunId field (string starts with TEST_)
         const result1 = await db.collection(collectionName).deleteMany({ 
@@ -73,14 +152,14 @@ export async function POST(request: NextRequest) {
         });
         deletedCount += result1.deletedCount;
         if (result1.deletedCount > 0) {
-          console.log(`Deleted ${result1.deletedCount} from ${collectionName} by testRunId`);
+          console.log(`🗑️ Deleted ${result1.deletedCount} from ${collectionName} by testRunId`);
         }
 
         // Also cleanup by isTest flag
         const result2 = await db.collection(collectionName).deleteMany({ isTest: true });
         deletedCount += result2.deletedCount;
         if (result2.deletedCount > 0) {
-          console.log(`Deleted ${result2.deletedCount} from ${collectionName} by isTest`);
+          console.log(`🗑️ Deleted ${result2.deletedCount} from ${collectionName} by isTest`);
         }
 
         // Also cleanup by name/slug prefix (case insensitive)
@@ -89,125 +168,140 @@ export async function POST(request: NextRequest) {
             { name: { $regex: /^TEST_/i } },
             { slug: { $regex: /^test-test_/i } },
             { username: { $regex: /^TEST_/i } },
+            { challengerName: { $regex: /^TEST_/i } },
+            { challengedName: { $regex: /^TEST_/i } },
           ]
         });
         deletedCount += result3.deletedCount;
         if (result3.deletedCount > 0) {
-          console.log(`Deleted ${result3.deletedCount} from ${collectionName} by name/slug/username`);
+          console.log(`🗑️ Deleted ${result3.deletedCount} from ${collectionName} by name patterns`);
         }
       } catch (e) {
         console.warn(`Failed to cleanup ${collectionName}:`, e);
       }
     }
-    
-    // Extra safety: Delete any competition/challenge with TEST_ in name directly
-    try {
-      const compResult = await db.collection('competitions').deleteMany({
-        name: { $regex: /TEST_/i }
-      });
-      if (compResult.deletedCount > 0) {
-        console.log(`Extra cleanup: Deleted ${compResult.deletedCount} competitions with TEST_ in name`);
-        deletedCount += compResult.deletedCount;
-      }
+
+    // ==========================================
+    // STEP 4: DELETE SIDE EFFECTS BY USER ID
+    // (notifications, badges, levels, wallet transactions)
+    // ==========================================
+    if (uniqueUserIds.length > 0) {
+      console.log(`🧹 Cleaning side effects for ${uniqueUserIds.length} test users...`);
       
-      const challengeResult = await db.collection('challenges').deleteMany({
-        $or: [
-          { challengerName: { $regex: /TEST_/i } },
-          { challengedName: { $regex: /TEST_/i } },
-        ]
-      });
-      if (challengeResult.deletedCount > 0) {
-        console.log(`Extra cleanup: Deleted ${challengeResult.deletedCount} challenges with TEST_ names`);
-        deletedCount += challengeResult.deletedCount;
-      }
-    } catch (e) {
-      console.warn('Extra cleanup failed:', e);
-    }
-    
-    // Cleanup side effects (notifications, badges, levels) for test users
-    // First, find all test user IDs from wallets and participants
-    try {
-      const testUserIds: string[] = [];
-      
-      // Get user IDs from test wallets
-      const testWallets = await db.collection('creditwallets').find({
-        $or: [
-          { testRunId: { $exists: true, $regex: /^TEST_/i } },
-          { userId: { $regex: /^TEST_/i } },
-        ]
-      }).toArray();
-      testWallets.forEach(w => {
-        if (w.userId) testUserIds.push(w.userId.toString());
-      });
-      
-      // Get user IDs from test participants
-      const testParticipants = await db.collection('competitionparticipants').find({
-        $or: [
-          { testRunId: { $exists: true, $regex: /^TEST_/i } },
-          { username: { $regex: /^TEST_/i } },
-        ]
-      }).toArray();
-      testParticipants.forEach(p => {
-        if (p.userId) testUserIds.push(p.userId.toString());
-      });
-      
-      // Get user IDs from test challenge participants
-      const testChallengeParticipants = await db.collection('challengeparticipants').find({
-        $or: [
-          { testRunId: { $exists: true, $regex: /^TEST_/i } },
-          { username: { $regex: /^TEST_/i } },
-        ]
-      }).toArray();
-      testChallengeParticipants.forEach(p => {
-        if (p.userId) testUserIds.push(p.userId.toString());
-      });
-      
-      // Dedupe user IDs
-      const uniqueUserIds = [...new Set(testUserIds)];
-      
-      if (uniqueUserIds.length > 0) {
-        console.log(`Found ${uniqueUserIds.length} test user IDs to clean up side effects`);
-        
-        // Delete notifications for test users
+      // Delete notifications for test users
+      try {
         const notifResult = await db.collection('notifications').deleteMany({
           userId: { $in: uniqueUserIds }
         });
         if (notifResult.deletedCount > 0) {
-          console.log(`Deleted ${notifResult.deletedCount} notifications for test users`);
+          console.log(`🗑️ Deleted ${notifResult.deletedCount} notifications`);
           deletedCount += notifResult.deletedCount;
         }
-        
-        // Delete badges for test users
+      } catch (e) {
+        console.warn('Failed to delete notifications:', e);
+      }
+      
+      // Delete badges for test users
+      try {
         const badgeResult = await db.collection('userbadges').deleteMany({
           userId: { $in: uniqueUserIds }
         });
         if (badgeResult.deletedCount > 0) {
-          console.log(`Deleted ${badgeResult.deletedCount} badges for test users`);
+          console.log(`🗑️ Deleted ${badgeResult.deletedCount} user badges`);
           deletedCount += badgeResult.deletedCount;
         }
-        
-        // Delete user levels for test users
+      } catch (e) {
+        console.warn('Failed to delete badges:', e);
+      }
+      
+      // Delete user levels for test users
+      try {
         const levelResult = await db.collection('userlevels').deleteMany({
           userId: { $in: uniqueUserIds }
         });
         if (levelResult.deletedCount > 0) {
-          console.log(`Deleted ${levelResult.deletedCount} user levels for test users`);
+          console.log(`🗑️ Deleted ${levelResult.deletedCount} user levels`);
           deletedCount += levelResult.deletedCount;
         }
-        
-        // Delete trading orders for test users
+      } catch (e) {
+        console.warn('Failed to delete user levels:', e);
+      }
+      
+      // Delete wallet transactions for test users
+      try {
+        const walletTxResult = await db.collection('wallettransactions').deleteMany({
+          userId: { $in: uniqueUserIds }
+        });
+        if (walletTxResult.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${walletTxResult.deletedCount} wallet transactions`);
+          deletedCount += walletTxResult.deletedCount;
+        }
+      } catch (e) {
+        console.warn('Failed to delete wallet transactions:', e);
+      }
+      
+      // Delete trading orders for test users
+      try {
         const orderResult = await db.collection('tradingorders').deleteMany({
           userId: { $in: uniqueUserIds }
         });
         if (orderResult.deletedCount > 0) {
-          console.log(`Deleted ${orderResult.deletedCount} trading orders for test users`);
+          console.log(`🗑️ Deleted ${orderResult.deletedCount} trading orders`);
           deletedCount += orderResult.deletedCount;
         }
+      } catch (e) {
+        console.warn('Failed to delete trading orders:', e);
       }
-    } catch (e) {
-      console.warn('Side effects cleanup failed:', e);
+    }
+    
+    // ==========================================
+    // STEP 5: DELETE BY COMPETITION/CHALLENGE ID
+    // (positions, orders linked to test competitions)
+    // ==========================================
+    if (uniqueCompetitionIds.length > 0) {
+      try {
+        // Delete positions by competitionId
+        const posResult = await db.collection('tradingpositions').deleteMany({
+          competitionId: { $in: uniqueCompetitionIds }
+        });
+        if (posResult.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${posResult.deletedCount} positions by competitionId`);
+          deletedCount += posResult.deletedCount;
+        }
+        
+        // Delete orders by competitionId
+        const orderResult = await db.collection('tradingorders').deleteMany({
+          competitionId: { $in: uniqueCompetitionIds }
+        });
+        if (orderResult.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${orderResult.deletedCount} orders by competitionId`);
+          deletedCount += orderResult.deletedCount;
+        }
+      } catch (e) {
+        console.warn('Failed to delete by competitionId:', e);
+      }
+    }
+    
+    if (uniqueChallengeIds.length > 0) {
+      try {
+        // Delete positions by challengeId (stored as competitionId in some cases)
+        const posResult = await db.collection('tradingpositions').deleteMany({
+          $or: [
+            { challengeId: { $in: uniqueChallengeIds } },
+            { competitionId: { $in: uniqueChallengeIds } },
+          ]
+        });
+        if (posResult.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${posResult.deletedCount} positions by challengeId`);
+          deletedCount += posResult.deletedCount;
+        }
+      } catch (e) {
+        console.warn('Failed to delete by challengeId:', e);
+      }
     }
 
+    console.log(`✅ Cleanup complete: ${deletedCount} total records deleted`);
+    
     return NextResponse.json({ 
       success: true, 
       deletedCount,

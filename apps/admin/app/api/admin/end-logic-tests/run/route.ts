@@ -31,6 +31,7 @@ const TEST_SCENARIOS: Record<string, {
     totalTrades: number;
     winRate?: number; // Optional: for win_rate tiebreaker tests
     pnlPercentage?: number; // Optional: for ROI tiebreaker tests
+    startingCapital?: number; // Optional: override starting capital for ROI tests
   }>;
   expected: {
     shouldEndEarly: boolean;
@@ -744,9 +745,11 @@ const TEST_SCENARIOS: Record<string, {
     disqualifyOnLiquidation: true,
     tieBreaker1: 'roi', // Higher ROI wins
     participants: [
-      // Same final capital, different starting (so different ROI)
-      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5, pnlPercentage: 30 }, // 30% ROI
-      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5, pnlPercentage: 20 }, // 20% ROI
+      // Same PNL ($1000), but different starting capitals = different ROI
+      // P0: started $3000, ended $4000, PNL=+$1000, ROI=33.3% (HIGHER)
+      // P1: started $5000, ended $6000, PNL=+$1000, ROI=20%
+      { role: 'participant', status: 'active', equity: 4000, totalTrades: 5, startingCapital: 3000 }, // 33% ROI
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5, startingCapital: 5000 }, // 20% ROI
     ],
     expected: { 
       shouldEndEarly: false, 
@@ -754,7 +757,7 @@ const TEST_SCENARIOS: Record<string, {
       statusAfter: 'completed',
       expectedPrizePool: 200,
       expectedPlatformFee: 40,
-      expectedRanking: [0, 1], // P0 wins via ROI tiebreaker
+      expectedRanking: [0, 1], // P0 wins via ROI tiebreaker (33% > 20%)
       expectedPrizes: [160, 0],
     },
   },
@@ -1107,13 +1110,13 @@ async function runRealCompetitionTest(
       updatedAt: now,
     });
 
-    // IMPORTANT: Use COMMON starting capital so PNL differences reflect equity differences
     // PNL = currentCapital - startingCapital = equity - startingCapital
+    // Use custom startingCapital if provided (for ROI tiebreaker tests), otherwise use common
     // Example: startingCapital=5000, equity=6000 → PNL=+1000 (profit), equity=4000 → PNL=-1000 (loss)
-    const commonStartingCapital = startingCapital; // Use competition's starting capital (5000)
-    const participantPnl = p.equity - commonStartingCapital;
+    const participantStartingCapital = p.startingCapital ?? startingCapital;
+    const participantPnl = p.equity - participantStartingCapital;
     // Use custom pnlPercentage if provided, otherwise calculate from equity difference
-    const participantPnlPercentage = p.pnlPercentage ?? (participantPnl / commonStartingCapital) * 100;
+    const participantPnlPercentage = p.pnlPercentage ?? (participantPnl / participantStartingCapital) * 100;
     
     // Calculate winning/losing trades based on winRate (if provided)
     const totalTrades = p.totalTrades || 1;
@@ -1135,7 +1138,7 @@ async function runRealCompetitionTest(
       username: `${testRunId}_User${i + 1}`,
       status: p.status,
       currentCapital: p.equity,
-      startingCapital: commonStartingCapital, // Common starting capital for all
+      startingCapital: participantStartingCapital, // Use custom or common starting capital
       pnl: participantPnl, // Calculated PNL based on equity difference
       pnlPercentage: participantPnlPercentage, // Use custom or calculated
       totalTrades,
@@ -1156,18 +1159,43 @@ async function runRealCompetitionTest(
       const positionsCollection = db.collection('tradingpositions');
       const numPositions = p.totalTrades;
       
-      // Split total PNL across all positions evenly
-      const pnlPerPosition = participantPnl / numPositions;
+      // Calculate winning/losing positions based on winRate
+      // Production counts winningTrades based on positions with positive realizedPnl
+      const winRatePercent = customWinRate; // Use the participant's winRate
+      const numWinningPositions = Math.round((winRatePercent / 100) * numPositions);
+      const numLosingPositions = numPositions - numWinningPositions;
       
-      // IMPORTANT: Production calculates PNL as: priceDiff * quantity * 100000 (forex contract size)
-      // To get the desired pnlPerPosition, we need: priceDiff = pnlPerPosition / (quantity * 100000)
+      // Calculate PNL per position to achieve total participantPnl
+      // We need: (winningPnl * numWins) + (losingPnl * numLosses) = totalPnl
+      // Simplify: Use fixed win/loss amounts that sum to totalPnl
+      let winPnl: number, lossPnl: number;
+      
+      if (numWinningPositions === 0) {
+        // All losing - split loss equally
+        winPnl = 0;
+        lossPnl = participantPnl / numLosingPositions;
+      } else if (numLosingPositions === 0) {
+        // All winning - split profit equally
+        winPnl = participantPnl / numWinningPositions;
+        lossPnl = 0;
+      } else {
+        // Mix of wins and losses
+        // Use a simple formula: wins are +200 each, losses are calculated to balance
+        winPnl = Math.abs(participantPnl) / numWinningPositions + 50; // Positive
+        lossPnl = (participantPnl - (winPnl * numWinningPositions)) / numLosingPositions; // Negative
+      }
+      
       const quantity = 1;
       const contractSize = 100000;
-      const priceDiff = pnlPerPosition / (quantity * contractSize);
       
       for (let posIdx = 0; posIdx < numPositions; posIdx++) {
         const positionId = new mongoose.Types.ObjectId();
         testDataIds.push(`position:${positionId}`);
+        
+        // First numWinningPositions are wins, rest are losses
+        const isWin = posIdx < numWinningPositions;
+        const positionPnl = isWin ? winPnl : lossPnl;
+        const priceDiff = positionPnl / (quantity * contractSize);
         
         await positionsCollection.insertOne({
           _id: positionId,
@@ -1184,7 +1212,7 @@ async function runRealCompetitionTest(
           currentPrice: 1.1000 + priceDiff,
           unrealizedPnl: 0,
           unrealizedPnlPercentage: 0,
-          realizedPnl: pnlPerPosition, // PNL for this position
+          realizedPnl: positionPnl, // PNL for this position (positive=win, negative=loss)
           leverage: 1,
           marginUsed: 1000,
           maintenanceMargin: 500,
