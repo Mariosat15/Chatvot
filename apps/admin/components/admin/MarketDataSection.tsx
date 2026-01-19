@@ -1448,6 +1448,10 @@ export default function MarketDataSection() {
           <div className="space-y-5">
             <div className="bg-yellow-600/10 border border-yellow-600/20 rounded-lg p-4 text-sm">
               <span className="text-yellow-400">💡 These settings control how charts load historical data.</span>
+              <p className="text-gray-400 text-xs mt-2">
+                <strong className="text-white">Trade-off:</strong> Lower count = faster loading, but less history visible initially. 
+                Users can still scroll left to lazy-load more history.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -1512,9 +1516,9 @@ export default function MarketDataSection() {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    min="100"
-                    max="5000"
-                    step="100"
+                    min="50"
+                    max="1000"
+                    step="50"
                     value={settings.initialCandleCount}
                     onChange={(e) => saveSettings({ initialCandleCount: parseInt(e.target.value) || 500 })}
                     className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-24 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
@@ -1524,6 +1528,39 @@ export default function MarketDataSection() {
                 <p className="text-gray-500 text-xs mt-2">
                   How many candles to load when chart first opens
                 </p>
+                {/* Performance Impact Table */}
+                <div className="mt-3 bg-gray-900/50 rounded-lg p-3 border border-gray-800/20">
+                  <div className="text-yellow-400 text-xs font-medium mb-2">⚡ Performance Impact (1h chart):</div>
+                  <div className="grid grid-cols-4 gap-2 text-xs">
+                    <div className="text-gray-500">Count</div>
+                    <div className="text-gray-500">Query</div>
+                    <div className="text-gray-500">Time</div>
+                    <div className="text-gray-500">Visible</div>
+                    
+                    <div className={settings.initialCandleCount <= 100 ? 'text-green-400 font-medium' : 'text-gray-400'}>100</div>
+                    <div className={settings.initialCandleCount <= 100 ? 'text-green-400' : 'text-gray-400'}>6K</div>
+                    <div className={settings.initialCandleCount <= 100 ? 'text-green-400' : 'text-gray-400'}>~2s</div>
+                    <div className={settings.initialCandleCount <= 100 ? 'text-green-400' : 'text-gray-400'}>4 days</div>
+                    
+                    <div className={settings.initialCandleCount > 100 && settings.initialCandleCount <= 200 ? 'text-blue-400 font-medium' : 'text-gray-400'}>200</div>
+                    <div className={settings.initialCandleCount > 100 && settings.initialCandleCount <= 200 ? 'text-blue-400' : 'text-gray-400'}>12K</div>
+                    <div className={settings.initialCandleCount > 100 && settings.initialCandleCount <= 200 ? 'text-blue-400' : 'text-gray-400'}>~5s</div>
+                    <div className={settings.initialCandleCount > 100 && settings.initialCandleCount <= 200 ? 'text-blue-400' : 'text-gray-400'}>8 days</div>
+                    
+                    <div className={settings.initialCandleCount > 200 && settings.initialCandleCount <= 500 ? 'text-yellow-400 font-medium' : 'text-gray-400'}>500</div>
+                    <div className={settings.initialCandleCount > 200 && settings.initialCandleCount <= 500 ? 'text-yellow-400' : 'text-gray-400'}>30K</div>
+                    <div className={settings.initialCandleCount > 200 && settings.initialCandleCount <= 500 ? 'text-yellow-400' : 'text-gray-400'}>~30s</div>
+                    <div className={settings.initialCandleCount > 200 && settings.initialCandleCount <= 500 ? 'text-yellow-400' : 'text-gray-400'}>21 days</div>
+                    
+                    <div className={settings.initialCandleCount > 500 ? 'text-red-400 font-medium' : 'text-gray-400'}>1000</div>
+                    <div className={settings.initialCandleCount > 500 ? 'text-red-400' : 'text-gray-400'}>60K</div>
+                    <div className={settings.initialCandleCount > 500 ? 'text-red-400' : 'text-gray-400'}>~60s+</div>
+                    <div className={settings.initialCandleCount > 500 ? 'text-red-400' : 'text-gray-400'}>42 days</div>
+                  </div>
+                  <p className="text-gray-500 text-[10px] mt-2">
+                    For 1h: count × 60 = 1m candles needed • count ÷ 24 = days visible
+                  </p>
+                </div>
               </div>
 
               {/* Lazy Load Batch Size */}
