@@ -653,8 +653,9 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           }
         }
         
-        // If local DB doesn't have enough, fetch from Massive.com API
-        if (historicalCandles.length < limit && !settings.useLocalHistory) {
+        // If local DB doesn't have enough, ALWAYS fallback to Massive.com API
+        // This ensures scrolling left always loads history even if historical DB is empty
+        if (historicalCandles.length < limit) {
           const massiveTimeframeMap: Record<string, Timeframe> = {
             '5m': '5', '15m': '15', '30m': '30',
             '1h': '60', '4h': '240', '1d': 'D',
@@ -666,7 +667,7 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
             const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
             
             // Filter to only candles before the cutoff
-            historicalCandles = apiCandles
+            const apiFiltered = apiCandles
               .filter(c => c.time < cutoffTimestamp)
               .map(c => ({
                 time: c.time, // Already in seconds
@@ -675,6 +676,16 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
                 low: c.low,
                 close: c.close,
               }));
+            
+            // Merge with any historical candles we got from DB (dedupe by timestamp)
+            const candleMap = new Map<number, typeof historicalCandles[0]>();
+            for (const c of apiFiltered) {
+              candleMap.set(c.time, c);
+            }
+            for (const c of historicalCandles) {
+              candleMap.set(c.time, c); // DB candles override API
+            }
+            historicalCandles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
           }
         }
       }
