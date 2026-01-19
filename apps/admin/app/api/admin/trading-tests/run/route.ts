@@ -20,6 +20,14 @@ import {
   calculatePipValue as productionCalculatePipValue,
   validateQuantity as productionValidateQuantity,
   validateSLTP as productionValidateSLTP,
+  // ⚡ NEW: TP/SL and liquidation functions
+  isMarginCall as productionIsMarginCall,
+  shouldLiquidate as productionShouldLiquidate,
+  calculateLiquidationPrice as productionCalculateLiquidationPrice,
+  calculatePipsMoved as productionCalculatePipsMoved,
+  calculatePotentialPnL as productionCalculatePotentialPnL,
+  calculateRiskRewardRatio as productionCalculateRiskRewardRatio,
+  calculateMaintenanceMargin as productionCalculateMaintenanceMargin,
   FOREX_PAIRS,
   type ForexSymbol,
 } from '@/lib/services/pnl-calculator.service';
@@ -147,7 +155,7 @@ interface TradingTestScenario {
   id: string;
   name: string;
   description: string;
-  type: 'open' | 'close' | 'roundtrip' | 'pnl' | 'margin' | 'validation' | 'risk' | 'pipvalue' | 'market' | 'realprice' | 'fullflow' | 'fullclose';
+  type: 'open' | 'close' | 'roundtrip' | 'pnl' | 'margin' | 'validation' | 'risk' | 'pipvalue' | 'market' | 'realprice' | 'fullflow' | 'fullclose' | 'tpsl' | 'liquidation' | 'stopout';
   params: {
     symbol: string;
     side: 'long' | 'short';
@@ -155,10 +163,14 @@ interface TradingTestScenario {
     leverage: number;
     entryPrice: number;
     exitPrice?: number;
+    currentPrice?: number; // For TP/SL tests
     startingCapital?: number;
     stopLoss?: number;
     takeProfit?: number;
     unrealizedPnl?: number;
+    marginLevel?: number; // For liquidation tests
+    usedMargin?: number;
+    equity?: number;
   };
   expected: {
     marginRequired?: number;
@@ -198,6 +210,18 @@ interface TradingTestScenario {
     capitalUpdated?: boolean;
     expectedPnl?: number;
     expectedFinalCapital?: number;
+    // TP/SL tests
+    slTriggered?: boolean;
+    tpTriggered?: boolean;
+    triggerPrice?: number;
+    // Liquidation tests
+    shouldLiquidate?: boolean;
+    isMarginCall?: boolean;
+    liquidationPrice?: number;
+    pipsMoved?: number;
+    potentialPnl?: number;
+    riskRewardRatio?: number;
+    maintenanceMargin?: number;
   };
 }
 
@@ -1000,6 +1024,367 @@ const TRADING_TEST_SCENARIOS: TradingTestScenario[] = [
       expectedFinalCapital: 10050.00,
     },
   },
+  
+  // ============ TP/SL HIT DETECTION TESTS ============
+  {
+    id: 'T-SL1',
+    name: 'Stop Loss Hit (Long)',
+    description: 'Test SL trigger for long position',
+    type: 'tpsl',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      stopLoss: 1.09500, // SL 50 pips below
+      currentPrice: 1.09450, // Price below SL - should trigger
+    },
+    expected: {
+      slTriggered: true,
+      tpTriggered: false,
+      triggerPrice: 1.09500,
+    },
+  },
+  {
+    id: 'T-SL2',
+    name: 'Stop Loss Not Hit (Long)',
+    description: 'Price above SL - should NOT trigger',
+    type: 'tpsl',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      stopLoss: 1.09500,
+      currentPrice: 1.09800, // Price above SL
+    },
+    expected: {
+      slTriggered: false,
+      tpTriggered: false,
+    },
+  },
+  {
+    id: 'T-TP1',
+    name: 'Take Profit Hit (Long)',
+    description: 'Test TP trigger for long position',
+    type: 'tpsl',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      takeProfit: 1.10500, // TP 50 pips above
+      currentPrice: 1.10550, // Price above TP - should trigger
+    },
+    expected: {
+      slTriggered: false,
+      tpTriggered: true,
+      triggerPrice: 1.10500,
+    },
+  },
+  {
+    id: 'T-SL3',
+    name: 'Stop Loss Hit (Short)',
+    description: 'Test SL trigger for short position',
+    type: 'tpsl',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'short',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      stopLoss: 1.10500, // SL 50 pips above (for short)
+      currentPrice: 1.10550, // Price above SL - should trigger for short
+    },
+    expected: {
+      slTriggered: true,
+      tpTriggered: false,
+      triggerPrice: 1.10500,
+    },
+  },
+  {
+    id: 'T-TP2',
+    name: 'Take Profit Hit (Short)',
+    description: 'Test TP trigger for short position',
+    type: 'tpsl',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'short',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      takeProfit: 1.09500, // TP 50 pips below (for short)
+      currentPrice: 1.09450, // Price below TP - should trigger for short
+    },
+    expected: {
+      slTriggered: false,
+      tpTriggered: true,
+      triggerPrice: 1.09500,
+    },
+  },
+  
+  // ============ LIQUIDATION TESTS ============
+  {
+    id: 'T-L1',
+    name: 'Should Liquidate (Below 50%)',
+    description: 'Test shouldLiquidate() returns true below threshold',
+    type: 'liquidation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 1.0,
+      leverage: 100,
+      entryPrice: 1.10000,
+      marginLevel: 45, // Below 50% liquidation threshold
+    },
+    expected: {
+      shouldLiquidate: true,
+      isMarginCall: true, // Also in margin call
+    },
+  },
+  {
+    id: 'T-L2',
+    name: 'Should NOT Liquidate (Above 50%)',
+    description: 'Test shouldLiquidate() returns false above threshold',
+    type: 'liquidation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 1.0,
+      leverage: 100,
+      entryPrice: 1.10000,
+      marginLevel: 75, // Above 50%, below 100%
+    },
+    expected: {
+      shouldLiquidate: false,
+      isMarginCall: true, // Still in margin call
+    },
+  },
+  {
+    id: 'T-L3',
+    name: 'Margin Call Detection (Below 100%)',
+    description: 'Test isMarginCall() at 90% margin level',
+    type: 'liquidation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 1.0,
+      leverage: 100,
+      entryPrice: 1.10000,
+      marginLevel: 90,
+    },
+    expected: {
+      shouldLiquidate: false,
+      isMarginCall: true,
+    },
+  },
+  {
+    id: 'T-L4',
+    name: 'No Margin Call (Above 100%)',
+    description: 'Test isMarginCall() at healthy margin level',
+    type: 'liquidation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 1.0,
+      leverage: 100,
+      entryPrice: 1.10000,
+      marginLevel: 500,
+    },
+    expected: {
+      shouldLiquidate: false,
+      isMarginCall: false,
+    },
+  },
+  {
+    id: 'T-L5',
+    name: 'Liquidation Price (Long)',
+    description: 'Calculate exact liquidation price for long',
+    type: 'liquidation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 1.0,
+      leverage: 100,
+      entryPrice: 1.10000,
+      startingCapital: 10000,
+      usedMargin: 1100, // Margin for 1 lot at 1:100
+    },
+    expected: {
+      // Liquidation when equity = 50% of margin = $550
+      // Need loss of $9450 (10000 - 550)
+      // For 1 lot, that's 9450 pips = 0.0945 price move
+      // Long liquidates at entry - move = 1.10000 - 0.0945 = 1.0055
+      liquidationPrice: 1.0055,
+    },
+  },
+  
+  // ============ STOP OUT SIMULATION TESTS ============
+  {
+    id: 'T-SO1',
+    name: 'Stop Out Scenario (Full)',
+    description: 'Simulate complete stop out flow',
+    type: 'stopout',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 1.0,
+      leverage: 100,
+      entryPrice: 1.10000,
+      currentPrice: 1.00550, // Price moved against by 945 pips
+      startingCapital: 10000,
+    },
+    expected: {
+      shouldLiquidate: true,
+      pnl: -9450, // Loss of $9450
+      marginLevel: 50, // At liquidation threshold
+    },
+  },
+  {
+    id: 'T-SO2',
+    name: 'Stop Out Prevented (Margin OK)',
+    description: 'Position should NOT be stopped out',
+    type: 'stopout',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      currentPrice: 1.09000, // 100 pips against
+      startingCapital: 10000,
+    },
+    expected: {
+      shouldLiquidate: false,
+      pnl: -100, // $100 loss (100 pips × $1/pip for 0.1 lot)
+    },
+  },
+  
+  // ============ PIPS & RISK CALCULATION TESTS ============
+  {
+    id: 'T-PIPS1',
+    name: 'Pips Moved Calculation',
+    description: 'Test calculatePipsMoved()',
+    type: 'tpsl',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      currentPrice: 1.10500, // 50 pips up
+    },
+    expected: {
+      pipsMoved: 50,
+    },
+  },
+  {
+    id: 'T-PIPS2',
+    name: 'Pips Moved (JPY Pair)',
+    description: 'Test pips calculation for USD/JPY',
+    type: 'tpsl',
+    params: {
+      symbol: 'USD/JPY',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 150.00,
+      currentPrice: 150.50, // 50 pips up for JPY
+    },
+    expected: {
+      pipsMoved: 50,
+    },
+  },
+  {
+    id: 'T-RR1',
+    name: 'Risk/Reward Ratio (2:1)',
+    description: 'Test calculateRiskRewardRatio()',
+    type: 'tpsl',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      stopLoss: 1.09500, // 50 pips risk
+      takeProfit: 1.11000, // 100 pips reward
+    },
+    expected: {
+      riskRewardRatio: 2.0, // 100/50 = 2:1
+    },
+  },
+  {
+    id: 'T-RR2',
+    name: 'Risk/Reward Ratio (1:1)',
+    description: 'Test equal risk and reward',
+    type: 'tpsl',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      stopLoss: 1.09500, // 50 pips risk
+      takeProfit: 1.10500, // 50 pips reward
+    },
+    expected: {
+      riskRewardRatio: 1.0,
+    },
+  },
+  {
+    id: 'T-PP1',
+    name: 'Potential Profit (Long TP)',
+    description: 'Test calculatePotentialPnL() for take profit',
+    type: 'tpsl',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      takeProfit: 1.10500, // 50 pips
+    },
+    expected: {
+      potentialPnl: 50, // $50 potential profit
+    },
+  },
+  {
+    id: 'T-PP2',
+    name: 'Potential Loss (Long SL)',
+    description: 'Test calculatePotentialPnL() for stop loss',
+    type: 'tpsl',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      stopLoss: 1.09500, // 50 pips
+    },
+    expected: {
+      potentialPnl: -50, // $50 potential loss
+    },
+  },
+  {
+    id: 'T-MM1',
+    name: 'Maintenance Margin',
+    description: 'Test calculateMaintenanceMargin()',
+    type: 'liquidation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 1.0,
+      leverage: 100,
+      entryPrice: 1.10000,
+      usedMargin: 1100, // Initial margin
+    },
+    expected: {
+      maintenanceMargin: 550, // 50% of initial margin
+    },
+  },
 ];
 
 export async function POST(request: Request) {
@@ -1789,6 +2174,221 @@ export async function POST(request: Request) {
           message: passed ? '✅ Full close flow calculated correctly' : `❌ ${issues.join(', ')}`,
           actualOutcome: `PNL: $${pnl.toFixed(2)}, Final: $${finalCapital.toFixed(2)}`,
           details: { marginReleased, pnl, finalCapital },
+        };
+      }
+      // ============ TP/SL HIT DETECTION TEST ============
+      else if (type === 'tpsl') {
+        console.log(`\n📊 TP/SL HIT DETECTION TEST:`);
+        console.log(`   Symbol: ${params.symbol}`);
+        console.log(`   Side: ${params.side}`);
+        console.log(`   Entry Price: ${params.entryPrice}`);
+        console.log(`   Current Price: ${params.currentPrice}`);
+        if (params.stopLoss) console.log(`   Stop Loss: ${params.stopLoss}`);
+        if (params.takeProfit) console.log(`   Take Profit: ${params.takeProfit}`);
+        
+        const currentPrice = params.currentPrice || params.entryPrice;
+        let slTriggered = false;
+        let tpTriggered = false;
+        
+        // Check Stop Loss trigger
+        if (params.stopLoss) {
+          if (params.side === 'long') {
+            // For LONG: SL triggers when price drops BELOW stop loss
+            slTriggered = currentPrice <= params.stopLoss;
+          } else {
+            // For SHORT: SL triggers when price rises ABOVE stop loss
+            slTriggered = currentPrice >= params.stopLoss;
+          }
+          console.log(`\n   SL Check: Current ${currentPrice} ${params.side === 'long' ? '<=' : '>='} SL ${params.stopLoss}`);
+          console.log(`      Result: ${slTriggered ? '🔴 TRIGGERED' : '✅ Not triggered'}`);
+        }
+        
+        // Check Take Profit trigger
+        if (params.takeProfit) {
+          if (params.side === 'long') {
+            // For LONG: TP triggers when price rises ABOVE take profit
+            tpTriggered = currentPrice >= params.takeProfit;
+          } else {
+            // For SHORT: TP triggers when price drops BELOW take profit
+            tpTriggered = currentPrice <= params.takeProfit;
+          }
+          console.log(`\n   TP Check: Current ${currentPrice} ${params.side === 'long' ? '>=' : '<='} TP ${params.takeProfit}`);
+          console.log(`      Result: ${tpTriggered ? '🟢 TRIGGERED' : '✅ Not triggered'}`);
+        }
+        
+        // Calculate pips moved
+        let pipsMoved: number | undefined;
+        if (params.currentPrice) {
+          pipsMoved = productionCalculatePipsMoved(params.entryPrice, currentPrice, params.symbol as ForexSymbol);
+          console.log(`\n   Pips Moved: ${pipsMoved}`);
+        }
+        
+        // Calculate risk/reward ratio
+        let riskRewardRatio: number | undefined;
+        if (params.stopLoss && params.takeProfit) {
+          riskRewardRatio = productionCalculateRiskRewardRatio(
+            params.entryPrice, params.stopLoss, params.takeProfit, params.side
+          );
+          console.log(`   Risk/Reward Ratio: ${riskRewardRatio.toFixed(2)}:1`);
+        }
+        
+        // Calculate potential PNL
+        let potentialPnl: number | undefined;
+        if (params.takeProfit && expected.potentialPnl !== undefined && expected.potentialPnl >= 0) {
+          potentialPnl = productionCalculatePotentialPnL(
+            params.side, params.entryPrice, params.takeProfit, params.quantity, params.symbol as ForexSymbol
+          );
+          console.log(`   Potential Profit at TP: $${potentialPnl.toFixed(2)}`);
+        } else if (params.stopLoss && expected.potentialPnl !== undefined && expected.potentialPnl < 0) {
+          potentialPnl = productionCalculatePotentialPnL(
+            params.side, params.entryPrice, params.stopLoss, params.quantity, params.symbol as ForexSymbol
+          );
+          console.log(`   Potential Loss at SL: $${potentialPnl.toFixed(2)}`);
+        }
+        
+        // Validate expectations
+        if (expected.slTriggered !== undefined && slTriggered !== expected.slTriggered) {
+          passed = false;
+          issues.push(`SL triggered: expected ${expected.slTriggered}, got ${slTriggered}`);
+        }
+        if (expected.tpTriggered !== undefined && tpTriggered !== expected.tpTriggered) {
+          passed = false;
+          issues.push(`TP triggered: expected ${expected.tpTriggered}, got ${tpTriggered}`);
+        }
+        if (expected.pipsMoved !== undefined && pipsMoved !== undefined && Math.abs(pipsMoved - expected.pipsMoved) > 1) {
+          passed = false;
+          issues.push(`Pips moved: expected ${expected.pipsMoved}, got ${pipsMoved}`);
+        }
+        if (expected.riskRewardRatio !== undefined && riskRewardRatio !== undefined && Math.abs(riskRewardRatio - expected.riskRewardRatio) > 0.1) {
+          passed = false;
+          issues.push(`R:R ratio: expected ${expected.riskRewardRatio}, got ${riskRewardRatio?.toFixed(2)}`);
+        }
+        if (expected.potentialPnl !== undefined && potentialPnl !== undefined && Math.abs(potentialPnl - expected.potentialPnl) > 1) {
+          passed = false;
+          issues.push(`Potential PNL: expected $${expected.potentialPnl}, got $${potentialPnl?.toFixed(2)}`);
+        }
+        
+        actualResult = {
+          passed,
+          message: passed ? '✅ TP/SL detection correct' : `❌ ${issues.join(', ')}`,
+          actualOutcome: `SL: ${slTriggered ? 'TRIGGERED' : 'OK'}, TP: ${tpTriggered ? 'TRIGGERED' : 'OK'}`,
+          details: { slTriggered, tpTriggered, pipsMoved, riskRewardRatio, potentialPnl },
+        };
+      }
+      // ============ LIQUIDATION TEST ============
+      else if (type === 'liquidation') {
+        console.log(`\n📊 LIQUIDATION DETECTION TEST:`);
+        console.log(`   Margin Level: ${params.marginLevel}%`);
+        
+        const marginLevel = params.marginLevel || 100;
+        
+        // Test shouldLiquidate (threshold default 50%)
+        const shouldLiquidate = productionShouldLiquidate(marginLevel, 50);
+        console.log(`\n   shouldLiquidate(${marginLevel}%, threshold=50%):`);
+        console.log(`      Result: ${shouldLiquidate ? '🔴 YES - LIQUIDATE' : '✅ NO'}`);
+        
+        // Test isMarginCall (threshold default 100%)
+        const isMarginCall = productionIsMarginCall(marginLevel, 100);
+        console.log(`\n   isMarginCall(${marginLevel}%, threshold=100%):`);
+        console.log(`      Result: ${isMarginCall ? '⚠️ YES - MARGIN CALL' : '✅ NO'}`);
+        
+        // Calculate liquidation price if we have the params
+        let liquidationPrice: number | undefined;
+        if (params.usedMargin && params.startingCapital) {
+          liquidationPrice = productionCalculateLiquidationPrice(
+            params.side, params.entryPrice, params.startingCapital, params.usedMargin, params.quantity, params.symbol as ForexSymbol
+          );
+          console.log(`\n   Liquidation Price: ${liquidationPrice?.toFixed(5)}`);
+        }
+        
+        // Calculate maintenance margin
+        let maintenanceMargin: number | undefined;
+        if (params.usedMargin) {
+          maintenanceMargin = productionCalculateMaintenanceMargin(params.usedMargin);
+          console.log(`   Maintenance Margin: $${maintenanceMargin.toFixed(2)}`);
+        }
+        
+        // Validate expectations
+        if (expected.shouldLiquidate !== undefined && shouldLiquidate !== expected.shouldLiquidate) {
+          passed = false;
+          issues.push(`shouldLiquidate: expected ${expected.shouldLiquidate}, got ${shouldLiquidate}`);
+        }
+        if (expected.isMarginCall !== undefined && isMarginCall !== expected.isMarginCall) {
+          passed = false;
+          issues.push(`isMarginCall: expected ${expected.isMarginCall}, got ${isMarginCall}`);
+        }
+        if (expected.liquidationPrice !== undefined && liquidationPrice !== undefined && Math.abs(liquidationPrice - expected.liquidationPrice) > 0.001) {
+          passed = false;
+          issues.push(`Liquidation price: expected ${expected.liquidationPrice}, got ${liquidationPrice?.toFixed(5)}`);
+        }
+        if (expected.maintenanceMargin !== undefined && maintenanceMargin !== undefined && Math.abs(maintenanceMargin - expected.maintenanceMargin) > 1) {
+          passed = false;
+          issues.push(`Maintenance margin: expected $${expected.maintenanceMargin}, got $${maintenanceMargin?.toFixed(2)}`);
+        }
+        
+        actualResult = {
+          passed,
+          message: passed ? '✅ Liquidation detection correct' : `❌ ${issues.join(', ')}`,
+          actualOutcome: `Liquidate: ${shouldLiquidate ? 'YES' : 'NO'}, Margin Call: ${isMarginCall ? 'YES' : 'NO'}`,
+          details: { shouldLiquidate, isMarginCall, marginLevel, liquidationPrice, maintenanceMargin },
+        };
+      }
+      // ============ STOP OUT SIMULATION TEST ============
+      else if (type === 'stopout') {
+        console.log(`\n📊 STOP OUT SIMULATION TEST:`);
+        console.log(`   Symbol: ${params.symbol}`);
+        console.log(`   Side: ${params.side}`);
+        console.log(`   Quantity: ${params.quantity} lots`);
+        console.log(`   Entry: ${params.entryPrice}`);
+        console.log(`   Current Price: ${params.currentPrice}`);
+        console.log(`   Starting Capital: $${params.startingCapital}`);
+        
+        const currentPrice = params.currentPrice || params.entryPrice;
+        const startingCapital = params.startingCapital || 10000;
+        
+        // Calculate current PNL
+        const pnl = productionCalculateUnrealizedPnL(
+          params.side, params.entryPrice, currentPrice, params.quantity, params.symbol as ForexSymbol
+        );
+        console.log(`\n   Current PNL: $${pnl.toFixed(2)}`);
+        
+        // Calculate margin used
+        const marginUsed = productionCalculateMarginRequired(
+          params.quantity, params.entryPrice, params.leverage, params.symbol as ForexSymbol
+        );
+        console.log(`   Margin Used: $${marginUsed.toFixed(2)}`);
+        
+        // Calculate equity
+        const equity = productionCalculateEquity(startingCapital, pnl);
+        console.log(`   Equity: $${equity.toFixed(2)}`);
+        
+        // Calculate margin level
+        const marginLevel = productionCalculateMarginLevel(equity, marginUsed);
+        console.log(`   Margin Level: ${marginLevel.toFixed(2)}%`);
+        
+        // Check if should liquidate
+        const shouldLiquidate = productionShouldLiquidate(marginLevel, 50);
+        console.log(`\n   Should Liquidate: ${shouldLiquidate ? '🔴 YES' : '✅ NO'}`);
+        
+        // Validate expectations
+        if (expected.shouldLiquidate !== undefined && shouldLiquidate !== expected.shouldLiquidate) {
+          passed = false;
+          issues.push(`shouldLiquidate: expected ${expected.shouldLiquidate}, got ${shouldLiquidate}`);
+        }
+        if (expected.pnl !== undefined && Math.abs(pnl - expected.pnl) > 10) {
+          passed = false;
+          issues.push(`PNL: expected $${expected.pnl}, got $${pnl.toFixed(2)}`);
+        }
+        if (expected.marginLevel !== undefined && Math.abs(marginLevel - expected.marginLevel) > 5) {
+          passed = false;
+          issues.push(`Margin level: expected ${expected.marginLevel}%, got ${marginLevel.toFixed(2)}%`);
+        }
+        
+        actualResult = {
+          passed,
+          message: passed ? '✅ Stop out simulation correct' : `❌ ${issues.join(', ')}`,
+          actualOutcome: `PNL: $${pnl.toFixed(2)}, Margin: ${marginLevel.toFixed(2)}%, Liquidate: ${shouldLiquidate ? 'YES' : 'NO'}`,
+          details: { pnl, marginUsed, equity, marginLevel, shouldLiquidate },
         };
       }
       else {

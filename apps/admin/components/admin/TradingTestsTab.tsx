@@ -22,13 +22,16 @@ import {
   ArrowRightLeft,
   Clock,
   Wifi,
+  Target,
+  Skull,
+  OctagonX,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Test case definition
 interface TradingTestCase {
   id: string;
-  category: 'open' | 'pnl' | 'margin' | 'roundtrip' | 'validation' | 'risk' | 'pipvalue' | 'market' | 'realprice' | 'fullflow';
+  category: 'open' | 'pnl' | 'margin' | 'roundtrip' | 'validation' | 'risk' | 'pipvalue' | 'market' | 'realprice' | 'fullflow' | 'tpsl' | 'liquidation' | 'stopout';
   name: string;
   description: string;
   scenario: string;
@@ -441,6 +444,183 @@ const TEST_CASES: TradingTestCase[] = [
     expectedResult: 'PNL: +$50, Final: $10050',
     status: 'pending',
   },
+  
+  // ============ TP/SL DETECTION TESTS ============
+  {
+    id: 'T-SL1',
+    category: 'tpsl',
+    name: 'Stop Loss Hit (Long)',
+    description: 'SL triggers when price drops below',
+    scenario: 'Long, SL=1.095, Price=1.0945',
+    expectedResult: '🔴 SL TRIGGERED',
+    status: 'pending',
+  },
+  {
+    id: 'T-SL2',
+    category: 'tpsl',
+    name: 'Stop Loss Not Hit (Long)',
+    description: 'Price above SL - no trigger',
+    scenario: 'Long, SL=1.095, Price=1.098',
+    expectedResult: '✅ SL OK',
+    status: 'pending',
+  },
+  {
+    id: 'T-TP1',
+    category: 'tpsl',
+    name: 'Take Profit Hit (Long)',
+    description: 'TP triggers when price rises above',
+    scenario: 'Long, TP=1.105, Price=1.1055',
+    expectedResult: '🟢 TP TRIGGERED',
+    status: 'pending',
+  },
+  {
+    id: 'T-SL3',
+    category: 'tpsl',
+    name: 'Stop Loss Hit (Short)',
+    description: 'SL triggers when price rises above',
+    scenario: 'Short, SL=1.105, Price=1.1055',
+    expectedResult: '🔴 SL TRIGGERED',
+    status: 'pending',
+  },
+  {
+    id: 'T-TP2',
+    category: 'tpsl',
+    name: 'Take Profit Hit (Short)',
+    description: 'TP triggers when price drops below',
+    scenario: 'Short, TP=1.095, Price=1.0945',
+    expectedResult: '🟢 TP TRIGGERED',
+    status: 'pending',
+  },
+  {
+    id: 'T-PIPS1',
+    category: 'tpsl',
+    name: 'Pips Moved Calculation',
+    description: 'Test pips calculation EUR/USD',
+    scenario: 'Entry 1.10, Current 1.105',
+    expectedResult: '50 pips',
+    status: 'pending',
+  },
+  {
+    id: 'T-PIPS2',
+    category: 'tpsl',
+    name: 'Pips Moved (JPY)',
+    description: 'Test pips for JPY pair',
+    scenario: 'Entry 150.00, Current 150.50',
+    expectedResult: '50 pips',
+    status: 'pending',
+  },
+  {
+    id: 'T-RR1',
+    category: 'tpsl',
+    name: 'Risk/Reward (2:1)',
+    description: 'Calculate R:R ratio',
+    scenario: 'SL=50 pips, TP=100 pips',
+    expectedResult: '2:1 ratio',
+    status: 'pending',
+  },
+  {
+    id: 'T-RR2',
+    category: 'tpsl',
+    name: 'Risk/Reward (1:1)',
+    description: 'Equal risk and reward',
+    scenario: 'SL=50 pips, TP=50 pips',
+    expectedResult: '1:1 ratio',
+    status: 'pending',
+  },
+  {
+    id: 'T-PP1',
+    category: 'tpsl',
+    name: 'Potential Profit',
+    description: 'Calculate potential profit at TP',
+    scenario: 'Long 0.1 lot, TP +50 pips',
+    expectedResult: '$50 potential',
+    status: 'pending',
+  },
+  {
+    id: 'T-PP2',
+    category: 'tpsl',
+    name: 'Potential Loss',
+    description: 'Calculate potential loss at SL',
+    scenario: 'Long 0.1 lot, SL -50 pips',
+    expectedResult: '-$50 potential',
+    status: 'pending',
+  },
+  
+  // ============ LIQUIDATION TESTS ============
+  {
+    id: 'T-L1',
+    category: 'liquidation',
+    name: 'Should Liquidate (<50%)',
+    description: 'Test shouldLiquidate() below threshold',
+    scenario: 'Margin Level: 45%',
+    expectedResult: '💀 LIQUIDATE',
+    status: 'pending',
+  },
+  {
+    id: 'T-L2',
+    category: 'liquidation',
+    name: 'Should NOT Liquidate (>50%)',
+    description: 'Test shouldLiquidate() above threshold',
+    scenario: 'Margin Level: 75%',
+    expectedResult: '✅ No liquidation',
+    status: 'pending',
+  },
+  {
+    id: 'T-L3',
+    category: 'liquidation',
+    name: 'Margin Call (<100%)',
+    description: 'Test isMarginCall() at 90%',
+    scenario: 'Margin Level: 90%',
+    expectedResult: '⚠️ Margin Call',
+    status: 'pending',
+  },
+  {
+    id: 'T-L4',
+    category: 'liquidation',
+    name: 'No Margin Call (>100%)',
+    description: 'Test isMarginCall() at healthy level',
+    scenario: 'Margin Level: 500%',
+    expectedResult: '✅ Healthy',
+    status: 'pending',
+  },
+  {
+    id: 'T-L5',
+    category: 'liquidation',
+    name: 'Liquidation Price',
+    description: 'Calculate exact liquidation price',
+    scenario: '1 lot, $10000 capital',
+    expectedResult: 'Price: ~1.0055',
+    status: 'pending',
+  },
+  {
+    id: 'T-MM1',
+    category: 'liquidation',
+    name: 'Maintenance Margin',
+    description: 'Calculate maintenance margin (50%)',
+    scenario: 'Initial Margin: $1100',
+    expectedResult: 'Maintenance: $550',
+    status: 'pending',
+  },
+  
+  // ============ STOP OUT TESTS ============
+  {
+    id: 'T-SO1',
+    category: 'stopout',
+    name: 'Stop Out Triggered',
+    description: 'Full stop out simulation',
+    scenario: '1 lot, price -945 pips',
+    expectedResult: '🛑 STOP OUT',
+    status: 'pending',
+  },
+  {
+    id: 'T-SO2',
+    category: 'stopout',
+    name: 'Stop Out Prevented',
+    description: 'Position should NOT be stopped out',
+    scenario: '0.1 lot, price -100 pips',
+    expectedResult: '✅ Position safe',
+    status: 'pending',
+  },
 ];
 
 // Category info
@@ -455,6 +635,9 @@ const CATEGORIES = [
   { id: 'market', name: '🕐 Market Status', icon: Clock, color: 'text-emerald-400' },
   { id: 'realprice', name: '📡 Real Prices', icon: Wifi, color: 'text-rose-400' },
   { id: 'fullflow', name: '🚀 Full Flow', icon: Play, color: 'text-indigo-400' },
+  { id: 'tpsl', name: '🎯 TP/SL Detection', icon: Target, color: 'text-red-400' },
+  { id: 'liquidation', name: '💀 Liquidation', icon: Skull, color: 'text-red-600' },
+  { id: 'stopout', name: '🛑 Stop Out', icon: OctagonX, color: 'text-orange-600' },
 ];
 
 export default function TradingTestsTab() {
