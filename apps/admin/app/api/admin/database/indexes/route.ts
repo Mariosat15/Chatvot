@@ -215,11 +215,31 @@ export async function POST(request: Request) {
         for (const required of requiredIndexes) {
           const indexName = required.options.name;
 
+          // Check if index with same name exists
           if (existingNames.has(indexName)) {
             results.push({
               collection: collectionName,
               index: indexName,
               status: 'exists',
+            });
+            continue;
+          }
+
+          // Check if an index with the same keys already exists (different name)
+          const keysString = JSON.stringify(required.keys);
+          const existingWithSameKeys = existingIndexes.find(idx => 
+            JSON.stringify(idx.key) === keysString
+          );
+
+          if (existingWithSameKeys) {
+            // Index with same keys exists but different name/options
+            // Skip to avoid IndexOptionsConflict error
+            console.log(`⏭️ Skipping ${indexName} on ${collectionName} - equivalent index "${existingWithSameKeys.name}" already exists`);
+            results.push({
+              collection: collectionName,
+              index: indexName,
+              status: 'exists',
+              error: `Equivalent index "${existingWithSameKeys.name}" already exists`,
             });
             continue;
           }
@@ -239,13 +259,24 @@ export async function POST(request: Request) {
 
             console.log(`✅ Created index ${indexName} on ${collectionName}`);
           } catch (indexError) {
+            // Handle IndexOptionsConflict gracefully
+            const errorMessage = indexError instanceof Error ? indexError.message : 'Unknown error';
+            const isConflict = errorMessage.includes('equivalent index') || 
+                              errorMessage.includes('IndexOptionsConflict') ||
+                              (indexError as { code?: number })?.code === 85;
+            
             results.push({
               collection: collectionName,
               index: indexName,
-              status: 'error',
-              error: indexError instanceof Error ? indexError.message : 'Unknown error',
+              status: isConflict ? 'exists' : 'error',
+              error: isConflict ? 'Equivalent index exists with different name' : errorMessage,
             });
-            console.error(`❌ Failed to create index ${indexName} on ${collectionName}:`, indexError);
+            
+            if (isConflict) {
+              console.log(`⏭️ ${indexName} on ${collectionName}: equivalent index already exists`);
+            } else {
+              console.error(`❌ Failed to create index ${indexName} on ${collectionName}:`, indexError);
+            }
           }
         }
       } catch (collError) {
