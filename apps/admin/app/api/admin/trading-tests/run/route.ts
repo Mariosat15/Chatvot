@@ -62,27 +62,62 @@ async function productionIsMarketOpen(assetClass: string = 'forex'): Promise<{ i
 }
 
 async function productionGetRealPrice(symbol: string): Promise<{ bid: number; ask: number; mid: number; spread: number; timestamp: number } | null> {
-  try {
-    // Call the main app's price endpoint
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/trading/prices?symbols=${symbol}`);
-    if (!response.ok) throw new Error('Failed to fetch price');
-    const data = await response.json();
-    
-    if (data.prices && data.prices[symbol]) {
-      const price = data.prices[symbol];
-      return {
-        bid: price.bid,
-        ask: price.ask,
-        mid: (price.bid + price.ask) / 2,
-        spread: price.ask - price.bid,
-        timestamp: price.timestamp || Date.now(),
-      };
+  // Try multiple price sources
+  const baseUrls = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.APP_URL,
+    'https://chartvolt.com', // Production URL
+    'http://localhost:3000',
+  ].filter(Boolean);
+  
+  for (const baseUrl of baseUrls) {
+    try {
+      // The prices endpoint uses POST with JSON body
+      const response = await fetch(`${baseUrl}/api/trading/prices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbols: [symbol] }),
+        cache: 'no-store',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[Price Test] Response from ${baseUrl}:`, JSON.stringify(data).substring(0, 300));
+        
+        // Response is { prices: [{ symbol, bid, ask, ... }], marketOpen, status }
+        if (data.prices && Array.isArray(data.prices)) {
+          const price = data.prices.find((p: { symbol: string }) => p.symbol === symbol);
+          if (price && price.bid && price.ask) {
+            return {
+              bid: price.bid,
+              ask: price.ask,
+              mid: (price.bid + price.ask) / 2,
+              spread: price.ask - price.bid,
+              timestamp: price.timestamp || Date.now(),
+            };
+          }
+        }
+        
+        // Also check if prices is an object with symbol keys
+        if (data.prices && data.prices[symbol]) {
+          const price = data.prices[symbol];
+          return {
+            bid: price.bid,
+            ask: price.ask,
+            mid: (price.bid + price.ask) / 2,
+            spread: price.ask - price.bid,
+            timestamp: price.timestamp || Date.now(),
+          };
+        }
+      }
+    } catch (error) {
+      console.warn(`[Price Test] Failed from ${baseUrl}:`, error instanceof Error ? error.message : 'Unknown');
+      continue;
     }
-    return null;
-  } catch (error) {
-    console.warn(`Could not fetch real price for ${symbol}:`, error);
-    return null;
   }
+  
+  console.warn(`[Price Test] Could not fetch price for ${symbol} from any source`);
+  return null;
 }
 
 // Wrapper functions that call production code (for cleaner test code)
@@ -139,7 +174,7 @@ interface TradingTestScenario {
     // Risk tests
     orderAllowed?: boolean;
     marginLevel?: number;
-    marginStatus?: 'safe' | 'warning' | 'margin_call' | 'liquidation';
+    marginStatus?: 'safe' | 'warning' | 'danger' | 'margin_call' | 'liquidation';
     // Pip value tests
     pipValue?: number;
     // Market tests
