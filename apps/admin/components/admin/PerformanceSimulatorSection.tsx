@@ -48,6 +48,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EndLogicTestsTab from './EndLogicTestsTab';
+import TradingTestsTab from './TradingTestsTab';
 import {
   LineChart,
   Line,
@@ -721,6 +722,10 @@ export default function PerformanceSimulatorSection() {
           <TabsTrigger value="end-logic" className="data-[state=active]:bg-gray-700">
             <Trophy className="h-4 w-4 mr-2" />
             End Logic
+          </TabsTrigger>
+          <TabsTrigger value="trading-tests" className="data-[state=active]:bg-gray-700">
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Trading Tests
           </TabsTrigger>
         </TabsList>
 
@@ -2104,6 +2109,11 @@ export default function PerformanceSimulatorSection() {
         {/* End Logic Tests Tab */}
         <TabsContent value="end-logic">
           <EndLogicTestsTab />
+        </TabsContent>
+
+        {/* Trading Tests Tab */}
+        <TabsContent value="trading-tests">
+          <TradingTestsTab />
         </TabsContent>
       </Tabs>
     </div>
