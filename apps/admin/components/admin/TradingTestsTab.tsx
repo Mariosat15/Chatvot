@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils';
 // Test case definition
 interface TradingTestCase {
   id: string;
-  category: 'open' | 'pnl' | 'margin' | 'roundtrip';
+  category: 'open' | 'pnl' | 'margin' | 'roundtrip' | 'validation' | 'risk' | 'pipvalue';
   name: string;
   description: string;
   scenario: string;
@@ -238,6 +238,129 @@ const TEST_CASES: TradingTestCase[] = [
     expectedResult: 'PNL: +$30, Final: $10030',
     status: 'pending',
   },
+  
+  // ============ VALIDATION TESTS ============
+  {
+    id: 'T-V1',
+    category: 'validation',
+    name: 'Valid Quantity (0.1 lot)',
+    description: 'Test validateQuantity() accepts valid lot',
+    scenario: 'validateQuantity(0.1)',
+    expectedResult: '✅ Valid',
+    status: 'pending',
+  },
+  {
+    id: 'T-V2',
+    category: 'validation',
+    name: 'Invalid Quantity (too small)',
+    description: 'Test validateQuantity() rejects < 0.01',
+    scenario: 'validateQuantity(0.001)',
+    expectedResult: '❌ Rejected (min 0.01)',
+    status: 'pending',
+  },
+  {
+    id: 'T-V3',
+    category: 'validation',
+    name: 'Invalid Quantity (too large)',
+    description: 'Test validateQuantity() rejects > 100',
+    scenario: 'validateQuantity(150)',
+    expectedResult: '❌ Rejected (max 100)',
+    status: 'pending',
+  },
+  {
+    id: 'T-V4',
+    category: 'validation',
+    name: 'Valid SL/TP (Long)',
+    description: 'Test validateSLTP() for long position',
+    scenario: 'Long entry=1.10, SL=1.095, TP=1.105',
+    expectedResult: '✅ Valid (SL below, TP above)',
+    status: 'pending',
+  },
+  {
+    id: 'T-V5',
+    category: 'validation',
+    name: 'Invalid SL (Long)',
+    description: 'Test validateSLTP() rejects wrong SL',
+    scenario: 'Long entry=1.10, SL=1.105 (above entry!)',
+    expectedResult: '❌ Rejected',
+    status: 'pending',
+  },
+  {
+    id: 'T-V6',
+    category: 'validation',
+    name: 'Valid SL/TP (Short)',
+    description: 'Test validateSLTP() for short position',
+    scenario: 'Short entry=1.10, SL=1.105, TP=1.095',
+    expectedResult: '✅ Valid (SL above, TP below)',
+    status: 'pending',
+  },
+  
+  // ============ RISK MANAGER TESTS ============
+  {
+    id: 'T-R1',
+    category: 'risk',
+    name: 'Order Allowed (Sufficient)',
+    description: 'Test validateNewOrder() allows valid order',
+    scenario: '$10000 capital, $110 margin needed',
+    expectedResult: '✅ Order Allowed',
+    status: 'pending',
+  },
+  {
+    id: 'T-R2',
+    category: 'risk',
+    name: 'Order Rejected (Insufficient)',
+    description: 'Test validateNewOrder() rejects low capital',
+    scenario: '$5000 capital, $11000 margin needed',
+    expectedResult: '❌ Order Rejected',
+    status: 'pending',
+  },
+  {
+    id: 'T-R3',
+    category: 'risk',
+    name: 'Margin Level Calculation',
+    description: 'Test getMarginStatus() calculates correctly',
+    scenario: 'Capital=$10000, PNL=-$500, Margin=$1100',
+    expectedResult: 'Margin Level: ~864%',
+    status: 'pending',
+  },
+  {
+    id: 'T-R4',
+    category: 'risk',
+    name: 'Margin Call Detection',
+    description: 'Test getMarginStatus() detects warning',
+    scenario: 'Capital=$2000, PNL=-$1000, Margin=$1100',
+    expectedResult: 'Status: Warning (~91%)',
+    status: 'pending',
+  },
+  
+  // ============ PIP VALUE TESTS ============
+  {
+    id: 'T-PV1',
+    category: 'pipvalue',
+    name: 'Pip Value (1.0 lot)',
+    description: 'Test calculatePipValue() for standard lot',
+    scenario: '1.0 lot EUR/USD',
+    expectedResult: '$10.00 per pip',
+    status: 'pending',
+  },
+  {
+    id: 'T-PV2',
+    category: 'pipvalue',
+    name: 'Pip Value (0.1 lot)',
+    description: 'Test calculatePipValue() for mini lot',
+    scenario: '0.1 lot EUR/USD',
+    expectedResult: '$1.00 per pip',
+    status: 'pending',
+  },
+  {
+    id: 'T-PV3',
+    category: 'pipvalue',
+    name: 'Pip Value (0.01 lot)',
+    description: 'Test calculatePipValue() for micro lot',
+    scenario: '0.01 lot EUR/USD',
+    expectedResult: '$0.10 per pip',
+    status: 'pending',
+  },
 ];
 
 // Category info
@@ -246,6 +369,9 @@ const CATEGORIES = [
   { id: 'pnl', name: '📊 PNL Calculation', icon: Calculator, color: 'text-blue-400' },
   { id: 'margin', name: '💰 Margin', icon: DollarSign, color: 'text-yellow-400' },
   { id: 'roundtrip', name: '🔄 Round-Trip', icon: ArrowRightLeft, color: 'text-purple-400' },
+  { id: 'validation', name: '✅ Validation', icon: CheckCircle, color: 'text-cyan-400' },
+  { id: 'risk', name: '⚠️ Risk Manager', icon: AlertCircle, color: 'text-orange-400' },
+  { id: 'pipvalue', name: '📈 Pip Value', icon: TrendingUp, color: 'text-pink-400' },
 ];
 
 export default function TradingTestsTab() {

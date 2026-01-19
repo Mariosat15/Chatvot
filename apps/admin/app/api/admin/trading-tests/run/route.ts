@@ -9,15 +9,27 @@ import mongoose from 'mongoose';
 // ⚡ TESTS ACTUAL PRODUCTION CODE - NOT ISOLATED COPIES!
 // =====================================================
 
-// Import ACTUAL production PNL calculator functions
+// ⚡ Import ACTUAL production functions (not copies!)
 import {
   calculateUnrealizedPnL as productionCalculateUnrealizedPnL,
   calculateMarginRequired as productionCalculateMarginRequired,
+  calculatePnLPercentage as productionCalculatePnLPercentage,
+  calculateMarginLevel as productionCalculateMarginLevel,
+  calculateEquity as productionCalculateEquity,
+  calculatePipValue as productionCalculatePipValue,
+  validateQuantity as productionValidateQuantity,
+  validateSLTP as productionValidateSLTP,
   FOREX_PAIRS,
   type ForexSymbol,
 } from '@/lib/services/pnl-calculator.service';
 
-// Wrapper functions that call production code
+// ⚡ Import risk manager functions
+import {
+  validateNewOrder as productionValidateNewOrder,
+  getMarginStatus as productionGetMarginStatus,
+} from '@/lib/services/risk-manager.service';
+
+// Wrapper functions that call production code (for cleaner test code)
 function calculateUnrealizedPnL(
   side: 'long' | 'short',
   entryPrice: number,
@@ -44,7 +56,7 @@ interface TradingTestScenario {
   id: string;
   name: string;
   description: string;
-  type: 'open' | 'close' | 'roundtrip' | 'pnl' | 'margin';
+  type: 'open' | 'close' | 'roundtrip' | 'pnl' | 'margin' | 'validation' | 'risk' | 'pipvalue';
   params: {
     symbol: string;
     side: 'long' | 'short';
@@ -53,6 +65,9 @@ interface TradingTestScenario {
     entryPrice: number;
     exitPrice?: number;
     startingCapital?: number;
+    stopLoss?: number;
+    takeProfit?: number;
+    unrealizedPnl?: number;
   };
   expected: {
     marginRequired?: number;
@@ -62,6 +77,15 @@ interface TradingTestScenario {
     marginReleased?: boolean;
     positionOpened?: boolean;
     positionClosed?: boolean;
+    // Validation tests
+    validQuantity?: boolean;
+    validSLTP?: boolean;
+    // Risk tests
+    orderAllowed?: boolean;
+    marginLevel?: number;
+    marginStatus?: 'safe' | 'warning' | 'margin_call' | 'liquidation';
+    // Pip value tests
+    pipValue?: number;
   };
 }
 
@@ -466,6 +490,232 @@ const TRADING_TEST_SCENARIOS: TradingTestScenario[] = [
       marginReleased: true,
       positionOpened: true,
       positionClosed: true,
+    },
+  },
+  
+  // ============ PRODUCTION VALIDATION TESTS ============
+  {
+    id: 'T-V1',
+    name: 'Validate Quantity (Valid)',
+    description: 'Test production validateQuantity() with valid lot',
+    type: 'validation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+    },
+    expected: {
+      validQuantity: true,
+    },
+  },
+  {
+    id: 'T-V2',
+    name: 'Validate Quantity (Too Small)',
+    description: 'Test production validateQuantity() rejects < 0.01',
+    type: 'validation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.001, // Too small
+      leverage: 100,
+      entryPrice: 1.10000,
+    },
+    expected: {
+      validQuantity: false,
+    },
+  },
+  {
+    id: 'T-V3',
+    name: 'Validate Quantity (Too Large)',
+    description: 'Test production validateQuantity() rejects > 100',
+    type: 'validation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 150, // Too large
+      leverage: 100,
+      entryPrice: 1.10000,
+    },
+    expected: {
+      validQuantity: false,
+    },
+  },
+  {
+    id: 'T-V4',
+    name: 'Validate SL/TP (Long Valid)',
+    description: 'Test production validateSLTP() for long position',
+    type: 'validation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      stopLoss: 1.09500, // Below entry ✓
+      takeProfit: 1.10500, // Above entry ✓
+    },
+    expected: {
+      validSLTP: true,
+    },
+  },
+  {
+    id: 'T-V5',
+    name: 'Validate SL/TP (Long Invalid)',
+    description: 'Test production validateSLTP() rejects wrong SL',
+    type: 'validation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      stopLoss: 1.10500, // Above entry - WRONG!
+      takeProfit: 1.11000,
+    },
+    expected: {
+      validSLTP: false,
+    },
+  },
+  {
+    id: 'T-V6',
+    name: 'Validate SL/TP (Short Valid)',
+    description: 'Test production validateSLTP() for short position',
+    type: 'validation',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'short',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      stopLoss: 1.10500, // Above entry ✓
+      takeProfit: 1.09500, // Below entry ✓
+    },
+    expected: {
+      validSLTP: true,
+    },
+  },
+  
+  // ============ RISK MANAGER TESTS ============
+  {
+    id: 'T-R1',
+    name: 'Order Validation (Sufficient Margin)',
+    description: 'Test production validateNewOrder() allows valid order',
+    type: 'risk',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+      startingCapital: 10000,
+    },
+    expected: {
+      orderAllowed: true,
+    },
+  },
+  {
+    id: 'T-R2',
+    name: 'Order Validation (Insufficient Margin)',
+    description: 'Test production validateNewOrder() rejects low capital',
+    type: 'risk',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 10.0, // Requires $11,000 margin
+      leverage: 100,
+      entryPrice: 1.10000,
+      startingCapital: 5000, // Only $5000 available
+    },
+    expected: {
+      orderAllowed: false,
+    },
+  },
+  {
+    id: 'T-R3',
+    name: 'Margin Level Calculation',
+    description: 'Test production getMarginStatus() calculates correctly',
+    type: 'risk',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 1.0,
+      leverage: 100,
+      entryPrice: 1.10000,
+      startingCapital: 10000,
+      unrealizedPnl: -500, // $500 loss
+    },
+    expected: {
+      marginLevel: 863.64, // (10000-500) / 1100 * 100 = 863.64%
+    },
+  },
+  {
+    id: 'T-R4',
+    name: 'Margin Call Detection',
+    description: 'Test production getMarginStatus() detects margin call',
+    type: 'risk',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 1.0,
+      leverage: 100,
+      entryPrice: 1.10000,
+      startingCapital: 2000, // Low capital
+      unrealizedPnl: -1000, // $1000 loss, equity = $1000
+    },
+    expected: {
+      marginStatus: 'warning', // 1000/1100 = 90.9%, below 100%
+    },
+  },
+  
+  // ============ PIP VALUE TESTS ============
+  {
+    id: 'T-PV1',
+    name: 'Pip Value EUR/USD (1.0 lot)',
+    description: 'Test production calculatePipValue()',
+    type: 'pipvalue',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 1.0,
+      leverage: 100,
+      entryPrice: 1.10000,
+    },
+    expected: {
+      pipValue: 10.00, // 0.0001 × 1.0 × 100000 = $10
+    },
+  },
+  {
+    id: 'T-PV2',
+    name: 'Pip Value EUR/USD (0.1 lot)',
+    description: 'Test pip value scales with lot size',
+    type: 'pipvalue',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.1,
+      leverage: 100,
+      entryPrice: 1.10000,
+    },
+    expected: {
+      pipValue: 1.00, // 0.0001 × 0.1 × 100000 = $1
+    },
+  },
+  {
+    id: 'T-PV3',
+    name: 'Pip Value EUR/USD (0.01 lot)',
+    description: 'Test micro lot pip value',
+    type: 'pipvalue',
+    params: {
+      symbol: 'EUR/USD',
+      side: 'long',
+      quantity: 0.01,
+      leverage: 100,
+      entryPrice: 1.10000,
+    },
+    expected: {
+      pipValue: 0.10, // 0.0001 × 0.01 × 100000 = $0.10
     },
   },
 ];
@@ -897,6 +1147,147 @@ export async function POST(request: Request) {
             actualFinalCapital: finalParticipant?.currentCapital,
             marginReleased: (finalParticipant?.usedMargin || 0) === 0,
           },
+        };
+      }
+      // ============ VALIDATION TEST ============
+      else if (type === 'validation') {
+        console.log(`📊 Production Validation Test:`);
+        
+        // Test quantity validation
+        if (expected.validQuantity !== undefined) {
+          const quantityValidation = productionValidateQuantity(params.quantity);
+          console.log(`   validateQuantity(${params.quantity}): ${quantityValidation.valid ? '✅ Valid' : '❌ Invalid'}`);
+          if (quantityValidation.error) console.log(`      Reason: ${quantityValidation.error}`);
+          
+          if (quantityValidation.valid !== expected.validQuantity) {
+            passed = false;
+            issues.push(`Quantity validation: expected ${expected.validQuantity}, got ${quantityValidation.valid}`);
+          }
+          
+          actualResult = {
+            passed,
+            message: passed ? '✅ Quantity validation correct' : `❌ ${issues.join(', ')}`,
+            actualOutcome: `Valid: ${quantityValidation.valid}`,
+            details: { quantityValidation, expected: expected.validQuantity },
+          };
+        }
+        // Test SL/TP validation
+        else if (expected.validSLTP !== undefined) {
+          const slTpValidation = productionValidateSLTP(
+            params.side,
+            params.entryPrice,
+            params.stopLoss,
+            params.takeProfit
+          );
+          console.log(`   validateSLTP(${params.side}, entry=${params.entryPrice}, SL=${params.stopLoss}, TP=${params.takeProfit}):`);
+          console.log(`      Result: ${slTpValidation.valid ? '✅ Valid' : '❌ Invalid'}`);
+          if (slTpValidation.error) console.log(`      Reason: ${slTpValidation.error}`);
+          
+          if (slTpValidation.valid !== expected.validSLTP) {
+            passed = false;
+            issues.push(`SL/TP validation: expected ${expected.validSLTP}, got ${slTpValidation.valid}`);
+          }
+          
+          actualResult = {
+            passed,
+            message: passed ? '✅ SL/TP validation correct' : `❌ ${issues.join(', ')}`,
+            actualOutcome: `Valid: ${slTpValidation.valid}`,
+            details: { slTpValidation, expected: expected.validSLTP },
+          };
+        }
+        else {
+          actualResult = { passed: false, message: 'No validation expectation specified' };
+        }
+      }
+      // ============ RISK MANAGER TEST ============
+      else if (type === 'risk') {
+        console.log(`📊 Production Risk Manager Test:`);
+        
+        const marginRequired = calculateMarginRequired(params.quantity, params.entryPrice, params.leverage, params.symbol);
+        
+        // Test order validation
+        if (expected.orderAllowed !== undefined) {
+          const orderValidation = productionValidateNewOrder(
+            params.startingCapital || 10000, // availableCapital
+            marginRequired,
+            0, // currentOpenPositions
+            params.quantity,
+            params.leverage,
+            10, // maxOpenPositions
+            params.leverage // maxLeverage
+          );
+          console.log(`   validateNewOrder(capital=$${params.startingCapital}, margin=$${marginRequired}):`);
+          console.log(`      Result: ${orderValidation.valid ? '✅ Allowed' : '❌ Rejected'}`);
+          if (orderValidation.error) console.log(`      Reason: ${orderValidation.error}`);
+          
+          if (orderValidation.valid !== expected.orderAllowed) {
+            passed = false;
+            issues.push(`Order validation: expected ${expected.orderAllowed ? 'allowed' : 'rejected'}, got ${orderValidation.valid ? 'allowed' : 'rejected'}`);
+          }
+          
+          actualResult = {
+            passed,
+            message: passed ? '✅ Order validation correct' : `❌ ${issues.join(', ')}`,
+            actualOutcome: `${orderValidation.valid ? 'Allowed' : 'Rejected'}`,
+            details: { orderValidation, marginRequired, expected: expected.orderAllowed },
+          };
+        }
+        // Test margin status
+        else if (expected.marginLevel !== undefined || expected.marginStatus !== undefined) {
+          const currentCapital = params.startingCapital || 10000;
+          const unrealizedPnl = params.unrealizedPnl || 0;
+          const usedMargin = marginRequired;
+          
+          const marginStatus = productionGetMarginStatus(currentCapital, unrealizedPnl, usedMargin);
+          
+          console.log(`   getMarginStatus(capital=$${currentCapital}, pnl=$${unrealizedPnl}, margin=$${usedMargin}):`);
+          console.log(`      Margin Level: ${marginStatus.marginLevel.toFixed(2)}%`);
+          console.log(`      Status: ${marginStatus.status}`);
+          
+          if (expected.marginLevel !== undefined) {
+            if (Math.abs(marginStatus.marginLevel - expected.marginLevel) > 1) {
+              passed = false;
+              issues.push(`Margin level: expected ${expected.marginLevel}%, got ${marginStatus.marginLevel.toFixed(2)}%`);
+            }
+          }
+          if (expected.marginStatus !== undefined) {
+            if (marginStatus.status !== expected.marginStatus) {
+              passed = false;
+              issues.push(`Margin status: expected ${expected.marginStatus}, got ${marginStatus.status}`);
+            }
+          }
+          
+          actualResult = {
+            passed,
+            message: passed ? '✅ Margin status correct' : `❌ ${issues.join(', ')}`,
+            actualOutcome: `Level: ${marginStatus.marginLevel.toFixed(2)}%, Status: ${marginStatus.status}`,
+            details: { marginStatus, expected: { marginLevel: expected.marginLevel, marginStatus: expected.marginStatus } },
+          };
+        }
+        else {
+          actualResult = { passed: false, message: 'No risk expectation specified' };
+        }
+      }
+      // ============ PIP VALUE TEST ============
+      else if (type === 'pipvalue') {
+        const actualPipValue = productionCalculatePipValue(params.quantity, params.symbol as ForexSymbol);
+        
+        console.log(`📊 Pip Value Calculation:`);
+        console.log(`   Symbol: ${params.symbol}`);
+        console.log(`   Quantity: ${params.quantity} lots`);
+        console.log(`   Expected Pip Value: $${expected.pipValue}`);
+        console.log(`   Actual Pip Value: $${actualPipValue}`);
+        
+        if (Math.abs(actualPipValue - (expected.pipValue || 0)) > 0.01) {
+          passed = false;
+          issues.push(`Pip value: expected $${expected.pipValue}, got $${actualPipValue}`);
+        }
+        
+        actualResult = {
+          passed,
+          message: passed ? '✅ Pip value correct' : `❌ ${issues.join(', ')}`,
+          actualOutcome: `Pip Value: $${actualPipValue}`,
+          details: { expectedPipValue: expected.pipValue, actualPipValue },
         };
       }
       else {
