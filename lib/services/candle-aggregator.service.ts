@@ -19,6 +19,7 @@
 
 import { connectToDatabase } from '@/database/mongoose';
 import Candle1m, { CandleData } from '@/database/models/candle-1m.model';
+import TradingSymbol from '@/database/models/trading/symbol-settings.model';
 import { getFormingCandle, FormingCandle } from '@/lib/services/websocket-price-streamer';
 
 // ============================================
@@ -396,12 +397,6 @@ export function clearCache(symbol?: string, timeframe?: string): void {
 // CACHE PRE-WARMING (Server Startup)
 // ============================================
 
-// Most commonly requested symbols
-const WARM_SYMBOLS = [
-  'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'NZD/USD', 'USD/CAD',
-  'EUR/GBP', 'EUR/JPY', 'GBP/JPY', 'XAU/USD', 'US30', 'US100', 'US500',
-];
-
 // Timeframes that use aggregator (excluding 1d/W/M which don't use it)
 const WARM_TIMEFRAMES = ['5m', '15m', '30m', '1h', '4h'];
 
@@ -409,7 +404,23 @@ let cacheWarmingComplete = false;
 let cacheWarmingInProgress = false;
 
 /**
- * Pre-warm the aggregator cache for common symbols and timeframes
+ * Fetch enabled symbols from admin configuration
+ */
+async function getEnabledSymbols(): Promise<string[]> {
+  try {
+    const symbols = await TradingSymbol.find({ enabled: true })
+      .select('symbol')
+      .lean();
+    return symbols.map(s => s.symbol);
+  } catch (err) {
+    console.warn('⚠️ [Aggregator] Failed to fetch symbols, using fallback:', err);
+    // Fallback to common symbols if DB query fails
+    return ['EUR/USD', 'GBP/USD', 'USD/JPY', 'XAU/USD'];
+  }
+}
+
+/**
+ * Pre-warm the aggregator cache for all enabled symbols and timeframes
  * Call this on server startup to ensure first users don't hit cold cache
  */
 export async function warmCache(): Promise<void> {
@@ -424,8 +435,12 @@ export async function warmCache(): Promise<void> {
   try {
     await connectToDatabase();
     
+    // Fetch enabled symbols from admin configuration
+    const enabledSymbols = await getEnabledSymbols();
+    console.log(`📊 [Aggregator] Found ${enabledSymbols.length} enabled symbols to warm`);
+    
     // Pre-warm in batches to avoid overwhelming MongoDB
-    for (const symbol of WARM_SYMBOLS) {
+    for (const symbol of enabledSymbols) {
       for (const timeframe of WARM_TIMEFRAMES) {
         try {
           // Use a smaller count for warming (100 candles = reasonable history)
@@ -439,7 +454,7 @@ export async function warmCache(): Promise<void> {
     
     cacheWarmingComplete = true;
     const duration = Date.now() - startTime;
-    console.log(`✅ [Aggregator] Cache pre-warming complete in ${duration}ms (${WARM_SYMBOLS.length} symbols × ${WARM_TIMEFRAMES.length} timeframes = ${aggregatedCandleCache.size} entries)`);
+    console.log(`✅ [Aggregator] Cache pre-warming complete in ${duration}ms (${enabledSymbols.length} symbols × ${WARM_TIMEFRAMES.length} timeframes = ${aggregatedCandleCache.size} entries)`);
   } catch (err) {
     console.error('❌ [Aggregator] Cache pre-warming failed:', err);
   } finally {
