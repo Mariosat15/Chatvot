@@ -458,8 +458,8 @@ export async function warmCache(): Promise<void> {
       await Promise.all(
         batch.map(async ({ symbol, timeframe }) => {
           try {
-            // Use smaller count for warming (50 candles = faster)
-            await getAggregatedCandles(symbol, timeframe, 50);
+            // Use full count for warming (500 candles = matches user requests)
+            await getAggregatedCandles(symbol, timeframe, 500);
             completed++;
           } catch (err) {
             // Don't fail the whole warming if one symbol fails
