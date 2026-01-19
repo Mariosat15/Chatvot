@@ -527,23 +527,80 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
     );
   }
   
-  // For aggregator-supported timeframes, use hybrid approach
-  // EXCEPT for daily/weekly/monthly - aggregating too many 1m candles is impractical
+  // For higher timeframes, use HISTORICAL FIRST approach (FAST!)
+  // Only use aggregator for recent data not yet in historical collections
   const useAggregator = isAggregatorSupported(normalizedTf) && !['1d', 'W', 'M'].includes(normalizedTf);
   
   if (useAggregator || ['5m', '15m', '30m', '1h', '4h', '1d', 'W', 'M'].includes(normalizedTf)) {
     try {
-      // Step 1: Get aggregated candles from 1m data (recent)
-      // Skip for daily - too many 1m candles needed
+      let historicalCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
       let aggregatedCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
       let formingCandle = null;
       
-      if (useAggregator) {
-        const result = await getAggregatedCandles(symbol, normalizedTf, limit);
+      // ============================================
+      // STEP 1: Query historical collection FIRST (FAST!)
+      // This is pre-built data, no aggregation needed
+      // ============================================
+      if (settings.useLocalHistory) {
+        const historicalModel = getHistoricalModel(normalizedTf);
+        
+        if (historicalModel) {
+          const queryStart = Date.now();
+          
+          if (before) {
+            // Lazy loading: get candles before specific timestamp
+            const dbCandles = await getHistoricalCandles(normalizedTf, symbol, {
+              before: new Date(before * 1000),
+              limit: limit,
+            });
+            
+            historicalCandles = dbCandles.map(c => ({
+              time: Math.floor(new Date(c.timestamp).getTime() / 1000),
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+            }));
+          } else {
+            // Initial load: get most recent historical candles
+            const dbCandles = await getHistoricalCandles(normalizedTf, symbol, {
+              limit: limit,
+            });
+            
+            historicalCandles = dbCandles.map(c => ({
+              time: Math.floor(new Date(c.timestamp).getTime() / 1000),
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+            }));
+          }
+          
+          const queryTime = Date.now() - queryStart;
+          if (historicalCandles.length > 0) {
+            console.log(`⚡ [Candles] Historical ${normalizedTf} for ${symbol}: ${historicalCandles.length} candles in ${queryTime}ms`);
+          }
+        }
+      }
+      
+      // ============================================
+      // STEP 2: Get recent data from aggregator (only if needed)
+      // Only for initial load, only for small amount of recent data
+      // ============================================
+      if (!before && useAggregator) {
+        // Get forming candle and recent aggregated data
+        const aggStart = Date.now();
+        // Only get last 50 candles from aggregator (recent data not in historical yet)
+        const result = await getAggregatedCandles(symbol, normalizedTf, 50);
         aggregatedCandles = result.candles;
         formingCandle = result.formingCandle;
-      } else {
-        // For daily/weekly/monthly (and other non-aggregated timeframes), get forming candle from WebSocket cache
+        const aggTime = Date.now() - aggStart;
+        
+        if (aggregatedCandles.length > 0) {
+          console.log(`📊 [Candles] Aggregated recent ${normalizedTf} for ${symbol}: ${aggregatedCandles.length} candles in ${aggTime}ms`);
+        }
+      } else if (!before) {
+        // For daily/weekly/monthly, just get forming candle from WebSocket cache
         if (normalizedTf === 'M') {
           formingCandle = getFormingMonthlyCandle(symbol);
         } else if (normalizedTf === 'W') {
@@ -557,74 +614,35 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         }
       }
       
-      // Apply history limit to aggregated candles
-      if (historyLimitDate && aggregatedCandles.length > 0) {
+      // Apply history limit
+      if (historyLimitDate) {
         const limitTimestamp = Math.floor(historyLimitDate.getTime() / 1000);
+        historicalCandles = historicalCandles.filter(c => c.time >= limitTimestamp);
         aggregatedCandles = aggregatedCandles.filter(c => c.time >= limitTimestamp);
       }
       
-      // Step 2: If lazy loading (before param) or not enough candles, get historical data
-      let historicalCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
-      
-      const needsHistoricalData = before || aggregatedCandles.length < limit;
-      
-      if (needsHistoricalData) {
-        // Determine the cutoff point (oldest aggregated candle or 'before' timestamp)
-        let cutoffTimestamp: number;
+      // ============================================
+      // STEP 3: If historical is empty, fallback to API
+      // ============================================
+      if (historicalCandles.length === 0 && !before) {
+        const massiveTimeframeMap: Record<string, Timeframe> = {
+          '5m': '5', '15m': '15', '30m': '30',
+          '1h': '60', '4h': '240', '1d': 'D',
+          'W': 'W', 'M': 'M',
+        };
         
-        if (before) {
-          cutoffTimestamp = before;
-        } else if (aggregatedCandles.length > 0) {
-          cutoffTimestamp = aggregatedCandles[0].time;
-        } else {
-          cutoffTimestamp = Math.floor(Date.now() / 1000);
-        }
-        
-        const cutoffDate = new Date(cutoffTimestamp * 1000);
-        
-        // Try to get from local database first
-        if (settings.useLocalHistory) {
-          const historicalModel = getHistoricalModel(normalizedTf);
+        const massiveTf = massiveTimeframeMap[normalizedTf];
+        if (massiveTf) {
+          console.log(`🌐 [Candles] No historical data, fetching from API for ${symbol} ${normalizedTf}...`);
+          const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
           
-          if (historicalModel) {
-            const dbCandles = await getHistoricalCandles(normalizedTf, symbol, {
-              before: cutoffDate,
-              limit: limit,
-            });
-            
-            historicalCandles = dbCandles.map(c => ({
-              time: Math.floor(new Date(c.timestamp).getTime() / 1000),
-              open: c.open,
-              high: c.high,
-              low: c.low,
-              close: c.close,
-            }));
-          }
-        }
-        
-        // If local DB doesn't have enough, fetch from Massive.com API
-        if (historicalCandles.length < limit && !settings.useLocalHistory) {
-          const massiveTimeframeMap: Record<string, Timeframe> = {
-            '5m': '5', '15m': '15', '30m': '30',
-            '1h': '60', '4h': '240', '1d': 'D',
-            'W': 'W', 'M': 'M',
-          };
-          
-          const massiveTf = massiveTimeframeMap[normalizedTf];
-          if (massiveTf) {
-            const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
-            
-            // Filter to only candles before the cutoff
-            historicalCandles = apiCandles
-              .filter(c => c.time < cutoffTimestamp)
-              .map(c => ({
-                time: c.time, // Already in seconds
-                open: c.open,
-                high: c.high,
-                low: c.low,
-                close: c.close,
-              }));
-          }
+          historicalCandles = apiCandles.map(c => ({
+            time: c.time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+          }));
         }
       }
       
