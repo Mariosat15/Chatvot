@@ -391,3 +391,65 @@ export function clearCache(symbol?: string, timeframe?: string): void {
     aggregatedCandleCache.clear();
   }
 }
+
+// ============================================
+// CACHE PRE-WARMING (Server Startup)
+// ============================================
+
+// Most commonly requested symbols
+const WARM_SYMBOLS = [
+  'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'NZD/USD', 'USD/CAD',
+  'EUR/GBP', 'EUR/JPY', 'GBP/JPY', 'XAU/USD', 'US30', 'US100', 'US500',
+];
+
+// Timeframes that use aggregator (excluding 1d/W/M which don't use it)
+const WARM_TIMEFRAMES = ['5m', '15m', '30m', '1h', '4h'];
+
+let cacheWarmingComplete = false;
+let cacheWarmingInProgress = false;
+
+/**
+ * Pre-warm the aggregator cache for common symbols and timeframes
+ * Call this on server startup to ensure first users don't hit cold cache
+ */
+export async function warmCache(): Promise<void> {
+  if (cacheWarmingComplete || cacheWarmingInProgress) {
+    return;
+  }
+  
+  cacheWarmingInProgress = true;
+  console.log('🔥 [Aggregator] Starting cache pre-warming...');
+  const startTime = Date.now();
+  
+  try {
+    await connectToDatabase();
+    
+    // Pre-warm in batches to avoid overwhelming MongoDB
+    for (const symbol of WARM_SYMBOLS) {
+      for (const timeframe of WARM_TIMEFRAMES) {
+        try {
+          // Use a smaller count for warming (100 candles = reasonable history)
+          await getAggregatedCandles(symbol, timeframe, 100);
+        } catch (err) {
+          // Don't fail the whole warming if one symbol fails
+          console.warn(`⚠️ [Aggregator] Failed to warm ${symbol} ${timeframe}:`, err);
+        }
+      }
+    }
+    
+    cacheWarmingComplete = true;
+    const duration = Date.now() - startTime;
+    console.log(`✅ [Aggregator] Cache pre-warming complete in ${duration}ms (${WARM_SYMBOLS.length} symbols × ${WARM_TIMEFRAMES.length} timeframes = ${aggregatedCandleCache.size} entries)`);
+  } catch (err) {
+    console.error('❌ [Aggregator] Cache pre-warming failed:', err);
+  } finally {
+    cacheWarmingInProgress = false;
+  }
+}
+
+/**
+ * Check if cache warming is complete
+ */
+export function isCacheWarmed(): boolean {
+  return cacheWarmingComplete;
+}

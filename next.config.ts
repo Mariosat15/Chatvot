@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Enable instrumentation for cache pre-warming on server startup
+  experimental: {
+    instrumentationHook: true,
+  },
 };
 
 export default nextConfig;
