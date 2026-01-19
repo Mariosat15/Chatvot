@@ -1214,11 +1214,10 @@ const TRADING_TEST_SCENARIOS: TradingTestScenario[] = [
       usedMargin: 1100, // Margin for 1 lot at 1:100
     },
     expected: {
-      // Liquidation when equity = 50% of margin = $550
-      // Need loss of $9450 (10000 - 550)
-      // For 1 lot, that's 9450 pips = 0.0945 price move
-      // Long liquidates at entry - move = 1.10000 - 0.0945 = 1.0055
-      liquidationPrice: 1.0055,
+      // Formula: priceMove = marginUsed / (quantity × contractSize)
+      // priceMove = 1100 / (1.0 × 100000) = 0.011
+      // liquidationPrice = entryPrice - priceMove = 1.10000 - 0.011 = 1.089
+      liquidationPrice: 1.089,
     },
   },
   
@@ -1234,13 +1233,13 @@ const TRADING_TEST_SCENARIOS: TradingTestScenario[] = [
       quantity: 1.0,
       leverage: 100,
       entryPrice: 1.10000,
-      currentPrice: 1.00550, // Price moved against by 945 pips
+      currentPrice: 1.00500, // Price moved against by 950 pips (below 50% margin)
       startingCapital: 10000,
     },
     expected: {
       shouldLiquidate: true,
-      pnl: -9450, // Loss of $9450
-      marginLevel: 50, // At liquidation threshold
+      pnl: -9500, // Loss of $9500 (950 pips × $10/pip)
+      marginLevel: 45, // Below 50% threshold = LIQUIDATE
     },
   },
   {
@@ -2293,10 +2292,16 @@ export async function POST(request: Request) {
         console.log(`      Result: ${isMarginCall ? '⚠️ YES - MARGIN CALL' : '✅ NO'}`);
         
         // Calculate liquidation price if we have the params
+        // Function signature: calculateLiquidationPrice(side, entryPrice, quantity, marginUsed, leverage, symbol)
         let liquidationPrice: number | undefined;
-        if (params.usedMargin && params.startingCapital) {
+        if (params.usedMargin) {
           liquidationPrice = productionCalculateLiquidationPrice(
-            params.side, params.entryPrice, params.startingCapital, params.usedMargin, params.quantity, params.symbol as ForexSymbol
+            params.side,
+            params.entryPrice,
+            params.quantity,
+            params.usedMargin,
+            params.leverage,
+            params.symbol as ForexSymbol
           );
           console.log(`\n   Liquidation Price: ${liquidationPrice?.toFixed(5)}`);
         }
