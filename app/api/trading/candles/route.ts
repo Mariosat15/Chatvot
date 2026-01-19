@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import Candle1m from '@/database/models/candle-1m.model';
-import { getRecentCandles, fetchCandlesForRange, Timeframe } from '@/lib/services/forex-historical.service';
+import { getRecentCandles, fetchCandlesForRange, fetchHistoricalCandles, Timeframe } from '@/lib/services/forex-historical.service';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { 
   getFormingCandle, 
@@ -664,18 +664,25 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           
           const massiveTf = massiveTimeframeMap[normalizedTf];
           if (massiveTf) {
-            const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
+            // Calculate date range for historical fetch (go back from cutoff)
+            const toDate = new Date(cutoffTimestamp * 1000);
+            const fromDate = new Date(toDate);
             
-            // Filter to only candles before the cutoff
-            const apiFiltered = apiCandles
-              .filter(c => c.time < cutoffTimestamp)
-              .map(c => ({
-                time: c.time, // Already in seconds
-                open: c.open,
-                high: c.high,
-                low: c.low,
-                close: c.close,
-              }));
+            // Calculate how far back based on timeframe and limit
+            const tfMinutes: Record<string, number> = { '5': 5, '15': 15, '30': 30, '60': 60, '240': 240, 'D': 1440, 'W': 10080, 'M': 43200 };
+            const minutes = tfMinutes[massiveTf] || 60;
+            fromDate.setMinutes(fromDate.getMinutes() - (limit * minutes));
+            
+            // Fetch historical candles for this specific date range
+            const apiCandles = await fetchHistoricalCandles(symbol as ForexSymbol, massiveTf, fromDate, toDate);
+            
+            const apiFiltered = apiCandles.map(c => ({
+              time: c.time, // Already in seconds from fetchHistoricalCandles
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+            }));
             
             // Merge with any historical candles we got from DB (dedupe by timestamp)
             const candleMap = new Map<number, typeof historicalCandles[0]>();
