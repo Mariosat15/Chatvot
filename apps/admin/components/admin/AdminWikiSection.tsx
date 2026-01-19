@@ -502,6 +502,273 @@ export default function AdminWikiSection() {
       )
     },
 
+    // ==================== SECURITY & PROTECTION ====================
+    {
+      id: 'security-protection',
+      title: 'Security & Rate Limiting',
+      icon: Shield,
+      category: 'Security',
+      tags: ['security', 'ddos', 'rate-limit', 'protection', 'nginx', 'redis', 'bot'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-green-400 mb-3">Security & DDoS Protection</h2>
+            <p className="text-gray-300 mb-4">
+              Your platform has multiple layers of protection against abuse, DDoS attacks, and malicious users.
+              Here&apos;s what&apos;s configured and actively protecting your platform.
+            </p>
+          </div>
+
+          <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
+            <h3 className="text-lg font-bold text-green-400 mb-4 flex items-center gap-2">
+              <CheckCircle className="h-5 w-5" />
+              Protection Status: ACTIVE
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-green-500/20 rounded-lg p-3 text-center">
+                <Server className="h-6 w-6 text-green-400 mx-auto mb-1" />
+                <span className="text-sm font-semibold text-green-300">Nginx</span>
+                <p className="text-xs text-gray-400">Rate Limiting</p>
+              </div>
+              <div className="bg-green-500/20 rounded-lg p-3 text-center">
+                <Code className="h-6 w-6 text-green-400 mx-auto mb-1" />
+                <span className="text-sm font-semibold text-green-300">Application</span>
+                <p className="text-xs text-gray-400">Route Limiting</p>
+              </div>
+              <div className="bg-green-500/20 rounded-lg p-3 text-center">
+                <HardDrive className="h-6 w-6 text-green-400 mx-auto mb-1" />
+                <span className="text-sm font-semibold text-green-300">Redis</span>
+                <p className="text-xs text-gray-400">Distributed</p>
+              </div>
+              <div className="bg-green-500/20 rounded-lg p-3 text-center">
+                <Shield className="h-6 w-6 text-green-400 mx-auto mb-1" />
+                <span className="text-sm font-semibold text-green-300">Registration</span>
+                <p className="text-xs text-gray-400">Bot Protection</p>
+              </div>
+            </div>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-blue-400 flex items-center gap-2">
+                <Server className="h-5 w-5" />
+                Layer 1: Nginx Rate Limiting
+              </CardTitle>
+              <CardDescription>First line of defense - blocks requests before they reach your app</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="bg-gray-900 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-700">
+                    <tr>
+                      <th className="text-left p-2 text-gray-300">Zone</th>
+                      <th className="text-left p-2 text-gray-300">Limit</th>
+                      <th className="text-left p-2 text-gray-300">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-300">
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2 font-mono">admin_limit</td>
+                      <td className="p-2">1 req/sec</td>
+                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
+                    </tr>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2 font-mono">api_limit</td>
+                      <td className="p-2">10 req/sec</td>
+                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
+                    </tr>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2 font-mono">login/auth routes</td>
+                      <td className="p-2">limit_req enabled</td>
+                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-400">
+                Config location: <code className="bg-gray-700 px-1 rounded">nginx/chartvolt.conf</code>
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400 flex items-center gap-2">
+                <Code className="h-5 w-5" />
+                Layer 2: Application Rate Limiting
+              </CardTitle>
+              <CardDescription>Intelligent per-route limits using rate-limiter.ts</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="bg-gray-900 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-700">
+                    <tr>
+                      <th className="text-left p-2 text-gray-300">Action</th>
+                      <th className="text-left p-2 text-gray-300">Limit</th>
+                      <th className="text-left p-2 text-gray-300">Scope</th>
+                      <th className="text-left p-2 text-gray-300">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-300">
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">Login Attempts</td>
+                      <td className="p-2 font-mono">5/min</td>
+                      <td className="p-2">per IP</td>
+                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
+                    </tr>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">Deposits</td>
+                      <td className="p-2 font-mono">5/min</td>
+                      <td className="p-2">per User</td>
+                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
+                    </tr>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">Withdrawals</td>
+                      <td className="p-2 font-mono">3/min</td>
+                      <td className="p-2">per User</td>
+                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
+                    </tr>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">API General</td>
+                      <td className="p-2 font-mono">60/min</td>
+                      <td className="p-2">per User</td>
+                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-400">
+                Config location: <code className="bg-gray-700 px-1 rounded">lib/utils/rate-limiter.ts</code>
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400 flex items-center gap-2">
+                <HardDrive className="h-5 w-5" />
+                Layer 3: Redis Distributed Rate Limiting
+              </CardTitle>
+              <CardDescription>Scales across multiple server instances</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm">
+                Redis-backed rate limiting is available for horizontal scaling scenarios. When you run multiple
+                Next.js instances, this ensures rate limits are shared across all servers.
+              </p>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-green-500/20 text-green-400">✅ Available</Badge>
+                <span className="text-sm text-gray-400">Ready when you need to scale</span>
+              </div>
+              <p className="text-xs text-gray-400">
+                Config location: <code className="bg-gray-700 px-1 rounded">lib/services/redis.service.ts</code>
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400 flex items-center gap-2">
+                <Ban className="h-5 w-5" />
+                Layer 4: Registration Security
+              </CardTitle>
+              <CardDescription>Advanced bot and fraud protection for new accounts</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-900 p-3 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-sm font-semibold text-white">Bot Protection</span>
+                  </div>
+                  <p className="text-xs text-gray-400">Detects automated signups</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-sm font-semibold text-white">Brute Force Detection</span>
+                  </div>
+                  <p className="text-xs text-gray-400">Tracks rapid attempts</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-sm font-semibold text-white">Account Lockouts</span>
+                  </div>
+                  <p className="text-xs text-gray-400">Temp blocks on failures</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-sm font-semibold text-white">Failed Login Tracking</span>
+                  </div>
+                  <p className="text-xs text-gray-400">Logged in Fraud system</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">
+                Config location: <code className="bg-gray-700 px-1 rounded">lib/services/registration-security.service.ts</code>
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Lightbulb className="h-5 w-5 text-yellow-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-yellow-400 mb-2">Optional: Cloudflare (External Layer)</h4>
+                <p className="text-sm text-gray-300 mb-2">
+                  For enterprise-level DDoS protection, you can add Cloudflare as an external layer:
+                </p>
+                <ul className="text-sm text-gray-300 space-y-1">
+                  <li>• Absorbs network-layer DDoS attacks (millions of requests)</li>
+                  <li>• Global CDN caching for static assets</li>
+                  <li>• Free SSL certificates</li>
+                  <li>• No code changes required - just DNS change</li>
+                  <li>• Free tier available for small sites</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-blue-400 mb-2">What This Protects Against</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>Login credential stuffing</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>API abuse/spam</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>Bot registrations</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>Withdrawal abuse</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>Application-layer DDoS</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>Brute force attacks</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    },
+
     // ==================== MARKET DATA ====================
     {
       id: 'market-data-overview',
@@ -2173,273 +2440,6 @@ export default function AdminWikiSection() {
               </ul>
             </CardContent>
           </Card>
-        </div>
-      )
-    },
-
-    // ==================== SECURITY & PROTECTION ====================
-    {
-      id: 'security-protection',
-      title: 'Security & Rate Limiting',
-      icon: Shield,
-      category: 'System',
-      tags: ['security', 'ddos', 'rate-limit', 'protection', 'nginx', 'redis', 'bot'],
-      content: (
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold text-green-400 mb-3">Security & DDoS Protection</h2>
-            <p className="text-gray-300 mb-4">
-              Your platform has multiple layers of protection against abuse, DDoS attacks, and malicious users.
-              Here's what's configured and actively protecting your platform.
-            </p>
-          </div>
-
-          <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
-            <h3 className="text-lg font-bold text-green-400 mb-4 flex items-center gap-2">
-              <CheckCircle className="h-5 w-5" />
-              Protection Status: ACTIVE
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-green-500/20 rounded-lg p-3 text-center">
-                <Server className="h-6 w-6 text-green-400 mx-auto mb-1" />
-                <span className="text-sm font-semibold text-green-300">Nginx</span>
-                <p className="text-xs text-gray-400">Rate Limiting</p>
-              </div>
-              <div className="bg-green-500/20 rounded-lg p-3 text-center">
-                <Code className="h-6 w-6 text-green-400 mx-auto mb-1" />
-                <span className="text-sm font-semibold text-green-300">Application</span>
-                <p className="text-xs text-gray-400">Route Limiting</p>
-              </div>
-              <div className="bg-green-500/20 rounded-lg p-3 text-center">
-                <HardDrive className="h-6 w-6 text-green-400 mx-auto mb-1" />
-                <span className="text-sm font-semibold text-green-300">Redis</span>
-                <p className="text-xs text-gray-400">Distributed</p>
-              </div>
-              <div className="bg-green-500/20 rounded-lg p-3 text-center">
-                <Shield className="h-6 w-6 text-green-400 mx-auto mb-1" />
-                <span className="text-sm font-semibold text-green-300">Registration</span>
-                <p className="text-xs text-gray-400">Bot Protection</p>
-              </div>
-            </div>
-          </div>
-
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-lg text-blue-400 flex items-center gap-2">
-                <Server className="h-5 w-5" />
-                Layer 1: Nginx Rate Limiting
-              </CardTitle>
-              <CardDescription>First line of defense - blocks requests before they reach your app</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="bg-gray-900 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-700">
-                    <tr>
-                      <th className="text-left p-2 text-gray-300">Zone</th>
-                      <th className="text-left p-2 text-gray-300">Limit</th>
-                      <th className="text-left p-2 text-gray-300">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-gray-300">
-                    <tr className="border-t border-gray-700">
-                      <td className="p-2 font-mono">admin_limit</td>
-                      <td className="p-2">1 req/sec</td>
-                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
-                    </tr>
-                    <tr className="border-t border-gray-700">
-                      <td className="p-2 font-mono">api_limit</td>
-                      <td className="p-2">10 req/sec</td>
-                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
-                    </tr>
-                    <tr className="border-t border-gray-700">
-                      <td className="p-2 font-mono">login/auth routes</td>
-                      <td className="p-2">limit_req enabled</td>
-                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-gray-400">
-                Config location: <code className="bg-gray-700 px-1 rounded">nginx/chartvolt.conf</code>
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-lg text-yellow-400 flex items-center gap-2">
-                <Code className="h-5 w-5" />
-                Layer 2: Application Rate Limiting
-              </CardTitle>
-              <CardDescription>Intelligent per-route limits using rate-limiter.ts</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="bg-gray-900 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-700">
-                    <tr>
-                      <th className="text-left p-2 text-gray-300">Action</th>
-                      <th className="text-left p-2 text-gray-300">Limit</th>
-                      <th className="text-left p-2 text-gray-300">Scope</th>
-                      <th className="text-left p-2 text-gray-300">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-gray-300">
-                    <tr className="border-t border-gray-700">
-                      <td className="p-2">Login Attempts</td>
-                      <td className="p-2 font-mono">5/min</td>
-                      <td className="p-2">per IP</td>
-                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
-                    </tr>
-                    <tr className="border-t border-gray-700">
-                      <td className="p-2">Deposits</td>
-                      <td className="p-2 font-mono">5/min</td>
-                      <td className="p-2">per User</td>
-                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
-                    </tr>
-                    <tr className="border-t border-gray-700">
-                      <td className="p-2">Withdrawals</td>
-                      <td className="p-2 font-mono">3/min</td>
-                      <td className="p-2">per User</td>
-                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
-                    </tr>
-                    <tr className="border-t border-gray-700">
-                      <td className="p-2">API General</td>
-                      <td className="p-2 font-mono">60/min</td>
-                      <td className="p-2">per User</td>
-                      <td className="p-2"><Badge className="bg-green-500/20 text-green-400">✅ Active</Badge></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-gray-400">
-                Config location: <code className="bg-gray-700 px-1 rounded">lib/utils/rate-limiter.ts</code>
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-lg text-cyan-400 flex items-center gap-2">
-                <HardDrive className="h-5 w-5" />
-                Layer 3: Redis Distributed Rate Limiting
-              </CardTitle>
-              <CardDescription>Scales across multiple server instances</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-gray-300">
-              <p className="text-sm">
-                Redis-backed rate limiting is available for horizontal scaling scenarios. When you run multiple
-                Next.js instances, this ensures rate limits are shared across all servers.
-              </p>
-              <div className="flex items-center gap-2">
-                <Badge className="bg-green-500/20 text-green-400">✅ Available</Badge>
-                <span className="text-sm text-gray-400">Ready when you need to scale</span>
-              </div>
-              <p className="text-xs text-gray-400">
-                Config location: <code className="bg-gray-700 px-1 rounded">lib/services/redis.service.ts</code>
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-lg text-red-400 flex items-center gap-2">
-                <Ban className="h-5 w-5" />
-                Layer 4: Registration Security
-              </CardTitle>
-              <CardDescription>Advanced bot and fraud protection for new accounts</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-900 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-semibold text-white">Bot Protection</span>
-                  </div>
-                  <p className="text-xs text-gray-400">Detects automated signups</p>
-                </div>
-                <div className="bg-gray-900 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-semibold text-white">Brute Force Detection</span>
-                  </div>
-                  <p className="text-xs text-gray-400">Tracks rapid attempts</p>
-                </div>
-                <div className="bg-gray-900 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-semibold text-white">Account Lockouts</span>
-                  </div>
-                  <p className="text-xs text-gray-400">Temp blocks on failures</p>
-                </div>
-                <div className="bg-gray-900 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-semibold text-white">Failed Login Tracking</span>
-                  </div>
-                  <p className="text-xs text-gray-400">Logged in Fraud system</p>
-                </div>
-              </div>
-              <p className="text-xs text-gray-400">
-                Config location: <code className="bg-gray-700 px-1 rounded">lib/services/registration-security.service.ts</code>
-              </p>
-            </CardContent>
-          </Card>
-
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <Lightbulb className="h-5 w-5 text-yellow-500 mt-0.5" />
-              <div>
-                <h4 className="font-semibold text-yellow-400 mb-2">Optional: Cloudflare (External Layer)</h4>
-                <p className="text-sm text-gray-300 mb-2">
-                  For enterprise-level DDoS protection, you can add Cloudflare as an external layer:
-                </p>
-                <ul className="text-sm text-gray-300 space-y-1">
-                  <li>• Absorbs network-layer DDoS attacks (millions of requests)</li>
-                  <li>• Global CDN caching for static assets</li>
-                  <li>• Free SSL certificates</li>
-                  <li>• No code changes required - just DNS change</li>
-                  <li>• Free tier available for small sites</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-blue-500 mt-0.5" />
-              <div>
-                <h4 className="font-semibold text-blue-400 mb-2">What This Protects Against</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Login credential stuffing</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>API abuse/spam</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Bot registrations</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Withdrawal abuse</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Application-layer DDoS</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Brute force attacks</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )
     },

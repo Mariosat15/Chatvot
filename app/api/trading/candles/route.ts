@@ -398,144 +398,94 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         }
       }
       
-      // If MongoDB has enough candles, add forming candle and return
-      if (candles && candles.length >= 50) {
-        // Auto-fill gaps in background (if enabled)
-        if (!before) {
-          autoFillGaps(symbol, candles);
-        }
+      // Get current forming candle from WebSocket streamer (SERVER AUTHORITATIVE!)
+      // Only add forming candle for initial load, not for lazy loading
+      const formingCandle = before ? null : getFormingCandle(symbol);
+      
+      // Create response candles, potentially adding/updating forming candle
+      const responseCandles = [...(candles || [])];
+      
+      if (formingCandle) {
+        const lastCandle = responseCandles[responseCandles.length - 1];
         
-        // Get current forming candle from WebSocket streamer (SERVER AUTHORITATIVE!)
-        // Only add forming candle for initial load, not for lazy loading
-        const formingCandle = before ? null : getFormingCandle(symbol);
-        
-        // Create response candles, potentially adding/updating forming candle
-        const responseCandles = [...candles];
-        
-        if (formingCandle) {
-          const lastCandle = responseCandles[responseCandles.length - 1];
-          
-          if (lastCandle && lastCandle.time === formingCandle.time) {
-            // Same minute - UPDATE with server's authoritative values
-            responseCandles[responseCandles.length - 1] = {
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            };
-          } else if (!lastCandle || formingCandle.time > lastCandle.time) {
-            // New minute - APPEND forming candle
-            responseCandles.push({
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            });
-          }
-        }
-        
-        // For lazy loading, indicate if there's more data
-        // Check both candles_1m and candles_historical_1m for more data
-        let hasMore = before ? candles.length === limit : undefined;
-        if (before && candles.length < limit && settings.useLocalHistory) {
-          // Check if there's more in historical
-          const historicalModel = getHistoricalModel('1m');
-          if (historicalModel) {
-            const oldestCandle = candles[0];
-            if (oldestCandle) {
-              const olderExists = await historicalModel.findOne({
-                symbol,
-                timestamp: { $lt: new Date(oldestCandle.time * 1000) }
-              }).lean();
-              hasMore = !!olderExists;
-            }
-          }
-        }
-        const oldestTimestamp = candles.length > 0 ? candles[0].time : undefined;
-        
-        return NextResponse.json({ 
-          candles: responseCandles,
-          formingCandle: formingCandle ? {
+        if (lastCandle && lastCandle.time === formingCandle.time) {
+          // Same minute - UPDATE with server's authoritative values
+          responseCandles[responseCandles.length - 1] = {
             time: formingCandle.time,
             open: formingCandle.open,
             high: formingCandle.high,
             low: formingCandle.low,
             close: formingCandle.close,
-            tickCount: formingCandle.tickCount,
-          } : null,
-          source: 'mongodb',
-          lastUpdate: Date.now(),
-          hasMore,
-          oldestTimestamp,
-        });
-      }
-      
-      // MongoDB empty or too few candles - SEED historical data first
-      console.log(`⚠️ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, seeding historical data...`);
-      
-      // Seed historical candles (fetches from Massive.com and saves to MongoDB)
-      await seedHistoricalCandles(symbol, Math.max(limit, 5000));
-      
-      // Now fetch from MongoDB again (should have data now)
-      candles = await Candle1m.getCandles(symbol, limit, before);
-      
-      if (candles && candles.length > 0) {
-        // Apply history limit
-        if (historyLimitDate) {
-          const limitTimestamp = Math.floor(historyLimitDate.getTime() / 1000);
-          candles = candles.filter(c => c.time >= limitTimestamp);
-        }
-        
-        // Also add forming candle after seeding
-        const formingCandle = before ? null : getFormingCandle(symbol);
-        const responseCandles = [...candles];
-        
-        if (formingCandle) {
-          const lastCandle = responseCandles[responseCandles.length - 1];
-          if (lastCandle && lastCandle.time === formingCandle.time) {
-            responseCandles[responseCandles.length - 1] = {
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            };
-          } else if (!lastCandle || formingCandle.time > lastCandle.time) {
-            responseCandles.push({
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            });
-          }
-        }
-        
-        console.log(`✅ [Candles API] After seeding: Returning ${responseCandles.length} candles for ${symbol}`);
-        return NextResponse.json({ 
-          candles: responseCandles,
-          formingCandle: formingCandle ? {
+          };
+        } else if (!lastCandle || formingCandle.time > lastCandle.time) {
+          // New minute - APPEND forming candle
+          responseCandles.push({
             time: formingCandle.time,
             open: formingCandle.open,
             high: formingCandle.high,
             low: formingCandle.low,
             close: formingCandle.close,
-            tickCount: formingCandle.tickCount,
-          } : null,
-          source: 'mongodb_seeded',
-          lastUpdate: Date.now(),
+          });
+        }
+      }
+      
+      // Check if we need to seed more data (< 50 candles)
+      const needsSeeding = !candles || candles.length < 50;
+      const isCurrentlySeeding = seedingInProgress.has(symbol);
+      
+      if (needsSeeding && !isCurrentlySeeding && !before) {
+        // BACKGROUND SEEDING: Don't block - seed in background and return immediately
+        console.log(`⚡ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, starting BACKGROUND seeding...`);
+        
+        // Fire and forget - don't await!
+        seedHistoricalCandles(symbol, Math.max(limit, 5000)).then(() => {
+          console.log(`✅ [Candles API] Background seeding completed for ${symbol}`);
+        }).catch((err) => {
+          console.error(`❌ [Candles API] Background seeding failed for ${symbol}:`, err);
         });
       }
       
-      // Still no candles - return empty with error message
-      console.error(`❌ [Candles API] Failed to get candles for ${symbol} after seeding`);
+      // If MongoDB has enough candles, also run gap fill in background
+      if (candles && candles.length >= 50 && !before) {
+        autoFillGaps(symbol, candles);
+      }
+      
+      // For lazy loading, indicate if there's more data
+      // Check both candles_1m and candles_historical_1m for more data
+      let hasMore = before ? (candles?.length || 0) === limit : undefined;
+      if (before && candles && candles.length < limit && settings.useLocalHistory) {
+        // Check if there's more in historical
+        const historicalModel = getHistoricalModel('1m');
+        if (historicalModel) {
+          const oldestCandle = candles[0];
+          if (oldestCandle) {
+            const olderExists = await historicalModel.findOne({
+              symbol,
+              timestamp: { $lt: new Date(oldestCandle.time * 1000) }
+            }).lean();
+            hasMore = !!olderExists;
+          }
+        }
+      }
+      const oldestTimestamp = candles && candles.length > 0 ? candles[0].time : undefined;
+      
+      // Return immediately with whatever we have
       return NextResponse.json({ 
-        candles: [],
-        source: 'error',
-        error: 'Failed to fetch historical candles',
+        candles: responseCandles,
+        formingCandle: formingCandle ? {
+          time: formingCandle.time,
+          open: formingCandle.open,
+          high: formingCandle.high,
+          low: formingCandle.low,
+          close: formingCandle.close,
+          tickCount: formingCandle.tickCount,
+        } : null,
+        source: needsSeeding ? (isCurrentlySeeding ? 'seeding_in_progress' : 'seeding_started') : 'mongodb',
         lastUpdate: Date.now(),
+        hasMore,
+        oldestTimestamp,
+        // Tell client if more data is being loaded in background
+        backgroundSeeding: needsSeeding,
       });
       
     } catch (dbError) {

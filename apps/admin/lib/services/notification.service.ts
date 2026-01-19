@@ -533,7 +533,11 @@ class NotificationService {
     return this.send({
       userId,
       templateId: 'stop_loss_triggered',
-      variables: { symbol, price: price.toFixed(5), pnl: pnl.toFixed(2) },
+      variables: { 
+        symbol, 
+        price: price.toFixed(5), 
+        loss: `-€${Math.abs(pnl).toFixed(2)}`,  // Template uses {{loss}}
+      },
     });
   }
 
@@ -542,7 +546,11 @@ class NotificationService {
     return this.send({
       userId,
       templateId: 'take_profit_triggered',
-      variables: { symbol, price: price.toFixed(5), pnl: `+${pnl.toFixed(2)}` },
+      variables: { 
+        symbol, 
+        price: price.toFixed(5), 
+        profit: `+€${Math.abs(pnl).toFixed(2)}`,  // Template uses {{profit}}
+      },
     });
   }
 

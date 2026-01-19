@@ -385,6 +385,7 @@ class NotificationService {
 
   /**
    * Send stop loss triggered notification
+   * Template expects: {{symbol}}, {{price}}, {{loss}}
    */
   async notifyStopLossTriggered(userId: string, symbol: string, exitPrice: number, realizedPnl: number): Promise<any> {
     return this.send({
@@ -392,14 +393,15 @@ class NotificationService {
       templateId: 'stop_loss_triggered',
       variables: {
         symbol,
-        exitPrice: exitPrice.toFixed(5),
-        pnl: realizedPnl >= 0 ? `+€${realizedPnl.toFixed(2)}` : `-€${Math.abs(realizedPnl).toFixed(2)}`,
+        price: exitPrice.toFixed(5),  // Template uses {{price}}
+        loss: `-€${Math.abs(realizedPnl).toFixed(2)}`,  // Template uses {{loss}}
       },
     });
   }
 
   /**
    * Send take profit triggered notification
+   * Template expects: {{symbol}}, {{price}}, {{profit}}
    */
   async notifyTakeProfitTriggered(userId: string, symbol: string, exitPrice: number, realizedPnl: number): Promise<any> {
     return this.send({
@@ -407,8 +409,8 @@ class NotificationService {
       templateId: 'take_profit_triggered',
       variables: {
         symbol,
-        exitPrice: exitPrice.toFixed(5),
-        pnl: realizedPnl >= 0 ? `+€${realizedPnl.toFixed(2)}` : `-€${Math.abs(realizedPnl).toFixed(2)}`,
+        price: exitPrice.toFixed(5),  // Template uses {{price}}
+        profit: `+€${Math.abs(realizedPnl).toFixed(2)}`,  // Template uses {{profit}}
       },
     });
   }
@@ -509,6 +511,7 @@ class NotificationService {
 
   /**
    * Send order filled notification
+   * Template expects: {{symbol}}, {{orderType}}, {{price}}, {{size}}
    */
   async notifyOrderFilled(userId: string, symbol: string, side: string, quantity: number, price: number): Promise<any> {
     return this.send({
@@ -516,15 +519,16 @@ class NotificationService {
       templateId: 'order_filled',
       variables: { 
         symbol, 
-        side: side.toUpperCase(),
-        quantity: quantity.toString(),
+        orderType: side.toUpperCase(),  // Template uses {{orderType}}
         price: price.toFixed(5),
+        size: quantity.toString(),  // Template uses {{size}}
       },
     });
   }
 
   /**
    * Send position closed notification
+   * Template expects: {{symbol}}, {{pnl}}, {{pnlPercent}}
    */
   async notifyPositionClosed(userId: string, symbol: string, realizedPnl: number, pnlPercentage: number): Promise<any> {
     return this.send({
@@ -533,7 +537,7 @@ class NotificationService {
       variables: { 
         symbol, 
         pnl: realizedPnl >= 0 ? `+€${realizedPnl.toFixed(2)}` : `-€${Math.abs(realizedPnl).toFixed(2)}`,
-        pnlPercentage: `${pnlPercentage >= 0 ? '+' : ''}${pnlPercentage.toFixed(2)}%`,
+        pnlPercent: `${pnlPercentage >= 0 ? '+' : ''}${pnlPercentage.toFixed(2)}`,  // Template uses {{pnlPercent}}
       },
     });
   }
