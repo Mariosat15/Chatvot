@@ -84,9 +84,14 @@ const TEST_CASES: TestCase[] = [
       // Check if concurrent mode is enabled
       const concurrentMode = ctx.config.concurrentMode || false;
       const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
+      
+      // Log the mode for debugging
+      console.log(`🔧 [SIMULATOR] Config concurrentMode: ${ctx.config.concurrentMode}, resolved: ${concurrentMode}`);
+      console.log(`🔧 [SIMULATOR] Config concurrentBatchSize: ${ctx.config.concurrentBatchSize}, resolved: ${concurrentBatchSize}`);
 
       if (concurrentMode) {
         // ⚡ CONCURRENT MODE: Fire all requests in parallel batches
+        console.log(`🚀 [SIMULATOR] CONCURRENT MODE ACTIVATED! Batch size: ${concurrentBatchSize}`);
         ctx.log('info', `🚀 CONCURRENT MODE: Running ${concurrentBatchSize} parallel requests`);
         
         const allUserBatches: { email: string; password: string; name: string }[][] = [];
@@ -668,9 +673,12 @@ const TEST_CASES: TestCase[] = [
       // Check if concurrent mode is enabled
       const concurrentMode = ctx.config.concurrentMode || false;
       const concurrentBatchSize = ctx.config.concurrentBatchSize || 50;
+      
+      console.log(`🔧 [SIMULATOR TRADING] Config concurrentMode: ${ctx.config.concurrentMode}, resolved: ${concurrentMode}`);
 
       if (concurrentMode) {
         // ⚡ CONCURRENT MODE: Prepare all trades then fire in parallel batches
+        console.log(`🚀 [SIMULATOR TRADING] CONCURRENT MODE ACTIVATED! Batch size: ${concurrentBatchSize}`);
         ctx.log('info', `🚀 CONCURRENT MODE: Executing trades with ${concurrentBatchSize} parallel requests`);
         
         // Prepare all trade requests

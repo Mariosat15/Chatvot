@@ -37,13 +37,23 @@ export async function GET() {
         memoryStressLevel: 5,
         useAIPatterns: true,
         useAIAnalysis: true,
+        concurrentMode: false,
+        concurrentBatchSize: 50,
         isActive: true,
       });
     }
 
+    // Ensure defaults for new fields on existing configs
+    const configObj = config.toObject();
+    const configWithDefaults = {
+      ...configObj,
+      concurrentMode: configObj.concurrentMode ?? false,
+      concurrentBatchSize: configObj.concurrentBatchSize ?? 50,
+    };
+
     return NextResponse.json({
       success: true,
-      config,
+      config: configWithDefaults,
     });
   } catch (error) {
     console.error('Error fetching simulator config:', error);
