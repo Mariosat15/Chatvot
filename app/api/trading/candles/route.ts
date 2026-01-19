@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import Candle1m from '@/database/models/candle-1m.model';
-import { getRecentCandles, fetchCandlesForRange, fetchHistoricalCandles, Timeframe } from '@/lib/services/forex-historical.service';
+import { getRecentCandles, fetchCandlesForRange, Timeframe } from '@/lib/services/forex-historical.service';
 import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 import { 
   getFormingCandle, 
@@ -29,8 +29,8 @@ const lastGapFillCheck = new Map<string, number>();
 const GAP_FILL_CHECK_INTERVAL = 60000; // Check for gaps every 60 seconds per symbol
 
 // Default settings (fallback if DB settings not available)
-const DEFAULT_INITIAL_CANDLE_COUNT = 100;
-const DEFAULT_LAZY_LOAD_BATCH_SIZE = 100;
+const DEFAULT_INITIAL_CANDLE_COUNT = 500;
+const DEFAULT_LAZY_LOAD_BATCH_SIZE = 500;
 
 // MarketDataSettings schema (must match admin app)
 const MarketDataSettingsSchema = new mongoose.Schema({
@@ -39,8 +39,8 @@ const MarketDataSettingsSchema = new mongoose.Schema({
   autoFetchHistory: { type: Boolean, default: false },
   chartHistoryLimitEnabled: { type: Boolean, default: false },
   chartHistoryLimitDays: { type: Number, default: 365 },
-  initialCandleCount: { type: Number, default: 100 },
-  lazyLoadBatchSize: { type: Number, default: 100 },
+  initialCandleCount: { type: Number, default: 500 },
+  lazyLoadBatchSize: { type: Number, default: 500 },
   historicalYearsToDownload: { type: Number, default: 10 },
 }, { timestamps: true });
 
@@ -77,8 +77,9 @@ async function getMarketDataSettings(): Promise<{
       };
     }
     
-    // Apply defaults for missing values
-    const result = {
+    console.log(`📋 [Settings] Loaded: limit=${settings.chartHistoryLimitEnabled ? settings.chartHistoryLimitDays + 'd' : 'OFF'}, initial=${settings.initialCandleCount}, batch=${settings.lazyLoadBatchSize}`);
+    
+    return {
       useLocalHistory: settings.useLocalHistory ?? true,
       autoFetchHistory: settings.autoFetchHistory ?? false,
       chartHistoryLimitEnabled: settings.chartHistoryLimitEnabled ?? false,
@@ -86,10 +87,6 @@ async function getMarketDataSettings(): Promise<{
       initialCandleCount: settings.initialCandleCount ?? DEFAULT_INITIAL_CANDLE_COUNT,
       lazyLoadBatchSize: settings.lazyLoadBatchSize ?? DEFAULT_LAZY_LOAD_BATCH_SIZE,
     };
-    
-    console.log(`📋 [Settings] Loaded: limit=${result.chartHistoryLimitEnabled ? result.chartHistoryLimitDays + 'd' : 'OFF'}, initial=${result.initialCandleCount}, batch=${result.lazyLoadBatchSize}`);
-    
-    return result;
   } catch (error) {
     console.error('❌ [Settings] Error loading settings:', error);
     return {
@@ -401,144 +398,94 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         }
       }
       
-      // If MongoDB has enough candles, add forming candle and return
-      if (candles && candles.length >= 50) {
-        // Auto-fill gaps in background (if enabled)
-        if (!before) {
-          autoFillGaps(symbol, candles);
-        }
+      // Get current forming candle from WebSocket streamer (SERVER AUTHORITATIVE!)
+      // Only add forming candle for initial load, not for lazy loading
+      const formingCandle = before ? null : getFormingCandle(symbol);
+      
+      // Create response candles, potentially adding/updating forming candle
+      const responseCandles = [...(candles || [])];
+      
+      if (formingCandle) {
+        const lastCandle = responseCandles[responseCandles.length - 1];
         
-        // Get current forming candle from WebSocket streamer (SERVER AUTHORITATIVE!)
-        // Only add forming candle for initial load, not for lazy loading
-        const formingCandle = before ? null : getFormingCandle(symbol);
-        
-        // Create response candles, potentially adding/updating forming candle
-        const responseCandles = [...candles];
-        
-        if (formingCandle) {
-          const lastCandle = responseCandles[responseCandles.length - 1];
-          
-          if (lastCandle && lastCandle.time === formingCandle.time) {
-            // Same minute - UPDATE with server's authoritative values
-            responseCandles[responseCandles.length - 1] = {
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            };
-          } else if (!lastCandle || formingCandle.time > lastCandle.time) {
-            // New minute - APPEND forming candle
-            responseCandles.push({
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            });
-          }
-        }
-        
-        // For lazy loading, indicate if there's more data
-        // Check both candles_1m and candles_historical_1m for more data
-        let hasMore = before ? candles.length === limit : undefined;
-        if (before && candles.length < limit && settings.useLocalHistory) {
-          // Check if there's more in historical
-          const historicalModel = getHistoricalModel('1m');
-          if (historicalModel) {
-            const oldestCandle = candles[0];
-            if (oldestCandle) {
-              const olderExists = await historicalModel.findOne({
-                symbol,
-                timestamp: { $lt: new Date(oldestCandle.time * 1000) }
-              }).lean();
-              hasMore = !!olderExists;
-            }
-          }
-        }
-        const oldestTimestamp = candles.length > 0 ? candles[0].time : undefined;
-        
-        return NextResponse.json({ 
-          candles: responseCandles,
-          formingCandle: formingCandle ? {
+        if (lastCandle && lastCandle.time === formingCandle.time) {
+          // Same minute - UPDATE with server's authoritative values
+          responseCandles[responseCandles.length - 1] = {
             time: formingCandle.time,
             open: formingCandle.open,
             high: formingCandle.high,
             low: formingCandle.low,
             close: formingCandle.close,
-            tickCount: formingCandle.tickCount,
-          } : null,
-          source: 'mongodb',
-          lastUpdate: Date.now(),
-          hasMore,
-          oldestTimestamp,
-        });
-      }
-      
-      // MongoDB empty or too few candles - SEED historical data first
-      console.log(`⚠️ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, seeding historical data...`);
-      
-      // Seed historical candles (fetches from Massive.com and saves to MongoDB)
-      await seedHistoricalCandles(symbol, Math.max(limit, 5000));
-      
-      // Now fetch from MongoDB again (should have data now)
-      candles = await Candle1m.getCandles(symbol, limit, before);
-      
-      if (candles && candles.length > 0) {
-        // Apply history limit
-        if (historyLimitDate) {
-          const limitTimestamp = Math.floor(historyLimitDate.getTime() / 1000);
-          candles = candles.filter(c => c.time >= limitTimestamp);
-        }
-        
-        // Also add forming candle after seeding
-        const formingCandle = before ? null : getFormingCandle(symbol);
-        const responseCandles = [...candles];
-        
-        if (formingCandle) {
-          const lastCandle = responseCandles[responseCandles.length - 1];
-          if (lastCandle && lastCandle.time === formingCandle.time) {
-            responseCandles[responseCandles.length - 1] = {
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            };
-          } else if (!lastCandle || formingCandle.time > lastCandle.time) {
-            responseCandles.push({
-              time: formingCandle.time,
-              open: formingCandle.open,
-              high: formingCandle.high,
-              low: formingCandle.low,
-              close: formingCandle.close,
-            });
-          }
-        }
-        
-        console.log(`✅ [Candles API] After seeding: Returning ${responseCandles.length} candles for ${symbol}`);
-        return NextResponse.json({ 
-          candles: responseCandles,
-          formingCandle: formingCandle ? {
+          };
+        } else if (!lastCandle || formingCandle.time > lastCandle.time) {
+          // New minute - APPEND forming candle
+          responseCandles.push({
             time: formingCandle.time,
             open: formingCandle.open,
             high: formingCandle.high,
             low: formingCandle.low,
             close: formingCandle.close,
-            tickCount: formingCandle.tickCount,
-          } : null,
-          source: 'mongodb_seeded',
-          lastUpdate: Date.now(),
+          });
+        }
+      }
+      
+      // Check if we need to seed more data (< 50 candles)
+      const needsSeeding = !candles || candles.length < 50;
+      const isCurrentlySeeding = seedingInProgress.has(symbol);
+      
+      if (needsSeeding && !isCurrentlySeeding && !before) {
+        // BACKGROUND SEEDING: Don't block - seed in background and return immediately
+        console.log(`⚡ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, starting BACKGROUND seeding...`);
+        
+        // Fire and forget - don't await!
+        seedHistoricalCandles(symbol, Math.max(limit, 5000)).then(() => {
+          console.log(`✅ [Candles API] Background seeding completed for ${symbol}`);
+        }).catch((err) => {
+          console.error(`❌ [Candles API] Background seeding failed for ${symbol}:`, err);
         });
       }
       
-      // Still no candles - return empty with error message
-      console.error(`❌ [Candles API] Failed to get candles for ${symbol} after seeding`);
+      // If MongoDB has enough candles, also run gap fill in background
+      if (candles && candles.length >= 50 && !before) {
+        autoFillGaps(symbol, candles);
+      }
+      
+      // For lazy loading, indicate if there's more data
+      // Check both candles_1m and candles_historical_1m for more data
+      let hasMore = before ? (candles?.length || 0) === limit : undefined;
+      if (before && candles && candles.length < limit && settings.useLocalHistory) {
+        // Check if there's more in historical
+        const historicalModel = getHistoricalModel('1m');
+        if (historicalModel) {
+          const oldestCandle = candles[0];
+          if (oldestCandle) {
+            const olderExists = await historicalModel.findOne({
+              symbol,
+              timestamp: { $lt: new Date(oldestCandle.time * 1000) }
+            }).lean();
+            hasMore = !!olderExists;
+          }
+        }
+      }
+      const oldestTimestamp = candles && candles.length > 0 ? candles[0].time : undefined;
+      
+      // Return immediately with whatever we have
       return NextResponse.json({ 
-        candles: [],
-        source: 'error',
-        error: 'Failed to fetch historical candles',
+        candles: responseCandles,
+        formingCandle: formingCandle ? {
+          time: formingCandle.time,
+          open: formingCandle.open,
+          high: formingCandle.high,
+          low: formingCandle.low,
+          close: formingCandle.close,
+          tickCount: formingCandle.tickCount,
+        } : null,
+        source: needsSeeding ? (isCurrentlySeeding ? 'seeding_in_progress' : 'seeding_started') : 'mongodb',
         lastUpdate: Date.now(),
+        hasMore,
+        oldestTimestamp,
+        // Tell client if more data is being loaded in background
+        backgroundSeeding: needsSeeding,
       });
       
     } catch (dbError) {
@@ -653,9 +600,8 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           }
         }
         
-        // If local DB doesn't have enough, ALWAYS fallback to Massive.com API
-        // This ensures scrolling left always loads history even if historical DB is empty
-        if (historicalCandles.length < limit) {
+        // If local DB doesn't have enough, fetch from Massive.com API
+        if (historicalCandles.length < limit && !settings.useLocalHistory) {
           const massiveTimeframeMap: Record<string, Timeframe> = {
             '5m': '5', '15m': '15', '30m': '30',
             '1h': '60', '4h': '240', '1d': 'D',
@@ -664,35 +610,18 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           
           const massiveTf = massiveTimeframeMap[normalizedTf];
           if (massiveTf) {
-            // Calculate date range for historical fetch (go back from cutoff)
-            const toDate = new Date(cutoffTimestamp * 1000);
-            const fromDate = new Date(toDate);
+            const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
             
-            // Calculate how far back based on timeframe and limit
-            const tfMinutes: Record<string, number> = { '5': 5, '15': 15, '30': 30, '60': 60, '240': 240, 'D': 1440, 'W': 10080, 'M': 43200 };
-            const minutes = tfMinutes[massiveTf] || 60;
-            fromDate.setMinutes(fromDate.getMinutes() - (limit * minutes));
-            
-            // Fetch historical candles for this specific date range
-            const apiCandles = await fetchHistoricalCandles(symbol as ForexSymbol, massiveTf, fromDate, toDate);
-            
-            const apiFiltered = apiCandles.map(c => ({
-              time: c.time, // Already in seconds from fetchHistoricalCandles
-              open: c.open,
-              high: c.high,
-              low: c.low,
-              close: c.close,
-            }));
-            
-            // Merge with any historical candles we got from DB (dedupe by timestamp)
-            const candleMap = new Map<number, typeof historicalCandles[0]>();
-            for (const c of apiFiltered) {
-              candleMap.set(c.time, c);
-            }
-            for (const c of historicalCandles) {
-              candleMap.set(c.time, c); // DB candles override API
-            }
-            historicalCandles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
+            // Filter to only candles before the cutoff
+            historicalCandles = apiCandles
+              .filter(c => c.time < cutoffTimestamp)
+              .map(c => ({
+                time: c.time, // Already in seconds
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+              }));
           }
         }
       }
