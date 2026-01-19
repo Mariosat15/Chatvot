@@ -20,11 +20,17 @@ const TEST_SCENARIOS: Record<string, {
   type: 'competition' | 'challenge';
   endType: 'early' | 'normal' | 'journey'; // 'journey' = test early end (should NOT trigger) then finalize
   disqualifyOnLiquidation: boolean;
+  // Custom tiebreaker settings (optional - defaults to trades_count)
+  tieBreaker1?: 'trades_count' | 'win_rate' | 'total_capital' | 'roi' | 'join_time' | 'split_prize';
+  tieBreaker2?: 'trades_count' | 'win_rate' | 'total_capital' | 'roi' | 'join_time' | 'split_prize';
+  tiePrizeDistribution?: 'split_equally' | 'split_weighted' | 'first_gets_all';
   participants: Array<{
     role: 'participant' | 'challenger' | 'challenged';
     status: 'active' | 'liquidated' | 'disqualified';
     equity: number;
     totalTrades: number;
+    winRate?: number; // Optional: for win_rate tiebreaker tests
+    pnlPercentage?: number; // Optional: for ROI tiebreaker tests
   }>;
   expected: {
     shouldEndEarly: boolean;
@@ -684,6 +690,195 @@ const TEST_SCENARIOS: Record<string, {
     },
   },
 
+  // ============ TIEBREAKER TYPE TESTS ============
+  // Test each tiebreaker option from admin settings
+  
+  'C-T4': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    tieBreaker1: 'win_rate', // Higher win rate wins
+    participants: [
+      // Same PNL, different win rates
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 10, winRate: 70 }, // 70% win rate
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 10, winRate: 50 }, // 50% win rate
+    ],
+    // 2 × 100 = 200 pool, 20% fee = 40, net = 160
+    // P0 wins due to higher win rate (70% > 50%)
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedRanking: [0, 1], // P0 wins via win_rate tiebreaker
+      expectedPrizes: [160, 0], // Winner takes all
+    },
+  },
+  
+  'C-T5': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    tieBreaker1: 'total_capital', // Higher capital wins
+    participants: [
+      // Same PNL percentage, different final capital
+      { role: 'participant', status: 'active', equity: 6500, totalTrades: 5 }, // Higher capital
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 }, // Lower capital
+    ],
+    // Same PNL% but P0 has more capital
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedRanking: [0, 1], // P0 wins via capital tiebreaker
+      expectedPrizes: [160, 0],
+    },
+  },
+  
+  'C-T6': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    tieBreaker1: 'roi', // Higher ROI wins
+    participants: [
+      // Same final capital, different starting (so different ROI)
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5, pnlPercentage: 30 }, // 30% ROI
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5, pnlPercentage: 20 }, // 20% ROI
+    ],
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedRanking: [0, 1], // P0 wins via ROI tiebreaker
+      expectedPrizes: [160, 0],
+    },
+  },
+  
+  'C-T7': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    tieBreaker1: 'join_time', // Earlier joiner wins
+    participants: [
+      // Same everything, different join times (created in order, so P0 joins first)
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
+    ],
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedRanking: [0, 1], // P0 wins because joined first
+      expectedPrizes: [160, 0],
+    },
+  },
+  
+  'C-T8': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    tieBreaker1: 'split_prize', // No tiebreaker - split the prize
+    participants: [
+      // Same everything - should split equally
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
+    ],
+    // 2 × 100 = 200 pool, 20% fee = 40, net = 160
+    // Both tied, split_prize means split equally
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedRanking: [0, 1], // Both rank 1 (tied)
+      expectedPrizes: [80, 80], // Split equally
+      expectedWinners: 2,
+    },
+  },
+  
+  // ============ PRIZE DISTRIBUTION TYPE TESTS ============
+  
+  'C-T9': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    tieBreaker1: 'split_prize', // Use split_prize to force a tie
+    tiePrizeDistribution: 'first_gets_all', // But first joiner gets everything
+    participants: [
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5 },
+    ],
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedRanking: [0, 1], // P0 joined first, gets all
+      expectedPrizes: [160, 0], // First gets all
+      expectedWinners: 1,
+    },
+  },
+  
+  'C-T10': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    tieBreaker1: 'split_prize', // Force a tie
+    tiePrizeDistribution: 'split_weighted', // Split by capital
+    participants: [
+      { role: 'participant', status: 'active', equity: 7500, totalTrades: 5 }, // 75% of total capital
+      { role: 'participant', status: 'active', equity: 2500, totalTrades: 5 }, // 25% of total capital
+    ],
+    // 2 × 100 = 200 pool, 20% fee = 40, net = 160
+    // P0 capital: 7500, P1 capital: 2500, total: 10000
+    // P0 gets 75% of 160 = 120, P1 gets 25% of 160 = 40
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedRanking: [0, 1],
+      expectedPrizes: [120, 40], // Split weighted by capital
+      expectedWinners: 2,
+    },
+  },
+  
+  // ============ SECOND TIEBREAKER TESTS ============
+  
+  'C-T11': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    tieBreaker1: 'trades_count', // First: fewer trades
+    tieBreaker2: 'win_rate', // Second: higher win rate
+    participants: [
+      // Same PNL, same trades, different win rates
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5, winRate: 60 }, // 60% win rate
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 5, winRate: 80 }, // 80% win rate (wins!)
+    ],
+    // Both have same trades (5), so tiebreaker1 is tied
+    // tiebreaker2 (win_rate): P1 has 80% > P0's 60%, so P1 wins
+    expected: { 
+      shouldEndEarly: false, 
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedRanking: [1, 0], // P1 wins via second tiebreaker
+      expectedPrizes: [0, 160], // P1 gets all
+    },
+  },
+
   // ============ EDGE CASE TESTS ============
   
   'C-EC1': {
@@ -871,10 +1066,10 @@ async function runRealCompetitionTest(
     createdBy: testAdminId.toString(),
     rules: {
       rankingMethod: 'pnl',
-      tieBreaker1: 'trades_count',
-      // No tieBreaker2 - so participants with same PNL and trades are truly tied
+      tieBreaker1: scenario.tieBreaker1 || 'trades_count', // Use test-specific or default
+      tieBreaker2: scenario.tieBreaker2, // Optional second tiebreaker
       minimumTrades: 1, // Participants with 0 trades get disqualified (matches real behavior)
-      tiePrizeDistribution: 'split_equally', // When truly tied after all tiebreakers, split equally
+      tiePrizeDistribution: scenario.tiePrizeDistribution || 'split_equally', // Use test-specific or default
       disqualifyOnLiquidation: scenario.disqualifyOnLiquidation,
     },
     prizeDistribution,
@@ -917,7 +1112,17 @@ async function runRealCompetitionTest(
     // Example: startingCapital=5000, equity=6000 → PNL=+1000 (profit), equity=4000 → PNL=-1000 (loss)
     const commonStartingCapital = startingCapital; // Use competition's starting capital (5000)
     const participantPnl = p.equity - commonStartingCapital;
-    const participantPnlPercentage = (participantPnl / commonStartingCapital) * 100;
+    // Use custom pnlPercentage if provided, otherwise calculate from equity difference
+    const participantPnlPercentage = p.pnlPercentage ?? (participantPnl / commonStartingCapital) * 100;
+    
+    // Calculate winning/losing trades based on winRate (if provided)
+    const totalTrades = p.totalTrades || 1;
+    const customWinRate = p.winRate ?? 50; // Default 50% if not specified
+    const winningTrades = Math.round((customWinRate / 100) * totalTrades);
+    const losingTrades = totalTrades - winningTrades;
+    
+    // Offset enteredAt for join_time tiebreaker tests (earlier participants join first)
+    const enteredAt = new Date(now.getTime() + i * 1000); // Each participant 1 second apart
     
     await participantsCollection.insertOne({
       _id: participantId,
@@ -932,12 +1137,12 @@ async function runRealCompetitionTest(
       currentCapital: p.equity,
       startingCapital: commonStartingCapital, // Common starting capital for all
       pnl: participantPnl, // Calculated PNL based on equity difference
-      pnlPercentage: participantPnlPercentage,
-      totalTrades: p.totalTrades || 1, // At least 1 trade to avoid disqualification
-      winningTrades: p.totalTrades > 0 ? Math.ceil(p.totalTrades / 2) : 1,
-      losingTrades: p.totalTrades > 0 ? Math.floor(p.totalTrades / 2) : 0,
-      winRate: 50,
-      enteredAt: now,
+      pnlPercentage: participantPnlPercentage, // Use custom or calculated
+      totalTrades,
+      winningTrades,
+      losingTrades,
+      winRate: customWinRate, // Use custom winRate for tiebreaker tests
+      enteredAt, // Offset for join_time tiebreaker tests
       testRunId,
       createdAt: now,
       updatedAt: now,
