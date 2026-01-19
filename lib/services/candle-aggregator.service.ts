@@ -422,6 +422,7 @@ async function getEnabledSymbols(): Promise<string[]> {
 /**
  * Pre-warm the aggregator cache for all enabled symbols and timeframes
  * Call this on server startup to ensure first users don't hit cold cache
+ * Uses parallel warming for faster completion
  */
 export async function warmCache(): Promise<void> {
   if (cacheWarmingComplete || cacheWarmingInProgress) {
@@ -429,7 +430,7 @@ export async function warmCache(): Promise<void> {
   }
   
   cacheWarmingInProgress = true;
-  console.log('🔥 [Aggregator] Starting cache pre-warming...');
+  console.log('🔥 [Aggregator] Starting cache pre-warming (parallel mode)...');
   const startTime = Date.now();
   
   try {
@@ -439,22 +440,43 @@ export async function warmCache(): Promise<void> {
     const enabledSymbols = await getEnabledSymbols();
     console.log(`📊 [Aggregator] Found ${enabledSymbols.length} enabled symbols to warm`);
     
-    // Pre-warm in batches to avoid overwhelming MongoDB
+    // Build list of all symbol/timeframe combinations to warm
+    const warmTasks: Array<{ symbol: string; timeframe: string }> = [];
     for (const symbol of enabledSymbols) {
       for (const timeframe of WARM_TIMEFRAMES) {
-        try {
-          // Use a smaller count for warming (100 candles = reasonable history)
-          await getAggregatedCandles(symbol, timeframe, 100);
-        } catch (err) {
-          // Don't fail the whole warming if one symbol fails
-          console.warn(`⚠️ [Aggregator] Failed to warm ${symbol} ${timeframe}:`, err);
-        }
+        warmTasks.push({ symbol, timeframe });
+      }
+    }
+    
+    // Process in parallel batches of 10 for faster warming
+    const BATCH_SIZE = 10;
+    let completed = 0;
+    
+    for (let i = 0; i < warmTasks.length; i += BATCH_SIZE) {
+      const batch = warmTasks.slice(i, i + BATCH_SIZE);
+      
+      await Promise.all(
+        batch.map(async ({ symbol, timeframe }) => {
+          try {
+            // Use smaller count for warming (50 candles = faster)
+            await getAggregatedCandles(symbol, timeframe, 50);
+            completed++;
+          } catch (err) {
+            // Don't fail the whole warming if one symbol fails
+            completed++;
+          }
+        })
+      );
+      
+      // Progress log every 50 completions
+      if (completed % 50 === 0 || completed === warmTasks.length) {
+        console.log(`🔄 [Aggregator] Warming progress: ${completed}/${warmTasks.length}`);
       }
     }
     
     cacheWarmingComplete = true;
     const duration = Date.now() - startTime;
-    console.log(`✅ [Aggregator] Cache pre-warming complete in ${duration}ms (${enabledSymbols.length} symbols × ${WARM_TIMEFRAMES.length} timeframes = ${aggregatedCandleCache.size} entries)`);
+    console.log(`✅ [Aggregator] Cache pre-warming complete in ${(duration / 1000).toFixed(1)}s (${enabledSymbols.length} symbols × ${WARM_TIMEFRAMES.length} timeframes = ${aggregatedCandleCache.size} entries)`);
   } catch (err) {
     console.error('❌ [Aggregator] Cache pre-warming failed:', err);
   } finally {

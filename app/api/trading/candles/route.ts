@@ -77,9 +77,7 @@ async function getMarketDataSettings(): Promise<{
       };
     }
     
-    console.log(`📋 [Settings] Loaded: limit=${settings.chartHistoryLimitEnabled ? settings.chartHistoryLimitDays + 'd' : 'OFF'}, initial=${settings.initialCandleCount}, batch=${settings.lazyLoadBatchSize}`);
-    
-    return {
+    const result = {
       useLocalHistory: settings.useLocalHistory ?? true,
       autoFetchHistory: settings.autoFetchHistory ?? false,
       chartHistoryLimitEnabled: settings.chartHistoryLimitEnabled ?? false,
@@ -87,6 +85,10 @@ async function getMarketDataSettings(): Promise<{
       initialCandleCount: settings.initialCandleCount ?? DEFAULT_INITIAL_CANDLE_COUNT,
       lazyLoadBatchSize: settings.lazyLoadBatchSize ?? DEFAULT_LAZY_LOAD_BATCH_SIZE,
     };
+    
+    console.log(`📋 [Settings] Loaded: limit=${result.chartHistoryLimitEnabled ? result.chartHistoryLimitDays + 'd' : 'OFF'}, initial=${result.initialCandleCount}, batch=${result.lazyLoadBatchSize}`);
+    
+    return result;
   } catch (error) {
     console.error('❌ [Settings] Error loading settings:', error);
     return {
