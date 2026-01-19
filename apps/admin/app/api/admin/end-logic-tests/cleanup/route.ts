@@ -56,12 +56,9 @@ export async function POST(request: NextRequest) {
       });
       console.log(`   Found ${testChallengeParticipants.length} test challenge participants`);
       
-      // Get user IDs from test wallets
+      // Get user IDs from test wallets (search by testRunId only - userId is ObjectId string)
       const testWallets = await db.collection('creditwallets').find({
-        $or: [
-          { testRunId: { $exists: true, $regex: /^TEST_/i } },
-          { userId: { $regex: /^TEST_/i } },
-        ]
+        testRunId: { $exists: true, $regex: /^TEST_/i }
       }).toArray();
       testWallets.forEach(w => {
         if (w.userId) testUserIds.push(w.userId.toString());
@@ -146,9 +143,9 @@ export async function POST(request: NextRequest) {
     
     for (const collectionName of mainCollections) {
       try {
-        // Delete by testRunId field (string starts with TEST_)
+        // Delete by testRunId field (string contains TEST_)
         const result1 = await db.collection(collectionName).deleteMany({ 
-          testRunId: { $exists: true, $regex: /^TEST_/ } 
+          testRunId: { $exists: true, $regex: /TEST_/i } 
         });
         deletedCount += result1.deletedCount;
         if (result1.deletedCount > 0) {
@@ -165,11 +162,12 @@ export async function POST(request: NextRequest) {
         // Also cleanup by name/slug prefix (case insensitive)
         const result3 = await db.collection(collectionName).deleteMany({
           $or: [
-            { name: { $regex: /^TEST_/i } },
-            { slug: { $regex: /^test-test_/i } },
-            { username: { $regex: /^TEST_/i } },
-            { challengerName: { $regex: /^TEST_/i } },
-            { challengedName: { $regex: /^TEST_/i } },
+            { name: { $regex: /TEST_/i } },
+            { slug: { $regex: /test_/i } },
+            { username: { $regex: /TEST_/i } },
+            { challengerName: { $regex: /TEST_/i } },
+            { challengedName: { $regex: /TEST_/i } },
+            { oddsUsername: { $regex: /TEST_/i } },
           ]
         });
         deletedCount += result3.deletedCount;
@@ -178,6 +176,42 @@ export async function POST(request: NextRequest) {
         }
       } catch (e) {
         console.warn(`Failed to cleanup ${collectionName}:`, e);
+      }
+    }
+    
+    // Extra: Delete by competitionId/challengeId found earlier
+    if (uniqueCompetitionIds.length > 0) {
+      for (const collName of ['competitionparticipants', 'tradingpositions', 'tradingorders']) {
+        try {
+          const result = await db.collection(collName).deleteMany({
+            competitionId: { $in: uniqueCompetitionIds }
+          });
+          if (result.deletedCount > 0) {
+            console.log(`🗑️ Deleted ${result.deletedCount} from ${collName} by competitionId`);
+            deletedCount += result.deletedCount;
+          }
+        } catch (e) {
+          console.warn(`Failed to delete from ${collName} by competitionId:`, e);
+        }
+      }
+    }
+    
+    if (uniqueChallengeIds.length > 0) {
+      for (const collName of ['challengeparticipants', 'tradingpositions', 'tradingorders']) {
+        try {
+          const result = await db.collection(collName).deleteMany({
+            $or: [
+              { challengeId: { $in: uniqueChallengeIds } },
+              { competitionId: { $in: uniqueChallengeIds } },
+            ]
+          });
+          if (result.deletedCount > 0) {
+            console.log(`🗑️ Deleted ${result.deletedCount} from ${collName} by challengeId`);
+            deletedCount += result.deletedCount;
+          }
+        } catch (e) {
+          console.warn(`Failed to delete from ${collName} by challengeId:`, e);
+        }
       }
     }
 
@@ -254,52 +288,6 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // ==========================================
-    // STEP 5: DELETE BY COMPETITION/CHALLENGE ID
-    // (positions, orders linked to test competitions)
-    // ==========================================
-    if (uniqueCompetitionIds.length > 0) {
-      try {
-        // Delete positions by competitionId
-        const posResult = await db.collection('tradingpositions').deleteMany({
-          competitionId: { $in: uniqueCompetitionIds }
-        });
-        if (posResult.deletedCount > 0) {
-          console.log(`🗑️ Deleted ${posResult.deletedCount} positions by competitionId`);
-          deletedCount += posResult.deletedCount;
-        }
-        
-        // Delete orders by competitionId
-        const orderResult = await db.collection('tradingorders').deleteMany({
-          competitionId: { $in: uniqueCompetitionIds }
-        });
-        if (orderResult.deletedCount > 0) {
-          console.log(`🗑️ Deleted ${orderResult.deletedCount} orders by competitionId`);
-          deletedCount += orderResult.deletedCount;
-        }
-      } catch (e) {
-        console.warn('Failed to delete by competitionId:', e);
-      }
-    }
-    
-    if (uniqueChallengeIds.length > 0) {
-      try {
-        // Delete positions by challengeId (stored as competitionId in some cases)
-        const posResult = await db.collection('tradingpositions').deleteMany({
-          $or: [
-            { challengeId: { $in: uniqueChallengeIds } },
-            { competitionId: { $in: uniqueChallengeIds } },
-          ]
-        });
-        if (posResult.deletedCount > 0) {
-          console.log(`🗑️ Deleted ${posResult.deletedCount} positions by challengeId`);
-          deletedCount += posResult.deletedCount;
-        }
-      } catch (e) {
-        console.warn('Failed to delete by challengeId:', e);
-      }
-    }
-
     console.log(`✅ Cleanup complete: ${deletedCount} total records deleted`);
     
     return NextResponse.json({ 

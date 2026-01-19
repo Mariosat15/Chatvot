@@ -1070,7 +1070,7 @@ async function runRealCompetitionTest(
     rules: {
       rankingMethod: 'pnl',
       tieBreaker1: scenario.tieBreaker1 || 'trades_count', // Use test-specific or default
-      tieBreaker2: scenario.tieBreaker2, // Optional second tiebreaker
+      ...(scenario.tieBreaker2 && { tieBreaker2: scenario.tieBreaker2 }), // Only include if defined
       minimumTrades: 1, // Participants with 0 trades get disqualified (matches real behavior)
       tiePrizeDistribution: scenario.tiePrizeDistribution || 'split_equally', // Use test-specific or default
       disqualifyOnLiquidation: scenario.disqualifyOnLiquidation,
