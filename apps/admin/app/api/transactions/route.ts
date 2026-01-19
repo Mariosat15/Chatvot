@@ -87,10 +87,14 @@ export async function GET(request: NextRequest) {
                            type === 'platform_fee' || type === 'unclaimed_pool' || type === 'deposit_fee' || 
                            type === 'withdrawal_fee' || !type;
 
-    // Execute query with pagination for wallet transactions
+    // OPTIMIZATION: Limit max records to prevent memory issues
+    // For very large result sets, use date filters to narrow down
+    const maxRecords = 1000; // Safety limit
+    
     const [walletTransactions, walletTotal] = await Promise.all([
       WalletTransaction.find(query)
         .sort(sort)
+        .limit(maxRecords)
         .lean(),
       WalletTransaction.countDocuments(query),
     ]);
@@ -112,7 +116,10 @@ export async function GET(request: NextRequest) {
         if (endDate) platformQuery.createdAt.$lte = new Date(endDate);
       }
       
-      platformTransactions = await PlatformTransaction.find(platformQuery).sort(sort).lean();
+      platformTransactions = await PlatformTransaction.find(platformQuery)
+        .sort(sort)
+        .limit(maxRecords)
+        .lean();
       
       // Fetch VAT payments if type is 'all' or 'vat_payment'
       if (type === 'all' || type === 'vat_payment' || !type) {
@@ -122,7 +129,10 @@ export async function GET(request: NextRequest) {
           if (startDate) vatQuery.paidAt.$gte = new Date(startDate);
           if (endDate) vatQuery.paidAt.$lte = new Date(endDate);
         }
-        vatPayments = await VATPayment.find(vatQuery).sort({ paidAt: -1 }).lean();
+        vatPayments = await VATPayment.find(vatQuery)
+          .sort({ paidAt: -1 })
+          .limit(maxRecords)
+          .lean();
       }
     }
 

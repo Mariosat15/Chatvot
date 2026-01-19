@@ -9,16 +9,29 @@ import '@/database/models/marketplace/marketplace-item.model';
 
 /**
  * GET /api/admin/users
- * Get all users with their complete data
- * Supports optional ?userId=xxx parameter to get a specific user
+ * Get users with pagination and search
+ * 
+ * Query params:
+ * - userId: Get specific user by ID
+ * - page: Page number (default 1)
+ * - limit: Items per page (default 20, max 100, 0 = all)
+ * - search: Search by name or email
+ * - sort: Sort field (default 'createdAt')
+ * - order: Sort order 'asc' or 'desc' (default 'desc')
  */
 export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
 
-    // Get optional userId filter from query params
+    // Get query params
     const { searchParams } = new URL(request.url);
     const userIdFilter = searchParams.get('userId');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+    const limitParam = parseInt(searchParams.get('limit') || '20');
+    const limit = limitParam === 0 ? 0 : Math.min(100, Math.max(1, limitParam)); // 0 = all, max 100
+    const search = searchParams.get('search')?.toLowerCase() || '';
+    const sortField = searchParams.get('sort') || 'createdAt';
+    const sortOrder = searchParams.get('order') === 'asc' ? 1 : -1;
 
     // Get users from the 'user' collection (created by better-auth)
     const mongoose = await import('mongoose');
@@ -30,6 +43,7 @@ export async function GET(request: NextRequest) {
 
     // Get users from better-auth collection
     let users;
+    let totalCount = 0;
     
     if (userIdFilter) {
       // Try to find user by 'id' field first (better-auth custom id)
@@ -52,58 +66,96 @@ export async function GET(request: NextRequest) {
         users = await db.collection('user').find({ _id: userIdFilter as any }).toArray();
       }
       
+      totalCount = users.length;
       console.log(`📊 Fetching user with ID: ${userIdFilter} - Found ${users.length} user(s)`);
     } else {
-      // Get all users
-      users = await db.collection('user').find({}).toArray();
-      console.log(`📊 Fetching all users - Found ${users.length} user(s)`);
+      // Build query for search
+      const query: Record<string, unknown> = {};
+      if (search) {
+        query.$or = [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+        ];
+      }
+
+      // Get total count for pagination
+      totalCount = await db.collection('user').countDocuments(query);
+
+      // Get paginated users
+      if (limit === 0) {
+        // Get all (backward compatibility)
+        users = await db.collection('user')
+          .find(query)
+          .sort({ [sortField]: sortOrder })
+          .toArray();
+      } else {
+        const skip = (page - 1) * limit;
+        users = await db.collection('user')
+          .find(query)
+          .sort({ [sortField]: sortOrder })
+          .skip(skip)
+          .limit(limit)
+          .toArray();
+      }
+      
+      console.log(`📊 Fetching users - Page ${page}, Limit ${limit}, Found ${users.length}/${totalCount} user(s)`);
     }
 
     // Get admin email from environment
     const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase() || '';
 
-    // Get wallet data for all users
-    const wallets = await CreditWallet.find({}).lean();
+    // OPTIMIZATION: Only load related data for the users we're displaying
+    const userIds = users.map((u: any) => u.id || u._id?.toString()).filter(Boolean);
+
+    // Get wallet data only for displayed users
+    const wallets = await CreditWallet.find({ userId: { $in: userIds } }).lean();
     const walletMap = new Map(wallets.map((w: any) => [w.userId, w]));
 
-    // Get competition stats for all users
-    const participants = await CompetitionParticipant.find({}).lean();
+    // Get competition stats only for displayed users
+    const participants = await CompetitionParticipant.find({ userId: { $in: userIds } })
+      .select('userId status totalTrades pnl winningTrades')
+      .lean();
     
-    // Group participants by user
+    // Group participants by user (O(n) with Map)
     const userParticipants = new Map<string, any[]>();
-    participants.forEach((p: any) => {
-      const userId = p.userId;
+    for (const p of participants) {
+      const userId = (p as any).userId;
       if (!userParticipants.has(userId)) {
         userParticipants.set(userId, []);
       }
       userParticipants.get(userId)!.push(p);
-    });
+    }
 
-    // Get challenge stats for all users
-    const challengeParticipants = await ChallengeParticipant.find({}).lean();
+    // Get challenge stats only for displayed users
+    const challengeParticipants = await ChallengeParticipant.find({ userId: { $in: userIds } })
+      .select('userId status isWinner')
+      .lean();
     
-    // Group challenge participants by user
+    // Group challenge participants by user (O(n) with Map)
     const userChallenges = new Map<string, any[]>();
-    challengeParticipants.forEach((cp: any) => {
-      const odId = cp.userId;
+    for (const cp of challengeParticipants) {
+      const odId = (cp as any).userId;
       if (!userChallenges.has(odId)) {
         userChallenges.set(odId, []);
       }
       userChallenges.get(odId)!.push(cp);
-    });
+    }
 
-    // Get marketplace purchases for all users
-    const purchases = await UserPurchase.find({}).populate('itemId', 'name').lean();
+    // Get marketplace purchases only for displayed users
+    const purchases = await UserPurchase.find({ userId: { $in: userIds } })
+      .populate('itemId', 'name')
+      .select('userId pricePaid itemId')
+      .lean();
     
-    // Group purchases by user
+    // Group purchases by user (O(n) with Map)
     const userPurchases = new Map<string, any[]>();
-    purchases.forEach((p: any) => {
-      const userId = p.userId;
+    for (const p of purchases) {
+      const userId = (p as any).userId;
       if (!userPurchases.has(userId)) {
         userPurchases.set(userId, []);
       }
       userPurchases.get(userId)!.push(p);
-    });
+    }
 
     // Combine all data
     const usersWithData = users.map((user: any) => {
@@ -203,15 +255,24 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Sort by created date (newest first)
-    usersWithData.sort((a: any, b: any) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    // Note: Sorting is now done at database level for paginated queries
+    // Only sort in JS if we got all users (limit=0 or single user lookup)
+    if (limit === 0 || userIdFilter) {
+      usersWithData.sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
 
     return NextResponse.json({
       success: true,
       users: usersWithData,
-      total: usersWithData.length,
+      total: totalCount,
+      pagination: limit > 0 ? {
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: page * limit < totalCount,
+      } : null,
     });
   } catch (error) {
     console.error('❌ Error fetching users:', error);
