@@ -1462,12 +1462,15 @@ async function runRealCompetitionTest(
         walletBalances.push({ participantIndex: i, userId: participantUserIds[i].toString(), balance });
       }
       
-      // Sort by balance descending to get ranking order (higher prize = higher rank)
-      walletBalances.sort((a, b) => b.balance - a.balance);
-      const actualRanking = walletBalances.map(w => w.participantIndex);
-      const actualPrizes = walletBalances.map(w => w.balance);
+      // Get prizes in PARTICIPANT ORDER (for expectedPrizes comparison)
+      const prizesByParticipantIndex = walletBalances.map(w => w.balance);
       
-      console.log(`🧪 [TEST] Prize distribution: ranking=${actualRanking.join(',')}, prizes=${actualPrizes.join(',')}`);
+      // Sort by balance descending to get ranking order (higher prize = higher rank)
+      const sortedByRank = [...walletBalances].sort((a, b) => b.balance - a.balance);
+      const actualRanking = sortedByRank.map(w => w.participantIndex);
+      const actualPrizes = prizesByParticipantIndex; // Prizes in PARTICIPANT order to match expectedPrizes
+      
+      console.log(`🧪 [TEST] Prize distribution: ranking=${actualRanking.join(',')}, prizesByParticipant=${actualPrizes.join(',')}`);
       
       // Check platform transactions for prize verification
       const platformFeeTransaction = await platformTransactionsCollection.findOne({

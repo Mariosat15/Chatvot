@@ -204,10 +204,11 @@ export async function POST(request: NextRequest) {
     }
     
     // ==========================================
-    // EXTRA: Delete platform transactions by competition/challenge ID
+    // EXTRA: Delete platform transactions by competition/challenge ID and description
     // ==========================================
-    if (uniqueCompetitionIds.length > 0 || uniqueChallengeIds.length > 0) {
-      try {
+    try {
+      // Delete by competition/challenge ID
+      if (uniqueCompetitionIds.length > 0 || uniqueChallengeIds.length > 0) {
         const ptResult = await db.collection('platformtransactions').deleteMany({
           $or: [
             { competitionId: { $in: uniqueCompetitionIds } },
@@ -219,9 +220,55 @@ export async function POST(request: NextRequest) {
           console.log(`🗑️ Deleted ${ptResult.deletedCount} platform transactions by competition/challenge ID`);
           deletedCount += ptResult.deletedCount;
         }
-      } catch (e) {
-        console.warn('Failed to delete platform transactions by ID:', e);
       }
+      
+      // Delete by description containing TEST_
+      const ptDescResult = await db.collection('platformtransactions').deleteMany({
+        $or: [
+          { description: testPatternDel },
+          { description: testStartPatternDel },
+          { source: testPatternDel },
+          { notes: testPatternDel },
+        ]
+      });
+      if (ptDescResult.deletedCount > 0) {
+        console.log(`🗑️ Deleted ${ptDescResult.deletedCount} platform transactions by description pattern`);
+        deletedCount += ptDescResult.deletedCount;
+      }
+    } catch (e) {
+      console.warn('Failed to delete platform transactions:', e);
+    }
+    
+    // ==========================================
+    // EXTRA: Delete wallet transactions for test users
+    // ==========================================
+    try {
+      // Delete by userId
+      if (uniqueUserIds.length > 0) {
+        const wtResult = await db.collection('wallettransactions').deleteMany({
+          userId: { $in: uniqueUserIds }
+        });
+        if (wtResult.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${wtResult.deletedCount} wallet transactions by userId`);
+          deletedCount += wtResult.deletedCount;
+        }
+      }
+      
+      // Delete by description containing TEST_
+      const wtDescResult = await db.collection('wallettransactions').deleteMany({
+        $or: [
+          { description: testPatternDel },
+          { description: testStartPatternDel },
+          { source: testPatternDel },
+          { notes: testPatternDel },
+        ]
+      });
+      if (wtDescResult.deletedCount > 0) {
+        console.log(`🗑️ Deleted ${wtDescResult.deletedCount} wallet transactions by description pattern`);
+        deletedCount += wtDescResult.deletedCount;
+      }
+    } catch (e) {
+      console.warn('Failed to delete wallet transactions:', e);
     }
     
     // Extra: Delete by competitionId/challengeId found earlier
