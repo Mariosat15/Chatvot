@@ -71,21 +71,21 @@ const MarketDataSettingsSchema = new mongoose.Schema({
   // Number of days to limit chart history (e.g., 365 = 1 year)
   chartHistoryLimitDays: {
     type: Number,
-    default: 365,
+    default: 3650, // Default to max (10 years)
     min: 0,
     max: 3650,
   },
   // Hours component for chart history limit
   chartHistoryLimitHours: {
     type: Number,
-    default: 0,
+    default: 23, // Default to max
     min: 0,
     max: 23,
   },
   // Minutes component for chart history limit
   chartHistoryLimitMinutes: {
     type: Number,
-    default: 0,
+    default: 59, // Default to max
     min: 0,
     max: 59,
   },
@@ -184,9 +184,9 @@ export async function GET() {
         useLocalHistory: true,
         autoFetchHistory: false,
         chartHistoryLimitEnabled: false,
-        chartHistoryLimitDays: 365,
-        chartHistoryLimitHours: 0,
-        chartHistoryLimitMinutes: 0,
+        chartHistoryLimitDays: 3650,
+        chartHistoryLimitHours: 23,
+        chartHistoryLimitMinutes: 59,
         initialCandleCount: 500,
         lazyLoadBatchSize: 500,
         historicalYearsToDownload: 10,
@@ -208,9 +208,9 @@ export async function GET() {
         useLocalHistory: settings.useLocalHistory ?? true,
         autoFetchHistory: settings.autoFetchHistory ?? false,
         chartHistoryLimitEnabled: settings.chartHistoryLimitEnabled ?? false,
-        chartHistoryLimitDays: settings.chartHistoryLimitDays ?? 365,
-        chartHistoryLimitHours: settings.chartHistoryLimitHours ?? 0,
-        chartHistoryLimitMinutes: settings.chartHistoryLimitMinutes ?? 0,
+        chartHistoryLimitDays: settings.chartHistoryLimitDays ?? 3650,
+        chartHistoryLimitHours: settings.chartHistoryLimitHours ?? 23,
+        chartHistoryLimitMinutes: settings.chartHistoryLimitMinutes ?? 59,
         initialCandleCount: settings.initialCandleCount ?? 500,
         lazyLoadBatchSize: settings.lazyLoadBatchSize ?? 500,
         historicalYearsToDownload: settings.historicalYearsToDownload ?? 10,
@@ -360,9 +360,9 @@ export async function POST(request: NextRequest) {
         useLocalHistory: settings.useLocalHistory ?? true,
         autoFetchHistory: settings.autoFetchHistory ?? false,
         chartHistoryLimitEnabled: settings.chartHistoryLimitEnabled ?? false,
-        chartHistoryLimitDays: settings.chartHistoryLimitDays ?? 365,
-        chartHistoryLimitHours: settings.chartHistoryLimitHours ?? 0,
-        chartHistoryLimitMinutes: settings.chartHistoryLimitMinutes ?? 0,
+        chartHistoryLimitDays: settings.chartHistoryLimitDays ?? 3650,
+        chartHistoryLimitHours: settings.chartHistoryLimitHours ?? 23,
+        chartHistoryLimitMinutes: settings.chartHistoryLimitMinutes ?? 59,
         initialCandleCount: settings.initialCandleCount ?? 500,
         lazyLoadBatchSize: settings.lazyLoadBatchSize ?? 500,
         historicalYearsToDownload: settings.historicalYearsToDownload ?? 10,

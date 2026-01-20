@@ -80,7 +80,7 @@ async function getMarketDataSettings(): Promise<{
         useLocalHistory: true,
         autoFetchHistory: false,
         chartHistoryLimitEnabled: false,
-        chartHistoryLimitMinutesTotal: 365 * 24 * 60, // 365 days in minutes
+        chartHistoryLimitMinutesTotal: (3650 * 24 * 60) + (23 * 60) + 59, // 10 years max in minutes
         initialCandleCount: DEFAULT_INITIAL_CANDLE_COUNT,
         lazyLoadBatchSize: DEFAULT_LAZY_LOAD_BATCH_SIZE,
         seedingMinutesTotal: DEFAULT_SEEDING_DAYS_BACK * 24 * 60, // 30 days in minutes
@@ -94,9 +94,9 @@ async function getMarketDataSettings(): Promise<{
     const seedingMinutesTotal = (seedingDays * 24 * 60) + (seedingHours * 60) + seedingMinutes;
     
     // Calculate total minutes for history limit (days + hours + minutes)
-    const historyDays = settings.chartHistoryLimitDays ?? 365;
-    const historyHours = settings.chartHistoryLimitHours ?? 0;
-    const historyMinutes = settings.chartHistoryLimitMinutes ?? 0;
+    const historyDays = settings.chartHistoryLimitDays ?? 3650;
+    const historyHours = settings.chartHistoryLimitHours ?? 23;
+    const historyMinutes = settings.chartHistoryLimitMinutes ?? 59;
     const chartHistoryLimitMinutesTotal = (historyDays * 24 * 60) + (historyHours * 60) + historyMinutes;
     
     const result = {
