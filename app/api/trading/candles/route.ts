@@ -50,6 +50,9 @@ function getMarketDataSettingsModel() {
     mongoose.model('MarketDataSettings', MarketDataSettingsSchema);
 }
 
+// Default seeding days (when DB is empty)
+const DEFAULT_SEEDING_DAYS_BACK = 30;
+
 /**
  * Get market data settings from database
  */
@@ -60,6 +63,7 @@ async function getMarketDataSettings(): Promise<{
   chartHistoryLimitDays: number;
   initialCandleCount: number;
   lazyLoadBatchSize: number;
+  seedingDaysBack: number;
 }> {
   try {
     const MarketDataSettings = getMarketDataSettingsModel();
@@ -74,6 +78,7 @@ async function getMarketDataSettings(): Promise<{
         chartHistoryLimitDays: 365,
         initialCandleCount: DEFAULT_INITIAL_CANDLE_COUNT,
         lazyLoadBatchSize: DEFAULT_LAZY_LOAD_BATCH_SIZE,
+        seedingDaysBack: DEFAULT_SEEDING_DAYS_BACK,
       };
     }
     
@@ -84,9 +89,10 @@ async function getMarketDataSettings(): Promise<{
       chartHistoryLimitDays: settings.chartHistoryLimitDays ?? 365,
       initialCandleCount: settings.initialCandleCount ?? DEFAULT_INITIAL_CANDLE_COUNT,
       lazyLoadBatchSize: settings.lazyLoadBatchSize ?? DEFAULT_LAZY_LOAD_BATCH_SIZE,
+      seedingDaysBack: settings.seedingDaysBack ?? DEFAULT_SEEDING_DAYS_BACK,
     };
     
-    console.log(`📋 [Settings] Loaded: limit=${result.chartHistoryLimitEnabled ? result.chartHistoryLimitDays + 'd' : 'OFF'}, initial=${result.initialCandleCount}, batch=${result.lazyLoadBatchSize}`);
+    console.log(`📋 [Settings] Loaded: limit=${result.chartHistoryLimitEnabled ? result.chartHistoryLimitDays + 'd' : 'OFF'}, initial=${result.initialCandleCount}, batch=${result.lazyLoadBatchSize}, seeding=${result.seedingDaysBack}d`);
     
     return result;
   } catch (error) {
@@ -98,6 +104,7 @@ async function getMarketDataSettings(): Promise<{
       chartHistoryLimitDays: 365,
       initialCandleCount: DEFAULT_INITIAL_CANDLE_COUNT,
       lazyLoadBatchSize: DEFAULT_LAZY_LOAD_BATCH_SIZE,
+      seedingDaysBack: DEFAULT_SEEDING_DAYS_BACK,
     };
   }
 }
@@ -159,8 +166,9 @@ export async function GET(request: NextRequest) {
 /**
  * Seed historical candles from Massive.com to MongoDB
  * This is called ONCE per symbol when MongoDB is empty
+ * @param seedingDaysBack - How many days back to fetch (from admin settings)
  */
-async function seedHistoricalCandles(symbol: string, limit: number): Promise<void> {
+async function seedHistoricalCandles(symbol: string, limit: number, seedingDaysBack: number = DEFAULT_SEEDING_DAYS_BACK): Promise<void> {
   // Prevent duplicate seeding for same symbol
   if (seedingInProgress.has(symbol)) {
     console.log(`⏳ [Candles API] Seeding already in progress for ${symbol}, waiting...`);
@@ -172,10 +180,10 @@ async function seedHistoricalCandles(symbol: string, limit: number): Promise<voi
   seedingInProgress.add(symbol);
   
   try {
-    console.log(`🌱 [Candles API] Seeding historical candles for ${symbol}...`);
+    console.log(`🌱 [Candles API] Seeding ${seedingDaysBack} days of candles for ${symbol}...`);
     
-    // Fetch from Massive.com REST API
-    const candles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit);
+    // Fetch from Massive.com REST API with configurable days back
+    const candles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit, seedingDaysBack);
     
     if (candles.length === 0) {
       console.log(`⚠️ [Candles API] No candles returned from Massive.com for ${symbol}`);
@@ -198,7 +206,7 @@ async function seedHistoricalCandles(symbol: string, limit: number): Promise<voi
     // Save ALL candles to MongoDB
     await Candle1m.bulkUpsertCandles(candlesToSave);
     
-    console.log(`✅ [Candles API] Seeded ${candles.length} historical candles for ${symbol} to MongoDB`);
+    console.log(`✅ [Candles API] Seeded ${candles.length} candles (${seedingDaysBack} days) for ${symbol} to MongoDB`);
   } catch (error) {
     console.error(`❌ [Candles API] Failed to seed candles for ${symbol}:`, error);
   } finally {
@@ -437,10 +445,11 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       
       if (needsSeeding && !isCurrentlySeeding && !before) {
         // BACKGROUND SEEDING: Don't block - seed in background and return immediately
-        console.log(`⚡ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, starting BACKGROUND seeding...`);
+        console.log(`⚡ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, starting BACKGROUND seeding (${settings.seedingDaysBack} days)...`);
         
         // Fire and forget - don't await!
-        seedHistoricalCandles(symbol, Math.max(limit, 5000)).then(() => {
+        // Pass seedingDaysBack from admin settings
+        seedHistoricalCandles(symbol, Math.max(limit, 5000), settings.seedingDaysBack).then(() => {
           console.log(`✅ [Candles API] Background seeding completed for ${symbol}`);
         }).catch((err) => {
           console.error(`❌ [Candles API] Background seeding failed for ${symbol}:`, err);

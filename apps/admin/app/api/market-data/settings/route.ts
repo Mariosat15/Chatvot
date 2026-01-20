@@ -98,6 +98,15 @@ const MarketDataSettingsSchema = new mongoose.Schema({
     min: 1,
     max: 20,
   },
+  // --- Auto-Seeding Settings ---
+  // How many days of data to fetch when database is empty (default: 30)
+  // This controls the initial seeding from Massive.com API
+  seedingDaysBack: {
+    type: Number,
+    default: 30,
+    min: 1,
+    max: 365,
+  },
 }, { timestamps: true });
 
 const MarketDataSettings = mongoose.models.MarketDataSettings || 
@@ -151,6 +160,7 @@ export async function GET() {
         initialCandleCount: 500,
         lazyLoadBatchSize: 500,
         historicalYearsToDownload: 10,
+        seedingDaysBack: 30,
       });
     }
     
@@ -170,6 +180,7 @@ export async function GET() {
         initialCandleCount: settings.initialCandleCount ?? 500,
         lazyLoadBatchSize: settings.lazyLoadBatchSize ?? 500,
         historicalYearsToDownload: settings.historicalYearsToDownload ?? 10,
+        seedingDaysBack: settings.seedingDaysBack ?? 30,
         updatedAt: settings.updatedAt,
       },
     });
@@ -279,6 +290,9 @@ export async function POST(request: NextRequest) {
     if (typeof body.historicalYearsToDownload === 'number') {
       updateData['historicalYearsToDownload'] = Math.max(1, Math.min(20, body.historicalYearsToDownload));
     }
+    if (typeof body.seedingDaysBack === 'number') {
+      updateData['seedingDaysBack'] = Math.max(1, Math.min(365, body.seedingDaysBack));
+    }
     
     const settings = await MarketDataSettings.findOneAndUpdate(
       { key: 'market_data_settings' },
@@ -302,6 +316,7 @@ export async function POST(request: NextRequest) {
         initialCandleCount: settings.initialCandleCount ?? 500,
         lazyLoadBatchSize: settings.lazyLoadBatchSize ?? 500,
         historicalYearsToDownload: settings.historicalYearsToDownload ?? 10,
+        seedingDaysBack: settings.seedingDaysBack ?? 30,
         updatedAt: settings.updatedAt,
       },
     });

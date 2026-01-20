@@ -201,11 +201,13 @@ export async function fetchCandlesForRange(
 /**
  * Get recent candles for initial chart load
  * Fetches last N days/hours depending on timeframe
+ * @param maxDaysBack - Optional override for max days back (from admin settings)
  */
 export async function getRecentCandles(
   symbol: ForexSymbol,
   timeframe: Timeframe,
-  bars: number = 300
+  bars: number = 300,
+  maxDaysBack?: number
 ): Promise<OHLCCandle[]> {
   const now = new Date();
   const from = new Date(now);
@@ -244,40 +246,46 @@ export async function getRecentCandles(
       break;
   }
 
-  // Apply minimum lookback based on timeframe
-  // Intraday data: Only go back 1-2 days (API limitation)
-  // Daily data: Can go back much further
+  // Apply max lookback limit
+  // If maxDaysBack is provided from admin settings, use that
+  // Otherwise use default limits per timeframe
   const minDaysBack = new Date(now);
   
-  switch (timeframe) {
-    case '1':
-    case '5':
-    case '15':
-    case '30':
-      // Intraday: Max 2 days back
-      minDaysBack.setDate(minDaysBack.getDate() - 2);
-      break;
-    case '60':
-    case '120':
-      // 1h/2h: Max 7 days back
-      minDaysBack.setDate(minDaysBack.getDate() - 7);
-      break;
-    case '240':
-      // 4h: Max 30 days back
-      minDaysBack.setDate(minDaysBack.getDate() - 30);
-      break;
-    case 'D':
-      // Daily: Max 2 years back
-      minDaysBack.setDate(minDaysBack.getDate() - 730);
-      break;
-    case 'W':
-      // Weekly: Max 5 years back
-      minDaysBack.setDate(minDaysBack.getDate() - 1825);
-      break;
-    case 'M':
-      // Monthly: Max 10 years back
-      minDaysBack.setDate(minDaysBack.getDate() - 3650);
-      break;
+  if (maxDaysBack && maxDaysBack > 0) {
+    // Use admin-configured limit (applies to all timeframes)
+    minDaysBack.setDate(minDaysBack.getDate() - maxDaysBack);
+  } else {
+    // Default limits per timeframe (backwards compatibility)
+    switch (timeframe) {
+      case '1':
+      case '5':
+      case '15':
+      case '30':
+        // Intraday: Default 2 days back
+        minDaysBack.setDate(minDaysBack.getDate() - 2);
+        break;
+      case '60':
+      case '120':
+        // 1h/2h: Default 7 days back
+        minDaysBack.setDate(minDaysBack.getDate() - 7);
+        break;
+      case '240':
+        // 4h: Default 30 days back
+        minDaysBack.setDate(minDaysBack.getDate() - 30);
+        break;
+      case 'D':
+        // Daily: Default 2 years back
+        minDaysBack.setDate(minDaysBack.getDate() - 730);
+        break;
+      case 'W':
+        // Weekly: Default 5 years back
+        minDaysBack.setDate(minDaysBack.getDate() - 1825);
+        break;
+      case 'M':
+        // Monthly: Default 10 years back
+        minDaysBack.setDate(minDaysBack.getDate() - 3650);
+        break;
+    }
   }
   
   // Don't fetch older than the minimum for this timeframe
@@ -285,7 +293,7 @@ export async function getRecentCandles(
     from.setTime(minDaysBack.getTime());
   }
 
-  log(`📅 Fetching from ${from.toISOString()} to ${now.toISOString()} (${timeframe})`);
+  log(`📅 Fetching from ${from.toISOString()} to ${now.toISOString()} (${timeframe}, maxDays=${maxDaysBack || 'default'})`);
   return fetchHistoricalCandles(symbol, timeframe, from, now);
 }
 

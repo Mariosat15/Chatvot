@@ -35,6 +35,7 @@ interface MarketDataSettings {
   initialCandleCount: number;
   lazyLoadBatchSize: number;
   historicalYearsToDownload: number;
+  seedingDaysBack: number;
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1620,6 +1621,29 @@ export default function MarketDataSection() {
                 <p className="text-gray-500 text-xs mt-2">
                   How many candles to load when user scrolls to load more
                 </p>
+              </div>
+
+              {/* Auto-Seeding Days Back */}
+              <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
+                <h4 className="text-white font-medium mb-3">🌱 Auto-Seeding (Empty DB)</h4>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    step="1"
+                    value={settings.seedingDaysBack || 30}
+                    onChange={(e) => saveSettings({ seedingDaysBack: parseInt(e.target.value) || 30 })}
+                    className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-24 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                  />
+                  <span className="text-gray-500 text-sm">days back</span>
+                </div>
+                <p className="text-gray-500 text-xs mt-2">
+                  When database is empty, fetch this many days from Massive.com API
+                </p>
+                <div className="mt-2 text-xs text-yellow-400/80">
+                  ⚡ Higher = slower initial load, but more history immediately available
+                </div>
               </div>
             </div>
           </div>
