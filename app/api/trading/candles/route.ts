@@ -188,6 +188,13 @@ async function seedHistoricalCandles(symbol: string, limit: number, seedingDaysB
     // Fetch from Massive.com REST API with configurable days back
     const candles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit, seedingDaysBack);
     
+    // Debug: Log what Massive.com actually returned
+    if (candles.length > 0) {
+      const oldestTime = new Date(candles[0].time * 1000).toISOString();
+      const newestTime = new Date(candles[candles.length - 1].time * 1000).toISOString();
+      console.log(`🔍 [Seeding Debug] Massive.com returned ${candles.length} candles, range: ${oldestTime} to ${newestTime}`);
+    }
+    
     if (candles.length === 0) {
       console.log(`⚠️ [Candles API] No candles returned from Massive.com for ${symbol}`);
       return;
@@ -372,6 +379,13 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
     try {
       // First, get candles from candles_1m (recent data for aggregation)
       let candles = await Candle1m.getCandles(symbol, limit, before);
+      
+      // Debug log to track what's happening
+      if (candles && candles.length > 0) {
+        const oldestTime = new Date(candles[0].time * 1000).toISOString();
+        const newestTime = new Date(candles[candles.length - 1].time * 1000).toISOString();
+        console.log(`📊 [1m Debug] Got ${candles.length} candles, range: ${oldestTime} to ${newestTime}`);
+      }
       
       // Apply history limit
       if (historyLimitDate && candles) {
