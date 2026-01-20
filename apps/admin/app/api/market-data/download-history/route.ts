@@ -250,7 +250,8 @@ export async function POST(request: NextRequest) {
       for (const symbol of symbols) {
         for (const timeframe of validTimeframes) {
           const Model = getHistoricalModel(timeframe);
-          if (!Model) continue;
+          const tfConfig = TIMEFRAME_CONFIG[timeframe];
+          if (!Model || !tfConfig) continue;
           
           let startMs: number;
           let endMs: number;
@@ -321,7 +322,7 @@ export async function POST(request: NextRequest) {
                   // This ensures database has clean, properly aligned data
                   const documents = candles.map(c => ({
                     symbol,
-                    timestamp: new Date(alignTimestamp(c.t, config.minutes, timeframe)),
+                    timestamp: new Date(alignTimestamp(c.t, tfConfig.minutes, timeframe)),
                     open: c.o, high: c.h, low: c.l, close: c.c, volume: c.v || 0,
                   }));
                   
