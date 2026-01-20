@@ -586,9 +586,15 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         // INITIAL LOAD: Historical first, then aggregate only recent gap
         // =================================================================
         
-        // Step 1: Find where historical data ends
+        // Step 1: Find where historical data ends AND where 1m candles begin
         const newestHistoricalDate = await getNewestHistoricalCandle(normalizedTf, symbol);
+        const oldest1mCandle = await Candle1m.getOldestCandle(symbol);
         const nowSeconds = Math.floor(Date.now() / 1000);
+        
+        const timeframeMinutes: Record<string, number> = {
+          '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240,
+        };
+        const tfMinutes = timeframeMinutes[normalizedTf] || 60;
         
         // Step 2: Query historical candles (FAST - pre-built!)
         if (settings.useLocalHistory && newestHistoricalDate) {
@@ -605,23 +611,60 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           }));
         }
         
-        // Step 3: Calculate how many recent candles to aggregate
-        // Only aggregate the gap between historical end and now
-        const timeframeMinutes: Record<string, number> = {
-          '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240,
-        };
-        const tfMinutes = timeframeMinutes[normalizedTf] || 60;
+        // Step 3: Check for GAP between historical end and 1m start
+        // If historical ends at Jan 13 and 1m starts at Jan 18, there's a gap!
+        const newestHistoricalSeconds = newestHistoricalDate 
+          ? Math.floor(newestHistoricalDate.getTime() / 1000) 
+          : 0;
+        const oldest1mSeconds = oldest1mCandle?.time || nowSeconds;
         
-        let recentCandlesToAggregate = 10; // Default: aggregate last 10 candles
-        
-        if (newestHistoricalDate) {
-          const newestHistoricalSeconds = Math.floor(newestHistoricalDate.getTime() / 1000);
-          const gapSeconds = nowSeconds - newestHistoricalSeconds;
-          const gapCandles = Math.ceil(gapSeconds / (tfMinutes * 60)) + 2; // +2 for safety overlap
-          recentCandlesToAggregate = Math.min(gapCandles, 50); // Cap at 50 to keep it fast
+        // If there's a gap (historical ends before 1m starts), fetch from API
+        if (newestHistoricalSeconds > 0 && oldest1mSeconds > newestHistoricalSeconds + (tfMinutes * 60 * 2)) {
+          // Gap detected! Fetch missing candles from API
+          console.log(`📊 [Candles] Gap detected for ${symbol} ${normalizedTf}: historical ends ${new Date(newestHistoricalSeconds * 1000).toISOString()}, 1m starts ${new Date(oldest1mSeconds * 1000).toISOString()}`);
+          
+          const massiveTimeframeMap: Record<string, Timeframe> = {
+            '5m': '5', '15m': '15', '30m': '30',
+            '1h': '60', '4h': '240', '1d': 'D', 'W': 'W', 'M': 'M',
+          };
+          const massiveTf = massiveTimeframeMap[normalizedTf];
+          
+          if (massiveTf) {
+            try {
+              // Fetch from API for the gap period
+              const gapCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
+              
+              // Filter to only include candles in the gap (after historical, before what we can aggregate)
+              const gapFiltered = gapCandles
+                .filter(c => c.time > newestHistoricalSeconds && c.time < oldest1mSeconds)
+                .map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
+              
+              if (gapFiltered.length > 0) {
+                console.log(`📊 [Candles] Filled ${gapFiltered.length} candles from API for gap`);
+                // Merge gap candles with historical
+                const candleMap = new Map<number, typeof historicalCandles[0]>();
+                for (const c of historicalCandles) candleMap.set(c.time, c);
+                for (const c of gapFiltered) if (!candleMap.has(c.time)) candleMap.set(c.time, c);
+                historicalCandles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
+              }
+            } catch (err) {
+              console.warn(`⚠️ [Candles] Failed to fetch gap candles from API:`, err);
+            }
+          }
         }
         
-        // Step 4: Aggregate only the recent gap (FAST - small count!)
+        // Step 4: Calculate how many recent candles to aggregate
+        // Only aggregate from where 1m candles exist
+        let recentCandlesToAggregate = 10; // Default: aggregate last 10 candles
+        
+        if (oldest1mCandle) {
+          // We can aggregate from oldest1mSeconds to now
+          const aggregatableSeconds = nowSeconds - oldest1mSeconds;
+          const aggregatableCandles = Math.ceil(aggregatableSeconds / (tfMinutes * 60)) + 2;
+          recentCandlesToAggregate = Math.min(aggregatableCandles, 50); // Cap at 50 to keep it fast
+        }
+        
+        // Step 5: Aggregate only the recent candles (from 1m data)
         if (useAggregator && recentCandlesToAggregate > 0) {
           const result = await getAggregatedCandles(symbol, normalizedTf, recentCandlesToAggregate);
           aggregatedCandles = result.candles;
@@ -637,7 +680,7 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           else if (normalizedTf === '1h') formingCandle = getForming1hCandle(symbol);
         }
         
-        // Step 5: If no historical data, fall back to full aggregation or API
+        // Step 6: If no historical data, fall back to full aggregation or API
         if (historicalCandles.length === 0) {
           if (useAggregator) {
             // No historical - do full aggregation (slower, but necessary)

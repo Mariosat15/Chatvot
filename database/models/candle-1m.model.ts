@@ -202,6 +202,29 @@ Candle1mSchema.statics.getLatestCandle = async function (
 };
 
 /**
+ * Get the oldest candle for a symbol
+ * Used to determine the earliest date we can aggregate from
+ */
+Candle1mSchema.statics.getOldestCandle = async function (
+  symbol: string
+): Promise<CandleData | null> {
+  const candle = await this.findOne({ symbol })
+    .sort({ t: 1 }) // Ascending - oldest first
+    .lean<ICandle1m>();
+  
+  if (!candle) return null;
+  
+  return {
+    time: candle.t,
+    open: candle.o,
+    high: candle.h,
+    low: candle.l,
+    close: candle.c,
+    volume: candle.v,
+  };
+};
+
+/**
  * Cleanup old candles (keep only last N days)
  * Called periodically to prevent collection from growing too large
  */
@@ -235,6 +258,7 @@ interface ICandle1mModel extends Model<ICandle1m> {
     volume?: number;
   }>): Promise<void>;
   getLatestCandle(symbol: string): Promise<CandleData | null>;
+  getOldestCandle(symbol: string): Promise<CandleData | null>;
   cleanupOldCandles(daysToKeep?: number): Promise<number>;
 }
 
