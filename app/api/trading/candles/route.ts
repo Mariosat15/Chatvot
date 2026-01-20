@@ -539,13 +539,15 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         const historicalModel = getHistoricalModel('1m');
         if (historicalModel) {
           // Determine the cutoff point for checking historical data
+          // IMPORTANT: Always use the oldest candle in the RESPONSE, not the 'before' parameter
+          // This ensures we check if there's more data BEFORE what we just returned
           let checkBeforeDate: Date;
-          if (before) {
-            // Lazy loading: check before the 'before' parameter
-            checkBeforeDate = new Date(before * 1000);
-          } else if (candles && candles.length > 0) {
-            // Initial load: check before the oldest candle we have
+          if (candles && candles.length > 0) {
+            // Use the oldest candle in the response (works for both initial and lazy load)
             checkBeforeDate = new Date(candles[0].time * 1000);
+          } else if (before) {
+            // No candles returned, but have 'before' parameter - use it as fallback
+            checkBeforeDate = new Date(before * 1000);
           } else {
             // No candles at all: check if ANY historical data exists
             checkBeforeDate = new Date();
