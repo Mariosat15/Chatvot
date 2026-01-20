@@ -18,6 +18,15 @@ const TIMEFRAME_CONFIG: Record<string, { minutes: number; collectionName: string
   '1M': { minutes: 43200, collectionName: 'candles_historical_1M', apiMultiplier: 1, apiTimespan: 'month' },
 };
 
+/**
+ * Align timestamp to proper interval boundary
+ * e.g., 12:13 for 5m → 12:10, 12:18 for 5m → 12:15
+ */
+function alignTimestamp(timestampMs: number, timeframeMinutes: number): number {
+  const intervalMs = timeframeMinutes * 60 * 1000;
+  return Math.floor(timestampMs / intervalMs) * intervalMs;
+}
+
 // Historical candle schema (matches database/models/candle-historical.model.ts)
 const HistoricalCandleSchema = new mongoose.Schema({
   symbol: { type: String, required: true, index: true },
@@ -272,9 +281,11 @@ export async function POST(request: NextRequest) {
               totalFetched += candles.length;
 
               if (candles.length > 0) {
-                // Track date range
-                const firstCandleDate = new Date(candles[0].t);
-                const lastCandleDate = new Date(candles[candles.length - 1].t);
+                const config = TIMEFRAME_CONFIG[timeframe];
+                
+                // Track date range (using aligned timestamps)
+                const firstCandleDate = new Date(alignTimestamp(candles[0].t, config.minutes));
+                const lastCandleDate = new Date(alignTimestamp(candles[candles.length - 1].t, config.minutes));
                 
                 if (!oldestDate || firstCandleDate < oldestDate) {
                   oldestDate = firstCandleDate;
@@ -283,10 +294,12 @@ export async function POST(request: NextRequest) {
                   newestDate = lastCandleDate;
                 }
 
-                // Convert to our format and save
+                // Convert to our format and save WITH ALIGNED TIMESTAMPS
+                // This ensures all candles are at proper interval boundaries
+                // e.g., 5m candles at :00, :05, :10, :15, etc.
                 const documents = candles.map(c => ({
                   symbol,
-                  timestamp: new Date(c.t),
+                  timestamp: new Date(alignTimestamp(c.t, config.minutes)), // ALIGNED!
                   open: c.o,
                   high: c.h,
                   low: c.l,

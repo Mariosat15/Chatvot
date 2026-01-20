@@ -21,6 +21,15 @@ Candle1mSchema.index({ symbol: 1, t: 1 }, { unique: true });
 const Candle1m = mongoose.models.Candle1m || mongoose.model('Candle1m', Candle1mSchema);
 
 /**
+ * Align timestamp to proper 1-minute boundary
+ * e.g., 12:13:27 → 12:13:00
+ */
+function alignTimestampToMinute(timestampMs: number): number {
+  const minuteMs = 60 * 1000;
+  return Math.floor(timestampMs / minuteMs) * minuteMs;
+}
+
+/**
  * Convert symbol format (EUR/USD) to Massive format (C:EURUSD)
  */
 function symbolToMassiveFormat(symbol: string): string {
@@ -195,22 +204,27 @@ export async function POST(request: NextRequest) {
             }
             
             // Bulk upsert to MongoDB
-            const bulkOps = candles.map((c) => ({
-              updateOne: {
-                filter: { symbol, t: Math.floor(c.t / 1000) },
-                update: {
-                  $setOnInsert: { symbol },
-                  $set: {
-                    o: c.o,
-                    h: c.h,
-                    l: c.l,
-                    c: c.c,
-                    v: c.v || 0,
+            // Align timestamps to exact minute boundaries
+            const bulkOps = candles.map((c) => {
+              const alignedMs = alignTimestampToMinute(c.t);
+              const alignedSeconds = Math.floor(alignedMs / 1000);
+              return {
+                updateOne: {
+                  filter: { symbol, t: alignedSeconds },
+                  update: {
+                    $setOnInsert: { symbol },
+                    $set: {
+                      o: c.o,
+                      h: c.h,
+                      l: c.l,
+                      c: c.c,
+                      v: c.v || 0,
+                    },
                   },
+                  upsert: true,
                 },
-                upsert: true,
-              },
-            }));
+              };
+            });
 
             const result = await Candle1m.bulkWrite(bulkOps, { ordered: false });
             
