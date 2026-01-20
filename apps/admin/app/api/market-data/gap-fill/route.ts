@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
     
     for (const sym of symbols) {
       console.log(`🔍 [Gap Detection] Checking ${sym}...`);
+      console.log(`🔍 [Gap Detection] Current time: ${new Date().toISOString()}`);
       
       // Get candles from candles_1m (live/recent)
       const liveCandles = await Candle1m.find({ symbol: sym })
@@ -87,6 +88,14 @@ export async function GET(request: NextRequest) {
         .sort({ timestamp: 1 })
         .select({ timestamp: 1 })
         .lean() as Array<{ timestamp: Date }>;
+      
+      console.log(`📊 [Gap Detection] ${sym}: live=${liveCandles.length}, historical=${historicalCandles.length}`);
+      if (liveCandles.length > 0) {
+        console.log(`📊 [Gap Detection] ${sym} live range: ${new Date(liveCandles[0].t * 1000).toISOString()} to ${new Date(liveCandles[liveCandles.length-1].t * 1000).toISOString()}`);
+      }
+      if (historicalCandles.length > 0) {
+        console.log(`📊 [Gap Detection] ${sym} historical range: ${new Date(historicalCandles[0].timestamp).toISOString()} to ${new Date(historicalCandles[historicalCandles.length-1].timestamp).toISOString()}`);
+      }
       
       let largestGap: { start: string; end: string; minutes: number; source: string } | null = null;
       let collectionGap: { start: string; end: string; minutes: number } | null = null;
@@ -134,6 +143,7 @@ export async function GET(request: NextRequest) {
           const isWeekendGap = (prevDay === 5 || prevDay === 6) && missingMinutes >= 1440 && missingMinutes <= 4500;
           
           if (!isWeekendGap && missingMinutes > 10) {
+            console.log(`🚨 [Gap Found] ${sym} in candles_1m: ${prevDate.toISOString()} → ${nextDate.toISOString()} (${missingMinutes} min)`);
             allGaps.push({
               symbol: sym,
               startTime: liveCandles[i - 1].t,
