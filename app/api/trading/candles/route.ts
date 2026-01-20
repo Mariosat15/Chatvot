@@ -791,9 +791,36 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       const tfMinutes = { '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240 }[normalizedTf] || 60;
       const tfSeconds = tfMinutes * 60;
       
+      // Helper function to align timestamp to proper interval boundary
+      // e.g., 12:13 for 5m → 12:10, 12:18 for 5m → 12:15
+      const alignTimestamp = (timestampSeconds: number): number => {
+        return Math.floor(timestampSeconds / tfSeconds) * tfSeconds;
+      };
+      
+      // Helper to deduplicate candles by timestamp (keep the most recent one)
+      const deduplicateCandles = (candles: Array<{ time: number; open: number; high: number; low: number; close: number }>) => {
+        const candleMap = new Map<number, { time: number; open: number; high: number; low: number; close: number }>();
+        for (const c of candles) {
+          const existing = candleMap.get(c.time);
+          if (!existing) {
+            candleMap.set(c.time, c);
+          } else {
+            // Merge: keep first open, highest high, lowest low, last close
+            candleMap.set(c.time, {
+              time: c.time,
+              open: existing.open,
+              high: Math.max(existing.high, c.high),
+              low: Math.min(existing.low, c.low),
+              close: c.close,
+            });
+          }
+        }
+        return Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
+      };
+      
       // Calculate the START of the current candle period
       const now = Math.floor(Date.now() / 1000);
-      const currentPeriodStart = Math.floor(now / tfSeconds) * tfSeconds;
+      const currentPeriodStart = alignTimestamp(now);
       
       let historicalCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
       let formingCandle: { time: number; open: number; high: number; low: number; close: number } | null = null;
@@ -810,13 +837,16 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
               before: cutoffDate,
               limit: limit,
             });
-            historicalCandles = dbCandles.map(c => ({
-              time: Math.floor(new Date(c.timestamp).getTime() / 1000),
+            // IMPORTANT: Align timestamps to proper interval boundaries
+            const rawCandles = dbCandles.map(c => ({
+              time: alignTimestamp(Math.floor(new Date(c.timestamp).getTime() / 1000)),
               open: c.open,
               high: c.high,
               low: c.low,
               close: c.close,
             }));
+            // Deduplicate after alignment
+            historicalCandles = deduplicateCandles(rawCandles);
           }
         }
         
@@ -830,9 +860,12 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           const massiveTf = massiveTimeframeMap[normalizedTf];
           if (massiveTf) {
             const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
-            historicalCandles = apiCandles
+            // IMPORTANT: Align timestamps to proper interval boundaries
+            const rawCandles = apiCandles
               .filter(c => c.time < before)
-              .map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
+              .map(c => ({ time: alignTimestamp(c.time), open: c.open, high: c.high, low: c.low, close: c.close }));
+            // Deduplicate after alignment
+            historicalCandles = deduplicateCandles(rawCandles);
           }
         }
       } else {
@@ -849,13 +882,17 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
               before: currentPeriodDate,
               limit: limit - 1, // Leave room for forming candle
             });
-            historicalCandles = dbCandles.map(c => ({
-              time: Math.floor(new Date(c.timestamp).getTime() / 1000),
+            // IMPORTANT: Align timestamps to proper interval boundaries
+            // e.g., 5m candles should be at :00, :05, :10, :15, etc.
+            const rawCandles = dbCandles.map(c => ({
+              time: alignTimestamp(Math.floor(new Date(c.timestamp).getTime() / 1000)),
               open: c.open,
               high: c.high,
               low: c.low,
               close: c.close,
             }));
+            // Deduplicate after alignment
+            historicalCandles = deduplicateCandles(rawCandles);
             
             console.log(`⚡ [${normalizedTf} Optimal] ${symbol}: Got ${historicalCandles.length} historical candles (before ${currentPeriodDate.toISOString()})`);
           }
