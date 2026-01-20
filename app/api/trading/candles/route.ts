@@ -809,9 +809,35 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       const tfSeconds = tfMinutes * 60;
       
       // Helper function to align timestamp to proper interval boundary
-      // e.g., 12:13 for 5m → 12:10, 12:18 for 5m → 12:15
+      // For weekly: align to Monday 00:00 UTC
+      // For monthly: align to 1st of month 00:00 UTC
+      // For others: align to interval boundaries
       const alignTimestamp = (timestampSeconds: number): number => {
-        return Math.floor(timestampSeconds / tfSeconds) * tfSeconds;
+        if (normalizedTf === 'W') {
+          // Align to Monday 00:00 UTC
+          const date = new Date(timestampSeconds * 1000);
+          const dayOfWeek = date.getUTCDay(); // 0 = Sunday, 1 = Monday, etc.
+          const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Monday = 0 days back
+          const monday = new Date(Date.UTC(
+            date.getUTCFullYear(),
+            date.getUTCMonth(),
+            date.getUTCDate() - daysToSubtract,
+            0, 0, 0, 0
+          ));
+          return Math.floor(monday.getTime() / 1000);
+        } else if (normalizedTf === 'M') {
+          // Align to 1st of month 00:00 UTC
+          const date = new Date(timestampSeconds * 1000);
+          const firstOfMonth = new Date(Date.UTC(
+            date.getUTCFullYear(),
+            date.getUTCMonth(),
+            1, 0, 0, 0, 0
+          ));
+          return Math.floor(firstOfMonth.getTime() / 1000);
+        } else {
+          // Standard interval alignment for daily and lower
+          return Math.floor(timestampSeconds / tfSeconds) * tfSeconds;
+        }
       };
       
       // Helper to deduplicate candles by timestamp (keep the most recent one)

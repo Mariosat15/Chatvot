@@ -20,11 +20,37 @@ const TIMEFRAME_CONFIG: Record<string, { minutes: number; collectionName: string
 
 /**
  * Align timestamp to proper interval boundary
- * e.g., 12:13 for 5m → 12:10, 12:18 for 5m → 12:15
+ * For weekly: align to Monday 00:00 UTC
+ * For monthly: align to 1st of month 00:00 UTC
+ * For others: align to interval boundaries
  */
-function alignTimestamp(timestampMs: number, timeframeMinutes: number): number {
-  const intervalMs = timeframeMinutes * 60 * 1000;
-  return Math.floor(timestampMs / intervalMs) * intervalMs;
+function alignTimestamp(timestampMs: number, timeframeMinutes: number, timeframe?: string): number {
+  if (timeframe === '1w' || timeframeMinutes === 10080) {
+    // Align to Monday 00:00 UTC
+    const date = new Date(timestampMs);
+    const dayOfWeek = date.getUTCDay(); // 0 = Sunday, 1 = Monday, etc.
+    const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Monday = 0 days back
+    const monday = new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate() - daysToSubtract,
+      0, 0, 0, 0
+    ));
+    return monday.getTime();
+  } else if (timeframe === '1M' || timeframeMinutes === 43200) {
+    // Align to 1st of month 00:00 UTC
+    const date = new Date(timestampMs);
+    const firstOfMonth = new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      1, 0, 0, 0, 0
+    ));
+    return firstOfMonth.getTime();
+  } else {
+    // Standard interval alignment for daily and lower
+    const intervalMs = timeframeMinutes * 60 * 1000;
+    return Math.floor(timestampMs / intervalMs) * intervalMs;
+  }
 }
 
 // Historical candle schema (matches database/models/candle-historical.model.ts)
@@ -289,15 +315,15 @@ export async function POST(request: NextRequest) {
 
                 if (candles.length > 0) {
                   const config = TIMEFRAME_CONFIG[timeframe];
-                  const firstCandleDate = new Date(alignTimestamp(candles[0].t, config.minutes));
-                  const lastCandleDate = new Date(alignTimestamp(candles[candles.length - 1].t, config.minutes));
+                  const firstCandleDate = new Date(alignTimestamp(candles[0].t, config.minutes, timeframe));
+                  const lastCandleDate = new Date(alignTimestamp(candles[candles.length - 1].t, config.minutes, timeframe));
                   
                   if (!oldestDate || firstCandleDate < oldestDate) oldestDate = firstCandleDate;
                   if (!newestDate || lastCandleDate > newestDate) newestDate = lastCandleDate;
 
                   const documents = candles.map(c => ({
                     symbol,
-                    timestamp: new Date(alignTimestamp(c.t, config.minutes)),
+                    timestamp: new Date(alignTimestamp(c.t, config.minutes, timeframe)),
                     open: c.o, high: c.h, low: c.l, close: c.c, volume: c.v || 0,
                   }));
 
