@@ -61,10 +61,10 @@ async function getMarketDataSettings(): Promise<{
   useLocalHistory: boolean;
   autoFetchHistory: boolean;
   chartHistoryLimitEnabled: boolean;
-  chartHistoryLimitDays: number;
+  chartHistoryLimitMinutesTotal: number; // Total minutes for history limit
   initialCandleCount: number;
   lazyLoadBatchSize: number;
-  seedingDaysBack: number;
+  seedingMinutesTotal: number; // Total minutes for seeding
 }> {
   try {
     // Use raw MongoDB query to bypass Mongoose schema caching issues
@@ -72,7 +72,7 @@ async function getMarketDataSettings(): Promise<{
     const settings = await db?.collection('marketdatasettings').findOne({ key: 'market_data_settings' });
     
     // Debug: Log raw database values
-    console.log(`🔍 [Settings Debug] Raw DB values: initialCandleCount=${settings?.initialCandleCount}, seedingDaysBack=${settings?.seedingDaysBack}, chartHistoryLimitEnabled=${settings?.chartHistoryLimitEnabled}`);
+    console.log(`🔍 [Settings Debug] Raw DB values: initialCandleCount=${settings?.initialCandleCount}, seedingDaysBack=${settings?.seedingDaysBack}, seedingHours=${settings?.seedingHours}, seedingMinutes=${settings?.seedingMinutes}, chartHistoryLimitEnabled=${settings?.chartHistoryLimitEnabled}`);
     
     if (!settings) {
       console.log('📋 [Settings] No settings found, using defaults');
@@ -80,24 +80,44 @@ async function getMarketDataSettings(): Promise<{
         useLocalHistory: true,
         autoFetchHistory: false,
         chartHistoryLimitEnabled: false,
-        chartHistoryLimitDays: 365,
+        chartHistoryLimitMinutesTotal: 365 * 24 * 60, // 365 days in minutes
         initialCandleCount: DEFAULT_INITIAL_CANDLE_COUNT,
         lazyLoadBatchSize: DEFAULT_LAZY_LOAD_BATCH_SIZE,
-        seedingDaysBack: DEFAULT_SEEDING_DAYS_BACK,
+        seedingMinutesTotal: DEFAULT_SEEDING_DAYS_BACK * 24 * 60, // 30 days in minutes
       };
     }
+    
+    // Calculate total minutes for seeding (days + hours + minutes)
+    const seedingDays = settings.seedingDaysBack ?? DEFAULT_SEEDING_DAYS_BACK;
+    const seedingHours = settings.seedingHours ?? 0;
+    const seedingMinutes = settings.seedingMinutes ?? 0;
+    const seedingMinutesTotal = (seedingDays * 24 * 60) + (seedingHours * 60) + seedingMinutes;
+    
+    // Calculate total minutes for history limit (days + hours + minutes)
+    const historyDays = settings.chartHistoryLimitDays ?? 365;
+    const historyHours = settings.chartHistoryLimitHours ?? 0;
+    const historyMinutes = settings.chartHistoryLimitMinutes ?? 0;
+    const chartHistoryLimitMinutesTotal = (historyDays * 24 * 60) + (historyHours * 60) + historyMinutes;
     
     const result = {
       useLocalHistory: settings.useLocalHistory ?? true,
       autoFetchHistory: settings.autoFetchHistory ?? false,
       chartHistoryLimitEnabled: settings.chartHistoryLimitEnabled ?? false,
-      chartHistoryLimitDays: settings.chartHistoryLimitDays ?? 365,
+      chartHistoryLimitMinutesTotal,
       initialCandleCount: settings.initialCandleCount ?? DEFAULT_INITIAL_CANDLE_COUNT,
       lazyLoadBatchSize: settings.lazyLoadBatchSize ?? DEFAULT_LAZY_LOAD_BATCH_SIZE,
-      seedingDaysBack: settings.seedingDaysBack ?? DEFAULT_SEEDING_DAYS_BACK,
+      seedingMinutesTotal,
     };
     
-    console.log(`📋 [Settings] Loaded: limit=${result.chartHistoryLimitEnabled ? result.chartHistoryLimitDays + 'd' : 'OFF'}, initial=${result.initialCandleCount}, batch=${result.lazyLoadBatchSize}, seeding=${result.seedingDaysBack}d`);
+    // Format time for logging
+    const formatTime = (totalMinutes: number) => {
+      const d = Math.floor(totalMinutes / (24 * 60));
+      const h = Math.floor((totalMinutes % (24 * 60)) / 60);
+      const m = totalMinutes % 60;
+      return `${d}d ${h}h ${m}m`;
+    };
+    
+    console.log(`📋 [Settings] Loaded: limit=${result.chartHistoryLimitEnabled ? formatTime(result.chartHistoryLimitMinutesTotal) : 'OFF'}, initial=${result.initialCandleCount}, batch=${result.lazyLoadBatchSize}, seeding=${formatTime(result.seedingMinutesTotal)}`);
     
     return result;
   } catch (error) {
@@ -106,10 +126,10 @@ async function getMarketDataSettings(): Promise<{
       useLocalHistory: true,
       autoFetchHistory: false,
       chartHistoryLimitEnabled: false,
-      chartHistoryLimitDays: 365,
+      chartHistoryLimitMinutesTotal: 365 * 24 * 60, // 365 days in minutes
       initialCandleCount: DEFAULT_INITIAL_CANDLE_COUNT,
       lazyLoadBatchSize: DEFAULT_LAZY_LOAD_BATCH_SIZE,
-      seedingDaysBack: DEFAULT_SEEDING_DAYS_BACK,
+      seedingMinutesTotal: DEFAULT_SEEDING_DAYS_BACK * 24 * 60, // 30 days in minutes
     };
   }
 }
@@ -173,9 +193,9 @@ export async function GET(request: NextRequest) {
 /**
  * Seed historical candles from Massive.com to MongoDB
  * This is called ONCE per symbol when MongoDB is empty
- * @param seedingDaysBack - How many days back to fetch (from admin settings)
+ * @param seedingMinutes - Total minutes of data to fetch (from admin settings)
  */
-async function seedHistoricalCandles(symbol: string, limit: number, seedingDaysBack: number = DEFAULT_SEEDING_DAYS_BACK): Promise<void> {
+async function seedHistoricalCandles(symbol: string, limit: number, seedingMinutes: number = DEFAULT_SEEDING_DAYS_BACK * 24 * 60): Promise<void> {
   // Prevent duplicate seeding for same symbol
   if (seedingInProgress.has(symbol)) {
     console.log(`⏳ [Candles API] Seeding already in progress for ${symbol}, waiting...`);
@@ -186,11 +206,22 @@ async function seedHistoricalCandles(symbol: string, limit: number, seedingDaysB
   
   seedingInProgress.add(symbol);
   
+  // Format time for logging
+  const formatTime = (totalMinutes: number) => {
+    const d = Math.floor(totalMinutes / (24 * 60));
+    const h = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const m = totalMinutes % 60;
+    return `${d}d ${h}h ${m}m`;
+  };
+  
+  // Convert minutes to days for the API call (with ceiling to not lose minutes)
+  const seedingDays = Math.ceil(seedingMinutes / (24 * 60)) || 1; // At least 1 day
+  
   try {
-    console.log(`🌱 [Candles API] Seeding ${seedingDaysBack} days of candles for ${symbol}...`);
+    console.log(`🌱 [Candles API] Seeding ${formatTime(seedingMinutes)} of candles for ${symbol}...`);
     
     // Fetch from Massive.com REST API with configurable days back
-    const candles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit, seedingDaysBack);
+    const candles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit, seedingDays);
     
     // Debug: Log what Massive.com actually returned
     if (candles.length > 0) {
@@ -220,7 +251,7 @@ async function seedHistoricalCandles(symbol: string, limit: number, seedingDaysB
     // Save ALL candles to MongoDB
     await Candle1m.bulkUpsertCandles(candlesToSave);
     
-    console.log(`✅ [Candles API] Seeded ${candles.length} candles (${seedingDaysBack} days) for ${symbol} to MongoDB`);
+    console.log(`✅ [Candles API] Seeded ${candles.length} candles (${formatTime(seedingMinutes)}) for ${symbol} to MongoDB`);
   } catch (error) {
     console.error(`❌ [Candles API] Failed to seed candles for ${symbol}:`, error);
   } finally {
@@ -373,8 +404,13 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
   let historyLimitDate: Date | undefined;
   if (settings.chartHistoryLimitEnabled) {
     historyLimitDate = new Date();
-    historyLimitDate.setDate(historyLimitDate.getDate() - settings.chartHistoryLimitDays);
-    console.log(`📊 [Candles] History limit enabled: ${settings.chartHistoryLimitDays} days (since ${historyLimitDate.toISOString()})`);
+    // Use minutes for more precision
+    historyLimitDate.setTime(historyLimitDate.getTime() - (settings.chartHistoryLimitMinutesTotal * 60 * 1000));
+    // Format time for logging
+    const d = Math.floor(settings.chartHistoryLimitMinutesTotal / (24 * 60));
+    const h = Math.floor((settings.chartHistoryLimitMinutesTotal % (24 * 60)) / 60);
+    const m = settings.chartHistoryLimitMinutesTotal % 60;
+    console.log(`📊 [Candles] History limit enabled: ${d}d ${h}h ${m}m (since ${historyLimitDate.toISOString()})`);
   }
 
   // For 1-minute timeframe: Get from MongoDB (server source of truth)
@@ -466,11 +502,15 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       
       if (needsSeeding && !isCurrentlySeeding && !before) {
         // BACKGROUND SEEDING: Don't block - seed in background and return immediately
-        console.log(`⚡ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, starting BACKGROUND seeding (${settings.seedingDaysBack} days)...`);
+        // Format time for logging
+        const d = Math.floor(settings.seedingMinutesTotal / (24 * 60));
+        const h = Math.floor((settings.seedingMinutesTotal % (24 * 60)) / 60);
+        const m = settings.seedingMinutesTotal % 60;
+        console.log(`⚡ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, starting BACKGROUND seeding (${d}d ${h}h ${m}m)...`);
         
         // Fire and forget - don't await!
-        // Pass seedingDaysBack from admin settings
-        seedHistoricalCandles(symbol, Math.max(limit, 5000), settings.seedingDaysBack).then(() => {
+        // Pass seedingMinutesTotal from admin settings
+        seedHistoricalCandles(symbol, Math.max(limit, 5000), settings.seedingMinutesTotal).then(() => {
           console.log(`✅ [Candles API] Background seeding completed for ${symbol}`);
         }).catch((err) => {
           console.error(`❌ [Candles API] Background seeding failed for ${symbol}:`, err);

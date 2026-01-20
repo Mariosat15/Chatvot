@@ -32,10 +32,14 @@ interface MarketDataSettings {
   autoFetchHistory: boolean;
   chartHistoryLimitEnabled: boolean;
   chartHistoryLimitDays: number;
+  chartHistoryLimitHours: number;
+  chartHistoryLimitMinutes: number;
   initialCandleCount: number;
   lazyLoadBatchSize: number;
   historicalYearsToDownload: number;
   seedingDaysBack: number;
+  seedingHours: number;
+  seedingMinutes: number;
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1493,20 +1497,44 @@ export default function MarketDataSection() {
                 </div>
                 <p className="text-gray-500 text-xs mb-2">
                   {settings.chartHistoryLimitEnabled 
-                    ? `Charts show max ${settings.chartHistoryLimitDays} days of history`
+                    ? `Charts show max ${settings.chartHistoryLimitDays}d ${settings.chartHistoryLimitHours || 0}h ${settings.chartHistoryLimitMinutes || 0}m of history`
                     : 'Charts can show all available history'}
                 </p>
                 {settings.chartHistoryLimitEnabled && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <input
-                      type="number"
-                      min="1"
-                      max="3650"
-                      value={settings.chartHistoryLimitDays}
-                      onChange={(e) => saveSettings({ chartHistoryLimitDays: parseInt(e.target.value) || 365 })}
-                      className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-20 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
-                    />
-                    <span className="text-gray-500 text-sm">days</span>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="3650"
+                        value={settings.chartHistoryLimitDays}
+                        onChange={(e) => saveSettings({ chartHistoryLimitDays: parseInt(e.target.value) || 0 })}
+                        className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-16 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                      />
+                      <span className="text-gray-500 text-sm">d</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="23"
+                        value={settings.chartHistoryLimitHours || 0}
+                        onChange={(e) => saveSettings({ chartHistoryLimitHours: parseInt(e.target.value) || 0 })}
+                        className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-16 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                      />
+                      <span className="text-gray-500 text-sm">h</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="59"
+                        value={settings.chartHistoryLimitMinutes || 0}
+                        onChange={(e) => saveSettings({ chartHistoryLimitMinutes: parseInt(e.target.value) || 0 })}
+                        className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-16 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                      />
+                      <span className="text-gray-500 text-sm">m</span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1517,10 +1545,10 @@ export default function MarketDataSection() {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    min="10"
+                    min="0"
                     step="10"
                     value={settings.initialCandleCount}
-                    onChange={(e) => saveSettings({ initialCandleCount: parseInt(e.target.value) || 100 })}
+                    onChange={(e) => saveSettings({ initialCandleCount: parseInt(e.target.value) || 0 })}
                     className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-24 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
                   />
                   <span className="text-gray-500 text-sm">candles</span>
@@ -1625,20 +1653,44 @@ export default function MarketDataSection() {
               {/* Auto-Seeding Days Back */}
               <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
                 <h4 className="text-white font-medium mb-3">🌱 Auto-Seeding (Empty DB)</h4>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    max="365"
-                    step="1"
-                    value={settings.seedingDaysBack || 30}
-                    onChange={(e) => saveSettings({ seedingDaysBack: parseInt(e.target.value) || 30 })}
-                    className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-24 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
-                  />
-                  <span className="text-gray-500 text-sm">days back</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="365"
+                      step="1"
+                      value={settings.seedingDaysBack || 0}
+                      onChange={(e) => saveSettings({ seedingDaysBack: parseInt(e.target.value) || 0 })}
+                      className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-16 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                    />
+                    <span className="text-gray-500 text-sm">d</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="23"
+                      value={settings.seedingHours || 0}
+                      onChange={(e) => saveSettings({ seedingHours: parseInt(e.target.value) || 0 })}
+                      className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-16 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                    />
+                    <span className="text-gray-500 text-sm">h</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={settings.seedingMinutes || 0}
+                      onChange={(e) => saveSettings({ seedingMinutes: parseInt(e.target.value) || 0 })}
+                      className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-16 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                    />
+                    <span className="text-gray-500 text-sm">m</span>
+                  </div>
                 </div>
                 <p className="text-gray-500 text-xs mt-2">
-                  When database is empty, fetch this many days from Massive.com API
+                  When database is empty, fetch this amount of data from Massive.com API
                 </p>
                 <div className="mt-2 text-xs text-yellow-400/80">
                   ⚡ Higher = slower initial load, but more history immediately available

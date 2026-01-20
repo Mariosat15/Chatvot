@@ -72,15 +72,29 @@ const MarketDataSettingsSchema = new mongoose.Schema({
   chartHistoryLimitDays: {
     type: Number,
     default: 365,
-    min: 1,
+    min: 0,
     max: 3650,
+  },
+  // Hours component for chart history limit
+  chartHistoryLimitHours: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 23,
+  },
+  // Minutes component for chart history limit
+  chartHistoryLimitMinutes: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 59,
   },
   // --- Lazy Loading Settings ---
   // How many candles to load initially (default: 100)
   initialCandleCount: {
     type: Number,
     default: 100,
-    min: 10,
+    min: 0, // Allow 0 for no initial load
     // No max limit - admin can set any value
   },
   // How many candles to load when scrolling (default: 500)
@@ -104,8 +118,22 @@ const MarketDataSettingsSchema = new mongoose.Schema({
   seedingDaysBack: {
     type: Number,
     default: 30,
-    min: 1,
+    min: 0,
     max: 365,
+  },
+  // Hours component for seeding
+  seedingHours: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 23,
+  },
+  // Minutes component for seeding
+  seedingMinutes: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 59,
   },
 }, { timestamps: true });
 
@@ -157,10 +185,14 @@ export async function GET() {
         autoFetchHistory: false,
         chartHistoryLimitEnabled: false,
         chartHistoryLimitDays: 365,
+        chartHistoryLimitHours: 0,
+        chartHistoryLimitMinutes: 0,
         initialCandleCount: 500,
         lazyLoadBatchSize: 500,
         historicalYearsToDownload: 10,
         seedingDaysBack: 30,
+        seedingHours: 0,
+        seedingMinutes: 0,
       });
     }
     
@@ -177,10 +209,14 @@ export async function GET() {
         autoFetchHistory: settings.autoFetchHistory ?? false,
         chartHistoryLimitEnabled: settings.chartHistoryLimitEnabled ?? false,
         chartHistoryLimitDays: settings.chartHistoryLimitDays ?? 365,
+        chartHistoryLimitHours: settings.chartHistoryLimitHours ?? 0,
+        chartHistoryLimitMinutes: settings.chartHistoryLimitMinutes ?? 0,
         initialCandleCount: settings.initialCandleCount ?? 500,
         lazyLoadBatchSize: settings.lazyLoadBatchSize ?? 500,
         historicalYearsToDownload: settings.historicalYearsToDownload ?? 10,
         seedingDaysBack: settings.seedingDaysBack ?? 30,
+        seedingHours: settings.seedingHours ?? 0,
+        seedingMinutes: settings.seedingMinutes ?? 0,
         updatedAt: settings.updatedAt,
       },
     });
@@ -279,10 +315,16 @@ export async function POST(request: NextRequest) {
       updateData['chartHistoryLimitEnabled'] = body.chartHistoryLimitEnabled;
     }
     if (typeof body.chartHistoryLimitDays === 'number') {
-      updateData['chartHistoryLimitDays'] = Math.max(1, Math.min(3650, body.chartHistoryLimitDays));
+      updateData['chartHistoryLimitDays'] = Math.max(0, Math.min(3650, body.chartHistoryLimitDays));
+    }
+    if (typeof body.chartHistoryLimitHours === 'number') {
+      updateData['chartHistoryLimitHours'] = Math.max(0, Math.min(23, body.chartHistoryLimitHours));
+    }
+    if (typeof body.chartHistoryLimitMinutes === 'number') {
+      updateData['chartHistoryLimitMinutes'] = Math.max(0, Math.min(59, body.chartHistoryLimitMinutes));
     }
     if (typeof body.initialCandleCount === 'number') {
-      updateData['initialCandleCount'] = Math.max(10, body.initialCandleCount); // No upper limit
+      updateData['initialCandleCount'] = Math.max(0, body.initialCandleCount); // No upper limit, allow 0
     }
     if (typeof body.lazyLoadBatchSize === 'number') {
       updateData['lazyLoadBatchSize'] = Math.max(100, Math.min(2000, body.lazyLoadBatchSize));
@@ -291,7 +333,13 @@ export async function POST(request: NextRequest) {
       updateData['historicalYearsToDownload'] = Math.max(1, Math.min(20, body.historicalYearsToDownload));
     }
     if (typeof body.seedingDaysBack === 'number') {
-      updateData['seedingDaysBack'] = Math.max(1, Math.min(365, body.seedingDaysBack));
+      updateData['seedingDaysBack'] = Math.max(0, Math.min(365, body.seedingDaysBack));
+    }
+    if (typeof body.seedingHours === 'number') {
+      updateData['seedingHours'] = Math.max(0, Math.min(23, body.seedingHours));
+    }
+    if (typeof body.seedingMinutes === 'number') {
+      updateData['seedingMinutes'] = Math.max(0, Math.min(59, body.seedingMinutes));
     }
     
     const settings = await MarketDataSettings.findOneAndUpdate(
@@ -313,10 +361,14 @@ export async function POST(request: NextRequest) {
         autoFetchHistory: settings.autoFetchHistory ?? false,
         chartHistoryLimitEnabled: settings.chartHistoryLimitEnabled ?? false,
         chartHistoryLimitDays: settings.chartHistoryLimitDays ?? 365,
+        chartHistoryLimitHours: settings.chartHistoryLimitHours ?? 0,
+        chartHistoryLimitMinutes: settings.chartHistoryLimitMinutes ?? 0,
         initialCandleCount: settings.initialCandleCount ?? 500,
         lazyLoadBatchSize: settings.lazyLoadBatchSize ?? 500,
         historicalYearsToDownload: settings.historicalYearsToDownload ?? 10,
         seedingDaysBack: settings.seedingDaysBack ?? 30,
+        seedingHours: settings.seedingHours ?? 0,
+        seedingMinutes: settings.seedingMinutes ?? 0,
         updatedAt: settings.updatedAt,
       },
     });
