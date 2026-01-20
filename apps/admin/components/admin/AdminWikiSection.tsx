@@ -771,6 +771,350 @@ export default function AdminWikiSection() {
 
     // ==================== MARKET DATA ====================
     {
+      id: 'market-data-setup',
+      title: 'Complete First-Time Setup Guide',
+      icon: Play,
+      category: 'Market Data',
+      tags: ['setup', 'first-time', 'guide', 'configuration', 'initial', 'tutorial'],
+      content: (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-xl p-6">
+            <h2 className="text-2xl font-bold text-green-400 mb-3 flex items-center gap-2">
+              <Play className="h-6 w-6" />
+              Complete First-Time Setup Guide
+            </h2>
+            <p className="text-gray-300">
+              <strong>Goal:</strong> Aggregate only 60 minutes of 1m data for real-time charts, with all older data served instantly from pre-built historical collections.
+            </p>
+          </div>
+
+          {/* Step 1 */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-blue-400 flex items-center gap-2">
+                <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">1</span>
+                Configure Market Data Settings
+              </CardTitle>
+              <CardDescription>Go to: Admin → Market Data → Settings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left py-2 px-3 text-gray-400">Setting</th>
+                      <th className="text-left py-2 px-3 text-gray-400">Value</th>
+                      <th className="text-left py-2 px-3 text-gray-400">Why</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-300">
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3 font-medium">Initial Load</td>
+                      <td className="py-2 px-3"><code className="bg-gray-700 px-2 py-0.5 rounded">60</code></td>
+                      <td className="py-2 px-3 text-gray-400">Load 60 candles initially (1 hour of 1m data)</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3 font-medium">Scroll Load Batch</td>
+                      <td className="py-2 px-3"><code className="bg-gray-700 px-2 py-0.5 rounded">100</code></td>
+                      <td className="py-2 px-3 text-gray-400">Load 100 candles when scrolling left</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3 font-medium">Auto-Seeding (Empty DB)</td>
+                      <td className="py-2 px-3"><code className="bg-gray-700 px-2 py-0.5 rounded">0d 1h 0m</code></td>
+                      <td className="py-2 px-3 text-gray-400">Only seed 1 hour if DB is empty</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3 font-medium">Data Source</td>
+                      <td className="py-2 px-3"><Badge className="bg-green-500/20 text-green-400">✓ ON</Badge></td>
+                      <td className="py-2 px-3 text-gray-400">Use local database (fast)</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3 font-medium">Limit Chart History</td>
+                      <td className="py-2 px-3"><code className="bg-gray-700 px-2 py-0.5 rounded">3650d</code></td>
+                      <td className="py-2 px-3 text-gray-400">How far back users can scroll (10 years)</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-3 font-medium">Gap Fill</td>
+                      <td className="py-2 px-3"><Badge className="bg-green-500/20 text-green-400">✓ ON, Auto</Badge></td>
+                      <td className="py-2 px-3 text-gray-400">Auto-fill small gaps</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-sm text-gray-400 mt-4">Click <strong>Save</strong> after configuring.</p>
+            </CardContent>
+          </Card>
+
+          {/* Step 2 */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400 flex items-center gap-2">
+                <span className="bg-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">2</span>
+                Download 1m Historical Data
+              </CardTitle>
+              <CardDescription>Go to: Admin → Market Data → Import Historical Data</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left py-2 px-3 text-gray-400">Parameter</th>
+                      <th className="text-left py-2 px-3 text-gray-400">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-300">
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3 font-medium">From Date</td>
+                      <td className="py-2 px-3"><code className="bg-gray-700 px-2 py-0.5 rounded">2024-01-01</code> (or how far back you want)</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3 font-medium">To Date</td>
+                      <td className="py-2 px-3">Click <strong>"Set to today →"</strong></td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-3 font-medium">Select Symbols</td>
+                      <td className="py-2 px-3">Click <strong>"Select All"</strong> (or choose specific ones)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                <p className="text-sm text-purple-300">
+                  Click <strong>"Start Import"</strong> and wait for completion. This downloads 1m candles into <code className="bg-gray-700 px-1 rounded">candles_historical_1m</code>.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Step 3 */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-orange-400 flex items-center gap-2">
+                <span className="bg-orange-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">3</span>
+                Download Higher Timeframe History
+              </CardTitle>
+              <CardDescription>Go to: Admin → Market Data → Download Higher Timeframe History</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left py-2 px-3 text-gray-400">Parameter</th>
+                      <th className="text-left py-2 px-3 text-gray-400">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-300">
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3 font-medium">Years of History</td>
+                      <td className="py-2 px-3"><code className="bg-gray-700 px-2 py-0.5 rounded">1</code> or <code className="bg-gray-700 px-2 py-0.5 rounded">2</code> (your choice)</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3 font-medium">Select Timeframes</td>
+                      <td className="py-2 px-3">✅ 5m, ✅ 15m, ✅ 30m, ✅ 1h, ✅ 4h, ✅ 1d, ✅ 1w, ✅ 1M</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-3 font-medium">Select Symbols</td>
+                      <td className="py-2 px-3">Click <strong>"Select All"</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                <p className="text-sm text-orange-300 mb-2">
+                  Click <strong>"Download History"</strong> and wait for completion. This downloads pre-built candles into:
+                </p>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <code className="bg-gray-700 px-2 py-1 rounded">candles_historical_5m</code>
+                  <code className="bg-gray-700 px-2 py-1 rounded">candles_historical_15m</code>
+                  <code className="bg-gray-700 px-2 py-1 rounded">candles_historical_30m</code>
+                  <code className="bg-gray-700 px-2 py-1 rounded">candles_historical_1h</code>
+                  <code className="bg-gray-700 px-2 py-1 rounded">candles_historical_4h</code>
+                  <code className="bg-gray-700 px-2 py-1 rounded">etc.</code>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Step 4 */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400 flex items-center gap-2">
+                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">4</span>
+                Verify Setup
+              </CardTitle>
+              <CardDescription>Test that everything works correctly</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-gray-300">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                  <span>Open user dashboard</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-300">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                  <span>Switch to 1h timeframe</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-300">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                  <span><strong>Initial load should be instant</strong> (from cache + historical)</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-300">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                  <span>Scroll left - <strong>history loads smoothly</strong> from <code className="bg-gray-700 px-1 rounded text-xs">candles_historical_1h</code></span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* How It Works */}
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
+            <h3 className="text-lg font-bold text-cyan-400 mb-4 flex items-center gap-2">
+              <Cpu className="h-5 w-5" />
+              How It Works After Setup
+            </h3>
+            <div className="space-y-4 font-mono text-sm">
+              <div className="bg-gray-900 p-4 rounded-lg border border-gray-700">
+                <div className="text-gray-400 text-center mb-2">USER REQUESTS 1H CHART</div>
+                <div className="flex justify-center">
+                  <ArrowDown className="h-4 w-4 text-gray-500" />
+                </div>
+              </div>
+              <div className="bg-blue-500/10 border border-blue-500/30 p-4 rounded-lg">
+                <div className="text-blue-400 font-bold mb-1">RECENT DATA (last ~60 minutes)</div>
+                <div className="text-gray-400 text-xs space-y-1">
+                  <div>Source: <code>candles_1m</code> (live)</div>
+                  <div>Process: Aggregate 60 × 1m candles → 1 hour candle</div>
+                  <div>Speed: <span className="text-green-400">Fast (small dataset)</span></div>
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <ArrowDown className="h-4 w-4 text-gray-500" />
+              </div>
+              <div className="bg-green-500/10 border border-green-500/30 p-4 rounded-lg">
+                <div className="text-green-400 font-bold mb-1">HISTORICAL DATA (everything older)</div>
+                <div className="text-gray-400 text-xs space-y-1">
+                  <div>Source: <code>candles_historical_1h</code></div>
+                  <div>Process: Direct read (NO aggregation!)</div>
+                  <div>Speed: <span className="text-green-400 font-bold">INSTANT ⚡</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Reference Card */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400 flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Quick Reference Card
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left py-2 px-3 text-gray-400">What</th>
+                      <th className="text-left py-2 px-3 text-gray-400">Collection</th>
+                      <th className="text-left py-2 px-3 text-gray-400">How it&apos;s used</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-300">
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3">Live prices</td>
+                      <td className="py-2 px-3"><code className="bg-gray-700 px-2 py-0.5 rounded text-xs">candles_1m</code></td>
+                      <td className="py-2 px-3 text-gray-400">Aggregated for recent timeframes</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3">1m history</td>
+                      <td className="py-2 px-3"><code className="bg-gray-700 px-2 py-0.5 rounded text-xs">candles_historical_1m</code></td>
+                      <td className="py-2 px-3 text-gray-400">Direct read when scrolling 1m chart</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3">5m history</td>
+                      <td className="py-2 px-3"><code className="bg-gray-700 px-2 py-0.5 rounded text-xs">candles_historical_5m</code></td>
+                      <td className="py-2 px-3 text-gray-400">Direct read when scrolling 5m chart</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 px-3">1h history</td>
+                      <td className="py-2 px-3"><code className="bg-gray-700 px-2 py-0.5 rounded text-xs">candles_historical_1h</code></td>
+                      <td className="py-2 px-3 text-gray-400">Direct read when scrolling 1h chart</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-3">4h history</td>
+                      <td className="py-2 px-3"><code className="bg-gray-700 px-2 py-0.5 rounded text-xs">candles_historical_4h</code></td>
+                      <td className="py-2 px-3 text-gray-400">Direct read when scrolling 4h chart</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Maintenance */}
+          <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5">
+            <h3 className="text-md font-bold text-gray-300 mb-3 flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Maintenance (Optional)
+            </h3>
+            <p className="text-gray-400 text-sm mb-3">The system auto-maintains itself, but you can:</p>
+            <ul className="space-y-2 text-sm text-gray-300">
+              <li className="flex items-center gap-2">
+                <Download className="h-4 w-4 text-blue-400" />
+                <strong>Re-download history</strong> anytime to fill gaps
+              </li>
+              <li className="flex items-center gap-2">
+                <Settings className="h-4 w-4 text-purple-400" />
+                <strong>Adjust Initial Load</strong> if you want more/less data on first view
+              </li>
+              <li className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-yellow-400" />
+                <strong>Enable Auto-Seeding</strong> to automatically populate empty databases
+              </li>
+            </ul>
+          </div>
+
+          {/* Summary Checklist */}
+          <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-xl p-6">
+            <h3 className="text-lg font-bold text-green-400 mb-4 flex items-center gap-2">
+              <CheckCircle className="h-5 w-5" />
+              Summary Checklist
+            </h3>
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 text-gray-300">
+                <input type="checkbox" className="w-4 h-4 rounded" />
+                <span>Set Initial Load to 60</span>
+              </label>
+              <label className="flex items-center gap-3 text-gray-300">
+                <input type="checkbox" className="w-4 h-4 rounded" />
+                <span>Set Auto-Seeding to 0d 1h 0m</span>
+              </label>
+              <label className="flex items-center gap-3 text-gray-300">
+                <input type="checkbox" className="w-4 h-4 rounded" />
+                <span>Download 1m history (Step 2)</span>
+              </label>
+              <label className="flex items-center gap-3 text-gray-300">
+                <input type="checkbox" className="w-4 h-4 rounded" />
+                <span>Download higher timeframe history (Step 3)</span>
+              </label>
+              <label className="flex items-center gap-3 text-gray-300">
+                <input type="checkbox" className="w-4 h-4 rounded" />
+                <span>Test chart loading speed</span>
+              </label>
+            </div>
+            <div className="mt-4 p-3 bg-green-500/20 rounded-lg text-center">
+              <p className="text-green-400 font-bold">
+                🚀 Done! Your charts will now load instantly with 60 minutes of real-time aggregation and years of pre-built history.
+              </p>
+            </div>
+          </div>
+        </div>
+      )
+    },
+
+    {
       id: 'market-data-overview',
       title: 'Market Data Overview',
       icon: CandlestickChart,
