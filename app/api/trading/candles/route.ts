@@ -814,17 +814,18 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       // For others: align to interval boundaries
       const alignTimestamp = (timestampSeconds: number): number => {
         if (normalizedTf === 'W') {
-          // Align to Monday 00:00 UTC
+          // Align to SUNDAY 00:00 UTC (forex markets open Sunday evening)
           const date = new Date(timestampSeconds * 1000);
           const dayOfWeek = date.getUTCDay(); // 0 = Sunday, 1 = Monday, etc.
-          const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Monday = 0 days back
-          const monday = new Date(Date.UTC(
+          // Sunday = 0 days back, Monday = 1 day back, ... Saturday = 6 days back
+          const daysToSubtract = dayOfWeek;
+          const sunday = new Date(Date.UTC(
             date.getUTCFullYear(),
             date.getUTCMonth(),
             date.getUTCDate() - daysToSubtract,
             0, 0, 0, 0
           ));
-          return Math.floor(monday.getTime() / 1000);
+          return Math.floor(sunday.getTime() / 1000);
         } else if (normalizedTf === 'M') {
           // Align to 1st of month 00:00 UTC
           const date = new Date(timestampSeconds * 1000);

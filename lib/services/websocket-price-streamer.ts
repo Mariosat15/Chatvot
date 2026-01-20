@@ -904,14 +904,15 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
     existingD.close = price;
   }
   
-  // Update Weekly cache (week starts at Monday 00:00 UTC)
-  // Calculate Monday 00:00 UTC of the current week
+  // Update Weekly cache (week starts at SUNDAY 00:00 UTC - forex market open)
+  // Calculate Sunday 00:00 UTC of the current week
   const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 1 = Monday, ...
-  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday is 6 days from Monday
-  const mondayDate = new Date(now);
-  mondayDate.setUTCDate(now.getUTCDate() - daysFromMonday);
-  mondayDate.setUTCHours(0, 0, 0, 0);
-  const periodW = Math.floor(mondayDate.getTime() / 1000);
+  // Sunday = 0 days back, Monday = 1 day back, ... Saturday = 6 days back
+  const daysFromSunday = dayOfWeek;
+  const sundayDate = new Date(now);
+  sundayDate.setUTCDate(now.getUTCDate() - daysFromSunday);
+  sundayDate.setUTCHours(0, 0, 0, 0);
+  const periodW = Math.floor(sundayDate.getTime() / 1000);
   const existingW = state.formingCandlesW.get(symbol);
   
   if (!existingW || existingW.periodStart !== periodW) {
