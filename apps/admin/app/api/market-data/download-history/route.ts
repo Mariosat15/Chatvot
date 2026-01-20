@@ -314,19 +314,23 @@ export async function POST(request: NextRequest) {
                 totalFetched += candles.length;
 
                 if (candles.length > 0) {
-                  // The Massive.com API already returns properly aligned timestamps
-                  // for ALL timeframes - use them directly without re-aligning
-                  const firstCandleDate = new Date(candles[0].t);
-                  const lastCandleDate = new Date(candles[candles.length - 1].t);
+                  // ALWAYS align timestamps before storing to ensure consistency:
+                  // - Weekly: align to Monday 00:00 UTC
+                  // - Monthly: align to 1st of month 00:00 UTC
+                  // - Others: align to interval boundaries
+                  // This ensures database has clean, properly aligned data
+                  const documents = candles.map(c => ({
+                    symbol,
+                    timestamp: new Date(alignTimestamp(c.t, config.minutes, timeframe)),
+                    open: c.o, high: c.h, low: c.l, close: c.c, volume: c.v || 0,
+                  }));
+                  
+                  // Track date range for logging (use aligned timestamps)
+                  const firstCandleDate = documents[0].timestamp;
+                  const lastCandleDate = documents[documents.length - 1].timestamp;
                   
                   if (!oldestDate || firstCandleDate < oldestDate) oldestDate = firstCandleDate;
                   if (!newestDate || lastCandleDate > newestDate) newestDate = lastCandleDate;
-
-                  const documents = candles.map(c => ({
-                    symbol,
-                    timestamp: new Date(c.t),
-                    open: c.o, high: c.h, low: c.l, close: c.c, volume: c.v || 0,
-                  }));
 
                   const BATCH_SIZE = 1000;
                   for (let i = 0; i < documents.length; i += BATCH_SIZE) {
