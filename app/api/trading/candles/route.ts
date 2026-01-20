@@ -28,6 +28,11 @@ const gapFillInProgress = new Set<string>();
 const lastGapFillCheck = new Map<string, number>();
 const GAP_FILL_CHECK_INTERVAL = 60000; // Check for gaps every 60 seconds per symbol
 
+// Track collection-to-collection gap fill (between candles_1m and candles_historical_1m)
+const collectionGapFillInProgress = new Set<string>();
+const lastCollectionGapCheck = new Map<string, number>();
+const COLLECTION_GAP_CHECK_INTERVAL = 300000; // Check for collection gaps every 5 minutes per symbol
+
 // Default settings (fallback if DB settings not available)
 const DEFAULT_INITIAL_CANDLE_COUNT = 500;
 const DEFAULT_LAZY_LOAD_BATCH_SIZE = 500;
@@ -396,6 +401,137 @@ async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): P
 }
 
 /**
+ * Detect and fill gap between candles_1m (live) and candles_historical_1m (historical)
+ * This is a SEPARATE operation from autoFillGaps - it bridges the two collections
+ * Runs in background every 5 minutes per symbol
+ */
+async function fillCollectionGap(symbol: string): Promise<void> {
+  const now = Date.now();
+  const lastCheck = lastCollectionGapCheck.get(symbol) || 0;
+  
+  // Only check every 5 minutes
+  if (now - lastCheck < COLLECTION_GAP_CHECK_INTERVAL) return;
+  if (collectionGapFillInProgress.has(symbol)) return;
+  
+  lastCollectionGapCheck.set(symbol, now);
+  
+  try {
+    // Check if auto gap fill is enabled
+    const MarketDataSettings = mongoose.models.MarketDataSettings;
+    if (!MarketDataSettings) return;
+    
+    const settings = await MarketDataSettings.findOne({ key: 'market_data_settings' });
+    if (!settings?.gapFill?.enabled || settings?.gapFill?.mode !== 'auto') return;
+    
+    // Get oldest candle from candles_1m (live data)
+    const oldest1m = await mongoose.connection.db?.collection('candles_1m').findOne(
+      { symbol },
+      { sort: { t: 1 }, projection: { t: 1 } }
+    );
+    
+    // Get newest candle from candles_historical_1m
+    const historicalModel = getHistoricalModel('1m');
+    if (!historicalModel) return;
+    
+    const newestHistorical = await historicalModel.findOne(
+      { symbol },
+      { sort: { timestamp: -1 }, projection: { timestamp: 1 } }
+    ).lean() as { timestamp?: Date } | null;
+    
+    if (!oldest1m || !newestHistorical) {
+      // Missing data in one of the collections, can't detect gap
+      return;
+    }
+    
+    const oldest1mTime = oldest1m.t as number; // in seconds
+    const newestHistoricalTime = Math.floor(new Date(newestHistorical.timestamp!).getTime() / 1000); // in seconds
+    
+    // Calculate gap in minutes
+    const gapMinutes = Math.floor((oldest1mTime - newestHistoricalTime) / 60);
+    
+    // If gap is less than 10 minutes, no need to fill
+    if (gapMinutes <= 10) {
+      return;
+    }
+    
+    // If gap is too large (> 7 days = 10080 minutes), don't auto-fill - user should download manually
+    if (gapMinutes > 10080) {
+      console.log(`⚠️ [Collection Gap] ${symbol}: Gap of ${gapMinutes} minutes (${Math.round(gapMinutes / 1440)} days) is too large. Please download manually from Admin.`);
+      return;
+    }
+    
+    console.log(`🔍 [Collection Gap] ${symbol}: Detected ${gapMinutes} minute gap between live and historical data`);
+    console.log(`   Historical ends: ${new Date(newestHistoricalTime * 1000).toISOString()}`);
+    console.log(`   Live starts: ${new Date(oldest1mTime * 1000).toISOString()}`);
+    
+    // Fill the gap in background
+    collectionGapFillInProgress.add(symbol);
+    
+    (async () => {
+      try {
+        const gapStartMs = newestHistoricalTime * 1000 + 60000; // Start 1 minute after newest historical
+        const gapEndMs = oldest1mTime * 1000 - 60000; // End 1 minute before oldest live
+        
+        console.log(`🔧 [Collection Gap Fill] ${symbol}: Fetching ${gapMinutes} minutes from Massive.com...`);
+        
+        const gapCandles = await fetchCandlesForRange(
+          symbol as ForexSymbol,
+          '1' as Timeframe,
+          gapStartMs,
+          gapEndMs
+        );
+        
+        if (gapCandles.length === 0) {
+          console.log(`⚠️ [Collection Gap Fill] ${symbol}: No candles available for gap period`);
+          return;
+        }
+        
+        console.log(`📥 [Collection Gap Fill] ${symbol}: Got ${gapCandles.length} candles, inserting to historical...`);
+        
+        // Insert gap candles into candles_historical_1m
+        let insertedCount = 0;
+        for (const candle of gapCandles) {
+          const timestamp = new Date(candle.time);
+          
+          // Skip weekends
+          const day = timestamp.getUTCDay();
+          if (day === 0 || day === 6) continue;
+          
+          // Skip if already exists
+          const exists = await historicalModel.findOne({
+            symbol,
+            timestamp
+          }).lean();
+          
+          if (!exists) {
+            await historicalModel.create({
+              symbol,
+              timestamp,
+              open: candle.open,
+              high: candle.high,
+              low: candle.low,
+              close: candle.close,
+              volume: candle.volume || 0,
+            });
+            insertedCount++;
+          }
+        }
+        
+        console.log(`✅ [Collection Gap Fill] ${symbol}: Inserted ${insertedCount} candles, gap filled!`);
+        
+      } catch (error) {
+        console.error(`❌ [Collection Gap Fill] Failed for ${symbol}:`, error);
+      } finally {
+        collectionGapFillInProgress.delete(symbol);
+      }
+    })();
+    
+  } catch {
+    // Settings not available, skip
+  }
+}
+
+/**
  * Shared handler for both GET and POST
  * @param before - Timestamp in SECONDS for lazy loading (get candles before this time)
  */
@@ -538,6 +674,11 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       // If MongoDB has enough candles, also run gap fill in background
       if (candles && candles.length >= 50 && !before) {
         autoFillGaps(symbol, candles);
+      }
+      
+      // Also check for gap between candles_1m and candles_historical_1m (runs in background)
+      if (!before) {
+        fillCollectionGap(symbol);
       }
       
       // For lazy loading, indicate if there's more data
