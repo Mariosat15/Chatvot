@@ -81,7 +81,7 @@ const MarketDataSettingsSchema = new mongoose.Schema({
     type: Number,
     default: 100,
     min: 10,
-    max: 1000,
+    // No max limit - admin can set any value
   },
   // How many candles to load when scrolling (default: 500)
   lazyLoadBatchSize: {
@@ -282,7 +282,7 @@ export async function POST(request: NextRequest) {
       updateData['chartHistoryLimitDays'] = Math.max(1, Math.min(3650, body.chartHistoryLimitDays));
     }
     if (typeof body.initialCandleCount === 'number') {
-      updateData['initialCandleCount'] = Math.max(10, Math.min(1000, body.initialCandleCount));
+      updateData['initialCandleCount'] = Math.max(10, body.initialCandleCount); // No upper limit
     }
     if (typeof body.lazyLoadBatchSize === 'number') {
       updateData['lazyLoadBatchSize'] = Math.max(100, Math.min(2000, body.lazyLoadBatchSize));

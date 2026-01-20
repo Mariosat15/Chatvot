@@ -1518,7 +1518,6 @@ export default function MarketDataSection() {
                   <input
                     type="number"
                     min="10"
-                    max="1000"
                     step="10"
                     value={settings.initialCandleCount}
                     onChange={(e) => saveSettings({ initialCandleCount: parseInt(e.target.value) || 100 })}
