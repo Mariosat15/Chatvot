@@ -33,9 +33,25 @@ const FOREX_PAIRS = [
   'USD/CAD', 'NZD/USD', 'EUR/GBP', 'EUR/JPY', 'EUR/CHF',
 ];
 
+// Historical candle schema
+const HistoricalCandle1mSchema = new mongoose.Schema({
+  symbol: { type: String, required: true, index: true },
+  timestamp: { type: Date, required: true },
+  open: { type: Number, required: true },
+  high: { type: Number, required: true },
+  low: { type: Number, required: true },
+  close: { type: Number, required: true },
+  volume: { type: Number, default: 0 },
+}, { timestamps: false, collection: 'candles_historical_1m' });
+
+HistoricalCandle1mSchema.index({ symbol: 1, timestamp: 1 }, { unique: true });
+
+const HistoricalCandle1m = mongoose.models.candles_historical_1m || 
+  mongoose.model('candles_historical_1m', HistoricalCandle1mSchema, 'candles_historical_1m');
+
 /**
  * GET - Detect gaps in candle data
- * Scans ALL candles to find gaps, including large multi-day gaps
+ * Now scans BOTH candles_1m AND candles_historical_1m, plus gap between them
  */
 export async function GET(request: NextRequest) {
   try {
@@ -47,81 +63,138 @@ export async function GET(request: NextRequest) {
     const allGaps: Gap[] = [];
     const symbolSummaries: Array<{
       symbol: string;
-      count: number;
-      oldest: string | null;
-      newest: string | null;
-      daysOfData: number;
-      largestGap: { start: string; end: string; minutes: number } | null;
+      liveCount: number;
+      historicalCount: number;
+      liveOldest: string | null;
+      liveNewest: string | null;
+      historicalOldest: string | null;
+      historicalNewest: string | null;
+      collectionGap: { start: string; end: string; minutes: number } | null;
+      largestGap: { start: string; end: string; minutes: number; source: string } | null;
     }> = [];
     
     for (const sym of symbols) {
-      // Get ALL candles for this symbol (sorted by time)
-      const candles = await Candle1m.find({ symbol: sym })
+      console.log(`🔍 [Gap Detection] Checking ${sym}...`);
+      
+      // Get candles from candles_1m (live/recent)
+      const liveCandles = await Candle1m.find({ symbol: sym })
         .sort({ t: 1 })
-        .select({ t: 1 })  // Only fetch timestamps to reduce memory
+        .select({ t: 1 })
         .lean() as Array<{ t: number }>;
       
-      if (candles.length === 0) {
-        symbolSummaries.push({
-          symbol: sym,
-          count: 0,
-          oldest: null,
-          newest: null,
-          daysOfData: 0,
-          largestGap: null,
-        });
-        continue;
-      }
+      // Get candles from candles_historical_1m
+      const historicalCandles = await HistoricalCandle1m.find({ symbol: sym })
+        .sort({ timestamp: 1 })
+        .select({ timestamp: 1 })
+        .lean() as Array<{ timestamp: Date }>;
       
-      let largestGap: { start: string; end: string; minutes: number } | null = null;
+      let largestGap: { start: string; end: string; minutes: number; source: string } | null = null;
+      let collectionGap: { start: string; end: string; minutes: number } | null = null;
       
-      // Check for gaps (should be 60 seconds apart for 1m candles)
-      // Skip expected gaps: weekends (Fri 5pm - Sun 5pm ET)
-      for (let i = 1; i < candles.length; i++) {
-        const timeDiff = candles[i].t - candles[i - 1].t;
+      // Check for gap BETWEEN collections (historical newest → live oldest)
+      if (historicalCandles.length > 0 && liveCandles.length > 0) {
+        const newestHistorical = Math.floor(new Date(historicalCandles[historicalCandles.length - 1].timestamp).getTime() / 1000);
+        const oldestLive = liveCandles[0].t;
         
-        // More than 1 minute gap
-        if (timeDiff > 60) {
-          const missingMinutes = Math.floor(timeDiff / 60) - 1;
+        if (oldestLive > newestHistorical) {
+          const gapMinutes = Math.floor((oldestLive - newestHistorical) / 60);
           
-          // Check if this is a weekend gap (expected, not an error)
-          const prevDate = new Date(candles[i - 1].t * 1000);
-          const nextDate = new Date(candles[i].t * 1000);
-          const prevDay = prevDate.getUTCDay(); // 0=Sun, 5=Fri, 6=Sat
+          // Check if it's a weekend gap
+          const prevDate = new Date(newestHistorical * 1000);
+          const prevDay = prevDate.getUTCDay();
+          const isWeekendGap = (prevDay === 5 || prevDay === 6) && gapMinutes >= 1440 && gapMinutes <= 4500;
           
-          // Skip if it's a typical weekend gap (Fri to Sun/Mon)
-          // Weekend gaps are typically 2-3 days (~2880-4320 minutes)
-          const isWeekendGap = (prevDay === 5 || prevDay === 6) && missingMinutes >= 1440 && missingMinutes <= 4500;
-          
-          if (!isWeekendGap) {
+          if (!isWeekendGap && gapMinutes > 10) {
+            collectionGap = {
+              start: new Date(newestHistorical * 1000).toISOString(),
+              end: new Date(oldestLive * 1000).toISOString(),
+              minutes: gapMinutes,
+            };
+            
             allGaps.push({
               symbol: sym,
-              startTime: candles[i - 1].t,
-              endTime: candles[i].t,
+              startTime: newestHistorical,
+              endTime: oldestLive,
+              missingMinutes: gapMinutes,
+            });
+            
+            largestGap = { ...collectionGap, source: 'between_collections' };
+          }
+        }
+      }
+      
+      // Check gaps within candles_1m
+      for (let i = 1; i < liveCandles.length; i++) {
+        const timeDiff = liveCandles[i].t - liveCandles[i - 1].t;
+        if (timeDiff > 60) {
+          const missingMinutes = Math.floor(timeDiff / 60) - 1;
+          const prevDate = new Date(liveCandles[i - 1].t * 1000);
+          const nextDate = new Date(liveCandles[i].t * 1000);
+          const prevDay = prevDate.getUTCDay();
+          const isWeekendGap = (prevDay === 5 || prevDay === 6) && missingMinutes >= 1440 && missingMinutes <= 4500;
+          
+          if (!isWeekendGap && missingMinutes > 10) {
+            allGaps.push({
+              symbol: sym,
+              startTime: liveCandles[i - 1].t,
+              endTime: liveCandles[i].t,
               missingMinutes,
             });
             
-            // Track largest gap
             if (!largestGap || missingMinutes > largestGap.minutes) {
               largestGap = {
                 start: prevDate.toISOString(),
                 end: nextDate.toISOString(),
                 minutes: missingMinutes,
+                source: 'candles_1m',
               };
             }
           }
         }
       }
       
-      const oldestTime = candles[0].t;
-      const newestTime = candles[candles.length - 1].t;
+      // Check gaps within candles_historical_1m
+      for (let i = 1; i < historicalCandles.length; i++) {
+        const prevTime = Math.floor(new Date(historicalCandles[i - 1].timestamp).getTime() / 1000);
+        const currTime = Math.floor(new Date(historicalCandles[i].timestamp).getTime() / 1000);
+        const timeDiff = currTime - prevTime;
+        
+        if (timeDiff > 60) {
+          const missingMinutes = Math.floor(timeDiff / 60) - 1;
+          const prevDate = new Date(prevTime * 1000);
+          const nextDate = new Date(currTime * 1000);
+          const prevDay = prevDate.getUTCDay();
+          const isWeekendGap = (prevDay === 5 || prevDay === 6) && missingMinutes >= 1440 && missingMinutes <= 4500;
+          
+          if (!isWeekendGap && missingMinutes > 10) {
+            allGaps.push({
+              symbol: sym,
+              startTime: prevTime,
+              endTime: currTime,
+              missingMinutes,
+            });
+            
+            if (!largestGap || missingMinutes > largestGap.minutes) {
+              largestGap = {
+                start: prevDate.toISOString(),
+                end: nextDate.toISOString(),
+                minutes: missingMinutes,
+                source: 'candles_historical_1m',
+              };
+            }
+          }
+        }
+      }
       
       symbolSummaries.push({
         symbol: sym,
-        count: candles.length,
-        oldest: new Date(oldestTime * 1000).toISOString(),
-        newest: new Date(newestTime * 1000).toISOString(),
-        daysOfData: Math.round((newestTime - oldestTime) / 86400),
+        liveCount: liveCandles.length,
+        historicalCount: historicalCandles.length,
+        liveOldest: liveCandles.length > 0 ? new Date(liveCandles[0].t * 1000).toISOString() : null,
+        liveNewest: liveCandles.length > 0 ? new Date(liveCandles[liveCandles.length - 1].t * 1000).toISOString() : null,
+        historicalOldest: historicalCandles.length > 0 ? new Date(historicalCandles[0].timestamp).toISOString() : null,
+        historicalNewest: historicalCandles.length > 0 ? new Date(historicalCandles[historicalCandles.length - 1].timestamp).toISOString() : null,
+        collectionGap,
         largestGap,
       });
     }
@@ -131,11 +204,11 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      gaps: allGaps.slice(0, 50), // Return top 50 largest gaps
+      gaps: allGaps.slice(0, 50),
       totalGaps: allGaps.length,
       totalMissingMinutes: allGaps.reduce((sum, g) => sum + g.missingMinutes, 0),
       symbolsChecked: symbols.length,
-      symbolSummaries,  // NEW: Show data range per symbol
+      symbolSummaries,
     });
   } catch (error) {
     console.error('Error detecting gaps:', error);

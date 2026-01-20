@@ -159,6 +159,94 @@ export async function POST(request: NextRequest) {
     console.log(`📥 [Seed History] From: ${fromDate} (${fromMs}ms = ${new Date(fromMs).toISOString()})`);
     console.log(`📥 [Seed History] To: ${toDate} (${toMs}ms = ${new Date(toMs).toISOString()})`);
 
+    // RETURN IMMEDIATELY - process in background to avoid timeout
+    // This prevents 502/504 gateway timeouts
+    const jobId = `seed-${Date.now()}`;
+    
+    // Start background processing (fire and forget)
+    (async () => {
+      console.log(`🚀 [Seed History] Background job ${jobId} started`);
+      const startTime = Date.now();
+      let totalFetched = 0;
+      let totalInserted = 0;
+      
+      for (const symbol of symbols) {
+        try {
+          console.log(`📊 [Seed History] Processing ${symbol}...`);
+          
+          // Fetch from Massive.com in chunks (7 days at a time)
+          let symbolFetched = 0;
+          let symbolInserted = 0;
+          
+          const chunkSize = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+          let chunkStart = fromMs;
+          
+          while (chunkStart < toMs) {
+            const chunkEnd = Math.min(chunkStart + chunkSize, toMs);
+            
+            try {
+              const candles = await fetchCandlesFromMassive(symbol, chunkStart, chunkEnd);
+              symbolFetched += candles.length;
+              
+              if (candles.length > 0) {
+                // Bulk upsert to MongoDB with aligned timestamps
+                const bulkOps = candles.map((c) => {
+                  const alignedMs = alignTimestampToMinute(c.t);
+                  const alignedSeconds = Math.floor(alignedMs / 1000);
+                  return {
+                    updateOne: {
+                      filter: { symbol, t: alignedSeconds },
+                      update: {
+                        $setOnInsert: { symbol },
+                        $set: { o: c.o, h: c.h, l: c.l, c: c.c, v: c.v || 0 },
+                      },
+                      upsert: true,
+                    },
+                  };
+                });
+                
+                const result = await Candle1m.bulkWrite(bulkOps, { ordered: false });
+                symbolInserted += result.upsertedCount || 0;
+              }
+            } catch (chunkError) {
+              console.error(`❌ [Seed History] Chunk error for ${symbol}:`, chunkError);
+            }
+            
+            chunkStart = chunkEnd;
+            await new Promise(resolve => setTimeout(resolve, 100)); // Rate limit
+          }
+          
+          totalFetched += symbolFetched;
+          totalInserted += symbolInserted;
+          console.log(`✅ [Seed History] ${symbol}: fetched ${symbolFetched}, inserted ${symbolInserted}`);
+          
+        } catch (symbolError) {
+          console.error(`❌ [Seed History] Error for ${symbol}:`, symbolError);
+        }
+      }
+      
+      const duration = Math.round((Date.now() - startTime) / 1000);
+      console.log(`🎉 [Seed History] Background job ${jobId} completed in ${duration}s - Total: ${totalFetched} fetched, ${totalInserted} inserted`);
+    })();
+    
+    // Return immediately with job info
+    return NextResponse.json({
+      success: true,
+      message: `Seeding started in background for ${symbols.length} symbols over ${days} days`,
+      jobId,
+      note: 'Check server logs for progress. This may take several minutes.',
+    });
+    
+  } catch (error) {
+    console.error('Error starting seed:', error);
+    return NextResponse.json({ error: 'Failed to start seeding' }, { status: 500 });
+  }
+}
+
+/**
+ * OLD BLOCKING CODE - Kept for reference but no longer used
+ */
+async function _oldBlockingPost(symbols: string[], fromMs: number, toMs: number) {
     const results: Array<{
       symbol: string;
       fetched: number;
