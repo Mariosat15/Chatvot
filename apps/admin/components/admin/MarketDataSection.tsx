@@ -186,7 +186,7 @@ function SchedulePicker({
             onChange={(e) => onChange({ ...schedule, minute: parseInt(e.target.value) })}
             className="bg-gray-800 text-white rounded-lg px-2 py-1.5 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm font-mono w-14 h-8"
           >
-            {[0, 15, 30, 45].map(m => (
+            {Array.from({ length: 60 }, (_, i) => i).map(m => (
               <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
             ))}
           </select>

@@ -22,6 +22,7 @@ const Candle1m = mongoose.models.Candle1m || mongoose.model('Candle1m', Candle1m
 
 interface Gap {
   symbol: string;
+  timeframe: string;
   startTime: number;
   endTime: number;
   missingMinutes: number;
@@ -33,8 +34,18 @@ const FOREX_PAIRS = [
   'USD/CAD', 'NZD/USD', 'EUR/GBP', 'EUR/JPY', 'EUR/CHF',
 ];
 
-// Historical candle schema
-const HistoricalCandle1mSchema = new mongoose.Schema({
+// All timeframes with their collection names and interval in minutes
+const TIMEFRAME_CONFIG: Record<string, { collection: string; minutes: number }> = {
+  '1m': { collection: 'candles_historical_1m', minutes: 1 },
+  '5m': { collection: 'candles_historical_5m', minutes: 5 },
+  '15m': { collection: 'candles_historical_15m', minutes: 15 },
+  '30m': { collection: 'candles_historical_30m', minutes: 30 },
+  '1h': { collection: 'candles_historical_1h', minutes: 60 },
+  '4h': { collection: 'candles_historical_4h', minutes: 240 },
+};
+
+// Historical candle schema (same structure for all timeframes)
+const HistoricalCandleSchema = new mongoose.Schema({
   symbol: { type: String, required: true, index: true },
   timestamp: { type: Date, required: true },
   open: { type: Number, required: true },
@@ -42,225 +53,199 @@ const HistoricalCandle1mSchema = new mongoose.Schema({
   low: { type: Number, required: true },
   close: { type: Number, required: true },
   volume: { type: Number, default: 0 },
-}, { timestamps: false, collection: 'candles_historical_1m' });
+}, { timestamps: false });
 
-HistoricalCandle1mSchema.index({ symbol: 1, timestamp: 1 }, { unique: true });
+HistoricalCandleSchema.index({ symbol: 1, timestamp: 1 }, { unique: true });
 
-const HistoricalCandle1m = mongoose.models.candles_historical_1m || 
-  mongoose.model('candles_historical_1m', HistoricalCandle1mSchema, 'candles_historical_1m');
+// Get or create model for a specific collection
+function getHistoricalModel(collectionName: string) {
+  if (mongoose.models[collectionName]) {
+    return mongoose.models[collectionName];
+  }
+  return mongoose.model(collectionName, HistoricalCandleSchema, collectionName);
+}
+
+// Backward compatible alias
+const HistoricalCandle1m = getHistoricalModel('candles_historical_1m');
 
 /**
  * GET - Detect gaps in candle data
- * Now scans BOTH candles_1m AND candles_historical_1m, plus gap between them
+ * Now scans ALL timeframes (1m, 5m, 15m, 30m, 1h, 4h) and candles_1m
  */
 export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
     
     const symbol = request.nextUrl.searchParams.get('symbol');
+    const timeframe = request.nextUrl.searchParams.get('timeframe'); // Optional: specific timeframe
     const symbols = symbol ? [symbol] : FOREX_PAIRS;
+    const timeframesToCheck = timeframe ? [timeframe] : Object.keys(TIMEFRAME_CONFIG);
     
     const allGaps: Gap[] = [];
-    const symbolSummaries: Array<{
+    const timeframeSummaries: Array<{
+      timeframe: string;
       symbol: string;
-      liveCount: number;
-      historicalCount: number;
-      liveOldest: string | null;
-      liveNewest: string | null;
-      historicalOldest: string | null;
-      historicalNewest: string | null;
-      collectionGap: { start: string; end: string; minutes: number } | null;
-      largestGap: { start: string; end: string; minutes: number; source: string } | null;
+      count: number;
+      oldest: string | null;
+      newest: string | null;
+      gapsFound: number;
+      largestGapMinutes: number | null;
     }> = [];
     
+    console.log(`🔍 [Gap Detection] Checking ${symbols.length} symbols × ${timeframesToCheck.length} timeframes`);
+    console.log(`🔍 [Gap Detection] Current time: ${new Date().toISOString()}`);
+    
     for (const sym of symbols) {
-      console.log(`🔍 [Gap Detection] Checking ${sym}...`);
-      console.log(`🔍 [Gap Detection] Current time: ${new Date().toISOString()}`);
-      
-      // Get candles from candles_1m (live/recent)
+      // Check candles_1m (live data) for gaps
       const liveCandles = await Candle1m.find({ symbol: sym })
         .sort({ t: 1 })
         .select({ t: 1 })
         .lean() as Array<{ t: number }>;
       
-      // Get candles from candles_historical_1m
-      const historicalCandles = await HistoricalCandle1m.find({ symbol: sym })
-        .sort({ timestamp: 1 })
-        .select({ timestamp: 1 })
-        .lean() as Array<{ timestamp: Date }>;
-      
-      console.log(`📊 [Gap Detection] ${sym}: live=${liveCandles.length}, historical=${historicalCandles.length}`);
       if (liveCandles.length > 0) {
-        console.log(`📊 [Gap Detection] ${sym} live range: ${new Date(liveCandles[0].t * 1000).toISOString()} to ${new Date(liveCandles[liveCandles.length-1].t * 1000).toISOString()}`);
-      }
-      if (historicalCandles.length > 0) {
-        console.log(`📊 [Gap Detection] ${sym} historical range: ${new Date(historicalCandles[0].timestamp).toISOString()} to ${new Date(historicalCandles[historicalCandles.length-1].timestamp).toISOString()}`);
-      }
-      
-      let largestGap: { start: string; end: string; minutes: number; source: string } | null = null;
-      let collectionGap: { start: string; end: string; minutes: number } | null = null;
-      
-      // NEW: Check for gap at START of today (missing data from 00:00 to first candle)
-      if (liveCandles.length > 0) {
+        console.log(`📊 [Gap Detection] ${sym} candles_1m: ${liveCandles.length} candles`);
+        
+        // Check for gap at START of today
         const oldestLive = liveCandles[0].t;
         const oldestLiveDate = new Date(oldestLive * 1000);
-        
-        // Get start of the day (00:00 UTC) for the oldest candle
         const startOfDay = new Date(oldestLiveDate);
         startOfDay.setUTCHours(0, 0, 0, 0);
         const startOfDaySeconds = Math.floor(startOfDay.getTime() / 1000);
-        
-        // If oldest candle is NOT at start of day, there's a gap
         const gapFromStartOfDay = oldestLive - startOfDaySeconds;
         const gapMinutes = Math.floor(gapFromStartOfDay / 60);
         
-        // Only flag if gap is > 60 minutes (to account for market open times)
         if (gapMinutes > 60) {
-          // Check if it's a weekend (forex closes Friday 5pm EST, opens Sunday 5pm EST)
-          const dayOfWeek = oldestLiveDate.getUTCDay(); // 0=Sun, 1=Mon, etc
+          const dayOfWeek = oldestLiveDate.getUTCDay();
           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
           
           if (!isWeekend) {
-            console.log(`🚨 [Gap Found] ${sym} GAP AT START OF DAY: ${startOfDay.toISOString()} → ${oldestLiveDate.toISOString()} (${gapMinutes} min)`);
-            
+            console.log(`🚨 [Gap Found] ${sym} candles_1m START OF DAY: ${startOfDay.toISOString()} → ${oldestLiveDate.toISOString()} (${gapMinutes} min)`);
             allGaps.push({
               symbol: sym,
+              timeframe: '1m (live)',
               startTime: startOfDaySeconds,
               endTime: oldestLive,
               missingMinutes: gapMinutes,
             });
-            
-            if (!largestGap || gapMinutes > largestGap.minutes) {
-              largestGap = {
-                start: startOfDay.toISOString(),
-                end: oldestLiveDate.toISOString(),
-                minutes: gapMinutes,
-                source: 'start_of_day',
-              };
-            }
           }
         }
-      }
-      
-      // Check for gap BETWEEN collections (historical newest → live oldest)
-      if (historicalCandles.length > 0 && liveCandles.length > 0) {
-        const newestHistorical = Math.floor(new Date(historicalCandles[historicalCandles.length - 1].timestamp).getTime() / 1000);
-        const oldestLive = liveCandles[0].t;
         
-        if (oldestLive > newestHistorical) {
-          const gapMinutes = Math.floor((oldestLive - newestHistorical) / 60);
-          
-          // Check if it's a weekend gap
-          const prevDate = new Date(newestHistorical * 1000);
-          const prevDay = prevDate.getUTCDay();
-          const isWeekendGap = (prevDay === 5 || prevDay === 6) && gapMinutes >= 1440 && gapMinutes <= 4500;
-          
-          if (!isWeekendGap && gapMinutes > 10) {
-            collectionGap = {
-              start: new Date(newestHistorical * 1000).toISOString(),
-              end: new Date(oldestLive * 1000).toISOString(),
-              minutes: gapMinutes,
-            };
+        // Check for gaps within candles_1m
+        for (let i = 1; i < liveCandles.length; i++) {
+          const timeDiff = liveCandles[i].t - liveCandles[i - 1].t;
+          if (timeDiff > 120) { // More than 2 minutes gap
+            const missingMinutes = Math.floor(timeDiff / 60) - 1;
+            const prevDate = new Date(liveCandles[i - 1].t * 1000);
+            const nextDate = new Date(liveCandles[i].t * 1000);
+            const prevDay = prevDate.getUTCDay();
+            const isWeekendGap = (prevDay === 5 || prevDay === 6) && missingMinutes >= 1440 && missingMinutes <= 4500;
             
-            allGaps.push({
-              symbol: sym,
-              startTime: newestHistorical,
-              endTime: oldestLive,
-              missingMinutes: gapMinutes,
-            });
-            
-            largestGap = { ...collectionGap, source: 'between_collections' };
-          }
-        }
-      }
-      
-      // Check gaps within candles_1m
-      for (let i = 1; i < liveCandles.length; i++) {
-        const timeDiff = liveCandles[i].t - liveCandles[i - 1].t;
-        if (timeDiff > 60) {
-          const missingMinutes = Math.floor(timeDiff / 60) - 1;
-          const prevDate = new Date(liveCandles[i - 1].t * 1000);
-          const nextDate = new Date(liveCandles[i].t * 1000);
-          const prevDay = prevDate.getUTCDay();
-          const isWeekendGap = (prevDay === 5 || prevDay === 6) && missingMinutes >= 1440 && missingMinutes <= 4500;
-          
-          if (!isWeekendGap && missingMinutes > 10) {
-            console.log(`🚨 [Gap Found] ${sym} in candles_1m: ${prevDate.toISOString()} → ${nextDate.toISOString()} (${missingMinutes} min)`);
-            allGaps.push({
-              symbol: sym,
-              startTime: liveCandles[i - 1].t,
-              endTime: liveCandles[i].t,
-              missingMinutes,
-            });
-            
-            if (!largestGap || missingMinutes > largestGap.minutes) {
-              largestGap = {
-                start: prevDate.toISOString(),
-                end: nextDate.toISOString(),
-                minutes: missingMinutes,
-                source: 'candles_1m',
-              };
+            if (!isWeekendGap && missingMinutes > 10) {
+              console.log(`🚨 [Gap Found] ${sym} candles_1m: ${prevDate.toISOString()} → ${nextDate.toISOString()} (${missingMinutes} min)`);
+              allGaps.push({
+                symbol: sym,
+                timeframe: '1m (live)',
+                startTime: liveCandles[i - 1].t,
+                endTime: liveCandles[i].t,
+                missingMinutes,
+              });
             }
           }
         }
       }
       
-      // Check gaps within candles_historical_1m
-      for (let i = 1; i < historicalCandles.length; i++) {
-        const prevTime = Math.floor(new Date(historicalCandles[i - 1].timestamp).getTime() / 1000);
-        const currTime = Math.floor(new Date(historicalCandles[i].timestamp).getTime() / 1000);
-        const timeDiff = currTime - prevTime;
+      // Check each historical timeframe
+      for (const tf of timeframesToCheck) {
+        const config = TIMEFRAME_CONFIG[tf];
+        if (!config) continue;
         
-        if (timeDiff > 60) {
-          const missingMinutes = Math.floor(timeDiff / 60) - 1;
-          const prevDate = new Date(prevTime * 1000);
-          const nextDate = new Date(currTime * 1000);
-          const prevDay = prevDate.getUTCDay();
-          const isWeekendGap = (prevDay === 5 || prevDay === 6) && missingMinutes >= 1440 && missingMinutes <= 4500;
+        const Model = getHistoricalModel(config.collection);
+        const candles = await Model.find({ symbol: sym })
+          .sort({ timestamp: 1 })
+          .select({ timestamp: 1 })
+          .lean() as Array<{ timestamp: Date }>;
+        
+        let gapsFound = 0;
+        let largestGapMinutes = 0;
+        
+        if (candles.length > 0) {
+          const oldestDate = new Date(candles[0].timestamp);
+          const newestDate = new Date(candles[candles.length - 1].timestamp);
           
-          if (!isWeekendGap && missingMinutes > 10) {
-            allGaps.push({
-              symbol: sym,
-              startTime: prevTime,
-              endTime: currTime,
-              missingMinutes,
-            });
+          console.log(`📊 [Gap Detection] ${sym} ${tf}: ${candles.length} candles (${oldestDate.toISOString()} → ${newestDate.toISOString()})`);
+          
+          // Expected gap between candles in seconds
+          const expectedGapSeconds = config.minutes * 60;
+          
+          // Check for gaps within this timeframe
+          for (let i = 1; i < candles.length; i++) {
+            const prevTime = new Date(candles[i - 1].timestamp).getTime() / 1000;
+            const currTime = new Date(candles[i].timestamp).getTime() / 1000;
+            const timeDiff = currTime - prevTime;
             
-            if (!largestGap || missingMinutes > largestGap.minutes) {
-              largestGap = {
-                start: prevDate.toISOString(),
-                end: nextDate.toISOString(),
-                minutes: missingMinutes,
-                source: 'candles_historical_1m',
-              };
+            // If gap is more than 2x the expected interval, it's a real gap
+            if (timeDiff > expectedGapSeconds * 2) {
+              const missingMinutes = Math.floor(timeDiff / 60);
+              const prevDate = new Date(prevTime * 1000);
+              const nextDate = new Date(currTime * 1000);
+              const prevDay = prevDate.getUTCDay();
+              
+              // Skip weekend gaps
+              const isWeekendGap = (prevDay === 5 || prevDay === 6) && missingMinutes >= 1440 && missingMinutes <= 4500;
+              
+              if (!isWeekendGap && missingMinutes > config.minutes * 2) {
+                console.log(`🚨 [Gap Found] ${sym} ${tf}: ${prevDate.toISOString()} → ${nextDate.toISOString()} (${missingMinutes} min)`);
+                allGaps.push({
+                  symbol: sym,
+                  timeframe: tf,
+                  startTime: prevTime,
+                  endTime: currTime,
+                  missingMinutes,
+                });
+                gapsFound++;
+                if (missingMinutes > largestGapMinutes) {
+                  largestGapMinutes = missingMinutes;
+                }
+              }
             }
           }
+          
+          timeframeSummaries.push({
+            timeframe: tf,
+            symbol: sym,
+            count: candles.length,
+            oldest: oldestDate.toISOString(),
+            newest: newestDate.toISOString(),
+            gapsFound,
+            largestGapMinutes: largestGapMinutes || null,
+          });
+        } else {
+          timeframeSummaries.push({
+            timeframe: tf,
+            symbol: sym,
+            count: 0,
+            oldest: null,
+            newest: null,
+            gapsFound: 0,
+            largestGapMinutes: null,
+          });
         }
       }
-      
-      symbolSummaries.push({
-        symbol: sym,
-        liveCount: liveCandles.length,
-        historicalCount: historicalCandles.length,
-        liveOldest: liveCandles.length > 0 ? new Date(liveCandles[0].t * 1000).toISOString() : null,
-        liveNewest: liveCandles.length > 0 ? new Date(liveCandles[liveCandles.length - 1].t * 1000).toISOString() : null,
-        historicalOldest: historicalCandles.length > 0 ? new Date(historicalCandles[0].timestamp).toISOString() : null,
-        historicalNewest: historicalCandles.length > 0 ? new Date(historicalCandles[historicalCandles.length - 1].timestamp).toISOString() : null,
-        collectionGap,
-        largestGap,
-      });
     }
     
     // Sort gaps by size (largest first)
     allGaps.sort((a, b) => b.missingMinutes - a.missingMinutes);
     
+    console.log(`✅ [Gap Detection] Complete: ${allGaps.length} gaps found across ${symbols.length} symbols and ${timeframesToCheck.length} timeframes`);
+    
     return NextResponse.json({
       success: true,
-      gaps: allGaps.slice(0, 50),
+      gaps: allGaps.slice(0, 100), // Return top 100 gaps
       totalGaps: allGaps.length,
       totalMissingMinutes: allGaps.reduce((sum, g) => sum + g.missingMinutes, 0),
       symbolsChecked: symbols.length,
-      symbolSummaries,
+      timeframesChecked: timeframesToCheck,
+      timeframeSummaries,
     });
   } catch (error) {
     console.error('Error detecting gaps:', error);
