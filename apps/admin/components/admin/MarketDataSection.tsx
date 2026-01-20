@@ -1509,7 +1509,7 @@ export default function MarketDataSection() {
                         max="3650"
                         value={settings.chartHistoryLimitDays}
                         onChange={(e) => saveSettings({ chartHistoryLimitDays: parseInt(e.target.value) || 0 })}
-                        className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-16 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                        className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-20 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
                       />
                       <span className="text-gray-500 text-sm">d</span>
                     </div>
@@ -1662,7 +1662,7 @@ export default function MarketDataSection() {
                       step="1"
                       value={settings.seedingDaysBack || 0}
                       onChange={(e) => saveSettings({ seedingDaysBack: parseInt(e.target.value) || 0 })}
-                      className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-16 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+                      className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-20 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
                     />
                     <span className="text-gray-500 text-sm">d</span>
                   </div>
