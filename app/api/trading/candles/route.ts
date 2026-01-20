@@ -143,12 +143,14 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET endpoint for simple candle requests
- * Usage: GET /api/trading/candles?symbol=EUR/USD&timeframe=1m&count=500&before=1234567890
+ * Usage: GET /api/trading/candles?symbol=EUR/USD&timeframe=1m&count=100&before=1234567890
+ * Note: If count is not provided, uses admin settings (initialCandleCount)
  */
 export async function GET(request: NextRequest) {
   const symbol = request.nextUrl.searchParams.get('symbol') || 'EUR/USD';
   const timeframe = request.nextUrl.searchParams.get('timeframe') || '1m';
-  const count = parseInt(request.nextUrl.searchParams.get('count') || '500');
+  const countParam = request.nextUrl.searchParams.get('count');
+  const count = countParam ? parseInt(countParam) : undefined; // Use admin settings if not specified
   const beforeParam = request.nextUrl.searchParams.get('before');
   const before = beforeParam ? parseInt(beforeParam) : undefined;
 
