@@ -100,6 +100,48 @@ export async function GET(request: NextRequest) {
       let largestGap: { start: string; end: string; minutes: number; source: string } | null = null;
       let collectionGap: { start: string; end: string; minutes: number } | null = null;
       
+      // NEW: Check for gap at START of today (missing data from 00:00 to first candle)
+      if (liveCandles.length > 0) {
+        const oldestLive = liveCandles[0].t;
+        const oldestLiveDate = new Date(oldestLive * 1000);
+        
+        // Get start of the day (00:00 UTC) for the oldest candle
+        const startOfDay = new Date(oldestLiveDate);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+        const startOfDaySeconds = Math.floor(startOfDay.getTime() / 1000);
+        
+        // If oldest candle is NOT at start of day, there's a gap
+        const gapFromStartOfDay = oldestLive - startOfDaySeconds;
+        const gapMinutes = Math.floor(gapFromStartOfDay / 60);
+        
+        // Only flag if gap is > 60 minutes (to account for market open times)
+        if (gapMinutes > 60) {
+          // Check if it's a weekend (forex closes Friday 5pm EST, opens Sunday 5pm EST)
+          const dayOfWeek = oldestLiveDate.getUTCDay(); // 0=Sun, 1=Mon, etc
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          
+          if (!isWeekend) {
+            console.log(`🚨 [Gap Found] ${sym} GAP AT START OF DAY: ${startOfDay.toISOString()} → ${oldestLiveDate.toISOString()} (${gapMinutes} min)`);
+            
+            allGaps.push({
+              symbol: sym,
+              startTime: startOfDaySeconds,
+              endTime: oldestLive,
+              missingMinutes: gapMinutes,
+            });
+            
+            if (!largestGap || gapMinutes > largestGap.minutes) {
+              largestGap = {
+                start: startOfDay.toISOString(),
+                end: oldestLiveDate.toISOString(),
+                minutes: gapMinutes,
+                source: 'start_of_day',
+              };
+            }
+          }
+        }
+      }
+      
       // Check for gap BETWEEN collections (historical newest → live oldest)
       if (historicalCandles.length > 0 && liveCandles.length > 0) {
         const newestHistorical = Math.floor(new Date(historicalCandles[historicalCandles.length - 1].timestamp).getTime() / 1000);

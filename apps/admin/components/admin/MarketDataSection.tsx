@@ -1189,37 +1189,76 @@ export default function MarketDataSection() {
       {/* Historical Data Import Section */}
       <Section title="Import Historical Data" icon="📥" defaultOpen={false}>
         <div className="space-y-5">
-          {/* Date Range */}
+          {/* Date Range with Time */}
           <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
-            <h4 className="text-white font-medium mb-4">Date Range</h4>
+            <h4 className="text-white font-medium mb-4">Date & Time Range</h4>
             <div className="flex flex-wrap items-center gap-4">
               <div>
-                <label className="text-gray-500 text-xs block mb-1">From</label>
+                <label className="text-gray-500 text-xs block mb-1">From (Date & Time)</label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={seedFromDate}
                   onChange={(e) => setSeedFromDate(e.target.value)}
                   className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-blue-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="text-gray-500 text-xs block mb-1">To</label>
+                <label className="text-gray-500 text-xs block mb-1">To (Date & Time)</label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={seedToDate}
                   onChange={(e) => setSeedToDate(e.target.value)}
                   className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-blue-500 focus:outline-none"
                 />
               </div>
+            </div>
+            
+            {/* Quick Actions */}
+            <div className="flex flex-wrap gap-2 mt-4">
               <button
-                onClick={() => setSeedToDate(new Date().toISOString().split('T')[0])}
-                className="text-blue-400 hover:text-blue-300 text-sm mt-5"
+                onClick={() => {
+                  const today = new Date();
+                  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0);
+                  setSeedFromDate(todayStart.toISOString().slice(0, 16));
+                  setSeedToDate(today.toISOString().slice(0, 16));
+                }}
+                className="px-3 py-1.5 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded-lg text-xs font-medium"
               >
-                Set to today →
+                📅 Today (00:00 → Now)
+              </button>
+              <button
+                onClick={() => {
+                  const now = new Date();
+                  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                  yesterday.setHours(0, 0, 0, 0);
+                  setSeedFromDate(yesterday.toISOString().slice(0, 16));
+                  setSeedToDate(now.toISOString().slice(0, 16));
+                }}
+                className="px-3 py-1.5 bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 rounded-lg text-xs font-medium"
+              >
+                📅 Last 24 Hours
+              </button>
+              <button
+                onClick={() => {
+                  const now = new Date();
+                  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                  setSeedFromDate(weekAgo.toISOString().slice(0, 16));
+                  setSeedToDate(now.toISOString().slice(0, 16));
+                }}
+                className="px-3 py-1.5 bg-green-600/20 text-green-400 hover:bg-green-600/30 rounded-lg text-xs font-medium"
+              >
+                📅 Last 7 Days
+              </button>
+              <button
+                onClick={() => setSeedToDate(new Date().toISOString().slice(0, 16))}
+                className="px-3 py-1.5 bg-gray-600/20 text-gray-400 hover:bg-gray-600/30 rounded-lg text-xs font-medium"
+              >
+                Set &quot;To&quot; = Now
               </button>
             </div>
+            
             <p className="text-yellow-500/70 text-xs mt-3">
-              💡 Set &quot;To&quot; date to today to avoid gaps between seeded and live data
+              💡 Now supports time selection! Use &quot;Today (00:00 → Now)&quot; to fill today&apos;s gap.
             </p>
           </div>
 
@@ -1261,12 +1300,23 @@ export default function MarketDataSection() {
           {selectedSymbols.length > 0 && seedFromDate && seedToDate && (
             <div className="bg-purple-600/10 border border-purple-600/20 rounded-lg p-4 text-sm">
               <span className="text-purple-400">📊 Estimated:</span>
-              <span className="text-white ml-2">
-                ~{(Math.ceil((new Date(seedToDate).getTime() - new Date(seedFromDate).getTime()) / (1000 * 60 * 60 * 24)) * 1440 * selectedSymbols.length).toLocaleString()} candles
-              </span>
-              <span className="text-gray-500 ml-2">
-                ({Math.ceil((new Date(seedToDate).getTime() - new Date(seedFromDate).getTime()) / (1000 * 60 * 60 * 24))} days × {selectedSymbols.length} symbols)
-              </span>
+              {(() => {
+                const fromMs = new Date(seedFromDate).getTime();
+                const toMs = new Date(seedToDate).getTime();
+                const minutes = Math.ceil((toMs - fromMs) / (1000 * 60));
+                const hours = Math.round(minutes / 60 * 10) / 10;
+                const days = Math.round(hours / 24 * 10) / 10;
+                return (
+                  <>
+                    <span className="text-white ml-2">
+                      ~{(minutes * selectedSymbols.length).toLocaleString()} candles
+                    </span>
+                    <span className="text-gray-500 ml-2">
+                      ({hours < 24 ? `${hours} hours` : `${days} days`} × {selectedSymbols.length} symbols)
+                    </span>
+                  </>
+                );
+              })()}
             </div>
           )}
 
