@@ -243,6 +243,7 @@ interface MarketDataStats {
 
 interface Gap {
   symbol: string;
+  timeframe?: string;
   startTime: number;
   endTime: number;
   missingMinutes: number;
@@ -417,12 +418,21 @@ export default function MarketDataSection() {
     }
   };
 
+  const [detectingGaps, setDetectingGaps] = useState(false);
+  
   const fetchGaps = async () => {
+    setDetectingGaps(true);
     try {
       const res = await fetch('/api/market-data/gap-fill');
-      if (res.ok) setGaps((await res.json()).gaps || []);
+      if (res.ok) {
+        const data = await res.json();
+        console.log('[Gap Detection] Response:', data);
+        setGaps(data.gaps || []);
+      }
     } catch (error) {
       console.error('Error fetching gaps:', error);
+    } finally {
+      setDetectingGaps(false);
     }
   };
 
@@ -1088,29 +1098,42 @@ export default function MarketDataSection() {
               </div>
               
               <div className="space-y-5 flex-1">
+                {/* Detect Gaps Button */}
+                <button
+                  onClick={fetchGaps}
+                  disabled={detectingGaps}
+                  className="w-full px-3 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
+                >
+                  {detectingGaps ? '🔍 Scanning...' : '🔍 Detect Gaps Now'}
+                </button>
+                
                 {/* Gap List Section */}
                 <div className="bg-gray-900/30 rounded-lg p-4 border border-gray-800/30 min-h-[80px]">
                   {gaps.length > 0 ? (
-                    <div className="max-h-28 overflow-y-auto space-y-1">
-                      {gaps.slice(0, 8).map((gap, i) => {
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {gaps.slice(0, 15).map((gap, i) => {
                         const startDate = new Date(gap.startTime * 1000);
                         const endDate = new Date(gap.endTime * 1000);
                         return (
                           <div key={i} className="text-xs text-gray-400 py-1 flex items-center justify-between">
                             <span>
                               <span className="text-white font-medium">{gap.symbol}</span>
+                              {gap.timeframe && <span className="text-purple-400 ml-1">({gap.timeframe})</span>}
                               <span className="mx-1.5">:</span>
-                              {startDate.toLocaleDateString()} → {endDate.toLocaleDateString()}
+                              <span className="text-gray-500">{startDate.toLocaleString()}</span>
+                              <span className="mx-1"> → </span>
+                              <span className="text-gray-500">{endDate.toLocaleString()}</span>
                             </span>
-                            <span className="text-yellow-400 text-[10px] px-1.5 py-0.5 bg-yellow-600/20 rounded">
-                              {gap.missingMinutes >= 1440 ? `${Math.round(gap.missingMinutes / 1440)}d` : `${gap.missingMinutes}m`}
+                            <span className="text-yellow-400 text-[10px] px-1.5 py-0.5 bg-yellow-600/20 rounded ml-2 whitespace-nowrap">
+                              {gap.missingMinutes >= 1440 ? `${Math.round(gap.missingMinutes / 1440)}d` : 
+                               gap.missingMinutes >= 60 ? `${Math.round(gap.missingMinutes / 60)}h` : `${gap.missingMinutes}m`}
                             </span>
                           </div>
                         );
                       })}
-                      {gaps.length > 8 && (
+                      {gaps.length > 15 && (
                         <div className="text-gray-500 text-xs pt-1 text-center">
-                          +{gaps.length - 8} more gaps
+                          +{gaps.length - 15} more gaps
                         </div>
                       )}
                     </div>
