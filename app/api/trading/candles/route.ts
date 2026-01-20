@@ -15,7 +15,6 @@ import { getAggregatedCandles, isAggregatorSupported } from '@/lib/services/cand
 import { 
   getHistoricalCandles, 
   getOldestHistoricalCandle,
-  getNewestHistoricalCandle,
   getHistoricalModel,
   IHistoricalCandle 
 } from '@/database/models/candle-historical.model';
@@ -369,80 +368,6 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         candles = candles.filter(c => c.time >= limitTimestamp);
       }
       
-      // =====================================================================
-      // GAP DETECTION FOR 1M: Check for gap between historical and candles_1m
-      // =====================================================================
-      if (!before && settings.useLocalHistory) {
-        // Get the boundaries
-        const newestHistoricalDate = await getNewestHistoricalCandle('1m', symbol);
-        const oldest1mCandle = await Candle1m.getOldestCandle(symbol);
-        
-        if (newestHistoricalDate && oldest1mCandle) {
-          const newestHistoricalSeconds = Math.floor(newestHistoricalDate.getTime() / 1000);
-          const oldest1mSeconds = oldest1mCandle.time;
-          
-          // If there's a gap (more than 2 minutes between historical end and 1m start)
-          if (oldest1mSeconds > newestHistoricalSeconds + 120) {
-            const gapDurationMs = (oldest1mSeconds - newestHistoricalSeconds) * 1000;
-            const gapDays = Math.ceil(gapDurationMs / (24 * 60 * 60 * 1000));
-            console.log(`📊 [Candles 1m] Gap detected for ${symbol}: ${gapDays} days gap`);
-            console.log(`   Historical ends: ${new Date(newestHistoricalSeconds * 1000).toISOString()}`);
-            console.log(`   candles_1m starts: ${new Date(oldest1mSeconds * 1000).toISOString()}`);
-            
-            try {
-              // Fetch from API to fill the gap
-              const fromMs = newestHistoricalSeconds * 1000;
-              const toMs = oldest1mSeconds * 1000;
-              
-              console.log(`📊 [Candles 1m] Fetching gap from API...`);
-              const gapCandles = await fetchCandlesForRange(symbol as ForexSymbol, '1', fromMs, toMs);
-              
-              if (gapCandles.length > 0) {
-                const gapMapped = gapCandles.map(c => ({
-                  time: c.time,
-                  open: c.open,
-                  high: c.high,
-                  low: c.low,
-                  close: c.close,
-                  volume: c.volume || 0,
-                }));
-                
-                console.log(`📊 [Candles 1m] Filled ${gapMapped.length} candles from API`);
-                
-                // Merge gap candles with existing
-                const candleMap = new Map<number, typeof candles[0]>();
-                for (const c of gapMapped) candleMap.set(c.time, c);
-                for (const c of candles) candleMap.set(c.time, c);
-                candles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
-              } else {
-                console.warn(`⚠️ [Candles 1m] No gap candles returned from API`);
-              }
-            } catch (err) {
-              console.warn(`⚠️ [Candles 1m] Failed to fetch gap candles:`, err);
-            }
-          }
-        }
-        
-        // Also merge historical data for initial load
-        const historicalCandles = await getHistoricalCandles('1m', symbol, { limit: limit });
-        if (historicalCandles.length > 0) {
-          const historicalFormatted = historicalCandles.map(c => ({
-            time: Math.floor(new Date(c.timestamp).getTime() / 1000),
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-            volume: c.volume || 0,
-          }));
-          
-          // Merge: historical + candles_1m (candles_1m overwrites if same time)
-          const candleMap = new Map<number, typeof candles[0]>();
-          for (const c of historicalFormatted) candleMap.set(c.time, c);
-          for (const c of candles) candleMap.set(c.time, c);
-          candles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
-        }
-      }
-      
       // If lazy loading and candles_1m doesn't have enough, also check candles_historical_1m
       if (before && candles.length < limit && settings.useLocalHistory) {
         const historicalModel = getHistoricalModel('1m');
@@ -608,203 +533,107 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
   
   if (useAggregator || ['5m', '15m', '30m', '1h', '4h', '1d', 'W', 'M'].includes(normalizedTf)) {
     try {
-      // =================================================================
-      // OPTIMIZED FLOW: Query historical FIRST, aggregate only recent gap
-      // =================================================================
-      
-      let historicalCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
+      // Step 1: Get aggregated candles from 1m data (recent)
+      // Skip for daily - too many 1m candles needed
       let aggregatedCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
       let formingCandle = null;
       
-      // For lazy loading (scrolling left), just query historical
-      if (before) {
-        const cutoffDate = new Date(before * 1000);
-        
-        if (settings.useLocalHistory) {
-          const dbCandles = await getHistoricalCandles(normalizedTf, symbol, {
-            before: cutoffDate,
-            limit: limit,
-          });
-          
-          historicalCandles = dbCandles.map(c => ({
-            time: Math.floor(new Date(c.timestamp).getTime() / 1000),
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-          }));
-        }
-        
-        // Fallback to API if not enough local data
-        if (historicalCandles.length < limit) {
-          const massiveTimeframeMap: Record<string, Timeframe> = {
-            '5m': '5', '15m': '15', '30m': '30',
-            '1h': '60', '4h': '240', '1d': 'D', 'W': 'W', 'M': 'M',
-          };
-          const massiveTf = massiveTimeframeMap[normalizedTf];
-          if (massiveTf) {
-            const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
-            const apiFiltered = apiCandles
-              .filter(c => c.time < before)
-              .map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
-            
-            // Merge with local, dedupe by timestamp
-            const candleMap = new Map<number, typeof apiFiltered[0]>();
-            for (const c of historicalCandles) candleMap.set(c.time, c);
-            for (const c of apiFiltered) if (!candleMap.has(c.time)) candleMap.set(c.time, c);
-            historicalCandles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
-          }
-        }
+      if (useAggregator) {
+        const result = await getAggregatedCandles(symbol, normalizedTf, limit);
+        aggregatedCandles = result.candles;
+        formingCandle = result.formingCandle;
       } else {
-        // =================================================================
-        // INITIAL LOAD: Historical first, then aggregate only recent gap
-        // =================================================================
-        
-        // Step 1: Find where historical data ends AND where 1m candles begin
-        const newestHistoricalDate = await getNewestHistoricalCandle(normalizedTf, symbol);
-        const oldest1mCandle = await Candle1m.getOldestCandle(symbol);
-        const nowSeconds = Math.floor(Date.now() / 1000);
-        
-        const timeframeMinutes: Record<string, number> = {
-          '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240,
-        };
-        const tfMinutes = timeframeMinutes[normalizedTf] || 60;
-        
-        // Step 2: Query historical candles (FAST - pre-built!)
-        if (settings.useLocalHistory && newestHistoricalDate) {
-          const dbCandles = await getHistoricalCandles(normalizedTf, symbol, {
-            limit: limit,
-          });
-          
-          historicalCandles = dbCandles.map(c => ({
-            time: Math.floor(new Date(c.timestamp).getTime() / 1000),
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-          }));
-        }
-        
-        // Step 3: Check for GAP between historical end and 1m start
-        // If historical ends at Jan 13 and 1m starts at Jan 18, there's a gap!
-        const newestHistoricalSeconds = newestHistoricalDate 
-          ? Math.floor(newestHistoricalDate.getTime() / 1000) 
-          : 0;
-        const oldest1mSeconds = oldest1mCandle?.time || nowSeconds;
-        
-        // If there's a gap (historical ends before 1m starts), fetch from API
-        if (newestHistoricalSeconds > 0 && oldest1mSeconds > newestHistoricalSeconds + (tfMinutes * 60 * 2)) {
-          // Gap detected! Fetch missing candles from API using date range
-          const gapDurationMs = (oldest1mSeconds - newestHistoricalSeconds) * 1000;
-          const gapDays = Math.ceil(gapDurationMs / (24 * 60 * 60 * 1000));
-          console.log(`📊 [Candles] Gap detected for ${symbol} ${normalizedTf}: ${gapDays} days gap`);
-          console.log(`   Historical ends: ${new Date(newestHistoricalSeconds * 1000).toISOString()}`);
-          console.log(`   1m starts: ${new Date(oldest1mSeconds * 1000).toISOString()}`);
-          
-          const massiveTimeframeMap: Record<string, Timeframe> = {
-            '5m': '5', '15m': '15', '30m': '30',
-            '1h': '60', '4h': '240', '1d': 'D', 'W': 'W', 'M': 'M',
-          };
-          const massiveTf = massiveTimeframeMap[normalizedTf];
-          
-          if (massiveTf) {
-            try {
-              // Use fetchCandlesForRange for large gaps - it fetches SPECIFIC date range
-              const fromMs = newestHistoricalSeconds * 1000;
-              const toMs = oldest1mSeconds * 1000;
-              
-              console.log(`📊 [Candles] Fetching gap from API: ${new Date(fromMs).toISOString()} to ${new Date(toMs).toISOString()}`);
-              const gapCandles = await fetchCandlesForRange(symbol as ForexSymbol, massiveTf, fromMs, toMs);
-              
-              if (gapCandles.length > 0) {
-                // Map to our format
-                const gapMapped = gapCandles.map(c => ({ 
-                  time: c.time, 
-                  open: c.open, 
-                  high: c.high, 
-                  low: c.low, 
-                  close: c.close 
-                }));
-                
-                console.log(`📊 [Candles] Filled ${gapMapped.length} candles from API for gap`);
-                
-                // Merge gap candles with historical
-                const candleMap = new Map<number, typeof historicalCandles[0]>();
-                for (const c of historicalCandles) candleMap.set(c.time, c);
-                for (const c of gapMapped) if (!candleMap.has(c.time)) candleMap.set(c.time, c);
-                historicalCandles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
-              } else {
-                console.warn(`⚠️ [Candles] No gap candles returned from API`);
-              }
-            } catch (err) {
-              console.warn(`⚠️ [Candles] Failed to fetch gap candles from API:`, err);
-            }
-          }
-        }
-        
-        // Step 4: Calculate how many recent candles to aggregate
-        // Only aggregate from where 1m candles exist
-        let recentCandlesToAggregate = 10; // Default: aggregate last 10 candles
-        
-        if (oldest1mCandle) {
-          // We can aggregate from oldest1mSeconds to now
-          const aggregatableSeconds = nowSeconds - oldest1mSeconds;
-          const aggregatableCandles = Math.ceil(aggregatableSeconds / (tfMinutes * 60)) + 2;
-          recentCandlesToAggregate = Math.min(aggregatableCandles, 50); // Cap at 50 to keep it fast
-        }
-        
-        // Step 5: Aggregate only the recent candles (from 1m data)
-        if (useAggregator && recentCandlesToAggregate > 0) {
-          const result = await getAggregatedCandles(symbol, normalizedTf, recentCandlesToAggregate);
-          aggregatedCandles = result.candles;
-          formingCandle = result.formingCandle;
-        }
-        
-        // Get forming candle for non-aggregated timeframes
-        if (!useAggregator) {
-          if (normalizedTf === 'M') formingCandle = getFormingMonthlyCandle(symbol);
-          else if (normalizedTf === 'W') formingCandle = getFormingWeeklyCandle(symbol);
-          else if (normalizedTf === '1d') formingCandle = getFormingDailyCandle(symbol);
-          else if (normalizedTf === '4h') formingCandle = getForming4hCandle(symbol);
-          else if (normalizedTf === '1h') formingCandle = getForming1hCandle(symbol);
-        }
-        
-        // Step 6: If no historical data, fall back to full aggregation or API
-        if (historicalCandles.length === 0) {
-          if (useAggregator) {
-            // No historical - do full aggregation (slower, but necessary)
-            const result = await getAggregatedCandles(symbol, normalizedTf, limit);
-            aggregatedCandles = result.candles;
-            formingCandle = result.formingCandle;
-          } else {
-            // Try API for non-aggregated timeframes
-            const massiveTimeframeMap: Record<string, Timeframe> = {
-              '5m': '5', '15m': '15', '30m': '30',
-              '1h': '60', '4h': '240', '1d': 'D', 'W': 'W', 'M': 'M',
-            };
-            const massiveTf = massiveTimeframeMap[normalizedTf];
-            if (massiveTf) {
-              const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
-              historicalCandles = apiCandles.map(c => ({
-                time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
-              }));
-            }
-          }
+        // For daily/weekly/monthly (and other non-aggregated timeframes), get forming candle from WebSocket cache
+        if (normalizedTf === 'M') {
+          formingCandle = getFormingMonthlyCandle(symbol);
+        } else if (normalizedTf === 'W') {
+          formingCandle = getFormingWeeklyCandle(symbol);
+        } else if (normalizedTf === '1d') {
+          formingCandle = getFormingDailyCandle(symbol);
+        } else if (normalizedTf === '4h') {
+          formingCandle = getForming4hCandle(symbol);
+        } else if (normalizedTf === '1h') {
+          formingCandle = getForming1hCandle(symbol);
         }
       }
       
-      // Apply history limit
-      if (historyLimitDate) {
+      // Apply history limit to aggregated candles
+      if (historyLimitDate && aggregatedCandles.length > 0) {
         const limitTimestamp = Math.floor(historyLimitDate.getTime() / 1000);
-        historicalCandles = historicalCandles.filter(c => c.time >= limitTimestamp);
         aggregatedCandles = aggregatedCandles.filter(c => c.time >= limitTimestamp);
       }
       
+      // Step 2: If lazy loading (before param) or not enough candles, get historical data
+      let historicalCandles: Array<{ time: number; open: number; high: number; low: number; close: number }> = [];
+      
+      const needsHistoricalData = before || aggregatedCandles.length < limit;
+      
+      if (needsHistoricalData) {
+        // Determine the cutoff point (oldest aggregated candle or 'before' timestamp)
+        let cutoffTimestamp: number;
+        
+        if (before) {
+          cutoffTimestamp = before;
+        } else if (aggregatedCandles.length > 0) {
+          cutoffTimestamp = aggregatedCandles[0].time;
+        } else {
+          cutoffTimestamp = Math.floor(Date.now() / 1000);
+        }
+        
+        const cutoffDate = new Date(cutoffTimestamp * 1000);
+        
+        // Try to get from local database first
+        if (settings.useLocalHistory) {
+          const historicalModel = getHistoricalModel(normalizedTf);
+          
+          if (historicalModel) {
+            const dbCandles = await getHistoricalCandles(normalizedTf, symbol, {
+              before: cutoffDate,
+              limit: limit,
+            });
+            
+            historicalCandles = dbCandles.map(c => ({
+              time: Math.floor(new Date(c.timestamp).getTime() / 1000),
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+            }));
+          }
+        }
+        
+        // If local DB doesn't have enough, fetch from Massive.com API
+        if (historicalCandles.length < limit && !settings.useLocalHistory) {
+          const massiveTimeframeMap: Record<string, Timeframe> = {
+            '5m': '5', '15m': '15', '30m': '30',
+            '1h': '60', '4h': '240', '1d': 'D',
+            'W': 'W', 'M': 'M',
+          };
+          
+          const massiveTf = massiveTimeframeMap[normalizedTf];
+          if (massiveTf) {
+            const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
+            
+            // Filter to only candles before the cutoff
+            historicalCandles = apiCandles
+              .filter(c => c.time < cutoffTimestamp)
+              .map(c => ({
+                time: c.time, // Already in seconds
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+              }));
+          }
+        }
+      }
+      
       // Combine: historical (older) + aggregated (newer)
+      // For lazy loading with 'before', only return historical
       let combinedCandles: Array<{ time: number; open: number; high: number; low: number; close: number }>;
       
       if (before) {
-        // Lazy loading: return only historical
+        // Lazy loading: return only historical candles before the cutoff
         combinedCandles = historicalCandles;
       } else {
         // Initial load: combine historical + aggregated, dedupe by timestamp
@@ -815,7 +644,7 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           candleMap.set(c.time, c);
         }
         
-        // Add aggregated (newer) - will overwrite if same timestamp (fresher data)
+        // Add aggregated (newer) - will overwrite if same timestamp
         for (const c of aggregatedCandles) {
           candleMap.set(c.time, c);
         }
