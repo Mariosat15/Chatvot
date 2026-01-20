@@ -805,7 +805,7 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       // 3. Combine: historical + forming
       // =====================================================
       
-      const tfMinutes = { '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240 }[normalizedTf] || 60;
+      const tfMinutes = { '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440, 'W': 10080, 'M': 43200 }[normalizedTf] || 60;
       const tfSeconds = tfMinutes * 60;
       
       // Helper function to align timestamp to proper interval boundary
