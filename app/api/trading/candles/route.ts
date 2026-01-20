@@ -369,6 +369,80 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         candles = candles.filter(c => c.time >= limitTimestamp);
       }
       
+      // =====================================================================
+      // GAP DETECTION FOR 1M: Check for gap between historical and candles_1m
+      // =====================================================================
+      if (!before && settings.useLocalHistory) {
+        // Get the boundaries
+        const newestHistoricalDate = await getNewestHistoricalCandle('1m', symbol);
+        const oldest1mCandle = await Candle1m.getOldestCandle(symbol);
+        
+        if (newestHistoricalDate && oldest1mCandle) {
+          const newestHistoricalSeconds = Math.floor(newestHistoricalDate.getTime() / 1000);
+          const oldest1mSeconds = oldest1mCandle.time;
+          
+          // If there's a gap (more than 2 minutes between historical end and 1m start)
+          if (oldest1mSeconds > newestHistoricalSeconds + 120) {
+            const gapDurationMs = (oldest1mSeconds - newestHistoricalSeconds) * 1000;
+            const gapDays = Math.ceil(gapDurationMs / (24 * 60 * 60 * 1000));
+            console.log(`📊 [Candles 1m] Gap detected for ${symbol}: ${gapDays} days gap`);
+            console.log(`   Historical ends: ${new Date(newestHistoricalSeconds * 1000).toISOString()}`);
+            console.log(`   candles_1m starts: ${new Date(oldest1mSeconds * 1000).toISOString()}`);
+            
+            try {
+              // Fetch from API to fill the gap
+              const fromMs = newestHistoricalSeconds * 1000;
+              const toMs = oldest1mSeconds * 1000;
+              
+              console.log(`📊 [Candles 1m] Fetching gap from API...`);
+              const gapCandles = await fetchCandlesForRange(symbol as ForexSymbol, '1', fromMs, toMs);
+              
+              if (gapCandles.length > 0) {
+                const gapMapped = gapCandles.map(c => ({
+                  time: c.time,
+                  open: c.open,
+                  high: c.high,
+                  low: c.low,
+                  close: c.close,
+                  volume: c.volume || 0,
+                }));
+                
+                console.log(`📊 [Candles 1m] Filled ${gapMapped.length} candles from API`);
+                
+                // Merge gap candles with existing
+                const candleMap = new Map<number, typeof candles[0]>();
+                for (const c of gapMapped) candleMap.set(c.time, c);
+                for (const c of candles) candleMap.set(c.time, c);
+                candles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
+              } else {
+                console.warn(`⚠️ [Candles 1m] No gap candles returned from API`);
+              }
+            } catch (err) {
+              console.warn(`⚠️ [Candles 1m] Failed to fetch gap candles:`, err);
+            }
+          }
+        }
+        
+        // Also merge historical data for initial load
+        const historicalCandles = await getHistoricalCandles('1m', symbol, { limit: limit });
+        if (historicalCandles.length > 0) {
+          const historicalFormatted = historicalCandles.map(c => ({
+            time: Math.floor(new Date(c.timestamp).getTime() / 1000),
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume || 0,
+          }));
+          
+          // Merge: historical + candles_1m (candles_1m overwrites if same time)
+          const candleMap = new Map<number, typeof candles[0]>();
+          for (const c of historicalFormatted) candleMap.set(c.time, c);
+          for (const c of candles) candleMap.set(c.time, c);
+          candles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
+        }
+      }
+      
       // If lazy loading and candles_1m doesn't have enough, also check candles_historical_1m
       if (before && candles.length < limit && settings.useLocalHistory) {
         const historicalModel = getHistoricalModel('1m');
