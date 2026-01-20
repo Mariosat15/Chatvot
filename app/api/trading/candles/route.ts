@@ -72,7 +72,7 @@ async function getMarketDataSettings(): Promise<{
     const settings = await db?.collection('marketdatasettings').findOne({ key: 'market_data_settings' });
     
     // Debug: Log raw database values
-    console.log(`🔍 [Settings Debug] Raw DB values: initialCandleCount=${settings?.initialCandleCount}, seedingDaysBack=${settings?.seedingDaysBack}, seedingHours=${settings?.seedingHours}, seedingMinutes=${settings?.seedingMinutes}, chartHistoryLimitEnabled=${settings?.chartHistoryLimitEnabled}`);
+    console.log(`🔍 [Settings Debug] Raw DB values: initialCandleCount=${settings?.initialCandleCount}, seedingDaysBack=${settings?.seedingDaysBack}, seedingHours=${settings?.seedingHours}, seedingMinutes=${settings?.seedingMinutes}, chartHistoryLimitEnabled=${settings?.chartHistoryLimitEnabled}, useLocalHistory=${settings?.useLocalHistory}`);
     
     if (!settings) {
       console.log('📋 [Settings] No settings found, using defaults');
@@ -533,17 +533,34 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       // For lazy loading, indicate if there's more data
       // Check both candles_1m and candles_historical_1m for more data
       let hasMore = before ? (candles?.length || 0) === limit : undefined;
-      if (before && candles && candles.length < limit && settings.useLocalHistory) {
-        // Check if there's more in historical
+      
+      // Check if there's more historical data (for both initial load and lazy load)
+      if (settings.useLocalHistory) {
         const historicalModel = getHistoricalModel('1m');
         if (historicalModel) {
-          const oldestCandle = candles[0];
-          if (oldestCandle) {
-            const olderExists = await historicalModel.findOne({
-              symbol,
-              timestamp: { $lt: new Date(oldestCandle.time * 1000) }
-            }).lean();
-            hasMore = !!olderExists;
+          // Determine the cutoff point for checking historical data
+          let checkBeforeDate: Date;
+          if (before) {
+            // Lazy loading: check before the 'before' parameter
+            checkBeforeDate = new Date(before * 1000);
+          } else if (candles && candles.length > 0) {
+            // Initial load: check before the oldest candle we have
+            checkBeforeDate = new Date(candles[0].time * 1000);
+          } else {
+            // No candles at all: check if ANY historical data exists
+            checkBeforeDate = new Date();
+          }
+          
+          const olderExists = await historicalModel.findOne({
+            symbol,
+            timestamp: { $lt: checkBeforeDate }
+          }).lean();
+          
+          if (olderExists) {
+            hasMore = true;
+            console.log(`📊 [1m hasMore] Found historical data before ${checkBeforeDate.toISOString()}`);
+          } else {
+            console.log(`📊 [1m hasMore] No historical data before ${checkBeforeDate.toISOString()}`);
           }
         }
       }
