@@ -937,20 +937,16 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
               console.log(`   Newest: ${new Date(newestDbCandle.timestamp).toISOString()}`);
             }
             
-            // For weekly/monthly, the API data is already correctly aligned - don't re-align
-            // For other timeframes, align to ensure consistency
-            const shouldAlign = !['W', 'M'].includes(normalizedTf);
-            
+            // The historical data from Massive.com API is already correctly aligned
+            // for ALL timeframes - use timestamps directly without re-aligning
             const rawCandles = dbCandles.map(c => ({
-              time: shouldAlign 
-                ? alignTimestamp(Math.floor(new Date(c.timestamp).getTime() / 1000))
-                : Math.floor(new Date(c.timestamp).getTime() / 1000),
+              time: Math.floor(new Date(c.timestamp).getTime() / 1000),
               open: c.open,
               high: c.high,
               low: c.low,
               close: c.close,
             }));
-            // Deduplicate after alignment (for non-weekly/monthly)
+            // Deduplicate in case of any duplicates
             historicalCandles = deduplicateCandles(rawCandles);
             
             console.log(`⚡ [${normalizedTf} Optimal] ${symbol}: Got ${historicalCandles.length} historical candles (before ${currentPeriodDate.toISOString()})`);
