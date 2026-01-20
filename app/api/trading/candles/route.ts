@@ -937,18 +937,19 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
               console.log(`   Newest: ${new Date(newestDbCandle.timestamp).toISOString()}`);
             }
             
-            // For weekly/monthly: API provides correctly aligned timestamps - use directly
-            // For other timeframes (5m, 15m, 30m, 1h, 4h, 1d): align to ensure consistency
+            // ALWAYS align timestamps when reading to ensure consistency:
+            // - Weekly: align to Monday 00:00 UTC
+            // - Monthly: align to 1st of month 00:00 UTC  
+            // - Others: align to interval boundaries
+            // This fixes API data that might use close dates instead of open dates
             const rawCandles = dbCandles.map(c => ({
-              time: ['W', 'M'].includes(normalizedTf) 
-                ? Math.floor(new Date(c.timestamp).getTime() / 1000)  // Weekly/Monthly: use as-is
-                : alignTimestamp(Math.floor(new Date(c.timestamp).getTime() / 1000)),  // Others: align
+              time: alignTimestamp(Math.floor(new Date(c.timestamp).getTime() / 1000)),
               open: c.open,
               high: c.high,
               low: c.low,
               close: c.close,
             }));
-            // Deduplicate after alignment
+            // Deduplicate after alignment (merges candles that align to same timestamp)
             historicalCandles = deduplicateCandles(rawCandles);
             
             console.log(`⚡ [${normalizedTf} Optimal] ${symbol}: Got ${historicalCandles.length} historical candles (before ${currentPeriodDate.toISOString()})`);
