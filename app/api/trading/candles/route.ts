@@ -1004,7 +1004,7 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         const currentPeriodTime = formingCandle.time; // seconds
         
         // Calculate expected gap based on timeframe
-        const gapTfMinutes = { '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240 }[normalizedTf] || 60;
+        const gapTfMinutes = { '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440, 'W': 10080, 'M': 43200 }[normalizedTf] || 60;
         const expectedGapSeconds = gapTfMinutes * 60 * 2; // Allow 2 candle gap as normal
         const actualGapSeconds = currentPeriodTime - newestHistorical;
         
