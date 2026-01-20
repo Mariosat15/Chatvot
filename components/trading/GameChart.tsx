@@ -862,12 +862,25 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
           </div>
         )}
         
-        {/* Loading More Indicator - Responsive */}
+        {/* Loading More Indicator - Centered and Prominent */}
         {isLoadingMore && (
-          <div className="absolute top-2 sm:top-3 left-1/2 transform -translate-x-1/2 z-10">
-            <div className="flex items-center gap-1 sm:gap-2 bg-purple-600/90 px-2 sm:px-4 py-1 sm:py-2 rounded-full shadow-lg shadow-purple-500/30">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span className="text-white text-[10px] sm:text-xs font-medium">Loading...</span>
+          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+            <div className="flex flex-col items-center gap-3 bg-gradient-to-br from-purple-900/95 to-pink-900/95 px-8 py-6 rounded-2xl border border-purple-500/40 shadow-2xl shadow-purple-500/30 backdrop-blur-sm">
+              {/* Animated spinner */}
+              <div className="relative">
+                <div className="w-12 h-12 border-4 border-purple-500/20 rounded-full" />
+                <div className="absolute top-0 left-0 w-12 h-12 border-4 border-transparent border-t-purple-400 rounded-full animate-spin" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 bg-purple-500 rounded-full animate-pulse" />
+              </div>
+              {/* Text */}
+              <div className="text-center">
+                <span className="text-sm font-medium text-white">Loading History</span>
+                <div className="flex items-center justify-center gap-1 mt-1">
+                  <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
             </div>
           </div>
         )}

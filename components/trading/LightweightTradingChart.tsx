@@ -3355,11 +3355,26 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               </div>
             )}
             
-            {/* Lazy loading indicator */}
+            {/* Lazy loading indicator - Centered and Prominent */}
             {isLoadingMore && !loading && (
-              <div className="absolute top-2 left-2 z-20 flex items-center gap-2 bg-[#1e222d]/90 px-3 py-1.5 rounded-md border border-[#2a2e39]">
-                <Loader2 className="h-4 w-4 animate-spin text-[#2962ff]" />
-                <span className="text-xs text-[#787b86]">Loading history...</span>
+              <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                <div className="flex flex-col items-center gap-3 bg-gradient-to-br from-[#1e222d]/95 to-[#131722]/95 px-8 py-6 rounded-2xl border border-[#2962ff]/30 shadow-2xl shadow-[#2962ff]/20 backdrop-blur-sm">
+                  {/* Animated spinner */}
+                  <div className="relative">
+                    <div className="w-12 h-12 border-4 border-[#2962ff]/20 rounded-full" />
+                    <div className="absolute top-0 left-0 w-12 h-12 border-4 border-transparent border-t-[#2962ff] rounded-full animate-spin" />
+                    <Loader2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 text-[#2962ff] animate-pulse" />
+                  </div>
+                  {/* Text */}
+                  <div className="text-center">
+                    <span className="text-sm font-medium text-white">Loading History</span>
+                    <div className="flex items-center justify-center gap-1 mt-1">
+                      <span className="w-1.5 h-1.5 bg-[#2962ff] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 bg-[#2962ff] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 bg-[#2962ff] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
