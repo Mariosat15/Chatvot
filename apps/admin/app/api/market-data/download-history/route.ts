@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
 
       for (const symbol of symbols) {
         for (const timeframe of validTimeframes) {
-          const Model = getHistoricalModel(timeframe);
+          const Model = getHistoricalModel(timeframe) as mongoose.Model<any>;
           const tfConfig = TIMEFRAME_CONFIG[timeframe];
           if (!Model || !tfConfig) continue;
           
@@ -269,9 +269,9 @@ export async function POST(request: NextRequest) {
             const oldestHistorical = await Model.findOne({ symbol })
               .sort({ timestamp: 1 })
               .select('timestamp')
-              .lean();
+              .lean() as { timestamp?: Date } | null;
             
-            if (oldestHistorical && oldestHistorical.timestamp) {
+            if (oldestHistorical?.timestamp) {
               endDate = new Date(oldestHistorical.timestamp);
               console.log(`📊 [Download History] ${symbol} ${timeframe}: Existing data, oldest at ${endDate.toISOString()}`);
             } else if (startFromLastCandle) {
