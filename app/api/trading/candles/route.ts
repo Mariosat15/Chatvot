@@ -876,6 +876,87 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         }
       }
       
+      // =====================================================
+      // GAP DETECTION AND FILL FOR HIGHER TIMEFRAMES
+      // Detect gap between historical data and aggregated data
+      // =====================================================
+      if (!before && historicalCandles.length > 0 && aggregatedCandles.length > 0) {
+        const newestHistorical = historicalCandles[historicalCandles.length - 1].time; // seconds
+        const oldestAggregated = aggregatedCandles[0].time; // seconds
+        
+        // Calculate expected gap based on timeframe
+        const tfMinutes = { '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240 }[normalizedTf] || 60;
+        const expectedGapSeconds = tfMinutes * 60 * 2; // Allow 2 candle gap as normal
+        const actualGapSeconds = oldestAggregated - newestHistorical;
+        
+        // If gap is larger than expected, try to fill it
+        if (actualGapSeconds > expectedGapSeconds) {
+          const gapCandles = Math.floor(actualGapSeconds / (tfMinutes * 60));
+          console.log(`🔍 [${normalizedTf} Gap] Detected ${gapCandles} candle gap for ${symbol}`);
+          console.log(`   Historical ends: ${new Date(newestHistorical * 1000).toISOString()}`);
+          console.log(`   Aggregated starts: ${new Date(oldestAggregated * 1000).toISOString()}`);
+          
+          // Try to fill gap from Massive.com API (background, fire and forget)
+          const massiveTimeframeMap: Record<string, Timeframe> = {
+            '5m': '5', '15m': '15', '30m': '30',
+            '1h': '60', '4h': '240',
+          };
+          const massiveTf = massiveTimeframeMap[normalizedTf];
+          
+          if (massiveTf) {
+            // Fire and forget - fill gap in background
+            (async () => {
+              try {
+                const gapStartMs = (newestHistorical + tfMinutes * 60) * 1000;
+                const gapEndMs = (oldestAggregated - tfMinutes * 60) * 1000;
+                
+                console.log(`🔧 [${normalizedTf} Gap Fill] Fetching gap candles from API...`);
+                
+                const gapCandlesData = await fetchCandlesForRange(
+                  symbol as ForexSymbol,
+                  massiveTf,
+                  gapStartMs,
+                  gapEndMs
+                );
+                
+                if (gapCandlesData.length > 0) {
+                  // Save to historical collection
+                  const historicalModel = getHistoricalModel(normalizedTf);
+                  if (historicalModel) {
+                    let insertedCount = 0;
+                    for (const candle of gapCandlesData) {
+                      const timestamp = new Date(candle.time);
+                      
+                      // Skip weekends
+                      const day = timestamp.getUTCDay();
+                      if (day === 0 || day === 6) continue;
+                      
+                      // Skip if exists
+                      const exists = await historicalModel.findOne({ symbol, timestamp }).lean();
+                      if (!exists) {
+                        await historicalModel.create({
+                          symbol,
+                          timestamp,
+                          open: candle.open,
+                          high: candle.high,
+                          low: candle.low,
+                          close: candle.close,
+                          volume: candle.volume || 0,
+                        });
+                        insertedCount++;
+                      }
+                    }
+                    console.log(`✅ [${normalizedTf} Gap Fill] ${symbol}: Inserted ${insertedCount} candles`);
+                  }
+                }
+              } catch (err) {
+                console.error(`❌ [${normalizedTf} Gap Fill] Failed for ${symbol}:`, err);
+              }
+            })();
+          }
+        }
+      }
+      
       // Combine: historical (older) + aggregated (newer)
       // For lazy loading with 'before', only return historical
       let combinedCandles: Array<{ time: number; open: number; high: number; low: number; close: number }>;
