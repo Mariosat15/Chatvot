@@ -2084,15 +2084,26 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         return;
       }
       
-      // Format the time
+      // Format the time - use UTC for daily/weekly/monthly to avoid timezone confusion
       const timestamp = param.time as number;
       const date = new Date(timestamp * 1000);
-      const timeStr = date.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+      
+      // For daily/weekly/monthly candles, show only date in UTC (no time)
+      // For intraday candles, show date + time in local timezone
+      const isDailyOrHigher = ['D', 'W', 'M', '1d', '1w', '1M'].includes(timeframe);
+      const timeStr = isDailyOrHigher
+        ? date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            timeZone: 'UTC',
+          })
+        : date.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
       
       // Get OHLCV values
       const open = data.open ?? data.value ?? 0;
