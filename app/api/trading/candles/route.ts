@@ -67,8 +67,12 @@ async function getMarketDataSettings(): Promise<{
   seedingDaysBack: number;
 }> {
   try {
-    const MarketDataSettings = getMarketDataSettingsModel();
-    const settings = await MarketDataSettings.findOne({ key: 'market_data_settings' });
+    // Use raw MongoDB query to bypass Mongoose schema caching issues
+    const db = mongoose.connection.db;
+    const settings = await db?.collection('marketdatasettings').findOne({ key: 'market_data_settings' });
+    
+    // Debug: Log raw database values
+    console.log(`🔍 [Settings Debug] Raw DB values: initialCandleCount=${settings?.initialCandleCount}, seedingDaysBack=${settings?.seedingDaysBack}, chartHistoryLimitEnabled=${settings?.chartHistoryLimitEnabled}`);
     
     if (!settings) {
       console.log('📋 [Settings] No settings found, using defaults');
