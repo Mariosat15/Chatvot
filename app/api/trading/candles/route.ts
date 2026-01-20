@@ -42,6 +42,7 @@ const MarketDataSettingsSchema = new mongoose.Schema({
   initialCandleCount: { type: Number, default: 500 },
   lazyLoadBatchSize: { type: Number, default: 500 },
   historicalYearsToDownload: { type: Number, default: 10 },
+  seedingDaysBack: { type: Number, default: 30 }, // How many days to fetch when DB is empty
 }, { timestamps: true });
 
 // Get or create the model
