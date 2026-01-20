@@ -401,6 +401,39 @@ const server = createServer(async (req, res) => {
             }
             break;
 
+          case 'data_updated':
+            // Broadcast data update notification to all price viewers
+            // Called when: seeding completes, gap fill completes, historical download completes
+            if (data.symbol && data.timeframe) {
+              const updateEvent = {
+                type: 'data_updated',
+                data: {
+                  symbol: data.symbol,
+                  timeframe: data.timeframe,
+                  reason: data.reason || 'historical_data_updated',
+                  timestamp: Date.now(),
+                },
+              };
+              
+              let notifiedCount = 0;
+              connections.forEach((conn) => {
+                if (conn.ws.readyState !== WebSocket.OPEN) return;
+                
+                // Only notify clients subscribed to this symbol
+                if (conn.subscribedSymbols.has(data.symbol)) {
+                  try {
+                    conn.ws.send(JSON.stringify(updateEvent));
+                    notifiedCount++;
+                  } catch {
+                    // Ignore send errors
+                  }
+                }
+              });
+              
+              console.log(`🔄 [Data Updated] ${data.symbol} ${data.timeframe} - notified ${notifiedCount} clients (${data.reason || 'update'})`);
+            }
+            break;
+
           default:
             console.warn(`Unknown internal endpoint: ${endpoint}`);
         }

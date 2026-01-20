@@ -464,6 +464,16 @@ export default function GameChart({ competitionId, positions = [] }: GameChartPr
           try {
             const message = JSON.parse(event.data);
             
+            // Handle data_updated events (refresh chart when historical data changes)
+            if (message.type === 'data_updated' && message.data) {
+              const { symbol: updatedSymbol } = message.data;
+              if (updatedSymbol === symbol) {
+                console.log(`🔄 [GameChart] Data updated for ${updatedSymbol} - will refresh on next load`);
+                // For GameChart, we just log - it doesn't need immediate refresh
+                // since game charts are typically short-term
+              }
+            }
+            
             if (message.type === 'price_update' && message.data) {
               const { prices, formingCandles, formingCandles5m, formingCandles15m } = message.data;
               

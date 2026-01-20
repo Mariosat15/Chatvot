@@ -1566,6 +1566,35 @@ export function getAllFormingCandles(): Map<string, FormingCandle> {
   return new Map(state.formingCandles);
 }
 
+/**
+ * Broadcast "data updated" event to all clients viewing a specific symbol
+ * Called when: seeding completes, gap fill completes, historical download completes
+ * This tells clients to refresh their chart data
+ */
+export async function broadcastDataUpdated(
+  symbol: string, 
+  timeframe: string, 
+  reason: 'seeding_complete' | 'gap_fill_complete' | 'history_download_complete' | 'data_updated' = 'data_updated'
+): Promise<void> {
+  const wsInternalUrl = process.env.WEBSOCKET_INTERNAL_URL || 'http://localhost:3003';
+  
+  try {
+    await fetch(`${wsInternalUrl}/internal/data_updated`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol,
+        timeframe,
+        reason,
+      }),
+    });
+    console.log(`🔄 [Broadcast] Data updated: ${symbol} ${timeframe} (${reason})`);
+  } catch (error) {
+    // Don't fail if WebSocket server is not running
+    console.warn(`⚠️ [Broadcast] Failed to notify data update: ${error instanceof Error ? error.message : error}`);
+  }
+}
+
 // ============================================
 // AUTO-INITIALIZATION ON SERVER STARTUP
 // ============================================

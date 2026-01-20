@@ -9,7 +9,8 @@ import {
   getForming4hCandle,
   getFormingDailyCandle,
   getFormingWeeklyCandle,
-  getFormingMonthlyCandle
+  getFormingMonthlyCandle,
+  broadcastDataUpdated
 } from '@/lib/services/websocket-price-streamer';
 import { getAggregatedCandles, isAggregatorSupported } from '@/lib/services/candle-aggregator.service';
 import { 
@@ -389,6 +390,10 @@ async function autoFillGaps(symbol: string, candles: Array<{ time: number }>): P
         }
         
         console.log(`✅ [Auto Gap Fill] Completed for ${symbol} - filled ${filledCount} candles`);
+        // Notify clients to refresh if we filled any gaps
+        if (filledCount > 0) {
+          broadcastDataUpdated(symbol, '1m', 'gap_fill_complete');
+        }
       } catch (error) {
         console.error(`❌ [Auto Gap Fill] Failed for ${symbol}:`, error);
       } finally {
@@ -536,6 +541,10 @@ async function fillCollectionGap(symbol: string): Promise<void> {
         
         console.log(`✅ [Collection Gap Fill] ${symbol}: Inserted ${insertedCount} candles, gap filled!`);
         
+        // Notify clients to refresh if we filled any gaps
+        if (insertedCount > 0) {
+          broadcastDataUpdated(symbol, '1m', 'gap_fill_complete');
+        }
       } catch (error) {
         console.error(`❌ [Collection Gap Fill] Failed for ${symbol}:`, error);
       } finally {
@@ -683,6 +692,8 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         // Pass seedingMinutesTotal from admin settings (this IS the number of 1m candles to fetch)
         seedHistoricalCandles(symbol, settings.seedingMinutesTotal, settings.seedingMinutesTotal).then(() => {
           console.log(`✅ [Candles API] Background seeding completed for ${symbol}`);
+          // Notify all clients viewing this symbol to refresh their data
+          broadcastDataUpdated(symbol, '1m', 'seeding_complete');
         }).catch((err) => {
           console.error(`❌ [Candles API] Background seeding failed for ${symbol}:`, err);
         });

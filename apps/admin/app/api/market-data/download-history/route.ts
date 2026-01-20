@@ -378,6 +378,24 @@ export async function POST(request: NextRequest) {
             grandTotalFetched += totalFetched;
             grandTotalSaved += totalSaved;
             console.log(`✅ [Download History] ${symbol} ${timeframe}: fetched ${totalFetched}, saved ${totalSaved}`);
+            
+            // Notify clients to refresh their charts (if any data was saved)
+            if (totalSaved > 0) {
+              try {
+                const wsInternalUrl = process.env.WEBSOCKET_INTERNAL_URL || 'http://localhost:3003';
+                await fetch(`${wsInternalUrl}/internal/data_updated`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    symbol,
+                    timeframe,
+                    reason: 'history_download_complete',
+                  }),
+                });
+              } catch {
+                // Ignore - WebSocket server might not be running
+              }
+            }
 
           } catch (error) {
             console.error(`❌ [Download History] Error ${symbol} ${timeframe}:`, error);

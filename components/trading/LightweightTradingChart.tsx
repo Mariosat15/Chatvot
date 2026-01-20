@@ -255,6 +255,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const [symbolDialogOpen, setSymbolDialogOpen] = useState(false);
   const [timeframeDialogOpen, setTimeframeDialogOpen] = useState(false);
   const [signalUpdateTrigger, setSignalUpdateTrigger] = useState(0);
+  const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0); // Triggers chart reload when server data updates
   const drawingCanvasRef = useRef<DrawingCanvasHandle>(null);
   const portalContainerRef = useRef<HTMLDivElement>(null);
   
@@ -1929,7 +1930,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         }
       }
     };
-  }, [symbol, timeframe, showVolume, chartType, showBidAskLines, showPriceLabels]); // Chart reinitializes when these change
+  }, [symbol, timeframe, showVolume, chartType, showBidAskLines, showPriceLabels, dataRefreshTrigger]); // Chart reinitializes when these change
 
   // Lazy loading: Load more candles when user scrolls to the left edge
   const loadMoreCandles = useCallback(async () => {
@@ -2242,6 +2243,18 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           ws.onmessage = (event) => {
             try {
               const message = JSON.parse(event.data);
+              
+              // Handle data_updated events (refresh chart when historical data changes)
+              if (message.type === 'data_updated' && message.data) {
+                const { symbol: updatedSymbol } = message.data;
+                
+                // Only refresh if this chart is showing the updated symbol
+                if (updatedSymbol === symbol) {
+                  console.log(`🔄 [Chart] Data updated for ${updatedSymbol} - refreshing chart...`);
+                  // Trigger chart reload by incrementing the refresh counter
+                  setDataRefreshTrigger(prev => prev + 1);
+                }
+              }
               
               // Handle price_update events
               if (message.type === 'price_update' && message.data) {
