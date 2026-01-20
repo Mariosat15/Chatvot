@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { symbols, timeframes, yearsBack = 10, startFromLastCandle = true } = body;
+    const { symbols, timeframes, yearsBack = 10, startFromLastCandle = true, fromDate, toDate } = body;
 
     if (!symbols || !Array.isArray(symbols) || symbols.length === 0) {
       return NextResponse.json({ error: 'symbols array is required' }, { status: 400 });
@@ -199,7 +199,17 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`📥 [Download History] Starting download for ${symbols.length} symbols, timeframes: ${validTimeframes.join(', ')}, ${yearsBack} years`);
+    // Determine if using date range mode or years back mode
+    const useDateRange = fromDate && toDate;
+    const dateRangeFrom = useDateRange ? new Date(fromDate) : null;
+    const dateRangeTo = useDateRange ? new Date(toDate) : null;
+    
+    if (useDateRange) {
+      console.log(`📥 [Download History] DATE RANGE MODE: ${symbols.length} symbols, timeframes: ${validTimeframes.join(', ')}`);
+      console.log(`📥 [Download History] From: ${dateRangeFrom?.toISOString()} To: ${dateRangeTo?.toISOString()}`);
+    } else {
+      console.log(`📥 [Download History] YEARS BACK MODE: ${symbols.length} symbols, timeframes: ${validTimeframes.join(', ')}, ${yearsBack} years`);
+    }
 
     // RETURN IMMEDIATELY - process in background to avoid timeout
     const jobId = `download-${Date.now()}`;
@@ -213,10 +223,22 @@ export async function POST(request: NextRequest) {
 
       for (const symbol of symbols) {
         for (const timeframe of validTimeframes) {
-          let endDate = new Date();
           const Model = getHistoricalModel(timeframe);
+          if (!Model) continue;
           
-          if (Model) {
+          let startMs: number;
+          let endMs: number;
+          
+          // DATE RANGE MODE: Use provided dates
+          if (useDateRange && dateRangeFrom && dateRangeTo) {
+            startMs = dateRangeFrom.getTime();
+            endMs = dateRangeTo.getTime();
+            console.log(`📊 [Download History] ${symbol} ${timeframe}: DATE RANGE ${dateRangeFrom.toISOString()} → ${dateRangeTo.toISOString()}`);
+          } 
+          // YEARS BACK MODE: Calculate from last candle backwards
+          else {
+            let endDate = new Date();
+            
             const oldestHistorical = await Model.findOne({ symbol })
               .sort({ timestamp: 1 })
               .select('timestamp')
@@ -235,14 +257,12 @@ export async function POST(request: NextRequest) {
                 }
               }
             }
-          }
 
-          const startDate = new Date(endDate);
-          startDate.setFullYear(startDate.getFullYear() - yearsBack);
-          const startMs = startDate.getTime();
-          const endMs = endDate.getTime();
-          
-          if (!Model) continue;
+            const startDate = new Date(endDate);
+            startDate.setFullYear(startDate.getFullYear() - yearsBack);
+            startMs = startDate.getTime();
+            endMs = endDate.getTime();
+          }
 
           try {
             await FetchStatus.updateOne(

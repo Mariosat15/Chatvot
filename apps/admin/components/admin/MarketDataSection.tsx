@@ -386,6 +386,9 @@ export default function MarketDataSection() {
   const [historyDownloadResults, setHistoryDownloadResults] = useState<SeedResult[] | null>(null);
   const [selectedHistoryTimeframes, setSelectedHistoryTimeframes] = useState<string[]>(['1m', '5m', '15m', '30m', '1h', '4h', '1d']);
   const [historyYearsBack, setHistoryYearsBack] = useState(10);
+  const [historyDownloadMode, setHistoryDownloadMode] = useState<'years' | 'daterange'>('years');
+  const [historyFromDate, setHistoryFromDate] = useState('');
+  const [historyToDate, setHistoryToDate] = useState('');
   const [downloadProgress, setDownloadProgress] = useState<{
     current: number;
     total: number;
@@ -589,6 +592,18 @@ export default function MarketDataSection() {
       return;
     }
     
+    // Validate date range if in daterange mode
+    if (historyDownloadMode === 'daterange') {
+      if (!historyFromDate || !historyToDate) {
+        setMessage({ type: 'error', text: 'Please select both From and To dates' });
+        return;
+      }
+      if (new Date(historyFromDate) >= new Date(historyToDate)) {
+        setMessage({ type: 'error', text: 'From date must be before To date' });
+        return;
+      }
+    }
+    
     setHistoryDownloadRunning(true);
     setHistoryDownloadResults(null);
     
@@ -621,15 +636,25 @@ export default function MarketDataSection() {
           });
           
           try {
+            // Build request body based on mode
+            const requestBody = historyDownloadMode === 'daterange'
+              ? {
+                  symbols: [symbol],
+                  timeframes: [timeframe],
+                  fromDate: historyFromDate,
+                  toDate: historyToDate,
+                }
+              : {
+                  symbols: [symbol],
+                  timeframes: [timeframe],
+                  yearsBack: historyYearsBack,
+                  startFromLastCandle: true,
+                };
+            
             const res = await fetch('/api/market-data/download-history', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                symbols: [symbol], 
-                timeframes: [timeframe],
-                yearsBack: historyYearsBack,
-                startFromLastCandle: true,
-              }),
+              body: JSON.stringify(requestBody),
             });
             
             if (res.ok) {
@@ -1386,26 +1411,114 @@ export default function MarketDataSection() {
             </ul>
           </div>
 
-          {/* Years Back */}
+          {/* Download Mode Toggle */}
           <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30">
-            <h4 className="text-white font-medium mb-3">Years of History</h4>
-            <div className="flex items-center gap-4">
-              <input
-                type="range"
-                min="1"
-                max="20"
-                value={historyYearsBack}
-                onChange={(e) => setHistoryYearsBack(parseInt(e.target.value))}
-                className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-              />
-              <div className="w-20 text-right">
-                <span className="text-white font-mono text-lg">{historyYearsBack}</span>
-                <span className="text-gray-500 text-sm ml-1">years</span>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-white font-medium">Download Mode</h4>
+              <div className="inline-flex bg-gray-900/50 rounded-lg p-0.5 border border-gray-800/50">
+                <button
+                  onClick={() => setHistoryDownloadMode('years')}
+                  className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    historyDownloadMode === 'years'
+                      ? 'bg-blue-600 text-white shadow-lg'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Years Back
+                </button>
+                <button
+                  onClick={() => setHistoryDownloadMode('daterange')}
+                  className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    historyDownloadMode === 'daterange'
+                      ? 'bg-green-600 text-white shadow-lg'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Date Range (Fill Gaps)
+                </button>
               </div>
             </div>
-            <p className="text-gray-500 text-xs mt-2">
-              Downloads history starting from the last 1m candle backwards
-            </p>
+            
+            {historyDownloadMode === 'years' ? (
+              <>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1"
+                    max="20"
+                    value={historyYearsBack}
+                    onChange={(e) => setHistoryYearsBack(parseInt(e.target.value))}
+                    className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  />
+                  <div className="w-20 text-right">
+                    <span className="text-white font-mono text-lg">{historyYearsBack}</span>
+                    <span className="text-gray-500 text-sm ml-1">years</span>
+                  </div>
+                </div>
+                <p className="text-gray-500 text-xs mt-2">
+                  Downloads history starting from the last candle backwards
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-4 mb-3">
+                  <div>
+                    <label className="text-gray-500 text-xs block mb-1">From Date</label>
+                    <input
+                      type="datetime-local"
+                      value={historyFromDate}
+                      onChange={(e) => setHistoryFromDate(e.target.value)}
+                      className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-green-500 focus:outline-none text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-gray-500 text-xs block mb-1">To Date</label>
+                    <input
+                      type="datetime-local"
+                      value={historyToDate}
+                      onChange={(e) => setHistoryToDate(e.target.value)}
+                      className="bg-gray-800 text-white rounded-lg px-3 py-2 border border-gray-700 focus:border-green-500 focus:outline-none text-sm"
+                    />
+                  </div>
+                </div>
+                
+                {/* Quick Actions */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <button
+                    onClick={() => {
+                      const now = new Date();
+                      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                      setHistoryFromDate(weekAgo.toISOString().slice(0, 16));
+                      setHistoryToDate(now.toISOString().slice(0, 16));
+                    }}
+                    className="px-3 py-1.5 bg-green-600/20 text-green-400 hover:bg-green-600/30 rounded-lg text-xs font-medium"
+                  >
+                    📅 Last 7 Days
+                  </button>
+                  <button
+                    onClick={() => {
+                      const now = new Date();
+                      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                      setHistoryFromDate(monthAgo.toISOString().slice(0, 16));
+                      setHistoryToDate(now.toISOString().slice(0, 16));
+                    }}
+                    className="px-3 py-1.5 bg-green-600/20 text-green-400 hover:bg-green-600/30 rounded-lg text-xs font-medium"
+                  >
+                    📅 Last 30 Days
+                  </button>
+                  <button
+                    onClick={() => setHistoryToDate(new Date().toISOString().slice(0, 16))}
+                    className="px-3 py-1.5 bg-gray-600/20 text-gray-400 hover:bg-gray-600/30 rounded-lg text-xs font-medium"
+                  >
+                    Set &quot;To&quot; = Now
+                  </button>
+                </div>
+                
+                <p className="text-green-500/70 text-xs">
+                  💡 Use this mode to fill specific gaps in your historical data
+                </p>
+              </>
+            )}
           </div>
 
           {/* Timeframe Selection */}
@@ -1471,10 +1584,21 @@ export default function MarketDataSection() {
 
           {/* Estimation */}
           {selectedSymbols.length > 0 && selectedHistoryTimeframes.length > 0 && (
-            <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-4 text-sm">
-              <span className="text-blue-400">📊 Will download:</span>
+            <div className={`border rounded-lg p-4 text-sm ${
+              historyDownloadMode === 'daterange' 
+                ? 'bg-green-600/10 border-green-600/20' 
+                : 'bg-blue-600/10 border-blue-600/20'
+            }`}>
+              <span className={historyDownloadMode === 'daterange' ? 'text-green-400' : 'text-blue-400'}>
+                📊 Will download:
+              </span>
               <span className="text-white ml-2">
-                {selectedSymbols.length} symbols × {selectedHistoryTimeframes.length} timeframes × {historyYearsBack} years
+                {selectedSymbols.length} symbols × {selectedHistoryTimeframes.length} timeframes
+                {historyDownloadMode === 'daterange' 
+                  ? (historyFromDate && historyToDate 
+                      ? ` (${new Date(historyFromDate).toLocaleDateString()} → ${new Date(historyToDate).toLocaleDateString()})` 
+                      : ' (select dates)')
+                  : ` × ${historyYearsBack} years`}
               </span>
               <span className="text-gray-500 ml-2">
                 (May take several minutes)
@@ -1556,7 +1680,9 @@ export default function MarketDataSection() {
                   </p>
                   <div className="flex items-center gap-4 mt-2 text-xs">
                     <span className="text-gray-500">
-                      ⏱️ Est. time: ~{Math.ceil(downloadProgress.total * historyYearsBack * 2)} minutes
+                      ⏱️ Est. time: ~{historyDownloadMode === 'daterange' 
+                        ? Math.ceil(downloadProgress.total * 2) 
+                        : Math.ceil(downloadProgress.total * historyYearsBack * 2)} minutes
                     </span>
                     <button 
                       onClick={fetchData}
