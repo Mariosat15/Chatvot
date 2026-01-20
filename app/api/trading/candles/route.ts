@@ -891,7 +891,8 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         // Step 1: Get COMPLETED candles from historical (before current period)
         const currentPeriodDate = new Date(currentPeriodStart * 1000);
         
-        if (settings.useLocalHistory && useAggregator) {
+        // Query historical collection for ALL timeframes (including 1d, W, M which don't use aggregator)
+        if (settings.useLocalHistory) {
           const historicalModel = getHistoricalModel(normalizedTf);
           if (historicalModel) {
             // Get completed candles (before current period start)
