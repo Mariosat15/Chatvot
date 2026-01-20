@@ -434,14 +434,22 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       }
       
       // If lazy loading and candles_1m doesn't have enough, also check candles_historical_1m
+      console.log(`📊 [1m Lazy] before=${before}, candles_1m.length=${candles.length}, limit=${limit}, useLocalHistory=${settings.useLocalHistory}`);
+      
       if (before && candles.length < limit && settings.useLocalHistory) {
         const historicalModel = getHistoricalModel('1m');
+        console.log(`📊 [1m Lazy] Checking historical... historicalModel exists: ${!!historicalModel}`);
+        
         if (historicalModel) {
           const cutoffDate = new Date(before * 1000);
+          console.log(`📊 [1m Lazy] Querying candles_historical_1m before ${cutoffDate.toISOString()}...`);
+          
           const historicalCandles = await getHistoricalCandles('1m', symbol, {
             before: cutoffDate,
             limit: limit - candles.length,
           });
+          
+          console.log(`📊 [1m Lazy] Got ${historicalCandles.length} candles from candles_historical_1m`);
           
           // Convert historical candles to the same format
           const historicalFormatted = historicalCandles.map(c => ({
