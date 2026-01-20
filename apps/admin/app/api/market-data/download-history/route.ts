@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
               { upsert: true }
             );
 
-            console.log(`📊 [Download History] ${symbol} ${timeframe}: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+            console.log(`📊 [Download History] ${symbol} ${timeframe}: ${new Date(startMs).toISOString()} to ${new Date(endMs).toISOString()}`);
 
             const chunkSize = 30 * 24 * 60 * 60 * 1000;
             let totalFetched = 0;
