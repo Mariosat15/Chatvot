@@ -201,221 +201,157 @@ export async function POST(request: NextRequest) {
 
     console.log(`📥 [Download History] Starting download for ${symbols.length} symbols, timeframes: ${validTimeframes.join(', ')}, ${yearsBack} years`);
 
-    const results: Array<{
-      symbol: string;
-      timeframe: string;
-      fetched: number;
-      saved: number;
-      duplicates: number;
-      error?: string;
-    }> = [];
+    // RETURN IMMEDIATELY - process in background to avoid timeout
+    const jobId = `download-${Date.now()}`;
+    
+    // Start background processing
+    (async () => {
+      console.log(`🚀 [Download History] Background job ${jobId} started`);
+      const jobStartTime = Date.now();
+      let grandTotalFetched = 0;
+      let grandTotalSaved = 0;
 
-    for (const symbol of symbols) {
-      for (const timeframe of validTimeframes) {
-        // For each timeframe, check if we already have historical data
-        // If yes, download backwards from the oldest candle we have
-        // If no, download backwards from the last 1m candle
-        
-        let endDate = new Date();
-        const Model = getHistoricalModel(timeframe);
-        
-        if (Model) {
-          // Check for existing historical data - get the OLDEST candle
-          const oldestHistorical = await Model.findOne({ symbol })
-            .sort({ timestamp: 1 })
-            .select('timestamp')
-            .lean();
+      for (const symbol of symbols) {
+        for (const timeframe of validTimeframes) {
+          let endDate = new Date();
+          const Model = getHistoricalModel(timeframe);
           
-          if (oldestHistorical && oldestHistorical.timestamp) {
-            // We have data - download further back from the oldest
-            endDate = new Date(oldestHistorical.timestamp);
-            console.log(`📊 [Download History] ${symbol} ${timeframe}: Existing data found, oldest at ${endDate.toISOString()}`);
-          } else if (startFromLastCandle) {
-            // No historical data - start from last 1m candle
-            const db = mongoose.connection.db;
-            if (db) {
-              const lastCandle = await db.collection('candles_1m')
-                .findOne({ symbol }, { sort: { t: -1 }, projection: { t: 1 } });
-              
-              if (lastCandle && lastCandle.t) {
-                endDate = new Date(lastCandle.t * 1000);
-                console.log(`📊 [Download History] ${symbol} ${timeframe}: No history, starting from last 1m at ${endDate.toISOString()}`);
+          if (Model) {
+            const oldestHistorical = await Model.findOne({ symbol })
+              .sort({ timestamp: 1 })
+              .select('timestamp')
+              .lean();
+            
+            if (oldestHistorical && oldestHistorical.timestamp) {
+              endDate = new Date(oldestHistorical.timestamp);
+              console.log(`📊 [Download History] ${symbol} ${timeframe}: Existing data, oldest at ${endDate.toISOString()}`);
+            } else if (startFromLastCandle) {
+              const db = mongoose.connection.db;
+              if (db) {
+                const lastCandle = await db.collection('candles_1m')
+                  .findOne({ symbol }, { sort: { t: -1 }, projection: { t: 1 } });
+                if (lastCandle && lastCandle.t) {
+                  endDate = new Date(lastCandle.t * 1000);
+                }
               }
             }
           }
-        }
 
-        // Calculate start date (yearsBack years ago from endDate)
-        const startDate = new Date(endDate);
-        startDate.setFullYear(startDate.getFullYear() - yearsBack);
+          const startDate = new Date(endDate);
+          startDate.setFullYear(startDate.getFullYear() - yearsBack);
+          const startMs = startDate.getTime();
+          const endMs = endDate.getTime();
+          
+          if (!Model) continue;
 
-        const startMs = startDate.getTime();
-        const endMs = endDate.getTime();
-        
-        if (!Model) continue;
+          try {
+            await FetchStatus.updateOne(
+              { symbol, timeframe },
+              { $set: { status: 'in_progress', lastFetchedAt: new Date() } },
+              { upsert: true }
+            );
 
-        try {
-          // Mark as in progress
-          await FetchStatus.updateOne(
-            { symbol, timeframe },
-            { $set: { status: 'in_progress', lastFetchedAt: new Date() } },
-            { upsert: true }
-          );
+            console.log(`📊 [Download History] ${symbol} ${timeframe}: ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
-          console.log(`📊 [Download History] ${symbol} ${timeframe}: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+            const chunkSize = 30 * 24 * 60 * 60 * 1000;
+            let totalFetched = 0;
+            let totalSaved = 0;
+            let chunkStart = startMs;
+            let oldestDate: Date | null = null;
+            let newestDate: Date | null = null;
 
-          // Fetch in chunks (30 days at a time)
-          const chunkSize = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
-          let totalFetched = 0;
-          let totalSaved = 0;
-          let totalDuplicates = 0;
-          let chunkStart = startMs;
-          let oldestDate: Date | null = null;
-          let newestDate: Date | null = null;
+            while (chunkStart < endMs) {
+              const chunkEnd = Math.min(chunkStart + chunkSize, endMs);
+              
+              try {
+                const candles = await fetchFromMassive(symbol, timeframe, chunkStart, chunkEnd);
+                totalFetched += candles.length;
 
-          while (chunkStart < endMs) {
-            const chunkEnd = Math.min(chunkStart + chunkSize, endMs);
-            
-            try {
-              const candles = await fetchFromMassive(symbol, timeframe, chunkStart, chunkEnd);
-              totalFetched += candles.length;
-
-              if (candles.length > 0) {
-                const config = TIMEFRAME_CONFIG[timeframe];
-                
-                // Track date range (using aligned timestamps)
-                const firstCandleDate = new Date(alignTimestamp(candles[0].t, config.minutes));
-                const lastCandleDate = new Date(alignTimestamp(candles[candles.length - 1].t, config.minutes));
-                
-                if (!oldestDate || firstCandleDate < oldestDate) {
-                  oldestDate = firstCandleDate;
-                }
-                if (!newestDate || lastCandleDate > newestDate) {
-                  newestDate = lastCandleDate;
-                }
-
-                // Convert to our format and save WITH ALIGNED TIMESTAMPS
-                // This ensures all candles are at proper interval boundaries
-                // e.g., 5m candles at :00, :05, :10, :15, etc.
-                const documents = candles.map(c => ({
-                  symbol,
-                  timestamp: new Date(alignTimestamp(c.t, config.minutes)), // ALIGNED!
-                  open: c.o,
-                  high: c.h,
-                  low: c.l,
-                  close: c.c,
-                  volume: c.v || 0,
-                }));
-
-                // Batch upsert
-                const BATCH_SIZE = 1000;
-                for (let i = 0; i < documents.length; i += BATCH_SIZE) {
-                  const batch = documents.slice(i, i + BATCH_SIZE);
+                if (candles.length > 0) {
+                  const config = TIMEFRAME_CONFIG[timeframe];
+                  const firstCandleDate = new Date(alignTimestamp(candles[0].t, config.minutes));
+                  const lastCandleDate = new Date(alignTimestamp(candles[candles.length - 1].t, config.minutes));
                   
-                  const operations = batch.map(doc => ({
-                    updateOne: {
-                      filter: { symbol: doc.symbol, timestamp: doc.timestamp },
-                      update: { $setOnInsert: doc },
-                      upsert: true,
-                    },
+                  if (!oldestDate || firstCandleDate < oldestDate) oldestDate = firstCandleDate;
+                  if (!newestDate || lastCandleDate > newestDate) newestDate = lastCandleDate;
+
+                  const documents = candles.map(c => ({
+                    symbol,
+                    timestamp: new Date(alignTimestamp(c.t, config.minutes)),
+                    open: c.o, high: c.h, low: c.l, close: c.c, volume: c.v || 0,
                   }));
 
-                  try {
-                    const result = await Model.bulkWrite(operations, { ordered: false });
-                    totalSaved += result.upsertedCount || 0;
-                    totalDuplicates += batch.length - (result.upsertedCount || 0);
-                  } catch (bulkError: unknown) {
-                    // Handle duplicate key errors gracefully
-                    if (bulkError instanceof Error && 'writeErrors' in bulkError) {
-                      const writeError = bulkError as { writeErrors: Array<{ code: number }> };
-                      totalDuplicates += writeError.writeErrors.filter(e => e.code === 11000).length;
+                  const BATCH_SIZE = 1000;
+                  for (let i = 0; i < documents.length; i += BATCH_SIZE) {
+                    const batch = documents.slice(i, i + BATCH_SIZE);
+                    const operations = batch.map(doc => ({
+                      updateOne: {
+                        filter: { symbol: doc.symbol, timestamp: doc.timestamp },
+                        update: { $setOnInsert: doc },
+                        upsert: true,
+                      },
+                    }));
+
+                    try {
+                      const result = await Model.bulkWrite(operations, { ordered: false });
+                      totalSaved += result.upsertedCount || 0;
+                    } catch {
+                      // Ignore duplicate key errors
                     }
                   }
                 }
+              } catch (chunkError) {
+                console.error(`⚠️ [Download History] Chunk error ${symbol} ${timeframe}: ${chunkError}`);
               }
-            } catch (chunkError) {
-              console.error(`⚠️ [Download History] Chunk error ${symbol} ${timeframe}: ${chunkError}`);
-              // Continue with next chunk
+
+              chunkStart = chunkEnd;
+              await new Promise(resolve => setTimeout(resolve, 100));
             }
 
-            chunkStart = chunkEnd;
-            
-            // Small delay to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await FetchStatus.updateOne(
+              { symbol, timeframe },
+              { 
+                $set: { 
+                  status: 'completed',
+                  oldestCandleDate: oldestDate,
+                  newestCandleDate: newestDate,
+                  totalCandles: totalFetched,
+                  lastFetchedAt: new Date(),
+                  lastError: null,
+                }
+              }
+            );
+
+            grandTotalFetched += totalFetched;
+            grandTotalSaved += totalSaved;
+            console.log(`✅ [Download History] ${symbol} ${timeframe}: fetched ${totalFetched}, saved ${totalSaved}`);
+
+          } catch (error) {
+            console.error(`❌ [Download History] Error ${symbol} ${timeframe}:`, error);
+            await FetchStatus.updateOne(
+              { symbol, timeframe },
+              { $set: { status: 'failed', lastError: error instanceof Error ? error.message : 'Unknown error', lastFetchedAt: new Date() } },
+              { upsert: true }
+            );
           }
-
-          // Update fetch status
-          await FetchStatus.updateOne(
-            { symbol, timeframe },
-            { 
-              $set: { 
-                status: 'completed',
-                oldestCandleDate: oldestDate,
-                newestCandleDate: newestDate,
-                totalCandles: totalFetched,
-                lastFetchedAt: new Date(),
-                lastError: null,
-              }
-            }
-          );
-
-          console.log(`✅ [Download History] ${symbol} ${timeframe}: fetched ${totalFetched}, saved ${totalSaved}, duplicates ${totalDuplicates}`);
-          
-          results.push({
-            symbol,
-            timeframe,
-            fetched: totalFetched,
-            saved: totalSaved,
-            duplicates: totalDuplicates,
-          });
-
-        } catch (error) {
-          console.error(`❌ [Download History] Error ${symbol} ${timeframe}:`, error);
-          
-          await FetchStatus.updateOne(
-            { symbol, timeframe },
-            { 
-              $set: { 
-                status: 'failed',
-                lastError: error instanceof Error ? error.message : 'Unknown error',
-                lastFetchedAt: new Date(),
-              }
-            },
-            { upsert: true }
-          );
-
-          results.push({
-            symbol,
-            timeframe,
-            fetched: 0,
-            saved: 0,
-            duplicates: 0,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
         }
       }
-    }
 
-    const totalSaved = results.reduce((sum, r) => sum + r.saved, 0);
-    const totalFetched = results.reduce((sum, r) => sum + r.fetched, 0);
+      const duration = Math.round((Date.now() - jobStartTime) / 1000);
+      console.log(`🎉 [Download History] Background job ${jobId} completed in ${duration}s - Total: ${grandTotalFetched} fetched, ${grandTotalSaved} saved`);
+    })();
 
-    console.log(`📥 [Download History] Complete: ${totalFetched} fetched, ${totalSaved} saved`);
-
+    // Return immediately
     return NextResponse.json({
       success: true,
-      summary: {
-        symbols: symbols.length,
-        timeframes: validTimeframes.length,
-        yearsBack,
-        totalFetched,
-        totalSaved,
-      },
-      results,
+      message: `Download started in background for ${symbols.length} symbols × ${validTimeframes.length} timeframes (${yearsBack} years)`,
+      jobId,
+      note: 'Check server logs for progress. This may take several minutes.',
     });
 
   } catch (error) {
-    console.error('Error downloading history:', error);
-    return NextResponse.json({ error: 'Download failed' }, { status: 500 });
+    console.error('Error starting download:', error);
+    return NextResponse.json({ error: 'Download failed to start' }, { status: 500 });
   }
 }
 

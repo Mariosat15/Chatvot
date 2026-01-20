@@ -536,8 +536,16 @@ export default function MarketDataSection() {
       });
       if (res.ok) {
         const data = await res.json();
-        setSeedResults(data.results);
-        setMessage({ type: 'success', text: `Seeding complete! Inserted ${data.summary.totalInserted} candles` });
+        // New non-blocking format: returns immediately with jobId
+        if (data.jobId) {
+          setMessage({ type: 'success', text: `✅ ${data.message}. ${data.note}` });
+        } else if (data.results) {
+          // Old format for backward compatibility
+          setSeedResults(data.results);
+          setMessage({ type: 'success', text: `Seeding complete! Inserted ${data.summary?.totalInserted || 0} candles` });
+        } else {
+          setMessage({ type: 'success', text: data.message || 'Seeding started!' });
+        }
         fetchData();
       } else {
         const error = await res.json();
@@ -547,7 +555,7 @@ export default function MarketDataSection() {
       setMessage({ type: 'error', text: 'Error running seed' });
     } finally {
       setSeedRunning(false);
-      setTimeout(() => setMessage(null), 10000);
+      setTimeout(() => setMessage(null), 15000); // Longer timeout for background job message
     }
   };
 
@@ -616,9 +624,16 @@ export default function MarketDataSection() {
             
             if (res.ok) {
               const data = await res.json();
-              const saved = data.summary?.totalSaved || 0;
-              totalSaved += saved;
-              completed.push({ symbol, timeframe, saved });
+              // Handle new non-blocking format (returns jobId)
+              if (data.jobId) {
+                // Background job started - mark as pending
+                completed.push({ symbol, timeframe, saved: -1, jobId: data.jobId });
+              } else {
+                // Old format for backward compatibility
+                const saved = data.summary?.totalSaved || 0;
+                totalSaved += saved;
+                completed.push({ symbol, timeframe, saved });
+              }
             } else {
               completed.push({ symbol, timeframe, saved: 0 });
             }
@@ -637,17 +652,27 @@ export default function MarketDataSection() {
         }
       }
       
+      // Check if any jobs are running in background
+      const backgroundJobs = completed.filter(c => c.saved === -1);
+      
       setHistoryDownloadResults(completed.map(c => ({
         symbol: c.symbol,
         timeframe: c.timeframe,
-        count: c.saved,
-        status: c.saved > 0 ? 'success' as const : 'skipped' as const,
+        count: c.saved === -1 ? 0 : c.saved,
+        status: c.saved === -1 ? 'pending' as const : (c.saved > 0 ? 'success' as const : 'skipped' as const),
       })));
       
-      setMessage({ 
-        type: 'success', 
-        text: `Download complete! Saved ${totalSaved.toLocaleString()} candles across ${completed.length} downloads` 
-      });
+      if (backgroundJobs.length > 0) {
+        setMessage({ 
+          type: 'success', 
+          text: `✅ ${backgroundJobs.length} download(s) started in background. Check server logs for progress.` 
+        });
+      } else {
+        setMessage({ 
+          type: 'success', 
+          text: `Download complete! Saved ${totalSaved.toLocaleString()} candles across ${completed.length} downloads` 
+        });
+      }
       fetchData();
       
     } catch {
