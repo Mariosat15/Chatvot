@@ -174,11 +174,46 @@ export async function GET(request: NextRequest) {
         if (candles.length > 0) {
           const oldestDate = new Date(candles[0].timestamp);
           const newestDate = new Date(candles[candles.length - 1].timestamp);
+          const now = new Date();
           
           console.log(`📊 [Gap Detection] ${sym} ${tf}: ${candles.length} candles (${oldestDate.toISOString()} → ${newestDate.toISOString()})`);
           
           // Expected gap between candles in seconds
           const expectedGapSeconds = config.minutes * 60;
+          
+          // CHECK FOR TRAILING GAP: Gap from newest candle to TODAY
+          const newestTime = newestDate.getTime() / 1000;
+          const nowTime = now.getTime() / 1000;
+          const trailingGapSeconds = nowTime - newestTime;
+          const trailingGapMinutes = Math.floor(trailingGapSeconds / 60);
+          
+          // If newest candle is more than 2x interval old, there's a trailing gap
+          if (trailingGapSeconds > expectedGapSeconds * 2) {
+            // Skip if it's just weekend gap for lower timeframes
+            const newestDay = newestDate.getUTCDay();
+            let isWeekendTrailing = false;
+            if (config.minutes <= 240) { // 4h or less
+              isWeekendTrailing = (newestDay === 5 || newestDay === 6) && trailingGapMinutes >= 2880 && trailingGapMinutes <= 4500;
+            } else if (config.minutes === 1440) { // 1d
+              isWeekendTrailing = (newestDay === 5) && trailingGapMinutes >= 2880 && trailingGapMinutes <= 4320;
+            }
+            
+            if (!isWeekendTrailing && trailingGapMinutes > config.minutes * 2) {
+              const missingCandles = Math.floor(trailingGapMinutes / config.minutes);
+              console.log(`🚨 [Gap Found] ${sym} ${tf} TRAILING: ${newestDate.toISOString()} → ${now.toISOString()} (${trailingGapMinutes} min, ~${missingCandles} missing candles)`);
+              allGaps.push({
+                symbol: sym,
+                timeframe: tf,
+                startTime: newestTime,
+                endTime: nowTime,
+                missingMinutes: trailingGapMinutes,
+              });
+              gapsFound++;
+              if (trailingGapMinutes > largestGapMinutes) {
+                largestGapMinutes = trailingGapMinutes;
+              }
+            }
+          }
           
           // Check for gaps within this timeframe
           for (let i = 1; i < candles.length; i++) {
