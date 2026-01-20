@@ -418,10 +418,20 @@ async function fillCollectionGap(symbol: string): Promise<void> {
   try {
     // Check if auto gap fill is enabled
     const MarketDataSettings = mongoose.models.MarketDataSettings;
-    if (!MarketDataSettings) return;
+    if (!MarketDataSettings) {
+      console.log(`⚠️ [Collection Gap] ${symbol}: MarketDataSettings model not found`);
+      return;
+    }
     
     const settings = await MarketDataSettings.findOne({ key: 'market_data_settings' });
-    if (!settings?.gapFill?.enabled || settings?.gapFill?.mode !== 'auto') return;
+    if (!settings?.gapFill?.enabled) {
+      console.log(`⚠️ [Collection Gap] ${symbol}: Gap fill is DISABLED in admin settings`);
+      return;
+    }
+    if (settings?.gapFill?.mode !== 'auto') {
+      console.log(`⚠️ [Collection Gap] ${symbol}: Gap fill mode is "${settings?.gapFill?.mode}", not "auto"`);
+      return;
+    }
     
     // Get oldest candle from candles_1m (live data)
     const oldest1m = await mongoose.connection.db?.collection('candles_1m').findOne(
@@ -440,17 +450,24 @@ async function fillCollectionGap(symbol: string): Promise<void> {
     
     if (!oldest1m || !newestHistorical) {
       // Missing data in one of the collections, can't detect gap
+      console.log(`⚠️ [Collection Gap] ${symbol}: Missing data - oldest1m: ${!!oldest1m}, newestHistorical: ${!!newestHistorical}`);
       return;
     }
     
     const oldest1mTime = oldest1m.t as number; // in seconds
     const newestHistoricalTime = Math.floor(new Date(newestHistorical.timestamp!).getTime() / 1000); // in seconds
     
+    // Log the timestamps for debugging
+    console.log(`🔍 [Collection Gap Check] ${symbol}:`);
+    console.log(`   candles_1m oldest: ${new Date(oldest1mTime * 1000).toISOString()}`);
+    console.log(`   candles_historical_1m newest: ${new Date(newestHistoricalTime * 1000).toISOString()}`);
+    
     // Calculate gap in minutes
     const gapMinutes = Math.floor((oldest1mTime - newestHistoricalTime) / 60);
     
     // If gap is less than 10 minutes, no need to fill
     if (gapMinutes <= 10) {
+      console.log(`✅ [Collection Gap] ${symbol}: No significant gap (${gapMinutes} minutes)`);
       return;
     }
     
