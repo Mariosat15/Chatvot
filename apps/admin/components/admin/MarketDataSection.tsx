@@ -1484,15 +1484,40 @@ export default function MarketDataSection() {
 
           {/* Results */}
           {historyDownloadResults && (
-            <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30 max-h-40 overflow-y-auto">
-              <h4 className="text-white font-medium mb-2">Results</h4>
+            <div className="bg-[#12141c] rounded-lg p-4 border border-gray-800/30 max-h-48 overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-white font-medium">Results</h4>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-blue-400">
+                    {historyDownloadResults.filter(r => r.status === 'pending').length} running
+                  </span>
+                  <span className="text-green-400">
+                    {historyDownloadResults.filter(r => r.status === 'success').length} done
+                  </span>
+                </div>
+              </div>
               <div className="space-y-1">
                 {historyDownloadResults.map((result, i) => {
-                  const r = result as any;
-                  const savedCount = r.count ?? r.saved ?? r.inserted ?? 0;
+                  const r = result as { symbol: string; timeframe?: string; count?: number; status?: string; error?: string };
+                  const savedCount = r.count ?? 0;
+                  const isPending = r.status === 'pending';
                   return (
-                    <div key={i} className={`text-xs ${result.error ? 'text-red-400' : 'text-gray-400'}`}>
-                      <span className="text-white">{result.symbol} {r.timeframe}</span>: {result.error ? `❌ ${result.error}` : `✓ ${savedCount.toLocaleString()} saved`}
+                    <div key={i} className={`text-xs flex items-center justify-between ${result.error ? 'text-red-400' : isPending ? 'text-blue-400' : 'text-gray-400'}`}>
+                      <span>
+                        <span className="text-white">{result.symbol}</span>
+                        {r.timeframe && <span className="text-gray-500 ml-1">({r.timeframe})</span>}
+                      </span>
+                      <span>
+                        {result.error ? (
+                          `❌ ${result.error}`
+                        ) : isPending ? (
+                          <span className="flex items-center gap-1">
+                            <span className="animate-pulse">⏳</span> Running in background...
+                          </span>
+                        ) : (
+                          `✓ ${savedCount.toLocaleString()} saved`
+                        )}
+                      </span>
                     </div>
                   );
                 })}
@@ -1505,10 +1530,12 @@ export default function MarketDataSection() {
             <div className="w-full bg-gray-900/50 rounded-lg p-4 border border-blue-500/30 mb-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-blue-400 text-sm font-medium">
-                  Downloading {downloadProgress.currentSymbol} {downloadProgress.currentTimeframe}...
+                  {downloadProgress.current < downloadProgress.total 
+                    ? `📤 Sending ${downloadProgress.currentSymbol} ${downloadProgress.currentTimeframe}...`
+                    : '✅ All download jobs submitted!'}
                 </span>
                 <span className="text-gray-400 text-sm">
-                  {downloadProgress.current} / {downloadProgress.total}
+                  {downloadProgress.current} / {downloadProgress.total} jobs
                 </span>
               </div>
               <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
@@ -1518,13 +1545,28 @@ export default function MarketDataSection() {
                 />
               </div>
               <div className="mt-2 text-xs text-gray-500">
-                {Math.round((downloadProgress.current / downloadProgress.total) * 100)}% complete
-                {downloadProgress.completed.length > 0 && (
-                  <span className="ml-2">
-                    • {downloadProgress.completed.reduce((sum, c) => sum + c.saved, 0).toLocaleString()} candles saved
-                  </span>
-                )}
+                {Math.round((downloadProgress.current / downloadProgress.total) * 100)}% jobs submitted
               </div>
+              {downloadProgress.current >= downloadProgress.total && (
+                <div className="mt-3 p-3 bg-blue-600/10 border border-blue-500/30 rounded-lg">
+                  <p className="text-blue-400 text-sm font-medium mb-1">📊 Downloads Running in Background</p>
+                  <p className="text-gray-400 text-xs">
+                    Jobs are processing on the server. Check server logs (PM2) for real-time progress.
+                    Depending on the amount of data, this may take several minutes to hours.
+                  </p>
+                  <div className="flex items-center gap-4 mt-2 text-xs">
+                    <span className="text-gray-500">
+                      ⏱️ Est. time: ~{Math.ceil(downloadProgress.total * historyYearsBack * 2)} minutes
+                    </span>
+                    <button 
+                      onClick={fetchData}
+                      className="text-blue-400 hover:text-blue-300"
+                    >
+                      🔄 Refresh to check results
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
