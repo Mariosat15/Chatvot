@@ -935,6 +935,7 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           formingCandle = getForming1hCandle(symbol);
         } else if (normalizedTf === '1d') {
           formingCandle = getFormingDailyCandle(symbol);
+          console.log(`🔍 [1d Forming] ${symbol}: ${formingCandle ? `time=${new Date(formingCandle.time * 1000).toISOString()}, O=${formingCandle.open}, H=${formingCandle.high}, L=${formingCandle.low}, C=${formingCandle.close}` : 'NULL'}`);
         } else if (normalizedTf === 'W') {
           formingCandle = getFormingWeeklyCandle(symbol);
         } else if (normalizedTf === 'M') {
