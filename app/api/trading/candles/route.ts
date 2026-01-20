@@ -237,10 +237,18 @@ async function seedHistoricalCandles(symbol: string, limit: number, seedingMinut
       return;
     }
     
+    // LIMIT to only the most recent N candles (barsToFetch)
+    // Candles are sorted oldest first, so take the LAST N
+    const limitedCandles = candles.length > barsToFetch 
+      ? candles.slice(-barsToFetch) 
+      : candles;
+    
+    console.log(`📊 [Seeding] Limiting ${candles.length} candles to ${limitedCandles.length} (configured: ${barsToFetch})`);
+    
     // Convert to format expected by bulkUpsertCandles
     // NOTE: getRecentCandles returns time in SECONDS, but bulkUpsertCandles expects MILLISECONDS
     // (because it divides by 1000 internally)
-    const candlesToSave = candles.map(c => ({
+    const candlesToSave = limitedCandles.map(c => ({
       symbol,
       time: c.time * 1000, // Convert seconds to ms (bulkUpsertCandles will divide by 1000)
       open: c.open,
@@ -250,10 +258,10 @@ async function seedHistoricalCandles(symbol: string, limit: number, seedingMinut
       volume: c.volume || 0,
     }));
     
-    // Save ALL candles to MongoDB
+    // Save LIMITED candles to MongoDB
     await Candle1m.bulkUpsertCandles(candlesToSave);
     
-    console.log(`✅ [Candles API] Seeded ${candles.length} candles (${formatTime(seedingMinutes)}) for ${symbol} to MongoDB`);
+    console.log(`✅ [Candles API] Seeded ${limitedCandles.length} candles (${formatTime(seedingMinutes)}) for ${symbol} to MongoDB`);
   } catch (error) {
     console.error(`❌ [Candles API] Failed to seed candles for ${symbol}:`, error);
   } finally {

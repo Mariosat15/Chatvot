@@ -238,7 +238,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   
   // Lazy loading state
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  // Start with false - only set true AFTER server confirms there's more history
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const oldestCandleTimeRef = useRef<number | null>(null);
   const [showVolume, setShowVolume] = useState(false);
   const [chartType, setChartType] = useState<'candlestick' | 'line' | 'renko' | 'heikinashi' | 'pointfigure'>('candlestick');
