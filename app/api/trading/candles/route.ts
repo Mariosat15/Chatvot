@@ -214,14 +214,16 @@ async function seedHistoricalCandles(symbol: string, limit: number, seedingMinut
     return `${d}d ${h}h ${m}m`;
   };
   
-  // Convert minutes to days for the API call (with ceiling to not lose minutes)
-  const seedingDays = Math.ceil(seedingMinutes / (24 * 60)) || 1; // At least 1 day
+  // For 1m candles, seedingMinutes = number of candles to fetch
+  // Calculate days needed (for API) but LIMIT actual candles returned
+  const barsToFetch = seedingMinutes; // 1 hour = 60 bars for 1m timeframe
+  const daysNeeded = Math.max(1, Math.ceil(seedingMinutes / (24 * 60))); // At least 1 day for API
   
   try {
-    console.log(`🌱 [Candles API] Seeding ${formatTime(seedingMinutes)} of candles for ${symbol}...`);
+    console.log(`🌱 [Candles API] Seeding ${formatTime(seedingMinutes)} of candles for ${symbol} (${barsToFetch} bars)...`);
     
-    // Fetch from Massive.com REST API with configurable days back
-    const candles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, limit, seedingDays);
+    // Fetch from Massive.com REST API - request exact number of bars based on seeding setting
+    const candles = await getRecentCandles(symbol as ForexSymbol, '1' as Timeframe, barsToFetch, daysNeeded);
     
     // Debug: Log what Massive.com actually returned
     if (candles.length > 0) {
@@ -517,8 +519,8 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         console.log(`⚡ [Candles API] MongoDB has only ${candles?.length || 0} candles for ${symbol}, starting BACKGROUND seeding (${d}d ${h}h ${m}m)...`);
         
         // Fire and forget - don't await!
-        // Pass seedingMinutesTotal from admin settings
-        seedHistoricalCandles(symbol, Math.max(limit, 5000), settings.seedingMinutesTotal).then(() => {
+        // Pass seedingMinutesTotal from admin settings (this IS the number of 1m candles to fetch)
+        seedHistoricalCandles(symbol, settings.seedingMinutesTotal, settings.seedingMinutesTotal).then(() => {
           console.log(`✅ [Candles API] Background seeding completed for ${symbol}`);
         }).catch((err) => {
           console.error(`❌ [Candles API] Background seeding failed for ${symbol}:`, err);
