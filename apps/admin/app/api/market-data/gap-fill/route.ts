@@ -42,6 +42,9 @@ const TIMEFRAME_CONFIG: Record<string, { collection: string; minutes: number }> 
   '30m': { collection: 'candles_historical_30m', minutes: 30 },
   '1h': { collection: 'candles_historical_1h', minutes: 60 },
   '4h': { collection: 'candles_historical_4h', minutes: 240 },
+  '1d': { collection: 'candles_historical_1d', minutes: 1440 },      // Daily = 24*60 minutes
+  '1w': { collection: 'candles_historical_1w', minutes: 10080 },     // Weekly = 7*24*60 minutes
+  '1M': { collection: 'candles_historical_1M', minutes: 43200 },     // Monthly = 30*24*60 minutes
 };
 
 // Historical candle schema (same structure for all timeframes)
@@ -190,11 +193,22 @@ export async function GET(request: NextRequest) {
               const nextDate = new Date(currTime * 1000);
               const prevDay = prevDate.getUTCDay();
               
-              // Skip weekend gaps
-              const isWeekendGap = (prevDay === 5 || prevDay === 6) && missingMinutes >= 1440 && missingMinutes <= 4500;
+              // Weekend gap detection - different thresholds for different timeframes
+              // For 1m-4h: weekend gap is ~2-3 days (2880-4500 min)
+              // For 1d: weekend gap should be exactly 2-3 days (Fri→Mon = 3 days = 4320 min)
+              // For 1w/1M: no weekend gaps expected
+              let isWeekendGap = false;
+              if (config.minutes <= 240) { // 4h or less
+                isWeekendGap = (prevDay === 5 || prevDay === 6) && missingMinutes >= 2880 && missingMinutes <= 4500;
+              } else if (config.minutes === 1440) { // 1d
+                // For daily: only skip if it's exactly 2-3 days (Sat/Sun)
+                // Gap of 4+ days on daily is a real gap
+                isWeekendGap = (prevDay === 5) && missingMinutes >= 2880 && missingMinutes <= 4320;
+              }
+              // For 1w and 1M, no weekend gaps
               
               if (!isWeekendGap && missingMinutes > config.minutes * 2) {
-                console.log(`🚨 [Gap Found] ${sym} ${tf}: ${prevDate.toISOString()} → ${nextDate.toISOString()} (${missingMinutes} min)`);
+                console.log(`🚨 [Gap Found] ${sym} ${tf}: ${prevDate.toISOString()} → ${nextDate.toISOString()} (${missingMinutes} min, ${Math.round(missingMinutes / 1440)} days)`);
                 allGaps.push({
                   symbol: sym,
                   timeframe: tf,
