@@ -620,8 +620,12 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         
         // If there's a gap (historical ends before 1m starts), fetch from API
         if (newestHistoricalSeconds > 0 && oldest1mSeconds > newestHistoricalSeconds + (tfMinutes * 60 * 2)) {
-          // Gap detected! Fetch missing candles from API
-          console.log(`📊 [Candles] Gap detected for ${symbol} ${normalizedTf}: historical ends ${new Date(newestHistoricalSeconds * 1000).toISOString()}, 1m starts ${new Date(oldest1mSeconds * 1000).toISOString()}`);
+          // Gap detected! Fetch missing candles from API using date range
+          const gapDurationMs = (oldest1mSeconds - newestHistoricalSeconds) * 1000;
+          const gapDays = Math.ceil(gapDurationMs / (24 * 60 * 60 * 1000));
+          console.log(`📊 [Candles] Gap detected for ${symbol} ${normalizedTf}: ${gapDays} days gap`);
+          console.log(`   Historical ends: ${new Date(newestHistoricalSeconds * 1000).toISOString()}`);
+          console.log(`   1m starts: ${new Date(oldest1mSeconds * 1000).toISOString()}`);
           
           const massiveTimeframeMap: Record<string, Timeframe> = {
             '5m': '5', '15m': '15', '30m': '30',
@@ -631,21 +635,32 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           
           if (massiveTf) {
             try {
-              // Fetch from API for the gap period
-              const gapCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
+              // Use fetchCandlesForRange for large gaps - it fetches SPECIFIC date range
+              const fromMs = newestHistoricalSeconds * 1000;
+              const toMs = oldest1mSeconds * 1000;
               
-              // Filter to only include candles in the gap (after historical, before what we can aggregate)
-              const gapFiltered = gapCandles
-                .filter(c => c.time > newestHistoricalSeconds && c.time < oldest1mSeconds)
-                .map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
+              console.log(`📊 [Candles] Fetching gap from API: ${new Date(fromMs).toISOString()} to ${new Date(toMs).toISOString()}`);
+              const gapCandles = await fetchCandlesForRange(symbol as ForexSymbol, massiveTf, fromMs, toMs);
               
-              if (gapFiltered.length > 0) {
-                console.log(`📊 [Candles] Filled ${gapFiltered.length} candles from API for gap`);
+              if (gapCandles.length > 0) {
+                // Map to our format
+                const gapMapped = gapCandles.map(c => ({ 
+                  time: c.time, 
+                  open: c.open, 
+                  high: c.high, 
+                  low: c.low, 
+                  close: c.close 
+                }));
+                
+                console.log(`📊 [Candles] Filled ${gapMapped.length} candles from API for gap`);
+                
                 // Merge gap candles with historical
                 const candleMap = new Map<number, typeof historicalCandles[0]>();
                 for (const c of historicalCandles) candleMap.set(c.time, c);
-                for (const c of gapFiltered) if (!candleMap.has(c.time)) candleMap.set(c.time, c);
+                for (const c of gapMapped) if (!candleMap.has(c.time)) candleMap.set(c.time, c);
                 historicalCandles = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
+              } else {
+                console.warn(`⚠️ [Candles] No gap candles returned from API`);
               }
             } catch (err) {
               console.warn(`⚠️ [Candles] Failed to fetch gap candles from API:`, err);
