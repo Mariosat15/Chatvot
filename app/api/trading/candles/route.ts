@@ -900,6 +900,17 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
               before: currentPeriodDate,
               limit: limit - 1, // Leave room for forming candle
             });
+            
+            // DEBUG: Log for daily timeframe
+            if (['1d', 'W', 'M'].includes(normalizedTf) && dbCandles.length > 0) {
+              const newestDbCandle = dbCandles[dbCandles.length - 1];
+              const oldestDbCandle = dbCandles[0];
+              console.log(`🔍 [${normalizedTf} DEBUG] ${symbol}: DB returned ${dbCandles.length} candles`);
+              console.log(`   Query: before ${currentPeriodDate.toISOString()}, limit ${limit - 1}`);
+              console.log(`   Oldest: ${new Date(oldestDbCandle.timestamp).toISOString()}`);
+              console.log(`   Newest: ${new Date(newestDbCandle.timestamp).toISOString()}`);
+            }
+            
             // IMPORTANT: Align timestamps to proper interval boundaries
             // e.g., 5m candles should be at :00, :05, :10, :15, etc.
             const rawCandles = dbCandles.map(c => ({
