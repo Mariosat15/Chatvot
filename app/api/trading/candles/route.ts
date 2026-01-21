@@ -982,12 +982,26 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         } else if (normalizedTf === 'M') {
           formingCandle = getFormingMonthlyCandle(symbol);
         } else if (useAggregator) {
-          // For 5m, 15m, 30m - ONLY get forming candle from aggregator cache
-          // IMPORTANT: Do NOT mix aggregator completed candles with historical!
-          // This ensures ALL users see the same historical candles.
-          const result = await getAggregatedCandles(symbol, normalizedTf, 1);
+          // For 5m, 15m, 30m - get forming candle AND recent completed candles from aggregator
+          // This fills the gap between historical collection and current period
+          // The aggregator uses 1m candles which ARE consistent for recent data
+          const result = await getAggregatedCandles(symbol, normalizedTf, 20); // Get up to 20 recent candles
           formingCandle = result.formingCandle;
-          // NOTE: We intentionally do NOT use result.candles here to maintain consistency
+          
+          // Fill the gap between historical and forming candle with aggregator candles
+          // This ensures users see complete data on initial load (no visual gaps)
+          if (historicalCandles.length > 0 && result.candles.length > 0) {
+            const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
+            // Only add aggregator candles that are NEWER than our newest historical candle
+            // and OLDER than the forming candle (completed candles only)
+            const gapFillerCandles = result.candles.filter(c => 
+              c.time > newestHistoricalTime && c.time < currentPeriodStart
+            );
+            if (gapFillerCandles.length > 0) {
+              console.log(`🔧 [${normalizedTf} Gap Fill] ${symbol}: Adding ${gapFillerCandles.length} candles from aggregator to fill gap`);
+              historicalCandles = [...historicalCandles, ...gapFillerCandles].sort((a, b) => a.time - b.time);
+            }
+          }
         }
         
         // If forming candle is missing, try to build it from recent 1m candles
