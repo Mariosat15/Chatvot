@@ -22,7 +22,8 @@ export async function GET() {
 
     // Get branding from WhiteLabel (existing branding settings)
     let whiteLabel = await WhiteLabel.findOne();
-    const brandingLogo = whiteLabel?.appLogo || '/assets/icons/logo.svg';
+    // Use logo from branding if set and not empty, otherwise leave empty (frontend handles fallback)
+    const brandingLogo = (whiteLabel?.appLogo && whiteLabel.appLogo.length > 0) ? whiteLabel.appLogo : '';
 
     // Get company settings for site name
     let companySettings = await CompanySettings.findOne();

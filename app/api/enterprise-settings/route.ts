@@ -30,7 +30,7 @@ export async function GET() {
     const enterpriseSettings = {
       // Branding
       siteName: companySettings?.companyName || settings.siteName || 'ChartVolt',
-      logo: whiteLabel?.appLogo || '/assets/icons/logo.svg',
+      logo: (whiteLabel?.appLogo && whiteLabel.appLogo.length > 0) ? whiteLabel.appLogo : '',
       
       // Hero Section
       heroTitle: settings.enterpriseHeroTitle,

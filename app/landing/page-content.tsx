@@ -382,17 +382,28 @@ export default function LandingPageContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-3">
-              <Image 
-                src={settings.logo || '/assets/images/logo.png'} 
-                alt={settings.siteName} 
-                width={140} 
-                height={32} 
-                className="h-8 w-auto" 
-                onError={(e) => {
-                  // Fallback to default logo if image fails to load
-                  (e.target as HTMLImageElement).src = '/assets/images/logo.png';
-                }}
-              />
+              {settings.logo && settings.logo.length > 0 ? (
+                <Image 
+                  src={settings.logo} 
+                  alt={settings.siteName} 
+                  width={140} 
+                  height={32} 
+                  className="h-8 w-auto" 
+                />
+              ) : (
+                <>
+                  <div className="relative">
+                    <div className="absolute inset-0 blur-lg opacity-50" style={{ backgroundColor: effectiveColors.primary }} />
+                    <div 
+                      className="relative w-10 h-10 rounded-xl flex items-center justify-center"
+                      style={{ background: theme?.effects.gradientStyle || `linear-gradient(135deg, ${effectiveColors.primary}, ${effectiveColors.secondary})` }}
+                    >
+                      <span className="text-xl">{theme?.themeIcons?.special || '⚡'}</span>
+                    </div>
+                  </div>
+                  <span className="text-xl font-bold hidden sm:block" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>{settings.siteName}</span>
+                </>
+              )}
             </Link>
             
             <nav className="hidden md:flex items-center gap-8">
@@ -1003,16 +1014,16 @@ export default function LandingPageContent() {
           <div className="py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div>
               <Link href="/" className="flex items-center gap-3 mb-4">
-                <Image 
-                  src={settings.logo || '/assets/images/logo.png'} 
-                  alt={settings.siteName} 
-                  width={120} 
-                  height={28} 
-                  className="h-7 w-auto" 
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/assets/images/logo.png';
-                  }}
-                />
+                {settings.logo && settings.logo.length > 0 ? (
+                  <Image src={settings.logo} alt={settings.siteName} width={120} height={28} className="h-7 w-auto" />
+                ) : (
+                  <>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: theme?.effects.gradientStyle }}>
+                      <span>{theme?.themeIcons?.special || '⚡'}</span>
+                    </div>
+                    <span className="text-lg font-bold" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>{settings.siteName}</span>
+                  </>
+                )}
               </Link>
               <p className="text-sm" style={{ color: theme?.colors.textMuted }}>{settings.tagline}</p>
             </div>
