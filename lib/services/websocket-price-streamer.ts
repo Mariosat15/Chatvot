@@ -15,6 +15,7 @@
 import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
 import Candle1m from '@/database/models/candle-1m.model';
 import { connectToDatabase } from '@/database/mongoose';
+import { getHistoricalModel } from '@/database/models/candle-historical.model';
 
 export interface StreamingPriceQuote {
   symbol: ForexSymbol;
@@ -788,6 +789,11 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existing5m = state.formingCandles5m.get(symbol);
   
   if (!existing5m || existing5m.periodStart !== period5m) {
+    // ⭐ SAVE COMPLETED CANDLE before starting new period (if it exists)
+    if (existing5m) {
+      // Fire and forget - don't block price updates
+      saveCompletedHigherTimeframeCandle('5m', { ...existing5m });
+    }
     // New 5m period - start fresh
     state.formingCandles5m.set(symbol, {
       symbol,
@@ -809,6 +815,10 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existing15m = state.formingCandles15m.get(symbol);
   
   if (!existing15m || existing15m.periodStart !== period15m) {
+    // ⭐ SAVE COMPLETED CANDLE
+    if (existing15m) {
+      saveCompletedHigherTimeframeCandle('15m', { ...existing15m });
+    }
     // New 15m period - start fresh
     state.formingCandles15m.set(symbol, {
       symbol,
@@ -830,6 +840,10 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existing30m = state.formingCandles30m.get(symbol);
   
   if (!existing30m || existing30m.periodStart !== period30m) {
+    // ⭐ SAVE COMPLETED CANDLE
+    if (existing30m) {
+      saveCompletedHigherTimeframeCandle('30m', { ...existing30m });
+    }
     // New 30m period - start fresh
     state.formingCandles30m.set(symbol, {
       symbol,
@@ -851,6 +865,10 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existing1h = state.formingCandles1h.get(symbol);
   
   if (!existing1h || existing1h.periodStart !== period1h) {
+    // ⭐ SAVE COMPLETED CANDLE
+    if (existing1h) {
+      saveCompletedHigherTimeframeCandle('1h', { ...existing1h });
+    }
     state.formingCandles1h.set(symbol, {
       symbol,
       periodStart: period1h,
@@ -870,6 +888,10 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existing4h = state.formingCandles4h.get(symbol);
   
   if (!existing4h || existing4h.periodStart !== period4h) {
+    // ⭐ SAVE COMPLETED CANDLE
+    if (existing4h) {
+      saveCompletedHigherTimeframeCandle('4h', { ...existing4h });
+    }
     state.formingCandles4h.set(symbol, {
       symbol,
       periodStart: period4h,
@@ -890,6 +912,10 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existingD = state.formingCandlesD.get(symbol);
   
   if (!existingD || existingD.periodStart !== periodD) {
+    // ⭐ SAVE COMPLETED CANDLE
+    if (existingD) {
+      saveCompletedHigherTimeframeCandle('1d', { ...existingD });
+    }
     state.formingCandlesD.set(symbol, {
       symbol,
       periodStart: periodD,
@@ -916,6 +942,10 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existingW = state.formingCandlesW.get(symbol);
   
   if (!existingW || existingW.periodStart !== periodW) {
+    // ⭐ SAVE COMPLETED CANDLE
+    if (existingW) {
+      saveCompletedHigherTimeframeCandle('1w', { ...existingW });
+    }
     state.formingCandlesW.set(symbol, {
       symbol,
       periodStart: periodW,
@@ -935,6 +965,10 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existingM = state.formingCandlesM.get(symbol);
   
   if (!existingM || existingM.periodStart !== periodM) {
+    // ⭐ SAVE COMPLETED CANDLE
+    if (existingM) {
+      saveCompletedHigherTimeframeCandle('1M', { ...existingM });
+    }
     state.formingCandlesM.set(symbol, {
       symbol,
       periodStart: periodM,
@@ -1004,6 +1038,58 @@ async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void
     }
   } catch (error) {
     console.error(`❌ [Candle Save Error] ${candle.symbol}:`, error instanceof Error ? error.message : error);
+  }
+}
+
+/**
+ * Save a completed higher timeframe candle to the historical collection
+ * This is called when we detect a new period has started (e.g., at :05, :10, :15 for 5m)
+ * 
+ * KEY INSIGHT: This creates a SINGLE SOURCE OF TRUTH
+ * - Completed candles go to historical collections
+ * - Historical collections are what the candles API queries
+ * - No more mixing aggregator + historical = consistent data for all users
+ */
+async function saveCompletedHigherTimeframeCandle(
+  timeframe: string, 
+  candle: CachedFormingCandle
+): Promise<void> {
+  try {
+    const historicalModel = getHistoricalModel(timeframe);
+    if (!historicalModel) {
+      console.error(`❌ [Auto-Save] No historical model for timeframe: ${timeframe}`);
+      return;
+    }
+    
+    const timestamp = new Date(candle.periodStart * 1000);
+    
+    // Use upsert to avoid duplicates (in case of race conditions)
+    await historicalModel.updateOne(
+      { 
+        symbol: candle.symbol, 
+        timestamp 
+      },
+      {
+        $setOnInsert: {
+          symbol: candle.symbol,
+          timestamp,
+          open: candle.open,
+          high: candle.high,
+          low: candle.low,
+          close: candle.close,
+          volume: 0,
+        }
+      },
+      { upsert: true }
+    );
+    
+    // Log only EUR/USD as sample (to avoid log spam)
+    if (candle.symbol === 'EUR/USD') {
+      console.log(`💾 [${timeframe}] Completed candle saved: ${timestamp.toISOString()} | O:${candle.open.toFixed(5)} H:${candle.high.toFixed(5)} L:${candle.low.toFixed(5)} C:${candle.close.toFixed(5)}`);
+    }
+  } catch (error) {
+    // Don't crash on save errors - just log and continue
+    console.error(`❌ [Auto-Save ${timeframe}] ${candle.symbol}:`, error instanceof Error ? error.message : error);
   }
 }
 

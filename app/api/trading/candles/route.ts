@@ -986,22 +986,8 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           const result = await getAggregatedCandles(symbol, normalizedTf, 1);
           formingCandle = result.formingCandle;
           
-          // DEBUG: Log exactly what we have
-          console.log(`🔍 [${normalizedTf} DEBUG] ${symbol}: Historical=${historicalCandles.length}, limit=${limit}, threshold=${Math.floor(limit/2)}`);
-          
-          // If aggregator returned completed candles and we don't have enough historical,
-          // use those as well (fallback for when historical collection is sparse)
-          if (historicalCandles.length < limit - 1 && result.candles.length > 0) {
-            const existingTimes = new Set(historicalCandles.map(c => c.time));
-            const additionalCandles = result.candles.filter(c => 
-              c.time < currentPeriodStart && !existingTimes.has(c.time)
-            );
-            if (additionalCandles.length > 0) {
-              console.log(`🔍 [${normalizedTf} DEBUG] ${symbol}: Adding ${additionalCandles.length} aggregator candles to fill gap`);
-            }
-            historicalCandles = [...historicalCandles, ...additionalCandles]
-              .sort((a, b) => a.time - b.time);
-          }
+          // DEBUG: Log what we have
+          console.log(`🔍 [${normalizedTf} DEBUG] ${symbol}: Historical=${historicalCandles.length}, limit=${limit}`);
         }
         
         // If forming candle is missing, try to build it from recent 1m candles
@@ -1023,18 +1009,9 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           }
         }
         
-        // CRITICAL: This fallback REPLACES historical with aggregator data
-        // If historical < limit/2, uses DIFFERENT data source = inconsistent charts!
-        if (historicalCandles.length < limit / 2 && useAggregator) {
-          console.log(`⚠️ [${normalizedTf} FALLBACK] ${symbol}: Historical sparse (${historicalCandles.length} < ${Math.floor(limit/2)}), SWITCHING to aggregator!`);
-          const result = await getAggregatedCandles(symbol, normalizedTf, limit);
-          // This REPLACES historical with aggregator - different source, different values!
-          historicalCandles = result.candles.filter(c => c.time < currentPeriodStart);
-          console.log(`⚠️ [${normalizedTf} FALLBACK] ${symbol}: Now using ${historicalCandles.length} aggregator candles`);
-          if (!formingCandle) {
-            formingCandle = result.formingCandle;
-          }
-        }
+        // NOTE: We removed the aggressive fallback to aggregator here!
+        // Historical collections are now automatically kept up-to-date by WebSocket streamer
+        // when candles complete. This ensures consistent data for all users.
         
         // Final count log
         console.log(`✅ [${normalizedTf} FINAL] ${symbol}: Returning ${historicalCandles.length} candles + forming=${!!formingCandle}`);
