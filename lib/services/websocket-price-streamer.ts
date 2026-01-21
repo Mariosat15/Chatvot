@@ -780,6 +780,9 @@ function updateFormingCandle(symbol: ForexSymbol, bidPrice: number): void {
 /**
  * Update cached forming candles for higher timeframes
  * This is FAST - just updates high/low/close, no iteration needed
+ * 
+ * IMPORTANT: When a period ends, we CAPTURE the completed candle BEFORE updating
+ * to the new period. This prevents race conditions with async saving.
  */
 function updateHigherTimeframeCaches(symbol: string, price: number, currentTime: number): void {
   const state = getState();
@@ -789,7 +792,14 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existing5m = state.formingCandles5m.get(symbol);
   
   if (!existing5m || existing5m.periodStart !== period5m) {
-    // New 5m period - start fresh
+    // New 5m period - CAPTURE the completed candle BEFORE updating
+    if (existing5m && existing5m.periodStart < period5m) {
+      captureCompletedHigherTimeframeCandle(
+        '5m', symbol, existing5m.periodStart,
+        existing5m.open, existing5m.high, existing5m.low, existing5m.close
+      );
+    }
+    // Start new period
     state.formingCandles5m.set(symbol, {
       symbol,
       periodStart: period5m,
@@ -810,7 +820,13 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existing15m = state.formingCandles15m.get(symbol);
   
   if (!existing15m || existing15m.periodStart !== period15m) {
-    // New 15m period - start fresh
+    // CAPTURE completed candle
+    if (existing15m && existing15m.periodStart < period15m) {
+      captureCompletedHigherTimeframeCandle(
+        '15m', symbol, existing15m.periodStart,
+        existing15m.open, existing15m.high, existing15m.low, existing15m.close
+      );
+    }
     state.formingCandles15m.set(symbol, {
       symbol,
       periodStart: period15m,
@@ -820,7 +836,6 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
       close: price,
     });
   } else {
-    // Same period - just update high/low/close
     existing15m.high = Math.max(existing15m.high, price);
     existing15m.low = Math.min(existing15m.low, price);
     existing15m.close = price;
@@ -831,7 +846,13 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existing30m = state.formingCandles30m.get(symbol);
   
   if (!existing30m || existing30m.periodStart !== period30m) {
-    // New 30m period - start fresh
+    // CAPTURE completed candle
+    if (existing30m && existing30m.periodStart < period30m) {
+      captureCompletedHigherTimeframeCandle(
+        '30m', symbol, existing30m.periodStart,
+        existing30m.open, existing30m.high, existing30m.low, existing30m.close
+      );
+    }
     state.formingCandles30m.set(symbol, {
       symbol,
       periodStart: period30m,
@@ -841,7 +862,6 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
       close: price,
     });
   } else {
-    // Same period - just update high/low/close
     existing30m.high = Math.max(existing30m.high, price);
     existing30m.low = Math.min(existing30m.low, price);
     existing30m.close = price;
@@ -852,6 +872,13 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existing1h = state.formingCandles1h.get(symbol);
   
   if (!existing1h || existing1h.periodStart !== period1h) {
+    // CAPTURE completed candle
+    if (existing1h && existing1h.periodStart < period1h) {
+      captureCompletedHigherTimeframeCandle(
+        '1h', symbol, existing1h.periodStart,
+        existing1h.open, existing1h.high, existing1h.low, existing1h.close
+      );
+    }
     state.formingCandles1h.set(symbol, {
       symbol,
       periodStart: period1h,
@@ -871,6 +898,13 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
   const existing4h = state.formingCandles4h.get(symbol);
   
   if (!existing4h || existing4h.periodStart !== period4h) {
+    // CAPTURE completed candle
+    if (existing4h && existing4h.periodStart < period4h) {
+      captureCompletedHigherTimeframeCandle(
+        '4h', symbol, existing4h.periodStart,
+        existing4h.open, existing4h.high, existing4h.low, existing4h.close
+      );
+    }
     state.formingCandles4h.set(symbol, {
       symbol,
       periodStart: period4h,
@@ -1004,141 +1038,96 @@ async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void
     // Log only EUR/USD as sample (not all 33 symbols)
     if (candle.symbol === 'EUR/USD') {
       console.log(`💾 1m candles saved (33 symbols) | EUR/USD: ${candle.close.toFixed(5)} (${candle.tickCount} ticks)`);
-      
-      // 🔥 AUTO-SAVE HIGHER TIMEFRAME CANDLES
-      // Only trigger once per minute (when EUR/USD saves), not for every symbol
-      // This checks if any higher timeframe (5m, 15m, 30m, 1h, 4h) just completed
-      // and saves them to historical collections automatically!
-      checkAndSaveCompletedHigherTimeframeCandles(candle.time).catch(err => {
-        console.error('❌ [Auto-Save] Error:', err instanceof Error ? err.message : err);
-      });
+      // NOTE: Higher timeframe auto-save now happens SYNCHRONOUSLY in updateHigherTimeframeCaches()
+      // to avoid race conditions. Completed candles are captured BEFORE the cache updates.
     }
   } catch (error) {
     console.error(`❌ [Candle Save Error] ${candle.symbol}:`, error instanceof Error ? error.message : error);
   }
 }
 
+// Pending higher timeframe candles to save (captured BEFORE cache updates)
+// Key: "{tf}:{symbol}:{periodStart}"
+const pendingHigherTfCandles = new Map<string, IHistoricalCandle>();
+let pendingHigherTfSaveTimer: NodeJS.Timeout | null = null;
+
 /**
- * Check if a higher timeframe period just ended and save the completed candle
- * Called when a 1m candle completes
- * 
- * This ensures historical collections are ALWAYS up-to-date!
- * - No gaps between downloads
- * - Real-time updates
- * 
- * @param completedMinuteTime - The timestamp (in seconds) of the 1m candle that just completed
+ * Capture a completed higher timeframe candle for saving
+ * Called SYNCHRONOUSLY before the cache updates to avoid race conditions
  */
-async function checkAndSaveCompletedHigherTimeframeCandles(completedMinuteTime: number): Promise<void> {
-  const state = getState();
+function captureCompletedHigherTimeframeCandle(
+  tf: string,
+  symbol: string,
+  periodStart: number,
+  open: number,
+  high: number,
+  low: number,
+  close: number
+): void {
+  const key = `${tf}:${symbol}:${periodStart}`;
   
-  // Check each timeframe to see if it just completed
-  // A timeframe completes when the PREVIOUS period ends
-  // Example: At 10:05:00, the 5m candle for 10:00-10:05 just completed
+  // Store the completed candle
+  pendingHigherTfCandles.set(key, {
+    symbol,
+    timestamp: new Date(periodStart * 1000),
+    open,
+    high,
+    low,
+    close,
+    volume: 0,
+  });
   
-  const timeframes: Array<{
-    tf: string;
-    periodSeconds: number;
-    cache: Map<string, CachedFormingCandle>;
-    getAlignedTime: (time: number) => number;
-  }> = [
-    { 
-      tf: '5m', 
-      periodSeconds: 300, 
-      cache: state.formingCandles5m,
-      getAlignedTime: (t) => Math.floor(t / 300) * 300,
-    },
-    { 
-      tf: '15m', 
-      periodSeconds: 900, 
-      cache: state.formingCandles15m,
-      getAlignedTime: (t) => Math.floor(t / 900) * 900,
-    },
-    { 
-      tf: '30m', 
-      periodSeconds: 1800, 
-      cache: state.formingCandles30m,
-      getAlignedTime: (t) => Math.floor(t / 1800) * 1800,
-    },
-    { 
-      tf: '1h', 
-      periodSeconds: 3600, 
-      cache: state.formingCandles1h,
-      getAlignedTime: (t) => Math.floor(t / 3600) * 3600,
-    },
-    { 
-      tf: '4h', 
-      periodSeconds: 14400, 
-      cache: state.formingCandles4h,
-      getAlignedTime: (t) => Math.floor(t / 14400) * 14400,
-    },
-  ];
+  // Schedule batch save (debounced to collect all symbols)
+  if (!pendingHigherTfSaveTimer) {
+    pendingHigherTfSaveTimer = setTimeout(flushPendingHigherTfCandles, 500);
+  }
+}
+
+/**
+ * Flush all pending higher timeframe candles to MongoDB
+ */
+async function flushPendingHigherTfCandles(): Promise<void> {
+  pendingHigherTfSaveTimer = null;
   
-  const candlesToSave: Array<{ tf: string; candle: IHistoricalCandle }> = [];
+  if (pendingHigherTfCandles.size === 0) return;
   
-  for (const { tf, periodSeconds, cache, getAlignedTime } of timeframes) {
-    // Check if a period just ended
-    // The completed minute's END time marks a period boundary
-    const completedMinuteEndTime = completedMinuteTime + 60; // End of the minute
-    
-    // If the completed minute's end time falls on a period boundary, the PREVIOUS period just completed
-    if (completedMinuteEndTime % periodSeconds === 0) {
-      // The completed period started at (completedMinuteEndTime - periodSeconds)
-      const completedPeriodStart = completedMinuteEndTime - periodSeconds;
-      
-      // Get all cached candles for this period from all symbols
-      for (const [symbol, cachedCandle] of cache.entries()) {
-        // Only save if this cached candle is from the period that just completed
-        if (cachedCandle.periodStart === completedPeriodStart) {
-          candlesToSave.push({
-            tf,
-            candle: {
-              symbol,
-              timestamp: new Date(completedPeriodStart * 1000),
-              open: cachedCandle.open,
-              high: cachedCandle.high,
-              low: cachedCandle.low,
-              close: cachedCandle.close,
-              volume: 0,
-            },
-          });
-        }
-      }
-    }
+  // Copy and clear
+  const toSave = new Map(pendingHigherTfCandles);
+  pendingHigherTfCandles.clear();
+  
+  // Group by timeframe
+  const byTimeframe = new Map<string, IHistoricalCandle[]>();
+  for (const [key, candle] of toSave.entries()) {
+    const tf = key.split(':')[0];
+    if (!byTimeframe.has(tf)) byTimeframe.set(tf, []);
+    byTimeframe.get(tf)!.push(candle);
   }
   
-  // Save all completed candles to their respective historical collections
-  if (candlesToSave.length > 0) {
-    // Group by timeframe for batch saving
-    const byTimeframe = new Map<string, IHistoricalCandle[]>();
-    for (const { tf, candle } of candlesToSave) {
-      if (!byTimeframe.has(tf)) byTimeframe.set(tf, []);
-      byTimeframe.get(tf)!.push(candle);
-    }
-    
-    // Save each timeframe batch
-    for (const [tf, candles] of byTimeframe.entries()) {
-      try {
-        const model = getHistoricalModel(tf);
-        if (!model) continue;
-        
-        const operations = candles.map(c => ({
-          updateOne: {
-            filter: { symbol: c.symbol, timestamp: c.timestamp },
-            update: { $set: c },
-            upsert: true,
-          },
-        }));
-        
-        await model.bulkWrite(operations, { ordered: false });
-        
-        // Log only for EUR/USD as sample
-        const eurUsd = candles.find(c => c.symbol === 'EUR/USD');
-        if (eurUsd) {
-          console.log(`💾 [Auto-Save] ${tf} candle saved for ${candles.length} symbols | EUR/USD: ${eurUsd.close.toFixed(5)} @ ${eurUsd.timestamp.toISOString()}`);
-        }
-      } catch (error) {
-        console.error(`❌ [Auto-Save] Failed to save ${tf} candles:`, error instanceof Error ? error.message : error);
+  // Save each timeframe batch
+  for (const [tf, candles] of byTimeframe.entries()) {
+    try {
+      const model = getHistoricalModel(tf);
+      if (!model) continue;
+      
+      await connectToDatabase();
+      
+      const operations = candles.map(c => ({
+        updateOne: {
+          filter: { symbol: c.symbol, timestamp: c.timestamp },
+          update: { $set: c },
+          upsert: true,
+        },
+      }));
+      
+      await model.bulkWrite(operations, { ordered: false });
+      
+      // Log only for EUR/USD as sample
+      const eurUsd = candles.find(c => c.symbol === 'EUR/USD');
+      if (eurUsd) {
+        console.log(`💾 [Auto-Save] ${tf} candle saved for ${candles.length} symbols | EUR/USD: ${eurUsd.close.toFixed(5)} @ ${eurUsd.timestamp.toISOString()}`);
       }
+    } catch (error) {
+      console.error(`❌ [Auto-Save] Failed to save ${tf} candles:`, error instanceof Error ? error.message : error);
     }
   }
 }
