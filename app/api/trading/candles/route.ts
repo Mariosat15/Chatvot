@@ -974,10 +974,16 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           formingCandle = getForming4hCandle(symbol);
           
           // Fill gap between historical and forming candle using aggregator
+          // Calculate how many candles we need to cover the ENTIRE gap
           if (historicalCandles.length > 0) {
-            const result = await getAggregatedCandles(symbol, normalizedTf, 10); // Get up to 10 recent 4h candles
+            const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
+            const gapSeconds = currentPeriodStart - newestHistoricalTime;
+            let gapCandlesNeeded = Math.ceil(gapSeconds / tfSeconds) + 2;
+            gapCandlesNeeded = Math.min(gapCandlesNeeded, 50); // Cap at 50 (200 hours = 8 days)
+            console.log(`📊 [4h Gap] ${symbol}: Historical ends ${new Date(newestHistoricalTime * 1000).toISOString()}, gap needs ${gapCandlesNeeded} candles`);
+            
+            const result = await getAggregatedCandles(symbol, normalizedTf, gapCandlesNeeded);
             if (result.candles.length > 0) {
-              const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
               const gapFillerCandles = result.candles.filter(c => 
                 c.time > newestHistoricalTime && c.time < currentPeriodStart
               );
@@ -991,10 +997,16 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           formingCandle = getForming1hCandle(symbol);
           
           // Fill gap between historical and forming candle using aggregator
+          // Calculate how many candles we need to cover the ENTIRE gap
           if (historicalCandles.length > 0) {
-            const result = await getAggregatedCandles(symbol, normalizedTf, 20); // Get up to 20 recent 1h candles
+            const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
+            const gapSeconds = currentPeriodStart - newestHistoricalTime;
+            let gapCandlesNeeded = Math.ceil(gapSeconds / tfSeconds) + 2;
+            gapCandlesNeeded = Math.min(gapCandlesNeeded, 100); // Cap at 100 hours
+            console.log(`📊 [1h Gap] ${symbol}: Historical ends ${new Date(newestHistoricalTime * 1000).toISOString()}, gap needs ${gapCandlesNeeded} candles`);
+            
+            const result = await getAggregatedCandles(symbol, normalizedTf, gapCandlesNeeded);
             if (result.candles.length > 0) {
-              const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
               const gapFillerCandles = result.candles.filter(c => 
                 c.time > newestHistoricalTime && c.time < currentPeriodStart
               );
@@ -1012,14 +1024,22 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         } else if (normalizedTf === 'M') {
           formingCandle = getFormingMonthlyCandle(symbol);
         } else if (useAggregator) {
-          // For 5m, 15m, 30m - get forming candle AND recent completed candles from aggregator
-          // This fills the gap between historical collection and current period
-          // The aggregator uses 1m candles which ARE consistent for recent data
-          const result = await getAggregatedCandles(symbol, normalizedTf, 20); // Get up to 20 recent candles
+          // For 5m, 15m, 30m - get forming candle AND fill the ENTIRE gap from aggregator
+          // Calculate how many candles we need to cover the gap
+          let gapCandlesNeeded = 20; // Default
+          if (historicalCandles.length > 0) {
+            const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
+            const gapSeconds = currentPeriodStart - newestHistoricalTime;
+            gapCandlesNeeded = Math.ceil(gapSeconds / tfSeconds) + 5; // +5 buffer
+            // Cap at 500 to avoid excessive load (covers ~42 hours for 5m)
+            gapCandlesNeeded = Math.min(gapCandlesNeeded, 500);
+            console.log(`📊 [${normalizedTf} Gap] ${symbol}: Historical ends ${new Date(newestHistoricalTime * 1000).toISOString()}, gap needs ${gapCandlesNeeded} candles`);
+          }
+          
+          const result = await getAggregatedCandles(symbol, normalizedTf, gapCandlesNeeded);
           formingCandle = result.formingCandle;
           
           // Fill the gap between historical and forming candle with aggregator candles
-          // This ensures users see complete data on initial load (no visual gaps)
           if (historicalCandles.length > 0 && result.candles.length > 0) {
             const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
             // Only add aggregator candles that are NEWER than our newest historical candle
