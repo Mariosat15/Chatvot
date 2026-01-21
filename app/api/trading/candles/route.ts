@@ -982,22 +982,12 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         } else if (normalizedTf === 'M') {
           formingCandle = getFormingMonthlyCandle(symbol);
         } else if (useAggregator) {
-          // For 5m, 15m, 30m - get forming candle from aggregator cache
-          // But only fetch 1 candle (the forming one), not all of them!
+          // For 5m, 15m, 30m - ONLY get forming candle from aggregator cache
+          // IMPORTANT: Do NOT mix aggregator completed candles with historical!
+          // This ensures ALL users see the same historical candles.
           const result = await getAggregatedCandles(symbol, normalizedTf, 1);
           formingCandle = result.formingCandle;
-          
-          // If aggregator returned completed candles and we don't have enough historical,
-          // use those as well (fallback for when historical collection is sparse)
-          if (historicalCandles.length < limit - 1 && result.candles.length > 0) {
-            // Filter to only candles we don't already have
-            const existingTimes = new Set(historicalCandles.map(c => c.time));
-            const additionalCandles = result.candles.filter(c => 
-              c.time < currentPeriodStart && !existingTimes.has(c.time)
-            );
-            historicalCandles = [...historicalCandles, ...additionalCandles]
-              .sort((a, b) => a.time - b.time);
-          }
+          // NOTE: We intentionally do NOT use result.candles here to maintain consistency
         }
         
         // If forming candle is missing, try to build it from recent 1m candles
@@ -1019,9 +1009,12 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           }
         }
         
-        // If we still don't have enough historical candles, fall back to old aggregator
-        if (historicalCandles.length < limit / 2 && useAggregator) {
-          console.log(`⚠️ [${normalizedTf} Optimal] ${symbol}: Historical sparse (${historicalCandles.length}), falling back to aggregator`);
+        // FALLBACK: Only use aggregator if historical collection is COMPLETELY EMPTY
+        // This ensures consistency: once you have historical data, it's the ONLY source
+        // The aggregator is only for "bootstrap" mode before history is downloaded
+        if (historicalCandles.length === 0 && useAggregator) {
+          console.log(`⚠️ [${normalizedTf} Bootstrap] ${symbol}: No historical data found, using aggregator as fallback`);
+          console.log(`   ℹ️ To get consistent charts, download history from Admin → Market Data → Download Higher Timeframe History`);
           const result = await getAggregatedCandles(symbol, normalizedTf, limit);
           // Use aggregated candles but keep our forming candle if we have one
           historicalCandles = result.candles.filter(c => c.time < currentPeriodStart);
