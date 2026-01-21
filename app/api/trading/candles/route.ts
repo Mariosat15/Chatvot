@@ -983,18 +983,22 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           formingCandle = getFormingMonthlyCandle(symbol);
         } else if (useAggregator) {
           // For 5m, 15m, 30m - get forming candle from aggregator cache
-          // But only fetch 1 candle (the forming one), not all of them!
           const result = await getAggregatedCandles(symbol, normalizedTf, 1);
           formingCandle = result.formingCandle;
+          
+          // DEBUG: Log exactly what we have
+          console.log(`🔍 [${normalizedTf} DEBUG] ${symbol}: Historical=${historicalCandles.length}, limit=${limit}, threshold=${Math.floor(limit/2)}`);
           
           // If aggregator returned completed candles and we don't have enough historical,
           // use those as well (fallback for when historical collection is sparse)
           if (historicalCandles.length < limit - 1 && result.candles.length > 0) {
-            // Filter to only candles we don't already have
             const existingTimes = new Set(historicalCandles.map(c => c.time));
             const additionalCandles = result.candles.filter(c => 
               c.time < currentPeriodStart && !existingTimes.has(c.time)
             );
+            if (additionalCandles.length > 0) {
+              console.log(`🔍 [${normalizedTf} DEBUG] ${symbol}: Adding ${additionalCandles.length} aggregator candles to fill gap`);
+            }
             historicalCandles = [...historicalCandles, ...additionalCandles]
               .sort((a, b) => a.time - b.time);
           }
@@ -1015,20 +1019,25 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
               low: Math.min(...recentCandles.map(c => c.l)),
               close: recentCandles[recentCandles.length - 1].c,
             };
-            console.log(`⚡ [${normalizedTf} Optimal] ${symbol}: Built forming candle from ${recentCandles.length} 1m candles`);
+            console.log(`⚡ [${normalizedTf}] ${symbol}: Built forming from ${recentCandles.length} 1m candles`);
           }
         }
         
-        // If we still don't have enough historical candles, fall back to old aggregator
+        // CRITICAL: This fallback REPLACES historical with aggregator data
+        // If historical < limit/2, uses DIFFERENT data source = inconsistent charts!
         if (historicalCandles.length < limit / 2 && useAggregator) {
-          console.log(`⚠️ [${normalizedTf} Optimal] ${symbol}: Historical sparse (${historicalCandles.length}), falling back to aggregator`);
+          console.log(`⚠️ [${normalizedTf} FALLBACK] ${symbol}: Historical sparse (${historicalCandles.length} < ${Math.floor(limit/2)}), SWITCHING to aggregator!`);
           const result = await getAggregatedCandles(symbol, normalizedTf, limit);
-          // Use aggregated candles but keep our forming candle if we have one
+          // This REPLACES historical with aggregator - different source, different values!
           historicalCandles = result.candles.filter(c => c.time < currentPeriodStart);
+          console.log(`⚠️ [${normalizedTf} FALLBACK] ${symbol}: Now using ${historicalCandles.length} aggregator candles`);
           if (!formingCandle) {
             formingCandle = result.formingCandle;
           }
         }
+        
+        // Final count log
+        console.log(`✅ [${normalizedTf} FINAL] ${symbol}: Returning ${historicalCandles.length} candles + forming=${!!formingCandle}`);
       }
       
       // Apply history limit
