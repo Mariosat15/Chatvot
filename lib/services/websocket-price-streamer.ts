@@ -15,6 +15,7 @@
 import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
 import Candle1m from '@/database/models/candle-1m.model';
 import { connectToDatabase } from '@/database/mongoose';
+import { getHistoricalModel, IHistoricalCandle } from '@/database/models/candle-historical.model';
 
 export interface StreamingPriceQuote {
   symbol: ForexSymbol;
@@ -955,6 +956,8 @@ function updateHigherTimeframeCaches(symbol: string, price: number, currentTime:
  * This is called when a new minute starts - we save the PREVIOUS minute's candle
  * 
  * The buffer is used for building 5m forming candles without querying MongoDB
+ * 
+ * ALSO: Checks if higher timeframe candles just completed and saves them too!
  */
 async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void> {
   const state = getState();
@@ -1001,9 +1004,142 @@ async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void
     // Log only EUR/USD as sample (not all 33 symbols)
     if (candle.symbol === 'EUR/USD') {
       console.log(`💾 1m candles saved (33 symbols) | EUR/USD: ${candle.close.toFixed(5)} (${candle.tickCount} ticks)`);
+      
+      // 🔥 AUTO-SAVE HIGHER TIMEFRAME CANDLES
+      // Only trigger once per minute (when EUR/USD saves), not for every symbol
+      // This checks if any higher timeframe (5m, 15m, 30m, 1h, 4h) just completed
+      // and saves them to historical collections automatically!
+      checkAndSaveCompletedHigherTimeframeCandles(candle.time).catch(err => {
+        console.error('❌ [Auto-Save] Error:', err instanceof Error ? err.message : err);
+      });
     }
   } catch (error) {
     console.error(`❌ [Candle Save Error] ${candle.symbol}:`, error instanceof Error ? error.message : error);
+  }
+}
+
+/**
+ * Check if a higher timeframe period just ended and save the completed candle
+ * Called when a 1m candle completes
+ * 
+ * This ensures historical collections are ALWAYS up-to-date!
+ * - No gaps between downloads
+ * - Real-time updates
+ * 
+ * @param completedMinuteTime - The timestamp (in seconds) of the 1m candle that just completed
+ */
+async function checkAndSaveCompletedHigherTimeframeCandles(completedMinuteTime: number): Promise<void> {
+  const state = getState();
+  
+  // Check each timeframe to see if it just completed
+  // A timeframe completes when the PREVIOUS period ends
+  // Example: At 10:05:00, the 5m candle for 10:00-10:05 just completed
+  
+  const timeframes: Array<{
+    tf: string;
+    periodSeconds: number;
+    cache: Map<string, CachedFormingCandle>;
+    getAlignedTime: (time: number) => number;
+  }> = [
+    { 
+      tf: '5m', 
+      periodSeconds: 300, 
+      cache: state.formingCandles5m,
+      getAlignedTime: (t) => Math.floor(t / 300) * 300,
+    },
+    { 
+      tf: '15m', 
+      periodSeconds: 900, 
+      cache: state.formingCandles15m,
+      getAlignedTime: (t) => Math.floor(t / 900) * 900,
+    },
+    { 
+      tf: '30m', 
+      periodSeconds: 1800, 
+      cache: state.formingCandles30m,
+      getAlignedTime: (t) => Math.floor(t / 1800) * 1800,
+    },
+    { 
+      tf: '1h', 
+      periodSeconds: 3600, 
+      cache: state.formingCandles1h,
+      getAlignedTime: (t) => Math.floor(t / 3600) * 3600,
+    },
+    { 
+      tf: '4h', 
+      periodSeconds: 14400, 
+      cache: state.formingCandles4h,
+      getAlignedTime: (t) => Math.floor(t / 14400) * 14400,
+    },
+  ];
+  
+  const candlesToSave: Array<{ tf: string; candle: IHistoricalCandle }> = [];
+  
+  for (const { tf, periodSeconds, cache, getAlignedTime } of timeframes) {
+    // Check if a period just ended
+    // The completed minute's END time marks a period boundary
+    const completedMinuteEndTime = completedMinuteTime + 60; // End of the minute
+    
+    // If the completed minute's end time falls on a period boundary, the PREVIOUS period just completed
+    if (completedMinuteEndTime % periodSeconds === 0) {
+      // The completed period started at (completedMinuteEndTime - periodSeconds)
+      const completedPeriodStart = completedMinuteEndTime - periodSeconds;
+      
+      // Get all cached candles for this period from all symbols
+      for (const [symbol, cachedCandle] of cache.entries()) {
+        // Only save if this cached candle is from the period that just completed
+        if (cachedCandle.periodStart === completedPeriodStart) {
+          candlesToSave.push({
+            tf,
+            candle: {
+              symbol,
+              timestamp: new Date(completedPeriodStart * 1000),
+              open: cachedCandle.open,
+              high: cachedCandle.high,
+              low: cachedCandle.low,
+              close: cachedCandle.close,
+              volume: 0,
+            },
+          });
+        }
+      }
+    }
+  }
+  
+  // Save all completed candles to their respective historical collections
+  if (candlesToSave.length > 0) {
+    // Group by timeframe for batch saving
+    const byTimeframe = new Map<string, IHistoricalCandle[]>();
+    for (const { tf, candle } of candlesToSave) {
+      if (!byTimeframe.has(tf)) byTimeframe.set(tf, []);
+      byTimeframe.get(tf)!.push(candle);
+    }
+    
+    // Save each timeframe batch
+    for (const [tf, candles] of byTimeframe.entries()) {
+      try {
+        const model = getHistoricalModel(tf);
+        if (!model) continue;
+        
+        const operations = candles.map(c => ({
+          updateOne: {
+            filter: { symbol: c.symbol, timestamp: c.timestamp },
+            update: { $set: c },
+            upsert: true,
+          },
+        }));
+        
+        await model.bulkWrite(operations, { ordered: false });
+        
+        // Log only for EUR/USD as sample
+        const eurUsd = candles.find(c => c.symbol === 'EUR/USD');
+        if (eurUsd) {
+          console.log(`💾 [Auto-Save] ${tf} candle saved for ${candles.length} symbols | EUR/USD: ${eurUsd.close.toFixed(5)} @ ${eurUsd.timestamp.toISOString()}`);
+        }
+      } catch (error) {
+        console.error(`❌ [Auto-Save] Failed to save ${tf} candles:`, error instanceof Error ? error.message : error);
+      }
+    }
   }
 }
 
