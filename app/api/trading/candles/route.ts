@@ -34,6 +34,58 @@ const collectionGapFillInProgress = new Set<string>();
 const lastCollectionGapCheck = new Map<string, number>();
 const COLLECTION_GAP_CHECK_INTERVAL = 300000; // Check for collection gaps every 5 minutes per symbol
 
+/**
+ * Save gap-filled candles to historical collection (fire-and-forget)
+ * This prevents the gap from growing - next request will find these candles in historical!
+ */
+async function saveGapFilledCandlesToHistorical(
+  timeframe: string,
+  symbol: string,
+  candles: Array<{ time: number; open: number; high: number; low: number; close: number }>
+): Promise<void> {
+  if (candles.length === 0) return;
+  
+  const model = getHistoricalModel(timeframe);
+  if (!model) {
+    console.warn(`⚠️ [Gap Save] No model for timeframe ${timeframe}`);
+    return;
+  }
+  
+  try {
+    await connectToDatabase();
+    
+    const operations = candles.map(c => ({
+      updateOne: {
+        filter: { 
+          symbol, 
+          timestamp: new Date(c.time * 1000)  // time is in seconds
+        },
+        update: { 
+          $setOnInsert: {
+            symbol,
+            timestamp: new Date(c.time * 1000),
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: 0,
+          }
+        },
+        upsert: true,
+      },
+    }));
+    
+    const result = await model.bulkWrite(operations, { ordered: false });
+    
+    if (result.upsertedCount > 0) {
+      console.log(`💾 [Gap Save] Saved ${result.upsertedCount} ${timeframe} candles for ${symbol} to historical`);
+    }
+  } catch (error) {
+    // Log but don't fail the request
+    console.error(`❌ [Gap Save] Error saving ${timeframe} candles for ${symbol}:`, error instanceof Error ? error.message : error);
+  }
+}
+
 // Default settings (fallback if DB settings not available)
 const DEFAULT_INITIAL_CANDLE_COUNT = 500;
 const DEFAULT_LAZY_LOAD_BATCH_SIZE = 500;
@@ -990,6 +1042,11 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
               if (gapFillerCandles.length > 0) {
                 console.log(`🔧 [4h Gap Fill] ${symbol}: Adding ${gapFillerCandles.length} candles from aggregator`);
                 historicalCandles = [...historicalCandles, ...gapFillerCandles].sort((a, b) => a.time - b.time);
+                
+                // 🔥 ALSO SAVE TO HISTORICAL COLLECTION
+                saveGapFilledCandlesToHistorical('4h', symbol, gapFillerCandles).catch(err => {
+                  console.error(`❌ [Gap Save] Failed to save 4h gap candles:`, err);
+                });
               }
             }
           }
@@ -1013,6 +1070,11 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
               if (gapFillerCandles.length > 0) {
                 console.log(`🔧 [1h Gap Fill] ${symbol}: Adding ${gapFillerCandles.length} candles from aggregator`);
                 historicalCandles = [...historicalCandles, ...gapFillerCandles].sort((a, b) => a.time - b.time);
+                
+                // 🔥 ALSO SAVE TO HISTORICAL COLLECTION
+                saveGapFilledCandlesToHistorical('1h', symbol, gapFillerCandles).catch(err => {
+                  console.error(`❌ [Gap Save] Failed to save 1h gap candles:`, err);
+                });
               }
             }
           }
@@ -1050,6 +1112,12 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
             if (gapFillerCandles.length > 0) {
               console.log(`🔧 [${normalizedTf} Gap Fill] ${symbol}: Adding ${gapFillerCandles.length} candles from aggregator to fill gap`);
               historicalCandles = [...historicalCandles, ...gapFillerCandles].sort((a, b) => a.time - b.time);
+              
+              // 🔥 ALSO SAVE TO HISTORICAL COLLECTION (fire-and-forget)
+              // This prevents the gap from growing - next request won't see the gap!
+              saveGapFilledCandlesToHistorical(normalizedTf, symbol, gapFillerCandles).catch(err => {
+                console.error(`❌ [Gap Save] Failed to save ${normalizedTf} gap candles:`, err);
+              });
             }
           }
         }
