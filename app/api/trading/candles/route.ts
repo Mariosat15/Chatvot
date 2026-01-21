@@ -972,8 +972,38 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         // This is MUCH faster than aggregating from 1m candles!
         if (normalizedTf === '4h') {
           formingCandle = getForming4hCandle(symbol);
+          
+          // Fill gap between historical and forming candle using aggregator
+          if (historicalCandles.length > 0) {
+            const result = await getAggregatedCandles(symbol, normalizedTf, 10); // Get up to 10 recent 4h candles
+            if (result.candles.length > 0) {
+              const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
+              const gapFillerCandles = result.candles.filter(c => 
+                c.time > newestHistoricalTime && c.time < currentPeriodStart
+              );
+              if (gapFillerCandles.length > 0) {
+                console.log(`🔧 [4h Gap Fill] ${symbol}: Adding ${gapFillerCandles.length} candles from aggregator`);
+                historicalCandles = [...historicalCandles, ...gapFillerCandles].sort((a, b) => a.time - b.time);
+              }
+            }
+          }
         } else if (normalizedTf === '1h') {
           formingCandle = getForming1hCandle(symbol);
+          
+          // Fill gap between historical and forming candle using aggregator
+          if (historicalCandles.length > 0) {
+            const result = await getAggregatedCandles(symbol, normalizedTf, 20); // Get up to 20 recent 1h candles
+            if (result.candles.length > 0) {
+              const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
+              const gapFillerCandles = result.candles.filter(c => 
+                c.time > newestHistoricalTime && c.time < currentPeriodStart
+              );
+              if (gapFillerCandles.length > 0) {
+                console.log(`🔧 [1h Gap Fill] ${symbol}: Adding ${gapFillerCandles.length} candles from aggregator`);
+                historicalCandles = [...historicalCandles, ...gapFillerCandles].sort((a, b) => a.time - b.time);
+              }
+            }
+          }
         } else if (normalizedTf === '1d') {
           formingCandle = getFormingDailyCandle(symbol);
           console.log(`🔍 [1d Forming] ${symbol}: ${formingCandle ? `time=${new Date(formingCandle.time * 1000).toISOString()}, O=${formingCandle.open}, H=${formingCandle.high}, L=${formingCandle.low}, C=${formingCandle.close}` : 'NULL'}`);
