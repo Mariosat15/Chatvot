@@ -30,7 +30,6 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',
-      cron_restart: '0 4 * * 6', // Weekly restart: Saturday 4:00 AM UTC (forex closed)
       error_file: './logs/web-error.log',
       out_file: './logs/web-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
@@ -81,7 +80,6 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '512M',
-      cron_restart: '0 */6 * * *', // Restart every 6 hours for memory cleanup (no user impact)
       error_file: './logs/worker-error.log',
       out_file: './logs/worker-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
@@ -114,7 +112,7 @@ module.exports = {
 
     // ============================================
     // WEBSOCKET SERVER (Real-time Messaging)
-    // Handles WebSocket connections for prices & chat
+    // Handles WebSocket connections for chat
     // ============================================
     {
       name: 'chartvolt-websocket',
@@ -128,8 +126,7 @@ module.exports = {
       exec_mode: 'fork',
       autorestart: true,
       watch: false,
-      max_memory_restart: '512M', // Increased for 1000+ concurrent connections
-      cron_restart: '2 4 * * 6', // Weekly restart: Saturday 4:02 AM UTC (forex closed, 2 min after web)
+      max_memory_restart: '256M',
       error_file: './logs/websocket-error.log',
       out_file: './logs/websocket-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',

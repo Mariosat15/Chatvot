@@ -34,58 +34,6 @@ const collectionGapFillInProgress = new Set<string>();
 const lastCollectionGapCheck = new Map<string, number>();
 const COLLECTION_GAP_CHECK_INTERVAL = 300000; // Check for collection gaps every 5 minutes per symbol
 
-/**
- * Save gap-filled candles to historical collection (fire-and-forget)
- * This prevents the gap from growing - next request will find these candles in historical!
- */
-async function saveGapFilledCandlesToHistorical(
-  timeframe: string,
-  symbol: string,
-  candles: Array<{ time: number; open: number; high: number; low: number; close: number }>
-): Promise<void> {
-  if (candles.length === 0) return;
-  
-  const model = getHistoricalModel(timeframe);
-  if (!model) {
-    console.warn(`⚠️ [Gap Save] No model for timeframe ${timeframe}`);
-    return;
-  }
-  
-  try {
-    await connectToDatabase();
-    
-    const operations = candles.map(c => ({
-      updateOne: {
-        filter: { 
-          symbol, 
-          timestamp: new Date(c.time * 1000)  // time is in seconds
-        },
-        update: { 
-          $setOnInsert: {
-            symbol,
-            timestamp: new Date(c.time * 1000),
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-            volume: 0,
-          }
-        },
-        upsert: true,
-      },
-    }));
-    
-    const result = await model.bulkWrite(operations, { ordered: false });
-    
-    if (result.upsertedCount > 0) {
-      console.log(`💾 [Gap Save] Saved ${result.upsertedCount} ${timeframe} candles for ${symbol} to historical`);
-    }
-  } catch (error) {
-    // Log but don't fail the request
-    console.error(`❌ [Gap Save] Error saving ${timeframe} candles for ${symbol}:`, error instanceof Error ? error.message : error);
-  }
-}
-
 // Default settings (fallback if DB settings not available)
 const DEFAULT_INITIAL_CANDLE_COUNT = 500;
 const DEFAULT_LAZY_LOAD_BATCH_SIZE = 500;
@@ -1024,60 +972,8 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         // This is MUCH faster than aggregating from 1m candles!
         if (normalizedTf === '4h') {
           formingCandle = getForming4hCandle(symbol);
-          
-          // Fill gap between historical and forming candle using aggregator
-          // Calculate how many candles we need to cover the ENTIRE gap
-          if (historicalCandles.length > 0) {
-            const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
-            const gapSeconds = currentPeriodStart - newestHistoricalTime;
-            let gapCandlesNeeded = Math.ceil(gapSeconds / tfSeconds) + 2;
-            gapCandlesNeeded = Math.min(gapCandlesNeeded, 50); // Cap at 50 (200 hours = 8 days)
-            console.log(`📊 [4h Gap] ${symbol}: Historical ends ${new Date(newestHistoricalTime * 1000).toISOString()}, gap needs ${gapCandlesNeeded} candles`);
-            
-            const result = await getAggregatedCandles(symbol, normalizedTf, gapCandlesNeeded);
-            if (result.candles.length > 0) {
-              const gapFillerCandles = result.candles.filter(c => 
-                c.time > newestHistoricalTime && c.time < currentPeriodStart
-              );
-              if (gapFillerCandles.length > 0) {
-                console.log(`🔧 [4h Gap Fill] ${symbol}: Adding ${gapFillerCandles.length} candles from aggregator`);
-                historicalCandles = [...historicalCandles, ...gapFillerCandles].sort((a, b) => a.time - b.time);
-                
-                // 🔥 ALSO SAVE TO HISTORICAL COLLECTION
-                saveGapFilledCandlesToHistorical('4h', symbol, gapFillerCandles).catch(err => {
-                  console.error(`❌ [Gap Save] Failed to save 4h gap candles:`, err);
-                });
-              }
-            }
-          }
         } else if (normalizedTf === '1h') {
           formingCandle = getForming1hCandle(symbol);
-          
-          // Fill gap between historical and forming candle using aggregator
-          // Calculate how many candles we need to cover the ENTIRE gap
-          if (historicalCandles.length > 0) {
-            const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
-            const gapSeconds = currentPeriodStart - newestHistoricalTime;
-            let gapCandlesNeeded = Math.ceil(gapSeconds / tfSeconds) + 2;
-            gapCandlesNeeded = Math.min(gapCandlesNeeded, 100); // Cap at 100 hours
-            console.log(`📊 [1h Gap] ${symbol}: Historical ends ${new Date(newestHistoricalTime * 1000).toISOString()}, gap needs ${gapCandlesNeeded} candles`);
-            
-            const result = await getAggregatedCandles(symbol, normalizedTf, gapCandlesNeeded);
-            if (result.candles.length > 0) {
-              const gapFillerCandles = result.candles.filter(c => 
-                c.time > newestHistoricalTime && c.time < currentPeriodStart
-              );
-              if (gapFillerCandles.length > 0) {
-                console.log(`🔧 [1h Gap Fill] ${symbol}: Adding ${gapFillerCandles.length} candles from aggregator`);
-                historicalCandles = [...historicalCandles, ...gapFillerCandles].sort((a, b) => a.time - b.time);
-                
-                // 🔥 ALSO SAVE TO HISTORICAL COLLECTION
-                saveGapFilledCandlesToHistorical('1h', symbol, gapFillerCandles).catch(err => {
-                  console.error(`❌ [Gap Save] Failed to save 1h gap candles:`, err);
-                });
-              }
-            }
-          }
         } else if (normalizedTf === '1d') {
           formingCandle = getFormingDailyCandle(symbol);
           console.log(`🔍 [1d Forming] ${symbol}: ${formingCandle ? `time=${new Date(formingCandle.time * 1000).toISOString()}, O=${formingCandle.open}, H=${formingCandle.high}, L=${formingCandle.low}, C=${formingCandle.close}` : 'NULL'}`);
@@ -1086,39 +982,21 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         } else if (normalizedTf === 'M') {
           formingCandle = getFormingMonthlyCandle(symbol);
         } else if (useAggregator) {
-          // For 5m, 15m, 30m - get forming candle AND fill the ENTIRE gap from aggregator
-          // Calculate how many candles we need to cover the gap
-          let gapCandlesNeeded = 20; // Default
-          if (historicalCandles.length > 0) {
-            const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
-            const gapSeconds = currentPeriodStart - newestHistoricalTime;
-            gapCandlesNeeded = Math.ceil(gapSeconds / tfSeconds) + 5; // +5 buffer
-            // Cap at 500 to avoid excessive load (covers ~42 hours for 5m)
-            gapCandlesNeeded = Math.min(gapCandlesNeeded, 500);
-            console.log(`📊 [${normalizedTf} Gap] ${symbol}: Historical ends ${new Date(newestHistoricalTime * 1000).toISOString()}, gap needs ${gapCandlesNeeded} candles`);
-          }
-          
-          const result = await getAggregatedCandles(symbol, normalizedTf, gapCandlesNeeded);
+          // For 5m, 15m, 30m - get forming candle from aggregator cache
+          // But only fetch 1 candle (the forming one), not all of them!
+          const result = await getAggregatedCandles(symbol, normalizedTf, 1);
           formingCandle = result.formingCandle;
           
-          // Fill the gap between historical and forming candle with aggregator candles
-          if (historicalCandles.length > 0 && result.candles.length > 0) {
-            const newestHistoricalTime = historicalCandles[historicalCandles.length - 1].time;
-            // Only add aggregator candles that are NEWER than our newest historical candle
-            // and OLDER than the forming candle (completed candles only)
-            const gapFillerCandles = result.candles.filter(c => 
-              c.time > newestHistoricalTime && c.time < currentPeriodStart
+          // If aggregator returned completed candles and we don't have enough historical,
+          // use those as well (fallback for when historical collection is sparse)
+          if (historicalCandles.length < limit - 1 && result.candles.length > 0) {
+            // Filter to only candles we don't already have
+            const existingTimes = new Set(historicalCandles.map(c => c.time));
+            const additionalCandles = result.candles.filter(c => 
+              c.time < currentPeriodStart && !existingTimes.has(c.time)
             );
-            if (gapFillerCandles.length > 0) {
-              console.log(`🔧 [${normalizedTf} Gap Fill] ${symbol}: Adding ${gapFillerCandles.length} candles from aggregator to fill gap`);
-              historicalCandles = [...historicalCandles, ...gapFillerCandles].sort((a, b) => a.time - b.time);
-              
-              // 🔥 ALSO SAVE TO HISTORICAL COLLECTION (fire-and-forget)
-              // This prevents the gap from growing - next request won't see the gap!
-              saveGapFilledCandlesToHistorical(normalizedTf, symbol, gapFillerCandles).catch(err => {
-                console.error(`❌ [Gap Save] Failed to save ${normalizedTf} gap candles:`, err);
-              });
-            }
+            historicalCandles = [...historicalCandles, ...additionalCandles]
+              .sort((a, b) => a.time - b.time);
           }
         }
         
@@ -1141,12 +1019,9 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           }
         }
         
-        // FALLBACK: Only use aggregator if historical collection is COMPLETELY EMPTY
-        // This ensures consistency: once you have historical data, it's the ONLY source
-        // The aggregator is only for "bootstrap" mode before history is downloaded
-        if (historicalCandles.length === 0 && useAggregator) {
-          console.log(`⚠️ [${normalizedTf} Bootstrap] ${symbol}: No historical data found, using aggregator as fallback`);
-          console.log(`   ℹ️ To get consistent charts, download history from Admin → Market Data → Download Higher Timeframe History`);
+        // If we still don't have enough historical candles, fall back to old aggregator
+        if (historicalCandles.length < limit / 2 && useAggregator) {
+          console.log(`⚠️ [${normalizedTf} Optimal] ${symbol}: Historical sparse (${historicalCandles.length}), falling back to aggregator`);
           const result = await getAggregatedCandles(symbol, normalizedTf, limit);
           // Use aggregated candles but keep our forming candle if we have one
           historicalCandles = result.candles.filter(c => c.time < currentPeriodStart);
