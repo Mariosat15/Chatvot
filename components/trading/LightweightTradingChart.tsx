@@ -3031,32 +3031,34 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     >
       {/* Portal container for dialogs in fullscreen */}
       <div ref={portalContainerRef} className="absolute inset-0 pointer-events-none z-[99999]" />
-      {/* Top Bar - TradingView Style Header */}
-      <div className="flex items-center justify-between bg-[#131722] px-2 py-1.5 border-b border-[#2A2E39] flex-shrink-0 h-[44px]">
-        {/* Left: Symbol, Timeframe, Chart Controls */}
-        <div className="flex items-center gap-1">
-          {/* Symbol Display */}
-          <div className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#2A2E39] rounded cursor-pointer transition-colors">
-            <span className="text-sm font-semibold text-white">{symbol}</span>
-          </div>
-          
-          <div className={cn(
-            "px-2 py-1 rounded text-[10px] font-semibold",
-            marketOpen ? "bg-[#22AB94]/20 text-[#22AB94]" : "bg-[#F23645]/20 text-[#F23645]"
-          )}>
-            {marketOpen ? '● LIVE' : '● CLOSED'}
-          </div>
-
-          <div className="w-px h-5 bg-[#2A2E39] mx-1" />
-
-          {/* Timeframe Dropdown */}
-          <button
-            onClick={() => setTimeframeDialogOpen(true)}
-            className="flex items-center gap-1 px-2 py-1.5 hover:bg-[#2A2E39] rounded text-[13px] text-white font-medium transition-colors"
+      {/* Top Header Bar - TradingView Style */}
+      <div className="bg-[#131722] border-b border-[#2a2e39] flex-shrink-0">
+        {/* Row 1: Main Toolbar */}
+        <div className="flex items-center h-[38px] px-1 gap-0.5 border-b border-[#2a2e39]/50">
+          {/* Symbol Selector */}
+          <button 
+            onClick={() => setSymbolDialogOpen(true)}
+            className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#2a2e39] rounded text-white transition-colors"
           >
-            {timeframe === 'D' ? '1D' : timeframe === 'W' ? '1W' : timeframe === 'M' ? '1M' : `${timeframe}m`}
+            <div className="w-5 h-5 rounded bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-[10px] font-bold">
+              {symbol.slice(0,2)}
+            </div>
+            <span className="text-[13px] font-semibold">{symbol}</span>
             <ChevronDown className="h-3 w-3 text-[#787B86]" />
           </button>
+
+          <div className="w-px h-5 bg-[#363a45]" />
+
+          {/* Timeframe */}
+          <button
+            onClick={() => setTimeframeDialogOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 hover:bg-[#2A2E39] rounded text-[13px] text-white font-medium transition-colors"
+          >
+            {timeframe === 'D' ? '1D' : timeframe === 'W' ? '1W' : timeframe === 'M' ? '1M' : timeframe === '60' ? '1H' : timeframe === '120' ? '2H' : timeframe === '240' ? '4H' : `${timeframe}`}
+            <ChevronDown className="h-3 w-3 text-[#787B86]" />
+          </button>
+
+          <div className="w-px h-5 bg-[#363a45]" />
 
           {/* Chart Type */}
           <button
@@ -3064,10 +3066,11 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             className="flex items-center gap-1 px-2 py-1.5 hover:bg-[#2A2E39] rounded text-[#787B86] hover:text-white transition-colors"
             title="Chart Type"
           >
-            <CandlestickChart className="h-4 w-4" />
+            <CandlestickChart className="h-[18px] w-[18px]" />
+            <ChevronDown className="h-3 w-3" />
           </button>
 
-          <div className="w-px h-5 bg-[#2A2E39] mx-1" />
+          <div className="w-px h-5 bg-[#363a45]" />
 
           {/* Indicators */}
           <AdvancedIndicatorManager
@@ -3082,84 +3085,128 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             className="flex items-center gap-1 px-2 py-1.5 hover:bg-[#2A2E39] rounded text-[#787B86] hover:text-white transition-colors"
             title="Settings"
           >
-            <Settings className="h-4 w-4" />
+            <Settings className="h-[18px] w-[18px]" />
           </button>
-          
-          {/* Stale Price Warning */}
-          {isStale && (
-            <button
-              onClick={forceRefresh}
-              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors cursor-pointer ml-2"
-              title="Click to refresh prices"
+
+          <div className="flex-1" />
+
+          {/* Right side controls */}
+          <div className="flex items-center gap-0.5">
+            {/* Market Status */}
+            <div className={cn(
+              "px-2 py-1 rounded text-[10px] font-semibold mr-1",
+              marketOpen ? "bg-[#22AB94]/15 text-[#22AB94]" : "bg-[#F23645]/15 text-[#F23645]"
+            )}>
+              {marketOpen ? '● LIVE' : '● CLOSED'}
+            </div>
+            
+            {/* Stale Warning */}
+            {isStale && (
+              <button
+                onClick={forceRefresh}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors cursor-pointer mr-1"
+                title="Click to refresh prices"
+              >
+                ⚠ STALE
+              </button>
+            )}
+
+            {/* Panel toggles - only show in fullscreen */}
+            {isFullscreen && (
+              <>
+                <div className="w-px h-5 bg-[#363a45] mx-1" />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowRightPanel(!showRightPanel)}
+                  className={cn(
+                    "h-7 w-7 p-0 hover:bg-[#2a2e39]",
+                    showRightPanel ? "text-[#2962ff]" : "text-[#787b86]"
+                  )}
+                  title="Toggle Order Panel"
+                >
+                  <PanelRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowBottomPanel(!showBottomPanel)}
+                  className={cn(
+                    "h-7 w-7 p-0 hover:bg-[#2a2e39]",
+                    showBottomPanel ? "text-[#2962ff]" : "text-[#787b86]"
+                  )}
+                  title="Toggle Positions Panel"
+                >
+                  <PanelBottom className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+
+            <div className="w-px h-5 bg-[#363a45] mx-1" />
+            
+            {/* Fullscreen */}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={toggleFullscreen}
+              className={cn(
+                "h-7 w-7 p-0 hover:bg-[#2a2e39]",
+                isFullscreen ? "text-white bg-[#F23645]/20 hover:bg-[#F23645]/40" : "text-[#787b86]"
+              )}
+              title={isFullscreen ? "Exit Fullscreen (ESC)" : "Fullscreen"}
             >
-              ⚠ STALE
-            </button>
-          )}
+              {isFullscreen ? <X className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
 
-        {/* Center: Price Display */}
-        {currentPrice && (
-          <div className="flex items-center gap-3 text-xs font-mono">
-            <div className="flex items-center gap-1">
-              <span className="text-[#787B86]">B:</span>
-              <span className="text-[#2962FF] font-semibold">{currentPrice.bid.toFixed(5)}</span>
-            </div>
-            <div className="text-white font-bold text-base">{currentPrice.mid.toFixed(5)}</div>
-            <div className="flex items-center gap-1">
-              <span className="text-[#787B86]">A:</span>
-              <span className="text-[#F23645] font-semibold">{currentPrice.ask.toFixed(5)}</span>
-            </div>
-            <div className="text-[#787B86] text-[10px]">
-              {(currentPrice.spread * (symbol.includes('JPY') ? 100 : 10000)).toFixed(1)}p
-            </div>
+        {/* Row 2: Symbol Info + Price + OHLC */}
+        <div className="flex items-center h-[32px] px-2 gap-3">
+          {/* Symbol with icon */}
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400" />
+            <span className="text-[13px] font-semibold text-white">{symbol}</span>
+            <span className="text-[11px] text-[#787B86]">• Forex</span>
           </div>
-        )}
 
-        {/* Right: Panel Toggles & Fullscreen */}
-        <div className="flex items-center gap-1">
-          {/* Panel toggles - only show in fullscreen */}
-          {isFullscreen && (
-            <>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setShowRightPanel(!showRightPanel)}
-                className={cn(
-                  "h-7 w-7 p-0 hover:bg-[#2a2e39]",
-                  showRightPanel ? "text-[#2962ff]" : "text-[#787b86]"
-                )}
-                title="Toggle Order Panel"
-              >
-                <PanelRight className="h-4 w-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setShowBottomPanel(!showBottomPanel)}
-                className={cn(
-                  "h-7 w-7 p-0 hover:bg-[#2a2e39]",
-                  showBottomPanel ? "text-[#2962ff]" : "text-[#787b86]"
-                )}
-                title="Toggle Positions Panel"
-              >
-                <PanelBottom className="h-4 w-4" />
-              </Button>
-              <div className="w-px h-5 bg-[#2b2b43] mx-1" />
-            </>
+          {/* OHLC Data (like TradingView) */}
+          {ohlcvData ? (
+            <div className="flex items-center gap-3 text-[11px] font-mono">
+              <span><span className="text-[#787B86]">O</span> <span className="text-[#d1d4dc]">{ohlcvData.open.toFixed(5)}</span></span>
+              <span><span className="text-[#787B86]">H</span> <span className="text-[#26a69a]">{ohlcvData.high.toFixed(5)}</span></span>
+              <span><span className="text-[#787B86]">L</span> <span className="text-[#ef5350]">{ohlcvData.low.toFixed(5)}</span></span>
+              <span><span className="text-[#787B86]">C</span> <span className={ohlcvData.change >= 0 ? 'text-[#26a69a]' : 'text-[#ef5350]'}>{ohlcvData.close.toFixed(5)}</span></span>
+              <span className={cn("font-semibold", ohlcvData.change >= 0 ? 'text-[#26a69a]' : 'text-[#ef5350]')}>
+                {ohlcvData.change >= 0 ? '+' : ''}{ohlcvData.changePercent.toFixed(2)}%
+              </span>
+            </div>
+          ) : (
+            <span className="text-[11px] text-[#787B86] font-mono">Hover for OHLCV</span>
           )}
-          
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={toggleFullscreen}
-            className={cn(
-              "h-7 w-7 p-0 hover:bg-[#2a2e39]",
-              isFullscreen ? "text-white bg-red-500/20 hover:bg-red-500/40" : "text-[#787b86]"
-            )}
-            title={isFullscreen ? "Exit Fullscreen (ESC)" : "Fullscreen"}
-          >
-            {isFullscreen ? <X className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </Button>
+
+          <div className="flex-1" />
+
+          {/* Current Price + Bid/Ask */}
+          {currentPrice && (
+            <div className="flex items-center gap-2">
+              {/* Sell Button */}
+              <button className="flex flex-col items-center px-3 py-0.5 bg-[#F23645]/10 hover:bg-[#F23645]/20 border border-[#F23645]/30 rounded transition-colors">
+                <span className="text-[9px] text-[#F23645] font-medium">SELL</span>
+                <span className="text-[13px] text-[#F23645] font-bold tabular-nums">{currentPrice.bid.toFixed(5)}</span>
+              </button>
+              
+              {/* Spread */}
+              <div className="text-[10px] text-[#787B86] font-mono">
+                {(currentPrice.spread * (symbol.includes('JPY') ? 100 : 10000)).toFixed(1)}
+              </div>
+              
+              {/* Buy Button */}
+              <button className="flex flex-col items-center px-3 py-0.5 bg-[#26a69a]/10 hover:bg-[#26a69a]/20 border border-[#26a69a]/30 rounded transition-colors">
+                <span className="text-[9px] text-[#26a69a] font-medium">BUY</span>
+                <span className="text-[13px] text-[#26a69a] font-bold tabular-nums">{currentPrice.ask.toFixed(5)}</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -3354,7 +3401,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           defaultLineWidth={chartDrawings.defaultLineWidth}
           onColorChange={chartDrawings.setDefaultColor}
           onLineWidthChange={chartDrawings.setDefaultLineWidth}
-          className="w-[40px] h-full flex-shrink-0"
+          className="w-[39px] h-full flex-shrink-0"
         />
 
         {/* Chart Area */}
@@ -3364,26 +3411,12 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             className="relative min-h-0"
             style={{ 
               flex: `1 1 0`,
-              minHeight: isFullscreen ? '300px' : '400px'
+              minHeight: isFullscreen ? '300px' : '350px'
             }}
           >
-            {/* OHLCV Data Legend */}
-            <div className="absolute top-2 left-2 z-20 flex items-center gap-3 text-xs font-mono bg-[#131722]/95 px-3 py-1.5 rounded border border-[#2b2b43]">
-              <span className="text-[#d1d4dc] font-bold">{symbol}</span>
-              {ohlcvData ? (
-                <>
-                  <span className="text-[#787b86]">{ohlcvData.time}</span>
-                  <span><span className="text-[#787b86]">O</span> <span className="text-[#d1d4dc]">{ohlcvData.open.toFixed(5)}</span></span>
-                  <span><span className="text-[#787b86]">H</span> <span className="text-[#22c55e]">{ohlcvData.high.toFixed(5)}</span></span>
-                  <span><span className="text-[#787b86]">L</span> <span className="text-[#ef4444]">{ohlcvData.low.toFixed(5)}</span></span>
-                  <span><span className="text-[#787b86]">C</span> <span className={ohlcvData.change >= 0 ? 'text-[#22c55e]' : 'text-[#ef4444]'}>{ohlcvData.close.toFixed(5)}</span></span>
-                  <span className={ohlcvData.change >= 0 ? 'text-[#22c55e]' : 'text-[#ef4444]'}>
-                    {ohlcvData.change >= 0 ? '+' : ''}{ohlcvData.changePercent.toFixed(2)}%
-                  </span>
-                </>
-              ) : (
-                <span className="text-[#787b86]">Hover for OHLCV</span>
-              )}
+            {/* Symbol + Timeframe Label (top-left corner like TradingView) */}
+            <div className="absolute top-1.5 left-1.5 z-20 text-[11px] font-semibold text-[#787B86]">
+              {symbol} • {timeframe === 'D' ? '1D' : timeframe === 'W' ? '1W' : timeframe === 'M' ? '1M' : timeframe === '60' ? '1H' : timeframe === '120' ? '2H' : timeframe === '240' ? '4H' : `${timeframe}m`}
             </div>
 
             {/* Active Drawing Tool Indicator */}
@@ -3473,6 +3506,40 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               ))}
             </>
           )}
+
+          {/* Bottom Timeframe Quick-Select Bar (TradingView style) */}
+          <div className="h-[28px] bg-[#131722] border-t border-[#2a2e39] flex items-center justify-between px-2 flex-shrink-0">
+            {/* Quick Timeframe Buttons */}
+            <div className="flex items-center gap-0.5">
+              {[
+                { label: '1m', value: '1' as Timeframe },
+                { label: '5m', value: '5' as Timeframe },
+                { label: '15m', value: '15' as Timeframe },
+                { label: '1H', value: '60' as Timeframe },
+                { label: '4H', value: '240' as Timeframe },
+                { label: '1D', value: 'D' as Timeframe },
+                { label: '1W', value: 'W' as Timeframe },
+              ].map((tf) => (
+                <button
+                  key={tf.value}
+                  onClick={() => setTimeframe(tf.value)}
+                  className={cn(
+                    "px-2 py-0.5 text-[11px] font-medium rounded transition-colors",
+                    timeframe === tf.value
+                      ? "bg-[#2962FF] text-white"
+                      : "text-[#787B86] hover:text-white hover:bg-[#2a2e39]"
+                  )}
+                >
+                  {tf.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Right side: Time display */}
+            <div className="flex items-center gap-2 text-[10px] text-[#787B86] font-mono">
+              <span>{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} UTC</span>
+            </div>
+          </div>
         </div>
 
         {/* Right Panel - Watchlist + Order Form (only in fullscreen) */}
