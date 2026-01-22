@@ -1159,22 +1159,66 @@ export default function UserFullDetailPanel({
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             <div>
                               <p className="text-xs text-gray-400 mb-1">Full Name</p>
-                              <p className="text-white">{user.name}</p>
+                              <p className="text-white">{user.name || 'N/A'}</p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-400 mb-1">Email</p>
-                              <p className="text-white">{user.email}</p>
+                              <p className="text-white">{user.email || 'N/A'}</p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-400 mb-1">User ID</p>
-                              <p className="text-white font-mono text-xs">{user.id}</p>
+                              <p className="text-white font-mono text-xs">{user.id || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">Role</p>
+                              <p className="text-white">{user.role || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">Email Verified</p>
+                              <p className="text-white">{user.emailVerified ? 'Yes' : 'No'}</p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-400 mb-1">Joined</p>
-                              <p className="text-white">{new Date(user.createdAt).toLocaleDateString()}</p>
+                              <p className="text-white">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">Country</p>
+                              <p className="text-white">{user.country || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">City</p>
+                              <p className="text-white">{user.city || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">Address</p>
+                              <p className="text-white">{user.address || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">Postal Code</p>
+                              <p className="text-white">{user.postalCode || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">Phone</p>
+                              <p className="text-white">{user.phone || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">Online Status</p>
+                              <p className="text-white">{user.isOnline ? 'Online' : 'Offline'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">Last Seen</p>
+                              <p className="text-white">
+                                {user.lastSeen ? new Date(user.lastSeen).toLocaleString() : 'N/A'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">Assigned To</p>
+                              <p className="text-white">
+                                {user.assignment?.employeeName || user.assignment?.employeeEmail || 'Unassigned'}
+                              </p>
                             </div>
                           </div>
                         </CardContent>
