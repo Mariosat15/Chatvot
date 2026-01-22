@@ -7,6 +7,7 @@ import { IChartApi, ISeriesApi, Time, Coordinate, MouseEventParams } from 'light
 import {
   DrawingToolType,
   ChartPoint,
+  FreePoint,
   ScreenPoint,
   DrawingSession,
   DrawingEvent,
@@ -160,16 +161,20 @@ export class DrawingManager {
   // DRAWING CREATION - Optimized
   // ============================================
 
-  private startDrawing(point: ChartPoint): void {
+  private startDrawing(point: ChartPoint, freePoint?: FreePoint): void {
     if (!this._activeTool) return;
     
     const toolInfo = getToolInfo(this._activeTool);
     if (!toolInfo) return;
     
+    // Check if this is a "free positioning" tool (trend lines, etc.)
+    const isFreePositionTool = ['trend-line', 'ray', 'extended-line', 'arrow'].includes(this._activeTool);
+    
     this._session = {
       tool: this._activeTool,
       state: 'placing',
       points: [point],
+      freePoints: isFreePositionTool && freePoint ? [freePoint] : undefined,
       preview: undefined,
     };
     
@@ -178,14 +183,19 @@ export class DrawingManager {
       return;
     }
     
-    this._session.preview = this.createPreviewPrimitive([point, point]);
+    // For free position tools, pass freePoints to preview
+    const freePoints = this._session.freePoints 
+      ? [this._session.freePoints[0], this._session.freePoints[0]] 
+      : undefined;
+    
+    this._session.preview = this.createPreviewPrimitive([point, point], freePoints);
     if (this._session.preview && this._series) {
       this._session.preview.attach(this._chart!, this._series);
     }
     this._session.state = 'drawing';
   }
 
-  private updateDrawing(point: ChartPoint): void {
+  private updateDrawing(point: ChartPoint, freePoint?: FreePoint): void {
     if (!this._session || this._session.state !== 'drawing' || !this._session.preview) return;
     
     const preview = this._session.preview;
@@ -193,7 +203,15 @@ export class DrawingManager {
     
     try {
       if (tool === 'trend-line' || tool === 'ray' || tool === 'extended-line' || tool === 'arrow') {
-        (preview as any).setPoints(this._session.points[0], point);
+        // Use FreePoints for free-positioning tools
+        if (this._session.freePoints && freePoint) {
+          (preview as any).setPoints(this._session.freePoints[0], freePoint);
+        } else {
+          // Fallback to ChartPoints (shouldn't happen for these tools)
+          const startFree = { timestamp: typeof this._session.points[0].time === 'number' ? this._session.points[0].time : 0, price: this._session.points[0].price };
+          const endFree = freePoint ?? { timestamp: typeof point.time === 'number' ? point.time : 0, price: point.price };
+          (preview as any).setPoints(startFree, endFree);
+        }
       } else if (tool === 'rectangle') {
         (preview as any).setCorners(this._session.points[0], point);
       } else if (tool === 'fibonacci') {
@@ -213,9 +231,15 @@ export class DrawingManager {
       ? this._session.points 
       : [this._session.points[0], this._session.points[this._session.points.length - 1]];
     
+    // Get FreePoints for free-positioning tools
+    const freePoints = this._session.freePoints && this._session.freePoints.length >= 2
+      ? [this._session.freePoints[0], this._session.freePoints[this._session.freePoints.length - 1]]
+      : undefined;
+    
     const drawing = createPrimitive({
       type: this._session.tool,
       points,
+      freePoints,
       options: {
         color: this._options.defaultColor,
         lineWidth: this._options.defaultLineWidth,
@@ -246,10 +270,11 @@ export class DrawingManager {
     this.updateCursor();
   }
 
-  private createPreviewPrimitive(points: ChartPoint[]): AnyPrimitive | null {
+  private createPreviewPrimitive(points: ChartPoint[], freePoints?: FreePoint[]): AnyPrimitive | null {
     return createPrimitive({
       type: this._activeTool,
       points,
+      freePoints,
       options: {
         color: this._options.defaultColor,
         lineWidth: this._options.defaultLineWidth,
@@ -376,6 +401,37 @@ export class DrawingManager {
     } catch { return null; }
   }
 
+  /**
+   * Convert screen point to FreePoint-compatible ChartPoint
+   * Uses linear interpolation for precise timestamp (MT5-style)
+   */
+  private screenToFreeChartPoint(point: ScreenPoint): ChartPoint | null {
+    if (!this._chart || !this._series) return null;
+    try {
+      // Get price
+      const price = this._series.coordinateToPrice(point.y as Coordinate);
+      if (price === null) return null;
+      
+      // Get precise timestamp via interpolation
+      const visibleRange = this._chart.timeScale().getVisibleRange();
+      if (!visibleRange) return null;
+      
+      const chartElement = (this._chart as any).chartElement?.();
+      const chartWidth = chartElement?.clientWidth || 800;
+      
+      const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+      const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+      const timeSpan = endTime - startTime;
+      
+      if (timeSpan <= 0 || chartWidth <= 0) return null;
+      
+      // Precise timestamp (no snapping)
+      const timestamp = startTime + (point.x / chartWidth) * timeSpan;
+      
+      return { time: timestamp as any, price };
+    } catch { return null; }
+  }
+
   private getChartPointFromEvent(param: MouseEventParams): ChartPoint | null {
     if (!param.point || !this._chart || !this._series) return null;
     try {
@@ -391,6 +447,39 @@ export class DrawingManager {
         time = timeValue;
       }
       return { time, price };
+    } catch { return null; }
+  }
+
+  /**
+   * Get FreePoint from event - MT5-style precise positioning
+   * Uses linear interpolation instead of snapping to candle times
+   */
+  private getFreePointFromEvent(param: MouseEventParams): FreePoint | null {
+    if (!param.point || !this._chart || !this._series) return null;
+    try {
+      // Get price from Y coordinate
+      const price = this._series.coordinateToPrice(param.point.y as Coordinate);
+      if (price === null || price === undefined) return null;
+      
+      // Get precise timestamp via linear interpolation
+      const visibleRange = this._chart.timeScale().getVisibleRange();
+      if (!visibleRange) return null;
+      
+      // Get chart width for interpolation
+      const chartElement = (this._chart as any).chartElement?.();
+      const chartWidth = chartElement?.clientWidth || 800;
+      
+      // Calculate time bounds
+      const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+      const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+      const timeSpan = endTime - startTime;
+      
+      if (timeSpan <= 0 || chartWidth <= 0) return null;
+      
+      // Linear interpolation for precise timestamp (no snapping!)
+      const timestamp = startTime + (param.point.x / chartWidth) * timeSpan;
+      
+      return { timestamp, price };
     } catch { return null; }
   }
 
@@ -464,8 +553,15 @@ export class DrawingManager {
       this._rafId = requestAnimationFrame(() => {
         this._pendingUpdate = false;
         
-        const chartPoint = this.screenToChart(screenPoint);
-        if (!chartPoint || !this._dragState) return;
+        if (!this._dragState) return;
+        
+        // Use free coordinates for trend line tools (MT5-style)
+        const isFreePositionTool = ['trend-line', 'ray', 'extended-line', 'arrow'].includes(this._dragState.drawing.type);
+        const chartPoint = isFreePositionTool 
+          ? this.screenToFreeChartPoint(screenPoint)
+          : this.screenToChart(screenPoint);
+        
+        if (!chartPoint) return;
         
         if (this._dragState.anchor) {
           // Anchor drag - direct update
@@ -552,11 +648,18 @@ export class DrawingManager {
     const chartPoint = this.getChartPointFromEvent(param);
     if (!chartPoint) return;
     
+    // Get FreePoint for MT5-style free positioning
+    const freePoint = this.getFreePointFromEvent(param);
+    
     if (this._activeTool) {
       if (!this._session) {
-        this.startDrawing(chartPoint);
+        this.startDrawing(chartPoint, freePoint ?? undefined);
       } else if (this._session.state === 'drawing') {
         this._session.points.push(chartPoint);
+        // Add FreePoint for free-positioning tools
+        if (this._session.freePoints && freePoint) {
+          this._session.freePoints.push(freePoint);
+        }
         this.completeDrawing();
       }
     }
@@ -567,7 +670,8 @@ export class DrawingManager {
     
     if (this._session?.state === 'drawing') {
       const chartPoint = this.getChartPointFromEvent(param);
-      if (chartPoint) this.updateDrawing(chartPoint);
+      const freePoint = this.getFreePointFromEvent(param);
+      if (chartPoint) this.updateDrawing(chartPoint, freePoint ?? undefined);
     }
   }
 

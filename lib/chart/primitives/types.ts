@@ -14,6 +14,12 @@ export interface ChartPoint {
   price: number;
 }
 
+// Free-floating point that doesn't snap to candles (MT5-style)
+export interface FreePoint {
+  timestamp: number; // Precise Unix timestamp in seconds (can be fractional)
+  price: number;
+}
+
 export interface ScreenPoint {
   x: number;
   y: number;
@@ -70,8 +76,8 @@ export interface DrawingOptions {
 }
 
 export interface TrendLineOptions extends DrawingOptions {
-  startPoint: ChartPoint;
-  endPoint: ChartPoint;
+  startPoint: FreePoint;
+  endPoint: FreePoint;
   showAngle?: boolean;
   showLength?: boolean;
   showPriceDiff?: boolean;
@@ -200,6 +206,7 @@ export interface DrawingSession {
   tool: DrawingToolType;
   state: DrawingState;
   points: ChartPoint[];
+  freePoints?: FreePoint[]; // For MT5-style free positioning (trend lines, etc.)
   preview?: DrawingPrimitive;
 }
 

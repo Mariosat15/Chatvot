@@ -16,6 +16,7 @@ import {
 import { 
   TrendLineOptions, 
   ChartPoint, 
+  FreePoint,
   ScreenPoint, 
   AnchorPosition,
   DEFAULT_DRAWING_OPTIONS,
@@ -168,7 +169,7 @@ class TrendLinePaneView extends BasePaneView {
 // ============================================
 
 export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
-  constructor(options: Partial<TrendLineOptions> & { startPoint: ChartPoint; endPoint: ChartPoint }) {
+  constructor(options: Partial<TrendLineOptions> & { startPoint: FreePoint; endPoint: FreePoint }) {
     const fullOptions: TrendLineOptions = {
       ...DEFAULT_DRAWING_OPTIONS,
       id: options.id || `trend_${Date.now()}`,
@@ -190,8 +191,9 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
   }
 
   getRenderData(): DrawingRenderData {
-    const startScreen = this.toScreen(this._options.startPoint);
-    const endScreen = this.toScreen(this._options.endPoint);
+    // Use free coordinate conversion (no snapping)
+    const startScreen = this.freePointToScreen(this._options.startPoint);
+    const endScreen = this.freePointToScreen(this._options.endPoint);
     
     const points: ScreenPoint[] = [];
     if (startScreen) points.push(startScreen);
@@ -199,9 +201,15 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
     
     const size = this.getCanvasSize();
     
+    // Convert FreePoint to ChartPoint for compatibility
+    const chartPoints: ChartPoint[] = [
+      { time: this._options.startPoint.timestamp as any, price: this._options.startPoint.price },
+      { time: this._options.endPoint.timestamp as any, price: this._options.endPoint.price },
+    ];
+    
     return {
       points,
-      chartPoints: [this._options.startPoint, this._options.endPoint],
+      chartPoints,
       options: this._options,
       isSelected: this._isSelected,
       isHovered: this._isHovered,
@@ -217,8 +225,8 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
   hitTest(point: ScreenPoint): boolean {
     if (!this._options.visible) return false;
     
-    const p1 = this.toScreen(this._options.startPoint);
-    const p2 = this.toScreen(this._options.endPoint);
+    const p1 = this.freePointToScreen(this._options.startPoint);
+    const p2 = this.freePointToScreen(this._options.endPoint);
     
     if (!p1 || !p2) return false;
     
@@ -229,8 +237,8 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
   getAnchorPoints(): ScreenPoint[] {
     const anchors: ScreenPoint[] = [];
     
-    const p1 = this.toScreen(this._options.startPoint);
-    const p2 = this.toScreen(this._options.endPoint);
+    const p1 = this.freePointToScreen(this._options.startPoint);
+    const p2 = this.freePointToScreen(this._options.endPoint);
     
     if (p1) anchors.push(p1);
     if (p2) anchors.push(p2);
@@ -244,8 +252,8 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
   }
 
   getAnchorAtPoint(point: ScreenPoint, threshold: number = 15): AnchorPosition | null {
-    const p1 = this.toScreen(this._options.startPoint);
-    const p2 = this.toScreen(this._options.endPoint);
+    const p1 = this.freePointToScreen(this._options.startPoint);
+    const p2 = this.freePointToScreen(this._options.endPoint);
     
     if (p1 && this.distanceToPoint(point, p1) < threshold) return 'start';
     if (p2 && this.distanceToPoint(point, p2) < threshold) return 'end';
@@ -261,18 +269,22 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
   moveAnchor(anchor: AnchorPosition, point: ChartPoint): void {
     if (this._options.locked) return;
     
+    // Convert ChartPoint to FreePoint
+    const freePoint: FreePoint = {
+      timestamp: typeof point.time === 'number' ? point.time : 0,
+      price: point.price,
+    };
+    
     switch (anchor) {
       case 'start':
-        this._options.startPoint = point;
+        this._options.startPoint = freePoint;
         break;
       case 'end':
-        this._options.endPoint = point;
+        this._options.endPoint = freePoint;
         break;
       case 'middle':
-        const oldMid = {
-          price: (this._options.startPoint.price + this._options.endPoint.price) / 2,
-        };
-        const deltaPrice = point.price - oldMid.price;
+        const oldMidPrice = (this._options.startPoint.price + this._options.endPoint.price) / 2;
+        const deltaPrice = freePoint.price - oldMidPrice;
         this._options.startPoint.price += deltaPrice;
         this._options.endPoint.price += deltaPrice;
         break;
@@ -294,7 +306,7 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
   // ADDITIONAL METHODS
   // ============================================
 
-  setPoints(start: ChartPoint, end: ChartPoint): void {
+  setPoints(start: FreePoint, end: FreePoint): void {
     this._options.startPoint = start;
     this._options.endPoint = end;
     this.requestUpdate();

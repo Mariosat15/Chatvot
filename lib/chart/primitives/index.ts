@@ -18,7 +18,7 @@ export { RectanglePrimitive } from './rectangle.primitive';
 export { FibonacciPrimitive } from './fibonacci.primitive';
 
 // Factory function for creating primitives
-import { DrawingToolType, ChartPoint, DrawingOptions } from './types';
+import { DrawingToolType, ChartPoint, FreePoint, DrawingOptions } from './types';
 import { TrendLinePrimitive } from './trend-line.primitive';
 import { HorizontalLinePrimitive } from './horizontal-line.primitive';
 import { VerticalLinePrimitive } from './vertical-line.primitive';
@@ -36,19 +36,35 @@ export type AnyPrimitive =
 export interface CreatePrimitiveOptions {
   type: DrawingToolType;
   points: ChartPoint[];
+  freePoints?: FreePoint[]; // For MT5-style free positioning
   options?: Partial<DrawingOptions>;
 }
 
-export function createPrimitive({ type, points, options = {} }: CreatePrimitiveOptions): AnyPrimitive | null {
+/**
+ * Convert ChartPoint to FreePoint
+ * If time is a number, use it directly as timestamp
+ * Otherwise, use current time (fallback)
+ */
+function toFreePoint(point: ChartPoint): FreePoint {
+  const timestamp = typeof point.time === 'number' 
+    ? point.time 
+    : Date.now() / 1000;
+  return { timestamp, price: point.price };
+}
+
+export function createPrimitive({ type, points, freePoints, options = {} }: CreatePrimitiveOptions): AnyPrimitive | null {
   switch (type) {
     case 'trend-line':
     case 'ray':
     case 'extended-line':
     case 'arrow':
-      if (points.length < 2) return null;
+      if (points.length < 2 && (!freePoints || freePoints.length < 2)) return null;
+      // Prefer freePoints for MT5-style positioning, fallback to converted ChartPoints
+      const startFree = freePoints?.[0] ?? toFreePoint(points[0]);
+      const endFree = freePoints?.[1] ?? toFreePoint(points[1]);
       return new TrendLinePrimitive({
-        startPoint: points[0],
-        endPoint: points[1],
+        startPoint: startFree,
+        endPoint: endFree,
         extendLeft: type === 'extended-line',
         extendRight: type === 'ray' || type === 'extended-line',
         ...options,
