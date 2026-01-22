@@ -403,7 +403,7 @@ export class DrawingManager {
 
   /**
    * Convert screen point to FreePoint-compatible ChartPoint
-   * Uses coordinateToLogical for proper chart-aware positioning
+   * Uses coordinateToLogical with fallback to linear interpolation
    */
   private screenToFreeChartPoint(point: ScreenPoint): ChartPoint | null {
     if (!this._chart || !this._series) return null;
@@ -414,27 +414,40 @@ export class DrawingManager {
       const price = this._series.coordinateToPrice(point.y as Coordinate);
       if (price === null) return null;
       
-      // Get logical ranges for timestamp conversion
+      // Try logical coordinate approach first
       const logicalRange = timeScale.getVisibleLogicalRange();
       const visibleRange = timeScale.getVisibleRange();
-      if (!logicalRange || !visibleRange) return null;
-      
-      // Get logical index from X coordinate
       const logicalIndex = timeScale.coordinateToLogical(point.x as Coordinate);
-      if (logicalIndex === null) return null;
       
-      // Convert logical index to timestamp
-      const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-      const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
-      const timeSpan = endTime - startTime;
-      const logicalSpan = logicalRange.to - logicalRange.from;
+      if (logicalRange && visibleRange && logicalIndex !== null) {
+        const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+        const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+        const timeSpan = endTime - startTime;
+        const logicalSpan = logicalRange.to - logicalRange.from;
+        
+        if (timeSpan > 0 && logicalSpan > 0) {
+          const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
+          const timestamp = startTime + logicalRatio * timeSpan;
+          return { time: timestamp as any, price };
+        }
+      }
       
-      if (timeSpan <= 0 || logicalSpan <= 0) return null;
+      // Fallback: Use linear interpolation with timeScale width
+      if (visibleRange) {
+        const chartWidth = timeScale.width();
+        if (chartWidth > 0) {
+          const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+          const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+          const timeSpan = endTime - startTime;
+          
+          if (timeSpan > 0) {
+            const timestamp = startTime + (point.x / chartWidth) * timeSpan;
+            return { time: timestamp as any, price };
+          }
+        }
+      }
       
-      const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
-      const timestamp = startTime + logicalRatio * timeSpan;
-      
-      return { time: timestamp as any, price };
+      return null;
     } catch { return null; }
   }
 
@@ -458,7 +471,7 @@ export class DrawingManager {
 
   /**
    * Get FreePoint from event - MT5-style precise positioning
-   * Uses coordinateToLogical for proper chart-aware positioning
+   * Uses coordinateToLogical with fallback to linear interpolation
    */
   private getFreePointFromEvent(param: MouseEventParams): FreePoint | null {
     if (!param.point || !this._chart || !this._series) return null;
@@ -469,27 +482,46 @@ export class DrawingManager {
       const price = this._series.coordinateToPrice(param.point.y as Coordinate);
       if (price === null || price === undefined) return null;
       
-      // Get logical ranges for timestamp conversion
+      // Try logical coordinate approach first
       const logicalRange = timeScale.getVisibleLogicalRange();
       const visibleRange = timeScale.getVisibleRange();
-      if (!logicalRange || !visibleRange) return null;
-      
-      // Get logical index from X coordinate
       const logicalIndex = timeScale.coordinateToLogical(param.point.x as Coordinate);
-      if (logicalIndex === null) return null;
       
-      // Convert logical index to timestamp
-      const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-      const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
-      const timeSpan = endTime - startTime;
-      const logicalSpan = logicalRange.to - logicalRange.from;
+      if (logicalRange && visibleRange && logicalIndex !== null) {
+        const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+        const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+        const timeSpan = endTime - startTime;
+        const logicalSpan = logicalRange.to - logicalRange.from;
+        
+        if (timeSpan > 0 && logicalSpan > 0) {
+          const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
+          const timestamp = startTime + logicalRatio * timeSpan;
+          return { timestamp, price };
+        }
+      }
       
-      if (timeSpan <= 0 || logicalSpan <= 0) return null;
+      // Fallback: Use linear interpolation with timeScale width
+      if (visibleRange) {
+        const chartWidth = timeScale.width();
+        if (chartWidth > 0) {
+          const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+          const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+          const timeSpan = endTime - startTime;
+          
+          if (timeSpan > 0) {
+            const timestamp = startTime + (param.point.x / chartWidth) * timeSpan;
+            return { timestamp, price };
+          }
+        }
+      }
       
-      const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
-      const timestamp = startTime + logicalRatio * timeSpan;
+      // Last resort: use param.time if available
+      if (param.time !== undefined && param.time !== null) {
+        const timestamp = typeof param.time === 'number' ? param.time : Date.now() / 1000;
+        return { timestamp, price };
+      }
       
-      return { timestamp, price };
+      return null;
     } catch { return null; }
   }
 
