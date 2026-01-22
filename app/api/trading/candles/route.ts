@@ -1009,9 +1009,51 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           }
         }
         
-        // NOTE: We removed the aggressive fallback to aggregator here!
-        // Historical collections are now automatically kept up-to-date by WebSocket streamer
-        // when candles complete. This ensures consistent data for all users.
+        // NOTE: Historical collections are now automatically kept up-to-date by WebSocket streamer
+        // when candles complete. But there might be a gap between last historical and current period.
+        // Fill this gap IMMEDIATELY from aggregator so user sees complete data on first load.
+        
+        if (historicalCandles.length > 0 && formingCandle !== null && useAggregator) {
+          const newestHistorical = historicalCandles[historicalCandles.length - 1].time;
+          const currentFormingTime = formingCandle.time;
+          const gapCandlesNeeded = Math.floor((currentFormingTime - newestHistorical) / tfSeconds) - 1;
+          
+          if (gapCandlesNeeded > 0) {
+            console.log(`🔧 [${normalizedTf} Gap Fill] ${symbol}: Need ${gapCandlesNeeded} candles to fill gap`);
+            
+            // Get gap candles from aggregator (which has recent 1m data)
+            const result = await getAggregatedCandles(symbol, normalizedTf, gapCandlesNeeded + 10);
+            const existingTimes = new Set(historicalCandles.map(c => c.time));
+            
+            // Add only candles that fill the gap (between historical and forming)
+            const gapCandles = result.candles.filter(c => 
+              c.time > newestHistorical && 
+              c.time < currentFormingTime && 
+              !existingTimes.has(c.time)
+            );
+            
+            if (gapCandles.length > 0) {
+              console.log(`✅ [${normalizedTf} Gap Fill] ${symbol}: Adding ${gapCandles.length} aggregator candles`);
+              historicalCandles = [...historicalCandles, ...gapCandles].sort((a, b) => a.time - b.time);
+              
+              // Also save to historical collection for future users (fire and forget)
+              const historicalModel = getHistoricalModel(normalizedTf);
+              if (historicalModel) {
+                (async () => {
+                  for (const candle of gapCandles) {
+                    try {
+                      await historicalModel.updateOne(
+                        { symbol, timestamp: new Date(candle.time * 1000) },
+                        { $setOnInsert: { symbol, timestamp: new Date(candle.time * 1000), open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: 0 } },
+                        { upsert: true }
+                      );
+                    } catch { /* ignore duplicates */ }
+                  }
+                })();
+              }
+            }
+          }
+        }
         
         // Final count log
         console.log(`✅ [${normalizedTf} FINAL] ${symbol}: Returning ${historicalCandles.length} candles + forming=${!!formingCandle}`);
