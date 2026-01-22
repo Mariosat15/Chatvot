@@ -2106,6 +2106,126 @@ async function seedCompletedCandlesBuffer(): Promise<void> {
   }
 }
 
+/**
+ * Seed higher timeframe forming candle caches from historical 1m data
+ * This ensures forming candles for 4h, D, W, M have accurate OHLC from period start
+ * Without this, forming candles only have data from server restart time!
+ */
+async function seedHigherTimeframeCaches(): Promise<void> {
+  const state = getState();
+  
+  try {
+    await connectToDatabase();
+    
+    const symbols = Object.keys(FOREX_PAIRS);
+    const now = Date.now();
+    const currentTime = Math.floor(now / 1000);
+    
+    console.log(`🌱 [HT Seed] Seeding higher timeframe caches for ${symbols.length} symbols...`);
+    
+    // Calculate period boundaries for each timeframe
+    const nowDate = new Date(now);
+    
+    // Shorter timeframes
+    const period5m = Math.floor(currentTime / 300) * 300;
+    const period15m = Math.floor(currentTime / 900) * 900;
+    const period30m = Math.floor(currentTime / 1800) * 1800;
+    const period1h = Math.floor(currentTime / 3600) * 3600;
+    const period4h = Math.floor(currentTime / 14400) * 14400;
+    
+    // Daily period start (00:00 UTC)
+    const periodD = Math.floor(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate()) / 1000);
+    
+    // Weekly period start (Sunday 00:00 UTC)
+    const dayOfWeek = nowDate.getUTCDay();
+    const sundayDate = new Date(nowDate);
+    sundayDate.setUTCDate(nowDate.getUTCDate() - dayOfWeek);
+    sundayDate.setUTCHours(0, 0, 0, 0);
+    const periodW = Math.floor(sundayDate.getTime() / 1000);
+    
+    // Monthly period start (1st of month 00:00 UTC)
+    const periodM = Math.floor(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), 1) / 1000);
+    
+    // Process each symbol
+    for (const symbol of symbols) {
+      try {
+        // Determine how many 1m candles we need for the longest period (monthly)
+        const minutesSinceMonthStart = Math.floor((currentTime - periodM) / 60);
+        const candlesToFetch = Math.min(minutesSinceMonthStart + 1, 50000); // Cap at 50k to avoid memory issues
+        
+        if (candlesToFetch <= 0) continue;
+        
+        // Fetch 1m candles from MongoDB
+        const candles1m = await Candle1m.find({ symbol })
+          .sort({ time: -1 })
+          .limit(candlesToFetch)
+          .lean()
+          .exec();
+        
+        if (candles1m.length === 0) continue;
+        
+        // Helper to aggregate candles for a period
+        // Note: candles1m uses short names: t=time, o=open, h=high, l=low, c=close
+        const aggregateForPeriod = (periodStart: number, periodEnd: number) => {
+          const periodCandles = candles1m.filter(c => c.t >= periodStart && c.t < periodEnd);
+          if (periodCandles.length === 0) return null;
+          
+          // Sort by time ascending
+          periodCandles.sort((a, b) => a.t - b.t);
+          
+          return {
+            symbol,
+            periodStart,
+            open: periodCandles[0].o,
+            high: Math.max(...periodCandles.map(c => c.h)),
+            low: Math.min(...periodCandles.map(c => c.l)),
+            close: periodCandles[periodCandles.length - 1].c,
+          };
+        };
+        
+        // Seed shorter timeframe caches
+        const candle5m = aggregateForPeriod(period5m, period5m + 300);
+        if (candle5m) state.formingCandles5m.set(symbol, candle5m);
+        
+        const candle15m = aggregateForPeriod(period15m, period15m + 900);
+        if (candle15m) state.formingCandles15m.set(symbol, candle15m);
+        
+        const candle30m = aggregateForPeriod(period30m, period30m + 1800);
+        if (candle30m) state.formingCandles30m.set(symbol, candle30m);
+        
+        const candle1h = aggregateForPeriod(period1h, period1h + 3600);
+        if (candle1h) state.formingCandles1h.set(symbol, candle1h);
+        
+        // Seed 4h cache
+        const candle4h = aggregateForPeriod(period4h, period4h + 14400);
+        if (candle4h) state.formingCandles4h.set(symbol, candle4h);
+        
+        // Seed Daily cache
+        const candleD = aggregateForPeriod(periodD, periodD + 86400);
+        if (candleD) state.formingCandlesD.set(symbol, candleD);
+        
+        // Seed Weekly cache
+        const candleW = aggregateForPeriod(periodW, periodW + 604800);
+        if (candleW) state.formingCandlesW.set(symbol, candleW);
+        
+        // Seed Monthly cache
+        const nextMonth = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth() + 1, 1));
+        const periodMEnd = Math.floor(nextMonth.getTime() / 1000);
+        const candleM = aggregateForPeriod(periodM, periodMEnd);
+        if (candleM) state.formingCandlesM.set(symbol, candleM);
+        
+      } catch (err) {
+        // Skip symbol on error, don't crash entire seeding
+        console.warn(`⚠️ [HT Seed] Failed for ${symbol}:`, err instanceof Error ? err.message : err);
+      }
+    }
+    
+    console.log(`✅ [HT Seed] Seeded: 5m=${state.formingCandles5m.size}, 15m=${state.formingCandles15m.size}, 30m=${state.formingCandles30m.size}, 1h=${state.formingCandles1h.size}, 4h=${state.formingCandles4h.size}, D=${state.formingCandlesD.size}, W=${state.formingCandlesW.size}, M=${state.formingCandlesM.size}`);
+  } catch (error) {
+    console.warn('⚠️ [HT Seed] Failed to seed higher timeframe caches:', error instanceof Error ? error.message : error);
+  }
+}
+
 async function autoInitialize(): Promise<void> {
   const state = getState();
   
@@ -2141,6 +2261,10 @@ async function autoInitialize(): Promise<void> {
     
     // Seed the completed candles buffer from MongoDB for 5m aggregation
     await seedCompletedCandlesBuffer();
+    
+    // Seed higher timeframe caches (4h, D, W, M) from historical 1m data
+    // This ensures forming candles have accurate OHLC from period start, not just server start
+    await seedHigherTimeframeCaches();
     
     // Start broadcasting forming candles to WebSocket server
     await startBroadcastTimer();
