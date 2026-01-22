@@ -7,6 +7,12 @@ import {
   PopoverContent, 
   PopoverTrigger 
 } from '@/components/ui/popover';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import {
@@ -19,9 +25,9 @@ import {
   MoveHorizontal,
   Trash2,
   Palette,
-  Settings2,
-  ChevronDown,
+  ChevronRight,
   RotateCcw,
+  Crosshair,
 } from 'lucide-react';
 import { DrawingToolType, DRAWING_TOOLS, ToolInfo } from '@/lib/chart/primitives';
 
@@ -58,20 +64,20 @@ const TOOL_ICONS: Record<string, React.ElementType> = {
 };
 
 // ============================================
-// COLORS
+// COLORS - TradingView palette
 // ============================================
 
 const PRESET_COLORS = [
-  '#2962ff', // Blue
-  '#f23645', // Red
-  '#22ab94', // Green
-  '#ff9800', // Orange
-  '#9c27b0', // Purple
-  '#ffeb3b', // Yellow
-  '#00bcd4', // Cyan
-  '#e91e63', // Pink
-  '#ffffff', // White
-  '#787b86', // Gray
+  '#2962FF', // Blue (TradingView primary)
+  '#F23645', // Red
+  '#22AB94', // Green (TradingView up)
+  '#FF9800', // Orange
+  '#9C27B0', // Purple
+  '#FFEB3B', // Yellow
+  '#00BCD4', // Cyan
+  '#E91E63', // Pink
+  '#B2B5BE', // Light gray
+  '#787B86', // Gray
 ];
 
 // ============================================
@@ -109,7 +115,7 @@ export default function ChartToolbar({
   onDeleteSelected,
   hasSelection = false,
   drawingsCount = 0,
-  defaultColor = '#2962ff',
+  defaultColor = '#2962FF',
   defaultLineWidth = 2,
   onColorChange,
   onLineWidthChange,
@@ -127,11 +133,11 @@ export default function ChartToolbar({
 
   // Get icon for tool
   const getToolIcon = (type: DrawingToolType): React.ElementType => {
-    if (!type) return MousePointer;
+    if (!type) return Crosshair;
     return TOOL_ICONS[type] || Activity;
   };
 
-  const ActiveIcon = activeToolInfo ? getToolIcon(activeTool) : MousePointer;
+  const ActiveIcon = activeToolInfo ? getToolIcon(activeTool) : Crosshair;
 
   // Handle tool selection
   const handleToolSelect = useCallback((tool: DrawingToolType) => {
@@ -152,203 +158,241 @@ export default function ChartToolbar({
   }, [onLineWidthChange]);
 
   return (
-    <div className={cn(
-      "flex flex-col gap-1 p-1 bg-[#1e222d] border border-[#2a2e39] rounded-lg shadow-lg",
-      className
-    )}>
-      {/* Selection Tool */}
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() => handleToolSelect(null)}
-        className={cn(
-          "h-9 w-9 p-0 hover:bg-[#2a2e39]",
-          !activeTool ? "bg-[#2962ff] text-white" : "text-[#787b86]"
-        )}
-        title="Select / Move (V)"
-      >
-        <MousePointer className="h-4 w-4" />
-      </Button>
+    <TooltipProvider delayDuration={200}>
+      <div className={cn(
+        "flex flex-col gap-0.5 p-1.5 bg-[#1E222D]/95 backdrop-blur-sm border border-[#363A45] rounded-lg shadow-xl",
+        className
+      )}>
+        {/* Selection Tool */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => handleToolSelect(null)}
+              className={cn(
+                "h-8 w-8 p-0 rounded-md transition-all duration-150",
+                !activeTool 
+                  ? "bg-[#2962FF] text-white shadow-lg shadow-[#2962FF]/20" 
+                  : "text-[#787B86] hover:text-[#B2B5BE] hover:bg-[#2A2E39]"
+              )}
+            >
+              <Crosshair className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="bg-[#2A2E39] border-[#363A45] text-[#B2B5BE]">
+            <p className="text-xs">Crosshair / Select <span className="text-[#787B86] ml-1">V</span></p>
+          </TooltipContent>
+        </Tooltip>
 
-      {/* Drawing Tools Dropdown */}
-      <Popover open={isToolsOpen} onOpenChange={setIsToolsOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            size="sm"
-            variant="ghost"
-            className={cn(
-              "h-9 w-9 p-0 hover:bg-[#2a2e39] relative",
-              activeTool ? "bg-[#2962ff] text-white" : "text-[#787b86]"
-            )}
-            title="Drawing Tools"
-          >
-            <ActiveIcon 
-              className="h-4 w-4" 
-              style={{
-                transform: activeTool === 'vertical-line' ? 'rotate(90deg)' : undefined
-              }}
-            />
-            <ChevronDown className="h-2.5 w-2.5 absolute bottom-0.5 right-0.5" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent 
-          side="right" 
-          align="start"
-          className="w-56 p-2 bg-[#1e222d] border-[#2a2e39]"
-        >
-          <div className="space-y-3">
-            {TOOL_CATEGORIES.map(category => (
-              <div key={category.name}>
-                <div className="text-[10px] uppercase text-[#787b86] font-semibold mb-1 px-1">
-                  {category.name}
-                </div>
-                <div className="space-y-0.5">
-                  {category.tools.map(tool => {
-                    const Icon = getToolIcon(tool.type);
-                    return (
-                      <Button
-                        key={tool.type}
-                        variant="ghost"
-                        onClick={() => handleToolSelect(tool.type)}
-                        className={cn(
-                          "w-full h-8 justify-start gap-2 px-2 text-sm",
-                          activeTool === tool.type 
-                            ? "bg-[#2962ff] text-white" 
-                            : "text-[#d1d4dc] hover:bg-[#2a2e39]"
-                        )}
-                      >
-                        <Icon 
-                          className="h-4 w-4" 
-                          style={{
-                            transform: tool.type === 'vertical-line' ? 'rotate(90deg)' : undefined
-                          }}
-                        />
-                        <span>{tool.name}</span>
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
+        {/* Divider */}
+        <div className="h-px bg-[#363A45]/50 my-1 mx-1" />
 
-      {/* Divider */}
-      <div className="h-px bg-[#2a2e39] my-1" />
-
-      {/* Drawing Settings */}
-      <Popover open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            size="sm"
-            variant="ghost"
-            className={cn(
-              "h-9 w-9 p-0 hover:bg-[#2a2e39]",
-              isSettingsOpen ? "bg-[#2a2e39]" : "text-[#787b86]"
-            )}
-            title="Drawing Settings"
-          >
-            <div className="relative">
-              <Palette className="h-4 w-4" />
-              <div 
-                className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-[#1e222d]"
-                style={{ backgroundColor: color }}
-              />
-            </div>
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent 
-          side="right" 
-          align="start"
-          className="w-52 p-3 bg-[#1e222d] border-[#2a2e39]"
-        >
-          <div className="space-y-4">
-            {/* Colors */}
-            <div>
-              <div className="text-xs text-[#787b86] mb-2">Color</div>
-              <div className="grid grid-cols-5 gap-1.5">
-                {PRESET_COLORS.map(presetColor => (
-                  <button
-                    key={presetColor}
-                    onClick={() => handleColorChange(presetColor)}
-                    className={cn(
-                      "h-6 w-6 rounded border-2 transition-all hover:scale-110",
-                      color === presetColor 
-                        ? "border-white ring-2 ring-white/30" 
-                        : "border-transparent"
-                    )}
-                    style={{ backgroundColor: presetColor }}
+        {/* Drawing Tools Dropdown */}
+        <Popover open={isToolsOpen} onOpenChange={setIsToolsOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={cn(
+                    "h-8 w-8 p-0 rounded-md transition-all duration-150 relative group",
+                    activeTool 
+                      ? "bg-[#2962FF] text-white shadow-lg shadow-[#2962FF]/20" 
+                      : "text-[#787B86] hover:text-[#B2B5BE] hover:bg-[#2A2E39]"
+                  )}
+                >
+                  <ActiveIcon 
+                    className="h-4 w-4" 
+                    style={{
+                      transform: activeTool === 'vertical-line' ? 'rotate(90deg)' : undefined
+                    }}
                   />
-                ))}
+                  <ChevronRight className="h-2 w-2 absolute bottom-0.5 right-0.5 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="bg-[#2A2E39] border-[#363A45] text-[#B2B5BE]">
+              <p className="text-xs">Drawing Tools</p>
+            </TooltipContent>
+          </Tooltip>
+          <PopoverContent 
+            side="right" 
+            align="start"
+            sideOffset={8}
+            className="w-52 p-2 bg-[#1E222D] border-[#363A45] shadow-2xl"
+          >
+            <div className="space-y-2">
+              {TOOL_CATEGORIES.map(category => (
+                <div key={category.name}>
+                  <div className="text-[10px] uppercase tracking-wider text-[#787B86] font-medium mb-1.5 px-2">
+                    {category.name}
+                  </div>
+                  <div className="space-y-0.5">
+                    {category.tools.map(tool => {
+                      const Icon = getToolIcon(tool.type);
+                      return (
+                        <Button
+                          key={tool.type}
+                          variant="ghost"
+                          onClick={() => handleToolSelect(tool.type)}
+                          className={cn(
+                            "w-full h-8 justify-start gap-2.5 px-2 text-[13px] rounded-md transition-all duration-150",
+                            activeTool === tool.type 
+                              ? "bg-[#2962FF] text-white" 
+                              : "text-[#B2B5BE] hover:bg-[#2A2E39] hover:text-white"
+                          )}
+                        >
+                          <Icon 
+                            className="h-4 w-4 flex-shrink-0" 
+                            style={{
+                              transform: tool.type === 'vertical-line' ? 'rotate(90deg)' : undefined
+                            }}
+                          />
+                          <span className="truncate">{tool.name}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Divider */}
+        <div className="h-px bg-[#363A45]/50 my-1 mx-1" />
+
+        {/* Drawing Settings */}
+        <Popover open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={cn(
+                    "h-8 w-8 p-0 rounded-md transition-all duration-150",
+                    isSettingsOpen 
+                      ? "bg-[#2A2E39] text-[#B2B5BE]" 
+                      : "text-[#787B86] hover:text-[#B2B5BE] hover:bg-[#2A2E39]"
+                  )}
+                >
+                  <div className="relative">
+                    <Palette className="h-4 w-4" />
+                    <div 
+                      className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-1 ring-[#1E222D]"
+                      style={{ backgroundColor: color }}
+                    />
+                  </div>
+                </Button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="bg-[#2A2E39] border-[#363A45] text-[#B2B5BE]">
+              <p className="text-xs">Style Settings</p>
+            </TooltipContent>
+          </Tooltip>
+          <PopoverContent 
+            side="right" 
+            align="start"
+            sideOffset={8}
+            className="w-48 p-3 bg-[#1E222D] border-[#363A45] shadow-2xl"
+          >
+            <div className="space-y-4">
+              {/* Colors */}
+              <div>
+                <div className="text-[11px] text-[#787B86] mb-2 font-medium">Color</div>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {PRESET_COLORS.map(presetColor => (
+                    <button
+                      key={presetColor}
+                      onClick={() => handleColorChange(presetColor)}
+                      className={cn(
+                        "h-5 w-5 rounded transition-transform duration-150 hover:scale-110",
+                        color === presetColor 
+                          ? "ring-2 ring-white ring-offset-1 ring-offset-[#1E222D]" 
+                          : "ring-1 ring-[#363A45]/50"
+                      )}
+                      style={{ backgroundColor: presetColor }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Line Width */}
+              <div>
+                <div className="text-[11px] text-[#787B86] mb-2 font-medium">
+                  Width: <span className="text-[#B2B5BE]">{lineWidth}px</span>
+                </div>
+                <Slider
+                  value={[lineWidth]}
+                  min={1}
+                  max={5}
+                  step={1}
+                  onValueChange={([v]) => handleLineWidthChange(v)}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Preview */}
+              <div className="p-2 bg-[#131722] rounded-md border border-[#363A45]/50">
+                <div className="text-[10px] text-[#787B86] mb-1.5">Preview</div>
+                <div 
+                  className="rounded-full"
+                  style={{ 
+                    backgroundColor: color, 
+                    height: `${lineWidth}px` 
+                  }}
+                />
               </div>
             </div>
+          </PopoverContent>
+        </Popover>
 
-            {/* Line Width */}
-            <div>
-              <div className="text-xs text-[#787b86] mb-2">
-                Line Width: {lineWidth}px
-              </div>
-              <Slider
-                value={[lineWidth]}
-                min={1}
-                max={6}
-                step={1}
-                onValueChange={([v]) => handleLineWidthChange(v)}
-                className="w-full"
-              />
-            </div>
+        {/* Divider - only show if there are action buttons */}
+        {(hasSelection || drawingsCount > 0) && (
+          <div className="h-px bg-[#363A45]/50 my-1 mx-1" />
+        )}
 
-            {/* Preview */}
-            <div className="p-2 bg-[#131722] rounded border border-[#2a2e39]">
-              <div className="text-[10px] text-[#787b86] mb-1.5">Preview</div>
-              <div 
-                className="h-px rounded"
-                style={{ 
-                  backgroundColor: color, 
-                  height: `${lineWidth}px` 
-                }}
-              />
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+        {/* Delete Selected */}
+        {hasSelection && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onDeleteSelected}
+                className="h-8 w-8 p-0 rounded-md text-[#F23645] hover:bg-[#F23645]/10 hover:text-[#F23645] transition-all duration-150"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="bg-[#2A2E39] border-[#363A45] text-[#B2B5BE]">
+              <p className="text-xs">Delete <span className="text-[#787B86] ml-1">Del</span></p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
-      {/* Divider */}
-      <div className="h-px bg-[#2a2e39] my-1" />
-
-      {/* Delete Selected */}
-      {hasSelection && (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onDeleteSelected}
-          className="h-9 w-9 p-0 hover:bg-[#2a2e39] text-[#f23645]"
-          title="Delete Selected (Del)"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      )}
-
-      {/* Clear All */}
-      {drawingsCount > 0 && (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onClearAll}
-          className="h-9 w-9 p-0 hover:bg-[#2a2e39] text-[#787b86] hover:text-[#f23645]"
-          title={`Clear All (${drawingsCount})`}
-        >
-          <RotateCcw className="h-4 w-4" />
-        </Button>
-      )}
-
-      {/* Active Tool Label */}
-      {activeTool && (
-        <div className="text-[9px] text-center text-[#787b86] mt-1 px-0.5 leading-tight">
-          {activeToolInfo?.name || 'Tool'}
-        </div>
-      )}
-    </div>
+        {/* Clear All */}
+        {drawingsCount > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onClearAll}
+                className="h-8 w-8 p-0 rounded-md text-[#787B86] hover:bg-[#F23645]/10 hover:text-[#F23645] transition-all duration-150"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="bg-[#2A2E39] border-[#363A45] text-[#B2B5BE]">
+              <p className="text-xs">Clear All ({drawingsCount})</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

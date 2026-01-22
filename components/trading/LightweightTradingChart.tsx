@@ -1135,20 +1135,22 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           height: 150,
           layout: {
             background: { color: '#131722' },
-            textColor: '#d1d4dc',
+            textColor: '#B2B5BE',
             fontSize: 11,
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+            attributionLogo: false,
           },
           grid: {
-            vertLines: { color: '#1e222d' },
-            horzLines: { color: '#1e222d' },
+            vertLines: { color: 'rgba(42, 46, 57, 0.6)' },
+            horzLines: { color: 'rgba(42, 46, 57, 0.6)' },
           },
           timeScale: {
-            borderColor: '#2b2b43',
+            borderColor: '#2A2E39',
             timeVisible: false,
             secondsVisible: false,
           },
           rightPriceScale: {
-            borderColor: '#2b2b43',
+            borderColor: '#2A2E39',
           },
         });
 
@@ -1601,44 +1603,45 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
           height: containerHeight,
           layout: {
             background: { color: '#131722' },
-            textColor: '#d1d4dc',
-            fontSize: 12,
-            fontFamily: "'Trebuchet MS', Arial, sans-serif",
+            textColor: '#B2B5BE',
+            fontSize: 11,
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+            attributionLogo: false,
           },
           grid: {
             vertLines: { 
-              color: '#1e222d',
-              style: 1,
+              color: 'rgba(42, 46, 57, 0.6)',
+              style: 0,
               visible: true,
             },
             horzLines: { 
-              color: '#1e222d',
-              style: 1,
+              color: 'rgba(42, 46, 57, 0.6)',
+              style: 0,
               visible: true,
             },
           },
           crosshair: {
             mode: 1,
             vertLine: {
-              color: '#758696',
+              color: 'rgba(152, 158, 172, 0.8)',
               width: 1,
-              style: 3,
-              labelBackgroundColor: '#131722',
+              style: 0,
+              labelBackgroundColor: '#2A2E39',
             },
             horzLine: {
-              color: '#758696',
+              color: 'rgba(152, 158, 172, 0.8)',
               width: 1,
-              style: 3,
-              labelBackgroundColor: '#131722',
+              style: 0,
+              labelBackgroundColor: '#2A2E39',
             },
           },
           rightPriceScale: {
-            borderColor: '#2b2b43',
+            borderColor: '#2A2E39',
             scaleMargins: {
               top: 0.1,
-              bottom: 0.1,
+              bottom: 0.15,
             },
-            mode: 0, // Normal price scale
+            mode: 0,
             autoScale: true,
             alignLabels: true,
             borderVisible: true,
@@ -1648,24 +1651,25 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             visible: false,
           },
           timeScale: {
-            borderColor: '#2b2b43',
+            borderColor: '#2A2E39',
             timeVisible: true,
             secondsVisible: timeframe === '1' || timeframe === '5',
-            rightOffset: 12,
-            barSpacing: 6,
+            rightOffset: 10,
+            barSpacing: 8,
+            minBarSpacing: 2,
             fixLeftEdge: false,
             fixRightEdge: false,
             lockVisibleTimeRangeOnResize: true,
             rightBarStaysOnScroll: true,
             borderVisible: true,
             visible: true,
+            ticksVisible: false,
             tickMarkFormatter: (time: UTCTimestamp) => {
               const date = new Date(time * 1000);
               const day = date.getUTCDate().toString().padStart(2, '0');
               const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
               const hours = date.getUTCHours().toString().padStart(2, '0');
               const minutes = date.getUTCMinutes().toString().padStart(2, '0');
-              // Show date + time for all timeframes
               return `${day}/${month} ${hours}:${minutes}`;
             },
           },
@@ -1702,12 +1706,13 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
         // Create candlestick series with TradingView colors and 5 decimal precision
         const candlestickSeries = chart.addCandlestickSeries({
-          upColor: '#26a69a',
-          downColor: '#ef5350',
-          borderUpColor: '#26a69a',
-          borderDownColor: '#ef5350',
-          wickUpColor: '#26a69a',
-          wickDownColor: '#ef5350',
+          upColor: '#22AB94',
+          downColor: '#F23645',
+          borderUpColor: '#22AB94',
+          borderDownColor: '#F23645',
+          wickUpColor: '#22AB94',
+          wickDownColor: '#F23645',
+          borderVisible: false,
           priceFormat: {
             type: 'price',
             precision: 5,
@@ -1739,11 +1744,17 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         // Add volume series (if enabled)
         if (showVolume) {
           const volumeSeries = chart.addHistogramSeries({
-            color: '#26a69a',
+            color: 'rgba(34, 171, 148, 0.5)',
             priceFormat: {
               type: 'volume',
             },
             priceScaleId: '',
+          });
+          chart.priceScale('').applyOptions({
+            scaleMargins: {
+              top: 0.85,
+              bottom: 0,
+            },
           });
           volumeSeriesRef.current = volumeSeries;
         }
