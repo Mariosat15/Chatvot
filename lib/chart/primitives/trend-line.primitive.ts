@@ -283,21 +283,30 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
         this._options.endPoint = freePoint;
         break;
       case 'middle':
+        // Calculate both price and time deltas for middle anchor
         const oldMidPrice = (this._options.startPoint.price + this._options.endPoint.price) / 2;
+        const oldMidTime = (this._options.startPoint.timestamp + this._options.endPoint.timestamp) / 2;
         const deltaPrice = freePoint.price - oldMidPrice;
+        const deltaTime = freePoint.timestamp - oldMidTime;
+        // Move both endpoints
         this._options.startPoint.price += deltaPrice;
         this._options.endPoint.price += deltaPrice;
+        this._options.startPoint.timestamp += deltaTime;
+        this._options.endPoint.timestamp += deltaTime;
         break;
     }
     
     this.requestUpdate();
   }
 
-  move(deltaPrice: number, _deltaTime: number): void {
+  move(deltaPrice: number, deltaTime: number): void {
     if (this._options.locked) return;
     
+    // Move both vertically (price) and horizontally (time)
     this._options.startPoint.price += deltaPrice;
     this._options.endPoint.price += deltaPrice;
+    this._options.startPoint.timestamp += deltaTime;
+    this._options.endPoint.timestamp += deltaTime;
     
     this.requestUpdate();
   }

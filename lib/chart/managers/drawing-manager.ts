@@ -567,10 +567,15 @@ export class DrawingManager {
           // Anchor drag - direct update
           this._dragState.drawing.moveAnchor(this._dragState.anchor, chartPoint);
         } else {
-          // Move entire drawing
+          // Move entire drawing - calculate both price and time deltas
           const deltaPrice = chartPoint.price - this._dragState.lastChartPoint.price;
-          if (Math.abs(deltaPrice) > 0.00001) { // Only update if meaningful change
-            this._dragState.drawing.move(deltaPrice, 0);
+          const currentTime = typeof chartPoint.time === 'number' ? chartPoint.time : 0;
+          const lastTime = typeof this._dragState.lastChartPoint.time === 'number' ? this._dragState.lastChartPoint.time : 0;
+          const deltaTime = currentTime - lastTime;
+          
+          // Update if meaningful change in either direction
+          if (Math.abs(deltaPrice) > 0.00001 || Math.abs(deltaTime) > 0.1) {
+            this._dragState.drawing.move(deltaPrice, deltaTime);
             this._dragState.lastChartPoint = chartPoint;
           }
         }
