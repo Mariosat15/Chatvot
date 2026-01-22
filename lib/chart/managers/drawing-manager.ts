@@ -402,8 +402,9 @@ export class DrawingManager {
   }
 
   /**
-   * Convert screen point to ChartPoint with logical index
+   * Convert screen point to ChartPoint with offset tracking
    * Used for dragging operations on free-positioning tools
+   * Returns ChartPoint with xOffset (fractional bar position) for precise movement
    */
   private screenToFreeChartPoint(point: ScreenPoint): ChartPoint | null {
     if (!this._chart || !this._series) return null;
@@ -414,15 +415,31 @@ export class DrawingManager {
       
       const timeScale = this._chart.timeScale();
       
-      // Get logical index for position
+      // Get logical index for calculating offset
       const logicalIndex = timeScale.coordinateToLogical(point.x as Coordinate);
       
       // Get timestamp from coordinate
       const time = timeScale.coordinateToTime(point.x as Coordinate);
       const timestamp = typeof time === 'number' ? time : 0;
       
-      // Return ChartPoint with logical index attached for free-positioning tools
-      const chartPoint = { time: timestamp as any, price } as ChartPoint & { logicalIndex?: number };
+      // Calculate fractional bar offset (how far into the bar we are)
+      let xOffset = 0;
+      if (time !== null && logicalIndex !== null) {
+        const refX = timeScale.timeToCoordinate(time);
+        if (refX !== null) {
+          const visibleRange = timeScale.getVisibleLogicalRange();
+          if (visibleRange) {
+            const tsWidth = timeScale.width();
+            const barsVisible = visibleRange.to - visibleRange.from;
+            const barWidth = barsVisible > 0 ? tsWidth / barsVisible : 10;
+            xOffset = (point.x - refX) / barWidth;
+          }
+        }
+      }
+      
+      // Return ChartPoint with xOffset for delta calculations
+      const chartPoint = { time: timestamp as any, price } as ChartPoint & { xOffset?: number; logicalIndex?: number };
+      chartPoint.xOffset = xOffset;
       if (logicalIndex !== null) {
         chartPoint.logicalIndex = logicalIndex;
       }
@@ -451,7 +468,7 @@ export class DrawingManager {
 
   /**
    * Get FreePoint from event - MT5-style precise positioning
-   * Stores logical index for stable positioning (official Lightweight Charts pattern)
+   * Uses reference bar anchoring to survive lazy loading (when new history loads)
    * Reference: https://tradingview.github.io/lightweight-charts/docs/plugins/series-primitives
    */
   private getFreePointFromEvent(param: MouseEventParams): FreePoint | null {
@@ -463,19 +480,51 @@ export class DrawingManager {
       
       const timeScale = this._chart.timeScale();
       
-      // Get logical index directly - this is the key for stable positioning
-      // logicalIndex allows fractional values between bars (MT5-style free positioning)
-      const logicalIndex = timeScale.coordinateToLogical(param.point.x as Coordinate);
-      if (logicalIndex === null) return null;
-      
-      // Also get timestamp for persistence
+      // Get the nearest bar's time (this is our anchor - survives lazy loading)
       const time = timeScale.coordinateToTime(param.point.x as Coordinate);
-      const timestamp = typeof time === 'number' ? time : 0;
+      const referenceBarTime = typeof time === 'number' ? time : undefined;
+      
+      // Calculate offset from reference bar
+      let offsetFromBar = 0;
+      if (referenceBarTime !== undefined) {
+        const refX = timeScale.timeToCoordinate(time!);
+        if (refX !== null) {
+          // Get bar width
+          const visibleRange = timeScale.getVisibleLogicalRange();
+          if (visibleRange) {
+            const tsWidth = timeScale.width();
+            const barsVisible = visibleRange.to - visibleRange.from;
+            const barWidth = barsVisible > 0 ? tsWidth / barsVisible : 10;
+            
+            // Calculate fractional offset
+            offsetFromBar = (param.point.x - refX) / barWidth;
+          }
+        }
+      }
+      
+      // Calculate timestamp for persistence
+      let timestamp = referenceBarTime ?? 0;
+      const logicalIndex = timeScale.coordinateToLogical(param.point.x as Coordinate);
+      if (logicalIndex !== null) {
+        const visibleRange = timeScale.getVisibleRange();
+        const logicalRange = timeScale.getVisibleLogicalRange();
+        if (visibleRange && logicalRange) {
+          const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+          const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+          const timeSpan = endTime - startTime;
+          const logicalSpan = logicalRange.to - logicalRange.from;
+          if (logicalSpan > 0 && timeSpan > 0) {
+            const ratio = (logicalIndex - logicalRange.from) / logicalSpan;
+            timestamp = startTime + ratio * timeSpan;
+          }
+        }
+      }
       
       return { 
         timestamp, 
         price,
-        logicalIndex, // This is the key - store for stable rendering
+        referenceBarTime,
+        offsetFromBar,
       };
     } catch { return null; }
   }
@@ -834,9 +883,22 @@ export class DrawingManager {
     
     for (const item of data) {
       let points: ChartPoint[] = [];
+      let freePoints: FreePoint[] | undefined;
       
       if ('startPoint' in item.options && 'endPoint' in item.options) {
-        points = [item.options.startPoint as ChartPoint, item.options.endPoint as ChartPoint];
+        const start = item.options.startPoint as any;
+        const end = item.options.endPoint as any;
+        
+        // Check if they're FreePoints with anchor data
+        if ('timestamp' in start && 'referenceBarTime' in start) {
+          freePoints = [start as FreePoint, end as FreePoint];
+        }
+        
+        // Also provide as ChartPoints for fallback
+        points = [
+          { time: (start.timestamp ?? start.time ?? 0) as any, price: start.price },
+          { time: (end.timestamp ?? end.time ?? 0) as any, price: end.price },
+        ];
       } else if ('price' in item.options) {
         points = [{ time: 0 as any, price: item.options.price as number }];
       } else if ('time' in item.options) {
@@ -848,6 +910,7 @@ export class DrawingManager {
       const drawing = createPrimitive({
         type: item.type,
         points,
+        freePoints, // Pass FreePoints if available
         options: { ...item.options, id: item.id },
       });
       

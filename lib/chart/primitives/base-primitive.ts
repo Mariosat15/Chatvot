@@ -329,13 +329,16 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
 
   // ============================================
   // FREE COORDINATE CONVERSION (MT5-style, no snapping)
-  // Uses logical index for stable positioning during scroll/zoom
+  // Uses reference bar anchoring to survive lazy loading
   // Reference: https://tradingview.github.io/lightweight-charts/docs/plugins/series-primitives
   // ============================================
 
   /**
    * Convert FreePoint to screen coordinates
-   * Uses logicalIndex for stable X positioning (recommended by official docs)
+   * Uses reference bar anchoring - survives lazy loading when new bars are added
+   * 
+   * The key insight: logical indices shift when new bars load, but bar times don't.
+   * So we anchor to a specific bar's time and store the offset.
    */
   protected freePointToScreen(point: FreePoint): ScreenPoint | null {
     if (!this._chart || !this._series) return null;
@@ -344,12 +347,28 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
       const timeScale = this._chart.timeScale();
       let x: number | null = null;
       
-      // Use logical index directly - this is the official recommended approach
-      if (point.logicalIndex !== undefined) {
-        x = timeScale.logicalToCoordinate(point.logicalIndex as any);
+      // Method 1: Use reference bar anchoring (survives lazy loading)
+      if (point.referenceBarTime !== undefined && point.offsetFromBar !== undefined) {
+        // Get the X coordinate of the reference bar
+        const refX = timeScale.timeToCoordinate(point.referenceBarTime as any);
+        
+        if (refX !== null) {
+          // Estimate bar width by looking at visible range
+          const visibleRange = timeScale.getVisibleLogicalRange();
+          if (visibleRange) {
+            const tsWidth = timeScale.width();
+            const barsVisible = visibleRange.to - visibleRange.from;
+            const barWidth = barsVisible > 0 ? tsWidth / barsVisible : 10;
+            
+            // Apply offset from reference bar
+            x = refX + (point.offsetFromBar * barWidth);
+          } else {
+            x = refX;
+          }
+        }
       }
       
-      // Fallback: try timeToCoordinate for exact bar times
+      // Method 2: Fallback to timeToCoordinate for exact bar times
       if (x === null && point.timestamp) {
         x = timeScale.timeToCoordinate(point.timestamp as any);
       }
@@ -368,7 +387,7 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
 
   /**
    * Convert screen coordinates to FreePoint
-   * Stores logical index for stable positioning (official pattern)
+   * Creates anchoring data for stable positioning across lazy loading
    */
   protected screenToFreePoint(point: ScreenPoint): FreePoint | null {
     if (!this._chart || !this._series) return null;
@@ -376,13 +395,53 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
     try {
       const timeScale = this._chart.timeScale();
       
-      // Get logical index directly - this is the key for stable positioning
-      const logicalIndex = timeScale.coordinateToLogical(point.x as Coordinate);
-      if (logicalIndex === null) return null;
-      
-      // Also get timestamp for persistence (using coordinateToTime)
+      // Get the time at this X coordinate (snaps to nearest bar)
       const time = timeScale.coordinateToTime(point.x as Coordinate);
-      const timestamp = typeof time === 'number' ? time : 0;
+      
+      // Get the X coordinate of that bar (reference point)
+      let referenceBarTime: number | undefined;
+      let offsetFromBar: number = 0;
+      
+      if (time !== null) {
+        referenceBarTime = typeof time === 'number' ? time : undefined;
+        
+        // Calculate offset from the reference bar
+        if (referenceBarTime !== undefined) {
+          const refX = timeScale.timeToCoordinate(time);
+          if (refX !== null) {
+            // Get bar width
+            const visibleRange = timeScale.getVisibleLogicalRange();
+            if (visibleRange) {
+              const tsWidth = timeScale.width();
+              const barsVisible = visibleRange.to - visibleRange.from;
+              const barWidth = barsVisible > 0 ? tsWidth / barsVisible : 10;
+              
+              // Calculate fractional offset from reference bar
+              offsetFromBar = (point.x - refX) / barWidth;
+            }
+          }
+        }
+      }
+      
+      // Get logical index for timestamp calculation
+      const logicalIndex = timeScale.coordinateToLogical(point.x as Coordinate);
+      
+      // Calculate precise timestamp using visible range
+      let timestamp = referenceBarTime ?? 0;
+      if (logicalIndex !== null) {
+        const visibleRange = timeScale.getVisibleRange();
+        const logicalRange = timeScale.getVisibleLogicalRange();
+        if (visibleRange && logicalRange) {
+          const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+          const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+          const timeSpan = endTime - startTime;
+          const logicalSpan = logicalRange.to - logicalRange.from;
+          if (logicalSpan > 0 && timeSpan > 0) {
+            const ratio = (logicalIndex - logicalRange.from) / logicalSpan;
+            timestamp = startTime + ratio * timeSpan;
+          }
+        }
+      }
       
       // Price from Y coordinate
       const price = this._series.coordinateToPrice(point.y as Coordinate);
@@ -391,7 +450,8 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
       return { 
         timestamp, 
         price,
-        logicalIndex,
+        referenceBarTime,
+        offsetFromBar,
       };
     } catch {
       return null;

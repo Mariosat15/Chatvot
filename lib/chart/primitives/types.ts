@@ -15,10 +15,14 @@ export interface ChartPoint {
 }
 
 // Free-floating point that doesn't snap to candles (MT5-style)
+// Uses reference bar anchoring to survive lazy loading (when new bars are added)
 export interface FreePoint {
-  timestamp: number; // Precise Unix timestamp in seconds (for persistence)
+  timestamp: number;          // Precise Unix timestamp in seconds (for persistence)
   price: number;
-  logicalIndex?: number; // Logical index for accurate rendering (allows fractional values)
+  // Anchoring system: reference bar + fractional offset
+  // This survives lazy loading because we anchor to a specific bar's time
+  referenceBarTime?: number;  // Timestamp of the nearest bar (anchor point)
+  offsetFromBar?: number;     // Fractional offset from reference bar (0 = at bar, 0.5 = halfway to next bar)
 }
 
 export interface ScreenPoint {

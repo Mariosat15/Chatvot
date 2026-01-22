@@ -42,14 +42,34 @@ export interface CreatePrimitiveOptions {
 
 /**
  * Convert ChartPoint to FreePoint
+ * Preserves anchor data if already present (for deserialization)
  * If time is a number, use it directly as timestamp
- * Otherwise, use current time (fallback)
  */
-function toFreePoint(point: ChartPoint): FreePoint {
-  const timestamp = typeof point.time === 'number' 
-    ? point.time 
+function toFreePoint(point: ChartPoint | FreePoint): FreePoint {
+  // If it's already a FreePoint with anchor data, preserve it
+  const freePoint = point as FreePoint;
+  if ('timestamp' in freePoint && 'referenceBarTime' in freePoint) {
+    return {
+      timestamp: freePoint.timestamp,
+      price: freePoint.price,
+      referenceBarTime: freePoint.referenceBarTime,
+      offsetFromBar: freePoint.offsetFromBar,
+    };
+  }
+  
+  // Convert ChartPoint to FreePoint
+  const chartPoint = point as ChartPoint;
+  const timestamp = typeof chartPoint.time === 'number' 
+    ? chartPoint.time 
     : Date.now() / 1000;
-  return { timestamp, price: point.price };
+  
+  // Use the timestamp as both the reference time (at a bar) with no offset
+  return { 
+    timestamp, 
+    price: chartPoint.price,
+    referenceBarTime: timestamp, // Anchor at this bar
+    offsetFromBar: 0,            // No offset from bar
+  };
 }
 
 export function createPrimitive({ type, points, freePoints, options = {} }: CreatePrimitiveOptions): AnyPrimitive | null {

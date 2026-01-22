@@ -230,7 +230,7 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
 
   /**
    * Project a FreePoint to screen coordinates
-   * Uses logical index directly with logicalToCoordinate for accurate X
+   * Uses reference bar anchoring - survives lazy loading when new bars are added
    */
   private projectPoint(point: FreePoint): ScreenPoint | null {
     if (!this._chart || !this._series) return null;
@@ -239,18 +239,29 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
       const timeScale = this._chart.timeScale();
       let x: number | null = null;
       
-      // Use logical index if available - this is the most accurate
-      if (point.logicalIndex !== undefined) {
-        x = timeScale.logicalToCoordinate(point.logicalIndex as any);
+      // Method 1: Use reference bar anchoring (survives lazy loading)
+      if (point.referenceBarTime !== undefined && point.offsetFromBar !== undefined) {
+        const refX = timeScale.timeToCoordinate(point.referenceBarTime as any);
+        
+        if (refX !== null) {
+          // Estimate bar width
+          const visibleRange = timeScale.getVisibleLogicalRange();
+          if (visibleRange) {
+            const tsWidth = timeScale.width();
+            const barsVisible = visibleRange.to - visibleRange.from;
+            const barWidth = barsVisible > 0 ? tsWidth / barsVisible : 10;
+            
+            // Apply offset
+            x = refX + (point.offsetFromBar * barWidth);
+          } else {
+            x = refX;
+          }
+        }
       }
       
-      // Fallback: try to find X from timestamp (less accurate for between-bar positions)
-      if (x === null) {
-        // Try native timeToCoordinate first (works for exact bar times)
-        const nativeX = timeScale.timeToCoordinate(point.timestamp as any);
-        if (nativeX !== null) {
-          x = nativeX;
-        }
+      // Method 2: Fallback to timeToCoordinate for exact bar times
+      if (x === null && point.timestamp) {
+        x = timeScale.timeToCoordinate(point.timestamp as any);
       }
       
       if (x === null) return null;
@@ -328,22 +339,28 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
         this._options.endPoint = freePoint;
         break;
       case 'middle':
-        // Calculate deltas
+        // Calculate price delta
         const oldMidPrice = (this._options.startPoint.price + this._options.endPoint.price) / 2;
         const deltaPrice = freePoint.price - oldMidPrice;
         
-        // For logical index, calculate delta if available
-        if (freePoint.logicalIndex !== undefined) {
-          const oldStartLogical = this._options.startPoint.logicalIndex ?? 0;
-          const oldEndLogical = this._options.endPoint.logicalIndex ?? 0;
-          const oldMidLogical = (oldStartLogical + oldEndLogical) / 2;
-          const deltaLogical = freePoint.logicalIndex - oldMidLogical;
-          
-          this._options.startPoint.logicalIndex = oldStartLogical + deltaLogical;
-          this._options.endPoint.logicalIndex = oldEndLogical + deltaLogical;
+        // Calculate offset delta using offset from bar
+        const oldStartOffset = this._options.startPoint.offsetFromBar ?? 0;
+        const oldEndOffset = this._options.endPoint.offsetFromBar ?? 0;
+        const oldMidOffset = (oldStartOffset + oldEndOffset) / 2;
+        const newOffset = freePoint.offsetFromBar ?? 0;
+        const deltaOffset = newOffset - oldMidOffset;
+        
+        // Update offsets (horizontal movement)
+        this._options.startPoint.offsetFromBar = oldStartOffset + deltaOffset;
+        this._options.endPoint.offsetFromBar = oldEndOffset + deltaOffset;
+        
+        // Update reference bar times if needed
+        if (freePoint.referenceBarTime !== undefined) {
+          this._options.startPoint.referenceBarTime = freePoint.referenceBarTime;
+          this._options.endPoint.referenceBarTime = freePoint.referenceBarTime;
         }
         
-        // Move both endpoints by price delta
+        // Move both endpoints by price delta (vertical movement)
         this._options.startPoint.price += deltaPrice;
         this._options.endPoint.price += deltaPrice;
         break;
@@ -355,16 +372,22 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
   move(deltaPrice: number, deltaLogical: number): void {
     if (this._options.locked) return;
     
-    // Move price
+    // Move price (vertical)
     this._options.startPoint.price += deltaPrice;
     this._options.endPoint.price += deltaPrice;
     
-    // Move logical index
-    if (this._options.startPoint.logicalIndex !== undefined) {
-      this._options.startPoint.logicalIndex += deltaLogical;
+    // Move horizontal by updating offset from reference bar
+    // deltaLogical represents bars to move
+    if (this._options.startPoint.offsetFromBar !== undefined) {
+      this._options.startPoint.offsetFromBar += deltaLogical;
+    } else {
+      this._options.startPoint.offsetFromBar = deltaLogical;
     }
-    if (this._options.endPoint.logicalIndex !== undefined) {
-      this._options.endPoint.logicalIndex += deltaLogical;
+    
+    if (this._options.endPoint.offsetFromBar !== undefined) {
+      this._options.endPoint.offsetFromBar += deltaLogical;
+    } else {
+      this._options.endPoint.offsetFromBar = deltaLogical;
     }
     
     this.requestUpdate();
@@ -378,19 +401,15 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
     
     try {
       const timeScale = this._chart.timeScale();
+      const timestamp = typeof point.time === 'number' ? point.time : 0;
       
-      // Get logical index from time
-      const x = timeScale.timeToCoordinate(point.time);
-      let logicalIndex: number | undefined;
-      
-      if (x !== null) {
-        logicalIndex = timeScale.coordinateToLogical(x as Coordinate) ?? undefined;
-      }
-      
+      // The ChartPoint time IS the reference bar time (it's snapped to a bar)
+      // Offset is 0 because it's exactly at a bar
       return {
-        timestamp: typeof point.time === 'number' ? point.time : 0,
+        timestamp,
         price: point.price,
-        logicalIndex,
+        referenceBarTime: timestamp,
+        offsetFromBar: 0,
       };
     } catch {
       return null;
