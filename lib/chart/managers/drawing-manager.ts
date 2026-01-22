@@ -403,30 +403,36 @@ export class DrawingManager {
 
   /**
    * Convert screen point to FreePoint-compatible ChartPoint
-   * Uses linear interpolation for precise timestamp (MT5-style)
+   * Uses coordinateToLogical for proper chart-aware positioning
    */
   private screenToFreeChartPoint(point: ScreenPoint): ChartPoint | null {
     if (!this._chart || !this._series) return null;
     try {
+      const timeScale = this._chart.timeScale();
+      
       // Get price
       const price = this._series.coordinateToPrice(point.y as Coordinate);
       if (price === null) return null;
       
-      // Get precise timestamp via interpolation
-      const visibleRange = this._chart.timeScale().getVisibleRange();
-      if (!visibleRange) return null;
+      // Get logical ranges for timestamp conversion
+      const logicalRange = timeScale.getVisibleLogicalRange();
+      const visibleRange = timeScale.getVisibleRange();
+      if (!logicalRange || !visibleRange) return null;
       
-      const chartElement = (this._chart as any).chartElement?.();
-      const chartWidth = chartElement?.clientWidth || 800;
+      // Get logical index from X coordinate
+      const logicalIndex = timeScale.coordinateToLogical(point.x as Coordinate);
+      if (logicalIndex === null) return null;
       
+      // Convert logical index to timestamp
       const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
       const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
       const timeSpan = endTime - startTime;
+      const logicalSpan = logicalRange.to - logicalRange.from;
       
-      if (timeSpan <= 0 || chartWidth <= 0) return null;
+      if (timeSpan <= 0 || logicalSpan <= 0) return null;
       
-      // Precise timestamp (no snapping)
-      const timestamp = startTime + (point.x / chartWidth) * timeSpan;
+      const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
+      const timestamp = startTime + logicalRatio * timeSpan;
       
       return { time: timestamp as any, price };
     } catch { return null; }
@@ -452,32 +458,36 @@ export class DrawingManager {
 
   /**
    * Get FreePoint from event - MT5-style precise positioning
-   * Uses linear interpolation instead of snapping to candle times
+   * Uses coordinateToLogical for proper chart-aware positioning
    */
   private getFreePointFromEvent(param: MouseEventParams): FreePoint | null {
     if (!param.point || !this._chart || !this._series) return null;
     try {
+      const timeScale = this._chart.timeScale();
+      
       // Get price from Y coordinate
       const price = this._series.coordinateToPrice(param.point.y as Coordinate);
       if (price === null || price === undefined) return null;
       
-      // Get precise timestamp via linear interpolation
-      const visibleRange = this._chart.timeScale().getVisibleRange();
-      if (!visibleRange) return null;
+      // Get logical ranges for timestamp conversion
+      const logicalRange = timeScale.getVisibleLogicalRange();
+      const visibleRange = timeScale.getVisibleRange();
+      if (!logicalRange || !visibleRange) return null;
       
-      // Get chart width for interpolation
-      const chartElement = (this._chart as any).chartElement?.();
-      const chartWidth = chartElement?.clientWidth || 800;
+      // Get logical index from X coordinate
+      const logicalIndex = timeScale.coordinateToLogical(param.point.x as Coordinate);
+      if (logicalIndex === null) return null;
       
-      // Calculate time bounds
+      // Convert logical index to timestamp
       const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
       const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
       const timeSpan = endTime - startTime;
+      const logicalSpan = logicalRange.to - logicalRange.from;
       
-      if (timeSpan <= 0 || chartWidth <= 0) return null;
+      if (timeSpan <= 0 || logicalSpan <= 0) return null;
       
-      // Linear interpolation for precise timestamp (no snapping!)
-      const timestamp = startTime + (param.point.x / chartWidth) * timeSpan;
+      const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
+      const timestamp = startTime + logicalRatio * timeSpan;
       
       return { timestamp, price };
     } catch { return null; }
