@@ -35,8 +35,9 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import AdvancedIndicatorManager, { CustomIndicator } from './AdvancedIndicatorManager';
-import DrawingToolsPanel from './DrawingToolsPanel';
-import DrawingCanvas, { DrawingToolType, DrawingItem, DrawingCanvasHandle } from './DrawingCanvas';
+import ChartToolbar from './ChartToolbar';
+import { useChartDrawings } from '@/hooks/useChartDrawings';
+import { DrawingToolType } from '@/lib/chart/primitives';
 import { SymbolSelector, SymbolSelectorButton } from './SymbolSelector';
 import OrderForm from './OrderForm';
 import PositionsTable from './PositionsTable';
@@ -245,18 +246,18 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const [chartType, setChartType] = useState<'candlestick' | 'line' | 'renko' | 'heikinashi' | 'pointfigure'>('candlestick');
   const [showGrid, setShowGrid] = useState(true);
   const [indicators, setIndicators] = useState<CustomIndicator[]>([]);
-  const [activeTool, setActiveTool] = useState<DrawingToolType>(null);
-  const [drawings, setDrawings] = useState<DrawingItem[]>([]);
-  const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
-  const [drawingColor, setDrawingColor] = useState('#2962ff');
-  const [drawingLineWidth, setDrawingLineWidth] = useState(2);
-  const [drawingTextSize, setDrawingTextSize] = useState(14);
+  // Drawing system using new primitive-based architecture
+  const chartDrawings = useChartDrawings({
+    storageKey: `chart-drawings-${competitionId}`,
+    autoSave: true,
+    defaultColor: '#2962ff',
+    defaultLineWidth: 2,
+  });
   const [chartTypeOpen, setChartTypeOpen] = useState(false);
   const [symbolDialogOpen, setSymbolDialogOpen] = useState(false);
   const [timeframeDialogOpen, setTimeframeDialogOpen] = useState(false);
   const [signalUpdateTrigger, setSignalUpdateTrigger] = useState(0);
   const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0); // Triggers chart reload when server data updates
-  const drawingCanvasRef = useRef<DrawingCanvasHandle>(null);
   const portalContainerRef = useRef<HTMLDivElement>(null);
   
   // OHLCV data display state
@@ -1666,6 +1667,11 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
         candlestickSeriesRef.current = candlestickSeries;
 
+        // Attach drawing system to chart
+        if (chartContainerRef.current) {
+          chartDrawings.attach(chart, candlestickSeries, chartContainerRef.current);
+        }
+
         // Add volume series (if enabled)
         if (showVolume) {
           const volumeSeries = chart.addHistogramSeries({
@@ -1909,6 +1915,9 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();
+      
+      // Detach drawing system before chart removal
+      chartDrawings.detach();
       
       // Clear all refs BEFORE removing chart to prevent "Object is disposed" errors
       const chart = chartRef.current;
@@ -3185,33 +3194,18 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
           <div className="w-8 h-px bg-[#2b2b43] my-1" />
 
-          {/* Drawing Tools */}
-          <DrawingToolsPanel
-            activeTool={activeTool}
-            drawings={drawings}
-            onToolSelect={setActiveTool}
-            onClearDrawings={() => {
-              drawingCanvasRef.current?.clearAllDrawings();
-              setActiveTool(null);
-            }}
-            onDeleteSelected={() => {
-              drawingCanvasRef.current?.deleteSelectedDrawing();
-            }}
-            selectedDrawingId={selectedDrawingId}
-            onColorChange={setDrawingColor}
-            onLineWidthChange={setDrawingLineWidth}
-            onTextSizeChange={setDrawingTextSize}
-            onUpdateSelectedDrawing={(updates) => {
-              if (selectedDrawingId) {
-                setDrawings(drawings.map(d => 
-                  d.id === selectedDrawingId ? { ...d, ...updates } : d
-                ));
-              }
-            }}
-            currentColor={drawingColor}
-            currentLineWidth={drawingLineWidth}
-            currentTextSize={drawingTextSize}
-            portalContainer={isFullscreen ? fullscreenRef.current : undefined}
+          {/* Drawing Tools - New Primitive-Based System */}
+          <ChartToolbar
+            activeTool={chartDrawings.activeTool}
+            onToolSelect={chartDrawings.setActiveTool}
+            onClearAll={chartDrawings.clearAll}
+            onDeleteSelected={chartDrawings.deleteSelected}
+            hasSelection={chartDrawings.hasSelection}
+            drawingsCount={chartDrawings.drawingsCount}
+            defaultColor={chartDrawings.defaultColor}
+            defaultLineWidth={chartDrawings.defaultLineWidth}
+            onColorChange={chartDrawings.setDefaultColor}
+            onLineWidthChange={chartDrawings.setDefaultLineWidth}
           />
 
           <div className="w-8 h-px bg-[#2b2b43] my-1" />
@@ -3354,19 +3348,17 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             </div>
 
             {/* Active Drawing Tool Indicator */}
-            {activeTool && (
+            {chartDrawings.activeTool && (
               <div className="absolute top-2 right-2 z-30 bg-[#2962ff] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-2">
                 <Activity className="h-3 w-3 animate-pulse" />
-                {activeTool === 'freehand' && 'Freehand'}
-                {activeTool === 'trend-line' && 'Trend Line'}
-                {activeTool === 'horizontal-line' && 'H-Line'}
-                {activeTool === 'vertical-line' && 'V-Line'}
-                {activeTool === 'rectangle' && 'Rectangle'}
-                {activeTool === 'arrow' && 'Arrow'}
-                {activeTool === 'fibonacci' && 'Fibonacci'}
-                {activeTool === 'ray' && 'Ray'}
-                {activeTool === 'extended-line' && 'Ext Line'}
-                {activeTool === 'text' && 'Text'}
+                {chartDrawings.activeTool === 'trend-line' && 'Trend Line'}
+                {chartDrawings.activeTool === 'horizontal-line' && 'H-Line'}
+                {chartDrawings.activeTool === 'vertical-line' && 'V-Line'}
+                {chartDrawings.activeTool === 'rectangle' && 'Rectangle'}
+                {chartDrawings.activeTool === 'arrow' && 'Arrow'}
+                {chartDrawings.activeTool === 'fibonacci' && 'Fibonacci'}
+                {chartDrawings.activeTool === 'ray' && 'Ray'}
+                {chartDrawings.activeTool === 'extended-line' && 'Ext Line'}
               </div>
             )}
 
@@ -3417,23 +3409,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               className="absolute inset-0"
             />
 
-            {/* Drawing Canvas Overlay */}
-            {!loading && chartRef.current && candlestickSeriesRef.current && (
-              <DrawingCanvas
-                ref={drawingCanvasRef}
-                chart={chartRef.current}
-                series={candlestickSeriesRef.current}
-                activeTool={activeTool}
-                onToolComplete={() => setActiveTool(null)}
-                drawings={drawings}
-                onDrawingsChange={setDrawings}
-                containerRef={chartContainerRef}
-                drawingColor={drawingColor}
-                drawingLineWidth={drawingLineWidth}
-                drawingTextSize={drawingTextSize}
-                onSelectionChange={setSelectedDrawingId}
-              />
-            )}
+            {/* New Drawing System is attached directly to the chart via primitives */}
           </div>
 
           {/* Oscillator Panels - Resizable */}
