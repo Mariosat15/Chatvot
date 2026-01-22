@@ -905,8 +905,8 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           }
         }
         
-        // If not enough from DB, try API
-        if (historicalCandles.length < limit && !settings.useLocalHistory) {
+        // If not enough from DB, try API (regardless of useLocalHistory setting)
+        if (historicalCandles.length < limit) {
           const massiveTimeframeMap: Record<string, Timeframe> = {
             '5m': '5', '15m': '15', '30m': '30',
             '1h': '60', '4h': '240', '1d': 'D',
@@ -914,13 +914,28 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           };
           const massiveTf = massiveTimeframeMap[normalizedTf];
           if (massiveTf) {
-            const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
-            // IMPORTANT: Align timestamps to proper interval boundaries
+            console.log(`📥 [${normalizedTf} Lazy] ${symbol}: DB has ${historicalCandles.length}, fetching more from API...`);
+            const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit * 2);
+            // IMPORTANT: getRecentCandles returns time in SECONDS, align to proper interval boundaries
             const rawCandles = apiCandles
               .filter(c => c.time < before)
               .map(c => ({ time: alignTimestamp(c.time), open: c.open, high: c.high, low: c.low, close: c.close }));
-            // Deduplicate after alignment
-            historicalCandles = deduplicateCandles(rawCandles);
+            
+            // Merge with existing historical
+            const mergedMap = new Map<number, { time: number; open: number; high: number; low: number; close: number }>();
+            for (const c of historicalCandles) {
+              mergedMap.set(c.time, c);
+            }
+            for (const c of rawCandles) {
+              if (!mergedMap.has(c.time)) {
+                mergedMap.set(c.time, c);
+              }
+            }
+            historicalCandles = Array.from(mergedMap.values())
+              .sort((a, b) => a.time - b.time)
+              .slice(-limit);
+            
+            console.log(`✅ [${normalizedTf} Lazy] ${symbol}: Merged to ${historicalCandles.length} candles`);
           }
         }
       } else {
@@ -965,6 +980,87 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
             historicalCandles = deduplicateCandles(rawCandles);
             
             console.log(`⚡ [${normalizedTf} Optimal] ${symbol}: Got ${historicalCandles.length} historical candles (before ${currentPeriodDate.toISOString()})`);
+            
+            // =====================================================
+            // AUTO-FETCH: If historical is empty/insufficient, fetch from API
+            // This ensures users always see data on higher timeframes
+            // =====================================================
+            if (historicalCandles.length < 50) {
+              console.log(`⚠️ [${normalizedTf}] ${symbol}: Historical has only ${historicalCandles.length} candles, fetching from API...`);
+              
+              const massiveTimeframeMap: Record<string, Timeframe> = {
+                '5m': '5', '15m': '15', '30m': '30',
+                '1h': '60', '4h': '240', '1d': 'D',
+                'W': 'W', 'M': 'M',
+              };
+              const massiveTf = massiveTimeframeMap[normalizedTf];
+              
+              if (massiveTf) {
+                try {
+                  const apiCandles = await getRecentCandles(symbol as ForexSymbol, massiveTf, limit);
+                  console.log(`📥 [${normalizedTf}] ${symbol}: API returned ${apiCandles.length} candles`);
+                  
+                  if (apiCandles.length > 0) {
+                    // Convert and align API candles
+                    // NOTE: getRecentCandles returns time in SECONDS already
+                    const apiFormatted = apiCandles.map(c => ({
+                      time: alignTimestamp(c.time),
+                      open: c.open,
+                      high: c.high,
+                      low: c.low,
+                      close: c.close,
+                    }));
+                    
+                    // Merge with any existing historical (API might have more recent data)
+                    const mergedMap = new Map<number, { time: number; open: number; high: number; low: number; close: number }>();
+                    for (const c of historicalCandles) {
+                      mergedMap.set(c.time, c);
+                    }
+                    for (const c of apiFormatted) {
+                      if (!mergedMap.has(c.time)) {
+                        mergedMap.set(c.time, c);
+                      }
+                    }
+                    historicalCandles = Array.from(mergedMap.values()).sort((a, b) => a.time - b.time);
+                    
+                    console.log(`✅ [${normalizedTf}] ${symbol}: Merged to ${historicalCandles.length} candles`);
+                    
+                    // Save API candles to historical collection (background, fire and forget)
+                    (async () => {
+                      let savedCount = 0;
+                      for (const candle of apiFormatted) {
+                        try {
+                          const timestamp = new Date(candle.time * 1000);
+                          // Skip weekends for forex
+                          const day = timestamp.getUTCDay();
+                          if (day === 0 || day === 6) continue;
+                          
+                          await historicalModel.updateOne(
+                            { symbol, timestamp },
+                            { 
+                              $setOnInsert: { 
+                                symbol, 
+                                timestamp, 
+                                open: candle.open, 
+                                high: candle.high, 
+                                low: candle.low, 
+                                close: candle.close, 
+                                volume: 0 
+                              } 
+                            },
+                            { upsert: true }
+                          );
+                          savedCount++;
+                        } catch { /* ignore duplicates */ }
+                      }
+                      console.log(`💾 [${normalizedTf}] ${symbol}: Saved ${savedCount} candles to historical collection`);
+                    })();
+                  }
+                } catch (apiError) {
+                  console.error(`❌ [${normalizedTf}] ${symbol}: API fetch failed:`, apiError);
+                }
+              }
+            }
           }
         }
         
