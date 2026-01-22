@@ -8,7 +8,6 @@ import {
   DrawingToolType,
   ChartPoint,
   ScreenPoint,
-  DrawingOptions,
   DrawingState,
   DrawingSession,
   DrawingEvent,
@@ -203,13 +202,17 @@ export class DrawingManager {
     const preview = this._session.preview;
     const tool = this._session.tool;
     
-    if (tool === 'trend-line' || tool === 'ray' || 
-        tool === 'extended-line' || tool === 'arrow') {
-      (preview as any).setPoints(this._session.points[0], point);
-    } else if (tool === 'rectangle') {
-      (preview as any).setCorners(this._session.points[0], point);
-    } else if (tool === 'fibonacci') {
-      (preview as any).setPoints(this._session.points[0], point);
+    try {
+      if (tool === 'trend-line' || tool === 'ray' || 
+          tool === 'extended-line' || tool === 'arrow') {
+        (preview as any).setPoints(this._session.points[0], point);
+      } else if (tool === 'rectangle') {
+        (preview as any).setCorners(this._session.points[0], point);
+      } else if (tool === 'fibonacci') {
+        (preview as any).setPoints(this._session.points[0], point);
+      }
+    } catch (error) {
+      console.error('[DrawingManager] Failed to update preview:', error);
     }
   }
 
@@ -220,7 +223,9 @@ export class DrawingManager {
     
     // Remove preview
     if (this._session.preview) {
-      this._session.preview.detach();
+      try {
+        this._session.preview.detach();
+      } catch {}
     }
     
     // Get final points
@@ -257,7 +262,9 @@ export class DrawingManager {
     
     // Remove preview
     if (this._session.preview) {
-      this._session.preview.detach();
+      try {
+        this._session.preview.detach();
+      } catch {}
     }
     
     this._session = null;
@@ -311,7 +318,9 @@ export class DrawingManager {
 
   clearAll(): void {
     for (const drawing of this._drawings.values()) {
-      drawing.detach();
+      try {
+        drawing.detach();
+      } catch {}
     }
     this._drawings.clear();
     this._selectedId = null;
@@ -380,28 +389,69 @@ export class DrawingManager {
   }
 
   // ============================================
+  // COORDINATE CONVERSION
+  // ============================================
+
+  private getChartPointFromEvent(param: MouseEventParams): ChartPoint | null {
+    if (!param.point || !this._chart || !this._series) {
+      return null;
+    }
+
+    try {
+      // Get price from Y coordinate
+      const price = this._series.coordinateToPrice(param.point.y as Coordinate);
+      if (price === null || price === undefined) {
+        console.log('[DrawingManager] Could not convert Y to price');
+        return null;
+      }
+
+      // Get time - use param.time if available, otherwise convert from X
+      let time: Time;
+      if (param.time) {
+        time = param.time;
+      } else {
+        // Convert X coordinate to time
+        const timeValue = this._chart.timeScale().coordinateToTime(param.point.x as Coordinate);
+        if (timeValue === null) {
+          console.log('[DrawingManager] Could not convert X to time');
+          return null;
+        }
+        time = timeValue;
+      }
+
+      return { time, price };
+    } catch (error) {
+      console.error('[DrawingManager] Error converting coordinates:', error);
+      return null;
+    }
+  }
+
+  // ============================================
   // EVENT HANDLERS
   // ============================================
 
   private handleChartClick(param: MouseEventParams): void {
-    if (!param.point || !param.time) {
-      console.log('[DrawingManager] Click without point/time');
+    if (!param.point) {
+      console.log('[DrawingManager] Click without point');
       return;
     }
     
     // Get chart coordinates from the event
-    const screenPoint: ScreenPoint = { x: param.point.x, y: param.point.y };
+    const chartPoint = this.getChartPointFromEvent(param);
     
-    // Get price from series at click point
-    const price = this._series?.coordinateToPrice(param.point.y as Coordinate);
-    if (price === null || price === undefined) {
-      console.log('[DrawingManager] Could not get price at click');
+    if (!chartPoint) {
+      console.log('[DrawingManager] Could not get chart coordinates from click');
       return;
     }
     
-    const chartPoint: ChartPoint = { time: param.time, price };
+    const screenPoint: ScreenPoint = { x: param.point.x, y: param.point.y };
     
-    console.log('[DrawingManager] Chart click at:', chartPoint, 'activeTool:', this._activeTool);
+    console.log('[DrawingManager] Chart click:', {
+      screen: screenPoint,
+      chart: chartPoint,
+      activeTool: this._activeTool,
+      sessionState: this._session?.state
+    });
     
     // If we have an active tool
     if (this._activeTool) {
@@ -430,10 +480,10 @@ export class DrawingManager {
     if (!param.point) return;
     
     // If drawing, update preview
-    if (this._session?.state === 'drawing' && param.time) {
-      const price = this._series?.coordinateToPrice(param.point.y as Coordinate);
-      if (price !== null && price !== undefined) {
-        this.updateDrawing({ time: param.time, price });
+    if (this._session?.state === 'drawing') {
+      const chartPoint = this.getChartPointFromEvent(param);
+      if (chartPoint) {
+        this.updateDrawing(chartPoint);
       }
     }
     
