@@ -1130,6 +1130,24 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
             };
             console.log(`🔄 [${normalizedTf}] ${symbol}: Augmented forming with ${candles1mInPeriod.length} 1m candles`);
           }
+        } else if (!formingCandle) {
+          // =====================================================
+          // FALLBACK: No 1m data AND no cached forming candle
+          // This can happen right at the start of a new period.
+          // Use the last historical candle's close as the forming candle's OHLC.
+          // This ensures the chart always shows something for the current period.
+          // =====================================================
+          if (historicalCandles.length > 0) {
+            const lastHistorical = historicalCandles[historicalCandles.length - 1];
+            formingCandle = {
+              time: currentPeriodStart,
+              open: lastHistorical.close,  // Open at previous close
+              high: lastHistorical.close,
+              low: lastHistorical.close,
+              close: lastHistorical.close,
+            };
+            console.log(`📌 [${normalizedTf}] ${symbol}: Created forming from last historical close (no 1m data yet)`);
+          }
         }
         
         // NOTE: Historical collections are now automatically kept up-to-date by WebSocket streamer
@@ -1281,11 +1299,15 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         // Initial load: combine historical + forming candle
         combinedCandles = [...historicalCandles];
         
-        // Add forming candle at the end if it exists and isn't already in historical
+        // Add or REPLACE forming candle (forming candle has most current data)
         if (formingCandle) {
           const formingTime = formingCandle.time;
-          const existsInHistorical = combinedCandles.some(c => c.time === formingTime);
-          if (!existsInHistorical) {
+          const existingIndex = combinedCandles.findIndex(c => c.time === formingTime);
+          if (existingIndex >= 0) {
+            // REPLACE the incomplete historical candle with the forming candle
+            combinedCandles[existingIndex] = formingCandle;
+          } else {
+            // Add forming candle at the end
             combinedCandles.push(formingCandle);
           }
         }
