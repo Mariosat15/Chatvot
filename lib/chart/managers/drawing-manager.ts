@@ -158,70 +158,23 @@ export class DrawingManager {
   }
 
   // ============================================
-  // DRAWING CREATION - FreePoint-first for free-positioning tools
+  // DRAWING CREATION - Optimized
   // ============================================
 
-  // Tools that use free positioning (can be placed anywhere, not snapped to candles)
-  private static readonly FREE_POSITION_TOOLS = ['trend-line', 'ray', 'extended-line', 'arrow'];
-
-  private isFreePositionTool(tool: DrawingToolType): boolean {
-    return DrawingManager.FREE_POSITION_TOOLS.includes(tool as string);
-  }
-
-  /**
-   * Start drawing - FreePoint is primary for free-positioning tools
-   * ChartPoint is only used as fallback or for snap-to-candle tools
-   */
-  private startDrawingWithFreePoint(freePoint: FreePoint): void {
+  private startDrawing(point: ChartPoint, freePoint?: FreePoint): void {
     if (!this._activeTool) return;
     
     const toolInfo = getToolInfo(this._activeTool);
     if (!toolInfo) return;
     
-    // Create synthetic ChartPoint from FreePoint (for compatibility)
-    const syntheticChartPoint: ChartPoint = {
-      time: freePoint.timestamp as any,
-      price: freePoint.price,
-    };
-    
-    this._session = {
-      tool: this._activeTool,
-      state: 'placing',
-      points: [syntheticChartPoint],
-      freePoints: [freePoint],
-      preview: undefined,
-    };
-    
-    if (toolInfo.pointsRequired === 1) {
-      this.completeDrawing();
-      return;
-    }
-    
-    // Create preview with FreePoints
-    this._session.preview = this.createPreviewPrimitive(
-      [syntheticChartPoint, syntheticChartPoint],
-      [freePoint, freePoint]
-    );
-    if (this._session.preview && this._series) {
-      this._session.preview.attach(this._chart!, this._series);
-    }
-    this._session.state = 'drawing';
-  }
-
-  /**
-   * Start drawing with ChartPoint (for snap-to-candle tools like vertical line)
-   */
-  private startDrawingWithChartPoint(point: ChartPoint): void {
-    if (!this._activeTool) return;
-    
-    const toolInfo = getToolInfo(this._activeTool);
-    if (!toolInfo) return;
+    // Check if this is a "free positioning" tool (trend lines, etc.)
+    const isFreePositionTool = ['trend-line', 'ray', 'extended-line', 'arrow'].includes(this._activeTool);
     
     this._session = {
       tool: this._activeTool,
       state: 'placing',
       points: [point],
-      freePoints: undefined,
+      freePoints: isFreePositionTool && freePoint ? [freePoint] : undefined,
       preview: undefined,
     };
     
@@ -230,99 +183,41 @@ export class DrawingManager {
       return;
     }
     
-    this._session.preview = this.createPreviewPrimitive([point, point]);
+    // For free position tools, pass freePoints to preview
+    const freePoints = this._session.freePoints 
+      ? [this._session.freePoints[0], this._session.freePoints[0]] 
+      : undefined;
+    
+    this._session.preview = this.createPreviewPrimitive([point, point], freePoints);
     if (this._session.preview && this._series) {
       this._session.preview.attach(this._chart!, this._series);
     }
     this._session.state = 'drawing';
   }
 
-  /**
-   * Update drawing preview - FreePoint is primary for free-positioning tools
-   */
-  private updateDrawingWithFreePoint(freePoint: FreePoint): void {
+  private updateDrawing(point: ChartPoint, freePoint?: FreePoint): void {
     if (!this._session || this._session.state !== 'drawing' || !this._session.preview) return;
     
     const preview = this._session.preview;
     const tool = this._session.tool;
     
     try {
-      if (this.isFreePositionTool(tool)) {
+      if (tool === 'trend-line' || tool === 'ray' || tool === 'extended-line' || tool === 'arrow') {
         // Use FreePoints for free-positioning tools
-        const startPoint = this._session.freePoints?.[0] ?? {
-          timestamp: typeof this._session.points[0].time === 'number' ? this._session.points[0].time : 0,
-          price: this._session.points[0].price,
-        };
-        (preview as any).setPoints(startPoint, freePoint);
-      }
-    } catch {}
-  }
-
-  /**
-   * Update drawing preview with ChartPoint (for snap-to-candle tools)
-   */
-  private updateDrawingWithChartPoint(point: ChartPoint): void {
-    if (!this._session || this._session.state !== 'drawing' || !this._session.preview) return;
-    
-    const preview = this._session.preview;
-    const tool = this._session.tool;
-    
-    try {
-      if (tool === 'rectangle') {
+        if (this._session.freePoints && freePoint) {
+          (preview as any).setPoints(this._session.freePoints[0], freePoint);
+        } else {
+          // Fallback to ChartPoints (shouldn't happen for these tools)
+          const startFree = { timestamp: typeof this._session.points[0].time === 'number' ? this._session.points[0].time : 0, price: this._session.points[0].price };
+          const endFree = freePoint ?? { timestamp: typeof point.time === 'number' ? point.time : 0, price: point.price };
+          (preview as any).setPoints(startFree, endFree);
+        }
+      } else if (tool === 'rectangle') {
         (preview as any).setCorners(this._session.points[0], point);
       } else if (tool === 'fibonacci') {
         (preview as any).setPoints(this._session.points[0], point);
       }
     } catch {}
-  }
-
-  /**
-   * Complete the drawing and add it to the chart
-   */
-  private completeDrawingWithFreePoint(freePoint: FreePoint): void {
-    if (!this._session) return;
-    
-    if (this._session.preview) {
-      try { this._session.preview.detach(); } catch {}
-    }
-    
-    // For free-positioning tools, use FreePoints
-    const startFreePoint = this._session.freePoints?.[0] ?? {
-      timestamp: typeof this._session.points[0].time === 'number' ? this._session.points[0].time : 0,
-      price: this._session.points[0].price,
-    };
-    
-    const freePoints = [startFreePoint, freePoint];
-    
-    // Create synthetic ChartPoints for compatibility
-    const points: ChartPoint[] = freePoints.map(fp => ({
-      time: fp.timestamp as any,
-      price: fp.price,
-    }));
-    
-    const drawing = createPrimitive({
-      type: this._session.tool,
-      points,
-      freePoints,
-      options: {
-        color: this._options.defaultColor,
-        lineWidth: this._options.defaultLineWidth,
-        lineStyle: this._options.defaultLineStyle,
-      },
-    });
-    
-    if (drawing && this._series) {
-      this.addDrawing(drawing);
-      this.emitEvent('created', drawing);
-      
-      // Auto-switch to selection mode and select the new drawing
-      this._activeTool = null;
-      this.select(drawing.id);
-      this.emitToolChanged();
-    }
-    
-    this._session = null;
-    this.updateCursor();
   }
 
   private completeDrawing(): void {
@@ -339,9 +234,7 @@ export class DrawingManager {
     // Get FreePoints for free-positioning tools
     const freePoints = this._session.freePoints && this._session.freePoints.length >= 2
       ? [this._session.freePoints[0], this._session.freePoints[this._session.freePoints.length - 1]]
-      : this._session.freePoints && this._session.freePoints.length === 1
-        ? [this._session.freePoints[0], this._session.freePoints[0]]
-        : undefined;
+      : undefined;
     
     const drawing = createPrimitive({
       type: this._session.tool,
@@ -510,51 +403,32 @@ export class DrawingManager {
 
   /**
    * Convert screen point to FreePoint-compatible ChartPoint
-   * Uses coordinateToLogical with fallback to linear interpolation
+   * Uses linear interpolation for precise timestamp (MT5-style)
    */
   private screenToFreeChartPoint(point: ScreenPoint): ChartPoint | null {
     if (!this._chart || !this._series) return null;
     try {
-      const timeScale = this._chart.timeScale();
-      
       // Get price
       const price = this._series.coordinateToPrice(point.y as Coordinate);
       if (price === null) return null;
       
-      // Try logical coordinate approach first
-      const logicalRange = timeScale.getVisibleLogicalRange();
-      const visibleRange = timeScale.getVisibleRange();
-      const logicalIndex = timeScale.coordinateToLogical(point.x as Coordinate);
+      // Get precise timestamp via interpolation
+      const visibleRange = this._chart.timeScale().getVisibleRange();
+      if (!visibleRange) return null;
       
-      if (logicalRange && visibleRange && logicalIndex !== null) {
-        const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-        const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
-        const timeSpan = endTime - startTime;
-        const logicalSpan = logicalRange.to - logicalRange.from;
-        
-        if (timeSpan > 0 && logicalSpan > 0) {
-          const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
-          const timestamp = startTime + logicalRatio * timeSpan;
-          return { time: timestamp as any, price };
-        }
-      }
+      const chartElement = (this._chart as any).chartElement?.();
+      const chartWidth = chartElement?.clientWidth || 800;
       
-      // Fallback: Use linear interpolation with timeScale width
-      if (visibleRange) {
-        const chartWidth = timeScale.width();
-        if (chartWidth > 0) {
-          const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-          const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
-          const timeSpan = endTime - startTime;
-          
-          if (timeSpan > 0) {
-            const timestamp = startTime + (point.x / chartWidth) * timeSpan;
-            return { time: timestamp as any, price };
-          }
-        }
-      }
+      const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+      const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+      const timeSpan = endTime - startTime;
       
-      return null;
+      if (timeSpan <= 0 || chartWidth <= 0) return null;
+      
+      // Precise timestamp (no snapping)
+      const timestamp = startTime + (point.x / chartWidth) * timeSpan;
+      
+      return { time: timestamp as any, price };
     } catch { return null; }
   }
 
@@ -578,57 +452,34 @@ export class DrawingManager {
 
   /**
    * Get FreePoint from event - MT5-style precise positioning
-   * Uses coordinateToLogical with fallback to linear interpolation
+   * Uses linear interpolation instead of snapping to candle times
    */
   private getFreePointFromEvent(param: MouseEventParams): FreePoint | null {
     if (!param.point || !this._chart || !this._series) return null;
     try {
-      const timeScale = this._chart.timeScale();
-      
       // Get price from Y coordinate
       const price = this._series.coordinateToPrice(param.point.y as Coordinate);
       if (price === null || price === undefined) return null;
       
-      // Try logical coordinate approach first
-      const logicalRange = timeScale.getVisibleLogicalRange();
-      const visibleRange = timeScale.getVisibleRange();
-      const logicalIndex = timeScale.coordinateToLogical(param.point.x as Coordinate);
+      // Get precise timestamp via linear interpolation
+      const visibleRange = this._chart.timeScale().getVisibleRange();
+      if (!visibleRange) return null;
       
-      if (logicalRange && visibleRange && logicalIndex !== null) {
-        const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-        const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
-        const timeSpan = endTime - startTime;
-        const logicalSpan = logicalRange.to - logicalRange.from;
-        
-        if (timeSpan > 0 && logicalSpan > 0) {
-          const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
-          const timestamp = startTime + logicalRatio * timeSpan;
-          return { timestamp, price };
-        }
-      }
+      // Get chart width for interpolation
+      const chartElement = (this._chart as any).chartElement?.();
+      const chartWidth = chartElement?.clientWidth || 800;
       
-      // Fallback: Use linear interpolation with timeScale width
-      if (visibleRange) {
-        const chartWidth = timeScale.width();
-        if (chartWidth > 0) {
-          const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-          const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
-          const timeSpan = endTime - startTime;
-          
-          if (timeSpan > 0) {
-            const timestamp = startTime + (param.point.x / chartWidth) * timeSpan;
-            return { timestamp, price };
-          }
-        }
-      }
+      // Calculate time bounds
+      const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+      const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+      const timeSpan = endTime - startTime;
       
-      // Last resort: use param.time if available
-      if (param.time !== undefined && param.time !== null) {
-        const timestamp = typeof param.time === 'number' ? param.time : Date.now() / 1000;
-        return { timestamp, price };
-      }
+      if (timeSpan <= 0 || chartWidth <= 0) return null;
       
-      return null;
+      // Linear interpolation for precise timestamp (no snapping!)
+      const timestamp = startTime + (param.point.x / chartWidth) * timeSpan;
+      
+      return { timestamp, price };
     } catch { return null; }
   }
 
@@ -792,39 +643,51 @@ export class DrawingManager {
   }
 
   // ============================================
-  // CHART EVENT HANDLERS - FreePoint-first for free-positioning tools
+  // CHART EVENT HANDLERS
   // ============================================
 
   private handleChartClick(param: MouseEventParams): void {
     if (this._dragState || this._isMouseDown) return;
     if (!param.point) return;
     
+    // Get FreePoint for MT5-style free positioning (this works anywhere on chart)
+    const freePoint = this.getFreePointFromEvent(param);
+    
+    // For drawing tools, prioritize FreePoint
     if (this._activeTool) {
-      // For free-positioning tools, use FreePoint as primary (doesn't require candle snap)
-      if (this.isFreePositionTool(this._activeTool)) {
-        const freePoint = this.getFreePointFromEvent(param);
-        if (!freePoint) return; // Need at least FreePoint for free-positioning tools
+      // For free-positioning tools (trend-line, ray, etc.), use FreePoint only
+      const isFreePositionTool = ['trend-line', 'ray', 'extended-line', 'arrow'].includes(this._activeTool);
+      
+      if (isFreePositionTool) {
+        if (!freePoint) return; // Need FreePoint for these tools
+        
+        // Create a synthetic ChartPoint from FreePoint
+        const chartPoint: ChartPoint = {
+          time: freePoint.timestamp as any,
+          price: freePoint.price,
+        };
         
         if (!this._session) {
-          this.startDrawingWithFreePoint(freePoint);
+          this.startDrawing(chartPoint, freePoint);
         } else if (this._session.state === 'drawing') {
-          this.completeDrawingWithFreePoint(freePoint);
+          this._session.points.push(chartPoint);
+          if (this._session.freePoints) {
+            this._session.freePoints.push(freePoint);
+          }
+          this.completeDrawing();
         }
       } else {
-        // For snap-to-candle tools (horizontal line, vertical line, rectangle, fibonacci)
+        // For snap-to-candle tools, try ChartPoint first
         const chartPoint = this.getChartPointFromEvent(param);
         
-        // Horizontal line only needs price, so create a synthetic point if time is missing
-        if (!chartPoint && this._activeTool === 'horizontal-line') {
-          const price = this._series?.coordinateToPrice(param.point.y as Coordinate);
-          if (price !== null && price !== undefined) {
-            const syntheticPoint: ChartPoint = { time: 0 as any, price };
-            if (!this._session) {
-              this.startDrawingWithChartPoint(syntheticPoint);
-            } else if (this._session.state === 'drawing') {
-              this._session.points.push(syntheticPoint);
-              this.completeDrawing();
-            }
+        // Special case: horizontal line only needs price
+        if (!chartPoint && this._activeTool === 'horizontal-line' && freePoint) {
+          const syntheticPoint: ChartPoint = { time: 0 as any, price: freePoint.price };
+          if (!this._session) {
+            this.startDrawing(syntheticPoint);
+          } else if (this._session.state === 'drawing') {
+            this._session.points.push(syntheticPoint);
+            this.completeDrawing();
           }
           return;
         }
@@ -832,9 +695,12 @@ export class DrawingManager {
         if (!chartPoint) return;
         
         if (!this._session) {
-          this.startDrawingWithChartPoint(chartPoint);
+          this.startDrawing(chartPoint, freePoint ?? undefined);
         } else if (this._session.state === 'drawing') {
           this._session.points.push(chartPoint);
+          if (this._session.freePoints && freePoint) {
+            this._session.freePoints.push(freePoint);
+          }
           this.completeDrawing();
         }
       }
@@ -845,18 +711,20 @@ export class DrawingManager {
     if (!param.point) return;
     
     if (this._session?.state === 'drawing') {
-      // For free-positioning tools, use FreePoint
-      if (this.isFreePositionTool(this._session.tool)) {
-        const freePoint = this.getFreePointFromEvent(param);
-        if (freePoint) {
-          this.updateDrawingWithFreePoint(freePoint);
-        }
+      const freePoint = this.getFreePointFromEvent(param);
+      
+      // For free-positioning tools, use FreePoint directly
+      const isFreePositionTool = ['trend-line', 'ray', 'extended-line', 'arrow'].includes(this._session.tool);
+      
+      if (isFreePositionTool && freePoint) {
+        const chartPoint: ChartPoint = {
+          time: freePoint.timestamp as any,
+          price: freePoint.price,
+        };
+        this.updateDrawing(chartPoint, freePoint);
       } else {
-        // For snap-to-candle tools
         const chartPoint = this.getChartPointFromEvent(param);
-        if (chartPoint) {
-          this.updateDrawingWithChartPoint(chartPoint);
-        }
+        if (chartPoint) this.updateDrawing(chartPoint, freePoint ?? undefined);
       }
     }
   }
