@@ -371,6 +371,8 @@ export default function MarketDataSection() {
   const [keepRecentEnabled, setKeepRecentEnabled] = useState(false);
   const [keepRecentDays, setKeepRecentDays] = useState(365);
   const [cleanupIncludeHistorical, setCleanupIncludeHistorical] = useState(true);
+  // Track if initial cleanup settings have been loaded (prevents race condition)
+  const cleanupSettingsLoadedRef = React.useRef(false);
   const [cleanupResults, setCleanupResults] = useState<{
     deleteOldest?: { enabled: boolean; days: number };
     keepRecent?: { enabled: boolean; days: number };
@@ -479,12 +481,20 @@ export default function MarketDataSection() {
       if (settings.cleanup.lastResults) {
         setCleanupResults(settings.cleanup.lastResults as typeof cleanupResults);
       }
+      // Mark initial load as complete (with small delay to allow state to settle)
+      setTimeout(() => {
+        cleanupSettingsLoadedRef.current = true;
+      }, 100);
     }
   }, [settings?.cleanup]);
 
   // Save cleanup settings when they change (debounced)
+  // IMPORTANT: Skip save until initial settings have been loaded to prevent race condition
   useEffect(() => {
+    // Don't save until initial load is complete
+    if (!cleanupSettingsLoadedRef.current) return;
     if (!settings) return;
+    
     const timeoutId = setTimeout(() => {
       saveSettings({
         cleanup: {
