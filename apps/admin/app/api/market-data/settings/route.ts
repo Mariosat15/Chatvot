@@ -254,6 +254,31 @@ export async function POST(request: NextRequest) {
       if (cleanup.mode) updateData['cleanup.mode'] = cleanup.mode;
       if (typeof cleanup.daysToKeep === 'number') updateData['cleanup.daysToKeep'] = Math.max(0, Math.min(365, cleanup.daysToKeep));
       
+      // Delete Oldest cleanup type
+      if (cleanup.deleteOldest) {
+        if (typeof cleanup.deleteOldest.enabled === 'boolean') {
+          updateData['cleanup.deleteOldest.enabled'] = cleanup.deleteOldest.enabled;
+        }
+        if (typeof cleanup.deleteOldest.days === 'number') {
+          updateData['cleanup.deleteOldest.days'] = Math.max(0, cleanup.deleteOldest.days);
+        }
+      }
+      
+      // Keep Recent cleanup type
+      if (cleanup.keepRecent) {
+        if (typeof cleanup.keepRecent.enabled === 'boolean') {
+          updateData['cleanup.keepRecent.enabled'] = cleanup.keepRecent.enabled;
+        }
+        if (typeof cleanup.keepRecent.days === 'number') {
+          updateData['cleanup.keepRecent.days'] = Math.max(0, cleanup.keepRecent.days);
+        }
+      }
+      
+      // Include Historical collections
+      if (typeof cleanup.includeHistorical === 'boolean') {
+        updateData['cleanup.includeHistorical'] = cleanup.includeHistorical;
+      }
+      
       if (cleanup.schedule) {
         if (cleanup.schedule.type && ['weekly', 'monthly'].includes(cleanup.schedule.type)) {
           updateData['cleanup.schedule.type'] = cleanup.schedule.type;
