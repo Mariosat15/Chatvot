@@ -12,6 +12,8 @@ const COLLECTIONS_TO_CLEAN = [
   'candles_historical_1h',
   'candles_historical_4h',
   'candles_historical_1d',
+  'candles_historical_1w',
+  'candles_historical_1M',
 ];
 
 interface CleanupResult {
