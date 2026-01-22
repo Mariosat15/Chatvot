@@ -105,8 +105,8 @@ export class DrawingManager {
     chart.subscribeClick(this._boundChartClick);
     chart.subscribeCrosshairMove(this._boundCrosshairMove);
     
-    container.addEventListener('mousedown', this._boundMouseDown, { passive: true });
-    document.addEventListener('mousemove', this._boundMouseMove, { passive: true });
+    container.addEventListener('mousedown', this._boundMouseDown, { passive: false });
+    document.addEventListener('mousemove', this._boundMouseMove, { passive: false });
     document.addEventListener('mouseup', this._boundMouseUp, { passive: true });
     document.addEventListener('keydown', this._boundKeyDown);
   }
@@ -414,6 +414,10 @@ export class DrawingManager {
     if (anchorHit) {
       const chartPoint = this.screenToChart(screenPoint);
       if (chartPoint) {
+        // Prevent chart from panning
+        e.preventDefault();
+        e.stopPropagation();
+        
         this._dragState = {
           drawing: anchorHit.drawing,
           anchor: anchorHit.anchor,
@@ -430,6 +434,10 @@ export class DrawingManager {
     if (hit) {
       const chartPoint = this.screenToChart(screenPoint);
       if (chartPoint) {
+        // Prevent chart from panning
+        e.preventDefault();
+        e.stopPropagation();
+        
         // Select immediately for faster feedback
         if (hit.id !== this._selectedId) {
           this.select(hit.id);
@@ -454,6 +462,10 @@ export class DrawingManager {
     
     // Dragging - use RAF for smooth updates
     if (this._dragState && this._isMouseDown) {
+      // Prevent chart from panning while dragging
+      e.preventDefault();
+      e.stopPropagation();
+      
       if (this._pendingUpdate) return; // Skip if update pending
       
       this._pendingUpdate = true;
