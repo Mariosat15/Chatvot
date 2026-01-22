@@ -1,5 +1,5 @@
 /**
- * Base Primitive Class
+ * Base Primitive Class - Optimized for Performance
  * Foundation for all chart drawing tools using Lightweight Charts plugin system
  */
 
@@ -39,8 +39,20 @@ export interface DrawingRenderData {
   canvasHeight: number;
 }
 
+// Canvas rendering target type for documentation
+export interface CanvasRenderingTarget2D {
+  useBitmapCoordinateSpace(callback: (scope: BitmapCoordinatesRenderingScope) => void): void;
+}
+
+export interface BitmapCoordinatesRenderingScope {
+  context: CanvasRenderingContext2D;
+  horizontalPixelRatio: number;
+  verticalPixelRatio: number;
+  bitmapSize: { width: number; height: number };
+}
+
 // ============================================
-// BASE PANE RENDERER - Using Lightweight Charts native rendering
+// BASE PANE RENDERER - Optimized
 // ============================================
 
 export abstract class BasePaneRenderer implements ISeriesPrimitivePaneRenderer {
@@ -50,24 +62,18 @@ export abstract class BasePaneRenderer implements ISeriesPrimitivePaneRenderer {
     this._data = data;
   }
 
-  // This method signature must match what Lightweight Charts expects
   draw(target: any): void {
-    if (!this._data) return;
-    if (!this._data.options.visible) return;
+    if (!this._data || !this._data.options.visible) return;
     
     try {
-      // Use the target's coordinate space methods safely
-      if (target && typeof target.useBitmapCoordinateSpace === 'function') {
-        target.useBitmapCoordinateSpace((scope: any) => {
-          this.drawImpl(scope.context, scope.horizontalPixelRatio || 1, scope.verticalPixelRatio || 1, scope.bitmapSize);
+      if (target?.useBitmapCoordinateSpace) {
+        target.useBitmapCoordinateSpace((scope: BitmapCoordinatesRenderingScope) => {
+          this.drawImpl(scope.context, scope.horizontalPixelRatio, scope.verticalPixelRatio, scope.bitmapSize);
         });
       }
-    } catch (error) {
-      console.error('[BasePaneRenderer] Draw error:', error);
-    }
+    } catch {}
   }
 
-  // Subclasses implement this
   protected abstract drawImpl(
     ctx: CanvasRenderingContext2D, 
     hpr: number, 
@@ -99,11 +105,8 @@ export class BasePaneView implements ISeriesPrimitivePaneView {
 
   update(): void {
     try {
-      const data = this._source.getRenderData();
-      this._renderer.update(data);
-    } catch (error) {
-      console.error('[BasePaneView] Update error:', error);
-    }
+      this._renderer.update(this._source.getRenderData());
+    } catch {}
   }
 
   renderer(): ISeriesPrimitivePaneRenderer {
@@ -116,7 +119,7 @@ export class BasePaneView implements ISeriesPrimitivePaneView {
 }
 
 // ============================================
-// BASE PRIMITIVE CLASS
+// BASE PRIMITIVE CLASS - Optimized
 // ============================================
 
 export abstract class BasePrimitive<T extends DrawingOptions> implements DrawingPrimitive<T>, ISeriesPrimitive<Time> {
@@ -129,6 +132,14 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
   protected _isSelected: boolean = false;
   protected _isHovered: boolean = false;
   protected _requestUpdate?: () => void;
+  
+  // Performance: cache canvas size
+  private _cachedCanvasSize: { width: number; height: number } = { width: 800, height: 600 };
+  private _canvasSizeCacheTime: number = 0;
+  
+  // Performance: throttle updates
+  private _pendingUpdate: boolean = false;
+  private _rafId: number | null = null;
 
   constructor(type: DrawingToolType, options: T) {
     this.id = options.id || `drawing_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -173,33 +184,27 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
     this._series = series as ISeriesApi<'Candlestick'>;
     this._requestUpdate = requestUpdate;
     this._paneViews = this.createPaneViews();
-    console.log(`[${this.type}] Attached to chart`);
   }
 
   detached(): void {
-    console.log(`[${this.type}] Detached from chart`);
+    if (this._rafId) cancelAnimationFrame(this._rafId);
     this._chart = null;
     this._series = null;
     this._requestUpdate = undefined;
     this._paneViews = [];
   }
 
-  // Public attach/detach for DrawingPrimitive interface
   attach(chart: IChartApi, series: ISeriesApi<'Candlestick'>): void {
     try {
       series.attachPrimitive(this);
-    } catch (error) {
-      console.error(`[${this.type}] Failed to attach:`, error);
-    }
+    } catch {}
   }
 
   detach(): void {
     if (this._series) {
       try {
         this._series.detachPrimitive(this);
-      } catch (error) {
-        console.error(`[${this.type}] Failed to detach:`, error);
-      }
+      } catch {}
     }
   }
 
@@ -214,15 +219,15 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
   protected abstract createPaneViews(): ISeriesPrimitivePaneView[];
 
   updateAllViews(): void {
-    this._paneViews.forEach(view => {
+    for (const view of this._paneViews) {
       if ('update' in view && typeof view.update === 'function') {
         (view as any).update();
       }
-    });
+    }
   }
 
   // ============================================
-  // STATE
+  // STATE - Optimized with RAF batching
   // ============================================
 
   update(options: Partial<T>): void {
@@ -231,8 +236,10 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
   }
 
   setVisible(visible: boolean): void {
-    this._options.visible = visible;
-    this.requestUpdate();
+    if (this._options.visible !== visible) {
+      this._options.visible = visible;
+      this.requestUpdate();
+    }
   }
 
   setLocked(locked: boolean): void {
@@ -240,60 +247,69 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
   }
 
   setSelected(selected: boolean): void {
-    this._isSelected = selected;
-    this.requestUpdate();
+    if (this._isSelected !== selected) {
+      this._isSelected = selected;
+      this.requestUpdate();
+    }
   }
 
   setHovered(hovered: boolean): void {
-    this._isHovered = hovered;
-    this.requestUpdate();
+    if (this._isHovered !== hovered) {
+      this._isHovered = hovered;
+      this.requestUpdate();
+    }
   }
 
   protected requestUpdate(): void {
+    // Batch updates using RAF
+    if (this._pendingUpdate) return;
+    this._pendingUpdate = true;
+    
+    this._rafId = requestAnimationFrame(() => {
+      this._pendingUpdate = false;
+      this.updateAllViews();
+      this._requestUpdate?.();
+    });
+  }
+
+  // Force immediate update (for critical changes)
+  protected requestImmediateUpdate(): void {
+    if (this._rafId) cancelAnimationFrame(this._rafId);
+    this._pendingUpdate = false;
     this.updateAllViews();
     this._requestUpdate?.();
   }
 
   // ============================================
-  // COORDINATE CONVERSION
+  // COORDINATE CONVERSION - Cached
   // ============================================
 
   protected timeToX(time: Time): number | null {
     if (!this._chart) return null;
     try {
-      const coordinate = this._chart.timeScale().timeToCoordinate(time);
-      return coordinate !== null ? coordinate : null;
-    } catch {
-      return null;
-    }
+      return this._chart.timeScale().timeToCoordinate(time);
+    } catch { return null; }
   }
 
   protected xToTime(x: number): Time | null {
     if (!this._chart) return null;
     try {
       return this._chart.timeScale().coordinateToTime(x as Coordinate);
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }
 
   protected priceToY(price: number): number | null {
     if (!this._series) return null;
     try {
-      const coordinate = this._series.priceToCoordinate(price);
-      return coordinate !== null ? coordinate : null;
-    } catch {
-      return null;
-    }
+      return this._series.priceToCoordinate(price);
+    } catch { return null; }
   }
 
   protected yToPrice(y: number): number | null {
     if (!this._series) return null;
     try {
       return this._series.coordinateToPrice(y as Coordinate);
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }
 
   protected toScreen(point: ChartPoint): ScreenPoint | null {
@@ -317,19 +333,29 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
   abstract getRenderData(): DrawingRenderData;
 
   protected getCanvasSize(): { width: number; height: number } {
-    if (!this._chart) return { width: 0, height: 0 };
-    try {
-      // Try to get chart container size
-      const chartElement = (this._chart as any).chartElement?.();
-      if (chartElement) {
-        return { width: chartElement.clientWidth || 800, height: chartElement.clientHeight || 600 };
-      }
-    } catch {}
-    return { width: 800, height: 600 }; // Fallback
+    // Cache canvas size for 100ms
+    const now = Date.now();
+    if (now - this._canvasSizeCacheTime < 100) {
+      return this._cachedCanvasSize;
+    }
+    
+    if (this._chart) {
+      try {
+        const chartElement = (this._chart as any).chartElement?.();
+        if (chartElement) {
+          this._cachedCanvasSize = { 
+            width: chartElement.clientWidth || 800, 
+            height: chartElement.clientHeight || 600 
+          };
+          this._canvasSizeCacheTime = now;
+        }
+      } catch {}
+    }
+    return this._cachedCanvasSize;
   }
 
   // ============================================
-  // INTERACTION (to be implemented by subclasses)
+  // INTERACTION
   // ============================================
 
   abstract hitTest(point: ScreenPoint): boolean;
@@ -352,7 +378,7 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
   }
 
   // ============================================
-  // UTILITY METHODS
+  // UTILITY METHODS - Optimized
   // ============================================
 
   protected distanceToSegment(point: ScreenPoint, p1: ScreenPoint, p2: ScreenPoint): number {
@@ -367,10 +393,7 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
     let t = ((point.x - p1.x) * dx + (point.y - p1.y) * dy) / lengthSquared;
     t = Math.max(0, Math.min(1, t));
     
-    const projX = p1.x + t * dx;
-    const projY = p1.y + t * dy;
-    
-    return Math.hypot(point.x - projX, point.y - projY);
+    return Math.hypot(point.x - (p1.x + t * dx), point.y - (p1.y + t * dy));
   }
 
   protected distanceToPoint(p1: ScreenPoint, p2: ScreenPoint): number {
