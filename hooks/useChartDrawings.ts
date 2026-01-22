@@ -109,8 +109,10 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
     };
 
     const handleCreated = () => {
-      console.log('[useChartDrawings] Drawing created');
       updateDrawings();
+      // Sync tool state after creation (manager auto-switches to selection mode)
+      setActiveToolState(manager.getActiveTool());
+      setSelectedDrawing(manager.getSelectedDrawing());
     };
 
     const handleDeleted = () => {
@@ -122,11 +124,17 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
       updateDrawings();
     };
 
+    const handleToolChanged = () => {
+      // Sync React state with manager state
+      setActiveToolState(manager.getActiveTool());
+    };
+
     manager.on('selected', handleSelected);
     manager.on('deselected', handleDeselected);
     manager.on('created', handleCreated);
     manager.on('deleted', handleDeleted);
     manager.on('moved', handleMoved);
+    manager.on('toolChanged', handleToolChanged);
 
     return () => {
       manager.off('selected', handleSelected);
@@ -134,6 +142,7 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
       manager.off('created', handleCreated);
       manager.off('deleted', handleDeleted);
       manager.off('moved', handleMoved);
+      manager.off('toolChanged', handleToolChanged);
     };
   }, []);
 

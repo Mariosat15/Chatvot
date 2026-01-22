@@ -226,6 +226,11 @@ export class DrawingManager {
     if (drawing && this._series) {
       this.addDrawing(drawing);
       this.emitEvent('created', drawing);
+      
+      // Auto-switch to selection mode and select the new drawing
+      this._activeTool = null;
+      this.select(drawing.id);
+      this.emitToolChanged();
     }
     
     this._session = null;
@@ -616,6 +621,16 @@ export class DrawingManager {
   private emitEvent(type: DrawingEventType, drawing: AnyPrimitive): void {
     const event: DrawingEvent = { type, drawing, timestamp: Date.now() };
     this._eventHandlers.get(type)?.forEach(handler => handler(event));
+  }
+
+  private emitToolChanged(): void {
+    // Emit a special event with a dummy drawing for tool changes
+    const event: DrawingEvent = { 
+      type: 'toolChanged', 
+      drawing: null as any, 
+      timestamp: Date.now() 
+    };
+    this._eventHandlers.get('toolChanged')?.forEach(handler => handler(event));
   }
 
   // ============================================

@@ -227,7 +227,8 @@ export type DrawingEventType =
   | 'selected'
   | 'deselected'
   | 'moved'
-  | 'resized';
+  | 'resized'
+  | 'toolChanged';
 
 export interface DrawingEvent {
   type: DrawingEventType;
