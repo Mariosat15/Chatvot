@@ -189,8 +189,16 @@ export class VerticalLinePrimitive extends BasePrimitive<VerticalLineOptions> {
     this.requestUpdate();
   }
 
-  move(_deltaPrice: number, _deltaTime: number): void {
+  move(_deltaPrice: number, deltaTime: number): void {
     if (this._options.locked) return;
+    // Vertical lines move by time, not price
+    // For now, just request update (time-based movement is complex)
+    this.requestUpdate();
+  }
+
+  moveByTime(newTime: Time): void {
+    if (this._options.locked) return;
+    this._options.time = newTime;
     this.requestUpdate();
   }
 

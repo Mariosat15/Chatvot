@@ -34,9 +34,11 @@ export interface DrawingManagerOptions {
 
 interface DragState {
   drawing: AnyPrimitive;
-  anchor: AnchorPosition | null;
-  startPoint: ScreenPoint;
+  anchor: AnchorPosition | null; // null means dragging entire drawing
+  startScreenPoint: ScreenPoint;
   startChartPoint: ChartPoint;
+  lastChartPoint: ChartPoint;
+  hasMoved: boolean;
 }
 
 // ============================================
@@ -56,11 +58,16 @@ export class DrawingManager {
   private _eventHandlers: Map<DrawingEventType, Set<DrawingEventHandler>> = new Map();
   private _containerElement: HTMLElement | null = null;
   private _isAttached: boolean = false;
+  private _isMouseDown: boolean = false;
+  private _pendingClickHit: AnyPrimitive | null = null;
   
   // Bound event handlers for cleanup
   private _boundChartClick: (param: MouseEventParams) => void;
   private _boundCrosshairMove: (param: MouseEventParams) => void;
   private _boundKeyDown: (e: KeyboardEvent) => void;
+  private _boundMouseDown: (e: MouseEvent) => void;
+  private _boundMouseMove: (e: MouseEvent) => void;
+  private _boundMouseUp: (e: MouseEvent) => void;
 
   constructor(options: DrawingManagerOptions = {}) {
     this._options = {
@@ -75,6 +82,9 @@ export class DrawingManager {
     this._boundChartClick = this.handleChartClick.bind(this);
     this._boundCrosshairMove = this.handleCrosshairMove.bind(this);
     this._boundKeyDown = this.handleKeyDown.bind(this);
+    this._boundMouseDown = this.handleMouseDown.bind(this);
+    this._boundMouseMove = this.handleMouseMove.bind(this);
+    this._boundMouseUp = this.handleMouseUp.bind(this);
   }
 
   // ============================================
@@ -91,9 +101,14 @@ export class DrawingManager {
     this._containerElement = container;
     this._isAttached = true;
     
-    // Subscribe to chart events
+    // Subscribe to chart events (for drawing new shapes)
     chart.subscribeClick(this._boundChartClick);
     chart.subscribeCrosshairMove(this._boundCrosshairMove);
+    
+    // Add DOM event listeners (for dragging/editing)
+    container.addEventListener('mousedown', this._boundMouseDown);
+    document.addEventListener('mousemove', this._boundMouseMove);
+    document.addEventListener('mouseup', this._boundMouseUp);
     document.addEventListener('keydown', this._boundKeyDown);
 
     console.log('[DrawingManager] Attached to chart');
@@ -115,6 +130,12 @@ export class DrawingManager {
       }
     }
     
+    // Remove DOM event listeners
+    if (this._containerElement) {
+      this._containerElement.removeEventListener('mousedown', this._boundMouseDown);
+    }
+    document.removeEventListener('mousemove', this._boundMouseMove);
+    document.removeEventListener('mouseup', this._boundMouseUp);
     document.removeEventListener('keydown', this._boundKeyDown);
     
     this._chart = null;
@@ -347,6 +368,7 @@ export class DrawingManager {
       drawing.setSelected(true);
       this._selectedId = id;
       this.emitEvent('selected', drawing);
+      console.log('[DrawingManager] Selected drawing:', id);
     }
   }
 
@@ -388,9 +410,49 @@ export class DrawingManager {
     return null;
   }
 
+  private hitTestAnchor(point: ScreenPoint): { drawing: AnyPrimitive; anchor: AnchorPosition } | null {
+    // Only test anchors on selected drawing
+    if (!this._selectedId) return null;
+    
+    const drawing = this._drawings.get(this._selectedId);
+    if (!drawing) return null;
+    
+    const anchor = drawing.getAnchorAtPoint(point, this._options.anchorThreshold);
+    if (anchor) {
+      return { drawing, anchor };
+    }
+    
+    return null;
+  }
+
   // ============================================
   // COORDINATE CONVERSION
   // ============================================
+
+  private getScreenPoint(e: MouseEvent): ScreenPoint | null {
+    if (!this._containerElement) return null;
+    
+    const rect = this._containerElement.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  }
+
+  private screenToChart(point: ScreenPoint): ChartPoint | null {
+    if (!this._chart || !this._series) return null;
+    
+    try {
+      const time = this._chart.timeScale().coordinateToTime(point.x as Coordinate);
+      const price = this._series.coordinateToPrice(point.y as Coordinate);
+      
+      if (time === null || price === null) return null;
+      
+      return { time, price };
+    } catch {
+      return null;
+    }
+  }
 
   private getChartPointFromEvent(param: MouseEventParams): ChartPoint | null {
     if (!param.point || !this._chart || !this._series) {
@@ -401,7 +463,6 @@ export class DrawingManager {
       // Get price from Y coordinate
       const price = this._series.coordinateToPrice(param.point.y as Coordinate);
       if (price === null || price === undefined) {
-        console.log('[DrawingManager] Could not convert Y to price');
         return null;
       }
 
@@ -410,29 +471,211 @@ export class DrawingManager {
       if (param.time) {
         time = param.time;
       } else {
-        // Convert X coordinate to time
         const timeValue = this._chart.timeScale().coordinateToTime(param.point.x as Coordinate);
         if (timeValue === null) {
-          console.log('[DrawingManager] Could not convert X to time');
           return null;
         }
         time = timeValue;
       }
 
       return { time, price };
-    } catch (error) {
-      console.error('[DrawingManager] Error converting coordinates:', error);
+    } catch {
       return null;
     }
   }
 
   // ============================================
-  // EVENT HANDLERS
+  // MOUSE EVENT HANDLERS (for dragging and selection)
+  // ============================================
+
+  private handleMouseDown(e: MouseEvent): void {
+    if (e.button !== 0) return; // Only left click
+    
+    // Don't interfere with drawing mode
+    if (this._activeTool || this._session) return;
+    
+    const screenPoint = this.getScreenPoint(e);
+    if (!screenPoint) return;
+    
+    this._isMouseDown = true;
+    this._pendingClickHit = null;
+    
+    // Check if we're clicking on an anchor of the selected drawing
+    const anchorHit = this.hitTestAnchor(screenPoint);
+    if (anchorHit) {
+      const chartPoint = this.screenToChart(screenPoint);
+      if (chartPoint) {
+        this._dragState = {
+          drawing: anchorHit.drawing,
+          anchor: anchorHit.anchor,
+          startScreenPoint: screenPoint,
+          startChartPoint: chartPoint,
+          lastChartPoint: chartPoint,
+          hasMoved: false,
+        };
+        console.log('[DrawingManager] Prepared anchor drag:', anchorHit.anchor);
+        this.updateCursorForDrag('anchor');
+        return;
+      }
+    }
+    
+    // Check if we're clicking on a drawing
+    const hit = this.hitTest(screenPoint);
+    if (hit) {
+      const chartPoint = this.screenToChart(screenPoint);
+      if (chartPoint) {
+        // If clicking on unselected drawing, store for potential selection
+        if (hit.id !== this._selectedId) {
+          this._pendingClickHit = hit;
+        }
+        
+        // Prepare for potential drag
+        this._dragState = {
+          drawing: hit,
+          anchor: null, // null = move entire drawing
+          startScreenPoint: screenPoint,
+          startChartPoint: chartPoint,
+          lastChartPoint: chartPoint,
+          hasMoved: false,
+        };
+        console.log('[DrawingManager] Prepared drawing drag (selected:', hit.id === this._selectedId, ')');
+        this.updateCursorForDrag('move');
+        return;
+      }
+    }
+    
+    // Clicked on empty space - deselect
+    this.deselect();
+  }
+
+  private handleMouseMove(e: MouseEvent): void {
+    const screenPoint = this.getScreenPoint(e);
+    if (!screenPoint) return;
+    
+    // Handle dragging
+    if (this._dragState && this._isMouseDown) {
+      const chartPoint = this.screenToChart(screenPoint);
+      if (!chartPoint) return;
+      
+      // Calculate movement
+      const dx = screenPoint.x - this._dragState.startScreenPoint.x;
+      const dy = screenPoint.y - this._dragState.startScreenPoint.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Only start actual drag after moving more than 3 pixels
+      const DRAG_THRESHOLD = 3;
+      if (distance > DRAG_THRESHOLD) {
+        this._dragState.hasMoved = true;
+        
+        // If dragging an unselected drawing, select it first
+        if (!this._dragState.anchor && this._dragState.drawing.id !== this._selectedId) {
+          this.select(this._dragState.drawing.id);
+        }
+        
+        if (this._dragState.anchor) {
+          // Dragging an anchor - resize/reshape
+          this._dragState.drawing.moveAnchor(this._dragState.anchor, chartPoint);
+        } else {
+          // Dragging entire drawing - move it
+          const deltaPrice = chartPoint.price - this._dragState.lastChartPoint.price;
+          this._dragState.drawing.move(deltaPrice, 0);
+          this._dragState.lastChartPoint = chartPoint;
+        }
+        
+        this.emitEvent('moved', this._dragState.drawing);
+      }
+      return;
+    }
+    
+    // Update cursor based on hover state (only when not drawing)
+    if (!this._activeTool && !this._session) {
+      this.updateHoverCursor(screenPoint);
+    }
+  }
+
+  private handleMouseUp(e: MouseEvent): void {
+    this._isMouseDown = false;
+    
+    if (this._dragState) {
+      if (this._dragState.hasMoved) {
+        // Completed a drag
+        console.log('[DrawingManager] Finished dragging');
+        this.emitEvent('resized', this._dragState.drawing);
+      } else {
+        // Was a click, not a drag
+        if (this._pendingClickHit) {
+          // Select the drawing that was clicked
+          this.select(this._pendingClickHit.id);
+          console.log('[DrawingManager] Selected via click:', this._pendingClickHit.id);
+        }
+      }
+      
+      this._dragState = null;
+    }
+    
+    this._pendingClickHit = null;
+    this.updateCursor();
+  }
+
+  private updateHoverCursor(screenPoint: ScreenPoint): void {
+    if (!this._containerElement) return;
+    
+    // Check anchor hover on selected drawing
+    const anchorHit = this.hitTestAnchor(screenPoint);
+    if (anchorHit) {
+      // Different cursors for different anchors
+      const anchor = anchorHit.anchor;
+      if (anchor === 'start' || anchor === 'end') {
+        this._containerElement.style.cursor = 'grab';
+      } else if (anchor === 'middle' || anchor === 'center') {
+        this._containerElement.style.cursor = 'move';
+      } else {
+        this._containerElement.style.cursor = 'grab';
+      }
+      return;
+    }
+    
+    // Check drawing hover
+    const hit = this.hitTest(screenPoint);
+    if (hit) {
+      this._containerElement.style.cursor = hit.id === this._selectedId ? 'move' : 'pointer';
+      
+      // Update hover state
+      if (hit.id !== this._hoveredId) {
+        if (this._hoveredId) {
+          const prev = this._drawings.get(this._hoveredId);
+          if (prev) prev.setHovered(false);
+        }
+        hit.setHovered(true);
+        this._hoveredId = hit.id;
+      }
+      return;
+    }
+    
+    // Clear hover
+    if (this._hoveredId) {
+      const prev = this._drawings.get(this._hoveredId);
+      if (prev) prev.setHovered(false);
+      this._hoveredId = null;
+    }
+    
+    this._containerElement.style.cursor = 'default';
+  }
+
+  private updateCursorForDrag(type: 'anchor' | 'move'): void {
+    if (!this._containerElement) return;
+    this._containerElement.style.cursor = type === 'anchor' ? 'grabbing' : 'move';
+  }
+
+  // ============================================
+  // CHART EVENT HANDLERS (for drawing new shapes)
   // ============================================
 
   private handleChartClick(param: MouseEventParams): void {
+    // If dragging, ignore chart clicks
+    if (this._dragState || this._isMouseDown) return;
+    
     if (!param.point) {
-      console.log('[DrawingManager] Click without point');
       return;
     }
     
@@ -444,16 +687,7 @@ export class DrawingManager {
       return;
     }
     
-    const screenPoint: ScreenPoint = { x: param.point.x, y: param.point.y };
-    
-    console.log('[DrawingManager] Chart click:', {
-      screen: screenPoint,
-      chart: chartPoint,
-      activeTool: this._activeTool,
-      sessionState: this._session?.state
-    });
-    
-    // If we have an active tool
+    // If we have an active tool, handle drawing
     if (this._activeTool) {
       if (!this._session) {
         // Start new drawing
@@ -466,14 +700,7 @@ export class DrawingManager {
       return;
     }
     
-    // No active tool - handle selection
-    const hit = this.hitTest(screenPoint);
-    
-    if (hit) {
-      this.select(hit.id);
-    } else {
-      this.deselect();
-    }
+    // No active tool - selection is handled by mousedown/mouseup events
   }
 
   private handleCrosshairMove(param: MouseEventParams): void {
@@ -484,28 +711,6 @@ export class DrawingManager {
       const chartPoint = this.getChartPointFromEvent(param);
       if (chartPoint) {
         this.updateDrawing(chartPoint);
-      }
-    }
-    
-    // Hover detection (only when not drawing)
-    if (!this._session && !this._activeTool) {
-      const screenPoint: ScreenPoint = { x: param.point.x, y: param.point.y };
-      const hit = this.hitTest(screenPoint);
-      const hitId = hit?.id || null;
-      
-      if (hitId !== this._hoveredId) {
-        // Clear previous hover
-        if (this._hoveredId) {
-          const prev = this._drawings.get(this._hoveredId);
-          if (prev) prev.setHovered(false);
-        }
-        
-        // Set new hover
-        if (hitId) {
-          hit!.setHovered(true);
-        }
-        
-        this._hoveredId = hitId;
       }
     }
   }
@@ -539,15 +744,13 @@ export class DrawingManager {
   private updateCursor(): void {
     if (!this._containerElement) return;
     
-    let cursor = 'default';
-    
     if (this._activeTool || this._session) {
-      cursor = 'crosshair';
-    } else if (this._hoveredId) {
-      cursor = 'pointer';
+      this._containerElement.style.cursor = 'crosshair';
+    } else if (this._dragState) {
+      this._containerElement.style.cursor = 'grabbing';
+    } else {
+      this._containerElement.style.cursor = 'default';
     }
-    
-    this._containerElement.style.cursor = cursor;
   }
 
   // ============================================
