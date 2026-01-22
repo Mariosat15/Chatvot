@@ -302,32 +302,221 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Massive.com API configuration
+const MASSIVE_API_KEY = process.env.NEXT_PUBLIC_MASSIVE_API_KEY || process.env.MASSIVE_API_KEY;
+const MASSIVE_API_BASE_URL = 'https://api.massive.com';
+
+// Timeframe mapping for Massive.com API
+const TIMEFRAME_TO_MASSIVE: Record<string, { multiplier: number; timespan: string }> = {
+  '1m': { multiplier: 1, timespan: 'minute' },
+  '5m': { multiplier: 5, timespan: 'minute' },
+  '15m': { multiplier: 15, timespan: 'minute' },
+  '30m': { multiplier: 30, timespan: 'minute' },
+  '1h': { multiplier: 1, timespan: 'hour' },
+  '4h': { multiplier: 4, timespan: 'hour' },
+  '1d': { multiplier: 1, timespan: 'day' },
+  '1w': { multiplier: 1, timespan: 'week' },
+  '1M': { multiplier: 1, timespan: 'month' },
+};
+
+/**
+ * Fetch candles from Massive.com API
+ */
+async function fetchFromMassive(
+  symbol: string, 
+  timeframe: string, 
+  fromMs: number, 
+  toMs: number
+): Promise<Array<{ time: number; open: number; high: number; low: number; close: number; volume: number }>> {
+  if (!MASSIVE_API_KEY) {
+    console.error('❌ [Gap Fill] MASSIVE_API_KEY not set');
+    return [];
+  }
+  
+  const config = TIMEFRAME_TO_MASSIVE[timeframe];
+  if (!config) {
+    console.error(`❌ [Gap Fill] Unknown timeframe: ${timeframe}`);
+    return [];
+  }
+  
+  const ticker = `C:${symbol.replace('/', '')}`;
+  const url = `${MASSIVE_API_BASE_URL}/v2/aggs/ticker/${ticker}/range/${config.multiplier}/${config.timespan}/${fromMs}/${toMs}?adjusted=true&sort=asc&limit=50000&apiKey=${MASSIVE_API_KEY}`;
+  
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) {
+      console.error(`❌ [Gap Fill] API error: ${response.status}`);
+      return [];
+    }
+    
+    const data = await response.json();
+    if (!data.results || data.results.length === 0) {
+      return [];
+    }
+    
+    return data.results.map((bar: { t: number; o: number; h: number; l: number; c: number; v?: number }) => ({
+      time: Math.floor(bar.t / 1000), // Convert to seconds
+      open: bar.o,
+      high: bar.h,
+      low: bar.l,
+      close: bar.c,
+      volume: bar.v || 0,
+    }));
+  } catch (err) {
+    console.error(`❌ [Gap Fill] Fetch error:`, err);
+    return [];
+  }
+}
+
 /**
  * POST - Fill gaps in candle data
- * Note: This calls the main app's API to do the actual filling
- * since the main app has the Massive.com connection
+ * Now works DIRECTLY - no need to call main app
  */
 export async function POST(request: NextRequest) {
   try {
     await connectToDatabase();
     
     const body = await request.json();
-    const { symbol } = body;
+    const { symbol, timeframe } = body;
     
-    // Call the main app's gap fill endpoint
-    const mainAppUrl = process.env.MAIN_APP_URL || 'http://localhost:3000';
+    const symbols = symbol ? [symbol] : FOREX_PAIRS;
+    const timeframesToFill = timeframe ? [timeframe] : Object.keys(TIMEFRAME_CONFIG);
     
-    const response = await fetch(`${mainAppUrl}/api/admin/market-data/gap-fill`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol }),
-    });
+    let totalGapsFilled = 0;
+    let totalCandlesFilled = 0;
+    const fillResults: Array<{
+      symbol: string;
+      timeframe: string;
+      candlesFilled: number;
+    }> = [];
     
-    if (!response.ok) {
-      return NextResponse.json({ error: 'Gap fill failed on main app' }, { status: 500 });
+    console.log(`🔧 [Gap Fill] Starting for ${symbols.length} symbols × ${timeframesToFill.length} timeframes`);
+    
+    for (const sym of symbols) {
+      for (const tf of timeframesToFill) {
+        const config = TIMEFRAME_CONFIG[tf];
+        if (!config) continue;
+        
+        const Model = getHistoricalModel(config.collection);
+        if (!Model) continue;
+        
+        // Get existing candles to find gaps
+        const candles = await Model.find({ symbol: sym })
+          .sort({ timestamp: 1 })
+          .select({ timestamp: 1 })
+          .lean() as Array<{ timestamp: Date }>;
+        
+        let tfCandlesFilled = 0;
+        
+        // If collection is empty or has very few candles, fetch fresh data
+        if (candles.length < 50) {
+          console.log(`📥 [Gap Fill] ${sym} ${tf}: Only ${candles.length} candles, fetching from API...`);
+          
+          // Fetch last 2 years of data
+          const toMs = Date.now();
+          const fromMs = toMs - (730 * 24 * 60 * 60 * 1000); // 2 years back
+          
+          const apiCandles = await fetchFromMassive(sym, tf, fromMs, toMs);
+          console.log(`📥 [Gap Fill] ${sym} ${tf}: API returned ${apiCandles.length} candles`);
+          
+          for (const candle of apiCandles) {
+            const timestamp = new Date(candle.time * 1000);
+            const day = timestamp.getUTCDay();
+            if (day === 0 || day === 6) continue; // Skip weekends
+            
+            try {
+              await Model.updateOne(
+                { symbol: sym, timestamp },
+                { 
+                  $setOnInsert: { 
+                    symbol: sym, 
+                    timestamp, 
+                    open: candle.open, 
+                    high: candle.high, 
+                    low: candle.low, 
+                    close: candle.close, 
+                    volume: candle.volume 
+                  } 
+                },
+                { upsert: true }
+              );
+              tfCandlesFilled++;
+            } catch { /* ignore duplicates */ }
+          }
+          
+          if (tfCandlesFilled > 0) {
+            totalGapsFilled++;
+          }
+        } else {
+          // Check for gaps within existing data
+          const expectedGapMs = config.minutes * 60 * 1000;
+          
+          for (let i = 1; i < candles.length; i++) {
+            const prevTime = new Date(candles[i - 1].timestamp).getTime();
+            const currTime = new Date(candles[i].timestamp).getTime();
+            const gap = currTime - prevTime;
+            
+            // Gap larger than 2x expected interval
+            if (gap > expectedGapMs * 2) {
+              const prevDay = new Date(prevTime).getUTCDay();
+              const gapMinutes = Math.floor(gap / 60000);
+              
+              // Skip weekend gaps
+              const isWeekendGap = (prevDay === 5 || prevDay === 6) && gapMinutes >= 2880 && gapMinutes <= 4500;
+              if (isWeekendGap) continue;
+              
+              console.log(`🔧 [Gap Fill] ${sym} ${tf}: Filling ${gapMinutes} minute gap`);
+              
+              const gapCandles = await fetchFromMassive(
+                sym,
+                tf,
+                prevTime + expectedGapMs,
+                currTime - expectedGapMs
+              );
+              
+              for (const candle of gapCandles) {
+                const timestamp = new Date(candle.time * 1000);
+                const day = timestamp.getUTCDay();
+                if (day === 0 || day === 6) continue;
+                
+                try {
+                  await Model.updateOne(
+                    { symbol: sym, timestamp },
+                    { 
+                      $setOnInsert: { 
+                        symbol: sym, 
+                        timestamp, 
+                        open: candle.open, 
+                        high: candle.high, 
+                        low: candle.low, 
+                        close: candle.close, 
+                        volume: candle.volume 
+                      } 
+                    },
+                    { upsert: true }
+                  );
+                  tfCandlesFilled++;
+                } catch { /* ignore duplicates */ }
+              }
+              
+              if (gapCandles.length > 0) {
+                totalGapsFilled++;
+              }
+            }
+          }
+        }
+        
+        if (tfCandlesFilled > 0) {
+          fillResults.push({
+            symbol: sym,
+            timeframe: tf,
+            candlesFilled: tfCandlesFilled,
+          });
+          totalCandlesFilled += tfCandlesFilled;
+          console.log(`✅ [Gap Fill] ${sym} ${tf}: Filled ${tfCandlesFilled} candles`);
+        }
+      }
     }
-    
-    const data = await response.json();
     
     // Update last run time in settings
     const MarketDataSettings = mongoose.models.MarketDataSettings;
@@ -338,7 +527,18 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    return NextResponse.json(data);
+    console.log(`🔧 [Gap Fill] COMPLETE: ${totalCandlesFilled} candles filled`);
+    
+    return NextResponse.json({
+      success: true,
+      gapFill: {
+        totalGapsFilled,
+        totalCandlesFilled,
+        symbolsProcessed: symbols.length,
+        timeframesProcessed: timeframesToFill,
+        results: fillResults,
+      },
+    });
   } catch (error) {
     console.error('Error filling gaps:', error);
     return NextResponse.json({ error: 'Gap fill failed' }, { status: 500 });
