@@ -3031,27 +3031,65 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     >
       {/* Portal container for dialogs in fullscreen */}
       <div ref={portalContainerRef} className="absolute inset-0 pointer-events-none z-[99999]" />
-      {/* Top Bar - Compact Header */}
-      <div className="flex items-center justify-between bg-[#0d0f14] px-3 py-2 border-b border-[#2b2b43] flex-shrink-0">
-        {/* Left: Symbol & Market Status */}
-        <div className="flex items-center gap-3">
+      {/* Top Bar - TradingView Style Header */}
+      <div className="flex items-center justify-between bg-[#131722] px-2 py-1.5 border-b border-[#2A2E39] flex-shrink-0 h-[44px]">
+        {/* Left: Symbol, Timeframe, Chart Controls */}
+        <div className="flex items-center gap-1">
           {/* Symbol Display */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1e222d] border border-[#2b2b43] rounded">
-            <span className="text-sm font-bold text-white">{symbol}</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#2A2E39] rounded cursor-pointer transition-colors">
+            <span className="text-sm font-semibold text-white">{symbol}</span>
           </div>
           
           <div className={cn(
-            "px-2 py-0.5 rounded text-[10px] font-semibold",
-            marketOpen ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
+            "px-2 py-1 rounded text-[10px] font-semibold",
+            marketOpen ? "bg-[#22AB94]/20 text-[#22AB94]" : "bg-[#F23645]/20 text-[#F23645]"
           )}>
             {marketOpen ? '● LIVE' : '● CLOSED'}
           </div>
+
+          <div className="w-px h-5 bg-[#2A2E39] mx-1" />
+
+          {/* Timeframe Dropdown */}
+          <button
+            onClick={() => setTimeframeDialogOpen(true)}
+            className="flex items-center gap-1 px-2 py-1.5 hover:bg-[#2A2E39] rounded text-[13px] text-white font-medium transition-colors"
+          >
+            {timeframe === 'D' ? '1D' : timeframe === 'W' ? '1W' : timeframe === 'M' ? '1M' : `${timeframe}m`}
+            <ChevronDown className="h-3 w-3 text-[#787B86]" />
+          </button>
+
+          {/* Chart Type */}
+          <button
+            onClick={() => setChartTypeOpen(true)}
+            className="flex items-center gap-1 px-2 py-1.5 hover:bg-[#2A2E39] rounded text-[#787B86] hover:text-white transition-colors"
+            title="Chart Type"
+          >
+            <CandlestickChart className="h-4 w-4" />
+          </button>
+
+          <div className="w-px h-5 bg-[#2A2E39] mx-1" />
+
+          {/* Indicators */}
+          <AdvancedIndicatorManager
+            indicators={indicators}
+            onIndicatorsChange={setIndicators}
+            portalContainer={isFullscreen ? fullscreenRef.current : undefined}
+          />
+
+          {/* Settings */}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="flex items-center gap-1 px-2 py-1.5 hover:bg-[#2A2E39] rounded text-[#787B86] hover:text-white transition-colors"
+            title="Settings"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
           
           {/* Stale Price Warning */}
           {isStale && (
             <button
               onClick={forceRefresh}
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors cursor-pointer ml-2"
               title="Click to refresh prices"
             >
               ⚠ STALE
@@ -3061,18 +3099,17 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
         {/* Center: Price Display */}
         {currentPrice && (
-          <div className="flex items-center gap-4 text-xs font-mono">
+          <div className="flex items-center gap-3 text-xs font-mono">
             <div className="flex items-center gap-1">
-              <span className="text-[#787b86]">B:</span>
-              <span className="text-[#2962ff] font-bold">{currentPrice.bid.toFixed(5)}</span>
+              <span className="text-[#787B86]">B:</span>
+              <span className="text-[#2962FF] font-semibold">{currentPrice.bid.toFixed(5)}</span>
             </div>
-            <div className="text-white font-bold text-sm">{currentPrice.mid.toFixed(5)}</div>
+            <div className="text-white font-bold text-base">{currentPrice.mid.toFixed(5)}</div>
             <div className="flex items-center gap-1">
-              <span className="text-[#787b86]">A:</span>
-              <span className="text-[#f23645] font-bold">{currentPrice.ask.toFixed(5)}</span>
+              <span className="text-[#787B86]">A:</span>
+              <span className="text-[#F23645] font-semibold">{currentPrice.ask.toFixed(5)}</span>
             </div>
-            <div className="text-[#787b86] text-[10px]">
-              {/* Calculate spread in pips: multiply by 10000 for standard pairs, 100 for JPY */}
+            <div className="text-[#787B86] text-[10px]">
               {(currentPrice.spread * (symbol.includes('JPY') ? 100 : 10000)).toFixed(1)}p
             </div>
           </div>
@@ -3126,183 +3163,89 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         </div>
       </div>
 
-      {/* Main Content - Sidebar + Chart + Order Form (in fullscreen) */}
-      <div className={cn("flex flex-1 min-h-0", isFullscreen ? "h-full" : "h-[1000px]")}>
-        {/* Left Sidebar - TradingView Style Drawing Tools */}
-        <ChartToolbar
-          activeTool={chartDrawings.activeTool}
-          onToolSelect={chartDrawings.setActiveTool}
-          onClearAll={chartDrawings.clearAll}
-          onDeleteSelected={chartDrawings.deleteSelected}
-          hasSelection={chartDrawings.hasSelection}
-          drawingsCount={chartDrawings.drawingsCount}
-          defaultColor={chartDrawings.defaultColor}
-          defaultLineWidth={chartDrawings.defaultLineWidth}
-          onColorChange={chartDrawings.setDefaultColor}
-          onLineWidthChange={chartDrawings.setDefaultLineWidth}
-          className="w-[38px] h-full"
-        />
+      {/* Dialogs */}
+      {/* Timeframe Dialog */}
+      <Dialog open={timeframeDialogOpen} onOpenChange={setTimeframeDialogOpen}>
+        <DialogContent className="bg-[#131722] border-[#2A2E39] text-white max-w-xs" style={{ zIndex: 99999 }} container={isFullscreen ? fullscreenRef.current : undefined}>
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Clock className="h-5 w-5 text-[#2962FF]" />
+              Timeframe
+            </DialogTitle>
+            <DialogDescription className="sr-only">Select chart timeframe</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-4 gap-2 mt-4">
+            {[
+              { label: '1m', value: '1' as Timeframe },
+              { label: '5m', value: '5' as Timeframe },
+              { label: '15m', value: '15' as Timeframe },
+              { label: '30m', value: '30' as Timeframe },
+              { label: '1H', value: '60' as Timeframe },
+              { label: '2H', value: '120' as Timeframe },
+              { label: '4H', value: '240' as Timeframe },
+              { label: '1D', value: 'D' as Timeframe },
+              { label: '1W', value: 'W' as Timeframe },
+              { label: '1M', value: 'M' as Timeframe },
+            ].map((tf) => (
+              <Button
+                key={tf.value}
+                variant="ghost"
+                onClick={() => {
+                  setTimeframe(tf.value);
+                  setTimeframeDialogOpen(false);
+                }}
+                className={cn(
+                  "h-10 hover:bg-[#2A2E39]",
+                  timeframe === tf.value && "bg-[#2962FF] text-white hover:bg-[#2962FF]"
+                )}
+              >
+                {tf.label}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
-        {/* Secondary Toolbar - Timeframe, Chart Type, etc */}
-        <div className="w-10 bg-[#131722] border-r border-[#2A2E39] flex flex-col items-center py-1 gap-0.5 overflow-y-auto">
-          {/* Timeframe Selector */}
-          <button
-            onClick={() => setTimeframeDialogOpen(true)}
-            className="h-[34px] w-[34px] flex items-center justify-center rounded-[4px] text-white bg-[#2962FF] text-[10px] font-semibold hover:bg-[#1E53E5] transition-colors"
-            title="Timeframe"
-          >
-            {timeframe === 'D' ? '1D' : timeframe === 'W' ? '1W' : timeframe === 'M' ? '1M' : `${timeframe}m`}
-          </button>
+      {/* Chart Type Dialog */}
+      <Dialog open={chartTypeOpen} onOpenChange={setChartTypeOpen}>
+        <DialogContent className="bg-[#131722] border-[#2A2E39] text-white max-w-xs" style={{ zIndex: 99999 }} container={isFullscreen ? fullscreenRef.current : undefined}>
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <CandlestickChart className="h-5 w-5 text-[#2962FF]" />
+              Chart Type
+            </DialogTitle>
+            <DialogDescription className="sr-only">Select chart type</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 mt-4">
+            {[
+              { value: 'candlestick', label: 'Candlestick', icon: CandlestickChart },
+              { value: 'line', label: 'Line Chart', icon: LineChart },
+              { value: 'heikinashi', label: 'Heikin Ashi', icon: BarChart },
+              { value: 'renko', label: 'Renko Bars', icon: Grid },
+              { value: 'pointfigure', label: 'Point & Figure', icon: CircleDot },
+            ].map(({ value, label, icon: Icon }) => (
+              <Button
+                key={value}
+                variant="ghost"
+                onClick={() => {
+                  setChartType(value as typeof chartType);
+                  setChartTypeOpen(false);
+                }}
+                className={cn(
+                  "h-12 flex items-center justify-start gap-3 px-4 hover:bg-[#2A2E39]",
+                  chartType === value && "bg-[#2962FF] text-white hover:bg-[#2962FF]"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                <span>{label}</span>
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
-          {/* Timeframe Dialog */}
-          <Dialog open={timeframeDialogOpen} onOpenChange={setTimeframeDialogOpen}>
-            <DialogContent className="bg-[#131722] border-[#2A2E39] text-white max-w-xs" style={{ zIndex: 99999 }} container={isFullscreen ? fullscreenRef.current : undefined}>
-              <DialogHeader>
-                <DialogTitle className="text-white flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-[#2962FF]" />
-                  Timeframe
-                </DialogTitle>
-                <DialogDescription className="sr-only">Select chart timeframe</DialogDescription>
-              </DialogHeader>
-              <div className="grid grid-cols-4 gap-2 mt-4">
-                {[
-                  { label: '1m', value: '1' as Timeframe },
-                  { label: '5m', value: '5' as Timeframe },
-                  { label: '15m', value: '15' as Timeframe },
-                  { label: '30m', value: '30' as Timeframe },
-                  { label: '1H', value: '60' as Timeframe },
-                  { label: '2H', value: '120' as Timeframe },
-                  { label: '4H', value: '240' as Timeframe },
-                  { label: '1D', value: 'D' as Timeframe },
-                  { label: '1W', value: 'W' as Timeframe },
-                  { label: '1M', value: 'M' as Timeframe },
-                ].map((tf) => (
-                  <Button
-                    key={tf.value}
-                    variant="ghost"
-                    onClick={() => {
-                      setTimeframe(tf.value);
-                      setTimeframeDialogOpen(false);
-                    }}
-                    className={cn(
-                      "h-10 hover:bg-[#2A2E39]",
-                      timeframe === tf.value && "bg-[#2962FF] text-white hover:bg-[#2962FF]"
-                    )}
-                  >
-                    {tf.label}
-                  </Button>
-                ))}
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <div className="h-px bg-[#2A2E39] w-6 my-1" />
-
-          {/* Chart Type */}
-          <button
-            onClick={() => setChartTypeOpen(true)}
-            className="h-[34px] w-[34px] flex items-center justify-center rounded-[4px] text-[#787B86] hover:bg-[#2A2E39] hover:text-[#D1D4DC] transition-colors"
-            title={`Chart Type: ${chartType}`}
-          >
-            <CandlestickChart className="h-4 w-4" />
-          </button>
-
-          {/* Chart Type Dialog */}
-          <Dialog open={chartTypeOpen} onOpenChange={setChartTypeOpen}>
-            <DialogContent className="bg-[#131722] border-[#2A2E39] text-white max-w-xs" style={{ zIndex: 99999 }} container={isFullscreen ? fullscreenRef.current : undefined}>
-              <DialogHeader>
-                <DialogTitle className="text-white flex items-center gap-2">
-                  <CandlestickChart className="h-5 w-5 text-[#2962FF]" />
-                  Chart Type
-                </DialogTitle>
-                <DialogDescription className="sr-only">Select chart type</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-2 mt-4">
-                {[
-                  { value: 'candlestick', label: 'Candlestick', icon: CandlestickChart },
-                  { value: 'line', label: 'Line Chart', icon: LineChart },
-                  { value: 'heikinashi', label: 'Heikin Ashi', icon: BarChart },
-                  { value: 'renko', label: 'Renko Bars', icon: Grid },
-                  { value: 'pointfigure', label: 'Point & Figure', icon: CircleDot },
-                ].map(({ value, label, icon: Icon }) => (
-                  <Button
-                    key={value}
-                    variant="ghost"
-                    onClick={() => {
-                      setChartType(value as typeof chartType);
-                      setChartTypeOpen(false);
-                    }}
-                    className={cn(
-                      "h-12 flex items-center justify-start gap-3 px-4 hover:bg-[#2A2E39]",
-                      chartType === value && "bg-[#2962FF] text-white hover:bg-[#2962FF]"
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span>{label}</span>
-                  </Button>
-                ))}
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Indicators */}
-          <AdvancedIndicatorManager
-            indicators={indicators}
-            onIndicatorsChange={setIndicators}
-            portalContainer={isFullscreen ? fullscreenRef.current : undefined}
-          />
-
-          <div className="h-px bg-[#2A2E39] w-6 my-1" />
-
-          {/* Volume */}
-          <button
-            onClick={() => setShowVolume(!showVolume)}
-            className={cn(
-              "h-[34px] w-[34px] flex items-center justify-center rounded-[4px] transition-colors",
-              showVolume ? "text-[#2962FF] bg-[#2962FF]/10" : "text-[#787B86] hover:bg-[#2A2E39] hover:text-[#D1D4DC]"
-            )}
-            title="Volume"
-          >
-            <BarChart3 className="h-4 w-4" />
-          </button>
-
-          {/* Grid */}
-          <button
-            onClick={() => {
-              setShowGrid(!showGrid);
-              if (chartRef.current) {
-                try {
-                  chartRef.current.applyOptions({
-                    grid: { vertLines: { visible: !showGrid }, horzLines: { visible: !showGrid } },
-                  });
-                } catch {
-                  // Chart may be disposed
-                }
-              }
-            }}
-            className={cn(
-              "h-[34px] w-[34px] flex items-center justify-center rounded-[4px] transition-colors",
-              showGrid ? "text-[#2962FF] bg-[#2962FF]/10" : "text-[#787B86] hover:bg-[#2A2E39] hover:text-[#D1D4DC]"
-            )}
-            title="Grid"
-          >
-            <Grid3x3 className="h-4 w-4" />
-          </button>
-
-          {/* Spacer */}
-          <div className="flex-1" />
-
-          {/* Settings */}
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="h-[34px] w-[34px] flex items-center justify-center rounded-[4px] text-[#787B86] hover:bg-[#2A2E39] hover:text-[#D1D4DC] transition-colors mb-1"
-            title="Chart Settings"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-
-          {/* Settings Dialog */}
-          <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+      {/* Settings Dialog */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DialogContent className="bg-[#131722] border-[#2b2b43] text-white max-w-sm" style={{ zIndex: 99999 }} container={isFullscreen ? fullscreenRef.current : undefined}>
               <DialogHeader>
                 <DialogTitle className="text-white flex items-center gap-2">
@@ -3395,8 +3338,24 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                 </div>
               </div>
             </DialogContent>
-          </Dialog>
-        </div>
+      </Dialog>
+
+      {/* Main Content - Sidebar + Chart */}
+      <div className={cn("flex flex-1 min-h-0", isFullscreen ? "h-full" : "h-[600px]")}>
+        {/* Left Sidebar - TradingView Style Drawing Tools */}
+        <ChartToolbar
+          activeTool={chartDrawings.activeTool}
+          onToolSelect={chartDrawings.setActiveTool}
+          onClearAll={chartDrawings.clearAll}
+          onDeleteSelected={chartDrawings.deleteSelected}
+          hasSelection={chartDrawings.hasSelection}
+          drawingsCount={chartDrawings.drawingsCount}
+          defaultColor={chartDrawings.defaultColor}
+          defaultLineWidth={chartDrawings.defaultLineWidth}
+          onColorChange={chartDrawings.setDefaultColor}
+          onLineWidthChange={chartDrawings.setDefaultLineWidth}
+          className="w-[40px] h-full flex-shrink-0"
+        />
 
         {/* Chart Area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
