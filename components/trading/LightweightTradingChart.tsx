@@ -38,6 +38,7 @@ import AdvancedIndicatorManager, { CustomIndicator } from './AdvancedIndicatorMa
 import ChartToolbar from './ChartToolbar';
 import { useChartDrawings } from '@/hooks/useChartDrawings';
 import { DrawingToolType } from '@/lib/chart/primitives';
+import { PeriodSeparatorPrimitive } from '@/lib/chart/primitives/period-separator.primitive';
 import { SymbolSelector, SymbolSelectorButton } from './SymbolSelector';
 import OrderForm from './OrderForm';
 import PositionsTable from './PositionsTable';
@@ -201,6 +202,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const periodSeparatorRef = useRef<PeriodSeparatorPrimitive | null>(null);
   
   // Drag-to-scroll refs for horizontal scrollable areas
   const priceDisplayRef = useDragScroll<HTMLDivElement>();
@@ -245,6 +247,13 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const [showVolume, setShowVolume] = useState(false);
   const [chartType, setChartType] = useState<'candlestick' | 'line' | 'renko' | 'heikinashi' | 'pointfigure'>('candlestick');
   const [showGrid, setShowGrid] = useState(true);
+  const [showPeriodSeparators, setShowPeriodSeparators] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('chart-show-period-separators');
+      return saved !== null ? JSON.parse(saved) : false;
+    }
+    return false;
+  });
   const [indicators, setIndicators] = useState<CustomIndicator[]>([]);
   // Drawing system using new primitive-based architecture
   const chartDrawings = useChartDrawings({
@@ -367,6 +376,27 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       localStorage.setItem('chart-show-tpsl-zones', JSON.stringify(showTPSLZones));
     }
   }, [showTPSLZones]);
+
+  // Save period separator setting to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('chart-show-period-separators', JSON.stringify(showPeriodSeparators));
+    }
+  }, [showPeriodSeparators]);
+
+  // Update period separator visibility when setting changes
+  useEffect(() => {
+    if (periodSeparatorRef.current) {
+      periodSeparatorRef.current.setVisible(showPeriodSeparators);
+    }
+  }, [showPeriodSeparators]);
+
+  // Update period separator timeframe when timeframe changes
+  useEffect(() => {
+    if (periodSeparatorRef.current) {
+      periodSeparatorRef.current.setTimeframe(timeframe);
+    }
+  }, [timeframe]);
 
   // Sync arsenal indicators with chart indicators
   useEffect(() => {
@@ -1629,6 +1659,26 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             rightBarStaysOnScroll: true,
             borderVisible: true,
             visible: true,
+            tickMarkFormatter: (time: UTCTimestamp) => {
+              const date = new Date(time * 1000);
+              const day = date.getUTCDate().toString().padStart(2, '0');
+              const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+              const hours = date.getUTCHours().toString().padStart(2, '0');
+              const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+              // Show date + time for all timeframes
+              return `${day}/${month} ${hours}:${minutes}`;
+            },
+          },
+          localization: {
+            timeFormatter: (time: number) => {
+              const date = new Date(time * 1000);
+              const day = date.getUTCDate().toString().padStart(2, '0');
+              const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+              const year = date.getUTCFullYear();
+              const hours = date.getUTCHours().toString().padStart(2, '0');
+              const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+              return `${day}/${month}/${year} ${hours}:${minutes}`;
+            },
           },
           handleScroll: {
             mouseWheel: true,
@@ -1666,6 +1716,20 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         });
 
         candlestickSeriesRef.current = candlestickSeries;
+
+        // Initialize period separator primitive
+        const periodSeparator = new PeriodSeparatorPrimitive({
+          color: '#363a45',
+          lineWidth: 1,
+          lineStyle: 'dashed',
+          opacity: 0.4,
+          separatorType: 'auto',
+        });
+        periodSeparator.attach(chart, candlestickSeries);
+        periodSeparator.setTimeframe(timeframe);
+        periodSeparator.setVisible(showPeriodSeparators);
+        candlestickSeries.attachPrimitive(periodSeparator);
+        periodSeparatorRef.current = periodSeparator;
 
         // Attach drawing system to chart
         if (chartContainerRef.current) {
@@ -3266,6 +3330,13 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                         }
                       }
                     }} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm text-white">Period Separators</Label>
+                      <p className="text-xs text-[#787b86]">Show session/day divider lines</p>
+                    </div>
+                    <Switch checked={showPeriodSeparators} onCheckedChange={setShowPeriodSeparators} />
                   </div>
                 </div>
 
