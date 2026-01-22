@@ -1049,6 +1049,9 @@ async function saveCompletedCandleToMongoDB(candle: FormingCandle): Promise<void
  * - Completed candles go to historical collections
  * - Historical collections are what the candles API queries
  * - No more mixing aggregator + historical = consistent data for all users
+ * 
+ * IMPORTANT: We AUGMENT the candle with 1m data to ensure completeness
+ * This fixes the issue where server restarts mid-candle cause incomplete candles
  */
 async function saveCompletedHigherTimeframeCandle(
   timeframe: string, 
@@ -1061,22 +1064,77 @@ async function saveCompletedHigherTimeframeCandle(
       return;
     }
     
+    await connectToDatabase();
+    
+    // Calculate the timeframe interval in seconds
+    const tfSecondsMap: Record<string, number> = {
+      '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400, '1w': 604800, '1M': 2592000
+    };
+    const tfSeconds = tfSecondsMap[timeframe] || 3600;
+    
+    // ================================================================
+    // AUGMENT WITH 1m DATA to ensure completeness after server restart
+    // Query 1m candles from this completed period to get full OHLC
+    // ================================================================
+    let finalOpen = candle.open;
+    let finalHigh = candle.high;
+    let finalLow = candle.low;
+    let finalClose = candle.close;
+    
+    try {
+      const candles1m = await Candle1m.find({
+        symbol: candle.symbol,
+        t: { 
+          $gte: candle.periodStart, 
+          $lt: candle.periodStart + tfSeconds 
+        }
+      }).sort({ t: 1 }).lean();
+      
+      if (candles1m.length > 0) {
+        // Merge 1m data with cached candle
+        const open1m = candles1m[0].o;
+        const high1m = Math.max(...candles1m.map(c => c.h));
+        const low1m = Math.min(...candles1m.map(c => c.l));
+        const close1m = candles1m[candles1m.length - 1].c;
+        
+        // Use 1m open (start of period is more accurate)
+        finalOpen = open1m;
+        // Merge high/low (take the extreme values from both sources)
+        finalHigh = Math.max(finalHigh, high1m);
+        finalLow = Math.min(finalLow, low1m);
+        // Use 1m close if it's more recent (based on timestamp)
+        const lastCachedTime = candle.periodStart;
+        const last1mTime = candles1m[candles1m.length - 1].t;
+        if (last1mTime >= lastCachedTime) {
+          finalClose = close1m;
+        }
+        
+        if (candle.symbol === 'EUR/USD') {
+          console.log(`🔄 [${timeframe}] Augmented with ${candles1m.length} 1m candles | O:${candle.open.toFixed(5)}→${finalOpen.toFixed(5)} H:${candle.high.toFixed(5)}→${finalHigh.toFixed(5)} L:${candle.low.toFixed(5)}→${finalLow.toFixed(5)}`);
+        }
+      }
+    } catch (err) {
+      // If 1m query fails, use cached values (better than nothing)
+      console.warn(`⚠️ [Auto-Save ${timeframe}] Failed to augment with 1m:`, err instanceof Error ? err.message : err);
+    }
+    
     const timestamp = new Date(candle.periodStart * 1000);
     
     // Use upsert to avoid duplicates (in case of race conditions)
+    // If candle already exists, UPDATE it with merged data (in case we have better data now)
     await historicalModel.updateOne(
       { 
         symbol: candle.symbol, 
         timestamp 
       },
       {
-        $setOnInsert: {
+        $set: {
           symbol: candle.symbol,
           timestamp,
-          open: candle.open,
-          high: candle.high,
-          low: candle.low,
-          close: candle.close,
+          open: finalOpen,
+          high: finalHigh,
+          low: finalLow,
+          close: finalClose,
           volume: 0,
         }
       },
@@ -1085,7 +1143,7 @@ async function saveCompletedHigherTimeframeCandle(
     
     // Log only EUR/USD as sample (to avoid log spam)
     if (candle.symbol === 'EUR/USD') {
-      console.log(`💾 [${timeframe}] Completed candle saved: ${timestamp.toISOString()} | O:${candle.open.toFixed(5)} H:${candle.high.toFixed(5)} L:${candle.low.toFixed(5)} C:${candle.close.toFixed(5)}`);
+      console.log(`💾 [${timeframe}] Completed candle saved: ${timestamp.toISOString()} | O:${finalOpen.toFixed(5)} H:${finalHigh.toFixed(5)} L:${finalLow.toFixed(5)} C:${finalClose.toFixed(5)}`);
     }
   } catch (error) {
     // Don't crash on save errors - just log and continue
