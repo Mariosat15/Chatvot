@@ -1035,10 +1035,11 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
                           const day = timestamp.getUTCDay();
                           if (day === 0 || day === 6) continue;
                           
+                          // Use $set to OVERWRITE existing incomplete candles with API data
                           await historicalModel.updateOne(
                             { symbol, timestamp },
                             { 
-                              $setOnInsert: { 
+                              $set: { 
                                 symbol, 
                                 timestamp, 
                                 open: candle.open, 
@@ -1164,9 +1165,10 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
                 (async () => {
                   for (const candle of gapCandles) {
                     try {
+                      // Use $set to OVERWRITE existing incomplete candles
                       await historicalModel.updateOne(
                         { symbol, timestamp: new Date(candle.time * 1000) },
-                        { $setOnInsert: { symbol, timestamp: new Date(candle.time * 1000), open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: 0 } },
+                        { $set: { symbol, timestamp: new Date(candle.time * 1000), open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: 0 } },
                         { upsert: true }
                       );
                     } catch { /* ignore duplicates */ }

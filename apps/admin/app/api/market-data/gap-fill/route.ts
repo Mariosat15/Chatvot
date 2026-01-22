@@ -425,10 +425,11 @@ export async function POST(request: NextRequest) {
             if (day === 0 || day === 6) continue; // Skip weekends
             
             try {
+              // Use $set to OVERWRITE existing incomplete candles
               await Model.updateOne(
                 { symbol: sym, timestamp },
                 { 
-                  $setOnInsert: { 
+                  $set: { 
                     symbol: sym, 
                     timestamp, 
                     open: candle.open, 
@@ -480,10 +481,11 @@ export async function POST(request: NextRequest) {
                 if (day === 0 || day === 6) continue;
                 
                 try {
+                  // Use $set to OVERWRITE existing incomplete candles
                   await Model.updateOne(
                     { symbol: sym, timestamp },
                     { 
-                      $setOnInsert: { 
+                      $set: { 
                         symbol: sym, 
                         timestamp, 
                         open: candle.open, 

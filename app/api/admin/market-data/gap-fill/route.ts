@@ -205,10 +205,11 @@ export async function POST(request: NextRequest) {
               if (day === 0 || day === 6) continue; // Skip weekends
               
               try {
+                // Use $set to OVERWRITE existing incomplete candles
                 await historicalModel.updateOne(
                   { symbol: sym, timestamp },
                   { 
-                    $setOnInsert: { 
+                    $set: { 
                       symbol: sym, 
                       timestamp, 
                       open: candle.open, 
@@ -225,7 +226,7 @@ export async function POST(request: NextRequest) {
             }
             
             tfGapsFilled = 1;
-            console.log(`✅ [Gap Fill] ${sym} ${tf}: Inserted ${tfCandlesFilled} candles from API`);
+            console.log(`✅ [Gap Fill] ${sym} ${tf}: Saved ${tfCandlesFilled} candles from API`);
           } catch (err) {
             console.error(`❌ [Gap Fill] ${sym} ${tf}: API fetch failed:`, err);
           }
@@ -264,10 +265,11 @@ export async function POST(request: NextRequest) {
                   if (day === 0 || day === 6) continue;
                   
                   try {
+                    // Use $set to OVERWRITE existing incomplete candles
                     await historicalModel.updateOne(
                       { symbol: sym, timestamp },
                       { 
-                        $setOnInsert: { 
+                        $set: { 
                           symbol: sym, 
                           timestamp, 
                           open: candle.open, 
@@ -312,10 +314,11 @@ export async function POST(request: NextRequest) {
                 if (day === 0 || day === 6) continue;
                 
                 try {
+                  // Use $set to OVERWRITE existing incomplete candles
                   await historicalModel.updateOne(
                     { symbol: sym, timestamp },
                     { 
-                      $setOnInsert: { 
+                      $set: { 
                         symbol: sym, 
                         timestamp, 
                         open: candle.open, 

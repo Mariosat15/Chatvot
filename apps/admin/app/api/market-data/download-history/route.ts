@@ -340,14 +340,16 @@ export async function POST(request: NextRequest) {
                     const operations = batch.map(doc => ({
                       updateOne: {
                         filter: { symbol: doc.symbol, timestamp: doc.timestamp },
-                        update: { $setOnInsert: doc },
+                        // Use $set to OVERWRITE existing incomplete candles with API data
+                        update: { $set: doc },
                         upsert: true,
                       },
                     }));
 
                     try {
                       const result = await Model.bulkWrite(operations, { ordered: false });
-                      totalSaved += result.upsertedCount || 0;
+                      // Count both upserted (new) and modified (updated) documents
+                      totalSaved += (result.upsertedCount || 0) + (result.modifiedCount || 0);
                     } catch {
                       // Ignore duplicate key errors
                     }
