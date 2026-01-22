@@ -14,17 +14,33 @@ const COLLECTIONS_TO_CLEAN = [
   'candles_historical_1d',
 ];
 
+interface CleanupResult {
+  deleted: number;
+  before: number;
+  after: number;
+  dataRange?: { oldest: string; newest: string };
+  deleteOldestCutoff?: string;
+  keepRecentCutoff?: string;
+  operations: string[];
+}
+
 /**
  * POST - Run candle cleanup
  * 
- * Two modes:
- * 1. mode='keepRecent' (default): Keep last X days, delete older (current behavior)
- * 2. mode='deleteOldest': Delete the oldest X days of data (new behavior)
+ * Supports two independent cleanup types that can run together:
+ * 1. deleteOldest: Delete the oldest X days of data (from the start of data)
+ * 2. keepRecent: Keep only last X days (delete anything older than X days from now)
+ * 
+ * Both can be enabled simultaneously to maintain constant database size
  * 
  * Body: {
- *   days: number,           // Number of days to keep or delete
- *   mode: 'keepRecent' | 'deleteOldest'  // default: 'deleteOldest'
+ *   deleteOldest: { enabled: boolean, days: number }
+ *   keepRecent: { enabled: boolean, days: number }
  *   includeHistorical: boolean  // Include historical collections (default: true)
+ *   
+ *   // Legacy support (deprecated)
+ *   days: number
+ *   mode: 'keepRecent' | 'deleteOldest'
  * }
  */
 export async function POST(request: NextRequest) {
@@ -32,18 +48,33 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
     
     const body = await request.json();
-    const { 
-      days, 
-      daysToKeep,  // backward compatibility
-      mode = 'deleteOldest',
-      includeHistorical = true 
-    } = body;
     
-    // Support both old 'daysToKeep' and new 'days' parameter
-    const daysValue = days ?? daysToKeep ?? 30;
+    // Support both new and legacy formats
+    let deleteOldestConfig = body.deleteOldest;
+    let keepRecentConfig = body.keepRecent;
+    const includeHistorical = body.includeHistorical ?? true;
     
-    if (daysValue < 0) {
-      return NextResponse.json({ error: 'days must be 0 or greater' }, { status: 400 });
+    // Legacy support: convert old format to new
+    if (!deleteOldestConfig && !keepRecentConfig && (body.mode || body.days !== undefined)) {
+      if (body.mode === 'deleteOldest') {
+        deleteOldestConfig = { enabled: true, days: body.days ?? body.daysToKeep ?? 1 };
+        keepRecentConfig = { enabled: false, days: 365 };
+      } else {
+        deleteOldestConfig = { enabled: false, days: 1 };
+        keepRecentConfig = { enabled: true, days: body.days ?? body.daysToKeep ?? 30 };
+      }
+    }
+    
+    // Default configs
+    deleteOldestConfig = deleteOldestConfig || { enabled: false, days: 1 };
+    keepRecentConfig = keepRecentConfig || { enabled: false, days: 365 };
+    
+    // Validate
+    if (!deleteOldestConfig.enabled && !keepRecentConfig.enabled) {
+      return NextResponse.json({ 
+        error: 'At least one cleanup type must be enabled',
+        success: false 
+      }, { status: 400 });
     }
     
     const db = mongoose.connection.db;
@@ -51,8 +82,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
     }
     
-    console.log(`🧹 [Cleanup] Mode: ${mode}, Days: ${daysValue}, Include Historical: ${includeHistorical}`);
-    console.log(`🧹 [Cleanup] Request body:`, JSON.stringify(body));
+    console.log(`🧹 [Cleanup] Delete Oldest: ${deleteOldestConfig.enabled ? `${deleteOldestConfig.days} days` : 'OFF'}`);
+    console.log(`🧹 [Cleanup] Keep Recent: ${keepRecentConfig.enabled ? `${keepRecentConfig.days} days` : 'OFF'}`);
+    console.log(`🧹 [Cleanup] Include Historical: ${includeHistorical}`);
     
     // Determine which collections to clean
     const collectionsToClean = includeHistorical 
@@ -62,13 +94,7 @@ export async function POST(request: NextRequest) {
     let totalDeleted = 0;
     let totalBefore = 0;
     let totalAfter = 0;
-    const results: Record<string, { 
-      deleted: number; 
-      before: number; 
-      after: number;
-      dataRange?: { oldest: string; newest: string };
-      cutoff?: string;
-    }> = {};
+    const results: Record<string, CleanupResult> = {};
     
     for (const collectionName of collectionsToClean) {
       // Check if collection exists
@@ -82,12 +108,9 @@ export async function POST(request: NextRequest) {
       
       totalBefore += countBefore;
       
-      // Determine the timestamp field (candles_1m uses 't', historical uses 'timestamp')
+      // Determine the timestamp field
       const isHistorical = collectionName.includes('historical');
       const timeField = isHistorical ? 'timestamp' : 't';
-      
-      let deleteQuery: Record<string, unknown>;
-      let cutoffDescription: string;
       
       // Get oldest and newest documents for context
       const oldestDoc = await collection.findOne({}, { sort: { [timeField]: 1 } });
@@ -108,64 +131,69 @@ export async function POST(request: NextRequest) {
       
       console.log(`🧹 [Cleanup] ${collectionName}: Data range: ${new Date(oldestTime).toISOString()} to ${new Date(newestTime).toISOString()}`);
       
-      if (mode === 'deleteOldest') {
-        // DELETE OLDEST: Find the oldest data and delete X days from the start
-        // Calculate cutoff: oldest + days to delete
-        const cutoffTime = oldestTime + (daysValue * 24 * 60 * 60 * 1000);
+      const operations: string[] = [];
+      let collectionDeleted = 0;
+      let deleteOldestCutoff: string | undefined;
+      let keepRecentCutoff: string | undefined;
+      
+      // OPERATION 1: Delete Oldest (from start of data)
+      if (deleteOldestConfig.enabled && deleteOldestConfig.days > 0) {
+        const cutoffTime = oldestTime + (deleteOldestConfig.days * 24 * 60 * 60 * 1000);
         const cutoffDate = new Date(cutoffTime);
         
+        let deleteQuery: Record<string, unknown>;
         if (isHistorical) {
           deleteQuery = { timestamp: { $lt: cutoffDate } };
         } else {
           deleteQuery = { t: { $lt: Math.floor(cutoffTime / 1000) } };
         }
         
-        cutoffDescription = `oldest ${daysValue} days (before ${cutoffDate.toISOString()})`;
-        console.log(`🧹 [Cleanup] ${collectionName}: Will delete everything before ${cutoffDate.toISOString()}`);
+        deleteOldestCutoff = cutoffDate.toISOString();
+        console.log(`🧹 [Cleanup] ${collectionName}: Deleting oldest ${deleteOldestConfig.days} days (before ${deleteOldestCutoff})`);
         
-      } else {
-        // KEEP RECENT: Delete anything older than X days from now
-        const cutoffTime = Date.now() - (daysValue * 24 * 60 * 60 * 1000);
-        const cutoffDate = new Date(cutoffTime);
-        
-        if (isHistorical) {
-          deleteQuery = { timestamp: { $lt: cutoffDate } };
-        } else {
-          deleteQuery = { t: { $lt: Math.floor(cutoffTime / 1000) } };
-        }
-        
-        cutoffDescription = `older than ${daysValue} days (before ${cutoffDate.toISOString()})`;
-        console.log(`🧹 [Cleanup] ${collectionName}: Will delete everything before ${cutoffDate.toISOString()}`);
+        const result = await collection.deleteMany(deleteQuery);
+        collectionDeleted += result.deletedCount;
+        operations.push(`Deleted oldest ${deleteOldestConfig.days} days: ${result.deletedCount} records`);
       }
       
-      // Delete
-      const result = await collection.deleteMany(deleteQuery);
+      // OPERATION 2: Keep Recent (delete older than X days from now)
+      if (keepRecentConfig.enabled && keepRecentConfig.days >= 0) {
+        const cutoffTime = Date.now() - (keepRecentConfig.days * 24 * 60 * 60 * 1000);
+        const cutoffDate = new Date(cutoffTime);
+        
+        let deleteQuery: Record<string, unknown>;
+        if (isHistorical) {
+          deleteQuery = { timestamp: { $lt: cutoffDate } };
+        } else {
+          deleteQuery = { t: { $lt: Math.floor(cutoffTime / 1000) } };
+        }
+        
+        keepRecentCutoff = cutoffDate.toISOString();
+        console.log(`🧹 [Cleanup] ${collectionName}: Keeping last ${keepRecentConfig.days} days (deleting before ${keepRecentCutoff})`);
+        
+        const result = await collection.deleteMany(deleteQuery);
+        collectionDeleted += result.deletedCount;
+        operations.push(`Keep recent ${keepRecentConfig.days} days: ${result.deletedCount} records`);
+      }
+      
       const countAfter = await collection.countDocuments();
-      
-      console.log(`🧹 [Cleanup] ${collectionName}: Deleted ${result.deletedCount} of ${countBefore} (${cutoffDescription})`);
-      
-      totalDeleted += result.deletedCount;
+      totalDeleted += collectionDeleted;
       totalAfter += countAfter;
       
+      console.log(`🧹 [Cleanup] ${collectionName}: Deleted ${collectionDeleted} of ${countBefore}`);
+      
       results[collectionName] = {
-        deleted: result.deletedCount,
+        deleted: collectionDeleted,
         before: countBefore,
         after: countAfter,
         dataRange: {
           oldest: new Date(oldestTime).toISOString(),
           newest: new Date(newestTime).toISOString(),
         },
-        cutoff: cutoffDescription,
+        deleteOldestCutoff,
+        keepRecentCutoff,
+        operations,
       };
-    }
-    
-    // Update last run time in settings
-    const MarketDataSettings = mongoose.models.MarketDataSettings;
-    if (MarketDataSettings) {
-      await MarketDataSettings.findOneAndUpdate(
-        { key: 'market_data_settings' },
-        { $set: { 'cleanup.lastRun': new Date() } }
-      );
     }
     
     // Estimate size (avg ~200 bytes per doc)
@@ -174,24 +202,42 @@ export async function POST(request: NextRequest) {
     
     console.log(`🧹 [Cleanup] Total: Deleted ${totalDeleted} candles, freed ~${(freedSpace / 1024 / 1024).toFixed(2)} MB`);
     
+    const cleanupResult = {
+      success: true,
+      deleteOldest: deleteOldestConfig,
+      keepRecent: keepRecentConfig,
+      includeHistorical,
+      deletedCount: totalDeleted,
+      before: {
+        count: totalBefore,
+        sizeMB: ((totalBefore * avgDocSize) / 1024 / 1024).toFixed(2),
+      },
+      after: {
+        count: totalAfter,
+        sizeMB: ((totalAfter * avgDocSize) / 1024 / 1024).toFixed(2),
+      },
+      freedMB: (freedSpace / 1024 / 1024).toFixed(2),
+      collections: results,
+      timestamp: new Date().toISOString(),
+    };
+    
+    // Update settings with last run time and results
+    const MarketDataSettings = mongoose.models.MarketDataSettings;
+    if (MarketDataSettings) {
+      await MarketDataSettings.findOneAndUpdate(
+        { key: 'market_data_settings' },
+        { 
+          $set: { 
+            'cleanup.lastRun': new Date(),
+            'cleanup.lastResults': cleanupResult,
+          } 
+        }
+      );
+    }
+    
     return NextResponse.json({
       success: true,
-      cleanup: {
-        mode,
-        days: daysValue,
-        deletedCount: totalDeleted,
-        includeHistorical,
-        before: {
-          count: totalBefore,
-          sizeMB: ((totalBefore * avgDocSize) / 1024 / 1024).toFixed(2),
-        },
-        after: {
-          count: totalAfter,
-          sizeMB: ((totalAfter * avgDocSize) / 1024 / 1024).toFixed(2),
-        },
-        freedMB: (freedSpace / 1024 / 1024).toFixed(2),
-        collections: results,
-      },
+      cleanup: cleanupResult,
     });
   } catch (error) {
     console.error('Error during cleanup:', error);

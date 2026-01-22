@@ -365,19 +365,26 @@ export default function MarketDataSection() {
   const [seedRunning, setSeedRunning] = useState(false);
   const [seedResults, setSeedResults] = useState<SeedResult[] | null>(null);
   
-  // Cleanup options state
-  const [cleanupMode, setCleanupMode] = useState<'deleteOldest' | 'keepRecent'>('deleteOldest');
+  // Cleanup options state - two independent cleanup types
+  const [deleteOldestEnabled, setDeleteOldestEnabled] = useState(true);
+  const [deleteOldestDays, setDeleteOldestDays] = useState(1);
+  const [keepRecentEnabled, setKeepRecentEnabled] = useState(false);
+  const [keepRecentDays, setKeepRecentDays] = useState(365);
   const [cleanupIncludeHistorical, setCleanupIncludeHistorical] = useState(true);
   const [cleanupResults, setCleanupResults] = useState<{
-    mode: string;
-    days: number;
+    deleteOldest?: { enabled: boolean; days: number };
+    keepRecent?: { enabled: boolean; days: number };
     deletedCount: number;
+    freedMB?: string;
+    timestamp?: string;
     collections: Record<string, {
       deleted: number;
       before: number;
       after: number;
       dataRange?: { oldest: string; newest: string };
-      cutoff?: string;
+      deleteOldestCutoff?: string;
+      keepRecentCutoff?: string;
+      operations?: string[];
     }>;
   } | null>(null);
   
@@ -443,12 +450,57 @@ export default function MarketDataSection() {
     fetchData();
     fetchGaps();
     fetchSymbols();
+  }, [fetchData, fetchGaps, fetchSymbols]);
+
+  // Initialize cleanup state from loaded settings
+  useEffect(() => {
+    if (settings?.cleanup) {
+      // Load deleteOldest config
+      if (settings.cleanup.deleteOldest) {
+        setDeleteOldestEnabled(settings.cleanup.deleteOldest.enabled ?? true);
+        setDeleteOldestDays(settings.cleanup.deleteOldest.days ?? 1);
+      }
+      // Load keepRecent config
+      if (settings.cleanup.keepRecent) {
+        setKeepRecentEnabled(settings.cleanup.keepRecent.enabled ?? false);
+        setKeepRecentDays(settings.cleanup.keepRecent.days ?? 365);
+      }
+      // Load includeHistorical
+      if (settings.cleanup.includeHistorical !== undefined) {
+        setCleanupIncludeHistorical(settings.cleanup.includeHistorical);
+      }
+      // Load last results
+      if (settings.cleanup.lastResults) {
+        setCleanupResults(settings.cleanup.lastResults as typeof cleanupResults);
+      }
+    }
+  }, [settings?.cleanup]);
+
+  // Save cleanup settings when they change (debounced)
+  useEffect(() => {
+    if (!settings) return;
+    const timeoutId = setTimeout(() => {
+      saveSettings({
+        cleanup: {
+          ...settings.cleanup,
+          deleteOldest: { enabled: deleteOldestEnabled, days: deleteOldestDays },
+          keepRecent: { enabled: keepRecentEnabled, days: keepRecentDays },
+          includeHistorical: cleanupIncludeHistorical,
+        }
+      });
+    }, 500);
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deleteOldestEnabled, deleteOldestDays, keepRecentEnabled, keepRecentDays, cleanupIncludeHistorical]);
+
+  useEffect(() => {
+    // Set initial date range for seeding
     const today = new Date();
     const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     setSeedToDate(today.toISOString().split('T')[0]);
     setSeedFromDate(thirtyDaysAgo.toISOString().split('T')[0]);
-  }, [fetchData]);
+  }, []);
 
   const saveSettings = async (newSettings: Partial<MarketDataSettings>) => {
     setSaving(true);
@@ -474,14 +526,23 @@ export default function MarketDataSection() {
 
   const runCleanup = async () => {
     if (!settings) return;
+    
+    // Validate at least one type is enabled
+    if (!deleteOldestEnabled && !keepRecentEnabled) {
+      setMessage({ type: 'error', text: 'Enable at least one cleanup type' });
+      return;
+    }
+    
     setCleanupRunning(true);
+    setCleanupResults(null);
+    
     try {
       const res = await fetch('/api/market-data/cleanup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          days: settings.cleanup.daysToKeep,
-          mode: cleanupMode,
+          deleteOldest: { enabled: deleteOldestEnabled, days: deleteOldestDays },
+          keepRecent: { enabled: keepRecentEnabled, days: keepRecentDays },
           includeHistorical: cleanupIncludeHistorical,
         }),
       });
@@ -495,7 +556,8 @@ export default function MarketDataSection() {
         });
         fetchData();
       } else {
-        setMessage({ type: 'error', text: 'Cleanup failed' });
+        const error = await res.json().catch(() => ({ error: 'Unknown error' }));
+        setMessage({ type: 'error', text: error.error || 'Cleanup failed' });
         setCleanupResults(null);
       }
     } catch {
@@ -913,58 +975,100 @@ export default function MarketDataSection() {
               </div>
               
               <div className="space-y-4 flex-1">
-                {/* Cleanup Type Toggle */}
-                <div className="bg-gray-900/30 rounded-lg p-3 border border-gray-800/30">
-                  <div className="text-gray-400 text-xs mb-2">Cleanup Type</div>
-                  <div className="inline-flex bg-gray-900/50 rounded-lg p-0.5 border border-gray-800/50 w-full">
-                    <button
-                      onClick={() => setCleanupMode('deleteOldest')}
-                      className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
-                        cleanupMode === 'deleteOldest'
-                          ? 'bg-red-600 text-white shadow-lg'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Delete Oldest
-                    </button>
-                    <button
-                      onClick={() => setCleanupMode('keepRecent')}
-                      className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
-                        cleanupMode === 'keepRecent'
-                          ? 'bg-blue-600 text-white shadow-lg'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Keep Recent
-                    </button>
+                {/* DELETE OLDEST Type - Independent Toggle */}
+                <div className={`rounded-lg p-3 border transition-all ${
+                  deleteOldestEnabled 
+                    ? 'bg-red-900/20 border-red-600/30' 
+                    : 'bg-gray-900/30 border-gray-800/30'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🗑️</span>
+                      <div>
+                        <div className="text-white text-sm font-medium">Delete Oldest</div>
+                        <div className="text-gray-500 text-xs">Remove oldest data from start of database</div>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={deleteOldestEnabled}
+                        onChange={(e) => setDeleteOldestEnabled(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
+                    </label>
                   </div>
-                  <p className="text-gray-500 text-xs mt-2">
-                    {cleanupMode === 'deleteOldest' 
-                      ? '🗑️ Removes oldest data first (keeps DB size constant)'
-                      : '📅 Keeps last X days, deletes older'}
-                  </p>
+                  {deleteOldestEnabled && (
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-800/30">
+                      <span className="text-gray-400 text-sm">Delete oldest</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={deleteOldestDays}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          setDeleteOldestDays(Number.isNaN(val) ? 0 : Math.max(0, val));
+                        }}
+                        className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-24 border border-gray-700 focus:border-red-500 focus:outline-none text-center font-mono text-sm"
+                      />
+                      <span className="text-gray-400 text-sm">days</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Days Input */}
-                <div className="bg-gray-900/30 rounded-lg p-3 border border-gray-800/30">
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-400 text-sm">
-                      {cleanupMode === 'deleteOldest' ? 'Delete' : 'Keep'}
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="365"
-                      value={settings.cleanup.daysToKeep}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value);
-                        saveSettings({ cleanup: { ...settings.cleanup, daysToKeep: Number.isNaN(val) ? 0 : Math.max(0, val) } });
-                      }}
-                      className="bg-gray-800 text-white rounded-lg px-3 py-2 w-20 border border-gray-700 focus:border-blue-500 focus:outline-none text-center font-mono"
-                    />
-                    <span className="text-gray-400 text-sm">days</span>
+                {/* KEEP RECENT Type - Independent Toggle */}
+                <div className={`rounded-lg p-3 border transition-all ${
+                  keepRecentEnabled 
+                    ? 'bg-blue-900/20 border-blue-600/30' 
+                    : 'bg-gray-900/30 border-gray-800/30'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">📅</span>
+                      <div>
+                        <div className="text-white text-sm font-medium">Keep Recent</div>
+                        <div className="text-gray-500 text-xs">Keep only last X days, delete older</div>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={keepRecentEnabled}
+                        onChange={(e) => setKeepRecentEnabled(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
                   </div>
+                  {keepRecentEnabled && (
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-800/30">
+                      <span className="text-gray-400 text-sm">Keep last</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={keepRecentDays}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          setKeepRecentDays(Number.isNaN(val) ? 0 : Math.max(0, val));
+                        }}
+                        className="bg-gray-800 text-white rounded-lg px-3 py-1.5 w-24 border border-gray-700 focus:border-blue-500 focus:outline-none text-center font-mono text-sm"
+                      />
+                      <span className="text-gray-400 text-sm">days</span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Combined Mode Explanation */}
+                {deleteOldestEnabled && keepRecentEnabled && (
+                  <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3">
+                    <div className="text-yellow-400 text-xs font-medium mb-1">⚡ Combined Mode Active</div>
+                    <p className="text-yellow-500/80 text-xs">
+                      Both operations will run: First delete oldest {deleteOldestDays} days, then ensure only last {keepRecentDays} days remain.
+                      This maintains a constant database size.
+                    </p>
+                  </div>
+                )}
 
                 {/* Include Historical Toggle */}
                 <div className="bg-gray-900/30 rounded-lg p-3 border border-gray-800/30">
@@ -1058,42 +1162,123 @@ export default function MarketDataSection() {
               {/* Action Button */}
               <button
                 onClick={runCleanup}
-                disabled={cleanupRunning || saving}
+                disabled={cleanupRunning || saving || (!deleteOldestEnabled && !keepRecentEnabled)}
                 className="w-full mt-4 px-4 py-3 bg-red-600/20 hover:bg-red-600/30 border border-red-600/30 text-red-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
                 {cleanupRunning ? '⏳ Running...' : '🗑️ Run Cleanup Now'}
               </button>
+
+              {/* Warning if nothing selected */}
+              {!deleteOldestEnabled && !keepRecentEnabled && (
+                <p className="text-yellow-500 text-xs mt-2 text-center">
+                  ⚠️ Enable at least one cleanup type to run
+                </p>
+              )}
               
-              {/* Cleanup Results */}
+              {/* Cleanup Results Box */}
               {cleanupResults && (
-                <div className="mt-4 bg-gray-900/50 rounded-lg p-3 border border-gray-800/30 max-h-64 overflow-y-auto">
-                  <div className="text-white text-sm font-medium mb-2">
-                    Last Cleanup Results ({cleanupResults.mode === 'keepRecent' ? 'Keep Recent' : 'Delete Oldest'} {cleanupResults.days} days)
-                  </div>
-                  <div className="text-green-400 text-xs mb-2">
-                    Total deleted: {cleanupResults.deletedCount.toLocaleString()} candles
-                  </div>
-                  <div className="space-y-2">
-                    {Object.entries(cleanupResults.collections).map(([name, data]) => (
-                      <div key={name} className="bg-gray-800/30 rounded p-2 text-xs">
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-300 font-mono">{name}</span>
-                          <span className={data.deleted > 0 ? 'text-red-400' : 'text-gray-500'}>
-                            -{data.deleted} / {data.before}
-                          </span>
-                        </div>
-                        {data.dataRange && (
-                          <div className="text-gray-500 mt-1">
-                            Range: {new Date(data.dataRange.oldest).toLocaleDateString()} to {new Date(data.dataRange.newest).toLocaleDateString()}
-                          </div>
-                        )}
-                        {data.cutoff && (
-                          <div className="text-yellow-500/70 mt-0.5">
-                            Cutoff: {data.cutoff}
-                          </div>
-                        )}
+                <div className="mt-4 bg-gray-900/50 rounded-lg border border-gray-800/30 overflow-hidden">
+                  {/* Header */}
+                  <div className="bg-green-900/30 border-b border-green-600/30 p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-green-400 text-sm font-medium flex items-center gap-2">
+                        ✅ Cleanup Completed
                       </div>
-                    ))}
+                      {cleanupResults.timestamp && (
+                        <span className="text-gray-500 text-xs">
+                          {new Date(cleanupResults.timestamp).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-4 mt-2 text-xs">
+                      <span className="text-white">
+                        Total: <span className="text-red-400 font-mono">{cleanupResults.deletedCount.toLocaleString()}</span> deleted
+                      </span>
+                      {cleanupResults.freedMB && (
+                        <span className="text-gray-400">
+                          Freed: <span className="text-green-400 font-mono">{cleanupResults.freedMB} MB</span>
+                        </span>
+                      )}
+                    </div>
+                    {/* Mode info */}
+                    <div className="flex gap-3 mt-2 text-xs">
+                      {cleanupResults.deleteOldest?.enabled && (
+                        <span className="bg-red-900/30 text-red-400 px-2 py-0.5 rounded">
+                          Delete Oldest: {cleanupResults.deleteOldest.days} days
+                        </span>
+                      )}
+                      {cleanupResults.keepRecent?.enabled && (
+                        <span className="bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded">
+                          Keep Recent: {cleanupResults.keepRecent.days} days
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Collections Details */}
+                  <div className="p-3 max-h-60 overflow-y-auto">
+                    <div className="text-gray-400 text-xs mb-2 uppercase font-medium">Collections</div>
+                    <div className="space-y-2">
+                      {Object.entries(cleanupResults.collections).map(([name, data]) => (
+                        <div key={name} className={`rounded p-2 text-xs ${
+                          data.deleted > 0 ? 'bg-red-900/20 border border-red-600/20' : 'bg-gray-800/30'
+                        }`}>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-300 font-mono text-xs">{name}</span>
+                            <span className={data.deleted > 0 ? 'text-red-400 font-medium' : 'text-gray-500'}>
+                              {data.deleted > 0 ? `-${data.deleted.toLocaleString()}` : '0'} / {data.before.toLocaleString()}
+                            </span>
+                          </div>
+                          {/* Operations performed */}
+                          {data.operations && data.operations.length > 0 && (
+                            <div className="mt-1 space-y-0.5">
+                              {data.operations.map((op, i) => (
+                                <div key={i} className="text-gray-500 text-[10px]">• {op}</div>
+                              ))}
+                            </div>
+                          )}
+                          {/* Data range */}
+                          {data.dataRange && (
+                            <div className="text-gray-500 mt-1 text-[10px]">
+                              📅 Range: {new Date(data.dataRange.oldest).toLocaleDateString()} → {new Date(data.dataRange.newest).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Auto Mode Last Results (show when auto mode is selected) */}
+              {settings.cleanup.mode === 'auto' && settings.cleanup.lastResults && !cleanupResults && (
+                <div className="mt-4 bg-gray-900/50 rounded-lg border border-gray-800/30 overflow-hidden">
+                  <div className="bg-blue-900/20 border-b border-blue-600/20 p-3">
+                    <div className="text-blue-400 text-sm font-medium flex items-center gap-2">
+                      📊 Last Auto Cleanup Results
+                    </div>
+                    {(settings.cleanup.lastResults as any).timestamp && (
+                      <span className="text-gray-500 text-xs block mt-1">
+                        {new Date((settings.cleanup.lastResults as any).timestamp).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-3 text-xs">
+                    <div className="text-white mb-2">
+                      Deleted: <span className="text-red-400 font-mono">{((settings.cleanup.lastResults as any).deletedCount || 0).toLocaleString()}</span> candles
+                    </div>
+                    {(settings.cleanup.lastResults as any).collections && (
+                      <div className="space-y-1">
+                        {Object.entries((settings.cleanup.lastResults as any).collections).map(([name, data]: [string, any]) => (
+                          <div key={name} className="flex justify-between text-gray-400">
+                            <span className="font-mono">{name}</span>
+                            <span className={data.deleted > 0 ? 'text-red-400' : 'text-gray-600'}>
+                              -{data.deleted}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

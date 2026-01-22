@@ -1,11 +1,12 @@
 /**
  * Market Data Maintenance Job
  * 
- * Handles automatic cleanup for 1m candles.
- * Runs on a schedule configured by admin:
- * - Daily at specific hour
- * - Weekly on specific days (e.g., weekends)
- * - Monthly on specific week and days
+ * Handles automatic cleanup for candle data.
+ * Supports two independent cleanup modes:
+ * 1. Delete Oldest: Remove the oldest X days of data (maintains constant size)
+ * 2. Keep Recent: Keep only last X days (removes old data)
+ * 
+ * Both can run simultaneously for precise database management.
  */
 
 import { connectToDatabase } from '../../database/mongoose';
@@ -14,16 +15,27 @@ import mongoose from 'mongoose';
 interface CleanupSchedule {
   type: 'daily' | 'weekly' | 'monthly';
   hour: number; // 0-23 UTC
+  minute?: number; // 0-59 UTC
   weekDays: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
-  monthWeek: number; // 1-4 (which week of month)
+  monthWeek?: number; // 1-4 (which week of month)
+  monthDay?: number; // 1-28 (day of month)
+}
+
+interface CleanupTypeConfig {
+  enabled: boolean;
+  days: number;
 }
 
 interface MarketDataSettings {
   cleanup: {
     enabled: boolean;
     mode: 'auto' | 'manual';
-    daysToKeep: number;
+    daysToKeep: number; // Legacy
+    deleteOldest?: CleanupTypeConfig;
+    keepRecent?: CleanupTypeConfig;
+    includeHistorical?: boolean;
     lastRun: string | null;
+    lastResults?: unknown;
     schedule: CleanupSchedule;
   };
   gapFill: {
@@ -32,6 +44,18 @@ interface MarketDataSettings {
     lastRun: string | null;
   };
 }
+
+// All collections to clean
+const COLLECTIONS_TO_CLEAN = [
+  'candles_1m',
+  'candles_historical_1m',
+  'candles_historical_5m',
+  'candles_historical_15m',
+  'candles_historical_30m',
+  'candles_historical_1h',
+  'candles_historical_4h',
+  'candles_historical_1d',
+];
 
 /**
  * Get market data settings from MongoDB
@@ -54,19 +78,27 @@ async function getSettings(): Promise<MarketDataSettings | null> {
 function shouldRunCleanup(schedule: CleanupSchedule, lastRun: Date | null): boolean {
   const now = new Date();
   const currentHour = now.getUTCHours();
+  const currentMinute = now.getUTCMinutes();
   const currentDay = now.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
   const currentDate = now.getUTCDate();
   
-  // Check if current hour matches
+  // Check if current hour matches (within the minute window)
+  const scheduleMinute = schedule.minute ?? 0;
   if (currentHour !== schedule.hour) {
+    return false;
+  }
+  
+  // Only trigger in the first 5 minutes of the scheduled hour
+  if (currentMinute > 5) {
     return false;
   }
   
   // Check if already ran today
   if (lastRun) {
     const lastRunDate = new Date(lastRun);
-    if (lastRunDate.toDateString() === now.toDateString()) {
-      return false; // Already ran today
+    const hoursSinceLastRun = (now.getTime() - lastRunDate.getTime()) / (1000 * 60 * 60);
+    if (hoursSinceLastRun < 23) {
+      return false; // Already ran within last 23 hours
     }
   }
   
@@ -79,53 +111,149 @@ function shouldRunCleanup(schedule: CleanupSchedule, lastRun: Date | null): bool
       return schedule.weekDays.includes(currentDay);
       
     case 'monthly':
-      // Check if we're in the correct week and day
-      const weekOfMonth = Math.ceil(currentDate / 7);
-      if (weekOfMonth !== schedule.monthWeek) {
-        return false;
+      // Check if we're on the correct day of month
+      if (schedule.monthDay && currentDate === schedule.monthDay) {
+        return true;
       }
-      return schedule.weekDays.includes(currentDay);
+      // Or check week + day combination
+      if (schedule.monthWeek) {
+        const weekOfMonth = Math.ceil(currentDate / 7);
+        if (weekOfMonth !== schedule.monthWeek) {
+          return false;
+        }
+        return schedule.weekDays.includes(currentDay);
+      }
+      return false;
       
     default:
       return false;
   }
 }
 
+interface CleanupResult {
+  success: boolean;
+  deletedCount: number;
+  collections: Record<string, { deleted: number; before: number; after: number }>;
+}
+
 /**
- * Run cleanup - deletes old candles
- * Uses timestamp comparison: t < cutoffTime (Unix seconds)
+ * Run cleanup with both modes
  */
-async function runCleanup(daysToKeep: number): Promise<{ success: boolean; deletedCount: number }> {
-  try {
-    // Calculate cutoff timestamp in seconds
-    // t field stores Unix timestamp in seconds (e.g., 1768348800)
-    const cutoffTime = Math.floor(Date.now() / 1000) - (daysToKeep * 24 * 60 * 60);
-    const cutoffDate = new Date(cutoffTime * 1000);
-    
-    console.log(`🧹 [Cleanup] Deleting candles older than ${cutoffDate.toISOString()} (${daysToKeep} days ago)`);
-    console.log(`   Cutoff timestamp: ${cutoffTime} (comparing t < ${cutoffTime})`);
-    
-    const result = await mongoose.connection.db?.collection('candles_1m').deleteMany({
-      t: { $lt: cutoffTime }
-    });
-    
-    const deletedCount = result?.deletedCount || 0;
-    
-    // Update last run time
-    const MarketDataSettingsModel = mongoose.models.MarketDataSettings;
-    if (MarketDataSettingsModel) {
-      await MarketDataSettingsModel.findOneAndUpdate(
-        { key: 'market_data_settings' },
-        { $set: { 'cleanup.lastRun': new Date() } }
-      );
-    }
-    
-    console.log(`🧹 [Market Data Cleanup] Deleted ${deletedCount} candles older than ${daysToKeep} days`);
-    return { success: true, deletedCount };
-  } catch (error) {
-    console.error('❌ [Market Data Cleanup] Error:', error);
-    return { success: false, deletedCount: 0 };
+async function runCleanup(
+  deleteOldest: CleanupTypeConfig,
+  keepRecent: CleanupTypeConfig,
+  includeHistorical: boolean
+): Promise<CleanupResult> {
+  const db = mongoose.connection.db;
+  if (!db) {
+    return { success: false, deletedCount: 0, collections: {} };
   }
+  
+  console.log(`🧹 [Auto Cleanup] Starting...`);
+  console.log(`   Delete Oldest: ${deleteOldest.enabled ? `${deleteOldest.days} days` : 'OFF'}`);
+  console.log(`   Keep Recent: ${keepRecent.enabled ? `${keepRecent.days} days` : 'OFF'}`);
+  console.log(`   Include Historical: ${includeHistorical}`);
+  
+  const collectionsToClean = includeHistorical ? COLLECTIONS_TO_CLEAN : ['candles_1m'];
+  let totalDeleted = 0;
+  const results: Record<string, { deleted: number; before: number; after: number }> = {};
+  
+  for (const collectionName of collectionsToClean) {
+    try {
+      const collections = await db.listCollections({ name: collectionName }).toArray();
+      if (collections.length === 0) continue;
+      
+      const collection = db.collection(collectionName);
+      const countBefore = await collection.countDocuments();
+      if (countBefore === 0) continue;
+      
+      const isHistorical = collectionName.includes('historical');
+      const timeField = isHistorical ? 'timestamp' : 't';
+      
+      // Get oldest document for deleteOldest calculation
+      const oldestDoc = await collection.findOne({}, { sort: { [timeField]: 1 } });
+      if (!oldestDoc) continue;
+      
+      let oldestTime: number;
+      if (isHistorical) {
+        oldestTime = new Date(oldestDoc.timestamp).getTime();
+      } else {
+        oldestTime = oldestDoc.t * 1000;
+      }
+      
+      let collectionDeleted = 0;
+      
+      // Delete Oldest operation
+      if (deleteOldest.enabled && deleteOldest.days > 0) {
+        const cutoffTime = oldestTime + (deleteOldest.days * 24 * 60 * 60 * 1000);
+        let deleteQuery: Record<string, unknown>;
+        
+        if (isHistorical) {
+          deleteQuery = { timestamp: { $lt: new Date(cutoffTime) } };
+        } else {
+          deleteQuery = { t: { $lt: Math.floor(cutoffTime / 1000) } };
+        }
+        
+        const result = await collection.deleteMany(deleteQuery);
+        collectionDeleted += result.deletedCount;
+        console.log(`   ${collectionName}: Deleted oldest ${deleteOldest.days} days = ${result.deletedCount} records`);
+      }
+      
+      // Keep Recent operation
+      if (keepRecent.enabled && keepRecent.days >= 0) {
+        const cutoffTime = Date.now() - (keepRecent.days * 24 * 60 * 60 * 1000);
+        let deleteQuery: Record<string, unknown>;
+        
+        if (isHistorical) {
+          deleteQuery = { timestamp: { $lt: new Date(cutoffTime) } };
+        } else {
+          deleteQuery = { t: { $lt: Math.floor(cutoffTime / 1000) } };
+        }
+        
+        const result = await collection.deleteMany(deleteQuery);
+        collectionDeleted += result.deletedCount;
+        console.log(`   ${collectionName}: Keep recent ${keepRecent.days} days = ${result.deletedCount} records removed`);
+      }
+      
+      const countAfter = await collection.countDocuments();
+      totalDeleted += collectionDeleted;
+      
+      results[collectionName] = {
+        deleted: collectionDeleted,
+        before: countBefore,
+        after: countAfter,
+      };
+      
+    } catch (error) {
+      console.error(`   ${collectionName}: Error - ${error}`);
+    }
+  }
+  
+  // Update settings with results
+  const MarketDataSettingsModel = mongoose.models.MarketDataSettings;
+  if (MarketDataSettingsModel) {
+    await MarketDataSettingsModel.findOneAndUpdate(
+      { key: 'market_data_settings' },
+      { 
+        $set: { 
+          'cleanup.lastRun': new Date(),
+          'cleanup.lastResults': {
+            success: true,
+            deleteOldest,
+            keepRecent,
+            includeHistorical,
+            deletedCount: totalDeleted,
+            collections: results,
+            timestamp: new Date().toISOString(),
+          },
+        } 
+      }
+    );
+  }
+  
+  console.log(`🧹 [Auto Cleanup] Complete: Deleted ${totalDeleted} total records`);
+  
+  return { success: true, deletedCount: totalDeleted, collections: results };
 }
 
 /**
@@ -151,12 +279,15 @@ export async function runMarketDataMaintenance(): Promise<void> {
         if (settings.cleanup.schedule.type !== 'daily') {
           console.log(`   Days: ${settings.cleanup.schedule.weekDays.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}`);
         }
-        await runCleanup(settings.cleanup.daysToKeep);
+        
+        // Use new cleanup config if available, fallback to legacy
+        const deleteOldest = settings.cleanup.deleteOldest ?? { enabled: true, days: settings.cleanup.daysToKeep };
+        const keepRecent = settings.cleanup.keepRecent ?? { enabled: false, days: 365 };
+        const includeHistorical = settings.cleanup.includeHistorical ?? true;
+        
+        await runCleanup(deleteOldest, keepRecent, includeHistorical);
       }
     }
-    
-    // Gap fill runs in background via API calls during chart requests, not here
-    // This prevents duplicate work and ensures gaps are filled when users need data
     
   } catch (error) {
     console.error('❌ [Market Data Maintenance] Error:', error);

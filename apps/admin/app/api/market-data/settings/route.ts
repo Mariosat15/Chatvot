@@ -17,8 +17,19 @@ const MarketDataSettingsSchema = new mongoose.Schema({
   cleanup: {
     enabled: { type: Boolean, default: false },
     mode: { type: String, enum: ['auto', 'manual'], default: 'manual' },
-    daysToKeep: { type: Number, default: 30 },
+    daysToKeep: { type: Number, default: 30 }, // Legacy - kept for backward compatibility
+    // New: Independent cleanup types - each can be ON/OFF separately
+    deleteOldest: {
+      enabled: { type: Boolean, default: true }, // Default ON
+      days: { type: Number, default: 1, min: 0 }, // No upper limit
+    },
+    keepRecent: {
+      enabled: { type: Boolean, default: false }, // Default OFF
+      days: { type: Number, default: 365, min: 0 }, // No upper limit
+    },
+    includeHistorical: { type: Boolean, default: true }, // Clean all collections
     lastRun: { type: Date, default: null },
+    lastResults: { type: mongoose.Schema.Types.Mixed, default: null }, // Store last cleanup results
     schedule: { type: ScheduleSchema, default: () => ({ type: 'weekly', weekDays: [0], monthDay: 1, hour: 3, minute: 0 }) },
   },
   gapFill: {
