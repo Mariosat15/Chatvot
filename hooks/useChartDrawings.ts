@@ -7,7 +7,6 @@ import {
   DrawingToolType, 
   AnyPrimitive, 
   SerializedDrawing,
-  DrawingEventType,
 } from '@/lib/chart/primitives';
 
 // ============================================
@@ -65,8 +64,14 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
     ...managerOptions
   } = options;
 
-  // Manager reference
+  // Manager reference - create once and persist
   const managerRef = useRef<DrawingManager | null>(null);
+  
+  // Ensure manager exists
+  if (!managerRef.current) {
+    managerRef.current = new DrawingManager(managerOptions);
+    console.log('[useChartDrawings] Created DrawingManager');
+  }
   
   // State
   const [activeTool, setActiveToolState] = useState<DrawingToolType>(null);
@@ -74,20 +79,17 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
   const [drawings, setDrawings] = useState<AnyPrimitive[]>([]);
   const [defaultColor, setDefaultColorState] = useState(managerOptions.defaultColor ?? '#2962ff');
   const [defaultLineWidth, setDefaultLineWidthState] = useState(managerOptions.defaultLineWidth ?? 2);
+  const [isAttached, setIsAttached] = useState(false);
 
-  // Initialize manager
+  // Cleanup on unmount
   useEffect(() => {
-    if (!managerRef.current) {
-      managerRef.current = new DrawingManager(managerOptions);
-    }
-    
     return () => {
+      console.log('[useChartDrawings] Cleaning up');
       managerRef.current?.detach();
-      managerRef.current = null;
     };
   }, []);
 
-  // Set up event listeners
+  // Set up event listeners when manager changes
   useEffect(() => {
     const manager = managerRef.current;
     if (!manager) return;
@@ -107,22 +109,17 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
     };
 
     const handleCreated = () => {
+      console.log('[useChartDrawings] Drawing created');
       updateDrawings();
-      if (autoSave) save();
     };
 
     const handleDeleted = () => {
       setSelectedDrawing(null);
       updateDrawings();
-      if (autoSave) save();
     };
 
     const handleMoved = () => {
       updateDrawings();
-    };
-
-    const handleResized = () => {
-      if (autoSave) save();
     };
 
     manager.on('selected', handleSelected);
@@ -130,7 +127,6 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
     manager.on('created', handleCreated);
     manager.on('deleted', handleDeleted);
     manager.on('moved', handleMoved);
-    manager.on('resized', handleResized);
 
     return () => {
       manager.off('selected', handleSelected);
@@ -138,12 +134,12 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
       manager.off('created', handleCreated);
       manager.off('deleted', handleDeleted);
       manager.off('moved', handleMoved);
-      manager.off('resized', handleResized);
     };
-  }, [autoSave]);
+  }, []);
 
   // Set active tool
   const setActiveTool = useCallback((tool: DrawingToolType) => {
+    console.log('[useChartDrawings] setActiveTool:', tool, 'isAttached:', managerRef.current?.isAttached());
     setActiveToolState(tool);
     managerRef.current?.setActiveTool(tool);
   }, []);
@@ -170,24 +166,11 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
     managerRef.current?.clearAll();
     setSelectedDrawing(null);
     setDrawings([]);
-    if (autoSave) save();
-  }, [autoSave]);
-
-  // Attach to chart
-  const attach = useCallback((
-    chart: IChartApi, 
-    series: ISeriesApi<'Candlestick'>, 
-    container: HTMLElement
-  ) => {
-    managerRef.current?.attach(chart, series, container);
-    load(); // Load saved drawings
-  }, []);
-
-  // Detach from chart
-  const detach = useCallback(() => {
-    if (autoSave) save();
-    managerRef.current?.detach();
-  }, [autoSave]);
+    // Clear localStorage
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {}
+  }, [storageKey]);
 
   // Save drawings to storage
   const save = useCallback(() => {
@@ -196,6 +179,7 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
     try {
       const data = managerRef.current.serialize();
       localStorage.setItem(storageKey, JSON.stringify(data));
+      console.log('[useChartDrawings] Saved', data.length, 'drawings');
     } catch (error) {
       console.error('Failed to save drawings:', error);
     }
@@ -203,7 +187,10 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
 
   // Load drawings from storage
   const load = useCallback(() => {
-    if (!managerRef.current) return;
+    if (!managerRef.current || !managerRef.current.isAttached()) {
+      console.log('[useChartDrawings] Cannot load - manager not attached');
+      return;
+    }
     
     try {
       const stored = localStorage.getItem(storageKey);
@@ -211,11 +198,36 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
         const data: SerializedDrawing[] = JSON.parse(stored);
         managerRef.current.deserialize(data);
         setDrawings(managerRef.current.getAllDrawings());
+        console.log('[useChartDrawings] Loaded', data.length, 'drawings');
       }
     } catch (error) {
       console.error('Failed to load drawings:', error);
     }
   }, [storageKey]);
+
+  // Attach to chart
+  const attach = useCallback((
+    chart: IChartApi, 
+    series: ISeriesApi<'Candlestick'>, 
+    container: HTMLElement
+  ) => {
+    console.log('[useChartDrawings] Attaching to chart');
+    managerRef.current?.attach(chart, series, container);
+    setIsAttached(true);
+    
+    // Load saved drawings after attachment
+    setTimeout(() => {
+      load();
+    }, 100);
+  }, [load]);
+
+  // Detach from chart
+  const detach = useCallback(() => {
+    console.log('[useChartDrawings] Detaching from chart');
+    if (autoSave) save();
+    managerRef.current?.detach();
+    setIsAttached(false);
+  }, [autoSave, save]);
 
   return {
     manager: managerRef.current,
