@@ -462,31 +462,31 @@ export default function MarketDataSection() {
 
   // Initialize cleanup state from loaded settings
   useEffect(() => {
-    if (settings?.cleanup) {
-      // Load deleteOldest config
-      if (settings.cleanup.deleteOldest) {
-        setDeleteOldestEnabled(settings.cleanup.deleteOldest.enabled ?? true);
-        setDeleteOldestDays(settings.cleanup.deleteOldest.days ?? 1);
-      }
-      // Load keepRecent config
-      if (settings.cleanup.keepRecent) {
-        setKeepRecentEnabled(settings.cleanup.keepRecent.enabled ?? false);
-        setKeepRecentDays(settings.cleanup.keepRecent.days ?? 365);
-      }
-      // Load includeHistorical
-      if (settings.cleanup.includeHistorical !== undefined) {
-        setCleanupIncludeHistorical(settings.cleanup.includeHistorical);
-      }
+    if (settings) {
+      // Load deleteOldest config - always set from settings or defaults
+      const deleteOldest = settings.cleanup?.deleteOldest;
+      setDeleteOldestEnabled(deleteOldest?.enabled ?? true);
+      setDeleteOldestDays(deleteOldest?.days ?? 1);
+      
+      // Load keepRecent config - always set from settings or defaults
+      const keepRecent = settings.cleanup?.keepRecent;
+      setKeepRecentEnabled(keepRecent?.enabled ?? false);
+      setKeepRecentDays(keepRecent?.days ?? 365);
+      
+      // Load includeHistorical - always set from settings or default
+      setCleanupIncludeHistorical(settings.cleanup?.includeHistorical ?? true);
+      
       // Load last results
-      if (settings.cleanup.lastResults) {
+      if (settings.cleanup?.lastResults) {
         setCleanupResults(settings.cleanup.lastResults as typeof cleanupResults);
       }
+      
       // Mark initial load as complete (with small delay to allow state to settle)
       setTimeout(() => {
         cleanupSettingsLoadedRef.current = true;
       }, 100);
     }
-  }, [settings?.cleanup]);
+  }, [settings]);
 
   // Save cleanup settings when they change (debounced)
   // IMPORTANT: Skip save until initial settings have been loaded to prevent race condition
