@@ -3450,6 +3450,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                 { label: '4H', value: '240' as Timeframe },
                 { label: '1D', value: 'D' as Timeframe },
                 { label: '1W', value: 'W' as Timeframe },
+                { label: '1M', value: 'M' as Timeframe },
               ].map((tf) => (
                 <button
                   key={tf.value}
@@ -3466,9 +3467,9 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               ))}
             </div>
 
-            {/* Right side: Time display */}
+            {/* Right side: UTC Time display */}
             <div className="flex items-center gap-2 text-[10px] text-[#787B86] font-mono">
-              <span>{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} UTC</span>
+              <span>{new Date().toISOString().slice(11, 19)} UTC</span>
             </div>
           </div>
         </div>
