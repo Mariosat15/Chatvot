@@ -420,6 +420,8 @@ export class DrawingManager {
           startChartPoint: chartPoint,
           lastChartPoint: chartPoint,
         };
+        // Disable chart scrolling while dragging drawing
+        this.setChartScrollEnabled(false);
         this.setCursor('grabbing');
         return;
       }
@@ -440,6 +442,8 @@ export class DrawingManager {
           startChartPoint: chartPoint,
           lastChartPoint: chartPoint,
         };
+        // Disable chart scrolling while dragging drawing
+        this.setChartScrollEnabled(false);
         this.setCursor('move');
         return;
       }
@@ -492,6 +496,8 @@ export class DrawingManager {
     this._isMouseDown = false;
     
     if (this._dragState) {
+      // Re-enable chart scrolling after drag
+      this.setChartScrollEnabled(true);
       this.emitEvent('moved', this._dragState.drawing);
       this._dragState = null;
     }
@@ -578,6 +584,26 @@ export class DrawingManager {
       else if (this._activeTool) this.setActiveTool(null);
       else this.deselect();
     }
+  }
+
+  // ============================================
+  // CHART SCROLL CONTROL
+  // ============================================
+
+  /**
+   * Enable/disable chart scrolling via mouse drag
+   * Uses Lightweight Charts official API: handleScroll.pressedMouseMove
+   * Reference: https://tradingview.github.io/lightweight-charts/docs/api/interfaces/HandleScrollOptions
+   */
+  private setChartScrollEnabled(enabled: boolean): void {
+    if (!this._chart) return;
+    try {
+      this._chart.applyOptions({
+        handleScroll: {
+          pressedMouseMove: enabled,
+        },
+      });
+    } catch {}
   }
 
   // ============================================
