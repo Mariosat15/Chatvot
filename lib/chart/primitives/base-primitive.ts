@@ -330,11 +330,12 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
   // ============================================
   // FREE COORDINATE CONVERSION (MT5-style, no snapping)
   // Uses logical index for stable positioning during scroll/zoom
+  // Reference: https://tradingview.github.io/lightweight-charts/docs/plugins/series-primitives
   // ============================================
 
   /**
    * Convert FreePoint to screen coordinates
-   * Priority: 1) stored screenX (for immediate render), 2) logical index, 3) timestamp calculation
+   * Uses logicalIndex for stable X positioning (recommended by official docs)
    */
   protected freePointToScreen(point: FreePoint): ScreenPoint | null {
     if (!this._chart || !this._series) return null;
@@ -343,45 +344,14 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
       const timeScale = this._chart.timeScale();
       let x: number | null = null;
       
-      // Priority 1: Use stored logical index with logicalToCoordinate
-      if ((point as any).logicalIndex !== undefined) {
-        x = timeScale.logicalToCoordinate((point as any).logicalIndex);
+      // Use logical index directly - this is the official recommended approach
+      if (point.logicalIndex !== undefined) {
+        x = timeScale.logicalToCoordinate(point.logicalIndex as any);
       }
       
-      // Priority 2: Calculate from timestamp
-      if (x === null) {
-        const visibleRange = timeScale.getVisibleRange();
-        const logicalRange = timeScale.getVisibleLogicalRange();
-        
-        if (visibleRange && logicalRange) {
-          const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-          const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
-          const timeSpan = endTime - startTime;
-          const logicalSpan = logicalRange.to - logicalRange.from;
-          
-          if (timeSpan > 0 && logicalSpan > 0) {
-            const timeRatio = (point.timestamp - startTime) / timeSpan;
-            const logicalIndex = logicalRange.from + timeRatio * logicalSpan;
-            x = timeScale.logicalToCoordinate(logicalIndex);
-          }
-        }
-      }
-      
-      // Priority 3: Fallback to simple ratio with timeScale.width()
-      if (x === null) {
-        const visibleRange = timeScale.getVisibleRange();
-        const timeScaleWidth = timeScale.width();
-        
-        if (visibleRange && timeScaleWidth > 0) {
-          const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-          const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
-          const timeSpan = endTime - startTime;
-          
-          if (timeSpan > 0) {
-            const timeRatio = (point.timestamp - startTime) / timeSpan;
-            x = timeRatio * timeScaleWidth;
-          }
-        }
+      // Fallback: try timeToCoordinate for exact bar times
+      if (x === null && point.timestamp) {
+        x = timeScale.timeToCoordinate(point.timestamp as any);
       }
       
       if (x === null) return null;
@@ -398,7 +368,7 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
 
   /**
    * Convert screen coordinates to FreePoint
-   * Stores logical index for stable positioning
+   * Stores logical index for stable positioning (official pattern)
    */
   protected screenToFreePoint(point: ScreenPoint): FreePoint | null {
     if (!this._chart || !this._series) return null;
@@ -406,36 +376,13 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
     try {
       const timeScale = this._chart.timeScale();
       
-      // Get logical index
+      // Get logical index directly - this is the key for stable positioning
       const logicalIndex = timeScale.coordinateToLogical(point.x as Coordinate);
+      if (logicalIndex === null) return null;
       
-      // Get visible ranges
-      const visibleRange = timeScale.getVisibleRange();
-      const logicalRange = timeScale.getVisibleLogicalRange();
-      
-      if (!visibleRange) return null;
-      
-      // Calculate time bounds
-      const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-      const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
-      const timeSpan = endTime - startTime;
-      
-      let timestamp: number;
-      
-      if (logicalRange && logicalIndex !== null) {
-        const logicalSpan = logicalRange.to - logicalRange.from;
-        if (logicalSpan > 0 && timeSpan > 0) {
-          const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
-          timestamp = startTime + logicalRatio * timeSpan;
-        } else {
-          return null;
-        }
-      } else {
-        // Fallback: use screen position ratio
-        const timeScaleWidth = timeScale.width();
-        if (timeScaleWidth <= 0 || timeSpan <= 0) return null;
-        timestamp = startTime + (point.x / timeScaleWidth) * timeSpan;
-      }
+      // Also get timestamp for persistence (using coordinateToTime)
+      const time = timeScale.coordinateToTime(point.x as Coordinate);
+      const timestamp = typeof time === 'number' ? time : 0;
       
       // Price from Y coordinate
       const price = this._series.coordinateToPrice(point.y as Coordinate);
@@ -444,8 +391,8 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
       return { 
         timestamp, 
         price,
-        logicalIndex: logicalIndex ?? undefined,
-      } as FreePoint & { logicalIndex?: number };
+        logicalIndex,
+      };
     } catch {
       return null;
     }

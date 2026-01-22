@@ -16,8 +16,9 @@ export interface ChartPoint {
 
 // Free-floating point that doesn't snap to candles (MT5-style)
 export interface FreePoint {
-  timestamp: number; // Precise Unix timestamp in seconds (can be fractional)
+  timestamp: number; // Precise Unix timestamp in seconds (for persistence)
   price: number;
+  logicalIndex?: number; // Logical index for accurate rendering (allows fractional values)
 }
 
 export interface ScreenPoint {

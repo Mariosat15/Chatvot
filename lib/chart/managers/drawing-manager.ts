@@ -402,9 +402,8 @@ export class DrawingManager {
   }
 
   /**
-   * Convert screen point to FreePoint-compatible ChartPoint
-   * Uses logical coordinate system for proper chart alignment
-   * Reference: https://tradingview.github.io/lightweight-charts/docs/plugins/series-primitives
+   * Convert screen point to ChartPoint with logical index
+   * Used for dragging operations on free-positioning tools
    */
   private screenToFreeChartPoint(point: ScreenPoint): ChartPoint | null {
     if (!this._chart || !this._series) return null;
@@ -415,28 +414,20 @@ export class DrawingManager {
       
       const timeScale = this._chart.timeScale();
       
-      // Convert X to logical index using native API
+      // Get logical index for position
       const logicalIndex = timeScale.coordinateToLogical(point.x as Coordinate);
-      if (logicalIndex === null) return null;
       
-      // Get logical and time ranges
-      const logicalRange = timeScale.getVisibleLogicalRange();
-      const visibleRange = timeScale.getVisibleRange();
+      // Get timestamp from coordinate
+      const time = timeScale.coordinateToTime(point.x as Coordinate);
+      const timestamp = typeof time === 'number' ? time : 0;
       
-      if (!logicalRange || !visibleRange) return null;
+      // Return ChartPoint with logical index attached for free-positioning tools
+      const chartPoint = { time: timestamp as any, price } as ChartPoint & { logicalIndex?: number };
+      if (logicalIndex !== null) {
+        chartPoint.logicalIndex = logicalIndex;
+      }
       
-      const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-      const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
-      const timeSpan = endTime - startTime;
-      const logicalSpan = logicalRange.to - logicalRange.from;
-      
-      if (timeSpan <= 0 || logicalSpan <= 0) return null;
-      
-      // Convert logical index to timestamp
-      const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
-      const timestamp = startTime + logicalRatio * timeSpan;
-      
-      return { time: timestamp as any, price };
+      return chartPoint;
     } catch { return null; }
   }
 
@@ -460,7 +451,8 @@ export class DrawingManager {
 
   /**
    * Get FreePoint from event - MT5-style precise positioning
-   * Stores both logical index AND screen ratio for maximum accuracy
+   * Stores logical index for stable positioning (official Lightweight Charts pattern)
+   * Reference: https://tradingview.github.io/lightweight-charts/docs/plugins/series-primitives
    */
   private getFreePointFromEvent(param: MouseEventParams): FreePoint | null {
     if (!param.point || !this._chart || !this._series) return null;
@@ -471,42 +463,20 @@ export class DrawingManager {
       
       const timeScale = this._chart.timeScale();
       
-      // Get logical index from click position
+      // Get logical index directly - this is the key for stable positioning
+      // logicalIndex allows fractional values between bars (MT5-style free positioning)
       const logicalIndex = timeScale.coordinateToLogical(param.point.x as Coordinate);
+      if (logicalIndex === null) return null;
       
-      // Also store the screen X position for immediate rendering accuracy
-      const screenX = param.point.x;
+      // Also get timestamp for persistence
+      const time = timeScale.coordinateToTime(param.point.x as Coordinate);
+      const timestamp = typeof time === 'number' ? time : 0;
       
-      // Get ranges for timestamp calculation
-      const logicalRange = timeScale.getVisibleLogicalRange();
-      const visibleRange = timeScale.getVisibleRange();
-      
-      if (!logicalRange || !visibleRange) return null;
-      
-      // Calculate timestamp from logical index if available
-      const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
-      const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
-      const timeSpan = endTime - startTime;
-      const logicalSpan = logicalRange.to - logicalRange.from;
-      
-      let timestamp: number;
-      if (logicalIndex !== null && timeSpan > 0 && logicalSpan > 0) {
-        const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
-        timestamp = startTime + logicalRatio * timeSpan;
-      } else {
-        // Fallback: use screen position ratio
-        const timeScaleWidth = timeScale.width();
-        if (timeScaleWidth <= 0 || timeSpan <= 0) return null;
-        timestamp = startTime + (screenX / timeScaleWidth) * timeSpan;
-      }
-      
-      // Return with both logical index and screen X for accurate rendering
       return { 
         timestamp, 
         price,
-        logicalIndex: logicalIndex ?? undefined,
-        screenX, // Store original screen X for immediate rendering
-      } as FreePoint & { logicalIndex?: number; screenX?: number };
+        logicalIndex, // This is the key - store for stable rendering
+      };
     } catch { return null; }
   }
 
@@ -580,7 +550,7 @@ export class DrawingManager {
       this._rafId = requestAnimationFrame(() => {
         this._pendingUpdate = false;
         
-        if (!this._dragState) return;
+        if (!this._dragState || !this._chart) return;
         
         // Use free coordinates for trend line tools (MT5-style)
         const isFreePositionTool = ['trend-line', 'ray', 'extended-line', 'arrow'].includes(this._dragState.drawing.type);
@@ -594,15 +564,22 @@ export class DrawingManager {
           // Anchor drag - direct update
           this._dragState.drawing.moveAnchor(this._dragState.anchor, chartPoint);
         } else {
-          // Move entire drawing - calculate both price and time deltas
+          // Move entire drawing - calculate deltas
           const deltaPrice = chartPoint.price - this._dragState.lastChartPoint.price;
-          const currentTime = typeof chartPoint.time === 'number' ? chartPoint.time : 0;
-          const lastTime = typeof this._dragState.lastChartPoint.time === 'number' ? this._dragState.lastChartPoint.time : 0;
-          const deltaTime = currentTime - lastTime;
+          
+          // For free-positioning tools, use logical index delta
+          let deltaLogical = 0;
+          if (isFreePositionTool) {
+            const currentLogical = (chartPoint as any).logicalIndex;
+            const lastLogical = (this._dragState.lastChartPoint as any).logicalIndex;
+            if (currentLogical !== undefined && lastLogical !== undefined) {
+              deltaLogical = currentLogical - lastLogical;
+            }
+          }
           
           // Update if meaningful change in either direction
-          if (Math.abs(deltaPrice) > 0.00001 || Math.abs(deltaTime) > 0.1) {
-            this._dragState.drawing.move(deltaPrice, deltaTime);
+          if (Math.abs(deltaPrice) > 0.00001 || Math.abs(deltaLogical) > 0.001) {
+            this._dragState.drawing.move(deltaPrice, deltaLogical);
             this._dragState.lastChartPoint = chartPoint;
           }
         }

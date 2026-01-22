@@ -1,11 +1,18 @@
 /**
- * Trend Line Primitive
- * Draws a line between two points with proper coordinate handling
+ * Trend Line Primitive - Official Plugin Pattern
+ * 
+ * Based on TradingView Lightweight Charts plugin examples:
+ * - https://tradingview.github.io/lightweight-charts/docs/plugins/series-primitives
+ * - https://github.com/tradingview/lightweight-charts/discussions/1434
+ * 
+ * Key insight: Store logical index directly for stable rendering.
+ * The logical index allows fractional values between bars (MT5-style free positioning).
  */
 
 import { 
   ISeriesPrimitivePaneView, 
   SeriesPrimitivePaneViewZOrder,
+  Coordinate,
 } from 'lightweight-charts';
 import { 
   BasePrimitive, 
@@ -39,15 +46,15 @@ class TrendLineRenderer extends BasePaneRenderer {
     const [p1, p2] = data.points;
     const options = data.options as TrendLineOptions;
 
-    // Scale coordinates
-    const x1 = p1.x * hpr;
-    const y1 = p1.y * vpr;
-    const x2 = p2.x * hpr;
-    const y2 = p2.y * vpr;
+    // Scale coordinates to bitmap space (pixel-perfect rendering)
+    const x1 = Math.round(p1.x * hpr);
+    const y1 = Math.round(p1.y * vpr);
+    const x2 = Math.round(p2.x * hpr);
+    const y2 = Math.round(p2.y * vpr);
 
     // Set line style
     ctx.strokeStyle = options.color || '#2962ff';
-    ctx.lineWidth = (options.lineWidth || 2) * hpr;
+    ctx.lineWidth = Math.max(1, Math.round((options.lineWidth || 2) * hpr));
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
@@ -111,8 +118,8 @@ class TrendLineRenderer extends BasePaneRenderer {
     const borderWidth = 2 * hpr;
     
     [p1, p2].forEach(p => {
-      const x = p.x * hpr;
-      const y = p.y * vpr;
+      const x = Math.round(p.x * hpr);
+      const y = Math.round(p.y * vpr);
       
       // White fill
       ctx.fillStyle = '#ffffff';
@@ -136,8 +143,8 @@ class TrendLineRenderer extends BasePaneRenderer {
 
     // Middle anchor for moving entire line
     if (data.isSelected) {
-      const midX = ((p1.x + p2.x) / 2) * hpr;
-      const midY = ((p1.y + p2.y) / 2) * vpr;
+      const midX = Math.round(((p1.x + p2.x) / 2) * hpr);
+      const midY = Math.round(((p1.y + p2.y) / 2) * vpr);
       
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
@@ -190,10 +197,13 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
     return [new TrendLinePaneView(this)];
   }
 
+  /**
+   * Get render data - converts FreePoints to screen coordinates
+   * Uses logicalToCoordinate for stable X positioning
+   */
   getRenderData(): DrawingRenderData {
-    // Use free coordinate conversion (no snapping)
-    const startScreen = this.freePointToScreen(this._options.startPoint);
-    const endScreen = this.freePointToScreen(this._options.endPoint);
+    const startScreen = this.projectPoint(this._options.startPoint);
+    const endScreen = this.projectPoint(this._options.endPoint);
     
     const points: ScreenPoint[] = [];
     if (startScreen) points.push(startScreen);
@@ -218,6 +228,43 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
     };
   }
 
+  /**
+   * Project a FreePoint to screen coordinates
+   * Uses logical index directly with logicalToCoordinate for accurate X
+   */
+  private projectPoint(point: FreePoint): ScreenPoint | null {
+    if (!this._chart || !this._series) return null;
+    
+    try {
+      const timeScale = this._chart.timeScale();
+      let x: number | null = null;
+      
+      // Use logical index if available - this is the most accurate
+      if (point.logicalIndex !== undefined) {
+        x = timeScale.logicalToCoordinate(point.logicalIndex as any);
+      }
+      
+      // Fallback: try to find X from timestamp (less accurate for between-bar positions)
+      if (x === null) {
+        // Try native timeToCoordinate first (works for exact bar times)
+        const nativeX = timeScale.timeToCoordinate(point.timestamp as any);
+        if (nativeX !== null) {
+          x = nativeX;
+        }
+      }
+      
+      if (x === null) return null;
+      
+      // Y coordinate from price
+      const y = this._series.priceToCoordinate(point.price);
+      if (y === null) return null;
+      
+      return { x, y };
+    } catch {
+      return null;
+    }
+  }
+
   // ============================================
   // INTERACTION
   // ============================================
@@ -225,8 +272,8 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
   hitTest(point: ScreenPoint): boolean {
     if (!this._options.visible) return false;
     
-    const p1 = this.freePointToScreen(this._options.startPoint);
-    const p2 = this.freePointToScreen(this._options.endPoint);
+    const p1 = this.projectPoint(this._options.startPoint);
+    const p2 = this.projectPoint(this._options.endPoint);
     
     if (!p1 || !p2) return false;
     
@@ -237,8 +284,8 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
   getAnchorPoints(): ScreenPoint[] {
     const anchors: ScreenPoint[] = [];
     
-    const p1 = this.freePointToScreen(this._options.startPoint);
-    const p2 = this.freePointToScreen(this._options.endPoint);
+    const p1 = this.projectPoint(this._options.startPoint);
+    const p2 = this.projectPoint(this._options.endPoint);
     
     if (p1) anchors.push(p1);
     if (p2) anchors.push(p2);
@@ -252,8 +299,8 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
   }
 
   getAnchorAtPoint(point: ScreenPoint, threshold: number = 15): AnchorPosition | null {
-    const p1 = this.freePointToScreen(this._options.startPoint);
-    const p2 = this.freePointToScreen(this._options.endPoint);
+    const p1 = this.projectPoint(this._options.startPoint);
+    const p2 = this.projectPoint(this._options.endPoint);
     
     if (p1 && this.distanceToPoint(point, p1) < threshold) return 'start';
     if (p2 && this.distanceToPoint(point, p2) < threshold) return 'end';
@@ -269,11 +316,9 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
   moveAnchor(anchor: AnchorPosition, point: ChartPoint): void {
     if (this._options.locked) return;
     
-    // Convert ChartPoint to FreePoint
-    const freePoint: FreePoint = {
-      timestamp: typeof point.time === 'number' ? point.time : 0,
-      price: point.price,
-    };
+    // Convert ChartPoint to FreePoint with logical index
+    const freePoint = this.chartPointToFreePoint(point);
+    if (!freePoint) return;
     
     switch (anchor) {
       case 'start':
@@ -283,32 +328,73 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
         this._options.endPoint = freePoint;
         break;
       case 'middle':
-        // Calculate both price and time deltas for middle anchor
+        // Calculate deltas
         const oldMidPrice = (this._options.startPoint.price + this._options.endPoint.price) / 2;
-        const oldMidTime = (this._options.startPoint.timestamp + this._options.endPoint.timestamp) / 2;
         const deltaPrice = freePoint.price - oldMidPrice;
-        const deltaTime = freePoint.timestamp - oldMidTime;
-        // Move both endpoints
+        
+        // For logical index, calculate delta if available
+        if (freePoint.logicalIndex !== undefined) {
+          const oldStartLogical = this._options.startPoint.logicalIndex ?? 0;
+          const oldEndLogical = this._options.endPoint.logicalIndex ?? 0;
+          const oldMidLogical = (oldStartLogical + oldEndLogical) / 2;
+          const deltaLogical = freePoint.logicalIndex - oldMidLogical;
+          
+          this._options.startPoint.logicalIndex = oldStartLogical + deltaLogical;
+          this._options.endPoint.logicalIndex = oldEndLogical + deltaLogical;
+        }
+        
+        // Move both endpoints by price delta
         this._options.startPoint.price += deltaPrice;
         this._options.endPoint.price += deltaPrice;
-        this._options.startPoint.timestamp += deltaTime;
-        this._options.endPoint.timestamp += deltaTime;
         break;
     }
     
     this.requestUpdate();
   }
 
-  move(deltaPrice: number, deltaTime: number): void {
+  move(deltaPrice: number, deltaLogical: number): void {
     if (this._options.locked) return;
     
-    // Move both vertically (price) and horizontally (time)
+    // Move price
     this._options.startPoint.price += deltaPrice;
     this._options.endPoint.price += deltaPrice;
-    this._options.startPoint.timestamp += deltaTime;
-    this._options.endPoint.timestamp += deltaTime;
+    
+    // Move logical index
+    if (this._options.startPoint.logicalIndex !== undefined) {
+      this._options.startPoint.logicalIndex += deltaLogical;
+    }
+    if (this._options.endPoint.logicalIndex !== undefined) {
+      this._options.endPoint.logicalIndex += deltaLogical;
+    }
     
     this.requestUpdate();
+  }
+
+  /**
+   * Convert ChartPoint to FreePoint with logical index
+   */
+  private chartPointToFreePoint(point: ChartPoint): FreePoint | null {
+    if (!this._chart) return null;
+    
+    try {
+      const timeScale = this._chart.timeScale();
+      
+      // Get logical index from time
+      const x = timeScale.timeToCoordinate(point.time);
+      let logicalIndex: number | undefined;
+      
+      if (x !== null) {
+        logicalIndex = timeScale.coordinateToLogical(x as Coordinate) ?? undefined;
+      }
+      
+      return {
+        timestamp: typeof point.time === 'number' ? point.time : 0,
+        price: point.price,
+        logicalIndex,
+      };
+    } catch {
+      return null;
+    }
   }
 
   // ============================================
