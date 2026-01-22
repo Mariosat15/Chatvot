@@ -333,18 +333,35 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
 
   /**
    * Convert FreePoint (precise timestamp) to screen coordinates
-   * Uses the chart's actual timeToCoordinate for accurate positioning
+   * Uses LINEAR INTERPOLATION for X to allow free positioning anywhere on chart
+   * (Native timeToCoordinate snaps to candle times which breaks free positioning)
    */
   protected freePointToScreen(point: FreePoint): ScreenPoint | null {
     if (!this._chart || !this._series) return null;
     
     try {
-      // Use the chart's native timeToCoordinate 
-      // Pass timestamp as Time (works for fractional values too)
-      const x = this._chart.timeScale().timeToCoordinate(point.timestamp as Time);
+      // Get visible time range for interpolation
+      const visibleRange = this._chart.timeScale().getVisibleRange();
+      if (!visibleRange) return null;
+      
+      // Get chart width
+      const chartElement = (this._chart as any).chartElement?.();
+      const chartWidth = chartElement?.clientWidth || 800;
+      
+      // Time range bounds (in seconds)
+      const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+      const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+      const timeSpan = endTime - startTime;
+      
+      if (timeSpan <= 0 || chartWidth <= 0) return null;
+      
+      // LINEAR INTERPOLATION for X (allows free positioning, no snapping!)
+      const x = ((point.timestamp - startTime) / timeSpan) * chartWidth;
+      
+      // Use native priceToCoordinate for Y (price axis is continuous)
       const y = this._series.priceToCoordinate(point.price);
       
-      if (x === null || y === null) return null;
+      if (y === null) return null;
       
       return { x, y };
     } catch {
@@ -354,19 +371,37 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
 
   /**
    * Convert screen coordinates to FreePoint (precise timestamp)
-   * Uses the chart's native coordinateToTime for accuracy
+   * Uses LINEAR INTERPOLATION for X to allow free positioning anywhere on chart
+   * (Native coordinateToTime snaps to candle times which breaks free positioning)
    */
   protected screenToFreePoint(point: ScreenPoint): FreePoint | null {
     if (!this._chart || !this._series) return null;
     
     try {
-      // Use the chart's native coordinate conversion
-      const timestamp = this._chart.timeScale().coordinateToTime(point.x as Coordinate);
+      // Get visible time range for interpolation
+      const visibleRange = this._chart.timeScale().getVisibleRange();
+      if (!visibleRange) return null;
+      
+      // Get chart width
+      const chartElement = (this._chart as any).chartElement?.();
+      const chartWidth = chartElement?.clientWidth || 800;
+      
+      // Time range bounds (in seconds)
+      const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
+      const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
+      const timeSpan = endTime - startTime;
+      
+      if (timeSpan <= 0 || chartWidth <= 0) return null;
+      
+      // LINEAR INTERPOLATION for timestamp (allows free positioning, no snapping!)
+      const timestamp = startTime + (point.x / chartWidth) * timeSpan;
+      
+      // Use native coordinateToPrice for Y (price axis is continuous)
       const price = this._series.coordinateToPrice(point.y as Coordinate);
       
-      if (timestamp === null || price === null) return null;
+      if (price === null) return null;
       
-      return { timestamp: timestamp as number, price };
+      return { timestamp, price };
     } catch {
       return null;
     }
