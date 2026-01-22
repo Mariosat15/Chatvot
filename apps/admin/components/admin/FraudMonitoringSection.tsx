@@ -111,6 +111,28 @@ interface DeviceStats {
   proxyDevices: number;
 }
 
+interface ManualCheckResult {
+  user: Record<string, unknown>;
+  suspicionScore: Record<string, unknown> | null;
+  alerts: FraudAlert[];
+  devices: DeviceFingerprint[];
+  restrictions: Array<Record<string, unknown>>;
+  lockouts: Array<Record<string, unknown>>;
+  paymentFingerprints: Array<Record<string, unknown>>;
+  history: Array<Record<string, unknown>>;
+  summary: {
+    alertsTotal: number;
+    alertsPending: number;
+    alertsInvestigating: number;
+    devicesTotal: number;
+    devicesHighRisk: number;
+    restrictionsActive: number;
+    lockoutsActive: number;
+    paymentFingerprintsTotal: number;
+    historyEntries: number;
+  };
+}
+
 export default function FraudMonitoringSection() {
   const [alerts, setAlerts] = useState<FraudAlert[]>([]);
   const [devices, setDevices] = useState<DeviceFingerprint[]>([]);
@@ -143,6 +165,11 @@ export default function FraudMonitoringSection() {
   const [selectedScoreUserId, setSelectedScoreUserId] = useState<string | null>(null);
   const [showScoreDialog, setShowScoreDialog] = useState(false);
   const [unlockingAccount, setUnlockingAccount] = useState<string | null>(null);
+  const [manualEmail, setManualEmail] = useState('');
+  const [manualUserId, setManualUserId] = useState('');
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [manualResult, setManualResult] = useState<ManualCheckResult | null>(null);
 
   // Handler to unlock a locked account (for brute_force alerts)
   const handleUnlockAccount = async (alert: FraudAlert) => {
@@ -281,6 +308,45 @@ export default function FraudMonitoringSection() {
     } catch (error) {
       console.error('❌ Error fetching devices:', error);
       console.error('Error details:', error instanceof Error ? error.message : error);
+    }
+  };
+
+  const runManualCheck = async () => {
+    const email = manualEmail.trim();
+    const userId = manualUserId.trim();
+
+    if (!email && !userId) {
+      toast.error('Enter a user email or user ID');
+      return;
+    }
+
+    setManualLoading(true);
+    setManualError(null);
+    setManualResult(null);
+
+    try {
+      const response = await fetch('/api/fraud/manual-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, userId })
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.success === false) {
+        const message = data.message || 'Manual check failed';
+        setManualError(message);
+        toast.error(message);
+        return;
+      }
+
+      setManualResult(data.data as ManualCheckResult);
+    } catch (error) {
+      console.error('Manual check failed:', error);
+      setManualError('Manual check failed');
+      toast.error('Manual check failed');
+    } finally {
+      setManualLoading(false);
     }
   };
 
@@ -704,6 +770,10 @@ export default function FraudMonitoringSection() {
           <TabsTrigger value="restricted" className="data-[state=active]:bg-gray-700">
             <Ban className="h-4 w-4 mr-2" />
             Restricted Users
+          </TabsTrigger>
+          <TabsTrigger value="manual-check" className="data-[state=active]:bg-gray-700">
+            <Search className="h-4 w-4 mr-2" />
+            Manual Check
           </TabsTrigger>
         <TabsTrigger value="settings" className="data-[state=active]:bg-gray-700">
           <Settings className="h-4 w-4 mr-2" />
@@ -1177,6 +1247,119 @@ export default function FraudMonitoringSection() {
         {/* Restricted Users Tab */}
         <TabsContent value="restricted" className="space-y-4">
           <RestrictedUsersSection />
+        </TabsContent>
+
+        {/* Manual Check Tab */}
+        <TabsContent value="manual-check" className="space-y-4">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-gray-100 flex items-center gap-2">
+                <Search className="h-5 w-5 text-blue-400" />
+                Manual User Check
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Enter a user email or user ID to run a full fraud check and view all available data.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-gray-300">User Email</Label>
+                  <Input
+                    value={manualEmail}
+                    onChange={(e) => setManualEmail(e.target.value)}
+                    placeholder="user@email.com"
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-2"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-300">User ID</Label>
+                  <Input
+                    value={manualUserId}
+                    onChange={(e) => setManualUserId(e.target.value)}
+                    placeholder="user id or ObjectId"
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-2"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={runManualCheck}
+                  disabled={manualLoading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {manualLoading ? 'Checking...' : 'Run Manual Check'}
+                </Button>
+                {manualError && (
+                  <span className="text-sm text-red-400">{manualError}</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {manualResult && (
+            <div className="space-y-4">
+              <Card className="bg-gray-800 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-300">
+                  <div>Alerts: <span className="text-white">{manualResult.summary.alertsTotal}</span></div>
+                  <div>Pending: <span className="text-yellow-400">{manualResult.summary.alertsPending}</span></div>
+                  <div>Investigating: <span className="text-blue-400">{manualResult.summary.alertsInvestigating}</span></div>
+                  <div>Devices: <span className="text-white">{manualResult.summary.devicesTotal}</span></div>
+                  <div>High Risk Devices: <span className="text-red-400">{manualResult.summary.devicesHighRisk}</span></div>
+                  <div>Active Restrictions: <span className="text-red-400">{manualResult.summary.restrictionsActive}</span></div>
+                  <div>Active Lockouts: <span className="text-red-400">{manualResult.summary.lockoutsActive}</span></div>
+                  <div>Payment Fingerprints: <span className="text-white">{manualResult.summary.paymentFingerprintsTotal}</span></div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-800 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">User Profile</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-gray-300 space-y-1">
+                  <div><span className="text-gray-400">ID:</span> {String(manualResult.user.id || manualResult.user._id || '')}</div>
+                  <div><span className="text-gray-400">Email:</span> {String(manualResult.user.email || '')}</div>
+                  <div><span className="text-gray-400">Name:</span> {String(manualResult.user.name || '')}</div>
+                  <div><span className="text-gray-400">Role:</span> {String(manualResult.user.role || '')}</div>
+                  <div><span className="text-gray-400">Country:</span> {String(manualResult.user.country || '')}</div>
+                  <div><span className="text-gray-400">City:</span> {String(manualResult.user.city || '')}</div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-800 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">Suspicion Score</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-gray-300">
+                  {manualResult.suspicionScore ? (
+                    <pre className="bg-gray-900/50 p-3 rounded text-xs overflow-auto max-h-60">
+                      {JSON.stringify(manualResult.suspicionScore, null, 2)}
+                    </pre>
+                  ) : (
+                    <span className="text-gray-500">No score found</span>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-800 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-base text-gray-100">Full Data (Raw JSON)</CardTitle>
+                  <CardDescription className="text-gray-400">
+                    All available data for this user (alerts, devices, restrictions, lockouts, payment fingerprints, history).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <pre className="bg-gray-900/50 p-3 rounded text-xs overflow-auto max-h-[400px] text-gray-200">
+                    {JSON.stringify(manualResult, null, 2)}
+                  </pre>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="debug" className="space-y-4">
