@@ -5,7 +5,6 @@
 
 import { 
   ISeriesPrimitivePaneView, 
-  ISeriesPrimitivePaneRenderer,
   SeriesPrimitivePaneViewZOrder,
 } from 'lightweight-charts';
 import { 
@@ -13,7 +12,6 @@ import {
   BasePaneRenderer, 
   BasePaneView,
   DrawingRenderData,
-  CanvasRenderingTarget2D,
 } from './base-primitive';
 import { 
   TrendLineOptions, 
@@ -28,77 +26,74 @@ import {
 // ============================================
 
 class TrendLineRenderer extends BasePaneRenderer {
-  draw(target: CanvasRenderingTarget2D): void {
-    if (!this._data || this._data.points.length < 2) return;
-    if (!this._data.options.visible) return;
+  protected drawImpl(
+    ctx: CanvasRenderingContext2D, 
+    hpr: number, 
+    vpr: number, 
+    size: { width: number; height: number }
+  ): void {
+    const data = this._data!;
+    if (data.points.length < 2) return;
 
-    target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio, verticalPixelRatio }) => {
-      const data = this._data!;
-      const [p1, p2] = data.points;
-      const options = data.options as TrendLineOptions;
+    const [p1, p2] = data.points;
+    const options = data.options as TrendLineOptions;
 
-      // Scale coordinates
-      const x1 = p1.x * horizontalPixelRatio;
-      const y1 = p1.y * verticalPixelRatio;
-      const x2 = p2.x * horizontalPixelRatio;
-      const y2 = p2.y * verticalPixelRatio;
+    // Scale coordinates
+    const x1 = p1.x * hpr;
+    const y1 = p1.y * vpr;
+    const x2 = p2.x * hpr;
+    const y2 = p2.y * vpr;
 
-      // Set line style
-      ctx.strokeStyle = options.color;
-      ctx.lineWidth = options.lineWidth * horizontalPixelRatio;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+    // Set line style
+    ctx.strokeStyle = options.color || '#2962ff';
+    ctx.lineWidth = (options.lineWidth || 2) * hpr;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    // Set dash pattern
+    const dash = this.getLineDash(options.lineStyle, hpr);
+    ctx.setLineDash(dash);
+
+    // Draw main line
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Draw extended parts if enabled
+    if (options.extendLeft || options.extendRight) {
+      ctx.globalAlpha = 0.5;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.sqrt(dx * dx + dy * dy);
       
-      // Set dash pattern
-      const dash = this.getLineDash(options.lineStyle, horizontalPixelRatio);
-      ctx.setLineDash(dash);
-
-      // Draw main line
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-
-      // Draw extended parts if enabled
-      if (options.extendLeft || options.extendRight) {
-        ctx.globalAlpha = 0.5;
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const len = Math.sqrt(dx * dx + dy * dy);
+      if (len > 0) {
+        const extendLength = 5000 * hpr;
         
-        if (len > 0) {
-          const extendLength = 5000 * horizontalPixelRatio;
-          
-          if (options.extendLeft) {
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x1 - (dx / len) * extendLength, y1 - (dy / len) * extendLength);
-            ctx.stroke();
-          }
-          
-          if (options.extendRight) {
-            ctx.beginPath();
-            ctx.moveTo(x2, y2);
-            ctx.lineTo(x2 + (dx / len) * extendLength, y2 + (dy / len) * extendLength);
-            ctx.stroke();
-          }
+        if (options.extendLeft) {
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x1 - (dx / len) * extendLength, y1 - (dy / len) * extendLength);
+          ctx.stroke();
         }
-        ctx.globalAlpha = 1;
+        
+        if (options.extendRight) {
+          ctx.beginPath();
+          ctx.moveTo(x2, y2);
+          ctx.lineTo(x2 + (dx / len) * extendLength, y2 + (dy / len) * extendLength);
+          ctx.stroke();
+        }
       }
+      ctx.globalAlpha = 1;
+    }
 
-      // Reset dash
-      ctx.setLineDash([]);
+    // Reset dash
+    ctx.setLineDash([]);
 
-      // Draw selection/hover state
-      if (data.isSelected || data.isHovered) {
-        this.drawAnchors(ctx, data, horizontalPixelRatio, verticalPixelRatio);
-      }
-
-      // Draw measurements if enabled
-      if (options.showAngle || options.showLength || options.showPriceDiff) {
-        this.drawMeasurements(ctx, data, horizontalPixelRatio, verticalPixelRatio);
-      }
-    });
+    // Draw selection/hover state
+    if (data.isSelected || data.isHovered) {
+      this.drawAnchors(ctx, data, hpr, vpr);
+    }
   }
 
   private drawAnchors(
@@ -125,13 +120,13 @@ class TrendLineRenderer extends BasePaneRenderer {
       ctx.fill();
       
       // Colored border
-      ctx.strokeStyle = options.color;
+      ctx.strokeStyle = options.color || '#2962ff';
       ctx.lineWidth = borderWidth;
       ctx.stroke();
       
       // Inner dot for selected state
       if (data.isSelected) {
-        ctx.fillStyle = options.color;
+        ctx.fillStyle = options.color || '#2962ff';
         ctx.beginPath();
         ctx.arc(x, y, anchorRadius * 0.4, 0, Math.PI * 2);
         ctx.fill();
@@ -147,76 +142,9 @@ class TrendLineRenderer extends BasePaneRenderer {
       ctx.beginPath();
       ctx.arc(midX, midY, anchorRadius * 0.8, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = options.color;
+      ctx.strokeStyle = options.color || '#2962ff';
       ctx.lineWidth = borderWidth;
       ctx.stroke();
-    }
-  }
-
-  private drawMeasurements(
-    ctx: CanvasRenderingContext2D,
-    data: DrawingRenderData,
-    hpr: number,
-    vpr: number
-  ): void {
-    const options = data.options as TrendLineOptions;
-    const [p1, p2] = data.chartPoints;
-    const [sp1, sp2] = data.points;
-    
-    const measurements: string[] = [];
-    
-    if (options.showPriceDiff && p1 && p2) {
-      const priceDiff = p2.price - p1.price;
-      const percentDiff = ((p2.price - p1.price) / p1.price) * 100;
-      measurements.push(`${priceDiff >= 0 ? '+' : ''}${priceDiff.toFixed(5)} (${percentDiff.toFixed(2)}%)`);
-    }
-    
-    if (options.showAngle) {
-      const dx = sp2.x - sp1.x;
-      const dy = sp2.y - sp1.y;
-      const angle = Math.atan2(-dy, dx) * (180 / Math.PI);
-      measurements.push(`${angle.toFixed(1)}°`);
-    }
-    
-    if (options.showLength && p1 && p2) {
-      const dx = sp2.x - sp1.x;
-      const dy = sp2.y - sp1.y;
-      const pixelLength = Math.sqrt(dx * dx + dy * dy);
-      measurements.push(`${Math.round(pixelLength)}px`);
-    }
-    
-    if (measurements.length > 0) {
-      const text = measurements.join(' | ');
-      const midX = ((sp1.x + sp2.x) / 2) * hpr;
-      const midY = ((sp1.y + sp2.y) / 2) * vpr - 15 * vpr;
-      
-      ctx.font = `${11 * hpr}px Arial`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      
-      const textWidth = ctx.measureText(text).width;
-      const padding = 4 * hpr;
-      
-      // Background
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(
-        midX - textWidth / 2 - padding,
-        midY - 14 * vpr,
-        textWidth + padding * 2,
-        16 * vpr
-      );
-      
-      // Text
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(text, midX, midY);
-    }
-  }
-
-  private getLineDash(style: string, pixelRatio: number): number[] {
-    switch (style) {
-      case 'dashed': return [8 * pixelRatio, 4 * pixelRatio];
-      case 'dotted': return [2 * pixelRatio, 2 * pixelRatio];
-      default: return [];
     }
   }
 }
@@ -295,38 +223,7 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
     if (!p1 || !p2) return false;
     
     const threshold = 10;
-    
-    // Check main line
-    if (this.distanceToSegment(point, p1, p2) < threshold) {
-      return true;
-    }
-    
-    // Check extended parts
-    if (this._options.extendLeft || this._options.extendRight) {
-      const dx = p2.x - p1.x;
-      const dy = p2.y - p1.y;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      
-      if (len > 0) {
-        if (this._options.extendLeft) {
-          const extP = { 
-            x: p1.x - (dx / len) * 5000, 
-            y: p1.y - (dy / len) * 5000 
-          };
-          if (this.distanceToSegment(point, extP, p1) < threshold) return true;
-        }
-        
-        if (this._options.extendRight) {
-          const extP = { 
-            x: p2.x + (dx / len) * 5000, 
-            y: p2.y + (dy / len) * 5000 
-          };
-          if (this.distanceToSegment(point, p2, extP) < threshold) return true;
-        }
-      }
-    }
-    
-    return false;
+    return this.distanceToSegment(point, p1, p2) < threshold;
   }
 
   getAnchorPoints(): ScreenPoint[] {
@@ -372,10 +269,8 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
         this._options.endPoint = point;
         break;
       case 'middle':
-        // Move entire line
         const oldMid = {
           price: (this._options.startPoint.price + this._options.endPoint.price) / 2,
-          time: this._options.startPoint.time, // Simplified - ideally calculate time midpoint
         };
         const deltaPrice = point.price - oldMid.price;
         this._options.startPoint.price += deltaPrice;
@@ -386,14 +281,11 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
     this.requestUpdate();
   }
 
-  move(deltaPrice: number, deltaTime: number): void {
+  move(deltaPrice: number, _deltaTime: number): void {
     if (this._options.locked) return;
     
     this._options.startPoint.price += deltaPrice;
     this._options.endPoint.price += deltaPrice;
-    
-    // Note: Moving by time is more complex due to Time type
-    // For now, we only support price movement
     
     this.requestUpdate();
   }
@@ -406,29 +298,5 @@ export class TrendLinePrimitive extends BasePrimitive<TrendLineOptions> {
     this._options.startPoint = start;
     this._options.endPoint = end;
     this.requestUpdate();
-  }
-
-  getAngle(): number {
-    const p1 = this.toScreen(this._options.startPoint);
-    const p2 = this.toScreen(this._options.endPoint);
-    
-    if (!p1 || !p2) return 0;
-    
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-    return Math.atan2(-dy, dx) * (180 / Math.PI);
-  }
-
-  getLength(): number {
-    const p1 = this.toScreen(this._options.startPoint);
-    const p2 = this.toScreen(this._options.endPoint);
-    
-    if (!p1 || !p2) return 0;
-    
-    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-  }
-
-  getPriceDifference(): number {
-    return this._options.endPoint.price - this._options.startPoint.price;
   }
 }

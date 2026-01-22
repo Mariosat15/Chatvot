@@ -5,7 +5,6 @@
 
 import { 
   ISeriesPrimitivePaneView, 
-  ISeriesPrimitivePaneRenderer,
   SeriesPrimitivePaneViewZOrder,
   Time,
 } from 'lightweight-charts';
@@ -14,7 +13,6 @@ import {
   BasePaneRenderer, 
   BasePaneView,
   DrawingRenderData,
-  CanvasRenderingTarget2D,
 } from './base-primitive';
 import { 
   VerticalLineOptions, 
@@ -29,44 +27,40 @@ import {
 // ============================================
 
 class VerticalLineRenderer extends BasePaneRenderer {
-  draw(target: CanvasRenderingTarget2D): void {
-    if (!this._data) return;
-    if (!this._data.options.visible) return;
-    if (this._data.points.length === 0) return;
+  protected drawImpl(
+    ctx: CanvasRenderingContext2D, 
+    hpr: number, 
+    vpr: number, 
+    size: { width: number; height: number }
+  ): void {
+    const data = this._data!;
+    if (data.points.length === 0) return;
 
-    target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio, verticalPixelRatio, bitmapSize }) => {
-      const data = this._data!;
-      const x = data.points[0].x * horizontalPixelRatio;
-      const options = data.options as VerticalLineOptions;
+    const x = data.points[0].x * hpr;
+    const options = data.options as VerticalLineOptions;
 
-      // Set line style
-      ctx.strokeStyle = options.color;
-      ctx.lineWidth = options.lineWidth * horizontalPixelRatio;
-      ctx.lineCap = 'round';
-      
-      // Set dash pattern
-      const dash = this.getLineDash(options.lineStyle, horizontalPixelRatio);
-      ctx.setLineDash(dash);
+    // Set line style
+    ctx.strokeStyle = options.color || '#2962ff';
+    ctx.lineWidth = (options.lineWidth || 2) * hpr;
+    ctx.lineCap = 'round';
+    
+    // Set dash pattern
+    const dash = this.getLineDash(options.lineStyle, hpr);
+    ctx.setLineDash(dash);
 
-      // Draw vertical line
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, bitmapSize.height);
-      ctx.stroke();
+    // Draw vertical line
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, size.height);
+    ctx.stroke();
 
-      // Reset dash
-      ctx.setLineDash([]);
+    // Reset dash
+    ctx.setLineDash([]);
 
-      // Draw selection/hover state
-      if (data.isSelected || data.isHovered) {
-        this.drawAnchor(ctx, data, horizontalPixelRatio, verticalPixelRatio, bitmapSize.height);
-      }
-
-      // Draw time label if enabled
-      if (options.showTime) {
-        this.drawTimeLabel(ctx, data, horizontalPixelRatio, verticalPixelRatio, bitmapSize.height);
-      }
-    });
+    // Draw selection/hover state
+    if (data.isSelected || data.isHovered) {
+      this.drawAnchor(ctx, data, hpr, vpr, size.height);
+    }
   }
 
   private drawAnchor(
@@ -79,7 +73,6 @@ class VerticalLineRenderer extends BasePaneRenderer {
     const x = data.points[0].x * hpr;
     const options = data.options;
     
-    // Draw anchor in the middle of the canvas
     const y = canvasHeight / 2;
     const anchorRadius = (data.isSelected ? 6 : 4) * hpr;
     const borderWidth = 2 * hpr;
@@ -89,68 +82,15 @@ class VerticalLineRenderer extends BasePaneRenderer {
     ctx.arc(x, y, anchorRadius, 0, Math.PI * 2);
     ctx.fill();
     
-    ctx.strokeStyle = options.color;
+    ctx.strokeStyle = options.color || '#2962ff';
     ctx.lineWidth = borderWidth;
     ctx.stroke();
     
     if (data.isSelected) {
-      ctx.fillStyle = options.color;
+      ctx.fillStyle = options.color || '#2962ff';
       ctx.beginPath();
       ctx.arc(x, y, anchorRadius * 0.4, 0, Math.PI * 2);
       ctx.fill();
-    }
-  }
-
-  private drawTimeLabel(
-    ctx: CanvasRenderingContext2D,
-    data: DrawingRenderData,
-    hpr: number,
-    vpr: number,
-    canvasHeight: number
-  ): void {
-    const options = data.options as VerticalLineOptions;
-    const x = data.points[0].x * hpr;
-    
-    // Format time
-    const time = options.time;
-    let timeText: string;
-    if (typeof time === 'number') {
-      const date = new Date(time * 1000);
-      timeText = date.toLocaleString();
-    } else if (typeof time === 'string') {
-      timeText = time;
-    } else {
-      timeText = `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`;
-    }
-    
-    const fontSize = 10 * hpr;
-    ctx.font = `${fontSize}px Arial`;
-    
-    const textWidth = ctx.measureText(timeText).width;
-    const padding = 4 * hpr;
-    const labelHeight = 16 * vpr;
-    const labelWidth = textWidth + padding * 2;
-    
-    const y = canvasHeight - 20 * vpr;
-    
-    // Draw label background
-    ctx.fillStyle = options.color;
-    ctx.beginPath();
-    ctx.roundRect(x - labelWidth / 2, y, labelWidth, labelHeight, 3 * hpr);
-    ctx.fill();
-    
-    // Draw text
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(timeText, x, y + labelHeight / 2);
-  }
-
-  private getLineDash(style: string, pixelRatio: number): number[] {
-    switch (style) {
-      case 'dashed': return [8 * pixelRatio, 4 * pixelRatio];
-      case 'dotted': return [2 * pixelRatio, 2 * pixelRatio];
-      default: return [];
     }
   }
 }
@@ -243,15 +183,14 @@ export class VerticalLinePrimitive extends BasePrimitive<VerticalLineOptions> {
     return null;
   }
 
-  moveAnchor(anchor: AnchorPosition, point: ChartPoint): void {
+  moveAnchor(_anchor: AnchorPosition, point: ChartPoint): void {
     if (this._options.locked) return;
     this._options.time = point.time;
     this.requestUpdate();
   }
 
-  move(_deltaPrice: number, deltaTime: number): void {
+  move(_deltaPrice: number, _deltaTime: number): void {
     if (this._options.locked) return;
-    // Time movement is complex - would need to convert delta to time units
     this.requestUpdate();
   }
 

@@ -5,7 +5,6 @@
 
 import { 
   ISeriesPrimitivePaneView, 
-  ISeriesPrimitivePaneRenderer,
   SeriesPrimitivePaneViewZOrder,
 } from 'lightweight-charts';
 import { 
@@ -13,7 +12,6 @@ import {
   BasePaneRenderer, 
   BasePaneView,
   DrawingRenderData,
-  CanvasRenderingTarget2D,
 } from './base-primitive';
 import { 
   FibonacciOptions, 
@@ -30,72 +28,74 @@ import {
 // ============================================
 
 class FibonacciRenderer extends BasePaneRenderer {
-  draw(target: CanvasRenderingTarget2D): void {
-    if (!this._data || this._data.points.length < 2) return;
-    if (!this._data.options.visible) return;
+  protected drawImpl(
+    ctx: CanvasRenderingContext2D, 
+    hpr: number, 
+    vpr: number, 
+    size: { width: number; height: number }
+  ): void {
+    const data = this._data!;
+    if (data.points.length < 2) return;
 
-    target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio, verticalPixelRatio, bitmapSize }) => {
-      const data = this._data!;
-      const [p1, p2] = data.points;
-      const [cp1, cp2] = data.chartPoints;
-      const options = data.options as FibonacciOptions;
+    const [p1, p2] = data.points;
+    const [cp1, cp2] = data.chartPoints;
+    const options = data.options as FibonacciOptions;
+    
+    const y1 = p1.y * vpr;
+    const y2 = p2.y * vpr;
+    const price1 = cp1?.price ?? 0;
+    const price2 = cp2?.price ?? 0;
+    const priceRange = price2 - price1;
+
+    // Draw background fill between 0 and 1 levels
+    ctx.globalAlpha = 0.05;
+    ctx.fillStyle = options.color || '#2962ff';
+    ctx.fillRect(0, Math.min(y1, y2), size.width, Math.abs(y2 - y1));
+    ctx.globalAlpha = 1;
+
+    // Draw each Fibonacci level
+    const levels = options.levels || DEFAULT_FIBONACCI_LEVELS;
+    
+    levels.forEach(level => {
+      const levelY = y1 + (y2 - y1) * level;
+      const levelPrice = options.reverse 
+        ? price2 - priceRange * level 
+        : price1 + priceRange * level;
       
-      const y1 = p1.y * verticalPixelRatio;
-      const y2 = p2.y * verticalPixelRatio;
-      const price1 = cp1.price;
-      const price2 = cp2.price;
-      const priceRange = price2 - price1;
-
-      // Draw background fill between 0 and 1 levels
-      ctx.globalAlpha = 0.05;
-      ctx.fillStyle = options.color;
-      ctx.fillRect(0, Math.min(y1, y2), bitmapSize.width, Math.abs(y2 - y1));
-      ctx.globalAlpha = 1;
-
-      // Draw each Fibonacci level
-      const levels = options.levels || DEFAULT_FIBONACCI_LEVELS;
+      const levelColor = options.levelColors?.[level] || FIBONACCI_COLORS[level] || options.color || '#2962ff';
       
-      levels.forEach(level => {
-        const levelY = y1 + (y2 - y1) * level;
-        const levelPrice = options.reverse 
-          ? price2 - priceRange * level 
-          : price1 + priceRange * level;
-        
-        const levelColor = options.levelColors?.[level] || FIBONACCI_COLORS[level] || options.color;
-        
-        // Draw level line
-        ctx.strokeStyle = levelColor;
-        ctx.lineWidth = (level === 0 || level === 1 ? 2 : 1) * horizontalPixelRatio;
-        ctx.setLineDash(level === 0.5 ? [4 * horizontalPixelRatio, 4 * horizontalPixelRatio] : []);
-        
-        ctx.beginPath();
-        ctx.moveTo(0, levelY);
-        ctx.lineTo(bitmapSize.width, levelY);
-        ctx.stroke();
-        
-        // Draw level label
-        if (options.showLabels !== false) {
-          this.drawLevelLabel(ctx, levelY, level, levelPrice, levelColor, horizontalPixelRatio, verticalPixelRatio, options.showPrices);
-        }
-      });
-
-      ctx.setLineDash([]);
-
-      // Draw trend line between points
-      ctx.strokeStyle = options.color;
-      ctx.lineWidth = 2 * horizontalPixelRatio;
-      ctx.globalAlpha = 0.5;
+      // Draw level line
+      ctx.strokeStyle = levelColor;
+      ctx.lineWidth = (level === 0 || level === 1 ? 2 : 1) * hpr;
+      ctx.setLineDash(level === 0.5 ? [4 * hpr, 4 * hpr] : []);
+      
       ctx.beginPath();
-      ctx.moveTo(p1.x * horizontalPixelRatio, y1);
-      ctx.lineTo(p2.x * horizontalPixelRatio, y2);
+      ctx.moveTo(0, levelY);
+      ctx.lineTo(size.width, levelY);
       ctx.stroke();
-      ctx.globalAlpha = 1;
-
-      // Draw selection/hover state
-      if (data.isSelected || data.isHovered) {
-        this.drawAnchors(ctx, data, horizontalPixelRatio, verticalPixelRatio);
+      
+      // Draw level label
+      if (options.showLabels !== false) {
+        this.drawLevelLabel(ctx, levelY, level, levelPrice, levelColor, hpr, vpr, options.showPrices);
       }
     });
+
+    ctx.setLineDash([]);
+
+    // Draw trend line between points
+    ctx.strokeStyle = options.color || '#2962ff';
+    ctx.lineWidth = 2 * hpr;
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(p1.x * hpr, y1);
+    ctx.lineTo(p2.x * hpr, y2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Draw selection/hover state
+    if (data.isSelected || data.isHovered) {
+      this.drawAnchors(ctx, data, hpr, vpr);
+    }
   }
 
   private drawLevelLabel(
@@ -111,7 +111,6 @@ class FibonacciRenderer extends BasePaneRenderer {
     const fontSize = 11 * hpr;
     ctx.font = `${fontSize}px Arial`;
     
-    // Format level text
     const levelText = `${(level * 100).toFixed(1)}%`;
     const priceText = showPrice ? ` (${price.toFixed(5)})` : '';
     const text = levelText + priceText;
@@ -146,7 +145,6 @@ class FibonacciRenderer extends BasePaneRenderer {
     const anchorRadius = (data.isSelected ? 6 : 4) * hpr;
     const borderWidth = 2 * hpr;
     
-    // Draw anchors at start and end points
     [
       { x: p1.x * hpr, y: p1.y * vpr },
       { x: p2.x * hpr, y: p2.y * vpr },
@@ -156,12 +154,12 @@ class FibonacciRenderer extends BasePaneRenderer {
       ctx.arc(p.x, p.y, anchorRadius, 0, Math.PI * 2);
       ctx.fill();
       
-      ctx.strokeStyle = options.color;
+      ctx.strokeStyle = options.color || '#2962ff';
       ctx.lineWidth = borderWidth;
       ctx.stroke();
       
       if (data.isSelected) {
-        ctx.fillStyle = options.color;
+        ctx.fillStyle = options.color || '#2962ff';
         ctx.beginPath();
         ctx.arc(p.x, p.y, anchorRadius * 0.4, 0, Math.PI * 2);
         ctx.fill();
@@ -180,7 +178,7 @@ class FibonacciPaneView extends BasePaneView {
   }
 
   zOrder(): SeriesPrimitivePaneViewZOrder {
-    return 'bottom'; // Draw beneath price data
+    return 'bottom';
   }
 }
 
@@ -312,45 +310,5 @@ export class FibonacciPrimitive extends BasePrimitive<FibonacciOptions> {
     this._options.startPoint = start;
     this._options.endPoint = end;
     this.requestUpdate();
-  }
-
-  setLevels(levels: number[]): void {
-    this._options.levels = levels;
-    this.requestUpdate();
-  }
-
-  addLevel(level: number): void {
-    if (!this._options.levels.includes(level)) {
-      this._options.levels = [...this._options.levels, level].sort((a, b) => a - b);
-      this.requestUpdate();
-    }
-  }
-
-  removeLevel(level: number): void {
-    this._options.levels = this._options.levels.filter(l => l !== level);
-    this.requestUpdate();
-  }
-
-  setReverse(reverse: boolean): void {
-    this._options.reverse = reverse;
-    this.requestUpdate();
-  }
-
-  getPriceAtLevel(level: number): number {
-    const priceRange = this._options.endPoint.price - this._options.startPoint.price;
-    if (this._options.reverse) {
-      return this._options.endPoint.price - priceRange * level;
-    }
-    return this._options.startPoint.price + priceRange * level;
-  }
-
-  getLevelAtPrice(price: number): number {
-    const priceRange = this._options.endPoint.price - this._options.startPoint.price;
-    if (priceRange === 0) return 0;
-    
-    if (this._options.reverse) {
-      return (this._options.endPoint.price - price) / priceRange;
-    }
-    return (price - this._options.startPoint.price) / priceRange;
   }
 }

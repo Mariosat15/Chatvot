@@ -12,7 +12,6 @@ import {
   SeriesPrimitivePaneViewZOrder,
   ISeriesPrimitivePaneView,
   ISeriesPrimitivePaneRenderer,
-  PriceToCoordinateConverter,
   Coordinate,
 } from 'lightweight-charts';
 import { 
@@ -25,49 +24,6 @@ import {
   AnchorPosition,
   DEFAULT_DRAWING_OPTIONS,
 } from './types';
-
-// ============================================
-// BASE PANE RENDERER
-// ============================================
-
-export abstract class BasePaneRenderer implements ISeriesPrimitivePaneRenderer {
-  protected _data: DrawingRenderData | null = null;
-
-  update(data: DrawingRenderData): void {
-    this._data = data;
-  }
-
-  abstract draw(target: CanvasRenderingTarget2D): void;
-  
-  drawBackground?(target: CanvasRenderingTarget2D): void;
-}
-
-// ============================================
-// BASE PANE VIEW
-// ============================================
-
-export abstract class BasePaneView implements ISeriesPrimitivePaneView {
-  protected _source: BasePrimitive<any>;
-  protected _renderer: BasePaneRenderer;
-
-  constructor(source: BasePrimitive<any>, renderer: BasePaneRenderer) {
-    this._source = source;
-    this._renderer = renderer;
-  }
-
-  update(): void {
-    const data = this._source.getRenderData();
-    this._renderer.update(data);
-  }
-
-  renderer(): ISeriesPrimitivePaneRenderer {
-    return this._renderer;
-  }
-
-  zOrder(): SeriesPrimitivePaneViewZOrder {
-    return 'normal';
-  }
-}
 
 // ============================================
 // RENDER DATA
@@ -84,28 +40,79 @@ export interface DrawingRenderData {
 }
 
 // ============================================
-// CANVAS RENDERING TARGET INTERFACE
+// BASE PANE RENDERER - Using Lightweight Charts native rendering
 // ============================================
 
-export interface CanvasRenderingTarget2D {
-  context: CanvasRenderingContext2D;
-  mediaSize: { width: number; height: number };
-  bitmapSize: { width: number; height: number };
-  useBitmapCoordinateSpace<T>(callback: (scope: BitmapCoordinatesRenderingScope) => T): T;
-  useMediaCoordinateSpace<T>(callback: (scope: MediaCoordinatesRenderingScope) => T): T;
+export abstract class BasePaneRenderer implements ISeriesPrimitivePaneRenderer {
+  protected _data: DrawingRenderData | null = null;
+
+  update(data: DrawingRenderData): void {
+    this._data = data;
+  }
+
+  // This method signature must match what Lightweight Charts expects
+  draw(target: any): void {
+    if (!this._data) return;
+    if (!this._data.options.visible) return;
+    
+    try {
+      // Use the target's coordinate space methods safely
+      if (target && typeof target.useBitmapCoordinateSpace === 'function') {
+        target.useBitmapCoordinateSpace((scope: any) => {
+          this.drawImpl(scope.context, scope.horizontalPixelRatio || 1, scope.verticalPixelRatio || 1, scope.bitmapSize);
+        });
+      }
+    } catch (error) {
+      console.error('[BasePaneRenderer] Draw error:', error);
+    }
+  }
+
+  // Subclasses implement this
+  protected abstract drawImpl(
+    ctx: CanvasRenderingContext2D, 
+    hpr: number, 
+    vpr: number, 
+    size: { width: number; height: number }
+  ): void;
+
+  protected getLineDash(style: string | undefined, pixelRatio: number): number[] {
+    switch (style) {
+      case 'dashed': return [8 * pixelRatio, 4 * pixelRatio];
+      case 'dotted': return [2 * pixelRatio, 2 * pixelRatio];
+      default: return [];
+    }
+  }
 }
 
-export interface BitmapCoordinatesRenderingScope {
-  context: CanvasRenderingContext2D;
-  bitmapSize: { width: number; height: number };
-  mediaSize: { width: number; height: number };
-  horizontalPixelRatio: number;
-  verticalPixelRatio: number;
-}
+// ============================================
+// BASE PANE VIEW
+// ============================================
 
-export interface MediaCoordinatesRenderingScope {
-  context: CanvasRenderingContext2D;
-  mediaSize: { width: number; height: number };
+export class BasePaneView implements ISeriesPrimitivePaneView {
+  protected _source: BasePrimitive<any>;
+  protected _renderer: BasePaneRenderer;
+
+  constructor(source: BasePrimitive<any>, renderer: BasePaneRenderer) {
+    this._source = source;
+    this._renderer = renderer;
+  }
+
+  update(): void {
+    try {
+      const data = this._source.getRenderData();
+      this._renderer.update(data);
+    } catch (error) {
+      console.error('[BasePaneView] Update error:', error);
+    }
+  }
+
+  renderer(): ISeriesPrimitivePaneRenderer {
+    return this._renderer;
+  }
+
+  zOrder(): SeriesPrimitivePaneViewZOrder {
+    return 'normal';
+  }
 }
 
 // ============================================
@@ -166,9 +173,11 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
     this._series = series as ISeriesApi<'Candlestick'>;
     this._requestUpdate = requestUpdate;
     this._paneViews = this.createPaneViews();
+    console.log(`[${this.type}] Attached to chart`);
   }
 
   detached(): void {
+    console.log(`[${this.type}] Detached from chart`);
     this._chart = null;
     this._series = null;
     this._requestUpdate = undefined;
@@ -177,13 +186,20 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
 
   // Public attach/detach for DrawingPrimitive interface
   attach(chart: IChartApi, series: ISeriesApi<'Candlestick'>): void {
-    // This is called by DrawingManager, actual attachment is done via attached()
-    series.attachPrimitive(this);
+    try {
+      series.attachPrimitive(this);
+    } catch (error) {
+      console.error(`[${this.type}] Failed to attach:`, error);
+    }
   }
 
   detach(): void {
     if (this._series) {
-      this._series.detachPrimitive(this);
+      try {
+        this._series.detachPrimitive(this);
+      } catch (error) {
+        console.error(`[${this.type}] Failed to detach:`, error);
+      }
     }
   }
 
@@ -200,7 +216,7 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
   updateAllViews(): void {
     this._paneViews.forEach(view => {
       if ('update' in view && typeof view.update === 'function') {
-        view.update();
+        (view as any).update();
       }
     });
   }
@@ -244,24 +260,40 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
 
   protected timeToX(time: Time): number | null {
     if (!this._chart) return null;
-    const coordinate = this._chart.timeScale().timeToCoordinate(time);
-    return coordinate !== null ? coordinate : null;
+    try {
+      const coordinate = this._chart.timeScale().timeToCoordinate(time);
+      return coordinate !== null ? coordinate : null;
+    } catch {
+      return null;
+    }
   }
 
   protected xToTime(x: number): Time | null {
     if (!this._chart) return null;
-    return this._chart.timeScale().coordinateToTime(x as Coordinate);
+    try {
+      return this._chart.timeScale().coordinateToTime(x as Coordinate);
+    } catch {
+      return null;
+    }
   }
 
   protected priceToY(price: number): number | null {
     if (!this._series) return null;
-    const coordinate = this._series.priceToCoordinate(price);
-    return coordinate !== null ? coordinate : null;
+    try {
+      const coordinate = this._series.priceToCoordinate(price);
+      return coordinate !== null ? coordinate : null;
+    } catch {
+      return null;
+    }
   }
 
   protected yToPrice(y: number): number | null {
     if (!this._series) return null;
-    return this._series.coordinateToPrice(y as Coordinate);
+    try {
+      return this._series.coordinateToPrice(y as Coordinate);
+    } catch {
+      return null;
+    }
   }
 
   protected toScreen(point: ChartPoint): ScreenPoint | null {
@@ -286,10 +318,13 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
 
   protected getCanvasSize(): { width: number; height: number } {
     if (!this._chart) return { width: 0, height: 0 };
-    const container = (this._chart as any)._chartWidget?._chartContainerElement;
-    if (container) {
-      return { width: container.clientWidth, height: container.clientHeight };
-    }
+    try {
+      // Try to get chart container size
+      const chartElement = (this._chart as any).chartElement?.();
+      if (chartElement) {
+        return { width: chartElement.clientWidth || 800, height: chartElement.clientHeight || 600 };
+      }
+    } catch {}
     return { width: 800, height: 600 }; // Fallback
   }
 
@@ -319,14 +354,6 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
   // ============================================
   // UTILITY METHODS
   // ============================================
-
-  protected getLineDash(): number[] {
-    switch (this._options.lineStyle) {
-      case 'dashed': return [8, 4];
-      case 'dotted': return [2, 2];
-      default: return [];
-    }
-  }
 
   protected distanceToSegment(point: ScreenPoint, p1: ScreenPoint, p2: ScreenPoint): number {
     const dx = p2.x - p1.x;

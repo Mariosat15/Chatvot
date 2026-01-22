@@ -5,8 +5,6 @@
 
 import { 
   ISeriesPrimitivePaneView, 
-  ISeriesPrimitivePaneRenderer,
-  ISeriesPrimitiveAxisView,
   SeriesPrimitivePaneViewZOrder,
 } from 'lightweight-charts';
 import { 
@@ -14,7 +12,6 @@ import {
   BasePaneRenderer, 
   BasePaneView,
   DrawingRenderData,
-  CanvasRenderingTarget2D,
 } from './base-primitive';
 import { 
   HorizontalLineOptions, 
@@ -29,44 +26,45 @@ import {
 // ============================================
 
 class HorizontalLineRenderer extends BasePaneRenderer {
-  draw(target: CanvasRenderingTarget2D): void {
-    if (!this._data) return;
-    if (!this._data.options.visible) return;
-    if (this._data.points.length === 0) return;
+  protected drawImpl(
+    ctx: CanvasRenderingContext2D, 
+    hpr: number, 
+    vpr: number, 
+    size: { width: number; height: number }
+  ): void {
+    const data = this._data!;
+    if (data.points.length === 0) return;
 
-    target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio, verticalPixelRatio, bitmapSize }) => {
-      const data = this._data!;
-      const y = data.points[0].y * verticalPixelRatio;
-      const options = data.options as HorizontalLineOptions;
+    const y = data.points[0].y * vpr;
+    const options = data.options as HorizontalLineOptions;
 
-      // Set line style
-      ctx.strokeStyle = options.color;
-      ctx.lineWidth = options.lineWidth * horizontalPixelRatio;
-      ctx.lineCap = 'round';
-      
-      // Set dash pattern
-      const dash = this.getLineDash(options.lineStyle, horizontalPixelRatio);
-      ctx.setLineDash(dash);
+    // Set line style
+    ctx.strokeStyle = options.color || '#2962ff';
+    ctx.lineWidth = (options.lineWidth || 2) * hpr;
+    ctx.lineCap = 'round';
+    
+    // Set dash pattern
+    const dash = this.getLineDash(options.lineStyle, hpr);
+    ctx.setLineDash(dash);
 
-      // Draw horizontal line across entire width
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(bitmapSize.width, y);
-      ctx.stroke();
+    // Draw horizontal line across entire width
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(size.width, y);
+    ctx.stroke();
 
-      // Reset dash
-      ctx.setLineDash([]);
+    // Reset dash
+    ctx.setLineDash([]);
 
-      // Draw selection/hover state
-      if (data.isSelected || data.isHovered) {
-        this.drawAnchor(ctx, data, horizontalPixelRatio, verticalPixelRatio, bitmapSize.width);
-      }
+    // Draw selection/hover state
+    if (data.isSelected || data.isHovered) {
+      this.drawAnchor(ctx, data, hpr, vpr, size.width);
+    }
 
-      // Draw price label on the left side if enabled
-      if (options.showPrice !== false) {
-        this.drawPriceLabel(ctx, data, horizontalPixelRatio, verticalPixelRatio, 'left');
-      }
-    });
+    // Draw price label if enabled
+    if (options.showPrice !== false) {
+      this.drawPriceLabel(ctx, data, hpr, vpr);
+    }
   }
 
   private drawAnchor(
@@ -79,7 +77,6 @@ class HorizontalLineRenderer extends BasePaneRenderer {
     const y = data.points[0].y * vpr;
     const options = data.options;
     
-    // Draw anchor in the middle of the canvas
     const x = canvasWidth / 2;
     const anchorRadius = (data.isSelected ? 6 : 4) * hpr;
     const borderWidth = 2 * hpr;
@@ -89,12 +86,12 @@ class HorizontalLineRenderer extends BasePaneRenderer {
     ctx.arc(x, y, anchorRadius, 0, Math.PI * 2);
     ctx.fill();
     
-    ctx.strokeStyle = options.color;
+    ctx.strokeStyle = options.color || '#2962ff';
     ctx.lineWidth = borderWidth;
     ctx.stroke();
     
     if (data.isSelected) {
-      ctx.fillStyle = options.color;
+      ctx.fillStyle = options.color || '#2962ff';
       ctx.beginPath();
       ctx.arc(x, y, anchorRadius * 0.4, 0, Math.PI * 2);
       ctx.fill();
@@ -105,8 +102,7 @@ class HorizontalLineRenderer extends BasePaneRenderer {
     ctx: CanvasRenderingContext2D,
     data: DrawingRenderData,
     hpr: number,
-    vpr: number,
-    position: 'left' | 'right'
+    vpr: number
   ): void {
     const options = data.options as HorizontalLineOptions;
     const y = data.points[0].y * vpr;
@@ -119,16 +115,10 @@ class HorizontalLineRenderer extends BasePaneRenderer {
     const padding = 4 * hpr;
     const labelHeight = 18 * vpr;
     const labelWidth = textWidth + padding * 2;
-    
-    let x: number;
-    if (position === 'left') {
-      x = 8 * hpr;
-    } else {
-      x = data.canvasWidth * hpr - labelWidth - 8 * hpr;
-    }
+    const x = 8 * hpr;
     
     // Draw label background
-    ctx.fillStyle = options.color;
+    ctx.fillStyle = options.color || '#2962ff';
     ctx.beginPath();
     ctx.roundRect(x, y - labelHeight / 2, labelWidth, labelHeight, 3 * hpr);
     ctx.fill();
@@ -138,87 +128,6 @@ class HorizontalLineRenderer extends BasePaneRenderer {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(priceText, x + padding, y);
-  }
-
-  private getLineDash(style: string, pixelRatio: number): number[] {
-    switch (style) {
-      case 'dashed': return [8 * pixelRatio, 4 * pixelRatio];
-      case 'dotted': return [2 * pixelRatio, 2 * pixelRatio];
-      default: return [];
-    }
-  }
-}
-
-// ============================================
-// HORIZONTAL LINE PRICE AXIS VIEW
-// ============================================
-
-class HorizontalLinePriceAxisRenderer implements ISeriesPrimitivePaneRenderer {
-  private _data: { price: number; color: string; y: number | null } | null = null;
-
-  update(data: { price: number; color: string; y: number | null }): void {
-    this._data = data;
-  }
-
-  draw(target: CanvasRenderingTarget2D): void {
-    if (!this._data || this._data.y === null) return;
-
-    target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio, verticalPixelRatio, bitmapSize }) => {
-      const y = this._data!.y! * verticalPixelRatio;
-      const priceText = this._data!.price.toFixed(5);
-      const fontSize = 11 * horizontalPixelRatio;
-      
-      ctx.font = `bold ${fontSize}px Arial`;
-      const textWidth = ctx.measureText(priceText).width;
-      const padding = 4 * horizontalPixelRatio;
-      const labelHeight = 18 * verticalPixelRatio;
-      const labelWidth = textWidth + padding * 2;
-      
-      // Draw background
-      ctx.fillStyle = this._data!.color;
-      ctx.beginPath();
-      ctx.roundRect(
-        bitmapSize.width - labelWidth - 2 * horizontalPixelRatio, 
-        y - labelHeight / 2, 
-        labelWidth, 
-        labelHeight, 
-        2 * horizontalPixelRatio
-      );
-      ctx.fill();
-      
-      // Draw text
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(priceText, bitmapSize.width - padding - 2 * horizontalPixelRatio, y);
-    });
-  }
-}
-
-class HorizontalLinePriceAxisView implements ISeriesPrimitiveAxisView {
-  private _source: HorizontalLinePrimitive;
-  private _renderer: HorizontalLinePriceAxisRenderer;
-
-  constructor(source: HorizontalLinePrimitive) {
-    this._source = source;
-    this._renderer = new HorizontalLinePriceAxisRenderer();
-  }
-
-  update(): void {
-    const y = this._source['priceToY'](this._source.options.price);
-    this._renderer.update({
-      price: this._source.options.price,
-      color: this._source.options.color,
-      y,
-    });
-  }
-
-  renderer(): ISeriesPrimitivePaneRenderer {
-    return this._renderer;
-  }
-
-  coordinate(): number | null {
-    return this._source['priceToY'](this._source.options.price);
   }
 }
 
@@ -255,10 +164,6 @@ export class HorizontalLinePrimitive extends BasePrimitive<HorizontalLineOptions
 
   protected createPaneViews(): ISeriesPrimitivePaneView[] {
     return [new HorizontalLinePaneView(this)];
-  }
-
-  priceAxisViews(): ISeriesPrimitiveAxisView[] {
-    return [new HorizontalLinePriceAxisView(this)];
   }
 
   getRenderData(): DrawingRenderData {
@@ -314,7 +219,7 @@ export class HorizontalLinePrimitive extends BasePrimitive<HorizontalLineOptions
     return null;
   }
 
-  moveAnchor(anchor: AnchorPosition, point: ChartPoint): void {
+  moveAnchor(_anchor: AnchorPosition, point: ChartPoint): void {
     if (this._options.locked) return;
     this._options.price = point.price;
     this.requestUpdate();
