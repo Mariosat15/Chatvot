@@ -16,6 +16,10 @@ interface ChartToolbarProps {
   onColorChange?: (color: string) => void;
   onLineWidthChange?: (width: number) => void;
   className?: string;
+  // New props for additional controls
+  onChartTypeClick?: () => void;
+  onSettingsClick?: () => void;
+  indicatorManager?: React.ReactNode;
 }
 
 // TradingView exact SVG icons (pixel-perfect recreations)
@@ -256,7 +260,7 @@ const Icons = {
       <path d="M18 4h6v6" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
-  // Date Range  
+  // Date Range
   dateRange: (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28">
       <rect x="4" y="6" width="20" height="18" stroke="currentColor" strokeWidth="1.2" fill="none" rx="1"/>
@@ -268,6 +272,29 @@ const Icons = {
   priceRange: (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28">
       <path d="M14 4v20M10 8l4-4 4 4M10 20l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Candlestick Chart
+  candlestick: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28">
+      <path d="M9 8v12M9 11h-2v6h2M19 6v16M19 9h-2v10h2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+    </svg>
+  ),
+  // Indicators
+  indicators: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28">
+      <path d="M4 20l6-8 4 4 10-12" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="4" cy="20" r="1.5" fill="currentColor"/>
+      <circle cx="10" cy="12" r="1.5" fill="currentColor"/>
+      <circle cx="14" cy="16" r="1.5" fill="currentColor"/>
+      <circle cx="24" cy="4" r="1.5" fill="currentColor"/>
+    </svg>
+  ),
+  // Settings
+  settings: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28">
+      <circle cx="14" cy="14" r="3" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <path d="M14 4v3M14 21v3M4 14h3M21 14h3M6.3 6.3l2.1 2.1M19.6 19.6l2.1 2.1M6.3 21.7l2.1-2.1M19.6 8.4l2.1-2.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
     </svg>
   ),
 };
@@ -313,6 +340,9 @@ export default function ChartToolbar({
   onClearAll,
   drawingsCount = 0,
   className,
+  onChartTypeClick,
+  onSettingsClick,
+  indicatorManager,
 }: ChartToolbarProps) {
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [magnetMode, setMagnetMode] = useState(false);
@@ -348,7 +378,7 @@ export default function ChartToolbar({
       {/* Cursor Tool */}
       <ToolButton
         icon={Icons.crosshair}
-        title="Crosshair (Ctrl+Shift+H)"
+        title="Crosshair"
         isActive={!activeTool}
         onClick={() => handleToolSelect(null)}
       />
@@ -401,26 +431,6 @@ export default function ChartToolbar({
 
       <Divider />
 
-      {/* Measure/Ruler */}
-      <ToolButton
-        icon={Icons.measure}
-        title="Measure (Shift+Click)"
-        isActive={false}
-        onClick={() => {}}
-        disabled
-      />
-
-      {/* Zoom */}
-      <ToolButton
-        icon={Icons.zoomIn}
-        title="Zoom In (Ctrl+Shift+LMB)"
-        isActive={false}
-        onClick={() => {}}
-        disabled
-      />
-
-      <Divider />
-
       {/* Magnet Mode */}
       <ToolButton
         icon={Icons.magnet}
@@ -444,6 +454,35 @@ export default function ChartToolbar({
         isActive={hideDrawings}
         onClick={() => setHideDrawings(!hideDrawings)}
       />
+
+      <Divider />
+
+      {/* Chart Type */}
+      {onChartTypeClick && (
+        <ToolButton
+          icon={Icons.candlestick}
+          title="Chart Type"
+          isActive={false}
+          onClick={onChartTypeClick}
+        />
+      )}
+
+      {/* Indicators - render the passed component */}
+      {indicatorManager && (
+        <div className="flex items-center justify-center h-[34px]">
+          {indicatorManager}
+        </div>
+      )}
+
+      {/* Settings */}
+      {onSettingsClick && (
+        <ToolButton
+          icon={Icons.settings}
+          title="Settings"
+          isActive={false}
+          onClick={onSettingsClick}
+        />
+      )}
 
       <div className="flex-1" />
 
