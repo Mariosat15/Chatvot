@@ -329,40 +329,40 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
 
   // ============================================
   // FREE COORDINATE CONVERSION (MT5-style, no snapping)
+  // Uses Lightweight Charts native API for accurate positioning
+  // Reference: https://tradingview.github.io/lightweight-charts/docs/plugins/series-primitives
   // ============================================
 
   /**
    * Convert FreePoint (precise timestamp) to screen coordinates
-   * Uses linear interpolation for pixel-perfect positioning
+   * Uses timeScale().width() for correct drawable area (excludes price axis)
    */
   protected freePointToScreen(point: FreePoint): ScreenPoint | null {
     if (!this._chart || !this._series) return null;
     
     try {
-      // Get visible time range for interpolation
-      const timeRange = this._chart.timeScale().getVisibleLogicalRange();
-      if (!timeRange) return null;
+      const timeScale = this._chart.timeScale();
       
-      // Get the first and last visible bars
-      const visibleRange = this._chart.timeScale().getVisibleRange();
+      // Get the actual drawable width (excludes price axis)
+      const timeScaleWidth = timeScale.width();
+      if (timeScaleWidth <= 0) return null;
+      
+      // Get visible time range
+      const visibleRange = timeScale.getVisibleRange();
       if (!visibleRange) return null;
       
-      // Get chart width
-      const chartElement = (this._chart as any).chartElement?.();
-      const chartWidth = chartElement?.clientWidth || 800;
-      
-      // Calculate time bounds in seconds
+      // Calculate time bounds
       const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
       const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
       const timeSpan = endTime - startTime;
       
       if (timeSpan <= 0) return null;
       
-      // Linear interpolation for X coordinate
-      const x = ((point.timestamp - startTime) / timeSpan) * chartWidth;
+      // Linear interpolation using timeScale.width() (correct drawable area)
+      const x = ((point.timestamp - startTime) / timeSpan) * timeScaleWidth;
       
-      // Y coordinate from price
-      const y = this.priceToY(point.price);
+      // Y coordinate from price using native API
+      const y = this._series.priceToCoordinate(point.price);
       if (y === null) return null;
       
       return { x, y };
@@ -373,32 +373,34 @@ export abstract class BasePrimitive<T extends DrawingOptions> implements Drawing
 
   /**
    * Convert screen coordinates to FreePoint (precise timestamp)
-   * No snapping to candle times
+   * Uses timeScale().width() for correct drawable area
    */
   protected screenToFreePoint(point: ScreenPoint): FreePoint | null {
     if (!this._chart || !this._series) return null;
     
     try {
-      // Get visible time range
-      const visibleRange = this._chart.timeScale().getVisibleRange();
-      if (!visibleRange) return null;
+      const timeScale = this._chart.timeScale();
       
-      // Get chart width
-      const chartElement = (this._chart as any).chartElement?.();
-      const chartWidth = chartElement?.clientWidth || 800;
+      // Get the actual drawable width (excludes price axis)
+      const timeScaleWidth = timeScale.width();
+      if (timeScaleWidth <= 0) return null;
+      
+      // Get visible time range
+      const visibleRange = timeScale.getVisibleRange();
+      if (!visibleRange) return null;
       
       // Calculate time bounds
       const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
       const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
       const timeSpan = endTime - startTime;
       
-      if (timeSpan <= 0 || chartWidth <= 0) return null;
+      if (timeSpan <= 0) return null;
       
-      // Linear interpolation for timestamp
-      const timestamp = startTime + (point.x / chartWidth) * timeSpan;
+      // Linear interpolation using timeScale.width()
+      const timestamp = startTime + (point.x / timeScaleWidth) * timeSpan;
       
-      // Price from Y coordinate
-      const price = this.yToPrice(point.y);
+      // Price from Y coordinate using native API
+      const price = this._series.coordinateToPrice(point.y as Coordinate);
       if (price === null) return null;
       
       return { timestamp, price };

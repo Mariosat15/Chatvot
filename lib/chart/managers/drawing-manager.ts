@@ -403,30 +403,34 @@ export class DrawingManager {
 
   /**
    * Convert screen point to FreePoint-compatible ChartPoint
-   * Uses linear interpolation for precise timestamp (MT5-style)
+   * Uses timeScale().width() for correct drawable area (excludes price axis)
+   * Reference: https://tradingview.github.io/lightweight-charts/tutorials/customization/time-scale
    */
   private screenToFreeChartPoint(point: ScreenPoint): ChartPoint | null {
     if (!this._chart || !this._series) return null;
     try {
-      // Get price
+      // Get price using native API
       const price = this._series.coordinateToPrice(point.y as Coordinate);
       if (price === null) return null;
       
-      // Get precise timestamp via interpolation
-      const visibleRange = this._chart.timeScale().getVisibleRange();
-      if (!visibleRange) return null;
+      const timeScale = this._chart.timeScale();
       
-      const chartElement = (this._chart as any).chartElement?.();
-      const chartWidth = chartElement?.clientWidth || 800;
+      // Get the actual drawable width (excludes price axis)
+      const timeScaleWidth = timeScale.width();
+      if (timeScaleWidth <= 0) return null;
+      
+      // Get visible time range
+      const visibleRange = timeScale.getVisibleRange();
+      if (!visibleRange) return null;
       
       const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
       const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
       const timeSpan = endTime - startTime;
       
-      if (timeSpan <= 0 || chartWidth <= 0) return null;
+      if (timeSpan <= 0) return null;
       
-      // Precise timestamp (no snapping)
-      const timestamp = startTime + (point.x / chartWidth) * timeSpan;
+      // Precise timestamp using timeScale.width()
+      const timestamp = startTime + (point.x / timeScaleWidth) * timeSpan;
       
       return { time: timestamp as any, price };
     } catch { return null; }
@@ -452,32 +456,35 @@ export class DrawingManager {
 
   /**
    * Get FreePoint from event - MT5-style precise positioning
-   * Uses linear interpolation instead of snapping to candle times
+   * Uses timeScale().width() for correct drawable area (excludes price axis)
+   * Reference: https://tradingview.github.io/lightweight-charts/tutorials/customization/time-scale
    */
   private getFreePointFromEvent(param: MouseEventParams): FreePoint | null {
     if (!param.point || !this._chart || !this._series) return null;
     try {
-      // Get price from Y coordinate
+      // Get price from Y coordinate using native API
       const price = this._series.coordinateToPrice(param.point.y as Coordinate);
       if (price === null || price === undefined) return null;
       
-      // Get precise timestamp via linear interpolation
-      const visibleRange = this._chart.timeScale().getVisibleRange();
-      if (!visibleRange) return null;
+      const timeScale = this._chart.timeScale();
       
-      // Get chart width for interpolation
-      const chartElement = (this._chart as any).chartElement?.();
-      const chartWidth = chartElement?.clientWidth || 800;
+      // Get the actual drawable width (excludes price axis)
+      const timeScaleWidth = timeScale.width();
+      if (timeScaleWidth <= 0) return null;
+      
+      // Get visible time range
+      const visibleRange = timeScale.getVisibleRange();
+      if (!visibleRange) return null;
       
       // Calculate time bounds
       const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
       const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
       const timeSpan = endTime - startTime;
       
-      if (timeSpan <= 0 || chartWidth <= 0) return null;
+      if (timeSpan <= 0) return null;
       
-      // Linear interpolation for precise timestamp (no snapping!)
-      const timestamp = startTime + (param.point.x / chartWidth) * timeSpan;
+      // Linear interpolation using timeScale.width() (no snapping!)
+      const timestamp = startTime + (param.point.x / timeScaleWidth) * timeSpan;
       
       return { timestamp, price };
     } catch { return null; }
