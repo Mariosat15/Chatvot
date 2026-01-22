@@ -460,41 +460,53 @@ export class DrawingManager {
 
   /**
    * Get FreePoint from event - MT5-style precise positioning
-   * Uses logical coordinate system for proper chart alignment
-   * Reference: https://tradingview.github.io/lightweight-charts/docs/plugins/series-primitives
+   * Stores both logical index AND screen ratio for maximum accuracy
    */
   private getFreePointFromEvent(param: MouseEventParams): FreePoint | null {
     if (!param.point || !this._chart || !this._series) return null;
     try {
-      // Get price from Y coordinate using native API
+      // Get price from Y coordinate
       const price = this._series.coordinateToPrice(param.point.y as Coordinate);
       if (price === null || price === undefined) return null;
       
       const timeScale = this._chart.timeScale();
       
-      // Convert X to logical index using native API
+      // Get logical index from click position
       const logicalIndex = timeScale.coordinateToLogical(param.point.x as Coordinate);
-      if (logicalIndex === null) return null;
       
-      // Get logical and time ranges
+      // Also store the screen X position for immediate rendering accuracy
+      const screenX = param.point.x;
+      
+      // Get ranges for timestamp calculation
       const logicalRange = timeScale.getVisibleLogicalRange();
       const visibleRange = timeScale.getVisibleRange();
       
       if (!logicalRange || !visibleRange) return null;
       
-      // Calculate time bounds
+      // Calculate timestamp from logical index if available
       const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
       const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
       const timeSpan = endTime - startTime;
       const logicalSpan = logicalRange.to - logicalRange.from;
       
-      if (timeSpan <= 0 || logicalSpan <= 0) return null;
+      let timestamp: number;
+      if (logicalIndex !== null && timeSpan > 0 && logicalSpan > 0) {
+        const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
+        timestamp = startTime + logicalRatio * timeSpan;
+      } else {
+        // Fallback: use screen position ratio
+        const timeScaleWidth = timeScale.width();
+        if (timeScaleWidth <= 0 || timeSpan <= 0) return null;
+        timestamp = startTime + (screenX / timeScaleWidth) * timeSpan;
+      }
       
-      // Convert logical index to timestamp (no snapping!)
-      const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
-      const timestamp = startTime + logicalRatio * timeSpan;
-      
-      return { timestamp, price };
+      // Return with both logical index and screen X for accurate rendering
+      return { 
+        timestamp, 
+        price,
+        logicalIndex: logicalIndex ?? undefined,
+        screenX, // Store original screen X for immediate rendering
+      } as FreePoint & { logicalIndex?: number; screenX?: number };
     } catch { return null; }
   }
 
