@@ -429,8 +429,12 @@ export default function MarketDataSection() {
   };
 
   const [detectingGaps, setDetectingGaps] = useState(false);
+  const detectingGapsRef = React.useRef(false);
   
-  const fetchGaps = async () => {
+  const fetchGaps = useCallback(async () => {
+    // Prevent multiple simultaneous calls using ref
+    if (detectingGapsRef.current) return;
+    detectingGapsRef.current = true;
     setDetectingGaps(true);
     try {
       const res = await fetch('/api/market-data/gap-fill');
@@ -442,15 +446,17 @@ export default function MarketDataSection() {
     } catch (error) {
       console.error('Error fetching gaps:', error);
     } finally {
+      detectingGapsRef.current = false;
       setDetectingGaps(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
     fetchGaps();
     fetchSymbols();
-  }, [fetchData, fetchGaps, fetchSymbols]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Initialize cleanup state from loaded settings
   useEffect(() => {
