@@ -403,8 +403,8 @@ export class DrawingManager {
 
   /**
    * Convert screen point to FreePoint-compatible ChartPoint
-   * Uses timeScale().width() for correct drawable area (excludes price axis)
-   * Reference: https://tradingview.github.io/lightweight-charts/tutorials/customization/time-scale
+   * Uses logical coordinate system for proper chart alignment
+   * Reference: https://tradingview.github.io/lightweight-charts/docs/plugins/series-primitives
    */
   private screenToFreeChartPoint(point: ScreenPoint): ChartPoint | null {
     if (!this._chart || !this._series) return null;
@@ -415,22 +415,26 @@ export class DrawingManager {
       
       const timeScale = this._chart.timeScale();
       
-      // Get the actual drawable width (excludes price axis)
-      const timeScaleWidth = timeScale.width();
-      if (timeScaleWidth <= 0) return null;
+      // Convert X to logical index using native API
+      const logicalIndex = timeScale.coordinateToLogical(point.x as Coordinate);
+      if (logicalIndex === null) return null;
       
-      // Get visible time range
+      // Get logical and time ranges
+      const logicalRange = timeScale.getVisibleLogicalRange();
       const visibleRange = timeScale.getVisibleRange();
-      if (!visibleRange) return null;
+      
+      if (!logicalRange || !visibleRange) return null;
       
       const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
       const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
       const timeSpan = endTime - startTime;
+      const logicalSpan = logicalRange.to - logicalRange.from;
       
-      if (timeSpan <= 0) return null;
+      if (timeSpan <= 0 || logicalSpan <= 0) return null;
       
-      // Precise timestamp using timeScale.width()
-      const timestamp = startTime + (point.x / timeScaleWidth) * timeSpan;
+      // Convert logical index to timestamp
+      const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
+      const timestamp = startTime + logicalRatio * timeSpan;
       
       return { time: timestamp as any, price };
     } catch { return null; }
@@ -456,8 +460,8 @@ export class DrawingManager {
 
   /**
    * Get FreePoint from event - MT5-style precise positioning
-   * Uses timeScale().width() for correct drawable area (excludes price axis)
-   * Reference: https://tradingview.github.io/lightweight-charts/tutorials/customization/time-scale
+   * Uses logical coordinate system for proper chart alignment
+   * Reference: https://tradingview.github.io/lightweight-charts/docs/plugins/series-primitives
    */
   private getFreePointFromEvent(param: MouseEventParams): FreePoint | null {
     if (!param.point || !this._chart || !this._series) return null;
@@ -468,23 +472,27 @@ export class DrawingManager {
       
       const timeScale = this._chart.timeScale();
       
-      // Get the actual drawable width (excludes price axis)
-      const timeScaleWidth = timeScale.width();
-      if (timeScaleWidth <= 0) return null;
+      // Convert X to logical index using native API
+      const logicalIndex = timeScale.coordinateToLogical(param.point.x as Coordinate);
+      if (logicalIndex === null) return null;
       
-      // Get visible time range
+      // Get logical and time ranges
+      const logicalRange = timeScale.getVisibleLogicalRange();
       const visibleRange = timeScale.getVisibleRange();
-      if (!visibleRange) return null;
+      
+      if (!logicalRange || !visibleRange) return null;
       
       // Calculate time bounds
       const startTime = typeof visibleRange.from === 'number' ? visibleRange.from : 0;
       const endTime = typeof visibleRange.to === 'number' ? visibleRange.to : startTime + 1;
       const timeSpan = endTime - startTime;
+      const logicalSpan = logicalRange.to - logicalRange.from;
       
-      if (timeSpan <= 0) return null;
+      if (timeSpan <= 0 || logicalSpan <= 0) return null;
       
-      // Linear interpolation using timeScale.width() (no snapping!)
-      const timestamp = startTime + (param.point.x / timeScaleWidth) * timeSpan;
+      // Convert logical index to timestamp (no snapping!)
+      const logicalRatio = (logicalIndex - logicalRange.from) / logicalSpan;
+      const timestamp = startTime + logicalRatio * timeSpan;
       
       return { timestamp, price };
     } catch { return null; }
