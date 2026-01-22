@@ -2287,12 +2287,20 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         });
       }
       
-      // Update candle
+      // MERGE candle data instead of replacing
+      // This prevents WebSocket updates from "shrinking" the candle if they have incomplete data
+      const existing = currentCandleRef.current;
+      const isSameCandle = existing && existing.time === candle.time;
+      
       const candleData: CandlestickData<UTCTimestamp> = {
         time: candle.time as UTCTimestamp,
-        open: candle.open,
-        high: candle.high,
-        low: candle.low,
+        // Keep the existing open if same candle (first price of period), otherwise use new
+        open: isSameCandle ? existing.open : candle.open,
+        // Always keep the HIGHEST high
+        high: isSameCandle ? Math.max(existing.high, candle.high) : candle.high,
+        // Always keep the LOWEST low
+        low: isSameCandle ? Math.min(existing.low, candle.low) : candle.low,
+        // Always use the latest close
         close: candle.close,
       };
       
