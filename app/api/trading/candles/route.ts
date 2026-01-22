@@ -1072,36 +1072,62 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
           formingCandle = getForming1hCandle(symbol);
         } else if (normalizedTf === '1d') {
           formingCandle = getFormingDailyCandle(symbol);
-          console.log(`🔍 [1d Forming] ${symbol}: ${formingCandle ? `time=${new Date(formingCandle.time * 1000).toISOString()}, O=${formingCandle.open}, H=${formingCandle.high}, L=${formingCandle.low}, C=${formingCandle.close}` : 'NULL'}`);
         } else if (normalizedTf === 'W') {
           formingCandle = getFormingWeeklyCandle(symbol);
         } else if (normalizedTf === 'M') {
           formingCandle = getFormingMonthlyCandle(symbol);
-        } else if (useAggregator) {
-          // For 5m, 15m, 30m - get forming candle from aggregator cache
+        } else if (normalizedTf === '30m') {
+          // 30m uses aggregator
           const result = await getAggregatedCandles(symbol, normalizedTf, 1);
           formingCandle = result.formingCandle;
-          
-          // DEBUG: Log what we have
-          console.log(`🔍 [${normalizedTf} DEBUG] ${symbol}: Historical=${historicalCandles.length}, limit=${limit}`);
+        } else if (useAggregator) {
+          // For 5m, 15m - get forming candle from aggregator cache
+          const result = await getAggregatedCandles(symbol, normalizedTf, 1);
+          formingCandle = result.formingCandle;
         }
         
-        // If forming candle is missing, try to build it from recent 1m candles
-        if (!formingCandle && useAggregator) {
-          const recentCandles = await Candle1m.find({ 
-            symbol, 
-            t: { $gte: currentPeriodStart } 
-          }).sort({ t: 1 }).lean();
+        // =====================================================
+        // AUGMENT FORMING CANDLE WITH 1m DATA
+        // This ensures the forming candle has COMPLETE OHLC for the current period,
+        // even if the server just restarted or the cache only has recent ticks.
+        // =====================================================
+        const candles1mInPeriod = await Candle1m.find({ 
+          symbol, 
+          t: { $gte: currentPeriodStart, $lt: currentPeriodStart + tfSeconds } 
+        }).sort({ t: 1 }).lean();
+        
+        if (candles1mInPeriod.length > 0) {
+          // Calculate OHLC from all 1m candles in this period
+          const open1m = candles1mInPeriod[0].o;
+          const high1m = Math.max(...candles1mInPeriod.map(c => c.h));
+          const low1m = Math.min(...candles1mInPeriod.map(c => c.l));
+          const close1m = candles1mInPeriod[candles1mInPeriod.length - 1].c;
           
-          if (recentCandles.length > 0) {
+          if (!formingCandle) {
+            // No cached forming candle - create from 1m data
             formingCandle = {
               time: currentPeriodStart,
-              open: recentCandles[0].o,
-              high: Math.max(...recentCandles.map(c => c.h)),
-              low: Math.min(...recentCandles.map(c => c.l)),
-              close: recentCandles[recentCandles.length - 1].c,
+              open: open1m,
+              high: high1m,
+              low: low1m,
+              close: close1m,
             };
-            console.log(`⚡ [${normalizedTf}] ${symbol}: Built forming from ${recentCandles.length} 1m candles`);
+            console.log(`⚡ [${normalizedTf}] ${symbol}: Created forming from ${candles1mInPeriod.length} 1m candles`);
+          } else {
+            // Merge cached forming candle with 1m historical data
+            // The cached forming candle has the LATEST close, but might miss older data
+            const mergedHigh = Math.max(formingCandle.high, high1m);
+            const mergedLow = Math.min(formingCandle.low, low1m);
+            
+            // Use 1m open (from start of period) - this is more accurate
+            formingCandle = {
+              time: currentPeriodStart,
+              open: open1m,  // Use 1m open (start of period)
+              high: mergedHigh,
+              low: mergedLow,
+              close: formingCandle.close, // Use cached close (most recent)
+            };
+            console.log(`🔄 [${normalizedTf}] ${symbol}: Augmented forming with ${candles1mInPeriod.length} 1m candles`);
           }
         }
         

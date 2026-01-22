@@ -3446,6 +3446,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                 { label: '1m', value: '1' as Timeframe },
                 { label: '5m', value: '5' as Timeframe },
                 { label: '15m', value: '15' as Timeframe },
+                { label: '30m', value: '30' as Timeframe },
                 { label: '1H', value: '60' as Timeframe },
                 { label: '4H', value: '240' as Timeframe },
                 { label: '1D', value: 'D' as Timeframe },
