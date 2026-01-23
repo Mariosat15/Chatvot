@@ -2363,13 +2363,22 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                 const isM = timeframe === 'M' || (timeframe as string) === '1M';
                 
                 // Map timeframe to timeframe string used in completedCandles
-                const currentTf = isM ? 'M' : (isW ? '1w' : (isD ? '1d' : (is4h ? '4h' : (is1h ? '1h' : (is30m ? '30m' : (is15m ? '15m' : (is5m ? '5m' : '1m')))))));
+                // MUST match the format used in websocket-price-streamer.ts saveCompletedHigherTimeframeCandle()
+                const currentTf = isM ? '1M' : (isW ? '1w' : (isD ? '1d' : (is4h ? '4h' : (is1h ? '1h' : (is30m ? '30m' : (is15m ? '15m' : (is5m ? '5m' : '1m')))))));
                 
                 // ⭐ HANDLE COMPLETED CANDLES - REPLACE with authoritative data from WebSocket
                 // This is critical for unified pipeline: completed candles are the SINGLE SOURCE OF TRUTH
                 // They come from WebSocket which saved them to historical collection after augmenting with 1m data
                 if (completedCandles && completedCandles.length > 0 && candlestickSeriesRef.current) {
+                  // Debug: log all received completed candles
+                  console.log(`📥 [Chart] Received ${completedCandles.length} completed candles, looking for symbol=${symbol} timeframe=${currentTf}`);
+                  
                   for (const completed of completedCandles) {
+                    // Debug: log each completed candle
+                    if (completed.symbol === symbol) {
+                      console.log(`📦 [Chart] Completed candle for ${completed.symbol}: tf=${completed.timeframe} (want ${currentTf}), time=${new Date(completed.time * 1000).toISOString()}`);
+                    }
+                    
                     // Check if this completed candle is for our symbol and timeframe
                     if (completed.symbol === symbol && completed.timeframe === currentTf) {
                       // FULLY REPLACE the candle with authoritative data (no merging!)
