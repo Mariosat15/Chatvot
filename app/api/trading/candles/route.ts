@@ -1088,114 +1088,28 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
         }
         
         // =====================================================
-        // AUGMENT FORMING CANDLE WITH 1m DATA
-        // This ensures the forming candle has COMPLETE OHLC for the current period,
-        // even if the server just restarted or the cache only has recent ticks.
+        // UNIFIED PIPELINE: WebSocket is the SINGLE SOURCE OF TRUTH
+        // - Historical candles come from historical collections (written by WebSocket)
+        // - Forming candle comes from WebSocket cache (seeded from 1m on startup)
+        // - NO augmentation here - prevents API/WebSocket divergence
         // =====================================================
-        const candles1mInPeriod = await Candle1m.find({ 
-          symbol, 
-          t: { $gte: currentPeriodStart, $lt: currentPeriodStart + tfSeconds } 
-        }).sort({ t: 1 }).lean();
         
-        if (candles1mInPeriod.length > 0) {
-          // Calculate OHLC from all 1m candles in this period
-          const open1m = candles1mInPeriod[0].o;
-          const high1m = Math.max(...candles1mInPeriod.map(c => c.h));
-          const low1m = Math.min(...candles1mInPeriod.map(c => c.l));
-          const close1m = candles1mInPeriod[candles1mInPeriod.length - 1].c;
-          
-          if (!formingCandle) {
-            // No cached forming candle - create from 1m data
-            formingCandle = {
-              time: currentPeriodStart,
-              open: open1m,
-              high: high1m,
-              low: low1m,
-              close: close1m,
-            };
-            console.log(`⚡ [${normalizedTf}] ${symbol}: Created forming from ${candles1mInPeriod.length} 1m candles`);
-          } else {
-            // Merge cached forming candle with 1m historical data
-            // The cached forming candle has the LATEST close, but might miss older data
-            const mergedHigh = Math.max(formingCandle.high, high1m);
-            const mergedLow = Math.min(formingCandle.low, low1m);
-            
-            // Use 1m open (from start of period) - this is more accurate
-            formingCandle = {
-              time: currentPeriodStart,
-              open: open1m,  // Use 1m open (start of period)
-              high: mergedHigh,
-              low: mergedLow,
-              close: formingCandle.close, // Use cached close (most recent)
-            };
-            console.log(`🔄 [${normalizedTf}] ${symbol}: Augmented forming with ${candles1mInPeriod.length} 1m candles`);
-          }
-        } else if (!formingCandle) {
-          // =====================================================
-          // FALLBACK: No 1m data AND no cached forming candle
-          // This can happen right at the start of a new period.
-          // Use the last historical candle's close as the forming candle's OHLC.
-          // This ensures the chart always shows something for the current period.
-          // =====================================================
-          if (historicalCandles.length > 0) {
-            const lastHistorical = historicalCandles[historicalCandles.length - 1];
-            formingCandle = {
-              time: currentPeriodStart,
-              open: lastHistorical.close,  // Open at previous close
-              high: lastHistorical.close,
-              low: lastHistorical.close,
-              close: lastHistorical.close,
-            };
-            console.log(`📌 [${normalizedTf}] ${symbol}: Created forming from last historical close (no 1m data yet)`);
-          }
+        // If no forming candle from cache, create a placeholder from last historical
+        // This ensures the chart shows something for the current period
+        if (!formingCandle && historicalCandles.length > 0) {
+          const lastHistorical = historicalCandles[historicalCandles.length - 1];
+          formingCandle = {
+            time: currentPeriodStart,
+            open: lastHistorical.close,  // Open at previous close
+            high: lastHistorical.close,
+            low: lastHistorical.close,
+            close: lastHistorical.close,
+          };
+          console.log(`📌 [${normalizedTf}] ${symbol}: Created forming placeholder from last historical close`);
         }
         
-        // NOTE: Historical collections are now automatically kept up-to-date by WebSocket streamer
-        // when candles complete. But there might be a gap between last historical and current period.
-        // Fill this gap IMMEDIATELY from aggregator so user sees complete data on first load.
-        
-        if (historicalCandles.length > 0 && formingCandle !== null && useAggregator) {
-          const newestHistorical = historicalCandles[historicalCandles.length - 1].time;
-          const currentFormingTime = formingCandle.time;
-          const gapCandlesNeeded = Math.floor((currentFormingTime - newestHistorical) / tfSeconds) - 1;
-          
-          if (gapCandlesNeeded > 0) {
-            console.log(`🔧 [${normalizedTf} Gap Fill] ${symbol}: Need ${gapCandlesNeeded} candles to fill gap`);
-            
-            // Get gap candles from aggregator (which has recent 1m data)
-            const result = await getAggregatedCandles(symbol, normalizedTf, gapCandlesNeeded + 10);
-            const existingTimes = new Set(historicalCandles.map(c => c.time));
-            
-            // Add only candles that fill the gap (between historical and forming)
-            const gapCandles = result.candles.filter(c => 
-              c.time > newestHistorical && 
-              c.time < currentFormingTime && 
-              !existingTimes.has(c.time)
-            );
-            
-            if (gapCandles.length > 0) {
-              console.log(`✅ [${normalizedTf} Gap Fill] ${symbol}: Adding ${gapCandles.length} aggregator candles`);
-              historicalCandles = [...historicalCandles, ...gapCandles].sort((a, b) => a.time - b.time);
-              
-              // Also save to historical collection for future users (fire and forget)
-              const historicalModel = getHistoricalModel(normalizedTf);
-              if (historicalModel) {
-                (async () => {
-                  for (const candle of gapCandles) {
-                    try {
-                      // Use $set to OVERWRITE existing incomplete candles
-                      await historicalModel.updateOne(
-                        { symbol, timestamp: new Date(candle.time * 1000) },
-                        { $set: { symbol, timestamp: new Date(candle.time * 1000), open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: 0 } },
-                        { upsert: true }
-                      );
-                    } catch { /* ignore duplicates */ }
-                  }
-                })();
-              }
-            }
-          }
-        }
+        // Log what we're returning (no augmentation, no gap filling from aggregator)
+        console.log(`🎯 [${normalizedTf} UNIFIED] ${symbol}: Using WebSocket as single source of truth`)
         
         // Final count log
         console.log(`✅ [${normalizedTf} FINAL] ${symbol}: Returning ${historicalCandles.length} candles + forming=${!!formingCandle}`);
@@ -1208,83 +1122,19 @@ async function handleCandleRequest(symbol: string, timeframe: string, count?: nu
       }
       
       // =====================================================
-      // GAP DETECTION AND FILL FOR HIGHER TIMEFRAMES
-      // Detect gap between historical data and current period
+      // GAP DETECTION (logging only - gaps are filled by WebSocket when candles complete)
+      // The WebSocket is now responsible for saving completed candles to historical
       // =====================================================
       if (!before && historicalCandles.length > 0 && formingCandle) {
-        const newestHistorical = historicalCandles[historicalCandles.length - 1].time; // seconds
-        const currentPeriodTime = formingCandle.time; // seconds
-        
-        // Calculate expected gap based on timeframe
+        const newestHistorical = historicalCandles[historicalCandles.length - 1].time;
+        const currentPeriodTime = formingCandle.time;
         const gapTfMinutes = { '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440, 'W': 10080, 'M': 43200 }[normalizedTf] || 60;
-        const expectedGapSeconds = gapTfMinutes * 60 * 2; // Allow 2 candle gap as normal
+        const expectedGapSeconds = gapTfMinutes * 60 * 2;
         const actualGapSeconds = currentPeriodTime - newestHistorical;
         
-        // If gap is larger than expected, try to fill it
         if (actualGapSeconds > expectedGapSeconds) {
           const gapCandlesCount = Math.floor(actualGapSeconds / (gapTfMinutes * 60));
-          console.log(`🔍 [${normalizedTf} Gap] Detected ${gapCandlesCount} candle gap for ${symbol}`);
-          console.log(`   Historical ends: ${new Date(newestHistorical * 1000).toISOString()}`);
-          console.log(`   Current period: ${new Date(currentPeriodTime * 1000).toISOString()}`);
-          
-          // Try to fill gap from Massive.com API (background, fire and forget)
-          const massiveTimeframeMap: Record<string, Timeframe> = {
-            '5m': '5', '15m': '15', '30m': '30',
-            '1h': '60', '4h': '240',
-          };
-          const massiveTf = massiveTimeframeMap[normalizedTf];
-          
-          if (massiveTf) {
-            // Fire and forget - fill gap in background
-            (async () => {
-              try {
-                const gapStartMs = (newestHistorical + gapTfMinutes * 60) * 1000;
-                const gapEndMs = (currentPeriodTime - gapTfMinutes * 60) * 1000;
-                
-                console.log(`🔧 [${normalizedTf} Gap Fill] Fetching gap candles from API...`);
-                
-                const gapCandlesData = await fetchCandlesForRange(
-                  symbol as ForexSymbol,
-                  massiveTf,
-                  gapStartMs,
-                  gapEndMs
-                );
-                
-                if (gapCandlesData.length > 0) {
-                  // Save to historical collection
-                  const historicalModel = getHistoricalModel(normalizedTf);
-                  if (historicalModel) {
-                    let insertedCount = 0;
-                    for (const candle of gapCandlesData) {
-                      const timestamp = new Date(candle.time);
-                      
-                      // Skip weekends
-                      const day = timestamp.getUTCDay();
-                      if (day === 0 || day === 6) continue;
-                      
-                      // Skip if exists
-                      const exists = await historicalModel.findOne({ symbol, timestamp }).lean();
-                      if (!exists) {
-                        await historicalModel.create({
-                          symbol,
-                          timestamp,
-                          open: candle.open,
-                          high: candle.high,
-                          low: candle.low,
-                          close: candle.close,
-                          volume: candle.volume || 0,
-                        });
-                        insertedCount++;
-                      }
-                    }
-                    console.log(`✅ [${normalizedTf} Gap Fill] ${symbol}: Inserted ${insertedCount} candles`);
-                  }
-                }
-              } catch (err) {
-                console.error(`❌ [${normalizedTf} Gap Fill] Failed for ${symbol}:`, err);
-              }
-            })();
-          }
+          console.log(`⚠️ [${normalizedTf} Gap] ${symbol}: ${gapCandlesCount} candle gap detected (WebSocket will fill on next completion)`);
         }
       }
       

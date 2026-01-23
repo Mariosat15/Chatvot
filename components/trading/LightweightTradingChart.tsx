@@ -2365,14 +2365,15 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                 // Map timeframe to timeframe string used in completedCandles
                 const currentTf = isM ? 'M' : (isW ? '1w' : (isD ? '1d' : (is4h ? '4h' : (is1h ? '1h' : (is30m ? '30m' : (is15m ? '15m' : (is5m ? '5m' : '1m')))))));
                 
-                // ⭐ HANDLE COMPLETED CANDLES - Update historical data when candles complete
-                // This prevents chart divergence between refreshed and non-refreshed charts
+                // ⭐ HANDLE COMPLETED CANDLES - REPLACE with authoritative data from WebSocket
+                // This is critical for unified pipeline: completed candles are the SINGLE SOURCE OF TRUTH
+                // They come from WebSocket which saved them to historical collection after augmenting with 1m data
                 if (completedCandles && completedCandles.length > 0 && candlestickSeriesRef.current) {
                   for (const completed of completedCandles) {
                     // Check if this completed candle is for our symbol and timeframe
                     if (completed.symbol === symbol && completed.timeframe === currentTf) {
-                      // Update the chart with the completed (authoritative) candle data
-                      const completedData = {
+                      // FULLY REPLACE the candle with authoritative data (no merging!)
+                      const completedData: CandlestickData<UTCTimestamp> = {
                         time: completed.time as UTCTimestamp,
                         open: completed.open,
                         high: completed.high,
@@ -2389,7 +2390,14 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                         candlestickSeriesRef.current?.update(completedData);
                       }
                       
-                      console.log(`✅ [Chart] Updated completed ${currentTf} candle: ${new Date(completed.time * 1000).toISOString()}`);
+                      // Also reset currentCandleRef if this was the current forming candle
+                      // This prevents stale data from affecting subsequent forming candle updates
+                      if (currentCandleRef.current && currentCandleRef.current.time === completed.time) {
+                        currentCandleRef.current = null;
+                        console.log(`🔄 [Chart] Reset currentCandleRef after completed candle`);
+                      }
+                      
+                      console.log(`✅ [Chart] Replaced ${currentTf} candle with authoritative data: ${new Date(completed.time * 1000).toISOString()} O:${completed.open.toFixed(5)} H:${completed.high.toFixed(5)} L:${completed.low.toFixed(5)} C:${completed.close.toFixed(5)}`);
                     }
                   }
                 }
