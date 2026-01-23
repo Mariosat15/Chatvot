@@ -2422,6 +2422,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                       
                       // Check if this completed candle is for our symbol and timeframe
                       if (completed.symbol === symbol && completed.timeframe === currentTf) {
+                        console.log(`   🎯 MATCHED: ${symbol} ${currentTf} @ ${new Date(completed.time * 1000).toISOString()}`);
+                        
                         // Track this timestamp as "finalized" - forming candles should NOT overwrite it
                         completedTimestamps.add(completed.time);
                         
@@ -2434,13 +2436,18 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                           close: completed.close,
                         };
                         
-                        if (chartType === 'line') {
-                          (candlestickSeriesRef.current as unknown as ISeriesApi<'Line'>).update({
-                            time: completed.time as UTCTimestamp,
-                            value: completed.close,
-                          });
-                        } else {
-                          candlestickSeriesRef.current?.update(completedData);
+                        try {
+                          if (chartType === 'line') {
+                            (candlestickSeriesRef.current as unknown as ISeriesApi<'Line'>).update({
+                              time: completed.time as UTCTimestamp,
+                              value: completed.close,
+                            });
+                          } else {
+                            candlestickSeriesRef.current?.update(completedData);
+                          }
+                          console.log(`   ✅ APPLIED to chart: O:${completed.open.toFixed(5)} H:${completed.high.toFixed(5)} L:${completed.low.toFixed(5)} C:${completed.close.toFixed(5)}`);
+                        } catch (updateError) {
+                          console.error(`   ❌ FAILED to apply completed candle:`, updateError);
                         }
                         
                         // Reset currentCandleRef - the next forming candle should be for a NEW timestamp
@@ -2448,8 +2455,6 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                           console.log(`   🔄 Reset currentCandleRef (was at same timestamp)`);
                           currentCandleRef.current = null;
                         }
-                        
-                        console.log(`   ✅ APPLIED to chart: ${symbol} ${currentTf} @ ${new Date(completed.time * 1000).toISOString()} | O:${completed.open.toFixed(5)} H:${completed.high.toFixed(5)} L:${completed.low.toFixed(5)} C:${completed.close.toFixed(5)}`);
                       } else {
                         console.log(`   ⏭️ Skipped (not our symbol/tf): watching ${symbol}/${currentTf}, received ${completed.symbol}/${completed.timeframe}`);
                       }
