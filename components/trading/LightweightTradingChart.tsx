@@ -281,6 +281,9 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
     changePercent: number;
   } | null>(null);
   
+  // UTC time display - client-side only to avoid hydration mismatch
+  const [utcTime, setUtcTime] = useState<string>('--:--:--');
+  
   // Chart display settings - Load from localStorage
   const [showBidAskLines, setShowBidAskLines] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -323,6 +326,16 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   const [priceUpdateMode, setPriceUpdateMode] = useState<'polling' | 'websocket'>('polling');
   const [pollingIntervalMs, setPollingIntervalMs] = useState(200);
   const [websocketIntervalMs, setWebsocketIntervalMs] = useState(200);
+  
+  // Update UTC time on client side only (avoids hydration mismatch)
+  useEffect(() => {
+    const updateTime = () => {
+      setUtcTime(new Date().toISOString().slice(11, 19));
+    };
+    updateTime(); // Set immediately on mount
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
   
   // Fetch price update mode and intervals from server (cached for 10 seconds)
   useEffect(() => {
@@ -3528,9 +3541,9 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               ))}
             </div>
 
-            {/* Right side: UTC Time display */}
+            {/* Right side: UTC Time display (uses state to avoid hydration mismatch) */}
             <div className="flex items-center gap-2 text-[10px] text-[#787B86] font-mono">
-              <span>{new Date().toISOString().slice(11, 19)} UTC</span>
+              <span>{utcTime} UTC</span>
             </div>
           </div>
         </div>

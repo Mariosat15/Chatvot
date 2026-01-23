@@ -220,21 +220,39 @@ export function useChartDrawings(options: UseChartDrawingsOptions = {}): UseChar
     series: ISeriesApi<'Candlestick'>, 
     container: HTMLElement
   ) => {
-    console.log('[useChartDrawings] Attaching to chart');
-    managerRef.current?.attach(chart, series, container);
-    setIsAttached(true);
+    // Guard: Check if chart is valid before attaching
+    try {
+      // Try to access a chart method to verify it's not disposed
+      chart.timeScale();
+    } catch {
+      console.log('[useChartDrawings] Cannot attach - chart is disposed');
+      return;
+    }
     
-    // Load saved drawings after attachment
-    setTimeout(() => {
-      load();
-    }, 100);
+    console.log('[useChartDrawings] Attaching to chart');
+    try {
+      managerRef.current?.attach(chart, series, container);
+      setIsAttached(true);
+      
+      // Load saved drawings after attachment
+      setTimeout(() => {
+        load();
+      }, 100);
+    } catch (error) {
+      console.log('[useChartDrawings] Error during attach:', error);
+      setIsAttached(false);
+    }
   }, [load]);
 
   // Detach from chart
   const detach = useCallback(() => {
     console.log('[useChartDrawings] Detaching from chart');
-    if (autoSave) save();
-    managerRef.current?.detach();
+    try {
+      if (autoSave) save();
+      managerRef.current?.detach();
+    } catch (error) {
+      console.log('[useChartDrawings] Error during detach (chart may already be disposed):', error);
+    }
     setIsAttached(false);
   }, [autoSave, save]);
 

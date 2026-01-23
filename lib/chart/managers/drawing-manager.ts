@@ -96,6 +96,14 @@ export class DrawingManager {
   // ============================================
 
   attach(chart: IChartApi, series: ISeriesApi<'Candlestick'>, container: HTMLElement): void {
+    // Guard: Verify chart is not disposed before attaching
+    try {
+      chart.timeScale(); // Test if chart is valid
+    } catch {
+      console.log('[DrawingManager] Cannot attach - chart is disposed');
+      return;
+    }
+    
     if (this._isAttached) this.detach();
 
     this._chart = chart;
@@ -103,13 +111,18 @@ export class DrawingManager {
     this._containerElement = container;
     this._isAttached = true;
     
-    chart.subscribeClick(this._boundChartClick);
-    chart.subscribeCrosshairMove(this._boundCrosshairMove);
-    
-    container.addEventListener('mousedown', this._boundMouseDown, { passive: true });
-    document.addEventListener('mousemove', this._boundMouseMove, { passive: true });
-    document.addEventListener('mouseup', this._boundMouseUp, { passive: true });
-    document.addEventListener('keydown', this._boundKeyDown);
+    try {
+      chart.subscribeClick(this._boundChartClick);
+      chart.subscribeCrosshairMove(this._boundCrosshairMove);
+      
+      container.addEventListener('mousedown', this._boundMouseDown, { passive: true });
+      document.addEventListener('mousemove', this._boundMouseMove, { passive: true });
+      document.addEventListener('mouseup', this._boundMouseUp, { passive: true });
+      document.addEventListener('keydown', this._boundKeyDown);
+    } catch (error) {
+      console.log('[DrawingManager] Error during attach:', error);
+      this._isAttached = false;
+    }
   }
 
   detach(): void {
@@ -140,6 +153,17 @@ export class DrawingManager {
 
   isAttached(): boolean {
     return this._isAttached;
+  }
+  
+  // Check if chart is still valid (not disposed)
+  private isChartValid(): boolean {
+    if (!this._chart || !this._isAttached) return false;
+    try {
+      this._chart.timeScale();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // ============================================
@@ -536,6 +560,7 @@ export class DrawingManager {
   private handleMouseDown(e: MouseEvent): void {
     if (e.button !== 0) return;
     if (this._activeTool || this._session) return;
+    if (!this.isChartValid()) return; // Guard: chart may be disposed
     
     const screenPoint = this.getScreenPoint(e);
     if (!screenPoint) return;
@@ -588,6 +613,8 @@ export class DrawingManager {
   }
 
   private handleMouseMove(e: MouseEvent): void {
+    if (!this.isChartValid()) return; // Guard: chart may be disposed
+    
     const screenPoint = this.getScreenPoint(e);
     if (!screenPoint) return;
     
