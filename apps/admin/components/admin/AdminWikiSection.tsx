@@ -1119,44 +1119,74 @@ export default function AdminWikiSection() {
       title: 'Market Data Overview',
       icon: CandlestickChart,
       category: 'Market Data',
-      tags: ['charts', 'prices', 'candles', 'architecture', 'system'],
+      tags: ['charts', 'prices', 'candles', 'architecture', 'system', 'unified-pipeline'],
       content: (
         <div className="space-y-6">
           <div>
-            <h2 className="text-2xl font-bold text-emerald-400 mb-3">Market Data System Architecture</h2>
+            <h2 className="text-2xl font-bold text-emerald-400 mb-3">Unified Pipeline Architecture</h2>
             <p className="text-gray-300 mb-4">
-              Complete overview of how real-time prices and candle data flow through the Chartvolt platform.
+              Chartvolt uses a <strong className="text-emerald-400">Single Source of Truth</strong> architecture where the WebSocket Price Streamer 
+              builds and stores ALL candle data, ensuring perfect consistency across all charts and clients.
             </p>
           </div>
 
           <div className="bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30 rounded-xl p-6">
             <h3 className="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
               <Layers className="h-5 w-5" />
-              System Flow Overview
+              Data Flow Overview
             </h3>
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-3">
-                <div className="bg-blue-500/20 px-3 py-2 rounded-lg text-blue-400 font-medium min-w-[140px]">Massive.com</div>
+                <div className="bg-blue-500/20 px-3 py-2 rounded-lg text-blue-400 font-medium min-w-[160px]">1. Massive.com</div>
                 <ArrowRight className="h-4 w-4 text-gray-500" />
-                <div className="text-gray-300">External price feed provider (WebSocket)</div>
+                <div className="text-gray-300">External price feed (~50ms ticks)</div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="bg-purple-500/20 px-3 py-2 rounded-lg text-purple-400 font-medium min-w-[140px]">Price Streamer</div>
+                <div className="bg-purple-500/20 px-3 py-2 rounded-lg text-purple-400 font-medium min-w-[160px]">2. Price Streamer</div>
                 <ArrowRight className="h-4 w-4 text-gray-500" />
-                <div className="text-gray-300">Receives quotes, builds candles, updates caches</div>
+                <div className="text-gray-300">Builds ALL timeframe candles, saves completed to MongoDB</div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="bg-orange-500/20 px-3 py-2 rounded-lg text-orange-400 font-medium min-w-[140px]">WebSocket Server</div>
+                <div className="bg-orange-500/20 px-3 py-2 rounded-lg text-orange-400 font-medium min-w-[160px]">3. WebSocket Server</div>
                 <ArrowRight className="h-4 w-4 text-gray-500" />
-                <div className="text-gray-300">Broadcasts to connected browsers (Port 3003)</div>
+                <div className="text-gray-300">Broadcasts forming + <strong className="text-green-400">completed</strong> candles</div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="bg-green-500/20 px-3 py-2 rounded-lg text-green-400 font-medium min-w-[140px]">Browser Charts</div>
+                <div className="bg-green-500/20 px-3 py-2 rounded-lg text-green-400 font-medium min-w-[160px]">4. Browser Charts</div>
                 <ArrowRight className="h-4 w-4 text-gray-500" />
-                <div className="text-gray-300">Displays historical + real-time data</div>
+                <div className="text-gray-300">Applies completed first, then forming candles</div>
               </div>
             </div>
           </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-400 flex items-center gap-2">
+                <CheckCircle className="h-5 w-5" />
+                Why Unified Pipeline?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="bg-green-500/10 border border-green-500/30 rounded p-3">
+                  <div className="font-medium text-green-400 mb-1">✓ No Divergence</div>
+                  <p className="text-xs">All charts show identical candles - no differences between tabs</p>
+                </div>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+                  <div className="font-medium text-blue-400 mb-1">✓ Server Restart Safe</div>
+                  <p className="text-xs">Completed candles augmented with 1m data from MongoDB</p>
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded p-3">
+                  <div className="font-medium text-purple-400 mb-1">✓ Real-Time Sync</div>
+                  <p className="text-xs">Completed candles broadcast instantly to all clients</p>
+                </div>
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded p-3">
+                  <div className="font-medium text-orange-400 mb-1">✓ No Refresh Needed</div>
+                  <p className="text-xs">Charts auto-update with authoritative historical data</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
@@ -1167,20 +1197,19 @@ export default function AdminWikiSection() {
             </CardHeader>
             <CardContent className="space-y-4 text-gray-300">
               <div>
-                <h4 className="font-semibold text-white mb-2">Real-Time Collections (Auto-Built)</h4>
+                <h4 className="font-semibold text-white mb-2">Real-Time Collection</h4>
                 <div className="bg-gray-900 p-3 rounded space-y-2 text-sm">
                   <div className="flex justify-between items-center">
                     <code className="text-cyan-400">candles_1m</code>
-                    <span className="text-gray-400">1-minute candles (~30 days retention)</span>
+                    <span className="text-gray-400">1-minute candles (~3 days, raw data for aggregation)</span>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-semibold text-white mb-2">Historical Collections (Downloaded)</h4>
+                <h4 className="font-semibold text-white mb-2">Historical Collections (Auto-Saved by Streamer)</h4>
                 <div className="bg-gray-900 p-3 rounded space-y-2 text-sm">
                   <div className="grid grid-cols-2 gap-2">
-                    <div><code className="text-cyan-400">candles_historical_1m</code></div>
                     <div><code className="text-cyan-400">candles_historical_5m</code></div>
                     <div><code className="text-cyan-400">candles_historical_15m</code></div>
                     <div><code className="text-cyan-400">candles_historical_30m</code></div>
@@ -1191,13 +1220,16 @@ export default function AdminWikiSection() {
                     <div><code className="text-cyan-400">candles_historical_1M</code></div>
                   </div>
                 </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  💡 Completed candles are saved here automatically when each period ends.
+                </p>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
-              <CardTitle className="text-lg text-emerald-400">Timeframe Data Sources</CardTitle>
+              <CardTitle className="text-lg text-emerald-400">Timeframe Data Flow</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -1205,55 +1237,59 @@ export default function AdminWikiSection() {
                   <thead>
                     <tr className="border-b border-gray-700">
                       <th className="text-left py-2 text-gray-400">Timeframe</th>
-                      <th className="text-left py-2 text-gray-400">Historical Data</th>
-                      <th className="text-left py-2 text-gray-400">Forming Candle</th>
+                      <th className="text-left py-2 text-gray-400">Historical (API Fetch)</th>
+                      <th className="text-left py-2 text-gray-400">Forming (WebSocket)</th>
+                      <th className="text-left py-2 text-gray-400">Completed (WebSocket)</th>
                     </tr>
                   </thead>
                   <tbody className="text-gray-300">
                     <tr className="border-b border-gray-800">
                       <td className="py-2 font-medium text-white">1m</td>
-                      <td><code className="text-xs text-cyan-400">candles_1m</code> + historical_1m</td>
-                      <td>WebSocket cache (live)</td>
+                      <td><code className="text-xs text-cyan-400">candles_1m</code></td>
+                      <td>formingCandles</td>
+                      <td className="text-gray-500">N/A (saved every minute)</td>
                     </tr>
                     <tr className="border-b border-gray-800">
                       <td className="py-2 font-medium text-white">5m</td>
-                      <td>Aggregated from 1m + historical_5m</td>
-                      <td>WebSocket cache (live)</td>
+                      <td><code className="text-xs text-cyan-400">historical_5m</code></td>
+                      <td>formingCandles5m</td>
+                      <td className="text-green-400">completedCandles</td>
                     </tr>
                     <tr className="border-b border-gray-800">
                       <td className="py-2 font-medium text-white">15m</td>
-                      <td>Aggregated from 1m + historical_15m</td>
-                      <td>WebSocket cache (live)</td>
-                    </tr>
-                    <tr className="border-b border-gray-800">
-                      <td className="py-2 font-medium text-white">30m</td>
-                      <td>Aggregated from 1m + historical_30m</td>
-                      <td>WebSocket cache (live)</td>
+                      <td><code className="text-xs text-cyan-400">historical_15m</code></td>
+                      <td>formingCandles15m</td>
+                      <td className="text-green-400">completedCandles</td>
                     </tr>
                     <tr className="border-b border-gray-800">
                       <td className="py-2 font-medium text-white">1h</td>
-                      <td>Aggregated from 1m + historical_1h</td>
-                      <td>WebSocket cache (live)</td>
+                      <td><code className="text-xs text-cyan-400">historical_1h</code></td>
+                      <td>formingCandles1h</td>
+                      <td className="text-green-400">completedCandles</td>
                     </tr>
                     <tr className="border-b border-gray-800">
                       <td className="py-2 font-medium text-white">4h</td>
-                      <td>Aggregated from 1m + historical_4h</td>
-                      <td>WebSocket cache (live)</td>
+                      <td><code className="text-xs text-cyan-400">historical_4h</code></td>
+                      <td>formingCandles4h</td>
+                      <td className="text-green-400">completedCandles</td>
                     </tr>
                     <tr className="border-b border-gray-800">
                       <td className="py-2 font-medium text-white">Daily</td>
-                      <td><code className="text-xs text-cyan-400">historical_1d</code> or Massive.com API</td>
-                      <td>WebSocket cache (live)</td>
+                      <td><code className="text-xs text-cyan-400">historical_1d</code></td>
+                      <td>formingCandlesDaily</td>
+                      <td className="text-green-400">completedCandles</td>
                     </tr>
                     <tr className="border-b border-gray-800">
                       <td className="py-2 font-medium text-white">Weekly</td>
-                      <td><code className="text-xs text-cyan-400">historical_1w</code> or Massive.com API</td>
-                      <td>WebSocket cache (live)</td>
+                      <td><code className="text-xs text-cyan-400">historical_1w</code></td>
+                      <td>formingCandlesWeekly</td>
+                      <td className="text-green-400">completedCandles</td>
                     </tr>
                     <tr>
                       <td className="py-2 font-medium text-white">Monthly</td>
-                      <td><code className="text-xs text-cyan-400">historical_1M</code> or Massive.com API</td>
-                      <td>WebSocket cache (live)</td>
+                      <td><code className="text-xs text-cyan-400">historical_1M</code></td>
+                      <td>formingCandlesMonthly</td>
+                      <td className="text-green-400">completedCandles</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1265,10 +1301,10 @@ export default function AdminWikiSection() {
             <div className="flex items-start gap-3">
               <Lightbulb className="h-5 w-5 text-blue-500 mt-0.5" />
               <div>
-                <h4 className="font-semibold text-blue-400 mb-1">Key Concept: Hybrid Data Loading</h4>
+                <h4 className="font-semibold text-blue-400 mb-1">Key Concept: Completed Candle Broadcast</h4>
                 <p className="text-sm text-gray-300">
-                  Charts load data from multiple sources: <strong>Recent data</strong> is aggregated from 1-minute candles in real-time. 
-                  <strong>Older data</strong> comes from pre-downloaded historical collections. This ensures fast chart loading with complete history.
+                  When a candle period ends (e.g., 12:05 for a 5m candle), the server broadcasts the <strong>authoritative completed candle</strong> to all clients. 
+                  Charts update this in their history using <code className="text-cyan-400">setData()</code>, ensuring all charts show identical historical data.
                 </p>
               </div>
             </div>
@@ -1352,18 +1388,22 @@ export default function AdminWikiSection() {
                 The WebSocket server (Port 3003) broadcasts to all connected browsers:
               </p>
               <div className="bg-gray-900 p-3 rounded text-sm font-mono">
-                <div className="text-gray-400 mb-2">// Broadcast payload</div>
+                <div className="text-gray-400 mb-2">// Broadcast payload (price_update event)</div>
                 <div className="text-cyan-400">{'{'}</div>
-                <div className="ml-4 text-green-400">type: 'prices',</div>
+                <div className="ml-4 text-green-400">type: &apos;price_update&apos;,</div>
                 <div className="ml-4 text-green-400">prices: [...],              <span className="text-gray-500">// Current bid/ask</span></div>
                 <div className="ml-4 text-green-400">formingCandles: [...],      <span className="text-gray-500">// 1m forming</span></div>
                 <div className="ml-4 text-green-400">formingCandles5m: [...],    <span className="text-gray-500">// 5m forming</span></div>
                 <div className="ml-4 text-green-400">formingCandles15m: [...],   <span className="text-gray-500">// 15m forming</span></div>
-                <div className="ml-4 text-green-400">formingCandles30m: [...],   <span className="text-gray-500">// 30m forming</span></div>
                 <div className="ml-4 text-green-400">formingCandles1h: [...],    <span className="text-gray-500">// 1h forming</span></div>
                 <div className="ml-4 text-green-400">formingCandles4h: [...],    <span className="text-gray-500">// 4h forming</span></div>
-                <div className="ml-4 text-green-400">formingCandlesDaily: [...]  <span className="text-gray-500">// Daily forming</span></div>
+                <div className="ml-4 text-green-400">formingCandlesDaily: [...], <span className="text-gray-500">// Daily forming</span></div>
+                <div className="ml-4 text-yellow-400 font-bold">completedCandles: [...],   <span className="text-gray-500">// ✨ NEW: Authoritative completed candles</span></div>
                 <div className="text-cyan-400">{'}'}</div>
+              </div>
+              <div className="bg-green-500/10 border border-green-500/30 rounded p-3 text-sm mt-3">
+                <strong className="text-green-400">completedCandles</strong> contains finalized historical candles that are sent once when a period ends.
+                Clients use these to update their historical data with the authoritative OHLC values.
               </div>
             </CardContent>
           </Card>
@@ -1509,7 +1549,7 @@ export default function AdminWikiSection() {
             </CardHeader>
             <CardContent className="space-y-3 text-gray-300">
               <p className="text-sm">
-                "Forming" candles are candles currently being built. They update on every price tick.
+                &quot;Forming&quot; candles are candles currently being built. They update on every price tick.
               </p>
               <div className="bg-gray-900 p-3 rounded text-sm space-y-2">
                 <div className="font-medium text-white">Cache Update Logic (O(1) per tick):</div>
@@ -1523,9 +1563,83 @@ export default function AdminWikiSection() {
                   <div className="ml-4">cache = {'{ open: price, high: price, low: price, close: price }'}</div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400 flex items-center gap-2">
+                <CheckCircle className="h-5 w-5" />
+                Completed Candles (Period End)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm">
+                When a candle period ends, the server finalizes and broadcasts the <strong>completed candle</strong>.
+              </p>
+              <div className="bg-gray-900 p-3 rounded text-sm space-y-2">
+                <div className="font-medium text-white">Period End Flow:</div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">1</span>
+                    <span>Fetch 1m candles for the period from MongoDB</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">2</span>
+                    <span>Augment OHLC with 1m data (ensures accuracy after restart)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">3</span>
+                    <span>Save to historical collection (e.g., candles_historical_5m)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-green-500/20 text-green-400 px-2 py-0.5 rounded">4</span>
+                    <span>Broadcast to all clients via completedCandles</span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-green-500/10 border border-green-500/30 rounded p-3 text-sm">
+                <strong className="text-green-400">Why Augment?</strong> If the server restarts mid-period, the forming candle cache is lost.
+                Augmenting with 1m data ensures the saved candle contains the full period&apos;s OHLC, not just post-restart data.
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400 flex items-center gap-2">
+                <Layers className="h-5 w-5" />
+                Frontend Processing Order
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm">
+                The browser chart processes WebSocket updates in a specific order to prevent data conflicts:
+              </p>
+              <div className="bg-gray-900 p-3 rounded text-sm space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold">FIRST</span>
+                  <div>
+                    <div className="font-medium text-green-400">Process completedCandles</div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Update local candleDataRef → Call setData() to refresh entire chart.
+                      This uses setData() because update() cannot modify historical candles.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="bg-blue-500 text-white px-2 py-0.5 rounded text-xs font-bold">SECOND</span>
+                  <div>
+                    <div className="font-medium text-blue-400">Process formingCandles</div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Skip if timestamp matches a just-completed candle (prevents overwrite).
+                      Otherwise, call update() to update the latest candle on the chart.
+                    </p>
+                  </div>
+                </div>
+              </div>
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 text-sm">
-                <strong className="text-yellow-400">Note:</strong> Forming candles are calculated server-side and broadcast to all clients.
-                This ensures all users see the same candle data.
+                <strong className="text-yellow-400">Note:</strong> This order prevents the forming candle from overwriting the authoritative completed candle data.
               </div>
             </CardContent>
           </Card>
@@ -1958,6 +2072,34 @@ export default function AdminWikiSection() {
 
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
+              <CardTitle className="text-lg text-red-400">Candle Differences Between Charts</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="space-y-2">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-1">❓ Symptom: Same candle shows different OHLC on two charts</div>
+                  <div className="text-gray-400 mt-2">
+                    <strong>Fixed by Unified Pipeline:</strong> This issue is now resolved. All charts receive 
+                    <span className="text-green-400"> completedCandles </span> broadcasts when periods end.
+                    <ul className="mt-2 space-y-1">
+                      <li>✅ If you see different candles, <strong>refresh the page</strong> to fetch authoritative data</li>
+                      <li>✅ New charts auto-sync via WebSocket broadcasts</li>
+                      <li>✅ No need for manual action - system self-corrects</li>
+                    </ul>
+                    <strong className="block mt-2 text-yellow-400">If issue persists:</strong>
+                    <ul className="mt-1 space-y-1">
+                      <li>• Check browser console for WebSocket connection errors</li>
+                      <li>• Verify chartvolt-websocket is running: <code className="text-cyan-400">pm2 status</code></li>
+                      <li>• Check server logs for completed candle broadcast errors</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
               <CardTitle className="text-lg text-red-400">Price Delays Between Charts</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-gray-300 text-sm">
@@ -1996,6 +2138,34 @@ export default function AdminWikiSection() {
                       <li>2. Download historical data for desired timeframes</li>
                       <li>3. Enable "Use Local History" toggle</li>
                     </ol>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400">Forming Candle Disappears</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="space-y-2">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-1">❓ Symptom: Current candle briefly shows then disappears</div>
+                  <div className="text-gray-400 mt-2">
+                    <strong>Possible Causes:</strong>
+                    <ul className="mt-1 space-y-1">
+                      <li>• WebSocket disconnected and reconnecting</li>
+                      <li>• Server restarted and caches are being rebuilt</li>
+                      <li>• Historical 1m data not yet seeded for current period</li>
+                    </ul>
+                    <strong className="block mt-2">Fix:</strong>
+                    <ul className="mt-1 space-y-1">
+                      <li>1. Verify chartvolt-web is running: <code className="text-cyan-400">pm2 status</code></li>
+                      <li>2. Check server logs for &quot;Seeding higher timeframe caches&quot; message</li>
+                      <li>3. Wait 1-2 minutes after server restart for caches to warm</li>
+                      <li>4. Refresh the chart page</li>
+                    </ul>
                   </div>
                 </div>
               </div>
