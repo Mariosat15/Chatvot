@@ -475,12 +475,12 @@ export default function ChallengesAdminSection() {
               {activeTab === 'history' && (
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-gray-500" />
-                  <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+                  <Select value={statusFilter || 'all'} onValueChange={(v) => { setStatusFilter(v === 'all' ? '' : v); setPage(1); }}>
                     <SelectTrigger className="w-[150px] bg-gray-900 border-gray-600 text-white">
                       <SelectValue placeholder="All Statuses" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-600">
-                      <SelectItem value="" className="text-white">All Statuses</SelectItem>
+                      <SelectItem value="all" className="text-white">All Statuses</SelectItem>
                       <SelectItem value="completed" className="text-white">Completed</SelectItem>
                       <SelectItem value="declined" className="text-white">Declined</SelectItem>
                       <SelectItem value="expired" className="text-white">Expired</SelectItem>
