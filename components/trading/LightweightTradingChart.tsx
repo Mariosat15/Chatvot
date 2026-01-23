@@ -2411,38 +2411,51 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                 // Track completed candle timestamps to prevent forming candles from overwriting them
                 const completedTimestamps = new Set<number>();
                 
-                if (completedCandles && completedCandles.length > 0 && candlestickSeriesRef.current) {
-                  for (const completed of completedCandles) {
-                    // Check if this completed candle is for our symbol and timeframe
-                    if (completed.symbol === symbol && completed.timeframe === currentTf) {
-                      // Track this timestamp as "finalized" - forming candles should NOT overwrite it
-                      completedTimestamps.add(completed.time);
+                // 🔍 DEBUG: Log when completed candles are received
+                if (completedCandles && completedCandles.length > 0) {
+                  console.log(`📦 [Chart] Received ${completedCandles.length} completed candle(s) in WebSocket message`);
+                  
+                  if (candlestickSeriesRef.current) {
+                    for (const completed of completedCandles) {
+                      // 🔍 DEBUG: Log each completed candle
+                      console.log(`   📥 Completed: ${completed.symbol} ${completed.timeframe} @ ${new Date(completed.time * 1000).toISOString()}`);
                       
-                      // FULLY REPLACE the candle with authoritative data (no merging!)
-                      const completedData: CandlestickData<UTCTimestamp> = {
-                        time: completed.time as UTCTimestamp,
-                        open: completed.open,
-                        high: completed.high,
-                        low: completed.low,
-                        close: completed.close,
-                      };
-                      
-                      if (chartType === 'line') {
-                        (candlestickSeriesRef.current as unknown as ISeriesApi<'Line'>).update({
+                      // Check if this completed candle is for our symbol and timeframe
+                      if (completed.symbol === symbol && completed.timeframe === currentTf) {
+                        // Track this timestamp as "finalized" - forming candles should NOT overwrite it
+                        completedTimestamps.add(completed.time);
+                        
+                        // FULLY REPLACE the candle with authoritative data (no merging!)
+                        const completedData: CandlestickData<UTCTimestamp> = {
                           time: completed.time as UTCTimestamp,
-                          value: completed.close,
-                        });
+                          open: completed.open,
+                          high: completed.high,
+                          low: completed.low,
+                          close: completed.close,
+                        };
+                        
+                        if (chartType === 'line') {
+                          (candlestickSeriesRef.current as unknown as ISeriesApi<'Line'>).update({
+                            time: completed.time as UTCTimestamp,
+                            value: completed.close,
+                          });
+                        } else {
+                          candlestickSeriesRef.current?.update(completedData);
+                        }
+                        
+                        // Reset currentCandleRef - the next forming candle should be for a NEW timestamp
+                        if (currentCandleRef.current && currentCandleRef.current.time === completed.time) {
+                          console.log(`   🔄 Reset currentCandleRef (was at same timestamp)`);
+                          currentCandleRef.current = null;
+                        }
+                        
+                        console.log(`   ✅ APPLIED to chart: ${symbol} ${currentTf} @ ${new Date(completed.time * 1000).toISOString()} | O:${completed.open.toFixed(5)} H:${completed.high.toFixed(5)} L:${completed.low.toFixed(5)} C:${completed.close.toFixed(5)}`);
                       } else {
-                        candlestickSeriesRef.current?.update(completedData);
+                        console.log(`   ⏭️ Skipped (not our symbol/tf): watching ${symbol}/${currentTf}, received ${completed.symbol}/${completed.timeframe}`);
                       }
-                      
-                      // Reset currentCandleRef - the next forming candle should be for a NEW timestamp
-                      if (currentCandleRef.current && currentCandleRef.current.time === completed.time) {
-                        currentCandleRef.current = null;
-                      }
-                      
-                      console.log(`✅ [Chart] Finalized ${currentTf} candle: ${new Date(completed.time * 1000).toISOString()} O:${completed.open.toFixed(5)} H:${completed.high.toFixed(5)} L:${completed.low.toFixed(5)} C:${completed.close.toFixed(5)}`);
                     }
+                  } else {
+                    console.warn(`   ⚠️ candlestickSeriesRef.current is null - cannot apply completed candles!`);
                   }
                 }
                 
@@ -2465,7 +2478,16 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                   if (completedTimestamps.has(candle.time)) {
                     // Skip this forming candle - it's stale data for a candle we just finalized
                     // The next WebSocket message will have the new forming candle for the next period
+                    console.log(`🛡️ [Chart] BLOCKED forming candle: ${symbol} ${currentTf} @ ${new Date(candle.time * 1000).toISOString()} | Reason: timestamp ${candle.time} was just finalized as completed`);
                   } else {
+                    // 🔍 DEBUG: Log forming candle updates (throttled to avoid spam - only log every 5 seconds)
+                    const now = Date.now();
+                    const lastFormingLogKey = `lastFormingLog_${symbol}_${currentTf}`;
+                    const lastFormingLog = (window as unknown as Record<string, number>)[lastFormingLogKey] || 0;
+                    if (now - lastFormingLog > 5000) {
+                      console.log(`📊 [Chart] Forming candle: ${symbol} ${currentTf} @ ${new Date(candle.time * 1000).toISOString()} | O:${candle.open?.toFixed(5)} H:${candle.high?.toFixed(5)} L:${candle.low?.toFixed(5)} C:${candle.close?.toFixed(5)}`);
+                      (window as unknown as Record<string, number>)[lastFormingLogKey] = now;
+                    }
                     updateChartWithCandle(candle, price);
                   }
                 }
