@@ -95,6 +95,8 @@ interface WebSocketGlobalState {
   formingCandlesW: Map<string, CachedFormingCandle>;
   formingCandlesM: Map<string, CachedFormingCandle>;
   changedSymbols: Set<string>; // Track symbols that changed since last broadcast
+  // Queue of completed candles to broadcast (so clients can update their historical data)
+  completedCandlesToBroadcast: Array<{ symbol: string; timeframe: string; time: number; open: number; high: number; low: number; close: number }>;
   lastUpdateTime: number;
   initialized: boolean;
   connectionId: string;
@@ -136,6 +138,7 @@ function getGlobalState(): WebSocketGlobalState {
       formingCandlesW: new Map<string, CachedFormingCandle>(),
       formingCandlesM: new Map<string, CachedFormingCandle>(),
       changedSymbols: new Set<string>(),
+      completedCandlesToBroadcast: [],
       lastUpdateTime: 0,
       initialized: false,
       connectionId: Math.random().toString(36).substring(7),
@@ -1141,9 +1144,21 @@ async function saveCompletedHigherTimeframeCandle(
       { upsert: true }
     );
     
+    // ⭐ ADD TO BROADCAST QUEUE so all connected clients update their historical data
+    // This is critical for preventing chart divergence when candles complete
+    state.completedCandlesToBroadcast.push({
+      symbol: candle.symbol,
+      timeframe,
+      time: candle.periodStart,
+      open: finalOpen,
+      high: finalHigh,
+      low: finalLow,
+      close: finalClose,
+    });
+    
     // Log only EUR/USD as sample (to avoid log spam)
     if (candle.symbol === 'EUR/USD') {
-      console.log(`💾 [${timeframe}] Completed candle saved: ${timestamp.toISOString()} | O:${finalOpen.toFixed(5)} H:${finalHigh.toFixed(5)} L:${finalLow.toFixed(5)} C:${finalClose.toFixed(5)}`);
+      console.log(`💾 [${timeframe}] Completed candle saved & queued for broadcast: ${timestamp.toISOString()} | O:${finalOpen.toFixed(5)} H:${finalHigh.toFixed(5)} L:${finalLow.toFixed(5)} C:${finalClose.toFixed(5)}`);
     }
   } catch (error) {
     // Don't crash on save errors - just log and continue
@@ -2032,8 +2047,19 @@ async function broadcastFormingCandles(): Promise<void> {
           close: c.close,
           timeframe: 'M',
         })),
+        // ⭐ COMPLETED CANDLES - broadcast so clients update their historical data
+        // This prevents chart divergence when candles complete
+        completedCandles: state.completedCandlesToBroadcast,
       }),
     });
+    
+    // Clear the completed candles queue after successful broadcast
+    if (response.ok) {
+      if (state.completedCandlesToBroadcast.length > 0) {
+        console.log(`📤 [Broadcast] Sent ${state.completedCandlesToBroadcast.length} completed candles`);
+      }
+      state.completedCandlesToBroadcast = [];
+    }
     
     if (!response.ok && Math.random() < 0.01) {
       console.warn(`⚠️ [Broadcast] WebSocket server returned ${response.status}`);

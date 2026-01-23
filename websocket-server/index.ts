@@ -331,6 +331,8 @@ const server = createServer(async (req, res) => {
               const allCandlesD = data.formingCandlesD || [];
               const allCandlesW = data.formingCandlesW || [];
               const allCandlesM = data.formingCandlesM || [];
+              // ⭐ COMPLETED CANDLES - so clients can update their historical data
+              const completedCandles = data.completedCandles || [];
               const timestamp = Date.now();
               
               // OPTIMIZATION 2: Pre-stringify for unsubscribed clients (stringify once, use many)
@@ -361,6 +363,8 @@ const server = createServer(async (req, res) => {
                         formingCandlesD: allCandlesD.filter((c: {symbol: string}) => subs.has(c.symbol)),
                         formingCandlesW: allCandlesW.filter((c: {symbol: string}) => subs.has(c.symbol)),
                         formingCandlesM: allCandlesM.filter((c: {symbol: string}) => subs.has(c.symbol)),
+                        // ⭐ Completed candles - filter by symbol
+                        completedCandles: completedCandles.filter((c: {symbol: string}) => subs.has(c.symbol)),
                         timestamp,
                       },
                     };
@@ -382,6 +386,8 @@ const server = createServer(async (req, res) => {
                           formingCandlesD: allCandlesD,
                           formingCandlesW: allCandlesW,
                           formingCandlesM: allCandlesM,
+                          // ⭐ Completed candles
+                          completedCandles: completedCandles,
                           timestamp,
                         },
                       });
@@ -394,9 +400,12 @@ const server = createServer(async (req, res) => {
                 }
               });
               
-              // Log only ~once per minute
-              if (Math.random() < 0.003) {
-                console.log(`📊 WS: ${clientCount} clients (${filteredCount} filtered) | ${allPrices.length} symbols`);
+              // Log only ~once per minute (or when completed candles are sent)
+              if (completedCandles.length > 0 || Math.random() < 0.003) {
+                const msg = completedCandles.length > 0 
+                  ? `📊 WS: ${clientCount} clients | ${completedCandles.length} COMPLETED candles sent` 
+                  : `📊 WS: ${clientCount} clients (${filteredCount} filtered) | ${allPrices.length} symbols`;
+                console.log(msg);
               }
             }
             break;

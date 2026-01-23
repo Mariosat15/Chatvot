@@ -2350,7 +2350,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
               
               // Handle price_update events
               if (message.type === 'price_update' && message.data) {
-                const { prices, formingCandles, formingCandles5m, formingCandles15m, formingCandles30m, formingCandles1h, formingCandles4h, formingCandlesD, formingCandlesW, formingCandlesM } = message.data;
+                const { prices, formingCandles, formingCandles5m, formingCandles15m, formingCandles30m, formingCandles1h, formingCandles4h, formingCandlesD, formingCandlesW, formingCandlesM, completedCandles } = message.data;
                 
                 // Select the correct forming candle based on timeframe
                 const is5m = timeframe === '5' || (timeframe as string) === '5m';
@@ -2361,6 +2361,38 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                 const isD = timeframe === 'D' || (timeframe as string) === '1d';
                 const isW = timeframe === 'W' || (timeframe as string) === '1w';
                 const isM = timeframe === 'M' || (timeframe as string) === '1M';
+                
+                // Map timeframe to timeframe string used in completedCandles
+                const currentTf = isM ? 'M' : (isW ? '1w' : (isD ? '1d' : (is4h ? '4h' : (is1h ? '1h' : (is30m ? '30m' : (is15m ? '15m' : (is5m ? '5m' : '1m')))))));
+                
+                // ⭐ HANDLE COMPLETED CANDLES - Update historical data when candles complete
+                // This prevents chart divergence between refreshed and non-refreshed charts
+                if (completedCandles && completedCandles.length > 0 && candlestickSeriesRef.current) {
+                  for (const completed of completedCandles) {
+                    // Check if this completed candle is for our symbol and timeframe
+                    if (completed.symbol === symbol && completed.timeframe === currentTf) {
+                      // Update the chart with the completed (authoritative) candle data
+                      const completedData = {
+                        time: completed.time as UTCTimestamp,
+                        open: completed.open,
+                        high: completed.high,
+                        low: completed.low,
+                        close: completed.close,
+                      };
+                      
+                      if (chartType === 'line') {
+                        (candlestickSeriesRef.current as ISeriesApi<'Line'>).update({
+                          time: completed.time as UTCTimestamp,
+                          value: completed.close,
+                        });
+                      } else {
+                        candlestickSeriesRef.current?.update(completedData);
+                      }
+                      
+                      console.log(`✅ [Chart] Updated completed ${currentTf} candle: ${new Date(completed.time * 1000).toISOString()}`);
+                    }
+                  }
+                }
                 
                 const candleSource = isM ? formingCandlesM :
                   (isW ? formingCandlesW :
