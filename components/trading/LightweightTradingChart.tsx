@@ -1599,6 +1599,11 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
   useEffect(() => {
     if (!chartContainerRef.current) return;
     
+    // Track if this specific effect instance is still active
+    let isEffectActive = true;
+    let chartInstance: ReturnType<typeof createChart> | null = null;
+    let resizeObserverInstance: ResizeObserver | null = null;
+    
     // Reset mounted state when chart initializes
     isMountedRef.current = true;
 
@@ -1718,6 +1723,13 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         });
 
         chartRef.current = chart;
+        chartInstance = chart; // Store local reference for cleanup
+
+        // Early return if effect was cleaned up during async operations
+        if (!isEffectActive) {
+          chart.remove();
+          return;
+        }
 
         // Create candlestick series with TradingView colors and 5 decimal precision
         const candlestickSeries = chart.addCandlestickSeries({
@@ -1751,8 +1763,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         candlestickSeries.attachPrimitive(periodSeparator);
         periodSeparatorRef.current = periodSeparator;
 
-        // Attach drawing system to chart
-        if (chartContainerRef.current) {
+        // Attach drawing system to chart (only if effect is still active)
+        if (isEffectActive && chartContainerRef.current) {
           chartDrawings.attach(chart, candlestickSeries, chartContainerRef.current);
         }
 
@@ -1813,6 +1825,10 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
         }
         
         const data = await response.json();
+        
+        // Early return if effect was cleaned up during fetch
+        if (!isEffectActive) return;
+        
         // API returns time in SECONDS - use directly (LightweightCharts expects seconds)
         const candles: OHLCCandle[] = data.candles.map((c: { time: number; open: number; high: number; low: number; close: number; volume?: number }) => ({
           time: c.time, // Already in seconds - DO NOT multiply by 1000!
@@ -1978,39 +1994,44 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
 
     // Handle resize with ResizeObserver for better responsiveness
     const handleResize = () => {
-      if (chartRef.current && chartContainerRef.current) {
-        const { clientWidth, clientHeight } = chartContainerRef.current;
-        try {
-          chartRef.current.applyOptions({
-            width: clientWidth,
-            height: clientHeight,
-          });
-        } catch {
-          // Chart may be disposed
-        }
+      // Guard: Don't resize if effect is no longer active or chart is disposed
+      if (!isEffectActive || !chartInstance || !chartContainerRef.current) return;
+      
+      const { clientWidth, clientHeight } = chartContainerRef.current;
+      try {
+        chartInstance.applyOptions({
+          width: clientWidth,
+          height: clientHeight,
+        });
+      } catch {
+        // Chart may be disposed - silently ignore
       }
     };
 
     // Use ResizeObserver for container size changes
-    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserverInstance = new ResizeObserver(handleResize);
     if (chartContainerRef.current) {
-      resizeObserver.observe(chartContainerRef.current);
+      resizeObserverInstance.observe(chartContainerRef.current);
     }
     
     window.addEventListener('resize', handleResize);
 
     return () => {
-      // CRITICAL: Mark as unmounted FIRST to stop all updates
+      // CRITICAL: Mark effect as inactive FIRST to stop all callbacks
+      isEffectActive = false;
       isMountedRef.current = false;
       
+      // Disconnect resize observer immediately to prevent callbacks
       window.removeEventListener('resize', handleResize);
-      resizeObserver.disconnect();
+      if (resizeObserverInstance) {
+        resizeObserverInstance.disconnect();
+        resizeObserverInstance = null;
+      }
       
       // Detach drawing system before chart removal
       chartDrawings.detach();
       
       // Clear all refs BEFORE removing chart to prevent "Object is disposed" errors
-      const chart = chartRef.current;
       chartRef.current = null;
       candlestickSeriesRef.current = null;
       bidPriceLineRef.current = null;
@@ -2020,13 +2041,14 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       positionLinesRef.current.clear();
       tpSlSeriesRef.current.clear();
       
-      // Remove chart last
-      if (chart) {
+      // Remove chart last using local reference
+      if (chartInstance) {
         try {
-          chart.remove();
+          chartInstance.remove();
         } catch {
           // Chart may already be disposed - ignore silently
         }
+        chartInstance = null;
       }
     };
   }, [symbol, timeframe, showVolume, chartType, showBidAskLines, showPriceLabels, dataRefreshTrigger]); // Chart reinitializes when these change
