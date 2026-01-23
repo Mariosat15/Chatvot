@@ -1138,7 +1138,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             textColor: '#B2B5BE',
             fontSize: 11,
             fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-            attributionLogo: false,
+            // @ts-expect-error attributionLogo is a newer lightweight-charts option not yet in types
+            attributionLogo: false, // Hide watermark
           },
           grid: {
             vertLines: { color: 'rgba(42, 46, 57, 0.6)' },
@@ -1606,7 +1607,8 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
             textColor: '#B2B5BE',
             fontSize: 11,
             fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-            attributionLogo: false,
+            // @ts-expect-error attributionLogo is a newer lightweight-charts option not yet in types
+            attributionLogo: false, // Hide watermark
           },
           grid: {
             vertLines: { 
@@ -2124,13 +2126,14 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
       // If the oldest visible candle is within 50 candles of our oldest data, load more
       // For 1m: 50 candles = 50 minutes
       // For 5m: 50 candles = 250 minutes, etc.
-      const timeframeMinutes = timeframe === '1m' || timeframe === '1' ? 1 :
-                               timeframe === '5m' || timeframe === '5' ? 5 :
-                               timeframe === '15m' || timeframe === '15' ? 15 :
-                               timeframe === '30m' || timeframe === '30' ? 30 :
-                               timeframe === '1h' || timeframe === '60' ? 60 :
-                               timeframe === '4h' || timeframe === '240' ? 240 :
-                               timeframe === '1d' || timeframe === 'D' ? 1440 : 1;
+      const tf = String(timeframe);
+      const timeframeMinutes = tf === '1m' || tf === '1' ? 1 :
+                               tf === '5m' || tf === '5' ? 5 :
+                               tf === '15m' || tf === '15' ? 15 :
+                               tf === '30m' || tf === '30' ? 30 :
+                               tf === '1h' || tf === '60' ? 60 :
+                               tf === '4h' || tf === '240' ? 240 :
+                               tf === '1d' || tf === 'D' ? 1440 : 1;
       
       const bufferTime = 50 * timeframeMinutes * 60; // 50 candles worth of time in seconds
       
@@ -2391,7 +2394,7 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                       };
                       
                       if (chartType === 'line') {
-                        (candlestickSeriesRef.current as ISeriesApi<'Line'>).update({
+                        (candlestickSeriesRef.current as unknown as ISeriesApi<'Line'>).update({
                           time: completed.time as UTCTimestamp,
                           value: completed.close,
                         });
