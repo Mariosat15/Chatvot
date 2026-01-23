@@ -2407,18 +2407,17 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                 // ⭐ HANDLE COMPLETED CANDLES - REPLACE with authoritative data from WebSocket
                 // This is critical for unified pipeline: completed candles are the SINGLE SOURCE OF TRUTH
                 // They come from WebSocket which saved them to historical collection after augmenting with 1m data
+                
+                // Track completed candle timestamps to prevent forming candles from overwriting them
+                const completedTimestamps = new Set<number>();
+                
                 if (completedCandles && completedCandles.length > 0 && candlestickSeriesRef.current) {
-                  // Debug: log all received completed candles
-                  console.log(`📥 [Chart] Received ${completedCandles.length} completed candles, looking for symbol=${symbol} timeframe=${currentTf}`);
-                  
                   for (const completed of completedCandles) {
-                    // Debug: log each completed candle
-                    if (completed.symbol === symbol) {
-                      console.log(`📦 [Chart] Completed candle for ${completed.symbol}: tf=${completed.timeframe} (want ${currentTf}), time=${new Date(completed.time * 1000).toISOString()}`);
-                    }
-                    
                     // Check if this completed candle is for our symbol and timeframe
                     if (completed.symbol === symbol && completed.timeframe === currentTf) {
+                      // Track this timestamp as "finalized" - forming candles should NOT overwrite it
+                      completedTimestamps.add(completed.time);
+                      
                       // FULLY REPLACE the candle with authoritative data (no merging!)
                       const completedData: CandlestickData<UTCTimestamp> = {
                         time: completed.time as UTCTimestamp,
@@ -2437,14 +2436,12 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                         candlestickSeriesRef.current?.update(completedData);
                       }
                       
-                      // Also reset currentCandleRef if this was the current forming candle
-                      // This prevents stale data from affecting subsequent forming candle updates
+                      // Reset currentCandleRef - the next forming candle should be for a NEW timestamp
                       if (currentCandleRef.current && currentCandleRef.current.time === completed.time) {
                         currentCandleRef.current = null;
-                        console.log(`🔄 [Chart] Reset currentCandleRef after completed candle`);
                       }
                       
-                      console.log(`✅ [Chart] Replaced ${currentTf} candle with authoritative data: ${new Date(completed.time * 1000).toISOString()} O:${completed.open.toFixed(5)} H:${completed.high.toFixed(5)} L:${completed.low.toFixed(5)} C:${completed.close.toFixed(5)}`);
+                      console.log(`✅ [Chart] Finalized ${currentTf} candle: ${new Date(completed.time * 1000).toISOString()} O:${completed.open.toFixed(5)} H:${completed.high.toFixed(5)} L:${completed.low.toFixed(5)} C:${completed.close.toFixed(5)}`);
                     }
                   }
                 }
@@ -2463,7 +2460,14 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                 const price = prices?.find((p: { symbol: string }) => p.symbol === symbol);
                 
                 if (candle) {
-                  updateChartWithCandle(candle, price);
+                  // 🛡️ CRITICAL: Do NOT apply forming candle if we just finalized it as a completed candle
+                  // This prevents stale forming candle data from overwriting the authoritative completed candle
+                  if (completedTimestamps.has(candle.time)) {
+                    // Skip this forming candle - it's stale data for a candle we just finalized
+                    // The next WebSocket message will have the new forming candle for the next period
+                  } else {
+                    updateChartWithCandle(candle, price);
+                  }
                 }
               }
             } catch {
