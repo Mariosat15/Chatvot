@@ -73,6 +73,7 @@ import FinancialDashboard from '@/components/admin/FinancialDashboard';
 import CompetitionAnalytics from '@/components/admin/CompetitionAnalytics';
 import CompetitionsListSection from '@/components/admin/CompetitionsListSection';
 import ChallengeSettingsSection from '@/components/admin/ChallengeSettingsSection';
+import ChallengesAdminSection from '@/components/admin/ChallengesAdminSection';
 import DatabaseSection from '@/components/admin/DatabaseSection';
 import UsersSection from '@/components/admin/UsersSection';
 import PaymentProvidersSection from '@/components/admin/PaymentProvidersSection';
@@ -734,7 +735,7 @@ export default function AdminDashboard({
       case 'competitions':
         return <CompetitionsListSection key={currentRefreshKey} />;
       case 'challenges':
-        return <ChallengeSettingsSection key={currentRefreshKey} />;
+        return <ChallengesAdminSection key={currentRefreshKey} />;
       case 'marketplace':
         return <MarketplaceSection key={currentRefreshKey} />;
       case 'users':
