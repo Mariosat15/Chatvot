@@ -1146,6 +1146,7 @@ async function saveCompletedHigherTimeframeCandle(
     
     // ⭐ ADD TO BROADCAST QUEUE so all connected clients update their historical data
     // This is critical for preventing chart divergence when candles complete
+    const state = getState();
     state.completedCandlesToBroadcast.push({
       symbol: candle.symbol,
       timeframe,
