@@ -2427,31 +2427,61 @@ const LightweightTradingChart = ({ competitionId, positions = [], pendingOrders 
                         // Track this timestamp as "finalized" - forming candles should NOT overwrite it
                         completedTimestamps.add(completed.time);
                         
-                        // FULLY REPLACE the candle with authoritative data (no merging!)
-                        const completedData: CandlestickData<UTCTimestamp> = {
-                          time: completed.time as UTCTimestamp,
-                          open: completed.open,
-                          high: completed.high,
-                          low: completed.low,
-                          close: completed.close,
-                        };
+                        // Update candleDataRef with the authoritative completed candle
+                        const completedTime = Number(completed.time);
+                        const existingIndex = candleDataRef.current.findIndex(c => c.time === completedTime);
                         
+                        if (existingIndex >= 0) {
+                          // Update existing candle in our local data
+                          candleDataRef.current[existingIndex] = {
+                            time: completedTime,
+                            open: completed.open,
+                            high: completed.high,
+                            low: completed.low,
+                            close: completed.close,
+                            volume: candleDataRef.current[existingIndex].volume || 0,
+                          };
+                          console.log(`   📝 Updated candleDataRef at index ${existingIndex}`);
+                        } else {
+                          // Candle doesn't exist yet, add it
+                          candleDataRef.current.push({
+                            time: completedTime,
+                            open: completed.open,
+                            high: completed.high,
+                            low: completed.low,
+                            close: completed.close,
+                            volume: 0,
+                          });
+                          // Sort by time
+                          candleDataRef.current.sort((a, b) => a.time - b.time);
+                          console.log(`   📝 Added new candle to candleDataRef`);
+                        }
+                        
+                        // Use setData() to properly update historical candles (update() only works for last bar)
                         try {
                           if (chartType === 'line') {
-                            (candlestickSeriesRef.current as unknown as ISeriesApi<'Line'>).update({
-                              time: completed.time as UTCTimestamp,
-                              value: completed.close,
-                            });
+                            const lineData = candleDataRef.current.map(c => ({
+                              time: c.time as UTCTimestamp,
+                              value: c.close,
+                            }));
+                            (candlestickSeriesRef.current as unknown as ISeriesApi<'Line'>).setData(lineData);
                           } else {
-                            candlestickSeriesRef.current?.update(completedData);
+                            const candleData = candleDataRef.current.map(c => ({
+                              time: c.time as UTCTimestamp,
+                              open: c.open,
+                              high: c.high,
+                              low: c.low,
+                              close: c.close,
+                            }));
+                            candlestickSeriesRef.current?.setData(candleData);
                           }
-                          console.log(`   ✅ APPLIED to chart: O:${completed.open.toFixed(5)} H:${completed.high.toFixed(5)} L:${completed.low.toFixed(5)} C:${completed.close.toFixed(5)}`);
+                          console.log(`   ✅ APPLIED via setData(): O:${completed.open.toFixed(5)} H:${completed.high.toFixed(5)} L:${completed.low.toFixed(5)} C:${completed.close.toFixed(5)}`);
                         } catch (updateError) {
                           console.error(`   ❌ FAILED to apply completed candle:`, updateError);
                         }
                         
                         // Reset currentCandleRef - the next forming candle should be for a NEW timestamp
-                        if (currentCandleRef.current && currentCandleRef.current.time === completed.time) {
+                        if (currentCandleRef.current && currentCandleRef.current.time === completedTime) {
                           console.log(`   🔄 Reset currentCandleRef (was at same timestamp)`);
                           currentCandleRef.current = null;
                         }
