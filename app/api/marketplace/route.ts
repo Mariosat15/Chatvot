@@ -20,6 +20,13 @@ export async function GET(request: NextRequest) {
       await seedMarketplaceItems();
     }
     
+    // Also check if Game Master packages exist, seed if missing
+    const gameMasterCount = await MarketplaceItem.countDocuments({ category: 'gamemaster', isPublished: true });
+    if (gameMasterCount === 0) {
+      console.log('No Game Master packages found, seeding...');
+      await seedMarketplaceItems();
+    }
+    
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const featured = searchParams.get('featured');
