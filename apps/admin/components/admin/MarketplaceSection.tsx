@@ -1148,6 +1148,18 @@ export default function MarketplaceSection() {
                     <p className="text-xs text-gray-500">
                       % of entry fees the Game Master earns from their referrals (e.g., 5%, 7.5%, 10%)
                     </p>
+                    {(editingItem.gameMasterConfig?.referralFeePercentage || 5) >= 10 && (
+                      <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                        <p className="text-xs text-yellow-400 flex items-center gap-2">
+                          <span className="text-lg">⚠️</span>
+                          <span>
+                            <strong>Warning:</strong> Referral fee must be LOWER than competition platform fees.
+                            This fee is subtracted from the platform's share. If total GM fees exceed the platform fee
+                            for a competition, GM earnings will be capped.
+                          </span>
+                        </p>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Max Competitions Per Day */}
