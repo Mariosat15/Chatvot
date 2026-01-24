@@ -417,16 +417,41 @@ export default function MarketplaceContent() {
                   <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/20 to-transparent" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {featuredItems.map((item) => (
-                    <ItemCard
-                      key={item._id}
-                      item={item}
-                      onView={() => setSelectedItem(item)}
-                      onPurchase={() => handlePurchase(item)}
-                      purchasing={purchasing === item._id}
-                      featured
-                    />
-                  ))}
+                  {featuredItems.map((item) => {
+                    // Use the correct card component based on category
+                    if (item.category === 'cosmetic') {
+                      return (
+                        <CosmeticCard
+                          key={item._id}
+                          item={item}
+                          onView={() => setSelectedItem(item)}
+                          onPurchase={() => handlePurchase(item)}
+                          purchasing={purchasing === item._id}
+                        />
+                      );
+                    }
+                    if (item.category === 'gamemaster') {
+                      return (
+                        <GameMasterCard
+                          key={item._id}
+                          item={item}
+                          onView={() => setSelectedItem(item)}
+                          onPurchase={() => handlePurchase(item)}
+                          purchasing={purchasing === item._id}
+                        />
+                      );
+                    }
+                    return (
+                      <ItemCard
+                        key={item._id}
+                        item={item}
+                        onView={() => setSelectedItem(item)}
+                        onPurchase={() => handlePurchase(item)}
+                        purchasing={purchasing === item._id}
+                        featured
+                      />
+                    );
+                  })}
                 </div>
               </section>
             )}
@@ -581,16 +606,49 @@ function ItemCard({
   purchasing: boolean;
   featured?: boolean;
 }) {
-  const _isIndicator = item.category === 'indicator';
+  // Properly detect category from the actual category field
+  const isIndicator = item.category === 'indicator';
   const isStrategy = item.category === 'strategy';
+  const isCosmetic = item.category === 'cosmetic';
+  const isGameMaster = item.category === 'gamemaster';
+  
   const indicatorInfo = item.indicatorType ? INDICATOR_TYPE_INFO[item.indicatorType] : null;
   const riskStyle = RISK_STYLES[item.riskLevel as keyof typeof RISK_STYLES] || RISK_STYLES.medium;
   
-  const CategoryIcon = isStrategy ? Target : (indicatorInfo?.icon || LineChart);
-  const iconColor = isStrategy ? 'text-orange-400' : (indicatorInfo?.color || 'text-emerald-400');
-  const gradientBg = isStrategy 
-    ? 'from-orange-500/10 to-amber-500/10' 
-    : 'from-emerald-500/10 to-teal-500/10';
+  // Set icon, color, and gradient based on ACTUAL category
+  let CategoryIcon = LineChart;
+  let iconColor = 'text-emerald-400';
+  let gradientBg = 'from-emerald-500/10 to-teal-500/10';
+  let categoryLabel = 'Indicator';
+  let categoryBgColor = 'bg-emerald-500/10 text-emerald-400';
+  let accentGradient = 'from-emerald-500 to-teal-500';
+  
+  if (isStrategy) {
+    CategoryIcon = Target;
+    iconColor = 'text-orange-400';
+    gradientBg = 'from-orange-500/10 to-amber-500/10';
+    categoryLabel = 'Strategy';
+    categoryBgColor = 'bg-orange-500/10 text-orange-400';
+    accentGradient = 'from-orange-500 to-amber-500';
+  } else if (isCosmetic) {
+    CategoryIcon = Palette;
+    iconColor = 'text-pink-400';
+    gradientBg = 'from-pink-500/10 to-rose-500/10';
+    categoryLabel = item.cosmeticType === 'avatar' ? 'Avatar' : 'Cosmetic';
+    categoryBgColor = 'bg-pink-500/10 text-pink-400';
+    accentGradient = 'from-pink-500 to-rose-500';
+  } else if (isGameMaster) {
+    CategoryIcon = Crown;
+    iconColor = 'text-yellow-400';
+    gradientBg = 'from-yellow-500/10 to-amber-500/10';
+    categoryLabel = 'Game Master';
+    categoryBgColor = 'bg-yellow-500/10 text-yellow-400';
+    accentGradient = 'from-yellow-500 to-amber-500';
+  } else if (isIndicator && indicatorInfo) {
+    CategoryIcon = indicatorInfo.icon;
+    iconColor = indicatorInfo.color;
+    categoryLabel = indicatorInfo.label;
+  }
   
   return (
     <div
@@ -607,7 +665,7 @@ function ItemCard({
       {/* Top gradient accent */}
       <div className={cn(
         'absolute top-0 left-0 right-0 h-1 bg-gradient-to-r',
-        isStrategy ? 'from-orange-500 to-amber-500' : 'from-emerald-500 to-teal-500'
+        accentGradient
       )} />
       
       {/* Badges */}
@@ -654,9 +712,9 @@ function ItemCard({
         <div className="flex items-center gap-2 mb-3">
           <span className={cn(
             'px-2.5 py-0.5 rounded-full text-xs font-medium',
-            isStrategy ? 'bg-orange-500/10 text-orange-400' : 'bg-emerald-500/10 text-emerald-400'
+            categoryBgColor
           )}>
-            {isStrategy ? 'Strategy' : indicatorInfo?.label || 'Indicator'}
+            {categoryLabel}
           </span>
           <span className="text-xs text-gray-500">v{item.version}</span>
         </div>
