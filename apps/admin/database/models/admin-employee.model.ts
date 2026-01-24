@@ -59,6 +59,9 @@ export const ADMIN_SECTIONS = [
   'dependency-updates',
   // Admin (Super Admin only)
   'employees',
+  // Game Master
+  'gamemaster-dashboard',    // For game masters - their referrals, earnings, competitions
+  'gamemaster-management',   // For super admin - manage all game masters
 ] as const;
 
 export type AdminSection = typeof ADMIN_SECTIONS[number];

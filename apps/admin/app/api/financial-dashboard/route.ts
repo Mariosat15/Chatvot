@@ -74,6 +74,20 @@ export async function GET(request: NextRequest) {
       },
     ]);
 
+    // Get total game master fees paid (from wallet transactions)
+    const gameMasterFees = await WalletTransaction.aggregate([
+      {
+        $match: { transactionType: 'gamemaster_earning' },
+      },
+      {
+        $group: {
+          _id: null,
+          totalFees: { $sum: '$amount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
     // Get recent transactions (last 50) with user info
     const recentTransactions = await WalletTransaction.find()
       .sort({ createdAt: -1 })
@@ -159,6 +173,7 @@ export async function GET(request: NextRequest) {
         // NEW: Enhanced platform financial metrics
         platformFinancials: {
           ...platformFinancialStats,
+          totalGameMasterFees: gameMasterFees[0]?.totalFees || 0,
           unclaimedPools: unclaimedPoolsSummary,
         },
         // NEW: Liability tracking for bank reconciliation

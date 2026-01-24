@@ -7,7 +7,7 @@ import InputField from "@/components/forms/InputField";
 import {CountrySelectField} from "@/components/forms/CountrySelectField";
 import FooterLink from "@/components/forms/FooterLink";
 import {signUpWithEmail} from "@/lib/actions/auth.actions";
-import {useRouter} from "next/navigation";
+import {useRouter, useSearchParams} from "next/navigation";
 import {toast} from "sonner";
 import {useDeviceFingerprint} from "@/hooks/useDeviceFingerprint";
 import { Check, X } from 'lucide-react';
@@ -28,10 +28,14 @@ const PASSWORD_REQUIREMENTS = [
 
 const SignUp = () => {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { track: trackFingerprint } = useDeviceFingerprint({ auto: false });
     const [passwordStrength, setPasswordStrength] = useState<Record<string, boolean>>({});
     const [showRequirements, setShowRequirements] = useState(false);
     const formStartTime = useRef(Date.now()); // Track form load time for bot detection
+    
+    // Capture referral code from URL (e.g., ?ref=GM123ABC)
+    const referralCode = searchParams.get('ref') || undefined;
     
     const {
         register,
@@ -93,11 +97,12 @@ const SignUp = () => {
         }
 
         try {
-            // Pass honeypot value to server for additional validation
+            // Pass honeypot value and referral code to server for additional validation
             const result = await signUpWithEmail({
                 ...data,
-                honeypot: data.website
-            } as SignUpFormData & { honeypot?: string });
+                honeypot: data.website,
+                referralCode  // Game master referral code if present
+            } as SignUpFormData & { honeypot?: string; referralCode?: string });
             
             if(result.success) {
                 // Track device fingerprint after successful sign-up

@@ -115,6 +115,10 @@ export interface ICompetition extends Document {
   imageUrl?: string;
   tags: string[]; // 'beginner', 'advanced', 'forex', etc.
   
+  // Game Master (if created by a game master)
+  gameMasterId?: string; // User ID of the game master who created this
+  gameMasterName?: string; // Cached for display
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -388,6 +392,13 @@ const CompetitionSchema = new Schema<ICompetition>(
       type: String,
     },
     tags: [String],
+    gameMasterId: {
+      type: String,
+      index: true,  // For finding competitions by game master
+    },
+    gameMasterName: {
+      type: String,
+    },
   },
   {
     timestamps: true,
@@ -403,6 +414,7 @@ CompetitionSchema.index({ status: 1, registrationDeadline: 1 });
 CompetitionSchema.index({ status: 1, endTime: 1 }); // Finding active/ending competitions
 CompetitionSchema.index({ status: 1, currentParticipants: 1 }); // Finding competitions with spots
 CompetitionSchema.index({ tags: 1, status: 1 }); // Tag-based filtering
+CompetitionSchema.index({ gameMasterId: 1, status: 1 }); // Game master competitions
 
 // Virtual for days until start
 CompetitionSchema.virtual('daysUntilStart').get(function () {

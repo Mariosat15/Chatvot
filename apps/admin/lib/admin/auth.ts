@@ -1,8 +1,9 @@
-import { jwtVerify } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { connectToDatabase } from '@/database/mongoose';
 import { Admin } from '@/database/models/admin.model';
 import { ADMIN_SECTIONS, type AdminSection } from '@/database/models/admin-employee.model';
+import mongoose from 'mongoose';
 
 const SECRET_KEY = new TextEncoder().encode(
   process.env.ADMIN_JWT_SECRET || 'your-super-secret-admin-key-change-in-production'
@@ -15,6 +16,17 @@ export interface AdminAuthResult {
   name?: string;
   isSuperAdmin?: boolean;
   role?: string;
+  allowedSections?: AdminSection[];
+}
+
+export interface GameMasterAuthResult {
+  isAuthenticated: boolean;
+  isGameMaster: boolean;
+  userId?: string;
+  email?: string;
+  name?: string;
+  subscriptionId?: string;
+  referralCode?: string;
   allowedSections?: AdminSection[];
 }
 
@@ -180,3 +192,149 @@ export async function getAdminSession(): Promise<{
   }
 }
 
+// ============================================
+// GAME MASTER AUTHENTICATION
+// ============================================
+
+const GAMEMASTER_SECTIONS: AdminSection[] = ['gamemaster-dashboard'];
+
+/**
+ * Verify game master authentication
+ * Game masters use a separate token (gm_token) stored in cookies
+ */
+export async function verifyGameMasterAuth(): Promise<GameMasterAuthResult> {
+  try {
+    // Try cookie-based auth first
+    const cookieStore = await cookies();
+    let token = cookieStore.get('gm_token')?.value;
+
+    // If no cookie, try Bearer token from Authorization header with GM prefix
+    if (!token) {
+      const headersList = await headers();
+      const authHeader = headersList.get('authorization');
+      if (authHeader?.startsWith('GM ')) {
+        token = authHeader.substring(3);
+      }
+    }
+
+    if (!token) {
+      return { isAuthenticated: false, isGameMaster: false };
+    }
+
+    const { payload } = await jwtVerify(token, SECRET_KEY);
+    
+    // Verify this is a game master token
+    if (payload.tokenType !== 'gamemaster') {
+      return { isAuthenticated: false, isGameMaster: false };
+    }
+
+    // Verify game master subscription is still active
+    await connectToDatabase();
+    const db = mongoose.connection.db;
+    
+    if (!db) {
+      return { isAuthenticated: false, isGameMaster: false };
+    }
+
+    const subscription = await db.collection('gamemastersubscriptions').findOne({
+      userId: payload.userId,
+      status: 'active',
+    });
+
+    if (!subscription) {
+      console.log(`❌ Game master subscription not found or inactive for user ${payload.userId}`);
+      return { isAuthenticated: false, isGameMaster: false };
+    }
+
+    // Check if subscription has expired
+    if (new Date(subscription.endDate) < new Date()) {
+      console.log(`❌ Game master subscription expired for user ${payload.userId}`);
+      return { isAuthenticated: false, isGameMaster: false };
+    }
+
+    return {
+      isAuthenticated: true,
+      isGameMaster: true,
+      userId: payload.userId as string,
+      email: payload.email as string,
+      name: payload.name as string,
+      subscriptionId: subscription._id.toString(),
+      referralCode: subscription.referralCode,
+      allowedSections: GAMEMASTER_SECTIONS,
+    };
+  } catch (error) {
+    console.error('Error verifying game master auth:', error);
+    return { isAuthenticated: false, isGameMaster: false };
+  }
+}
+
+/**
+ * Generate a game master JWT token
+ */
+export async function generateGameMasterToken(
+  userId: string,
+  email: string,
+  name: string
+): Promise<string> {
+  const token = await new SignJWT({
+    userId,
+    email,
+    name,
+    tokenType: 'gamemaster',
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')  // Game master tokens valid for 7 days
+    .sign(SECRET_KEY);
+  
+  return token;
+}
+
+/**
+ * Check if request has valid game master or admin access
+ * Returns combined auth result
+ */
+export async function verifyAnyAuth(): Promise<{
+  isAuthenticated: boolean;
+  authType: 'admin' | 'gamemaster' | null;
+  adminAuth?: AdminAuthResult;
+  gmAuth?: GameMasterAuthResult;
+}> {
+  // First try admin auth
+  const adminAuth = await verifyAdminAuth();
+  if (adminAuth.isAuthenticated) {
+    return {
+      isAuthenticated: true,
+      authType: 'admin',
+      adminAuth,
+    };
+  }
+
+  // Then try game master auth
+  const gmAuth = await verifyGameMasterAuth();
+  if (gmAuth.isAuthenticated) {
+    return {
+      isAuthenticated: true,
+      authType: 'gamemaster',
+      gmAuth,
+    };
+  }
+
+  return {
+    isAuthenticated: false,
+    authType: null,
+  };
+}
+
+/**
+ * Require game master authentication
+ */
+export async function requireGameMasterAuth(): Promise<GameMasterAuthResult> {
+  const auth = await verifyGameMasterAuth();
+  
+  if (!auth.isAuthenticated || !auth.isGameMaster) {
+    throw new Error('Game Master authentication required');
+  }
+  
+  return auth;
+}

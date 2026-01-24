@@ -1,0 +1,244 @@
+/**
+ * Game Master Subscription Renewal Job
+ * 
+ * This job runs daily to:
+ * 1. Process auto-renewals for subscriptions ending soon
+ * 2. Expire subscriptions that have ended and didn't renew
+ * 3. Reset daily competition counters
+ */
+
+import mongoose from 'mongoose';
+import { connectToDatabase } from '../../database/mongoose';
+
+interface RenewalResult {
+  processedCount: number;
+  renewedCount: number;
+  expiredCount: number;
+  failedCount: number;
+  resetCount: number;
+  errors: string[];
+}
+
+export async function runGameMasterRenewalJob(): Promise<RenewalResult> {
+  const result: RenewalResult = {
+    processedCount: 0,
+    renewedCount: 0,
+    expiredCount: 0,
+    failedCount: 0,
+    resetCount: 0,
+    errors: [],
+  };
+
+  try {
+    console.log('🎮 [GM RENEWAL] Starting game master subscription renewal job...');
+    
+    await connectToDatabase();
+    const db = mongoose.connection.db;
+    
+    if (!db) {
+      throw new Error('Database connection failed');
+    }
+
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
+    // TASK 1: Reset daily competition counters
+    console.log('📊 [GM RENEWAL] Resetting daily competition counters...');
+    
+    const resetResult = await db.collection('gamemastersubscriptions').updateMany(
+      {
+        status: 'active',
+        lastCompetitionResetDate: { $lt: todayStart },
+      },
+      {
+        $set: {
+          currentPeriodCompetitionsCreated: 0,
+          lastCompetitionResetDate: now,
+        },
+      }
+    );
+    result.resetCount = resetResult.modifiedCount;
+    console.log(`   ✅ Reset ${result.resetCount} subscription(s) daily counters`);
+
+    // TASK 2: Process subscriptions that need renewal (ending today or already ended)
+    console.log('🔄 [GM RENEWAL] Processing subscriptions due for renewal...');
+    
+    const subscriptionsToProcess = await db.collection('gamemastersubscriptions').find({
+      status: 'active',
+      nextRenewalDate: { $lte: now },
+    }).toArray();
+
+    console.log(`   Found ${subscriptionsToProcess.length} subscription(s) to process`);
+    result.processedCount = subscriptionsToProcess.length;
+
+    for (const subscription of subscriptionsToProcess) {
+      try {
+        console.log(`\n   Processing subscription for user ${subscription.userId}...`);
+
+        // Check if auto-renewal is enabled
+        if (!subscription.autoRenew) {
+          console.log(`   ⚠️ Auto-renewal disabled, expiring subscription`);
+          
+          await db.collection('gamemastersubscriptions').updateOne(
+            { _id: subscription._id },
+            {
+              $set: {
+                status: 'expired',
+                updatedAt: now,
+              },
+            }
+          );
+          result.expiredCount++;
+          continue;
+        }
+
+        // Get user's wallet balance
+        const wallet = await db.collection('creditwallets').findOne({
+          userId: subscription.userId,
+        });
+
+        const balance = wallet?.creditBalance || 0;
+        const renewalPrice = subscription.renewalPrice || 0;
+
+        console.log(`   Wallet balance: ${balance}, Renewal price: ${renewalPrice}`);
+
+        // Check if user has enough balance
+        if (balance < renewalPrice) {
+          console.log(`   ❌ Insufficient balance, expiring subscription`);
+          
+          await db.collection('gamemastersubscriptions').updateOne(
+            { _id: subscription._id },
+            {
+              $set: {
+                status: 'expired',
+                updatedAt: now,
+              },
+              $push: {
+                renewalHistory: {
+                  date: now,
+                  amount: renewalPrice,
+                  transactionId: '',
+                  status: 'failed',
+                  failureReason: 'Insufficient balance',
+                },
+              } as unknown as mongoose.mongo.PushOperator<Document>,
+            }
+          );
+          
+          // Send notification to user about expired subscription
+          // TODO: Implement notification
+          
+          result.expiredCount++;
+          continue;
+        }
+
+        // Process renewal - deduct from wallet
+        const balanceBefore = balance;
+        const balanceAfter = balance - renewalPrice;
+
+        await db.collection('creditwallets').updateOne(
+          { userId: subscription.userId },
+          {
+            $inc: { creditBalance: -renewalPrice },
+          }
+        );
+
+        // Create transaction record
+        const transactionResult = await db.collection('wallettransactions').insertOne({
+          userId: subscription.userId,
+          transactionType: 'gamemaster_subscription',
+          amount: -renewalPrice,
+          balanceBefore,
+          balanceAfter,
+          status: 'completed',
+          description: `🎮 Game Master subscription renewal for ${subscription.packageName}`,
+          metadata: {
+            subscriptionId: subscription._id.toString(),
+            packageName: subscription.packageName,
+            period: 'monthly',
+          },
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        // Calculate new dates
+        const durationDays = 30; // Default 30 days
+        const newStartDate = new Date(subscription.endDate);
+        const newEndDate = new Date(newStartDate);
+        newEndDate.setDate(newEndDate.getDate() + durationDays);
+
+        // Update subscription
+        await db.collection('gamemastersubscriptions').updateOne(
+          { _id: subscription._id },
+          {
+            $set: {
+              startDate: newStartDate,
+              endDate: newEndDate,
+              nextRenewalDate: newEndDate,
+              updatedAt: now,
+            },
+            $push: {
+              renewalHistory: {
+                date: now,
+                amount: renewalPrice,
+                transactionId: transactionResult.insertedId.toString(),
+                status: 'success',
+              },
+            } as unknown as mongoose.mongo.PushOperator<Document>,
+          }
+        );
+
+        console.log(`   ✅ Renewed until ${newEndDate.toISOString()}`);
+        result.renewedCount++;
+
+        // Send notification to user about successful renewal
+        // TODO: Implement notification
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`   ❌ Error processing subscription ${subscription._id}:`, error);
+        result.errors.push(`Subscription ${subscription._id}: ${errorMessage}`);
+        result.failedCount++;
+      }
+    }
+
+    // TASK 3: Expire subscriptions that have passed their end date (missed renewal)
+    console.log('\n⏰ [GM RENEWAL] Checking for expired subscriptions...');
+    
+    const expireResult = await db.collection('gamemastersubscriptions').updateMany(
+      {
+        status: 'active',
+        endDate: { $lt: now },
+      },
+      {
+        $set: {
+          status: 'expired',
+          updatedAt: now,
+        },
+      }
+    );
+    
+    if (expireResult.modifiedCount > 0) {
+      console.log(`   ⚠️ Force-expired ${expireResult.modifiedCount} subscription(s) past end date`);
+      result.expiredCount += expireResult.modifiedCount;
+    }
+
+    console.log('\n🎮 [GM RENEWAL] Job completed!');
+    console.log(`   Processed: ${result.processedCount}`);
+    console.log(`   Renewed: ${result.renewedCount}`);
+    console.log(`   Expired: ${result.expiredCount}`);
+    console.log(`   Failed: ${result.failedCount}`);
+    console.log(`   Daily resets: ${result.resetCount}`);
+
+    return result;
+
+  } catch (error) {
+    console.error('❌ [GM RENEWAL] Job failed:', error);
+    result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    return result;
+  }
+}
+
+// Export for worker index
+export default runGameMasterRenewalJob;

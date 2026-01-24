@@ -111,6 +111,8 @@ import CustomerAssignmentSettings from '@/components/admin/CustomerAssignmentSet
 import EmployeeProfileSection from '@/components/admin/EmployeeProfileSection';
 import MessagingSection from '@/components/admin/MessagingSection';
 import MessagingSettingsSection from '@/components/admin/MessagingSettingsSection';
+import GameMasterDashboardSection from '@/components/admin/GameMasterDashboardSection';
+import GameMasterManagementSection from '@/components/admin/GameMasterManagementSection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -377,6 +379,29 @@ const menuGroups: MenuGroup[] = [
         icon: <MessageCircle className="h-5 w-5" />,
         color: 'text-pink-400',
         bgColor: 'bg-pink-500/10 hover:bg-pink-500/20',
+      },
+    ],
+  },
+  // Game Master (shown for game masters or super admins managing game masters)
+  {
+    id: 'gamemaster-group',
+    label: 'Game Master',
+    icon: <Crown className="h-4 w-4" />,
+    color: 'text-amber-400',
+    items: [
+      {
+        id: 'gamemaster-dashboard',
+        label: 'GM Dashboard',
+        icon: <Crown className="h-5 w-5" />,
+        color: 'text-amber-400',
+        bgColor: 'bg-amber-500/10 hover:bg-amber-500/20',
+      },
+      {
+        id: 'gamemaster-management',
+        label: 'Manage Game Masters',
+        icon: <Users className="h-5 w-5" />,
+        color: 'text-amber-400',
+        bgColor: 'bg-amber-500/10 hover:bg-amber-500/20',
       },
     ],
   },
@@ -823,6 +848,10 @@ export default function AdminDashboard({
         return <MessagingSection key={currentRefreshKey} />;
       case 'messaging-settings':
         return <MessagingSettingsSection key={currentRefreshKey} />;
+      case 'gamemaster-dashboard':
+        return <GameMasterDashboardSection key={currentRefreshKey} />;
+      case 'gamemaster-management':
+        return <GameMasterManagementSection key={currentRefreshKey} />;
       default:
         return <CompetitionsListSection key={currentRefreshKey} />;
     }

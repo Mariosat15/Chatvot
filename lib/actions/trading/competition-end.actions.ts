@@ -549,6 +549,190 @@ export async function finalizeCompetition(competitionId: string) {
       });
     }
 
+    // STEP 4.6: Distribute Game Master referral fees
+    console.log(`🎮 Processing Game Master referral fees...`);
+    try {
+      const db = mongoose.connection.db;
+      if (db) {
+        // Get all participants who have referredByGameMasterId
+        const referredParticipants = await db.collection('user').find({
+          id: { $in: participants.map(p => p.userId) },
+          referredByGameMasterId: { $exists: true, $ne: null },
+        }).toArray();
+        
+        console.log(`   Found ${referredParticipants.length} referred participants`);
+        
+        // Group by game master
+        const gmEarningsMap = new Map<string, { 
+          gmId: string; 
+          users: { userId: string; userName: string; userEmail: string }[];
+          totalEntryFees: number;
+        }>();
+        
+        for (const user of referredParticipants) {
+          const gmId = user.referredByGameMasterId;
+          const participant = participants.find(p => p.userId === user.id);
+          if (!participant || !gmId) continue;
+          
+          if (!gmEarningsMap.has(gmId)) {
+            gmEarningsMap.set(gmId, { 
+              gmId, 
+              users: [], 
+              totalEntryFees: 0 
+            });
+          }
+          
+          const gmData = gmEarningsMap.get(gmId)!;
+          gmData.users.push({ 
+            userId: user.id, 
+            userName: user.name || 'Unknown', 
+            userEmail: user.email 
+          });
+          gmData.totalEntryFees += competition.entryFee;
+        }
+        
+        // Process earnings for each game master
+        for (const [gmId, gmData] of gmEarningsMap) {
+          // Get game master subscription to find fee percentage
+          const gmSubscription = await db.collection('gamemastersubscriptions').findOne({
+            userId: gmId,
+            status: 'active',
+          });
+          
+          if (!gmSubscription) {
+            console.log(`   ⚠️ Game master ${gmId} has no active subscription, skipping`);
+            continue;
+          }
+          
+          const feePercentage = gmSubscription.limits?.referralFeePercentage || 5;
+          
+          // Create earning records for each referred user
+          for (const user of gmData.users) {
+            const entryFee = competition.entryFee;
+            const grossEarning = entryFee * (feePercentage / 100);
+            const platformFee = 0; // No platform fee on GM earnings
+            const netEarning = grossEarning - platformFee;
+            
+            // Create GameMasterEarning record
+            await db.collection('gamemasterearnings').insertOne({
+              gameMasterId: gmId,
+              gameMasterEmail: gmSubscription.userEmail,
+              sourceType: 'competition',
+              sourceId: competition._id.toString(),
+              sourceName: competition.name,
+              referredUserId: user.userId,
+              referredUserEmail: user.userEmail,
+              referredUserName: user.userName,
+              entryFeeAmount: entryFee,
+              earningPercentage: feePercentage,
+              grossEarning,
+              platformFee,
+              netEarning,
+              status: 'pending',
+              eventStartTime: competition.startTime,
+              eventEndTime: competition.endTime,
+              participantCount: participants.length,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+            
+            console.log(`   💰 GM ${gmId} earned ${netEarning.toFixed(2)} from ${user.userName}`);
+          }
+          
+          // Update game master subscription stats
+          const totalEarning = gmData.users.length * competition.entryFee * (feePercentage / 100);
+          await db.collection('gamemastersubscriptions').updateOne(
+            { _id: gmSubscription._id },
+            { 
+              $inc: { 
+                totalEarnings: totalEarning,
+                pendingEarnings: totalEarning,
+              },
+              $set: { updatedAt: new Date() }
+            }
+          );
+          
+          // Credit to game master's wallet
+          let gmWallet = await CreditWallet.findOne({ userId: gmId }).session(session);
+          if (!gmWallet) {
+            gmWallet = await CreditWallet.create(
+              [{
+                userId: gmId,
+                creditBalance: 0,
+                totalDeposited: 0,
+                totalWithdrawn: 0,
+                totalSpentOnCompetitions: 0,
+                totalWonFromCompetitions: 0,
+                isActive: true,
+                kycVerified: false,
+                withdrawalEnabled: false,
+              }],
+              { session }
+            );
+            gmWallet = gmWallet[0];
+          }
+          
+          const balanceBefore = gmWallet.creditBalance || 0;
+          const balanceAfter = balanceBefore + totalEarning;
+          
+          await CreditWallet.findOneAndUpdate(
+            { userId: gmId },
+            { $inc: { creditBalance: totalEarning } },
+            { session }
+          );
+          
+          // Create wallet transaction
+          await WalletTransaction.create(
+            [{
+              userId: gmId,
+              transactionType: 'gamemaster_earning',
+              amount: totalEarning,
+              balanceBefore,
+              balanceAfter,
+              competitionId: competition._id,
+              status: 'completed',
+              description: `🎮 Game Master referral earnings from ${competition.name} (${gmData.users.length} referred users)`,
+              metadata: {
+                competitionId: competition._id.toString(),
+                competitionName: competition.name,
+                referredUsersCount: gmData.users.length,
+                feePercentage,
+              },
+            }],
+            { session }
+          );
+          
+          // Update earnings status to paid
+          await db.collection('gamemasterearnings').updateMany(
+            {
+              gameMasterId: gmId,
+              sourceId: competition._id.toString(),
+              sourceType: 'competition',
+            },
+            {
+              $set: {
+                status: 'paid',
+                paidAt: new Date(),
+              },
+            }
+          );
+          
+          // Update subscription pending earnings
+          await db.collection('gamemastersubscriptions').updateOne(
+            { _id: gmSubscription._id },
+            { 
+              $inc: { pendingEarnings: -totalEarning }
+            }
+          );
+          
+          console.log(`   ✅ GM ${gmId}: Total earned ${totalEarning.toFixed(2)} from ${gmData.users.length} referrals`);
+        }
+      }
+    } catch (gmError) {
+      console.error('   ⚠️ Error processing Game Master fees (non-blocking):', gmError);
+      // Don't fail the competition finalization for GM fee errors
+    }
+
     // STEP 5: Update competition and participant statuses
     console.log(`🎯 Updating competition status...`);
     competition.status = 'completed';

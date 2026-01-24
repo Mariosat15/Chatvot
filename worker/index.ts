@@ -46,6 +46,7 @@ import { defineWithdrawalProcessJob, scheduleWithdrawalJobs } from './jobs/withd
 import { runKYCExpiryCheck } from './jobs/kyc-expiry-check.job';
 import { runMarketDataMaintenance } from './jobs/market-data-maintenance.job';
 import { runEarlyEndCheck } from './jobs/early-end-check.job';
+import { runGameMasterRenewalJob } from './jobs/gamemaster-renewal.job';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -277,6 +278,19 @@ agenda.define('market-data-maintenance', async () => {
 });
 
 /**
+ * GAME MASTER RENEWAL JOB
+ * Processes subscription renewals, expirations, and daily counter resets
+ * Runs daily at 00:05 UTC
+ */
+agenda.define('gamemaster-renewal', async () => {
+  try {
+    await runGameMasterRenewalJob();
+  } catch (error) {
+    console.error(`🎮 [GAMEMASTER RENEWAL] Failed:`, error);
+  }
+});
+
+/**
  * Early End Check Job
  * Checks if all players eliminated/disqualified and ends competition/challenge early
  * - Competitions: All liquidated → rank by equity, all disqualified → no winners
@@ -364,6 +378,7 @@ async function startWorker(): Promise<void> {
     await agenda.every('1 hour', 'evaluate-badges');
     await agenda.every('1 day', 'kyc-expiry-check');  // Daily KYC expiry check
     await agenda.every('5 minutes', 'market-data-maintenance');  // Market data cleanup check
+    await agenda.every('1 day', 'gamemaster-renewal');  // Daily game master subscription renewal
     
     // Schedule withdrawal processing jobs
     await scheduleWithdrawalJobs(agenda);

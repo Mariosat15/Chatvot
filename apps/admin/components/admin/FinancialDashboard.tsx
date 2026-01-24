@@ -88,6 +88,7 @@ interface PlatformFinancials {
   totalUnclaimedPools: number;
   totalPlatformFees: number;
   totalChallengeFees: number; // Challenge platform fees
+  totalGameMasterFees: number; // Fees paid to game masters
   
   // Marketplace revenue
   totalMarketplaceSales: number;
@@ -773,6 +774,10 @@ export default function FinancialDashboard() {
                     <span className="text-orange-400">+{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-gray-400">Game Master Fees (Paid Out)</span>
+                    <span className="text-amber-400">-{currencySymbol}{(platformFinancials?.totalGameMasterFees || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-gray-400">Marketplace Sales</span>
                     <span className="text-purple-400">+{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</span>
                   </div>
@@ -913,6 +918,11 @@ export default function FinancialDashboard() {
                   <div className="text-xs text-gray-400 uppercase">Challenge Fees</div>
                   <div className="text-2xl font-bold text-orange-400">{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</div>
                   <div className="text-xs text-gray-500">1v1 challenge fees</div>
+                </div>
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                  <div className="text-xs text-gray-400 uppercase">Game Master Fees</div>
+                  <div className="text-2xl font-bold text-amber-400">-{currencySymbol}{(platformFinancials?.totalGameMasterFees || 0).toFixed(2)}</div>
+                  <div className="text-xs text-gray-500">Paid to GMs</div>
                 </div>
                 <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
                   <div className="text-xs text-gray-400 uppercase">Marketplace Sales</div>

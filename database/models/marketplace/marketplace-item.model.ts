@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema, Model } from 'mongoose';
 
-// Item Categories - Indicators, Strategies, and Cosmetics
-export type ItemCategory = 'indicator' | 'strategy' | 'cosmetic';
+// Item Categories - Indicators, Strategies, Cosmetics, and Game Master Packages
+export type ItemCategory = 'indicator' | 'strategy' | 'cosmetic' | 'gamemaster';
 
 // Cosmetic Types
 export type CosmeticType = 'avatar' | 'profile_frame' | 'badge' | 'title';
@@ -64,6 +64,14 @@ export interface IStrategyConfig {
   };
 }
 
+// Game Master Package Configuration
+export interface IGameMasterConfig {
+  maxCompetitionsPerDay: number;      // How many competitions GM can create per day
+  maxUsersPerCompetition: number;     // Max participants in GM-created competitions
+  referralFeePercentage: number;      // % of entry fees from referred users (e.g., 5 = 5%)
+  subscriptionDurationDays: number;   // Subscription period (typically 30 for monthly)
+}
+
 export interface IMarketplaceItem extends Document {
   _id: mongoose.Types.ObjectId;
   
@@ -95,6 +103,7 @@ export interface IMarketplaceItem extends Document {
   strategyConfig?: IStrategyConfig; // For strategy items
   cosmeticType?: CosmeticType; // For cosmetic items (avatar, frame, etc.)
   imageUrl?: string; // For cosmetic items - the actual image/asset
+  gameMasterConfig?: IGameMasterConfig; // For gamemaster subscription packages
   
   // The actual code/configuration (JSON string)
   codeTemplate: string;
@@ -189,7 +198,7 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     category: {
       type: String,
       required: true,
-      enum: ['indicator', 'strategy', 'cosmetic'],
+      enum: ['indicator', 'strategy', 'cosmetic', 'gamemaster'],
       default: 'indicator',
     },
     price: {
@@ -237,6 +246,12 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       enum: ['avatar', 'profile_frame', 'badge', 'title'],
     },
     imageUrl: String, // For cosmetic items - the actual image/asset
+    gameMasterConfig: {
+      maxCompetitionsPerDay: { type: Number, min: 1, default: 1 },
+      maxUsersPerCompetition: { type: Number, min: 2, default: 50 },
+      referralFeePercentage: { type: Number, min: 0, max: 50, default: 5 },
+      subscriptionDurationDays: { type: Number, min: 1, default: 30 },
+    },
     codeTemplate: {
       type: String,
       required: true,

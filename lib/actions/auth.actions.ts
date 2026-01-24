@@ -17,8 +17,9 @@ export const signUpWithEmail = async ({
     address, 
     city, 
     postalCode,
-    honeypot 
-}: SignUpFormData & { honeypot?: string }) => {
+    honeypot,
+    referralCode
+}: SignUpFormData & { honeypot?: string; referralCode?: string }) => {
     try {
         // Get client IP for security checks
         const ip = await getClientIP();
@@ -98,6 +99,51 @@ export const signUpWithEmail = async ({
                     console.error(`⚠️ Sign-up: Could not find user to update profile data. userId: ${userId}`);
                 } else {
                     console.log(`✅ Sign-up: Profile data saved for user ${userId}`, { country, address, city, postalCode });
+                }
+                
+                // Process game master referral if present
+                if (referralCode && referralCode.startsWith('GM')) {
+                    try {
+                        console.log(`🎮 Processing referral code: ${referralCode}`);
+                        
+                        // Find the game master subscription with this referral code
+                        const gmSubscription = await db.collection('gamemastersubscriptions').findOne({
+                            referralCode: referralCode,
+                            status: 'active',
+                        });
+                        
+                        if (gmSubscription) {
+                            // Update the new user with the game master reference
+                            await db.collection('user').updateOne(
+                                { $or: queries },
+                                { 
+                                    $set: { 
+                                        referredByGameMasterId: gmSubscription.userId,
+                                        referredByReferralCode: referralCode,
+                                        referredAt: new Date()
+                                    } 
+                                }
+                            );
+                            
+                            // Increment game master's referred user count
+                            await db.collection('gamemastersubscriptions').updateOne(
+                                { _id: gmSubscription._id },
+                                { 
+                                    $inc: { 
+                                        totalReferredUsers: 1,
+                                        activeReferredUsers: 1 
+                                    } 
+                                }
+                            );
+                            
+                            console.log(`✅ User ${userId} linked to Game Master ${gmSubscription.userId} via referral code ${referralCode}`);
+                        } else {
+                            console.log(`⚠️ Referral code ${referralCode} not found or game master not active`);
+                        }
+                    } catch (referralError) {
+                        console.error('⚠️ Failed to process referral:', referralError);
+                        // Don't fail registration if referral processing fails
+                    }
                 }
                 
                 // Send verification email (required before login)
