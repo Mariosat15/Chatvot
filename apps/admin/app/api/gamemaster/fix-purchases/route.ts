@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { verifyAdminAuth } from '@/lib/admin/auth';
-import { connectAdminDB } from '@/database/mongoose';
+import { connectToDatabase } from '@/database/mongoose';
 
 /**
  * POST /api/gamemaster/fix-purchases
@@ -30,7 +30,7 @@ export async function POST() {
       );
     }
 
-    await connectAdminDB();
+    await connectToDatabase();
     const db = mongoose.connection.db;
     
     if (!db) {
@@ -214,7 +214,7 @@ export async function GET() {
       );
     }
 
-    await connectAdminDB();
+    await connectToDatabase();
     const db = mongoose.connection.db;
     
     if (!db) {
