@@ -445,7 +445,7 @@ export default function GameMasterDashboardContent() {
 
               {/* Action Buttons */}
               <Link
-                href="/competitions"
+                href="/gamemaster/create-competition"
                 className={cn(
                   'flex items-center justify-between p-4 rounded-xl transition-all',
                   isExpired 
@@ -465,28 +465,28 @@ export default function GameMasterDashboardContent() {
               </Link>
 
               <Link
-                href="/leaderboard"
+                href="/gamemaster/referrals"
                 className="flex items-center justify-between p-4 bg-gray-900/50 hover:bg-gray-900 rounded-xl transition-all text-white"
               >
                 <div className="flex items-center gap-3">
                   <Users className="h-5 w-5 text-blue-400" />
                   <div>
-                    <p className="font-medium">View Leaderboard</p>
-                    <p className="text-sm text-gray-400">See top traders and your referrals</p>
+                    <p className="font-medium">View Referrals</p>
+                    <p className="text-sm text-gray-400">See all your referred users</p>
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5" />
               </Link>
 
               <Link
-                href="/wallet"
+                href="/gamemaster/earnings"
                 className="flex items-center justify-between p-4 bg-gray-900/50 hover:bg-gray-900 rounded-xl transition-all text-white"
               >
                 <div className="flex items-center gap-3">
                   <Gift className="h-5 w-5 text-emerald-400" />
                   <div>
                     <p className="font-medium">View Earnings</p>
-                    <p className="text-sm text-gray-400">Check your referral earnings</p>
+                    <p className="text-sm text-gray-400">Detailed earnings history</p>
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5" />
