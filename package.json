@@ -25,7 +25,8 @@
     "test:db": "node scripts/test-db.mjs",
     "worker": "npx cross-env IS_WORKER=true tsx worker/index.ts",
     "worker:build": "node worker/build.mjs",
-    "worker:start": "npx cross-env IS_WORKER=true NODE_ENV=production node dist/worker/index.js"
+    "worker:start": "npx cross-env IS_WORKER=true NODE_ENV=production node dist/worker/index.js",
+    "fix:gm-purchases": "tsx scripts/fix-existing-gm-purchases.ts"
   },
   "dependencies": {
     "@fingerprintjs/fingerprintjs": "^5.0.1",
