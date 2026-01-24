@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { Camera, Calendar, ChevronDown, Sparkles, Trophy, Swords, TrendingUp, Verified } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { Camera, Calendar, ChevronDown, Sparkles, Trophy, Swords, TrendingUp, Verified, Crown } from 'lucide-react';
 import { useUserProfileImage } from '@/hooks/useUserProfileImage';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import AvatarWithFrame from '@/components/ui/AvatarWithFrame';
@@ -54,12 +55,31 @@ export default function ProfileHeader({
   const { profileImage, frameUrl, hasCustomImage } = useUserProfileImage();
   const { settings } = useAppSettings();
   const [showQuickStats, setShowQuickStats] = useState(true);
+  const [isGameMaster, setIsGameMaster] = useState(false);
+  const [gmPackageName, setGmPackageName] = useState('');
 
   const displayName = session.user.name || 'Trader';
   const memberSince = new Date().getFullYear(); // Would come from user data
 
   // Calculate total wins
   const totalWins = (competitionStats?.competitionsWon || 0) + (challengeStats?.totalChallengesWon || 0);
+
+  // Check Game Master status
+  useEffect(() => {
+    const checkGameMasterStatus = async () => {
+      try {
+        const response = await fetch('/api/gamemaster/status');
+        const data = await response.json();
+        if (data.success && data.isGameMaster) {
+          setIsGameMaster(true);
+          setGmPackageName(data.subscription?.packageName || 'Game Master');
+        }
+      } catch {
+        // Silently fail
+      }
+    };
+    checkGameMasterStatus();
+  }, []);
 
   return (
     <div className="relative overflow-hidden">
@@ -152,6 +172,16 @@ export default function ProfileHeader({
                   <span>{levelData.currentTitle}</span>
                   <span className="text-xs opacity-70">Lv.{levelData.currentLevel}</span>
                 </div>
+
+                {/* Game Master Badge */}
+                {isGameMaster && (
+                  <Link href="/gamemaster">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold bg-gradient-to-r from-yellow-500/20 to-amber-500/20 text-yellow-400 border border-yellow-500/30 hover:border-yellow-400/50 transition-colors cursor-pointer">
+                      <Crown className="w-4 h-4" />
+                      <span>{gmPackageName}</span>
+                    </div>
+                  </Link>
+                )}
               </div>
 
               <p className="text-gray-400 mb-4 text-sm sm:text-base">{session.user.email}</p>
@@ -170,6 +200,12 @@ export default function ProfileHeader({
                   <Trophy className="w-4 h-4 text-amber-500" />
                   <span>{totalWins} Wins</span>
                 </div>
+                {isGameMaster && (
+                  <Link href="/gamemaster" className="flex items-center gap-1.5 text-yellow-400 hover:text-yellow-300 transition-colors">
+                    <Crown className="w-4 h-4" />
+                    <span>Game Master Dashboard</span>
+                  </Link>
+                )}
               </div>
             </div>
 

@@ -4,6 +4,7 @@ import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.
 import { UserPurchase } from '@/database/models/marketplace/user-purchase.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import GameMasterSubscription from '@/database/models/gamemaster/gamemaster-subscription.model';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import mongoose from 'mongoose';
@@ -138,12 +139,99 @@ export async function POST(request: NextRequest) {
       { session: mongoSession }
     );
     
+    // If this is a Game Master package, auto-activate the subscription
+    let gameMasterSubscription = null;
+    if (item.category === 'gamemaster' && item.gameMasterConfig) {
+      const config = item.gameMasterConfig;
+      const now = new Date();
+      const durationDays = config.subscriptionDurationDays || 30;
+      const endDate = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+      
+      // Generate unique referral code
+      let referralCode = '';
+      let codeExists = true;
+      while (codeExists) {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        referralCode = 'GM';
+        for (let i = 0; i < 6; i++) {
+          referralCode += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        const existing = await GameMasterSubscription.findOne({ referralCode }).session(mongoSession);
+        codeExists = !!existing;
+      }
+      
+      // Check if user already has a subscription (upgrade/renew scenario)
+      const existingSubscription = await GameMasterSubscription.findOne({ userId }).session(mongoSession);
+      
+      if (existingSubscription) {
+        // Update existing subscription (upgrade or renew)
+        existingSubscription.packageId = item._id.toString();
+        existingSubscription.packageName = item.name;
+        existingSubscription.status = 'active';
+        existingSubscription.startDate = now;
+        existingSubscription.endDate = endDate;
+        existingSubscription.nextRenewalDate = endDate;
+        existingSubscription.renewalPrice = item.price;
+        existingSubscription.limits = {
+          maxCompetitionsPerDay: config.maxCompetitionsPerDay || 1,
+          maxUsersPerCompetition: config.maxUsersPerCompetition || 50,
+          referralFeePercentage: config.referralFeePercentage || 5,
+        };
+        existingSubscription.currentPeriodCompetitionsCreated = 0;
+        existingSubscription.lastCompetitionResetDate = now;
+        await existingSubscription.save({ session: mongoSession });
+        gameMasterSubscription = existingSubscription;
+      } else {
+        // Create new subscription
+        const newSubscription = await GameMasterSubscription.create(
+          [{
+            userId,
+            userEmail: session.user.email || '',
+            userName: session.user.name || session.user.email || 'Game Master',
+            packageId: item._id.toString(),
+            packageName: item.name,
+            status: 'active',
+            activatedAt: now,
+            startDate: now,
+            endDate: endDate,
+            nextRenewalDate: endDate,
+            autoRenew: true,
+            renewalPrice: item.price,
+            referralCode,
+            limits: {
+              maxCompetitionsPerDay: config.maxCompetitionsPerDay || 1,
+              maxUsersPerCompetition: config.maxUsersPerCompetition || 50,
+              referralFeePercentage: config.referralFeePercentage || 5,
+            },
+            currentPeriodCompetitionsCreated: 0,
+            lastCompetitionResetDate: now,
+            totalCompetitionsCreated: 0,
+            totalEarnings: 0,
+            pendingEarnings: 0,
+            totalReferredUsers: 0,
+            activeReferredUsers: 0,
+            renewalHistory: [],
+          }],
+          { session: mongoSession }
+        );
+        gameMasterSubscription = newSubscription[0];
+      }
+      
+      console.log(`✅ Game Master subscription activated for user ${userId}, referral code: ${gameMasterSubscription.referralCode}`);
+    }
+    
     await mongoSession.commitTransaction();
     
     return NextResponse.json({
       success: true,
       purchase: purchase[0],
       newBalance: wallet.creditBalance,
+      gameMasterActivated: !!gameMasterSubscription,
+      gameMasterSubscription: gameMasterSubscription ? {
+        referralCode: gameMasterSubscription.referralCode,
+        endDate: gameMasterSubscription.endDate,
+        limits: gameMasterSubscription.limits,
+      } : null,
     });
   } catch (error) {
     await mongoSession.abortTransaction();

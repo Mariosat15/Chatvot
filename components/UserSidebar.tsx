@@ -29,6 +29,7 @@ import {
   Bell,
   Sparkles,
   MessageCircle,
+  Crown,
 } from 'lucide-react';
 
 interface SidebarUser {
@@ -127,6 +128,21 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const { profileImage: userProfileImage } = useUserProfileImage();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isGameMaster, setIsGameMaster] = useState(false);
+
+  // Check if user is a Game Master
+  useEffect(() => {
+    const checkGameMasterStatus = async () => {
+      try {
+        const response = await fetch('/api/gamemaster/status');
+        const data = await response.json();
+        setIsGameMaster(data.success && data.isGameMaster);
+      } catch {
+        setIsGameMaster(false);
+      }
+    };
+    checkGameMasterStatus();
+  }, []);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -291,6 +307,28 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             <NavLink key={item.href} item={item} />
           ))}
         </div>
+
+        {/* Game Master Section - Only show if user is a Game Master */}
+        {isGameMaster && (
+          <div className="mt-6 space-y-1">
+            {!isCollapsed && (
+              <h4 className="px-3 mb-2 text-xs font-semibold text-yellow-500/80 uppercase tracking-wider flex items-center gap-1">
+                <Crown className="h-3 w-3" />
+                Game Master
+              </h4>
+            )}
+            <NavLink 
+              item={{
+                href: '/gamemaster',
+                label: 'GM Dashboard',
+                icon: <Crown className="h-5 w-5" />,
+                color: 'text-yellow-400',
+                gradient: 'from-yellow-500/20 to-amber-600/5',
+                badge: 'GM',
+              }} 
+            />
+          </div>
+        )}
 
         {/* Account Navigation */}
         <div className="mt-6 space-y-1">

@@ -125,6 +125,25 @@ export const signUpWithEmail = async ({
                                 }
                             );
                             
+                            // Create a UserReferral record for better tracking
+                            await db.collection('userreferrals').insertOne({
+                                userId: userId,
+                                userEmail: email,
+                                userName: fullName,
+                                gameMasterId: gmSubscription.userId,
+                                gameMasterEmail: gmSubscription.userEmail,
+                                referralCode: referralCode,
+                                referredAt: new Date(),
+                                signupIP: ip || undefined,
+                                isActive: true,
+                                totalEntryFees: 0,
+                                totalGMEarnings: 0,
+                                competitionsEntered: 0,
+                                challengesEntered: 0,
+                                createdAt: new Date(),
+                                updatedAt: new Date(),
+                            });
+                            
                             // Increment game master's referred user count
                             await db.collection('gamemastersubscriptions').updateOne(
                                 { _id: gmSubscription._id },
