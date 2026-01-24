@@ -538,19 +538,19 @@ export async function finalizeCompetition(competitionId: string) {
       console.log(`   Extra prize %s were redistributed as bonus to existing winners - no unclaimed funds`);
     }
     
-    // Record platform fee in financials
-    if (actualPlatformFee > 0) {
-      await PlatformFinancialsService.recordPlatformFee({
-        amount: actualPlatformFee,
-        sourceType: 'competition',
-        sourceId: competition._id.toString(),
-        sourceName: competition.name,
-        description: `Platform fee (${competition.platformFeePercentage}%) from ${competition.name}`,
-      });
-    }
-
-    // STEP 4.6: Distribute Game Master referral fees
-    console.log(`🎮 Processing Game Master referral fees...`);
+    // STEP 4.6: Calculate Game Master referral fees FIRST (before recording platform fee)
+    // GM fees come FROM the platform fee, so we need to calculate them first
+    console.log(`🎮 Calculating Game Master referral fees...`);
+    
+    let totalGmEarnings = 0; // Track total GM earnings to subtract from platform fee
+    const gmPayments: Array<{
+      gmId: string;
+      gmSubscription: any;
+      users: { userId: string; userName: string; userEmail: string }[];
+      feePercentage: number;
+      totalEarning: number;
+    }> = [];
+    
     try {
       const db = mongoose.connection.db;
       if (db) {
@@ -591,9 +591,8 @@ export async function finalizeCompetition(competitionId: string) {
           gmData.totalEntryFees += competition.entryFee;
         }
         
-        // Process earnings for each game master
+        // Calculate earnings for each game master (but don't pay yet)
         for (const [gmId, gmData] of gmEarningsMap) {
-          // Get game master subscription to find fee percentage
           const gmSubscription = await db.collection('gamemastersubscriptions').findOne({
             userId: gmId,
             status: 'active',
@@ -605,12 +604,57 @@ export async function finalizeCompetition(competitionId: string) {
           }
           
           const feePercentage = gmSubscription.limits?.referralFeePercentage || 5;
+          const totalEarning = gmData.users.length * competition.entryFee * (feePercentage / 100);
+          
+          totalGmEarnings += totalEarning;
+          gmPayments.push({
+            gmId,
+            gmSubscription,
+            users: gmData.users,
+            feePercentage,
+            totalEarning,
+          });
+          
+          console.log(`   📊 GM ${gmId}: ${gmData.users.length} referrals × €${competition.entryFee} × ${feePercentage}% = €${totalEarning.toFixed(2)}`);
+        }
+      }
+    } catch (gmCalcError) {
+      console.error('   ⚠️ Error calculating Game Master fees:', gmCalcError);
+      // Continue without GM fees if calculation fails
+    }
+    
+    // Calculate NET platform fee (platform fee minus GM referral fees)
+    const netPlatformFee = Math.max(0, actualPlatformFee - totalGmEarnings);
+    
+    console.log(`💼 Platform fee breakdown:`);
+    console.log(`   Gross platform fee: €${actualPlatformFee.toFixed(2)} (${competition.platformFeePercentage}%)`);
+    console.log(`   GM referral fees:   €${totalGmEarnings.toFixed(2)} (from ${gmPayments.reduce((sum, p) => sum + p.users.length, 0)} referrals)`);
+    console.log(`   NET platform fee:   €${netPlatformFee.toFixed(2)}`);
+    
+    // Record NET platform fee in financials (after subtracting GM fees)
+    if (netPlatformFee > 0) {
+      await PlatformFinancialsService.recordPlatformFee({
+        amount: netPlatformFee,
+        sourceType: 'competition',
+        sourceId: competition._id.toString(),
+        sourceName: competition.name,
+        description: `Platform fee (${competition.platformFeePercentage}% - ${totalGmEarnings.toFixed(2)} GM fees) from ${competition.name}`,
+      });
+    }
+
+    // STEP 4.7: Distribute Game Master referral fees (now that we've calculated and recorded platform fee)
+    console.log(`🎮 Distributing Game Master referral fees...`);
+    try {
+      const db = mongoose.connection.db;
+      if (db && gmPayments.length > 0) {
+        for (const payment of gmPayments) {
+          const { gmId, gmSubscription, users, feePercentage, totalEarning } = payment;
           
           // Create earning records for each referred user
-          for (const user of gmData.users) {
+          for (const user of users) {
             const entryFee = competition.entryFee;
             const grossEarning = entryFee * (feePercentage / 100);
-            const platformFee = 0; // No platform fee on GM earnings
+            const platformFee = 0; // GM gets full referral %, platform fee already deducted above
             const netEarning = grossEarning - platformFee;
             
             // Create GameMasterEarning record
@@ -639,8 +683,7 @@ export async function finalizeCompetition(competitionId: string) {
             console.log(`   💰 GM ${gmId} earned ${netEarning.toFixed(2)} from ${user.userName}`);
           }
           
-          // Update game master subscription stats
-          const totalEarning = gmData.users.length * competition.entryFee * (feePercentage / 100);
+          // Update game master subscription stats (totalEarning already calculated in payment object)
           await db.collection('gamemastersubscriptions').updateOne(
             { _id: gmSubscription._id },
             { 
@@ -691,11 +734,11 @@ export async function finalizeCompetition(competitionId: string) {
               balanceAfter,
               competitionId: competition._id,
               status: 'completed',
-              description: `🎮 Game Master referral earnings from ${competition.name} (${gmData.users.length} referred users)`,
+              description: `🎮 Game Master referral earnings from ${competition.name} (${users.length} referred users)`,
               metadata: {
                 competitionId: competition._id.toString(),
                 competitionName: competition.name,
-                referredUsersCount: gmData.users.length,
+                referredUsersCount: users.length,
                 feePercentage,
               },
             }],
@@ -725,7 +768,7 @@ export async function finalizeCompetition(competitionId: string) {
             }
           );
           
-          console.log(`   ✅ GM ${gmId}: Total earned ${totalEarning.toFixed(2)} from ${gmData.users.length} referrals`);
+          console.log(`   ✅ GM ${gmId}: Total earned ${totalEarning.toFixed(2)} from ${users.length} referrals`);
         }
       }
     } catch (gmError) {
@@ -762,8 +805,10 @@ export async function finalizeCompetition(competitionId: string) {
     console.log(`✅ Competition ${competition.name} finalized successfully!`);
     console.log(`   Winners: ${winnerTransactions.length}`);
     console.log(`   Total Distributed: ${totalDistributed} credits`);
-    console.log(`   Platform Fee: ${actualPlatformFee.toFixed(2)} credits`);
-    console.log(`   Platform Earned: ${(prizePool - totalDistributed).toFixed(2)} credits`);
+    console.log(`   Gross Platform Fee: ${actualPlatformFee.toFixed(2)} credits (${competition.platformFeePercentage}%)`);
+    console.log(`   GM Referral Fees: ${totalGmEarnings.toFixed(2)} credits (paid to Game Masters)`);
+    console.log(`   Net Platform Fee: ${netPlatformFee.toFixed(2)} credits (platform keeps)`);
+    console.log(`   Platform Net Earned: ${(prizePool - totalDistributed - totalGmEarnings).toFixed(2)} credits`);
 
     // Evaluate badges for ALL participants after competition ends (fire and forget - non-blocking)
     try {
