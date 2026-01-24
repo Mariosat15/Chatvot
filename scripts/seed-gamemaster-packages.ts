@@ -13,7 +13,7 @@ import path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
-const MONGODB_URI = process.env.MONGODB_URI || 'REMOVED_CREDENTIALS';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
   console.error('❌ MONGODB_URI is not defined in environment variables');
