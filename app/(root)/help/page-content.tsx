@@ -102,6 +102,7 @@ const menuSections = [
   { id: 'credits', title: '💰 Credits & Wallet', icon: Coins },
   { id: 'profile', title: '👤 Profile & Stats', icon: User },
   { id: 'arsenal', title: '🎯 Trading Arsenal', icon: Briefcase },
+  { id: 'gamemaster', title: '👑 Game Master', icon: Award },
   { id: 'notifications', title: '🔔 Notifications', icon: Bell },
   { id: 'trader-levels', title: '👑 Trader Levels', icon: Award },
   { id: 'badge-system', title: '🏅 Badge System', icon: Award },
@@ -954,6 +955,130 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <li>3. Toggle ON the tools you want to activate</li>
                   <li>4. See signals directly on your chart</li>
                 </ol>
+              </div>
+            </div>
+          </section>
+
+          {/* Game Master */}
+          <section id="gamemaster" className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6">
+            <div className="flex items-center gap-3 mb-6">
+              <Award className="h-6 w-6 text-purple-500" />
+              <h2 className="text-2xl font-bold text-white">👑 Game Master</h2>
+            </div>
+            
+            <div className="space-y-4 text-gray-300">
+              <p className="leading-relaxed">
+                Become a Game Master and earn passive income! Share your referral link and earn a percentage 
+                of entry fees whenever your referred users join competitions or challenges.
+              </p>
+
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-3">🎮 How to Become a Game Master:</h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-6 h-6 rounded-full bg-purple-500/30 flex items-center justify-center text-purple-400 text-xs font-bold">1</span>
+                      <span className="font-semibold text-white">Purchase Package</span>
+                    </div>
+                    <p className="text-xs text-gray-400 ml-8">Buy a Game Master package from the Marketplace</p>
+                  </div>
+                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-6 h-6 rounded-full bg-purple-500/30 flex items-center justify-center text-purple-400 text-xs font-bold">2</span>
+                      <span className="font-semibold text-white">Activate</span>
+                    </div>
+                    <p className="text-xs text-gray-400 ml-8">Go to Arsenal and activate your package</p>
+                  </div>
+                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-6 h-6 rounded-full bg-purple-500/30 flex items-center justify-center text-purple-400 text-xs font-bold">3</span>
+                      <span className="font-semibold text-white">Share Link</span>
+                    </div>
+                    <p className="text-xs text-gray-400 ml-8">Get your unique referral link and share it</p>
+                  </div>
+                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-6 h-6 rounded-full bg-purple-500/30 flex items-center justify-center text-purple-400 text-xs font-bold">4</span>
+                      <span className="font-semibold text-white">Earn!</span>
+                    </div>
+                    <p className="text-xs text-gray-400 ml-8">Earn % of entry fees from your referrals</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-white mb-3">📦 Available Packages:</h4>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <h5 className="font-bold text-white mb-1">Starter</h5>
+                    <p className="text-yellow-400 font-semibold text-sm">299 {settings.credits.name}</p>
+                    <ul className="text-xs text-gray-400 mt-2 space-y-1">
+                      <li>• 1 competition/day</li>
+                      <li>• 30 max users</li>
+                      <li>• 5% referral fee</li>
+                    </ul>
+                  </div>
+                  <div className="p-4 bg-purple-500/20 rounded-lg border border-purple-500/30">
+                    <h5 className="font-bold text-purple-400 mb-1">Pro ⭐</h5>
+                    <p className="text-yellow-400 font-semibold text-sm">599 {settings.credits.name}</p>
+                    <ul className="text-xs text-gray-400 mt-2 space-y-1">
+                      <li>• 3 competitions/day</li>
+                      <li>• 75 max users</li>
+                      <li>• 7.5% referral fee</li>
+                    </ul>
+                  </div>
+                  <div className="p-4 bg-yellow-500/20 rounded-lg border border-yellow-500/30">
+                    <h5 className="font-bold text-yellow-400 mb-1">Elite ⭐</h5>
+                    <p className="text-yellow-400 font-semibold text-sm">999 {settings.credits.name}</p>
+                    <ul className="text-xs text-gray-400 mt-2 space-y-1">
+                      <li>• 10 competitions/day</li>
+                      <li>• 150 max users</li>
+                      <li>• 10% referral fee</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+                  <h5 className="font-semibold text-green-400 mb-2 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" /> Earning Potential
+                  </h5>
+                  <p className="text-sm text-gray-400">
+                    If you refer 50 users who each join a 100 {settings.credits.name} competition with 10% referral fee, 
+                    you earn <span className="text-green-400 font-bold">500 {settings.credits.name}</span> per competition!
+                  </p>
+                </div>
+                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                  <h5 className="font-semibold text-blue-400 mb-2 flex items-center gap-2">
+                    <Eye className="h-4 w-4" /> Dashboard Access
+                  </h5>
+                  <p className="text-sm text-gray-400">
+                    Track your referrals, view earnings history, and manage your subscription from your Game Master Dashboard.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2">💡 Pro Tips:</h4>
+                <ul className="space-y-1 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <span>Referrals are permanent - once linked, you earn from them forever</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <span>Enable auto-renewal to never lose your Game Master status</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <span>Create your own competitions to attract more users</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <span>Earnings are credited directly to your wallet instantly</span>
+                  </li>
+                </ul>
               </div>
             </div>
           </section>

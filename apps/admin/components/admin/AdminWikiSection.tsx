@@ -2895,6 +2895,294 @@ export default function AdminWikiSection() {
       )
     },
 
+    // ==================== GAME MASTER ====================
+    {
+      id: 'gamemaster-overview',
+      title: 'Game Master System',
+      icon: Trophy,
+      category: 'Game Master',
+      tags: ['gamemaster', 'referral', 'affiliate', 'subscription', 'earnings'],
+      content: (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl p-6">
+            <h2 className="text-2xl font-bold text-purple-400 mb-3 flex items-center gap-2">
+              <Trophy className="h-6 w-6" />
+              Game Master System Overview
+            </h2>
+            <p className="text-gray-300 leading-relaxed">
+              The Game Master System allows users to become referral partners. They purchase a Game Master package, 
+              receive a unique referral link, and earn a percentage of entry fees from users they refer who participate in competitions and challenges.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400">How It Works</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-gray-300">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded">1</span>
+                    <h4 className="font-semibold text-white">User Purchases Package</h4>
+                  </div>
+                  <p className="text-sm text-gray-400">User buys a Game Master package from the Marketplace using credits.</p>
+                </div>
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded">2</span>
+                    <h4 className="font-semibold text-white">Activate Subscription</h4>
+                  </div>
+                  <p className="text-sm text-gray-400">User activates the package in their Arsenal, receives unique referral code.</p>
+                </div>
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded">3</span>
+                    <h4 className="font-semibold text-white">Share Referral Link</h4>
+                  </div>
+                  <p className="text-sm text-gray-400">Game Master shares their link: yoursite.com/sign-up?ref=CODE</p>
+                </div>
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded">4</span>
+                    <h4 className="font-semibold text-white">Earn Commissions</h4>
+                  </div>
+                  <p className="text-sm text-gray-400">When referred users join competitions, Game Master earns % of their entry fees.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400">Available Packages</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
+                  <h4 className="font-bold text-white mb-2">Starter</h4>
+                  <p className="text-yellow-400 font-bold">299 Credits</p>
+                  <ul className="text-sm mt-2 space-y-1">
+                    <li>• 1 competition/day</li>
+                    <li>• 30 max users</li>
+                    <li>• 5% referral fee</li>
+                    <li>• 30 day duration</li>
+                  </ul>
+                </div>
+                <div className="bg-purple-500/20 p-4 rounded-lg border border-purple-500/30">
+                  <h4 className="font-bold text-purple-400 mb-2">Pro ⭐</h4>
+                  <p className="text-yellow-400 font-bold">599 Credits</p>
+                  <ul className="text-sm mt-2 space-y-1">
+                    <li>• 3 competitions/day</li>
+                    <li>• 75 max users</li>
+                    <li>• 7.5% referral fee</li>
+                    <li>• 30 day duration</li>
+                  </ul>
+                </div>
+                <div className="bg-yellow-500/20 p-4 rounded-lg border border-yellow-500/30">
+                  <h4 className="font-bold text-yellow-400 mb-2">Elite ⭐</h4>
+                  <p className="text-yellow-400 font-bold">999 Credits</p>
+                  <ul className="text-sm mt-2 space-y-1">
+                    <li>• 10 competitions/day</li>
+                    <li>• 150 max users</li>
+                    <li>• 10% referral fee</li>
+                    <li>• 30 day duration</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Lightbulb className="h-5 w-5 text-yellow-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-yellow-400 mb-1">Key Points</h4>
+                <ul className="text-sm text-gray-300 space-y-1">
+                  <li>• Subscriptions auto-renew if enabled and user has sufficient credits</li>
+                  <li>• Referral link persists permanently - all users signed up via link are tracked</li>
+                  <li>• Earnings are credited immediately when competitions finalize</li>
+                  <li>• Game Masters can create their own competitions (within daily limits)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'gamemaster-management',
+      title: 'Managing Game Masters',
+      icon: UserCog,
+      category: 'Game Master',
+      tags: ['gamemaster', 'management', 'admin', 'revoke', 'earnings'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-purple-400 mb-3">Managing Game Masters</h2>
+            <p className="text-gray-300 mb-4">
+              As a Super Admin, you have full control over the Game Master system including viewing all Game Masters, 
+              their referrals, earnings, and the ability to revoke their status.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400">Game Master Dashboard</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm">Access via: <code className="bg-gray-900 px-2 py-1 rounded">Admin Panel → Game Master Management</code></p>
+              <div className="space-y-2 text-sm">
+                <div className="bg-gray-900 p-3 rounded">
+                  <strong className="text-white">View All Game Masters:</strong>
+                  <p className="text-gray-400 mt-1">See all active, expired, and cancelled subscriptions with stats.</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <strong className="text-white">Referral Details:</strong>
+                  <p className="text-gray-400 mt-1">View which users were referred by each Game Master.</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <strong className="text-white">Earnings History:</strong>
+                  <p className="text-gray-400 mt-1">Complete breakdown of all earnings, by competition/challenge.</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <strong className="text-white">Competition Created:</strong>
+                  <p className="text-gray-400 mt-1">Track how many competitions each Game Master has created.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400 flex items-center gap-2">
+                <Ban className="h-5 w-5" />
+                Revoking Game Master Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm">You may need to revoke Game Master status if:</p>
+              <ul className="text-sm space-y-1">
+                <li>• User violates terms of service</li>
+                <li>• Suspicious referral activity detected</li>
+                <li>• User requests cancellation</li>
+              </ul>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mt-3">
+                <p className="text-sm text-red-400">
+                  <strong>Warning:</strong> Revoking status is irreversible. The user would need to purchase a new package.
+                  Existing referred users remain linked, but no new earnings will be generated.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400">Financial Tracking</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm">Game Master earnings are tracked in the Financial Dashboard:</p>
+              <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                <div className="bg-green-500/10 border border-green-500/30 p-3 rounded">
+                  <strong className="text-green-400">Total GM Earnings</strong>
+                  <p className="text-gray-400 text-xs mt-1">Sum of all referral fees paid to Game Masters</p>
+                </div>
+                <div className="bg-blue-500/10 border border-blue-500/30 p-3 rounded">
+                  <strong className="text-blue-400">Subscription Revenue</strong>
+                  <p className="text-gray-400 text-xs mt-1">Revenue from Game Master package purchases</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+    {
+      id: 'gamemaster-api',
+      title: 'Game Master API',
+      icon: Code,
+      category: 'Game Master',
+      tags: ['gamemaster', 'api', 'endpoints', 'integration'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-purple-400 mb-3">Game Master API Endpoints</h2>
+            <p className="text-gray-300 mb-4">
+              Technical reference for Game Master API endpoints.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400">User Endpoints</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="bg-gray-900 p-3 rounded font-mono">
+                <div className="text-green-400">POST /api/gamemaster/activate</div>
+                <p className="text-gray-400 mt-1">Activate a purchased Game Master package</p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded font-mono">
+                <div className="text-blue-400">GET /api/gamemaster/status</div>
+                <p className="text-gray-400 mt-1">Get current subscription status</p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded font-mono">
+                <div className="text-yellow-400">POST /api/gamemaster/toggle-renewal</div>
+                <p className="text-gray-400 mt-1">Toggle auto-renewal on/off</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400">Game Master Dashboard Endpoints</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="bg-gray-900 p-3 rounded font-mono">
+                <div className="text-green-400">GET /api/gamemaster/dashboard</div>
+                <p className="text-gray-400 mt-1">Get dashboard statistics</p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded font-mono">
+                <div className="text-blue-400">GET /api/gamemaster/referrals</div>
+                <p className="text-gray-400 mt-1">List all referred users</p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded font-mono">
+                <div className="text-yellow-400">GET /api/gamemaster/earnings</div>
+                <p className="text-gray-400 mt-1">Get earnings history</p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded font-mono">
+                <div className="text-cyan-400">GET /api/gamemaster/link</div>
+                <p className="text-gray-400 mt-1">Get referral link</p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded font-mono">
+                <div className="text-orange-400">POST /api/gamemaster/competitions</div>
+                <p className="text-gray-400 mt-1">Create a competition (within limits)</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400">Admin Endpoints</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="bg-gray-900 p-3 rounded font-mono">
+                <div className="text-green-400">GET /api/gamemasters</div>
+                <p className="text-gray-400 mt-1">List all Game Masters (paginated)</p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded font-mono">
+                <div className="text-blue-400">GET /api/gamemasters/:id</div>
+                <p className="text-gray-400 mt-1">Get Game Master details</p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded font-mono">
+                <div className="text-red-400">POST /api/gamemasters/:id/revoke</div>
+                <p className="text-gray-400 mt-1">Revoke Game Master status</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+
     // ==================== ADMIN CREDENTIALS ====================
     {
       id: 'admin-credentials',
