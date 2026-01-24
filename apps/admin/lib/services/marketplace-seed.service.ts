@@ -886,21 +886,23 @@ export async function getMarketplaceStats(): Promise<{
   totalIndicators: number;
   totalStrategies: number;
   totalCosmetics: number;
+  totalGameMaster: number;
   totalPurchases: number;
 }> {
   await connectToDatabase();
   
-  const [totalItems, totalIndicators, totalStrategies, totalCosmetics] = await Promise.all([
+  const [totalItems, totalIndicators, totalStrategies, totalCosmetics, totalGameMaster] = await Promise.all([
     MarketplaceItem.countDocuments({ isPublished: true }),
     MarketplaceItem.countDocuments({ isPublished: true, category: 'indicator' }),
     MarketplaceItem.countDocuments({ isPublished: true, category: 'strategy' }),
     MarketplaceItem.countDocuments({ isPublished: true, category: 'cosmetic' }),
+    MarketplaceItem.countDocuments({ isPublished: true, category: 'gamemaster' }),
   ]);
   
   const { UserPurchase } = await import('@/database/models/marketplace/user-purchase.model');
   const totalPurchases = await UserPurchase.countDocuments();
   
-  return { totalItems, totalIndicators, totalStrategies, totalCosmetics, totalPurchases };
+  return { totalItems, totalIndicators, totalStrategies, totalCosmetics, totalGameMaster, totalPurchases };
 }
 
 /**

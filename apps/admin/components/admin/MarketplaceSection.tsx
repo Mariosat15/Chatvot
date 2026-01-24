@@ -18,6 +18,11 @@ import {
   Palette,
   Image as ImageIcon,
   User,
+  Crown,
+  Calendar,
+  Percent,
+  Trophy,
+  UserPlus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -57,13 +62,20 @@ interface StrategyConfig {
   };
 }
 
+interface GameMasterConfig {
+  subscriptionDurationDays: number;
+  referralFeePercentage: number;
+  maxCompetitionsPerDay: number;
+  maxUsersPerCompetition: number;
+}
+
 interface MarketplaceItem {
   _id: string;
   name: string;
   slug: string;
   shortDescription: string;
   fullDescription: string;
-  category: 'indicator' | 'strategy' | 'cosmetic';
+  category: 'indicator' | 'strategy' | 'cosmetic' | 'gamemaster';
   price: number;
   originalPrice?: number;
   isFree: boolean;
@@ -73,6 +85,7 @@ interface MarketplaceItem {
   version: string;
   indicatorType?: string;
   strategyConfig?: StrategyConfig;
+  gameMasterConfig?: GameMasterConfig;
   cosmeticType?: string;
   imageUrl?: string;
   codeTemplate: string;
@@ -91,6 +104,7 @@ interface Stats {
   totalIndicators: number;
   totalStrategies: number;
   totalCosmetics: number;
+  totalGameMaster: number;
   totalPurchases: number;
 }
 
@@ -98,6 +112,7 @@ const CATEGORIES = [
   { value: 'indicator', label: 'Indicator', icon: TrendingUp },
   { value: 'strategy', label: 'Strategy', icon: Target },
   { value: 'cosmetic', label: 'Cosmetic', icon: Palette },
+  { value: 'gamemaster', label: 'Game Master', icon: Crown },
 ];
 
 const COSMETIC_TYPES = [
@@ -140,6 +155,12 @@ const emptyItem: Partial<MarketplaceItem> = {
       showLabels: true,
       arrowSize: 'medium',
     },
+  },
+  gameMasterConfig: {
+    subscriptionDurationDays: 30,
+    referralFeePercentage: 5,
+    maxCompetitionsPerDay: 1,
+    maxUsersPerCompetition: 50,
   },
   cosmeticType: 'avatar',
   imageUrl: '',
@@ -409,7 +430,7 @@ export default function MarketplaceSection() {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <Card className="bg-gray-900 border-gray-700">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -450,6 +471,17 @@ export default function MarketplaceSection() {
               <div>
                 <div className="text-2xl font-bold text-white">{stats?.totalCosmetics || 0}</div>
                 <div className="text-sm text-gray-400">Cosmetics</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gray-900 border-gray-700">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Crown className="h-8 w-8 text-yellow-400" />
+              <div>
+                <div className="text-2xl font-bold text-white">{stats?.totalGameMaster || 0}</div>
+                <div className="text-sm text-gray-400">Game Master</div>
               </div>
             </div>
           </CardContent>
@@ -689,7 +721,10 @@ export default function MarketplaceSection() {
               {editingItem.category === 'strategy' && (
                 <TabsTrigger value="strategy">Strategy Builder</TabsTrigger>
               )}
-              {editingItem.category !== 'cosmetic' && (
+              {editingItem.category === 'gamemaster' && (
+                <TabsTrigger value="gamemaster">Game Master Settings</TabsTrigger>
+              )}
+              {editingItem.category !== 'cosmetic' && editingItem.category !== 'gamemaster' && (
                 <TabsTrigger value="code">
                   {editingItem.category === 'strategy' ? 'Settings' : 'Code & Settings'}
                 </TabsTrigger>
@@ -1046,6 +1081,172 @@ export default function MarketplaceSection() {
                   initialConfig={editingItem.strategyConfig}
                   onChange={(config) => setEditingItem({ ...editingItem, strategyConfig: config })}
                 />
+              </TabsContent>
+            )}
+            
+            {/* Game Master Settings Tab */}
+            {editingItem.category === 'gamemaster' && (
+              <TabsContent value="gamemaster" className="space-y-6 pb-20">
+                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-xl p-6">
+                  <h4 className="text-yellow-400 font-bold text-lg flex items-center gap-2 mb-2">
+                    <Crown className="h-5 w-5" />
+                    Game Master Package Configuration
+                  </h4>
+                  <p className="text-sm text-gray-300">
+                    Configure the subscription settings for this Game Master package. Users who purchase this package
+                    will be able to create competitions and earn referral fees based on these settings.
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Subscription Duration */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Calendar className="h-5 w-5 text-blue-400" />
+                      <Label className="text-white font-semibold">Subscription Duration</Label>
+                    </div>
+                    <Input
+                      type="number"
+                      value={editingItem.gameMasterConfig?.subscriptionDurationDays || 30}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        gameMasterConfig: {
+                          ...editingItem.gameMasterConfig!,
+                          subscriptionDurationDays: parseInt(e.target.value) || 30
+                        }
+                      })}
+                      min={1}
+                      max={365}
+                      className="bg-gray-800 border-gray-600 text-white text-lg h-12"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Number of days the subscription is active (e.g., 30 for monthly)
+                    </p>
+                  </div>
+                  
+                  {/* Referral Fee Percentage */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Percent className="h-5 w-5 text-green-400" />
+                      <Label className="text-white font-semibold">Referral Fee Percentage</Label>
+                    </div>
+                    <Input
+                      type="number"
+                      value={editingItem.gameMasterConfig?.referralFeePercentage || 5}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        gameMasterConfig: {
+                          ...editingItem.gameMasterConfig!,
+                          referralFeePercentage: parseFloat(e.target.value) || 5
+                        }
+                      })}
+                      min={0}
+                      max={50}
+                      step={0.5}
+                      className="bg-gray-800 border-gray-600 text-white text-lg h-12"
+                    />
+                    <p className="text-xs text-gray-500">
+                      % of entry fees the Game Master earns from their referrals (e.g., 5%, 7.5%, 10%)
+                    </p>
+                  </div>
+                  
+                  {/* Max Competitions Per Day */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Trophy className="h-5 w-5 text-yellow-400" />
+                      <Label className="text-white font-semibold">Max Competitions Per Day</Label>
+                    </div>
+                    <Input
+                      type="number"
+                      value={editingItem.gameMasterConfig?.maxCompetitionsPerDay || 1}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        gameMasterConfig: {
+                          ...editingItem.gameMasterConfig!,
+                          maxCompetitionsPerDay: parseInt(e.target.value) || 1
+                        }
+                      })}
+                      min={1}
+                      max={100}
+                      className="bg-gray-800 border-gray-600 text-white text-lg h-12"
+                    />
+                    <p className="text-xs text-gray-500">
+                      How many competitions this Game Master can create per day
+                    </p>
+                  </div>
+                  
+                  {/* Max Users Per Competition */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <UserPlus className="h-5 w-5 text-cyan-400" />
+                      <Label className="text-white font-semibold">Max Users Per Competition</Label>
+                    </div>
+                    <Input
+                      type="number"
+                      value={editingItem.gameMasterConfig?.maxUsersPerCompetition || 50}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        gameMasterConfig: {
+                          ...editingItem.gameMasterConfig!,
+                          maxUsersPerCompetition: parseInt(e.target.value) || 50
+                        }
+                      })}
+                      min={2}
+                      max={1000}
+                      className="bg-gray-800 border-gray-600 text-white text-lg h-12"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Maximum number of participants in competitions created by this Game Master
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Summary Card */}
+                <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-xl p-6">
+                  <h5 className="text-purple-400 font-bold mb-4 flex items-center gap-2">
+                    <Star className="h-4 w-4" />
+                    Package Summary
+                  </h5>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div className="bg-gray-900/50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-blue-400">
+                        {editingItem.gameMasterConfig?.subscriptionDurationDays || 30}
+                      </div>
+                      <div className="text-xs text-gray-400">Days</div>
+                    </div>
+                    <div className="bg-gray-900/50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-green-400">
+                        {editingItem.gameMasterConfig?.referralFeePercentage || 5}%
+                      </div>
+                      <div className="text-xs text-gray-400">Referral Fee</div>
+                    </div>
+                    <div className="bg-gray-900/50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-yellow-400">
+                        {editingItem.gameMasterConfig?.maxCompetitionsPerDay || 1}
+                      </div>
+                      <div className="text-xs text-gray-400">Comps/Day</div>
+                    </div>
+                    <div className="bg-gray-900/50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-cyan-400">
+                        {editingItem.gameMasterConfig?.maxUsersPerCompetition || 50}
+                      </div>
+                      <div className="text-xs text-gray-400">Max Users</div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Tips */}
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                  <h5 className="text-yellow-400 font-semibold mb-2 flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4" />
+                    Pricing Tips
+                  </h5>
+                  <ul className="text-sm text-gray-300 space-y-1">
+                    <li>• <strong>Starter:</strong> 30 days, 5% fee, 1 comp/day, 30 max users → ~299 credits</li>
+                    <li>• <strong>Pro:</strong> 30 days, 7.5% fee, 3 comps/day, 75 max users → ~599 credits</li>
+                    <li>• <strong>Elite:</strong> 30 days, 10% fee, 10 comps/day, 150 max users → ~999 credits</li>
+                  </ul>
+                </div>
               </TabsContent>
             )}
             

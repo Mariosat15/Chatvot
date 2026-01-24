@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema, Model } from 'mongoose';
 
-// Item Categories - Indicators, Strategies, and Cosmetics
-export type ItemCategory = 'indicator' | 'strategy' | 'cosmetic';
+// Item Categories - Indicators, Strategies, Cosmetics, and Game Master
+export type ItemCategory = 'indicator' | 'strategy' | 'cosmetic' | 'gamemaster';
 
 // Cosmetic Types
 export type CosmeticType = 'avatar' | 'profile_frame' | 'badge' | 'title';
@@ -64,6 +64,14 @@ export interface IStrategyConfig {
   };
 }
 
+// Game Master Package Configuration
+export interface IGameMasterConfig {
+  subscriptionDurationDays: number; // How long the subscription lasts (e.g., 30 days)
+  referralFeePercentage: number;    // % of entry fees earned from referrals (e.g., 5, 7.5, 10)
+  maxCompetitionsPerDay: number;    // How many competitions can be created per day
+  maxUsersPerCompetition: number;   // Max participants in GM-created competitions
+}
+
 export interface IMarketplaceItem extends Document {
   _id: mongoose.Types.ObjectId;
   
@@ -93,6 +101,7 @@ export interface IMarketplaceItem extends Document {
   version: string;
   indicatorType?: IndicatorType; // For indicator items
   strategyConfig?: IStrategyConfig; // For strategy items
+  gameMasterConfig?: IGameMasterConfig; // For game master items
   cosmeticType?: CosmeticType; // For cosmetic items (avatar, frame, etc.)
   imageUrl?: string; // For cosmetic items - the actual image/asset
   
@@ -189,7 +198,7 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
     category: {
       type: String,
       required: true,
-      enum: ['indicator', 'strategy', 'cosmetic'],
+      enum: ['indicator', 'strategy', 'cosmetic', 'gamemaster'],
       default: 'indicator',
     },
     price: {
@@ -232,6 +241,12 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       enum: ['sma', 'ema', 'bb', 'rsi', 'macd', 'support_resistance'],
     },
     strategyConfig: StrategyConfigSchema,
+    gameMasterConfig: {
+      subscriptionDurationDays: { type: Number, default: 30 },
+      referralFeePercentage: { type: Number, default: 5 },
+      maxCompetitionsPerDay: { type: Number, default: 1 },
+      maxUsersPerCompetition: { type: Number, default: 50 },
+    },
     cosmeticType: {
       type: String,
       enum: ['avatar', 'profile_frame', 'badge', 'title'],
