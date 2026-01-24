@@ -803,7 +803,182 @@ Known only by her codename "Zero," this elite operative was trained by a clandes
 };
 
 // ============================================================================
-// ALL ITEMS - Indicators, Strategies, and Cosmetics
+// GAME MASTER PACKAGES
+// ============================================================================
+
+const GAMEMASTER_STARTER_PACKAGE: Partial<IMarketplaceItem> = {
+  name: 'Game Master Starter',
+  slug: 'game-master-starter',
+  shortDescription: 'Begin your Game Master journey! Create daily competitions, earn 5% from referrals, and build your trading community.',
+  fullDescription: `# Welcome to Your Game Master Journey
+
+The **Starter Package** is your gateway to becoming a Game Master on ChartVolt. Perfect for traders who want to dip their toes into community building while earning passive income.
+
+## What You Get
+
+- **1 Competition per Day** - Host daily trading battles for your community
+- **Up to 30 Participants** - Perfect size for intimate, competitive events
+- **5% Referral Earnings** - Earn from every entry fee your referred users pay
+- **30 Days Duration** - Full month of Game Master privileges
+
+## How Referral Earnings Work
+
+When users sign up using your unique referral link and join ANY competition on the platform:
+- They pay the entry fee as normal
+- You automatically receive 5% of their entry fee
+- Earnings are credited instantly to your wallet
+
+## Perfect For
+
+- New community builders testing the waters
+- Traders with small but loyal followings
+- Anyone wanting to start earning from referrals
+
+*"Every Game Master empire started somewhere. Start yours today."*`,
+  category: 'gamemaster',
+  price: 299,
+  isFree: false,
+  status: 'active',
+  isPublished: true,
+  isFeatured: false,
+  version: '1.0.0',
+  codeTemplate: '{}',
+  defaultSettings: {},
+  supportedAssets: [],
+  tags: ['gamemaster', 'starter', 'referral', 'beginner', 'affordable'],
+  riskLevel: 'low',
+  gameMasterConfig: {
+    maxCompetitionsPerDay: 1,
+    maxUsersPerCompetition: 30,
+    referralFeePercentage: 5,
+    subscriptionDurationDays: 30,
+  },
+};
+
+const GAMEMASTER_PRO_PACKAGE: Partial<IMarketplaceItem> = {
+  name: 'Game Master Pro',
+  slug: 'game-master-pro',
+  shortDescription: 'Level up your Game Master game! 3 daily competitions, 75 participants, and 7.5% referral earnings. The choice of serious community builders.',
+  fullDescription: `# The Professional's Choice
+
+The **Pro Package** is designed for Game Masters who are serious about building a thriving trading community. More competitions, bigger events, better earnings.
+
+## What You Get
+
+- **3 Competitions per Day** - Run morning, afternoon, and evening events
+- **Up to 75 Participants** - Scale your competitions for bigger prize pools
+- **7.5% Referral Earnings** - 50% more earnings than Starter tier
+- **30 Days Duration** - Full month of enhanced privileges
+
+## Why Upgrade to Pro?
+
+**More Events = More Engagement**
+Keep your community active with multiple daily competitions. Different timeframes attract different traders.
+
+**Bigger Competitions = Bigger Prizes**
+With 75 participant capacity, your events can have prize pools that truly excite traders.
+
+**Higher Earnings = Better ROI**
+At 7.5% referral rate, just 8,000 credits in entry fees from your referrals pays back your subscription.
+
+## Ideal For
+
+- Growing Discord/Telegram trading communities
+- Social media influencers with engaged audiences
+- Active traders looking to monetize their network
+
+*"Pro isn't just a tier—it's a statement. You're here to build something real."*`,
+  category: 'gamemaster',
+  price: 599,
+  isFree: false,
+  status: 'active',
+  isPublished: true,
+  isFeatured: true,
+  version: '1.0.0',
+  codeTemplate: '{}',
+  defaultSettings: {},
+  supportedAssets: [],
+  tags: ['gamemaster', 'pro', 'referral', 'popular', 'recommended'],
+  riskLevel: 'low',
+  gameMasterConfig: {
+    maxCompetitionsPerDay: 3,
+    maxUsersPerCompetition: 75,
+    referralFeePercentage: 7.5,
+    subscriptionDurationDays: 30,
+  },
+};
+
+const GAMEMASTER_ELITE_PACKAGE: Partial<IMarketplaceItem> = {
+  name: 'Game Master Elite',
+  slug: 'game-master-elite',
+  shortDescription: 'The ultimate Game Master experience. 10 daily competitions, 150 participants, and maximum 10% referral earnings. For those who dominate.',
+  fullDescription: `# Dominate the Arena
+
+The **Elite Package** is for Game Masters who refuse to compromise. Maximum power. Maximum earnings. Maximum respect.
+
+## What You Get
+
+- **10 Competitions per Day** - Run events around the clock
+- **Up to 150 Participants** - Host massive tournaments with huge prize pools
+- **10% Referral Earnings** - The highest referral rate available
+- **30 Days Duration** - Full month of elite privileges
+
+## The Elite Advantage
+
+**Unlimited Potential**
+10 competitions per day means you can run specialized events:
+- Morning scalp battles
+- Lunch break quick trades
+- Evening swing competitions
+- Weekend tournaments
+
+**Massive Scale**
+150 participants per competition enables:
+- Prize pools worth thousands of credits
+- Tournament-style bracket competitions
+- Community-wide events that go viral
+
+**Maximum Earnings**
+At 10% referral rate, your passive income potential is unmatched:
+- 10,000 credits in referral entry fees = 1,000 credits earned
+- Your subscription pays for itself with just one successful referral push
+
+## Built For
+
+- Professional trading community managers
+- Large Discord servers (1000+ members)
+- Influencers with substantial followings
+- Trading educators and course creators
+
+## Elite Perks
+
+👑 Priority support for event issues
+👑 Higher visibility in platform promotions
+👑 Exclusive Elite badge on your profile
+
+*"At the top, there's only one tier. Welcome to Elite."*`,
+  category: 'gamemaster',
+  price: 999,
+  isFree: false,
+  status: 'active',
+  isPublished: true,
+  isFeatured: true,
+  version: '1.0.0',
+  codeTemplate: '{}',
+  defaultSettings: {},
+  supportedAssets: [],
+  tags: ['gamemaster', 'elite', 'referral', 'premium', 'unlimited', 'best-value'],
+  riskLevel: 'low',
+  gameMasterConfig: {
+    maxCompetitionsPerDay: 10,
+    maxUsersPerCompetition: 150,
+    referralFeePercentage: 10,
+    subscriptionDurationDays: 30,
+  },
+};
+
+// ============================================================================
+// ALL ITEMS - Indicators, Strategies, Cosmetics, and Game Master Packages
 // ============================================================================
 
 const ALL_ITEMS = [
@@ -829,6 +1004,10 @@ const ALL_ITEMS = [
   AVATAR_STORM_CENTURION,
   AVATAR_QUANTUM_SAGE,
   AVATAR_DIGITAL_ASSASSIN,
+  // Game Master Packages
+  GAMEMASTER_STARTER_PACKAGE,
+  GAMEMASTER_PRO_PACKAGE,
+  GAMEMASTER_ELITE_PACKAGE,
 ];
 
 // ============================================================================
@@ -860,6 +1039,10 @@ export async function seedMarketplaceItems(adminId: string = 'system'): Promise<
         existing.defaultSettings = itemData.defaultSettings || existing.defaultSettings;
         existing.fullDescription = itemData.fullDescription || existing.fullDescription;
         existing.version = itemData.version || existing.version;
+        // Update Game Master config if present
+        if (itemData.gameMasterConfig) {
+          existing.gameMasterConfig = itemData.gameMasterConfig as any;
+        }
         await existing.save();
         result.updated++;
         continue;
@@ -886,21 +1069,23 @@ export async function getMarketplaceStats(): Promise<{
   totalIndicators: number;
   totalStrategies: number;
   totalCosmetics: number;
+  totalGameMasterPackages: number;
   totalPurchases: number;
 }> {
   await connectToDatabase();
   
-  const [totalItems, totalIndicators, totalStrategies, totalCosmetics] = await Promise.all([
+  const [totalItems, totalIndicators, totalStrategies, totalCosmetics, totalGameMasterPackages] = await Promise.all([
     MarketplaceItem.countDocuments({ isPublished: true }),
     MarketplaceItem.countDocuments({ isPublished: true, category: 'indicator' }),
     MarketplaceItem.countDocuments({ isPublished: true, category: 'strategy' }),
     MarketplaceItem.countDocuments({ isPublished: true, category: 'cosmetic' }),
+    MarketplaceItem.countDocuments({ isPublished: true, category: 'gamemaster' }),
   ]);
   
   const { UserPurchase } = await import('@/database/models/marketplace/user-purchase.model');
   const totalPurchases = await UserPurchase.countDocuments();
   
-  return { totalItems, totalIndicators, totalStrategies, totalCosmetics, totalPurchases };
+  return { totalItems, totalIndicators, totalStrategies, totalCosmetics, totalGameMasterPackages, totalPurchases };
 }
 
 /**
