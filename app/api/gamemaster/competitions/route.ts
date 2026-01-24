@@ -98,6 +98,10 @@ export async function POST(request: NextRequest) {
       platformFeePercentage,
       assetClasses,
       prizeDistribution,
+      rules,
+      levelRequirement,
+      riskLimits,
+      difficulty,
     } = body;
 
     // Validate required fields
@@ -179,15 +183,45 @@ export async function POST(request: NextRequest) {
 
     // Build allowed symbols based on asset classes
     const allowedSymbols: string[] = [];
-    if (assetClasses?.forex !== false) {
-      allowedSymbols.push('EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD');
+    const assetClassesArray: string[] = [];
+    
+    // Handle both array and object format for assetClasses
+    if (Array.isArray(assetClasses)) {
+      if (assetClasses.includes('forex')) {
+        allowedSymbols.push('EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD');
+        assetClassesArray.push('forex');
+      }
+      if (assetClasses.includes('crypto')) {
+        allowedSymbols.push('BTC/USD', 'ETH/USD', 'XRP/USD', 'SOL/USD');
+        assetClassesArray.push('crypto');
+      }
+      if (assetClasses.includes('stocks')) {
+        allowedSymbols.push('AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN');
+        assetClassesArray.push('stocks');
+      }
+    } else {
+      if (assetClasses?.forex !== false) {
+        allowedSymbols.push('EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD');
+        assetClassesArray.push('forex');
+      }
+      if (assetClasses?.crypto) {
+        allowedSymbols.push('BTC/USD', 'ETH/USD', 'XRP/USD', 'SOL/USD');
+        assetClassesArray.push('crypto');
+      }
+      if (assetClasses?.stocks) {
+        allowedSymbols.push('AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN');
+        assetClassesArray.push('stocks');
+      }
     }
-    if (assetClasses?.crypto) {
-      allowedSymbols.push('BTC/USD', 'ETH/USD', 'XRP/USD', 'SOL/USD');
-    }
-    if (assetClasses?.stocks) {
-      allowedSymbols.push('AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN');
-    }
+
+    // Default rules if not provided
+    const defaultRules = {
+      rankingMethod: 'pnl',
+      tieBreaker1: 'trades_count',
+      minimumTrades: 1,
+      disqualifyOnLiquidation: true,
+      tiePrizeDistribution: 'split_equally',
+    };
 
     // Create competition
     const competition = {
@@ -205,6 +239,7 @@ export async function POST(request: NextRequest) {
       endTime: new Date(endTime),
       registrationDeadline: new Date(startTime),
       allowedSymbols: allowedSymbols.length > 0 ? allowedSymbols : ['EUR/USD', 'GBP/USD', 'USD/JPY'],
+      assetClasses: assetClassesArray.length > 0 ? assetClassesArray : ['forex'],
       leverage: leverage || 30,
       platformFeePercentage: platformFee,
       prizeDistribution: prizeDistribution || [
@@ -216,13 +251,35 @@ export async function POST(request: NextRequest) {
       gameMasterId: userId,
       gameMasterName: session.user.name || 'Game Master',
       createdBy: userId,
-      // Competition rules (default)
-      rules: {
-        rankingMethod: 'pnl',
-        tieBreaker1: 'trades_count',
-        minimumTrades: 1,
-        disqualifyOnLiquidation: true,
-      },
+      // Competition rules (use provided or defaults)
+      rules: rules ? {
+        rankingMethod: rules.rankingMethod || defaultRules.rankingMethod,
+        tieBreaker1: rules.tieBreaker1 || defaultRules.tieBreaker1,
+        tieBreaker2: rules.tieBreaker2,
+        minimumTrades: rules.minimumTrades ?? defaultRules.minimumTrades,
+        minimumWinRate: rules.minimumWinRate,
+        disqualifyOnLiquidation: rules.disqualifyOnLiquidation ?? defaultRules.disqualifyOnLiquidation,
+        tiePrizeDistribution: rules.tiePrizeDistribution || defaultRules.tiePrizeDistribution,
+      } : defaultRules,
+      // Level requirement
+      levelRequirement: levelRequirement?.enabled ? {
+        enabled: true,
+        minLevel: levelRequirement.minLevel || 1,
+        maxLevel: levelRequirement.maxLevel,
+      } : { enabled: false },
+      // Risk limits
+      riskLimits: riskLimits?.enabled ? {
+        enabled: true,
+        maxDrawdownPercent: riskLimits.maxDrawdownPercent || 50,
+        dailyLossLimitPercent: riskLimits.dailyLossLimitPercent || 20,
+        equityCheckEnabled: riskLimits.equityCheckEnabled || false,
+        equityDrawdownPercent: riskLimits.equityDrawdownPercent || 30,
+      } : { enabled: false },
+      // Difficulty setting
+      difficulty: difficulty ? {
+        mode: difficulty.mode || 'auto',
+        manualLevel: difficulty.manualLevel,
+      } : { mode: 'auto' },
       createdAt: new Date(),
       updatedAt: new Date(),
     };
