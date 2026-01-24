@@ -20,10 +20,12 @@ export async function GET(request: NextRequest) {
       await seedMarketplaceItems();
     }
     
-    // Also check if Game Master packages exist, seed if missing
-    const gameMasterCount = await MarketplaceItem.countDocuments({ category: 'gamemaster', isPublished: true });
-    if (gameMasterCount === 0) {
-      console.log('No Game Master packages found, seeding...');
+    // Check if Game Master packages exist and are published
+    const publishedGMCount = await MarketplaceItem.countDocuments({ category: 'gamemaster', isPublished: true, status: 'active' });
+    if (publishedGMCount === 0) {
+      // Check if they exist at all (might be unpublished)
+      const totalGMCount = await MarketplaceItem.countDocuments({ category: 'gamemaster' });
+      console.log(`Game Master packages: ${publishedGMCount} published, ${totalGMCount} total. Running seed to fix...`);
       await seedMarketplaceItems();
     }
     

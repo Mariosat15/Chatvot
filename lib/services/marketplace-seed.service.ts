@@ -1030,7 +1030,7 @@ export async function seedMarketplaceItems(adminId: string = 'system'): Promise<
       const existing = await MarketplaceItem.findOne({ slug: itemData.slug });
       
       if (existing) {
-        // Update existing item
+        // Update existing item - ensure all required fields are set
         existing.indicatorType = itemData.indicatorType;
         existing.strategyConfig = itemData.strategyConfig as any;
         existing.cosmeticType = itemData.cosmeticType as any;
@@ -1038,7 +1038,15 @@ export async function seedMarketplaceItems(adminId: string = 'system'): Promise<
         existing.codeTemplate = itemData.codeTemplate || existing.codeTemplate;
         existing.defaultSettings = itemData.defaultSettings || existing.defaultSettings;
         existing.fullDescription = itemData.fullDescription || existing.fullDescription;
+        existing.shortDescription = itemData.shortDescription || existing.shortDescription;
         existing.version = itemData.version || existing.version;
+        // CRITICAL: Ensure these are set correctly for items to appear
+        existing.isPublished = itemData.isPublished ?? true;
+        existing.status = itemData.status || 'active';
+        existing.category = itemData.category || existing.category;
+        existing.price = itemData.price ?? existing.price;
+        existing.isFree = itemData.isFree ?? existing.isFree;
+        existing.tags = itemData.tags || existing.tags;
         // Update Game Master config if present
         if (itemData.gameMasterConfig) {
           existing.gameMasterConfig = itemData.gameMasterConfig as any;
