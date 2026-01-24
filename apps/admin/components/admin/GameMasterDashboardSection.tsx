@@ -94,6 +94,10 @@ export default function GameMasterDashboardSection() {
     try {
       setLoading(true);
       const response = await fetch('/api/gamemaster/dashboard');
+      if (response.status === 401) {
+        setError('not_gamemaster');
+        return;
+      }
       if (!response.ok) {
         throw new Error('Failed to fetch dashboard data');
       }
@@ -143,6 +147,29 @@ export default function GameMasterDashboardSection() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error === 'not_gamemaster') {
+    return (
+      <div className="text-center py-12 max-w-md mx-auto">
+        <div className="bg-purple-500/10 border border-purple-500/30 rounded-2xl p-8">
+          <Trophy className="h-16 w-16 text-purple-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Game Master Access Required</h2>
+          <p className="text-gray-400 mb-6">
+            This dashboard is for Game Masters only. To become a Game Master, purchase a Game Master package from the Marketplace and activate it.
+          </p>
+          <div className="space-y-3 text-left bg-gray-800/50 rounded-lg p-4">
+            <p className="text-sm text-gray-300 font-semibold">How to become a Game Master:</p>
+            <ol className="text-sm text-gray-400 space-y-2 list-decimal list-inside">
+              <li>Go to the main platform Marketplace</li>
+              <li>Purchase a Game Master package</li>
+              <li>Activate it in your Trading Arsenal</li>
+              <li>Return here to access your dashboard</li>
+            </ol>
+          </div>
+        </div>
       </div>
     );
   }

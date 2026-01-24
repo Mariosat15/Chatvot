@@ -183,6 +183,7 @@ export default function CredentialsSection({
             <Input
               id="currentPassword"
               type="password"
+              autoComplete="current-password"
               value={formData.currentPassword}
               onChange={(e) =>
                 setFormData({ ...formData, currentPassword: e.target.value })
@@ -218,6 +219,7 @@ export default function CredentialsSection({
                 <Input
                   id="newPassword"
                   type="password"
+                  autoComplete="new-password"
                   value={formData.newPassword}
                   onChange={(e) =>
                     setFormData({ ...formData, newPassword: e.target.value })
@@ -238,6 +240,7 @@ export default function CredentialsSection({
                 <Input
                   id="confirmPassword"
                   type="password"
+                  autoComplete="new-password"
                   value={formData.confirmPassword}
                   onChange={(e) =>
                     setFormData({ ...formData, confirmPassword: e.target.value })
