@@ -1031,22 +1031,37 @@ export async function seedMarketplaceItems(adminId: string = 'system'): Promise<
       
       if (existing) {
         // Update existing item - ensure all required fields are set
+        // BUT preserve admin-uploaded data (images, custom descriptions, etc.)
         existing.indicatorType = itemData.indicatorType;
         existing.strategyConfig = itemData.strategyConfig as any;
         existing.cosmeticType = itemData.cosmeticType as any;
-        existing.imageUrl = itemData.imageUrl;
+        // PRESERVE existing imageUrl if admin has uploaded one - only set if empty
+        if (!existing.imageUrl && itemData.imageUrl) {
+          existing.imageUrl = itemData.imageUrl;
+        }
         existing.codeTemplate = itemData.codeTemplate || existing.codeTemplate;
         existing.defaultSettings = itemData.defaultSettings || existing.defaultSettings;
-        existing.fullDescription = itemData.fullDescription || existing.fullDescription;
-        existing.shortDescription = itemData.shortDescription || existing.shortDescription;
+        // PRESERVE existing descriptions if admin has customized them
+        if (!existing.fullDescription && itemData.fullDescription) {
+          existing.fullDescription = itemData.fullDescription;
+        }
+        if (!existing.shortDescription && itemData.shortDescription) {
+          existing.shortDescription = itemData.shortDescription;
+        }
         existing.version = itemData.version || existing.version;
         // CRITICAL: Ensure these are set correctly for items to appear
         existing.isPublished = itemData.isPublished ?? true;
         existing.status = itemData.status || 'active';
         existing.category = itemData.category || existing.category;
-        existing.price = itemData.price ?? existing.price;
+        // PRESERVE existing price if admin has customized it (only update if 0 or undefined)
+        if (existing.price === 0 || existing.price === undefined) {
+          existing.price = itemData.price ?? existing.price;
+        }
         existing.isFree = itemData.isFree ?? existing.isFree;
-        existing.tags = itemData.tags || existing.tags;
+        // PRESERVE existing tags, merge if needed
+        if (!existing.tags || existing.tags.length === 0) {
+          existing.tags = itemData.tags || existing.tags;
+        }
         // Update Game Master config if present
         if (itemData.gameMasterConfig) {
           existing.gameMasterConfig = itemData.gameMasterConfig as any;
