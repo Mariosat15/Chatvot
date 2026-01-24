@@ -9,6 +9,7 @@
  */
 
 import mongoose from 'mongoose';
+import { ObjectId } from 'mongodb';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -135,15 +136,33 @@ async function fixExistingGMPurchases() {
           continue;
         }
 
-        // Get user details
+        // Get user details - try multiple ID formats
+        const userIdStr = purchase.userId.toString();
+        const userQueries: Record<string, unknown>[] = [
+          { id: userIdStr },
+          { _id: userIdStr },
+        ];
+        
+        // Try ObjectId format if it's a valid ObjectId string
+        if (ObjectId.isValid(userIdStr)) {
+          userQueries.push({ _id: new ObjectId(userIdStr) });
+        }
+        
         const user = await db.collection('user').findOne({
-          $or: [
-            { id: purchase.userId },
-            { _id: purchase.userId },
-          ]
+          $or: userQueries
         }) as UserDoc | null;
 
         if (!user) {
+          // Debug: Let's see what users exist with similar IDs
+          console.log(`   ⚠️ User not found with ID: ${userIdStr}`);
+          console.log(`      Searching with queries:`, userQueries);
+          
+          // Try to find any user to see the ID format
+          const sampleUser = await db.collection('user').findOne({});
+          if (sampleUser) {
+            console.log(`      Sample user ID format: _id=${sampleUser._id}, id=${sampleUser.id || 'none'}`);
+          }
+          
           errors.push(`User not found: ${purchase.userId}`);
           failed++;
           continue;

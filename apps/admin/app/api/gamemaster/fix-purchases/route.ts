@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
+import { ObjectId } from 'mongodb';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { connectToDatabase } from '@/database/mongoose';
 
@@ -98,12 +99,21 @@ export async function POST() {
           continue;
         }
 
-        // Get user details
+        // Get user details - try multiple ID formats
+        const userIdStr = purchase.userId.toString();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const userQueries: any[] = [
+          { id: userIdStr },
+          { _id: userIdStr },
+        ];
+        
+        // Try ObjectId format if it's a valid ObjectId string
+        if (ObjectId.isValid(userIdStr)) {
+          userQueries.push({ _id: new ObjectId(userIdStr) });
+        }
+        
         const user = await db.collection('user').findOne({
-          $or: [
-            { id: purchase.userId },
-            { _id: purchase.userId },
-          ]
+          $or: userQueries
         });
 
         if (!user) {
