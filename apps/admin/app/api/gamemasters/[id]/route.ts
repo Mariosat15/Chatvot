@@ -84,8 +84,6 @@ export async function GET(
           ...subscription.limits,
           canCreateCompetitions: subscription.limits?.canCreateCompetitions ?? true,
         },
-        competitionCreationOverride: subscription.competitionCreationOverride || null,
-        overrideLimits: subscription.overrideLimits || null,
         currentPeriodCompetitionsCreated: subscription.currentPeriodCompetitionsCreated,
         totalCompetitionsCreated: subscription.totalCompetitionsCreated,
         totalEarnings: subscription.totalEarnings,
@@ -146,7 +144,7 @@ export async function PATCH(
     
     const { id } = await params;
     const body = await request.json();
-    const { action, reason, limits, override, overrideLimits } = body;
+    const { action, reason, limits } = body;
 
     await connectToDatabase();
     const db = mongoose.connection.db;
@@ -211,45 +209,6 @@ export async function PATCH(
           ...updateData,
           endDate: newEndDate,
           nextRenewalDate: newEndDate,
-        };
-        break;
-      
-      case 'toggleCompetitionCreation':
-        // Set override: 'enabled', 'disabled', or null (to use package default)
-        const validOverrideValue = override === 'enabled' || override === 'disabled' || override === null || override === undefined;
-        if (!validOverrideValue) {
-          return NextResponse.json({ error: `Invalid override value: ${override}` }, { status: 400 });
-        }
-        
-        // Normalize undefined to null
-        const normalizedOverride = override === undefined ? null : override;
-        
-        console.log(`[GM Toggle] Setting competitionCreationOverride to: ${normalizedOverride}`);
-        
-        updateData = {
-          ...updateData,
-          competitionCreationOverride: normalizedOverride,
-        };
-        // If enabling, also save the custom limits
-        if (normalizedOverride === 'enabled' && overrideLimits) {
-          updateData.overrideLimits = {
-            maxCompetitionsPerDay: overrideLimits.maxCompetitionsPerDay || 1,
-            maxUsersPerCompetition: overrideLimits.maxUsersPerCompetition || 50,
-          };
-          console.log(`[GM Toggle] Setting overrideLimits:`, updateData.overrideLimits);
-        }
-        // If disabling or clearing, clear the override limits
-        if (normalizedOverride === 'disabled' || normalizedOverride === null) {
-          updateData.overrideLimits = null;
-          console.log(`[GM Toggle] Clearing overrideLimits`);
-        }
-        break;
-      
-      case 'clearCompetitionOverride':
-        // Reset to package default
-        updateData = {
-          ...updateData,
-          competitionCreationOverride: null,
         };
         break;
       

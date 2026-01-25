@@ -41,11 +41,6 @@ interface GameMaster {
     referralFeePercentage: number;
     canCreateCompetitions: boolean;
   };
-  competitionCreationOverride?: 'enabled' | 'disabled' | null;
-  overrideLimits?: {
-    maxCompetitionsPerDay?: number;
-    maxUsersPerCompetition?: number;
-  };
   totalReferredUsers: number;
   totalEarnings: number;
   totalCompetitionsCreated: number;
@@ -113,11 +108,6 @@ export default function GameMasterManagementSection() {
   const [selectedGM, setSelectedGM] = useState<DetailedGameMaster | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  
-  // State for competition override limits modal
-  const [showLimitsModal, setShowLimitsModal] = useState(false);
-  const [limitsModalGM, setLimitsModalGM] = useState<GameMaster | null>(null);
-  const [overrideLimits, setOverrideLimits] = useState({ maxCompetitionsPerDay: 1, maxUsersPerCompetition: 50 });
 
   const fetchGameMasters = useCallback(async () => {
     try {
@@ -241,47 +231,20 @@ export default function GameMasterManagementSection() {
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {/* Competition Creation Toggle */}
-            {gm.status === 'active' && (() => {
-              // Calculate effective state
-              const packageAllows = gm.limits?.canCreateCompetitions !== false; // Default to true if undefined
-              const hasOverride = gm.competitionCreationOverride === 'enabled' || gm.competitionCreationOverride === 'disabled';
-              const isEffectivelyEnabled = hasOverride 
-                ? gm.competitionCreationOverride === 'enabled'
-                : packageAllows;
-              
-              return (
-                <button
-                  onClick={() => {
-                    if (isEffectivelyEnabled) {
-                      // Currently ON, turn OFF (set override to disabled)
-                      handleAction(gm.id, 'toggleCompetitionCreation', { override: 'disabled' });
-                    } else {
-                      // Currently OFF, show modal to set limits before turning ON
-                      setLimitsModalGM(gm);
-                      setOverrideLimits({
-                        maxCompetitionsPerDay: gm.overrideLimits?.maxCompetitionsPerDay || gm.limits?.maxCompetitionsPerDay || 1,
-                        maxUsersPerCompetition: gm.overrideLimits?.maxUsersPerCompetition || gm.limits?.maxUsersPerCompetition || 50,
-                      });
-                      setShowLimitsModal(true);
-                    }
-                  }}
-                  disabled={actionLoading}
-                  className={`flex items-center gap-2 px-4 py-2 rounded disabled:opacity-50 ${
-                    isEffectivelyEnabled
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-gray-600 text-white hover:bg-gray-500'
-                  }`}
-                  title={hasOverride ? `Override: ${gm.competitionCreationOverride}` : `Package default: ${packageAllows ? 'ON' : 'OFF'}`}
-                >
-                  <Trophy className="h-4 w-4" />
-                  {isEffectivelyEnabled ? 'Comps: ON' : 'Comps: OFF'}
-                  {hasOverride && (
-                    <span className="text-xs bg-white/20 px-1 rounded">Override</span>
-                  )}
-                </button>
-              );
-            })()}
+            {/* Competition Creation Status (read-only, based on package) */}
+            {gm.status === 'active' && (
+              <div
+                className={`flex items-center gap-2 px-4 py-2 rounded ${
+                  gm.limits?.canCreateCompetitions !== false
+                    ? 'bg-green-600/20 text-green-400 border border-green-600/50'
+                    : 'bg-gray-600/20 text-gray-400 border border-gray-600/50'
+                }`}
+                title={`Based on ${gm.packageName} package settings`}
+              >
+                <Trophy className="h-4 w-4" />
+                {gm.limits?.canCreateCompetitions !== false ? 'Comps: ON' : 'Comps: OFF'}
+              </div>
+            )}
             {gm.status === 'active' && (
               <button
                 onClick={() => handleAction(gm.id, 'suspend', { reason: 'Suspended by admin' })}
@@ -376,49 +339,23 @@ export default function GameMasterManagementSection() {
               <hr className="border-gray-700 my-3" />
               <div className="flex justify-between">
                 <span className="text-gray-400">Can Create Competitions</span>
-                {(() => {
-                  const packageAllows = gm.limits?.canCreateCompetitions !== false;
-                  const hasOverride = gm.competitionCreationOverride === 'enabled' || gm.competitionCreationOverride === 'disabled';
-                  const effectivelyEnabled = gm.competitionCreationOverride === 'enabled' || 
-                    (gm.competitionCreationOverride !== 'disabled' && packageAllows);
-                  
-                  if (!packageAllows && !hasOverride) {
-                    return <span className="text-gray-500 font-medium">Pack doesn't offer</span>;
-                  }
-                  
-                  return (
-                    <span className={`font-medium ${effectivelyEnabled ? 'text-green-400' : 'text-red-400'}`}>
-                      {effectivelyEnabled ? 'Yes' : 'No'}
-                      {hasOverride && <span className="ml-2 text-xs text-purple-400">(Override)</span>}
-                    </span>
-                  );
-                })()}
+                <span className={`font-medium ${gm.limits?.canCreateCompetitions !== false ? 'text-green-400' : 'text-gray-500'}`}>
+                  {gm.limits?.canCreateCompetitions !== false ? 'Yes' : 'No (Pack)'}
+                </span>
               </div>
-              {/* Only show these when competitions are effectively enabled */}
-              {(() => {
-                const packageAllows = gm.limits?.canCreateCompetitions !== false;
-                const effectivelyEnabled = gm.competitionCreationOverride === 'enabled' || 
-                  (gm.competitionCreationOverride !== 'disabled' && packageAllows);
-                
-                if (!effectivelyEnabled) return null;
-                
-                // Use override limits if admin enabled via override, otherwise package limits
-                const maxComps = gm.overrideLimits?.maxCompetitionsPerDay || gm.limits.maxCompetitionsPerDay;
-                const maxUsers = gm.overrideLimits?.maxUsersPerCompetition || gm.limits.maxUsersPerCompetition;
-                
-                return (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Max Competitions/Day</span>
-                      <span className="text-white">{maxComps}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Max Users/Competition</span>
-                      <span className="text-white">{maxUsers}</span>
-                    </div>
-                  </>
-                );
-              })()}
+              {/* Only show these when competitions are enabled in the package */}
+              {gm.limits?.canCreateCompetitions !== false && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Max Competitions/Day</span>
+                    <span className="text-white">{gm.limits?.maxCompetitionsPerDay || 1}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Max Users/Competition</span>
+                    <span className="text-white">{gm.limits?.maxUsersPerCompetition || 50}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between">
                 <span className="text-gray-400">Referral Fee %</span>
                 <span className="text-white">{gm.limits.referralFeePercentage}%</span>
@@ -634,26 +571,13 @@ export default function GameMasterManagementSection() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {(() => {
-                      const packageAllows = gm.limits?.canCreateCompetitions !== false;
-                      const hasOverride = gm.competitionCreationOverride === 'enabled' || gm.competitionCreationOverride === 'disabled';
-                      const effectivelyEnabled = gm.competitionCreationOverride === 'enabled' || 
-                        (gm.competitionCreationOverride !== 'disabled' && packageAllows);
-                      
-                      if (!packageAllows && !hasOverride) {
-                        // Package doesn't offer competitions, no admin override
-                        return <span className="px-2 py-1 rounded text-xs bg-gray-700 text-gray-500">Pack N/A</span>;
-                      }
-                      
-                      return (
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          effectivelyEnabled ? 'bg-green-900/50 text-green-400' : 'bg-gray-700 text-gray-400'
-                        }`}>
-                          {effectivelyEnabled ? 'ON' : 'OFF'}
-                          {hasOverride && <span className="ml-1 text-purple-400">(Override)</span>}
-                        </span>
-                      );
-                    })()}
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      gm.limits?.canCreateCompetitions !== false
+                        ? 'bg-green-900/50 text-green-400'
+                        : 'bg-gray-700 text-gray-500'
+                    }`}>
+                      {gm.limits?.canCreateCompetitions !== false ? 'ON' : 'OFF'}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <span className="font-mono text-amber-400">{gm.referralCode}</span>
@@ -702,72 +626,6 @@ export default function GameMasterManagementSection() {
         </div>
       )}
 
-      {/* Override Limits Modal */}
-      {showLimitsModal && limitsModalGM && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700">
-            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-yellow-400" />
-              Enable Competition Creation
-            </h3>
-            <p className="text-gray-400 text-sm mb-6">
-              Set the competition limits for <span className="text-white font-medium">{limitsModalGM.userName}</span>.
-              These override the package defaults.
-            </p>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Max Competitions Per Day</label>
-                <input
-                  type="number"
-                  value={overrideLimits.maxCompetitionsPerDay}
-                  onChange={(e) => setOverrideLimits(prev => ({ ...prev, maxCompetitionsPerDay: parseInt(e.target.value) || 1 }))}
-                  min={1}
-                  max={100}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Max Users Per Competition</label>
-                <input
-                  type="number"
-                  value={overrideLimits.maxUsersPerCompetition}
-                  onChange={(e) => setOverrideLimits(prev => ({ ...prev, maxUsersPerCompetition: parseInt(e.target.value) || 50 }))}
-                  min={2}
-                  max={1000}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded text-white"
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowLimitsModal(false);
-                  setLimitsModalGM(null);
-                }}
-                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  await handleAction(limitsModalGM.id, 'toggleCompetitionCreation', { 
-                    override: 'enabled',
-                    overrideLimits 
-                  });
-                  setShowLimitsModal(false);
-                  setLimitsModalGM(null);
-                }}
-                disabled={actionLoading}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-              >
-                Enable
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

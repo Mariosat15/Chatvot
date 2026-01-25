@@ -84,8 +84,6 @@ export async function GET(request: NextRequest) {
           ...gm.limits,
           canCreateCompetitions: gm.limits?.canCreateCompetitions ?? true,
         },
-        competitionCreationOverride: gm.competitionCreationOverride || null,
-        overrideLimits: gm.overrideLimits || null,
         totalReferredUsers: gm.totalReferredUsers,
         activeReferredUsers: gm.activeReferredUsers,
         totalEarnings: gm.totalEarnings,

@@ -140,31 +140,20 @@ export async function POST(request: NextRequest) {
 
     // Check if GM is allowed to create competitions
     // Override takes precedence, then falls back to package setting
-    const canCreateCompetitions = 
-      subscription.competitionCreationOverride === 'enabled' ? true :
-      subscription.competitionCreationOverride === 'disabled' ? false :
-      subscription.limits?.canCreateCompetitions ?? true;
-    
-    if (!canCreateCompetitions) {
+    // Check if GM can create competitions (based on package setting)
+    if (subscription.limits?.canCreateCompetitions === false) {
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Your Game Master package does not allow creating competitions. You can still earn from referrals in admin-created competitions.' 
+          error: 'Your package does not allow competition creation. Upgrade your package to create competitions.' 
         },
         { status: 403 }
       );
     }
 
-    // Determine effective limits (override takes precedence if enabled)
-    const effectiveMaxCompetitionsPerDay = 
-      (subscription.competitionCreationOverride === 'enabled' && subscription.overrideLimits?.maxCompetitionsPerDay)
-        ? subscription.overrideLimits.maxCompetitionsPerDay
-        : subscription.limits.maxCompetitionsPerDay;
-    
-    const effectiveMaxUsersPerCompetition = 
-      (subscription.competitionCreationOverride === 'enabled' && subscription.overrideLimits?.maxUsersPerCompetition)
-        ? subscription.overrideLimits.maxUsersPerCompetition
-        : subscription.limits.maxUsersPerCompetition;
+    // Use package limits directly
+    const effectiveMaxCompetitionsPerDay = subscription.limits?.maxCompetitionsPerDay || 1;
+    const effectiveMaxUsersPerCompetition = subscription.limits?.maxUsersPerCompetition || 50;
 
     // Check daily competition limit
     const today = new Date();
