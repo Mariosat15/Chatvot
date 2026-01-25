@@ -30,6 +30,10 @@ import {
   Calendar,
   Percent,
   Zap,
+  AlertTriangle,
+  Loader2,
+  RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -154,6 +158,21 @@ export default function MarketplaceContent() {
     fetchItems();
   }, [fetchItems]);
   
+  // State for GM action modal
+  const [gmActionModal, setGmActionModal] = useState<{
+    show: boolean;
+    type: 'upgrade_only' | 'renew_or_delete' | null;
+    details: {
+      currentPackage?: string;
+      currentPrice?: number;
+      newPrice?: number;
+      expiredDate?: string;
+      renewalPrice?: number;
+      message?: string;
+    } | null;
+  }>({ show: false, type: null, details: null });
+  const [gmActionLoading, setGmActionLoading] = useState<'renew' | 'delete' | null>(null);
+
   const handlePurchase = async (item: MarketplaceItem) => {
     if (item.owned) {
       router.push('/profile?tab=trading-arsenal');
@@ -171,19 +190,95 @@ export default function MarketplaceContent() {
       const data = await response.json();
       
       if (data.success) {
-        toast.success(`Successfully purchased ${item.name}!`);
+        // Different success messages for GM packages
+        if (data.gameMasterActivated) {
+          if (data.gameMasterPurchaseType === 'upgrade') {
+            toast.success(`🎉 Upgraded to ${data.gameMasterSubscription?.packageName}!`, {
+              description: 'Your new Game Master benefits are now active.',
+              duration: 5000,
+            });
+          } else {
+            toast.success(`🎮 Welcome, Game Master!`, {
+              description: `Your ${data.gameMasterSubscription?.packageName} subscription is now active.`,
+              duration: 5000,
+            });
+          }
+        } else {
+          toast.success(`Successfully purchased ${item.name}!`);
+        }
         setItems(prev => prev.map(i => 
           i._id === item._id ? { ...i, owned: true } : i
         ));
         setSelectedItem(null);
       } else {
-        toast.error(data.error || 'Failed to purchase');
+        // Handle GM-specific errors with custom modal
+        if (data.errorCode === 'GM_ACTIVE_UPGRADE_ONLY') {
+          setGmActionModal({
+            show: true,
+            type: 'upgrade_only',
+            details: data.details,
+          });
+        } else if (data.errorCode === 'GM_EXPIRED_MUST_RENEW_OR_DELETE') {
+          setGmActionModal({
+            show: true,
+            type: 'renew_or_delete',
+            details: data.details,
+          });
+        } else {
+          toast.error(data.error || 'Failed to purchase');
+        }
       }
     } catch (error) {
       console.error('Error purchasing item:', error);
       toast.error('Failed to purchase item');
     } finally {
       setPurchasing(null);
+    }
+  };
+
+  const handleGmRenew = async () => {
+    try {
+      setGmActionLoading('renew');
+      const response = await fetch('/api/gamemaster/renew', {
+        method: 'POST',
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success(data.message);
+        setGmActionModal({ show: false, type: null, details: null });
+        fetchItems(); // Refresh items
+      } else {
+        toast.error(data.error || 'Failed to renew subscription');
+      }
+    } catch (error) {
+      console.error('Error renewing subscription:', error);
+      toast.error('Failed to renew subscription');
+    } finally {
+      setGmActionLoading(null);
+    }
+  };
+
+  const handleGmDelete = async () => {
+    try {
+      setGmActionLoading('delete');
+      const response = await fetch('/api/gamemaster/delete', {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success(data.message);
+        setGmActionModal({ show: false, type: null, details: null });
+        fetchItems(); // Refresh items
+      } else {
+        toast.error(data.error || 'Failed to delete subscription');
+      }
+    } catch (error) {
+      console.error('Error deleting subscription:', error);
+      toast.error('Failed to delete subscription');
+    } finally {
+      setGmActionLoading(null);
     }
   };
   
@@ -587,6 +682,115 @@ export default function MarketplaceContent() {
           onPurchase={() => handlePurchase(selectedItem)}
           purchasing={purchasing === selectedItem._id}
         />
+      )}
+      
+      {/* GM Action Modal */}
+      {gmActionModal.show && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0f0f1a] border border-gray-700 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            {gmActionModal.type === 'upgrade_only' && (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-3 rounded-full bg-yellow-500/10">
+                    <Crown className="h-6 w-6 text-yellow-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white">Upgrade Required</h3>
+                </div>
+                <p className="text-gray-300 mb-4">
+                  {gmActionModal.details?.message}
+                </p>
+                <div className="bg-gray-800/50 rounded-lg p-4 mb-6">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-400">Current Package</span>
+                    <span className="text-white font-medium">{gmActionModal.details?.currentPackage}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-400">Current Price</span>
+                    <span className="text-yellow-400 font-medium">⚡ {gmActionModal.details?.currentPrice} credits</span>
+                  </div>
+                  <hr className="border-gray-700 my-3" />
+                  <p className="text-sm text-gray-400">
+                    Choose a package priced higher than <span className="text-yellow-400">⚡ {gmActionModal.details?.currentPrice}</span> credits to upgrade.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setGmActionModal({ show: false, type: null, details: null })}
+                  className="w-full py-3 rounded-lg bg-gray-700 hover:bg-gray-600 text-white font-medium transition-colors"
+                >
+                  Got it, I&apos;ll choose a higher tier
+                </button>
+              </>
+            )}
+            
+            {gmActionModal.type === 'renew_or_delete' && (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-3 rounded-full bg-red-500/10">
+                    <AlertTriangle className="h-6 w-6 text-red-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white">Subscription Expired</h3>
+                </div>
+                <p className="text-gray-300 mb-4">
+                  {gmActionModal.details?.message}
+                </p>
+                <div className="bg-gray-800/50 rounded-lg p-4 mb-6">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-400">Expired Package</span>
+                    <span className="text-white font-medium">{gmActionModal.details?.currentPackage}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Renewal Price</span>
+                    <span className="text-yellow-400 font-medium">⚡ {gmActionModal.details?.renewalPrice} credits</span>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-gray-400 mb-4">
+                  You have two options:
+                </p>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={handleGmRenew}
+                    disabled={gmActionLoading !== null}
+                    className="w-full py-3 rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    {gmActionLoading === 'renew' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Renew Current Package (⚡ {gmActionModal.details?.renewalPrice})
+                  </button>
+                  
+                  <button
+                    onClick={handleGmDelete}
+                    disabled={gmActionLoading !== null}
+                    className="w-full py-3 rounded-lg bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 disabled:opacity-50 text-red-400 font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    {gmActionLoading === 'delete' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    Delete &amp; Start Fresh
+                  </button>
+                  
+                  <button
+                    onClick={() => setGmActionModal({ show: false, type: null, details: null })}
+                    disabled={gmActionLoading !== null}
+                    className="w-full py-2 text-gray-400 hover:text-white text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                
+                <p className="text-xs text-gray-500 mt-4 text-center">
+                  Deleting preserves your referral history but allows you to purchase any package.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

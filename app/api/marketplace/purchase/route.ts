@@ -139,32 +139,93 @@ export async function POST(request: NextRequest) {
       { session: mongoSession }
     );
     
-    // If this is a Game Master package, auto-activate the subscription
+    // If this is a Game Master package, handle subscription logic
     let gameMasterSubscription = null;
+    let purchaseType: 'new' | 'upgrade' = 'new';
+    
     if (item.category === 'gamemaster' && item.gameMasterConfig) {
+      // Check if user already has a subscription
+      const existingSubscription = await GameMasterSubscription.findOne({ userId }).session(mongoSession);
+      
+      if (existingSubscription) {
+        const isActive = existingSubscription.status === 'active' && new Date(existingSubscription.endDate) > new Date();
+        const isExpired = existingSubscription.status === 'expired' || new Date(existingSubscription.endDate) <= new Date();
+        
+        // Get current package price for comparison
+        let currentPackagePrice = existingSubscription.renewalPrice || 0;
+        if (existingSubscription.packageId) {
+          const currentPackage = await MarketplaceItem.findById(existingSubscription.packageId).session(mongoSession);
+          if (currentPackage) {
+            currentPackagePrice = currentPackage.price;
+          }
+        }
+        
+        // RULE 1: Active subscription - can only UPGRADE (higher price package)
+        if (isActive) {
+          if (item.price <= currentPackagePrice) {
+            await mongoSession.abortTransaction();
+            return NextResponse.json(
+              { 
+                success: false, 
+                error: 'You already have an active Game Master subscription. You can only upgrade to a higher-tier package.',
+                errorCode: 'GM_ACTIVE_UPGRADE_ONLY',
+                details: {
+                  currentPackage: existingSubscription.packageName,
+                  currentPrice: currentPackagePrice,
+                  newPrice: item.price,
+                  action: 'upgrade',
+                  message: `Your current package "${existingSubscription.packageName}" (${currentPackagePrice} credits) is active. To upgrade, choose a package with a higher price than ${currentPackagePrice} credits.`
+                }
+              },
+              { status: 400 }
+            );
+          }
+          purchaseType = 'upgrade';
+        }
+        
+        // RULE 2: Expired subscription - must renew or delete first
+        if (isExpired && existingSubscription.status !== 'cancelled') {
+          await mongoSession.abortTransaction();
+          return NextResponse.json(
+            { 
+              success: false, 
+              error: 'You have an expired Game Master subscription. Please renew it or delete it before purchasing a new package.',
+              errorCode: 'GM_EXPIRED_MUST_RENEW_OR_DELETE',
+              details: {
+                currentPackage: existingSubscription.packageName,
+                expiredDate: existingSubscription.endDate,
+                renewalPrice: existingSubscription.renewalPrice,
+                action: 'renew_or_delete',
+                message: `Your "${existingSubscription.packageName}" subscription expired on ${new Date(existingSubscription.endDate).toLocaleDateString()}. You must either renew it (${existingSubscription.renewalPrice} credits) or delete it from your arsenal before purchasing a new package.`
+              }
+            },
+            { status: 400 }
+          );
+        }
+      }
+      
       const config = item.gameMasterConfig;
       const now = new Date();
       const durationDays = config.subscriptionDurationDays || 30;
       const endDate = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
       
-      // Generate unique referral code
-      let referralCode = '';
-      let codeExists = true;
-      while (codeExists) {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        referralCode = 'GM';
-        for (let i = 0; i < 6; i++) {
-          referralCode += chars.charAt(Math.floor(Math.random() * chars.length));
+      // Generate unique referral code (only if new subscription)
+      let referralCode = existingSubscription?.referralCode || '';
+      if (!referralCode) {
+        let codeExists = true;
+        while (codeExists) {
+          const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+          referralCode = 'GM';
+          for (let i = 0; i < 6; i++) {
+            referralCode += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+          const existing = await GameMasterSubscription.findOne({ referralCode }).session(mongoSession);
+          codeExists = !!existing;
         }
-        const existing = await GameMasterSubscription.findOne({ referralCode }).session(mongoSession);
-        codeExists = !!existing;
       }
       
-      // Check if user already has a subscription (upgrade/renew scenario)
-      const existingSubscription = await GameMasterSubscription.findOne({ userId }).session(mongoSession);
-      
-      if (existingSubscription) {
-        // Update existing subscription (upgrade or renew)
+      if (existingSubscription && existingSubscription.status !== 'cancelled') {
+        // UPGRADE: Update existing subscription with new package
         existingSubscription.packageId = item._id.toString();
         existingSubscription.packageName = item.name;
         existingSubscription.status = 'active';
@@ -176,14 +237,16 @@ export async function POST(request: NextRequest) {
           maxCompetitionsPerDay: config.maxCompetitionsPerDay || 1,
           maxUsersPerCompetition: config.maxUsersPerCompetition || 50,
           referralFeePercentage: config.referralFeePercentage || 5,
-          canCreateCompetitions: config.canCreateCompetitions !== false, // Default to true if not specified
+          canCreateCompetitions: config.canCreateCompetitions !== false,
         };
         existingSubscription.currentPeriodCompetitionsCreated = 0;
         existingSubscription.lastCompetitionResetDate = now;
+        existingSubscription.expiryWarnings = {}; // Reset expiry warnings
         await existingSubscription.save({ session: mongoSession });
         gameMasterSubscription = existingSubscription;
+        console.log(`✅ Game Master subscription UPGRADED for user ${userId} to ${item.name}`);
       } else {
-        // Create new subscription
+        // NEW: Create new subscription (first time or after deletion)
         const newSubscription = await GameMasterSubscription.create(
           [{
             userId,
@@ -203,7 +266,7 @@ export async function POST(request: NextRequest) {
               maxCompetitionsPerDay: config.maxCompetitionsPerDay || 1,
               maxUsersPerCompetition: config.maxUsersPerCompetition || 50,
               referralFeePercentage: config.referralFeePercentage || 5,
-              canCreateCompetitions: config.canCreateCompetitions !== false, // Default to true if not specified
+              canCreateCompetitions: config.canCreateCompetitions !== false,
             },
             currentPeriodCompetitionsCreated: 0,
             lastCompetitionResetDate: now,
@@ -217,9 +280,8 @@ export async function POST(request: NextRequest) {
           { session: mongoSession }
         );
         gameMasterSubscription = newSubscription[0];
+        console.log(`✅ Game Master subscription CREATED for user ${userId}, referral code: ${gameMasterSubscription.referralCode}`);
       }
-      
-      console.log(`✅ Game Master subscription activated for user ${userId}, referral code: ${gameMasterSubscription.referralCode}`);
     }
     
     await mongoSession.commitTransaction();
@@ -229,10 +291,12 @@ export async function POST(request: NextRequest) {
       purchase: purchase[0],
       newBalance: wallet.creditBalance,
       gameMasterActivated: !!gameMasterSubscription,
+      gameMasterPurchaseType: purchaseType, // 'new' or 'upgrade'
       gameMasterSubscription: gameMasterSubscription ? {
         referralCode: gameMasterSubscription.referralCode,
         endDate: gameMasterSubscription.endDate,
         limits: gameMasterSubscription.limits,
+        packageName: gameMasterSubscription.packageName,
       } : null,
     });
   } catch (error) {
