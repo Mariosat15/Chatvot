@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
     // If this is a Game Master package, handle subscription logic
     let gameMasterSubscription = null;
     let purchaseType: 'new' | 'upgrade' = 'new';
+    let remainingDaysFromOld = 0; // Days carried over from old subscription during upgrade
     
     if (item.category === 'gamemaster' && item.gameMasterConfig) {
       // Check if user already has a subscription
@@ -207,7 +208,19 @@ export async function POST(request: NextRequest) {
       const config = item.gameMasterConfig;
       const now = new Date();
       const durationDays = config.subscriptionDurationDays || 30;
-      const endDate = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+      
+      // Calculate remaining days from old subscription (only for upgrades)
+      if (existingSubscription && purchaseType === 'upgrade') {
+        const oldEndDate = new Date(existingSubscription.endDate);
+        if (oldEndDate > now) {
+          remainingDaysFromOld = Math.ceil((oldEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          console.log(`📅 Carrying over ${remainingDaysFromOld} remaining days from old subscription`);
+        }
+      }
+      
+      // Total duration = new package duration + remaining days from old
+      const totalDurationDays = durationDays + remainingDaysFromOld;
+      const endDate = new Date(now.getTime() + totalDurationDays * 24 * 60 * 60 * 1000);
       
       // Generate unique referral code (only if new subscription)
       let referralCode = existingSubscription?.referralCode || '';
@@ -224,13 +237,31 @@ export async function POST(request: NextRequest) {
         }
       }
       
+      // If upgrading, remove old GM package purchase record so user only sees new one
+      if (existingSubscription && purchaseType === 'upgrade' && existingSubscription.packageId) {
+        // Find and delete old GM package purchase
+        const oldGmPurchases = await UserPurchase.find({
+          userId,
+          itemId: { $ne: item._id }, // Not the new item
+        }).session(mongoSession).populate('itemId');
+        
+        for (const oldPurchase of oldGmPurchases) {
+          const oldItem = oldPurchase.itemId as unknown as { category?: string; _id: mongoose.Types.ObjectId };
+          if (oldItem && oldItem.category === 'gamemaster') {
+            console.log(`🗑️ Removing old GM package purchase: ${oldItem._id}`);
+            await UserPurchase.deleteOne({ _id: oldPurchase._id }).session(mongoSession);
+          }
+        }
+      }
+      
       if (existingSubscription && existingSubscription.status !== 'cancelled') {
         // UPGRADE: Update existing subscription with new package
+        // This REPLACES the old subscription entirely - user only has ONE subscription
         existingSubscription.packageId = item._id.toString();
         existingSubscription.packageName = item.name;
         existingSubscription.status = 'active';
         existingSubscription.startDate = now;
-        existingSubscription.endDate = endDate;
+        existingSubscription.endDate = endDate; // Includes carried over days
         existingSubscription.nextRenewalDate = endDate;
         existingSubscription.renewalPrice = item.price;
         existingSubscription.limits = {
@@ -286,6 +317,11 @@ export async function POST(request: NextRequest) {
     
     await mongoSession.commitTransaction();
     
+    // Calculate total days for response
+    const totalDaysGranted = item.category === 'gamemaster' && item.gameMasterConfig
+      ? (item.gameMasterConfig.subscriptionDurationDays || 30) + (purchaseType === 'upgrade' ? remainingDaysFromOld : 0)
+      : 0;
+    
     return NextResponse.json({
       success: true,
       purchase: purchase[0],
@@ -297,6 +333,14 @@ export async function POST(request: NextRequest) {
         endDate: gameMasterSubscription.endDate,
         limits: gameMasterSubscription.limits,
         packageName: gameMasterSubscription.packageName,
+      } : null,
+      upgradeDetails: purchaseType === 'upgrade' ? {
+        daysCarriedOver: remainingDaysFromOld,
+        newPackageDays: item.gameMasterConfig?.subscriptionDurationDays || 30,
+        totalDays: totalDaysGranted,
+        message: remainingDaysFromOld > 0 
+          ? `Your ${remainingDaysFromOld} remaining days have been added to your new ${item.gameMasterConfig?.subscriptionDurationDays || 30}-day package!`
+          : undefined,
       } : null,
     });
   } catch (error) {

@@ -193,9 +193,14 @@ export default function MarketplaceContent() {
         // Different success messages for GM packages
         if (data.gameMasterActivated) {
           if (data.gameMasterPurchaseType === 'upgrade') {
+            const upgradeDetails = data.upgradeDetails;
+            let description = 'Your new Game Master benefits are now active.';
+            if (upgradeDetails?.daysCarriedOver > 0) {
+              description = `${upgradeDetails.daysCarriedOver} remaining days added! Total: ${upgradeDetails.totalDays} days.`;
+            }
             toast.success(`🎉 Upgraded to ${data.gameMasterSubscription?.packageName}!`, {
-              description: 'Your new Game Master benefits are now active.',
-              duration: 5000,
+              description,
+              duration: 6000,
             });
           } else {
             toast.success(`🎮 Welcome, Game Master!`, {
