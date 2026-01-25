@@ -23,6 +23,11 @@ import {
   Loader2,
   AlertCircle,
   ShoppingBag,
+  Pause,
+  Play,
+  Trash2,
+  AlertTriangle,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -50,6 +55,11 @@ interface GameMasterData {
     pendingEarnings: number;
     totalReferredUsers: number;
     activeReferredUsers: number;
+    // Pause and cancellation state
+    isPaused?: boolean;
+    pausedAt?: string;
+    scheduledForDeletion?: boolean;
+    scheduledDeletionAt?: string;
   } | null;
   referredUsers: Array<{
     _id: string;
@@ -72,6 +82,9 @@ export default function GameMasterDashboardContent() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [togglingRenewal, setTogglingRenewal] = useState(false);
+  const [togglingPause, setTogglingPause] = useState(false);
+  const [schedulingCancel, setSchedulingCancel] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => {
     fetchGameMasterData();
@@ -145,6 +158,95 @@ export default function GameMasterDashboardContent() {
     }
   };
 
+  const togglePause = async () => {
+    if (!data?.subscription) return;
+    
+    const isPaused = data.subscription.isPaused;
+    const action = isPaused ? 'resume' : 'pause';
+    
+    try {
+      setTogglingPause(true);
+      const response = await fetch('/api/gamemaster/pause', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        setData(prev => prev ? {
+          ...prev,
+          subscription: prev.subscription ? {
+            ...prev.subscription,
+            isPaused: !isPaused,
+            pausedAt: isPaused ? undefined : new Date().toISOString(),
+          } : null,
+        } : null);
+        
+        if (action === 'pause') {
+          toast.warning('Subscription paused. You will NOT receive referral fees while paused.', {
+            duration: 5000,
+          });
+        } else {
+          toast.success('Subscription resumed! You will now receive referral fees again.');
+        }
+      } else {
+        toast.error(result.error || `Failed to ${action} subscription`);
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing subscription:`, error);
+      toast.error(`Failed to ${action} subscription`);
+    } finally {
+      setTogglingPause(false);
+    }
+  };
+
+  const toggleScheduledCancellation = async () => {
+    if (!data?.subscription) return;
+    
+    const isScheduled = data.subscription.scheduledForDeletion;
+    const action = isScheduled ? 'unschedule' : 'schedule';
+    
+    try {
+      setSchedulingCancel(true);
+      const response = await fetch('/api/gamemaster/schedule-cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        setData(prev => prev ? {
+          ...prev,
+          subscription: prev.subscription ? {
+            ...prev.subscription,
+            scheduledForDeletion: !isScheduled,
+            scheduledDeletionAt: isScheduled ? undefined : new Date().toISOString(),
+            autoRenew: isScheduled ? prev.subscription.autoRenew : false, // Disable autoRenew on schedule
+          } : null,
+        } : null);
+        
+        if (action === 'schedule') {
+          const daysRemaining = Math.max(0, Math.ceil((new Date(data.subscription.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+          toast.info(`Subscription scheduled for deletion after ${daysRemaining} days. You will continue earning until then.`, {
+            duration: 6000,
+          });
+        } else {
+          toast.success('Cancellation cancelled. Your subscription will not be deleted.');
+        }
+        setShowCancelConfirm(false);
+      } else {
+        toast.error(result.error || `Failed to ${action} cancellation`);
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing cancellation:`, error);
+      toast.error(`Failed to ${action} cancellation`);
+    } finally {
+      setSchedulingCancel(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
@@ -212,6 +314,9 @@ export default function GameMasterDashboardContent() {
   const isExpired = sub.status !== 'active' || daysRemaining === 0;
   const isExpiringSoon = daysRemaining > 0 && daysRemaining <= 7; // Warning when 7 days or less
   const isExpiringCritical = daysRemaining > 0 && daysRemaining <= 3; // Critical when 3 days or less
+  const isPaused = sub.isPaused === true;
+  const isScheduledForDeletion = sub.scheduledForDeletion === true;
+  const canEarnFees = !isExpired && !isPaused;
 
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
@@ -271,15 +376,68 @@ export default function GameMasterDashboardContent() {
           </div>
         )}
 
+        {/* Warning for paused subscription */}
+        {isPaused && !isExpired && (
+          <div className="mb-8 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl flex items-start gap-4">
+            <Pause className="h-6 w-6 text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-yellow-400">Subscription Paused</h3>
+              <p className="text-gray-400 text-sm mt-1">
+                Your Game Master subscription is paused. You will <span className="text-yellow-400 font-semibold">NOT receive referral fees</span> from your referrals until you resume.
+              </p>
+              <button
+                onClick={togglePause}
+                disabled={togglingPause}
+                className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {togglingPause ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                Resume Subscription
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Warning for scheduled deletion */}
+        {isScheduledForDeletion && !isExpired && (
+          <div className="mb-8 p-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-start gap-4">
+            <AlertTriangle className="h-6 w-6 text-orange-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-orange-400">Scheduled for Cancellation</h3>
+              <p className="text-gray-400 text-sm mt-1">
+                Your subscription is scheduled to be deleted on <span className="text-orange-400 font-semibold">{new Date(sub.endDate).toLocaleDateString()}</span>. 
+                You will continue receiving referral fees until then.
+              </p>
+              <button
+                onClick={toggleScheduledCancellation}
+                disabled={schedulingCancel}
+                className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {schedulingCancel ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                Cancel Deletion
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Referral Section */}
         <div className="mb-8">
-          <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 rounded-2xl p-6 border border-yellow-500/20">
+          <div className={cn(
+            "rounded-2xl p-6 border",
+            isPaused 
+              ? "bg-gray-800/50 border-gray-700/50 opacity-75"
+              : "bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/20"
+          )}>
             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Link2 className="h-5 w-5 text-yellow-400" />
+              <Link2 className={isPaused ? "h-5 w-5 text-gray-400" : "h-5 w-5 text-yellow-400"} />
               Your Referral Link
+              {isPaused && <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">PAUSED</span>}
             </h2>
             <p className="text-gray-400 text-sm mb-4">
-              Share this link to invite new traders. You'll earn <span className="text-emerald-400 font-semibold">{sub.limits.referralFeePercentage}%</span> of their competition entry fees!
+              {isPaused ? (
+                <span className="text-yellow-400">⚠️ Your subscription is paused. Referral fees are not being collected.</span>
+              ) : (
+                <>Share this link to invite new traders. You'll earn <span className="text-emerald-400 font-semibold">{sub.limits.referralFeePercentage}%</span> of their competition entry fees!</>
+              )}
             </p>
             
             <div className="grid md:grid-cols-2 gap-4">
@@ -458,6 +616,77 @@ export default function GameMasterDashboardContent() {
                 Auto-renews for ⚡ {sub.renewalPrice.toLocaleString()} credits on {new Date(sub.endDate).toLocaleDateString()}
               </p>
             )}
+
+            {/* Subscription Management Controls */}
+            {!isExpired && (
+              <div className="mt-6 pt-6 border-t border-gray-700/50">
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                  Subscription Controls
+                </h3>
+                
+                {/* Pause/Resume Toggle */}
+                <div className="flex items-center justify-between py-3 mb-3 bg-gray-900/50 rounded-lg px-4">
+                  <div>
+                    <span className="text-white font-medium flex items-center gap-2">
+                      {isPaused ? <Pause className="h-4 w-4 text-yellow-400" /> : <Play className="h-4 w-4 text-emerald-400" />}
+                      {isPaused ? 'Paused' : 'Active'}
+                    </span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {isPaused ? 'Not receiving referral fees' : 'Receiving referral fees'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={togglePause}
+                    disabled={togglingPause}
+                    className={cn(
+                      'px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50',
+                      isPaused 
+                        ? 'bg-emerald-500 hover:bg-emerald-600 text-white' 
+                        : 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30'
+                    )}
+                  >
+                    {togglingPause ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : isPaused ? (
+                      <><Play className="h-4 w-4" /> Resume</>
+                    ) : (
+                      <><Pause className="h-4 w-4" /> Pause</>
+                    )}
+                  </button>
+                </div>
+
+                {/* Cancel Subscription */}
+                {!isScheduledForDeletion ? (
+                  <button
+                    onClick={() => setShowCancelConfirm(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-900/50 hover:bg-red-500/10 border border-gray-700 hover:border-red-500/30 rounded-lg text-gray-400 hover:text-red-400 transition-all"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Cancel Subscription
+                  </button>
+                ) : (
+                  <div className="flex items-center justify-between py-3 px-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                    <div>
+                      <span className="text-orange-400 font-medium flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        Scheduled for Deletion
+                      </span>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Ends {new Date(sub.endDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={toggleScheduledCancellation}
+                      disabled={schedulingCancel}
+                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {schedulingCancel ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                      Keep
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Package Limits / Create Competition */}
@@ -595,6 +824,68 @@ export default function GameMasterDashboardContent() {
           </div>
         )}
       </div>
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelConfirm && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-2xl max-w-md w-full p-6 border border-gray-700">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="p-3 bg-orange-500/20 rounded-xl">
+                <AlertTriangle className="h-6 w-6 text-orange-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Cancel Subscription?</h3>
+                <p className="text-sm text-gray-400">This action schedules your subscription for deletion</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">
+                <p className="text-sm text-emerald-400 flex items-center gap-2">
+                  <Check className="h-4 w-4" />
+                  You'll continue earning referral fees until {new Date(sub.endDate).toLocaleDateString()}
+                </p>
+              </div>
+              
+              <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
+                <p className="text-sm text-orange-400 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  After that, your subscription will be permanently deleted
+                </p>
+              </div>
+              
+              <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                <p className="text-sm text-gray-400">
+                  <strong className="text-white">Note:</strong> Auto-renewal will be disabled. You can undo this anytime before expiry.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                className="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-medium transition-colors"
+              >
+                Keep Subscription
+              </button>
+              <button
+                onClick={toggleScheduledCancellation}
+                disabled={schedulingCancel}
+                className="flex-1 px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {schedulingCancel ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    Schedule Deletion
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

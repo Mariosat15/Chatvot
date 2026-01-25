@@ -19,6 +19,12 @@ import {
   Info,
   Calendar,
   Tag,
+  Crown,
+  Pause,
+  Play,
+  Trash2,
+  AlertTriangle,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -76,6 +82,7 @@ interface Purchase {
 
 const CATEGORIES = [
   { value: 'all', label: 'All Items', icon: ShoppingBag },
+  { value: 'gamemaster', label: 'Game Master', icon: Crown },
   { value: 'trading_bot', label: 'Trading Bots', icon: Bot },
   { value: 'indicator', label: 'Indicators', icon: TrendingUp },
   { value: 'strategy', label: 'Strategies', icon: Zap },
@@ -86,6 +93,23 @@ const getCategoryIcon = (category: string) => {
   const found = CATEGORIES.find(c => c.value === category);
   return found ? found.icon : ShoppingBag;
 };
+
+interface GameMasterSubscription {
+  _id: string;
+  status: string;
+  packageName: string;
+  startDate: string;
+  endDate: string;
+  autoRenew: boolean;
+  isPaused: boolean;
+  scheduledForDeletion: boolean;
+  limits: {
+    referralFeePercentage: number;
+    canCreateCompetitions: boolean;
+  };
+  totalEarnings: number;
+  totalReferredUsers: number;
+}
 
 export default function TradingArsenalSection() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -101,15 +125,22 @@ export default function TradingArsenalSection() {
   const [currentFrameId, setCurrentFrameId] = useState<string | null>(null);
   const [infoDialogItem, setInfoDialogItem] = useState<Purchase | null>(null);
   
+  // Game Master state
+  const [gmSubscription, setGmSubscription] = useState<GameMasterSubscription | null>(null);
+  const [togglingGmPause, setTogglingGmPause] = useState(false);
+  const [schedulingGmCancel, setSchedulingGmCancel] = useState(false);
+  const [showGmCancelConfirm, setShowGmCancelConfirm] = useState(false);
+  
   useEffect(() => {
     fetchPurchases();
+    fetchGmSubscription();
   }, [category]);
   
   const fetchPurchases = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (category !== 'all') params.set('category', category);
+      if (category !== 'all' && category !== 'gamemaster') params.set('category', category);
       
       const response = await fetch(`/api/marketplace/purchases?${params.toString()}`);
       const data = await response.json();
@@ -122,6 +153,90 @@ export default function TradingArsenalSection() {
       toast.error('Failed to load your items');
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const fetchGmSubscription = async () => {
+    try {
+      const response = await fetch('/api/gamemaster/dashboard');
+      const data = await response.json();
+      
+      if (data.success && data.data?.subscription) {
+        setGmSubscription(data.data.subscription);
+      }
+    } catch (error) {
+      console.error('Error fetching GM subscription:', error);
+    }
+  };
+  
+  const toggleGmPause = async () => {
+    if (!gmSubscription) return;
+    
+    const isPaused = gmSubscription.isPaused;
+    const action = isPaused ? 'resume' : 'pause';
+    
+    try {
+      setTogglingGmPause(true);
+      const response = await fetch('/api/gamemaster/pause', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        setGmSubscription(prev => prev ? { ...prev, isPaused: !isPaused } : null);
+        if (action === 'pause') {
+          toast.warning('Subscription paused. You will NOT receive referral fees.');
+        } else {
+          toast.success('Subscription resumed! Referral fees active.');
+        }
+      } else {
+        toast.error(result.error || `Failed to ${action} subscription`);
+      }
+    } catch (error) {
+      toast.error(`Failed to ${action} subscription`);
+    } finally {
+      setTogglingGmPause(false);
+    }
+  };
+  
+  const toggleGmScheduledCancellation = async () => {
+    if (!gmSubscription) return;
+    
+    const isScheduled = gmSubscription.scheduledForDeletion;
+    const action = isScheduled ? 'unschedule' : 'schedule';
+    
+    try {
+      setSchedulingGmCancel(true);
+      const response = await fetch('/api/gamemaster/schedule-cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        setGmSubscription(prev => prev ? { 
+          ...prev, 
+          scheduledForDeletion: !isScheduled,
+          autoRenew: isScheduled ? prev.autoRenew : false,
+        } : null);
+        
+        if (action === 'schedule') {
+          const daysRemaining = Math.max(0, Math.ceil((new Date(gmSubscription.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+          toast.info(`Scheduled for deletion in ${daysRemaining} days.`);
+        } else {
+          toast.success('Cancellation cancelled.');
+        }
+        setShowGmCancelConfirm(false);
+      } else {
+        toast.error(result.error || `Failed to ${action} cancellation`);
+      }
+    } catch (error) {
+      toast.error(`Failed to ${action} cancellation`);
+    } finally {
+      setSchedulingGmCancel(false);
     }
   };
   
@@ -361,6 +476,24 @@ export default function TradingArsenalSection() {
         </Card>
       ) : (
         <div className="space-y-8">
+          {/* Game Master Subscription */}
+          {gmSubscription && (category === 'all' || category === 'gamemaster') && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Crown className="h-5 w-5 text-yellow-400" />
+                Game Master Subscription
+              </h3>
+              <GameMasterSubscriptionCard
+                subscription={gmSubscription}
+                onTogglePause={toggleGmPause}
+                onScheduleCancel={() => setShowGmCancelConfirm(true)}
+                onUnscheduleCancel={toggleGmScheduledCancellation}
+                togglingPause={togglingGmPause}
+                schedulingCancel={schedulingGmCancel}
+              />
+            </div>
+          )}
+
           {/* Trading Bots */}
           {bots.length > 0 && (category === 'all' || category === 'trading_bot') && (
             <div>
@@ -711,7 +844,199 @@ export default function TradingArsenalSection() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* GM Cancel Confirmation Modal */}
+      {showGmCancelConfirm && gmSubscription && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-2xl max-w-md w-full p-6 border border-gray-700">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="p-3 bg-orange-500/20 rounded-xl">
+                <AlertTriangle className="h-6 w-6 text-orange-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Cancel Subscription?</h3>
+                <p className="text-sm text-gray-400">Schedule for deletion after expiry</p>
+              </div>
+            </div>
+            
+            <div className="space-y-3 mb-6">
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
+                <p className="text-sm text-emerald-400">
+                  ✓ Continue earning referral fees until {new Date(gmSubscription.endDate).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
+                <p className="text-sm text-orange-400">
+                  ⚠ Pack will be deleted after expiry
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowGmCancelConfirm(false)}
+                className="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-medium transition-colors"
+              >
+                Keep
+              </button>
+              <button
+                onClick={toggleGmScheduledCancellation}
+                disabled={schedulingGmCancel}
+                className="flex-1 px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {schedulingGmCancel ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>Schedule Deletion</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// Game Master Subscription Card Component
+function GameMasterSubscriptionCard({
+  subscription,
+  onTogglePause,
+  onScheduleCancel,
+  onUnscheduleCancel,
+  togglingPause,
+  schedulingCancel,
+}: {
+  subscription: GameMasterSubscription;
+  onTogglePause: () => void;
+  onScheduleCancel: () => void;
+  onUnscheduleCancel: () => void;
+  togglingPause: boolean;
+  schedulingCancel: boolean;
+}) {
+  const daysRemaining = Math.max(0, Math.ceil((new Date(subscription.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+  const isExpired = subscription.status !== 'active' || daysRemaining === 0;
+  const isPaused = subscription.isPaused;
+  const isScheduledForDeletion = subscription.scheduledForDeletion;
+  
+  return (
+    <Card className={cn(
+      'bg-gray-900/80 border transition-all',
+      isExpired ? 'border-red-500/30' :
+      isPaused ? 'border-yellow-500/30' :
+      isScheduledForDeletion ? 'border-orange-500/30' :
+      'border-yellow-500/30 hover:border-yellow-500/50'
+    )}>
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              'p-2 rounded-lg',
+              isExpired ? 'bg-red-500/20' :
+              isPaused ? 'bg-yellow-500/20' :
+              'bg-yellow-500/20'
+            )}>
+              <Crown className={cn(
+                'h-5 w-5',
+                isExpired ? 'text-red-400' :
+                isPaused ? 'text-yellow-400' :
+                'text-yellow-400'
+              )} />
+            </div>
+            <div>
+              <h4 className="font-semibold text-white flex items-center gap-2">
+                {subscription.packageName}
+                {isPaused && <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">PAUSED</span>}
+                {isScheduledForDeletion && <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full">ENDING</span>}
+              </h4>
+              <p className="text-sm text-gray-400">
+                {subscription.limits?.canCreateCompetitions 
+                  ? 'Create competitions & earn referrals' 
+                  : `Earn ${subscription.limits?.referralFeePercentage || 5}% from referrals`}
+              </p>
+            </div>
+          </div>
+          
+          <Link href="/gamemaster">
+            <Button variant="outline" size="sm" className="gap-1 border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10">
+              Dashboard <ExternalLink className="h-3 w-3" />
+            </Button>
+          </Link>
+        </div>
+        
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-gray-800/50 rounded-lg p-3">
+            <p className="text-xs text-gray-500">Days Left</p>
+            <p className={cn(
+              'text-lg font-bold',
+              daysRemaining <= 3 ? 'text-red-400' :
+              daysRemaining <= 7 ? 'text-yellow-400' :
+              'text-white'
+            )}>{daysRemaining}</p>
+          </div>
+          <div className="bg-gray-800/50 rounded-lg p-3">
+            <p className="text-xs text-gray-500">Earnings</p>
+            <p className="text-lg font-bold text-emerald-400">⚡ {subscription.totalEarnings}</p>
+          </div>
+          <div className="bg-gray-800/50 rounded-lg p-3">
+            <p className="text-xs text-gray-500">Referrals</p>
+            <p className="text-lg font-bold text-blue-400">{subscription.totalReferredUsers}</p>
+          </div>
+        </div>
+        
+        {/* Controls */}
+        {!isExpired && (
+          <div className="flex gap-2 pt-3 border-t border-gray-800">
+            {/* Pause/Resume Button */}
+            <button
+              onClick={onTogglePause}
+              disabled={togglingPause}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50',
+                isPaused 
+                  ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30' 
+                  : 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/30'
+              )}
+            >
+              {togglingPause ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isPaused ? (
+                <><Play className="h-4 w-4" /> Resume</>
+              ) : (
+                <><Pause className="h-4 w-4" /> Pause</>
+              )}
+            </button>
+            
+            {/* Cancel/Uncancel Button */}
+            {isScheduledForDeletion ? (
+              <button
+                onClick={onUnscheduleCancel}
+                disabled={schedulingCancel}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30 transition-colors disabled:opacity-50"
+              >
+                {schedulingCancel ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Keep Active</>}
+              </button>
+            ) : (
+              <button
+                onClick={onScheduleCancel}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gray-800 text-gray-400 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 border border-gray-700 transition-colors"
+              >
+                <Trash2 className="h-4 w-4" /> Cancel
+              </button>
+            )}
+          </div>
+        )}
+        
+        {/* Warning for paused */}
+        {isPaused && !isExpired && (
+          <p className="text-xs text-yellow-400/80 mt-3 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            Not receiving referral fees while paused
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

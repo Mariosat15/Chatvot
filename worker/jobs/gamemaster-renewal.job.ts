@@ -17,6 +17,7 @@ interface RenewalResult {
   failedCount: number;
   resetCount: number;
   warningsSent: number;
+  deletedCount: number;  // Scheduled cancellations that were deleted
   errors: string[];
 }
 
@@ -28,6 +29,7 @@ export async function runGameMasterRenewalJob(): Promise<RenewalResult> {
     failedCount: 0,
     resetCount: 0,
     warningsSent: 0,
+    deletedCount: 0,
     errors: [],
   };
 
@@ -292,10 +294,61 @@ export async function runGameMasterRenewalJob(): Promise<RenewalResult> {
       result.expiredCount += expireResult.modifiedCount;
     }
 
+    // TASK 4: Delete subscriptions that were scheduled for cancellation and have now expired
+    console.log('\n🗑️ [GM RENEWAL] Checking for scheduled deletions...');
+    
+    const subscriptionsToDelete = await db.collection('gamemastersubscriptions').find({
+      scheduledForDeletion: true,
+      endDate: { $lt: now },
+    }).toArray();
+
+    for (const subscription of subscriptionsToDelete) {
+      try {
+        console.log(`   Deleting scheduled subscription for user ${subscription.userId}...`);
+        
+        // Delete the subscription
+        await db.collection('gamemastersubscriptions').deleteOne({ _id: subscription._id });
+        
+        // Also delete the associated UserPurchase record for the GM package
+        const deletedPurchase = await db.collection('userpurchases').deleteOne({
+          userId: subscription.userId,
+          'item.category': 'gamemaster',
+        });
+        
+        // Send notification to user about deleted subscription
+        await db.collection('notifications').insertOne({
+          userId: subscription.userId,
+          type: 'gamemaster_deleted',
+          title: '🎮 Game Master Subscription Ended',
+          message: `Your ${subscription.packageName} subscription has ended and been removed from your arsenal as scheduled. Thank you for being a Game Master!`,
+          link: '/marketplace',
+          isRead: false,
+          metadata: {
+            packageName: subscription.packageName,
+            finalEndDate: subscription.endDate,
+            totalEarnings: subscription.totalEarnings,
+            totalReferredUsers: subscription.totalReferredUsers,
+          },
+          createdAt: now,
+        });
+        
+        console.log(`   ✅ Deleted subscription and ${deletedPurchase.deletedCount} purchase record(s) for user ${subscription.userId}`);
+        result.deletedCount++;
+      } catch (deleteError) {
+        console.error(`   ❌ Failed to delete subscription ${subscription._id}:`, deleteError);
+        result.errors.push(`Failed to delete scheduled cancellation ${subscription._id}`);
+      }
+    }
+    
+    if (result.deletedCount > 0) {
+      console.log(`   ✅ Deleted ${result.deletedCount} scheduled cancellation(s)`);
+    }
+
     console.log('\n🎮 [GM RENEWAL] Job completed!');
     console.log(`   Processed: ${result.processedCount}`);
     console.log(`   Renewed: ${result.renewedCount}`);
     console.log(`   Expired: ${result.expiredCount}`);
+    console.log(`   Deleted (scheduled): ${result.deletedCount}`);
     console.log(`   Failed: ${result.failedCount}`);
     console.log(`   Daily resets: ${result.resetCount}`);
     console.log(`   Warnings sent: ${result.warningsSent}`);

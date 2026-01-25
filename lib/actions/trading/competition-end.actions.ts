@@ -608,18 +608,25 @@ export async function finalizeCompetition(competitionId: string) {
             userId: gmId,
           });
           
+          // Check for ACTIVE and NOT PAUSED subscription
           const gmSubscription = await db.collection('gamemastersubscriptions').findOne({
             userId: gmId,
             status: 'active',
+            isPaused: { $ne: true }, // Must NOT be paused
           });
           
           if (!gmSubscription) {
-            // GM has no active subscription - record this for platform reconciliation
+            // GM has no active subscription OR is paused - record this for platform reconciliation
             const defaultFeePercentage = anySubscription?.limits?.referralFeePercentage || 5;
             const wouldHaveEarned = gmData.users.length * competition.entryFee * (defaultFeePercentage / 100);
-            const subscriptionStatus = anySubscription?.status || 'no_subscription';
+            let subscriptionStatus = anySubscription?.status || 'no_subscription';
             
-            console.log(`   ⚠️ Game master ${gmId} has no active subscription (status: ${subscriptionStatus}), retaining fee for platform`);
+            // Check if specifically paused
+            if (anySubscription?.status === 'active' && anySubscription?.isPaused) {
+              subscriptionStatus = 'paused';
+            }
+            
+            console.log(`   ⚠️ Game master ${gmId} has no earning-eligible subscription (status: ${subscriptionStatus}), retaining fee for platform`);
             console.log(`   💰 Would have earned: €${wouldHaveEarned.toFixed(2)} from ${gmData.users.length} referrals`);
             
             inactiveGmFees.push({

@@ -69,6 +69,15 @@ export interface IGameMasterSubscription extends Document {
     failureReason?: string;
   }[];
   
+  // Pause State (user can pause to stop earning fees but keep subscription)
+  isPaused: boolean;                     // If true, GM won't earn referral fees
+  pausedAt?: Date;
+  pauseReason?: string;
+  
+  // Scheduled Cancellation (user can schedule deletion after expiry)
+  scheduledForDeletion: boolean;         // If true, will be deleted after expiry
+  scheduledDeletionAt?: Date;            // When the schedule was set
+  
   // Suspension/Cancellation
   suspendedAt?: Date;
   suspendedReason?: string;
@@ -228,6 +237,19 @@ const GameMasterSubscriptionSchema = new Schema<IGameMasterSubscription>(
       status: { type: String, enum: ['success', 'failed'], required: true },
       failureReason: { type: String },
     }],
+    isPaused: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+    pausedAt: Date,
+    pauseReason: String,
+    scheduledForDeletion: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+    scheduledDeletionAt: Date,
     suspendedAt: Date,
     suspendedReason: String,
     cancelledAt: Date,
@@ -243,9 +265,14 @@ GameMasterSubscriptionSchema.index({ status: 1, nextRenewalDate: 1 });  // For r
 GameMasterSubscriptionSchema.index({ status: 1, endDate: 1 });  // For expiry checks
 GameMasterSubscriptionSchema.index({ totalEarnings: -1 });  // For leaderboards
 
-// Virtual for checking if subscription is currently valid
+// Virtual for checking if subscription is currently valid (can access GM dashboard)
 GameMasterSubscriptionSchema.virtual('isValid').get(function() {
   return this.status === 'active' && this.endDate > new Date();
+});
+
+// Virtual for checking if GM can earn referral fees (not paused)
+GameMasterSubscriptionSchema.virtual('canEarnFees').get(function() {
+  return this.status === 'active' && this.endDate > new Date() && !this.isPaused;
 });
 
 // Virtual for days remaining
