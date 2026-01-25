@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import GameMasterSubscription from '@/database/models/gamemaster/gamemaster-subscription.model';
 import GameMasterEarning from '@/database/models/gamemaster/gamemaster-earning.model';
 import UserReferral from '@/database/models/user-referral.model';
+import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 
@@ -61,15 +62,33 @@ export async function GET() {
       .limit(20)
       .lean();
     
-    // Use package setting directly (no overrides)
-    const canCreateCompetitions = subscription.limits?.canCreateCompetitions !== false;
+    // IMPORTANT: Get CURRENT package settings (not cached subscription limits)
+    // This ensures if admin changes package, all GMs with that package see the update
+    let currentPackageLimits = subscription.limits || {};
+    
+    if (subscription.packageId) {
+      const currentPackage = await MarketplaceItem.findById(subscription.packageId).lean();
+      if (currentPackage?.gameMasterConfig) {
+        // Use current package settings
+        currentPackageLimits = {
+          maxCompetitionsPerDay: currentPackage.gameMasterConfig.maxCompetitionsPerDay,
+          maxUsersPerCompetition: currentPackage.gameMasterConfig.maxUsersPerCompetition,
+          referralFeePercentage: currentPackage.gameMasterConfig.referralFeePercentage,
+          canCreateCompetitions: currentPackage.gameMasterConfig.canCreateCompetitions !== false,
+        };
+        console.log(`[GM Dashboard] Using current package settings for ${subscription.packageName}:`, currentPackageLimits);
+      }
+    }
+    
+    const canCreateCompetitions = currentPackageLimits.canCreateCompetitions !== false;
     
     return NextResponse.json({
       success: true,
       data: {
         subscription: {
           ...subscription,
-          canCreateCompetitions, // Based on package setting
+          limits: currentPackageLimits, // Use current package limits
+          canCreateCompetitions, // Based on current package setting
         },
         referredUsers,
         recentEarnings,

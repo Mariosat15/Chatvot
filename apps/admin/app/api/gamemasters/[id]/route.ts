@@ -63,6 +63,30 @@ export async function GET(
       gameMasterId: subscription.userId,
     }).sort({ createdAt: -1 }).limit(50).toArray();
 
+    // Get CURRENT package settings (not cached subscription limits)
+    let currentLimits = {
+      ...subscription.limits,
+      canCreateCompetitions: subscription.limits?.canCreateCompetitions ?? true,
+    };
+    
+    if (subscription.packageId) {
+      try {
+        const currentPackage = await db.collection('marketplaceitems').findOne({
+          _id: new ObjectId(subscription.packageId),
+        });
+        if (currentPackage?.gameMasterConfig) {
+          currentLimits = {
+            maxCompetitionsPerDay: currentPackage.gameMasterConfig.maxCompetitionsPerDay,
+            maxUsersPerCompetition: currentPackage.gameMasterConfig.maxUsersPerCompetition,
+            referralFeePercentage: currentPackage.gameMasterConfig.referralFeePercentage,
+            canCreateCompetitions: currentPackage.gameMasterConfig.canCreateCompetitions !== false,
+          };
+        }
+      } catch (e) {
+        console.error('Error fetching package:', e);
+      }
+    }
+
     return NextResponse.json({
       subscription: {
         id: subscription._id.toString(),
@@ -80,10 +104,7 @@ export async function GET(
         renewalPrice: subscription.renewalPrice,
         referralCode: subscription.referralCode,
         referralLink: subscription.referralLink,
-        limits: {
-          ...subscription.limits,
-          canCreateCompetitions: subscription.limits?.canCreateCompetitions ?? true,
-        },
+        limits: currentLimits,
         currentPeriodCompetitionsCreated: subscription.currentPeriodCompetitionsCreated,
         totalCompetitionsCreated: subscription.totalCompetitionsCreated,
         totalEarnings: subscription.totalEarnings,

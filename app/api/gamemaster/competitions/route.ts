@@ -5,6 +5,7 @@ import { ObjectId } from 'mongodb';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import GameMasterSubscription from '@/database/models/gamemaster/gamemaster-subscription.model';
+import { MarketplaceItem } from '@/database/models/marketplace/marketplace-item.model';
 
 /**
  * GET /api/gamemaster/competitions
@@ -32,6 +33,24 @@ export async function GET() {
       return NextResponse.json({ success: false, error: 'Not a Game Master' }, { status: 403 });
     }
 
+    // Get CURRENT package settings (not cached subscription limits)
+    let currentLimits = {
+      maxCompetitionsPerDay: subscription.limits?.maxCompetitionsPerDay || 1,
+      maxUsersPerCompetition: subscription.limits?.maxUsersPerCompetition || 50,
+      canCreateCompetitions: subscription.limits?.canCreateCompetitions !== false,
+    };
+    
+    if (subscription.packageId) {
+      const currentPackage = await MarketplaceItem.findById(subscription.packageId).lean();
+      if (currentPackage?.gameMasterConfig) {
+        currentLimits = {
+          maxCompetitionsPerDay: currentPackage.gameMasterConfig.maxCompetitionsPerDay || 1,
+          maxUsersPerCompetition: currentPackage.gameMasterConfig.maxUsersPerCompetition || 50,
+          canCreateCompetitions: currentPackage.gameMasterConfig.canCreateCompetitions !== false,
+        };
+      }
+    }
+
     // Get competitions created by this Game Master
     const competitions = await db.collection('competitions')
       .find({ gameMasterId: userId })
@@ -54,10 +73,13 @@ export async function GET() {
         createdAt: c.createdAt,
       })),
       limits: {
-        maxCompetitionsPerDay: subscription.limits.maxCompetitionsPerDay,
-        maxUsersPerCompetition: subscription.limits.maxUsersPerCompetition,
+        maxCompetitionsPerDay: currentLimits.maxCompetitionsPerDay,
+        maxUsersPerCompetition: currentLimits.maxUsersPerCompetition,
+        canCreateCompetitions: currentLimits.canCreateCompetitions,
         currentPeriodCreated: subscription.currentPeriodCompetitionsCreated,
-        remaining: subscription.limits.maxCompetitionsPerDay - subscription.currentPeriodCompetitionsCreated,
+        remaining: currentLimits.canCreateCompetitions 
+          ? currentLimits.maxCompetitionsPerDay - (subscription.currentPeriodCompetitionsCreated || 0)
+          : 0,
       },
     });
   } catch (error) {
@@ -138,10 +160,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if GM is allowed to create competitions
-    // Override takes precedence, then falls back to package setting
-    // Check if GM can create competitions (based on package setting)
-    if (subscription.limits?.canCreateCompetitions === false) {
+    // Get CURRENT package settings (not cached subscription limits)
+    // This ensures if admin changes the package, the GM cannot bypass restrictions
+    let currentPackageLimits = {
+      maxCompetitionsPerDay: subscription.limits?.maxCompetitionsPerDay || 1,
+      maxUsersPerCompetition: subscription.limits?.maxUsersPerCompetition || 50,
+      canCreateCompetitions: subscription.limits?.canCreateCompetitions !== false,
+      referralFeePercentage: subscription.limits?.referralFeePercentage || 5,
+    };
+    
+    if (subscription.packageId) {
+      try {
+        const currentPackage = await db.collection('marketplaceitems').findOne({
+          _id: new ObjectId(subscription.packageId),
+        });
+        if (currentPackage?.gameMasterConfig) {
+          currentPackageLimits = {
+            maxCompetitionsPerDay: currentPackage.gameMasterConfig.maxCompetitionsPerDay || 1,
+            maxUsersPerCompetition: currentPackage.gameMasterConfig.maxUsersPerCompetition || 50,
+            canCreateCompetitions: currentPackage.gameMasterConfig.canCreateCompetitions !== false,
+            referralFeePercentage: currentPackage.gameMasterConfig.referralFeePercentage || 5,
+          };
+          console.log(`[GM Competition] Using current package settings:`, currentPackageLimits);
+        }
+      } catch (e) {
+        console.error('Error fetching package:', e);
+      }
+    }
+
+    // Check if GM is allowed to create competitions (based on CURRENT package setting)
+    if (!currentPackageLimits.canCreateCompetitions) {
       return NextResponse.json(
         { 
           success: false, 
@@ -151,9 +199,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use package limits directly
-    const effectiveMaxCompetitionsPerDay = subscription.limits?.maxCompetitionsPerDay || 1;
-    const effectiveMaxUsersPerCompetition = subscription.limits?.maxUsersPerCompetition || 50;
+    // Use CURRENT package limits
+    const effectiveMaxCompetitionsPerDay = currentPackageLimits.maxCompetitionsPerDay;
+    const effectiveMaxUsersPerCompetition = currentPackageLimits.maxUsersPerCompetition;
 
     // Check daily competition limit
     const today = new Date();

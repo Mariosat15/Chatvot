@@ -66,31 +66,55 @@ export async function GET(request: NextRequest) {
       }
     ]).toArray();
 
+    // Get all unique package IDs and look up CURRENT package settings
+    const packageIds = [...new Set(gamemasters.map(gm => gm.packageId).filter(Boolean))];
+    const packages = await db.collection('marketplaceitems').find({
+      _id: { $in: packageIds.map(id => {
+        try { return new mongoose.Types.ObjectId(id); } catch { return null; }
+      }).filter(Boolean) }
+    }).toArray();
+    
+    // Create a map of package ID -> current settings
+    const packageSettingsMap = new Map(
+      packages.map(pkg => [pkg._id.toString(), pkg.gameMasterConfig])
+    );
+
     return NextResponse.json({
-      gamemasters: gamemasters.map(gm => ({
-        id: gm._id.toString(),
-        userId: gm.userId,
-        userEmail: gm.userEmail,
-        userName: gm.userName,
-        packageName: gm.packageName,
-        status: gm.status,
-        referralCode: gm.referralCode,
-        referralLink: gm.referralLink,
-        startDate: gm.startDate,
-        endDate: gm.endDate,
-        autoRenew: gm.autoRenew,
-        renewalPrice: gm.renewalPrice,
-        limits: {
+      gamemasters: gamemasters.map(gm => {
+        // Get CURRENT package settings (not cached subscription limits)
+        const currentPackageSettings = gm.packageId ? packageSettingsMap.get(gm.packageId.toString()) : null;
+        const currentLimits = currentPackageSettings ? {
+          maxCompetitionsPerDay: currentPackageSettings.maxCompetitionsPerDay,
+          maxUsersPerCompetition: currentPackageSettings.maxUsersPerCompetition,
+          referralFeePercentage: currentPackageSettings.referralFeePercentage,
+          canCreateCompetitions: currentPackageSettings.canCreateCompetitions !== false,
+        } : {
           ...gm.limits,
           canCreateCompetitions: gm.limits?.canCreateCompetitions ?? true,
-        },
-        totalReferredUsers: gm.totalReferredUsers,
-        activeReferredUsers: gm.activeReferredUsers,
-        totalEarnings: gm.totalEarnings,
-        pendingEarnings: gm.pendingEarnings,
-        totalCompetitionsCreated: gm.totalCompetitionsCreated,
-        createdAt: gm.createdAt,
-      })),
+        };
+        
+        return {
+          id: gm._id.toString(),
+          userId: gm.userId,
+          userEmail: gm.userEmail,
+          userName: gm.userName,
+          packageName: gm.packageName,
+          status: gm.status,
+          referralCode: gm.referralCode,
+          referralLink: gm.referralLink,
+          startDate: gm.startDate,
+          endDate: gm.endDate,
+          autoRenew: gm.autoRenew,
+          renewalPrice: gm.renewalPrice,
+          limits: currentLimits,
+          totalReferredUsers: gm.totalReferredUsers,
+          activeReferredUsers: gm.activeReferredUsers,
+          totalEarnings: gm.totalEarnings,
+          pendingEarnings: gm.pendingEarnings,
+          totalCompetitionsCreated: gm.totalCompetitionsCreated,
+          createdAt: gm.createdAt,
+        };
+      }),
       stats: stats[0] || {
         totalActive: 0,
         totalExpired: 0,
