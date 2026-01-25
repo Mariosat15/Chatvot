@@ -15,7 +15,8 @@ export interface IPlatformTransaction extends Document {
     | 'withdrawal_fee'           // Fee from user withdrawals
     | 'admin_withdrawal'         // Admin withdrawing platform earnings to bank
     | 'admin_adjustment'         // Manual adjustment
-    | 'refund_clawback';         // Refund that returns funds to platform
+    | 'refund_clawback'          // Refund that returns funds to platform
+    | 'retained_gm_fee';         // GM referral fee retained by platform due to inactive GM subscription
   
   amount: number;                 // Amount in credits (positive = platform gains, negative = platform pays out)
   amountEUR: number;              // EUR equivalent at time of transaction
@@ -52,6 +53,16 @@ export interface IPlatformTransaction extends Document {
     platformFee: number;          // What platform charged user
     bankFee: number;              // What bank/Stripe charged platform
     netEarning: number;           // Platform's actual earning (platform fee - bank fee)
+  };
+  
+  // For retained GM fees (when GM subscription is inactive)
+  retainedGmFeeDetails?: {
+    gameMasterId: string;         // The GM who would have been paid
+    gameMasterEmail?: string;
+    referredUsersCount: number;   // How many referrals participated
+    originalFeePercentage: number; // What % GM would have earned
+    subscriptionStatus: string;   // Why GM didn't get paid (expired, suspended, etc.)
+    referredUserIds?: string[];   // List of referred users in this competition
   };
   
   description: string;
@@ -106,6 +117,7 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
         'admin_withdrawal',
         'admin_adjustment',
         'refund_clawback',
+        'retained_gm_fee',
       ],
       index: true,
     },
@@ -152,6 +164,14 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
       platformFee: Number,
       bankFee: Number,
       netEarning: Number,
+    },
+    retainedGmFeeDetails: {
+      gameMasterId: String,
+      gameMasterEmail: String,
+      referredUsersCount: Number,
+      originalFeePercentage: Number,
+      subscriptionStatus: String,
+      referredUserIds: [String],
     },
     description: {
       type: String,

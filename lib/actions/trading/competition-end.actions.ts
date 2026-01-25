@@ -592,14 +592,44 @@ export async function finalizeCompetition(competitionId: string) {
         }
         
         // Calculate earnings for each game master (but don't pay yet)
+        // Also track inactive GM fees for platform reconciliation
+        const inactiveGmFees: Array<{
+          gmId: string;
+          gmEmail?: string;
+          users: { userId: string; userName: string; userEmail: string }[];
+          wouldHaveEarned: number;
+          feePercentage: number;
+          subscriptionStatus: string;
+        }> = [];
+        
         for (const [gmId, gmData] of gmEarningsMap) {
+          // First check if there's ANY subscription (active or not)
+          const anySubscription = await db.collection('gamemastersubscriptions').findOne({
+            userId: gmId,
+          });
+          
           const gmSubscription = await db.collection('gamemastersubscriptions').findOne({
             userId: gmId,
             status: 'active',
           });
           
           if (!gmSubscription) {
-            console.log(`   ⚠️ Game master ${gmId} has no active subscription, skipping`);
+            // GM has no active subscription - record this for platform reconciliation
+            const defaultFeePercentage = anySubscription?.limits?.referralFeePercentage || 5;
+            const wouldHaveEarned = gmData.users.length * competition.entryFee * (defaultFeePercentage / 100);
+            const subscriptionStatus = anySubscription?.status || 'no_subscription';
+            
+            console.log(`   ⚠️ Game master ${gmId} has no active subscription (status: ${subscriptionStatus}), retaining fee for platform`);
+            console.log(`   💰 Would have earned: €${wouldHaveEarned.toFixed(2)} from ${gmData.users.length} referrals`);
+            
+            inactiveGmFees.push({
+              gmId,
+              gmEmail: anySubscription?.userEmail,
+              users: gmData.users,
+              wouldHaveEarned,
+              feePercentage: defaultFeePercentage,
+              subscriptionStatus,
+            });
             continue;
           }
           
@@ -616,6 +646,28 @@ export async function finalizeCompetition(competitionId: string) {
           });
           
           console.log(`   📊 GM ${gmId}: ${gmData.users.length} referrals × €${competition.entryFee} × ${feePercentage}% = €${totalEarning.toFixed(2)}`);
+        }
+        
+        // Record retained GM fees for platform reconciliation
+        if (inactiveGmFees.length > 0) {
+          console.log(`   📊 Recording ${inactiveGmFees.length} inactive GM fee(s) for reconciliation...`);
+          for (const inactiveGm of inactiveGmFees) {
+            try {
+              await PlatformFinancialsService.recordRetainedGmFee({
+                competitionId: competition._id.toString(),
+                competitionName: competition.name,
+                gameMasterId: inactiveGm.gmId,
+                gameMasterEmail: inactiveGm.gmEmail,
+                referredUsersCount: inactiveGm.users.length,
+                amount: inactiveGm.wouldHaveEarned,
+                originalFeePercentage: inactiveGm.feePercentage,
+                subscriptionStatus: inactiveGm.subscriptionStatus,
+                referredUserIds: inactiveGm.users.map(u => u.userId),
+              });
+            } catch (recordError) {
+              console.error(`   ⚠️ Failed to record retained GM fee for ${inactiveGm.gmId}:`, recordError);
+            }
+          }
         }
       }
     } catch (gmCalcError) {

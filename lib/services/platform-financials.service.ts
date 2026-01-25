@@ -63,6 +63,48 @@ export const PlatformFinancialsService = {
   },
   
   /**
+   * Record retained GM fee (when GM subscription is inactive)
+   * These fees would have gone to the GM but are kept by platform
+   */
+  recordRetainedGmFee: async (params: {
+    competitionId: string;
+    competitionName: string;
+    gameMasterId: string;
+    gameMasterEmail?: string;
+    referredUsersCount: number;
+    amount: number; // Amount that would have been paid to GM
+    originalFeePercentage: number;
+    subscriptionStatus: string;
+    referredUserIds?: string[];
+  }): Promise<void> => {
+    await connectToDatabase();
+    
+    const conversionSettings = await CreditConversionSettings.getSingleton();
+    const eurAmount = params.amount / conversionSettings.eurToCreditsRate;
+    
+    await PlatformTransaction.create({
+      transactionType: 'retained_gm_fee',
+      amount: params.amount,
+      amountEUR: eurAmount,
+      sourceType: 'competition',
+      sourceId: params.competitionId,
+      sourceName: params.competitionName,
+      retainedGmFeeDetails: {
+        gameMasterId: params.gameMasterId,
+        gameMasterEmail: params.gameMasterEmail,
+        referredUsersCount: params.referredUsersCount,
+        originalFeePercentage: params.originalFeePercentage,
+        subscriptionStatus: params.subscriptionStatus,
+        referredUserIds: params.referredUserIds,
+      },
+      description: `Retained GM fee: ${params.referredUsersCount} referrals from inactive GM (${params.subscriptionStatus}) - ${params.competitionName}`,
+    });
+    
+    console.log(`💰 [PLATFORM] Retained GM fee: ${params.amount} credits (€${eurAmount.toFixed(2)}) from inactive GM ${params.gameMasterId}`);
+    console.log(`   Competition: ${params.competitionName}, Referrals: ${params.referredUsersCount}, Status: ${params.subscriptionStatus}`);
+  },
+
+  /**
    * Record platform fee earnings
    */
   recordPlatformFee: async (params: {
@@ -216,6 +258,8 @@ export const PlatformFinancialsService = {
     marketplacePurchases: number;        // Number of marketplace purchases
     totalDepositFeesGross: number;       // Platform deposit fees charged to users
     totalWithdrawalFeesGross: number;    // Platform withdrawal fees charged to users
+    totalRetainedGmFees: number;         // GM fees retained due to inactive subscriptions
+    retainedGmFeesCount: number;         // Number of inactive GM fee instances
     
     // Bank Fees (what payment providers charge platform)
     totalBankDepositFees: number;       // Stripe/bank fees on deposits
@@ -320,6 +364,8 @@ export const PlatformFinancialsService = {
     let netWithdrawalEarnings = 0;
     let totalAdminWithdrawals = 0;
     let totalAdminWithdrawalsEUR = 0;
+    let totalRetainedGmFees = 0;
+    let retainedGmFeesCount = 0;
     
     for (const earning of platformEarnings) {
       switch (earning._id) {
@@ -346,13 +392,17 @@ export const PlatformFinancialsService = {
           totalAdminWithdrawals = Math.abs(earning.total);
           totalAdminWithdrawalsEUR = Math.abs(earning.totalEUR);
           break;
+        case 'retained_gm_fee':
+          totalRetainedGmFees = earning.total;
+          retainedGmFeesCount = earning.count;
+          break;
       }
     }
     
-    // Calculate totals (including challenge fees and marketplace sales)
+    // Calculate totals (including challenge fees, marketplace sales, and retained GM fees)
     const totalBankFees = totalBankDepositFees + totalBankWithdrawalFees;
-    const totalGrossEarnings = totalUnclaimedPools + totalPlatformFees + totalChallengeFees + totalMarketplaceSales + totalDepositFeesGross + totalWithdrawalFeesGross;
-    const totalNetEarnings = totalUnclaimedPools + totalPlatformFees + totalChallengeFees + totalMarketplaceSales + netDepositEarnings + netWithdrawalEarnings;
+    const totalGrossEarnings = totalUnclaimedPools + totalPlatformFees + totalChallengeFees + totalMarketplaceSales + totalDepositFeesGross + totalWithdrawalFeesGross + totalRetainedGmFees;
+    const totalNetEarnings = totalUnclaimedPools + totalPlatformFees + totalChallengeFees + totalMarketplaceSales + netDepositEarnings + netWithdrawalEarnings + totalRetainedGmFees;
     const totalNetEarningsEUR = totalNetEarnings;
     
     const platformNetCredits = totalNetEarnings - totalAdminWithdrawals;
@@ -421,6 +471,8 @@ export const PlatformFinancialsService = {
       marketplacePurchases,
       totalDepositFeesGross,
       totalWithdrawalFeesGross,
+      totalRetainedGmFees,
+      retainedGmFeesCount,
       
       // Bank fees (what providers charge platform)
       totalBankDepositFees,
