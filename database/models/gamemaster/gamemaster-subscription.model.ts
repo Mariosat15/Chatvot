@@ -35,7 +35,12 @@ export interface IGameMasterSubscription extends Document {
     maxCompetitionsPerDay: number;
     maxUsersPerCompetition: number;
     referralFeePercentage: number;      // % of entry fees from referred users
+    canCreateCompetitions: boolean;     // Whether package allows competition creation
   };
+  
+  // Admin Override for Competition Creation
+  // null = use package default, 'enabled' = force allow, 'disabled' = force deny
+  competitionCreationOverride?: 'enabled' | 'disabled' | null;
   
   // Usage Tracking
   currentPeriodCompetitionsCreated: number;   // Reset daily
@@ -153,6 +158,16 @@ const GameMasterSubscriptionSchema = new Schema<IGameMasterSubscription>(
         min: 0,
         max: 50,
       },
+      canCreateCompetitions: {
+        type: Boolean,
+        required: true,
+        default: true,  // By default, GMs can create competitions
+      },
+    },
+    competitionCreationOverride: {
+      type: String,
+      enum: ['enabled', 'disabled', null],
+      default: null,  // null = use package setting
     },
     currentPeriodCompetitionsCreated: {
       type: Number,
@@ -222,6 +237,15 @@ GameMasterSubscriptionSchema.virtual('daysRemaining').get(function() {
   const now = new Date();
   const diff = this.endDate.getTime() - now.getTime();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+});
+
+// Virtual to determine if GM can create competitions (considers override and package setting)
+GameMasterSubscriptionSchema.virtual('canCreateCompetitions').get(function() {
+  // Admin override takes precedence
+  if (this.competitionCreationOverride === 'enabled') return true;
+  if (this.competitionCreationOverride === 'disabled') return false;
+  // Fall back to package setting
+  return this.limits?.canCreateCompetitions ?? true;
 });
 
 // Static method to generate unique referral code

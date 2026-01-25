@@ -70,6 +70,7 @@ export interface IGameMasterConfig {
   referralFeePercentage: number;    // % of entry fees earned from referrals (e.g., 5, 7.5, 10)
   maxCompetitionsPerDay: number;    // How many competitions can be created per day
   maxUsersPerCompetition: number;   // Max participants in GM-created competitions
+  canCreateCompetitions: boolean;   // Whether this package allows GM to create competitions (true = can create, false = earn only from admin competitions)
 }
 
 export interface IMarketplaceItem extends Document {

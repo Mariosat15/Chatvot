@@ -61,10 +61,20 @@ export async function GET() {
       .limit(20)
       .lean();
     
+    // Calculate the effective canCreateCompetitions value
+    // Override takes precedence, then falls back to package setting
+    const canCreateCompetitions = 
+      subscription.competitionCreationOverride === 'enabled' ? true :
+      subscription.competitionCreationOverride === 'disabled' ? false :
+      subscription.limits?.canCreateCompetitions ?? true;
+    
     return NextResponse.json({
       success: true,
       data: {
-        subscription,
+        subscription: {
+          ...subscription,
+          canCreateCompetitions, // Computed field for easy frontend access
+        },
         referredUsers,
         recentEarnings,
       },

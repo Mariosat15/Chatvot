@@ -41,7 +41,10 @@ interface GameMasterData {
       maxCompetitionsPerDay: number;
       maxUsersPerCompetition: number;
       referralFeePercentage: number;
+      canCreateCompetitions?: boolean;
     };
+    competitionCreationOverride?: 'enabled' | 'disabled' | null;
+    canCreateCompetitions: boolean; // Computed field from API
     currentPeriodCompetitionsCreated: number;
     totalCompetitionsCreated: number;
     totalEarnings: number;
@@ -372,15 +375,28 @@ export default function GameMasterDashboardContent() {
                 <span className="text-white font-medium">{sub.packageName}</span>
               </div>
               <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
-                <span className="text-gray-400">Competitions/Day</span>
-                <span className="text-white font-medium">
-                  {sub.currentPeriodCompetitionsCreated} / {sub.limits.maxCompetitionsPerDay}
+                <span className="text-gray-400">Create Competitions</span>
+                <span className={cn(
+                  'font-medium',
+                  sub.canCreateCompetitions ? 'text-emerald-400' : 'text-purple-400'
+                )}>
+                  {sub.canCreateCompetitions ? 'Enabled' : 'Referral-Only'}
                 </span>
               </div>
-              <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
-                <span className="text-gray-400">Max Users/Competition</span>
-                <span className="text-white font-medium">{sub.limits.maxUsersPerCompetition}</span>
-              </div>
+              {sub.canCreateCompetitions && (
+                <>
+                  <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
+                    <span className="text-gray-400">Competitions/Day</span>
+                    <span className="text-white font-medium">
+                      {sub.currentPeriodCompetitionsCreated} / {sub.limits.maxCompetitionsPerDay}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
+                    <span className="text-gray-400">Max Users/Competition</span>
+                    <span className="text-white font-medium">{sub.limits.maxUsersPerCompetition}</span>
+                  </div>
+                </>
+              )}
               <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
                 <span className="text-gray-400">Referral Fee</span>
                 <span className="text-emerald-400 font-medium">{sub.limits.referralFeePercentage}%</span>
@@ -425,44 +441,62 @@ export default function GameMasterDashboardContent() {
             </h2>
             
             <div className="space-y-4">
-              {/* Today's Usage */}
-              <div className="bg-gray-900/50 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-400">Today's Competitions</span>
-                  <span className="text-white font-medium">
-                    {sub.currentPeriodCompetitionsCreated} / {sub.limits.maxCompetitionsPerDay}
-                  </span>
-                </div>
-                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-yellow-500 to-amber-500 transition-all"
-                    style={{ 
-                      width: `${Math.min(100, (sub.currentPeriodCompetitionsCreated / sub.limits.maxCompetitionsPerDay) * 100)}%` 
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <Link
-                href="/gamemaster/create-competition"
-                className={cn(
-                  'flex items-center justify-between p-4 rounded-xl transition-all',
-                  isExpired 
-                    ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed' 
-                    : 'bg-gradient-to-r from-yellow-500/10 to-amber-500/10 hover:from-yellow-500/20 hover:to-amber-500/20 text-white border border-yellow-500/20'
-                )}
-                onClick={(e) => isExpired && e.preventDefault()}
-              >
-                <div className="flex items-center gap-3">
-                  <Trophy className="h-5 w-5 text-yellow-400" />
-                  <div>
-                    <p className="font-medium">Create Competition</p>
-                    <p className="text-sm text-gray-400">Host a new trading competition</p>
+              {/* Today's Usage - Only show if can create competitions */}
+              {sub.canCreateCompetitions && (
+                <div className="bg-gray-900/50 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-400">Today's Competitions</span>
+                    <span className="text-white font-medium">
+                      {sub.currentPeriodCompetitionsCreated} / {sub.limits.maxCompetitionsPerDay}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-yellow-500 to-amber-500 transition-all"
+                      style={{ 
+                        width: `${Math.min(100, (sub.currentPeriodCompetitionsCreated / sub.limits.maxCompetitionsPerDay) * 100)}%` 
+                      }}
+                    />
                   </div>
                 </div>
-                <ChevronRight className="h-5 w-5" />
-              </Link>
+              )}
+
+              {/* Create Competition - Only show if can create competitions */}
+              {sub.canCreateCompetitions ? (
+                <Link
+                  href="/gamemaster/create-competition"
+                  className={cn(
+                    'flex items-center justify-between p-4 rounded-xl transition-all',
+                    isExpired 
+                      ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed' 
+                      : 'bg-gradient-to-r from-yellow-500/10 to-amber-500/10 hover:from-yellow-500/20 hover:to-amber-500/20 text-white border border-yellow-500/20'
+                  )}
+                  onClick={(e) => isExpired && e.preventDefault()}
+                >
+                  <div className="flex items-center gap-3">
+                    <Trophy className="h-5 w-5 text-yellow-400" />
+                    <div>
+                      <p className="font-medium">Create Competition</p>
+                      <p className="text-sm text-gray-400">Host a new trading competition</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5" />
+                </Link>
+              ) : (
+                <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-purple-500/20">
+                      <TrendingUp className="h-5 w-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-purple-400">Referral-Only Package</p>
+                      <p className="text-sm text-gray-400">
+                        Earn {sub.limits.referralFeePercentage}% from your referrals in all competitions
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <Link
                 href="/gamemaster/referrals"

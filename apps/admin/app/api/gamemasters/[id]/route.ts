@@ -80,7 +80,11 @@ export async function GET(
         renewalPrice: subscription.renewalPrice,
         referralCode: subscription.referralCode,
         referralLink: subscription.referralLink,
-        limits: subscription.limits,
+        limits: {
+          ...subscription.limits,
+          canCreateCompetitions: subscription.limits?.canCreateCompetitions ?? true,
+        },
+        competitionCreationOverride: subscription.competitionCreationOverride || null,
         currentPeriodCompetitionsCreated: subscription.currentPeriodCompetitionsCreated,
         totalCompetitionsCreated: subscription.totalCompetitionsCreated,
         totalEarnings: subscription.totalEarnings,
@@ -141,7 +145,7 @@ export async function PATCH(
     
     const { id } = await params;
     const body = await request.json();
-    const { action, reason, limits } = body;
+    const { action, reason, limits, override } = body;
 
     await connectToDatabase();
     const db = mongoose.connection.db;
@@ -206,6 +210,26 @@ export async function PATCH(
           ...updateData,
           endDate: newEndDate,
           nextRenewalDate: newEndDate,
+        };
+        break;
+      
+      case 'toggleCompetitionCreation':
+        // Set override: 'enabled', 'disabled', or null (to use package default)
+        const validOverrides = ['enabled', 'disabled', null];
+        if (!validOverrides.includes(override)) {
+          return NextResponse.json({ error: 'Invalid override value' }, { status: 400 });
+        }
+        updateData = {
+          ...updateData,
+          competitionCreationOverride: override,
+        };
+        break;
+      
+      case 'clearCompetitionOverride':
+        // Reset to package default
+        updateData = {
+          ...updateData,
+          competitionCreationOverride: null,
         };
         break;
       

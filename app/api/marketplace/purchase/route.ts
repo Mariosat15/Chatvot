@@ -176,6 +176,7 @@ export async function POST(request: NextRequest) {
           maxCompetitionsPerDay: config.maxCompetitionsPerDay || 1,
           maxUsersPerCompetition: config.maxUsersPerCompetition || 50,
           referralFeePercentage: config.referralFeePercentage || 5,
+          canCreateCompetitions: config.canCreateCompetitions !== false, // Default to true if not specified
         };
         existingSubscription.currentPeriodCompetitionsCreated = 0;
         existingSubscription.lastCompetitionResetDate = now;
@@ -202,6 +203,7 @@ export async function POST(request: NextRequest) {
               maxCompetitionsPerDay: config.maxCompetitionsPerDay || 1,
               maxUsersPerCompetition: config.maxUsersPerCompetition || 50,
               referralFeePercentage: config.referralFeePercentage || 5,
+              canCreateCompetitions: config.canCreateCompetitions !== false, // Default to true if not specified
             },
             currentPeriodCompetitionsCreated: 0,
             lastCompetitionResetDate: now,

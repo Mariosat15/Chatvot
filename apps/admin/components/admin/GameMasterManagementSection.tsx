@@ -18,6 +18,8 @@ import {
   ChevronLeft,
   Clock,
   Trash2,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react';
 
 interface GameMaster {
@@ -37,7 +39,9 @@ interface GameMaster {
     maxCompetitionsPerDay: number;
     maxUsersPerCompetition: number;
     referralFeePercentage: number;
+    canCreateCompetitions: boolean;
   };
+  competitionCreationOverride?: 'enabled' | 'disabled' | null;
   totalReferredUsers: number;
   totalEarnings: number;
   totalCompetitionsCreated: number;
@@ -219,7 +223,36 @@ export default function GameMasterManagementSection() {
               </span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {/* Competition Creation Toggle */}
+            {gm.status === 'active' && (
+              <button
+                onClick={() => {
+                  const currentEffective = gm.competitionCreationOverride === 'enabled' ? true :
+                    gm.competitionCreationOverride === 'disabled' ? false :
+                    gm.limits.canCreateCompetitions;
+                  const newOverride = currentEffective ? 'disabled' : 'enabled';
+                  handleAction(gm.id, 'toggleCompetitionCreation', { override: newOverride });
+                }}
+                disabled={actionLoading}
+                className={`flex items-center gap-2 px-4 py-2 rounded disabled:opacity-50 ${
+                  (gm.competitionCreationOverride === 'enabled' || 
+                   (gm.competitionCreationOverride !== 'disabled' && gm.limits.canCreateCompetitions))
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-gray-600 text-white hover:bg-gray-500'
+                }`}
+                title={gm.competitionCreationOverride ? `Override: ${gm.competitionCreationOverride}` : 'Using package default'}
+              >
+                <Trophy className="h-4 w-4" />
+                {(gm.competitionCreationOverride === 'enabled' || 
+                  (gm.competitionCreationOverride !== 'disabled' && gm.limits.canCreateCompetitions))
+                  ? 'Comps: ON'
+                  : 'Comps: OFF'}
+                {gm.competitionCreationOverride && (
+                  <span className="text-xs bg-white/20 px-1 rounded">Override</span>
+                )}
+              </button>
+            )}
             {gm.status === 'active' && (
               <button
                 onClick={() => handleAction(gm.id, 'suspend', { reason: 'Suspended by admin' })}
@@ -312,6 +345,21 @@ export default function GameMasterManagementSection() {
                 <span className="text-white">{gm.renewalPrice} Credits</span>
               </div>
               <hr className="border-gray-700 my-3" />
+              <div className="flex justify-between">
+                <span className="text-gray-400">Can Create Competitions</span>
+                <span className={`font-medium ${
+                  (gm.competitionCreationOverride === 'enabled' || 
+                   (gm.competitionCreationOverride !== 'disabled' && gm.limits.canCreateCompetitions))
+                    ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {(gm.competitionCreationOverride === 'enabled' || 
+                    (gm.competitionCreationOverride !== 'disabled' && gm.limits.canCreateCompetitions))
+                    ? 'Yes' : 'No'}
+                  {gm.competitionCreationOverride && (
+                    <span className="ml-2 text-xs text-yellow-400">(Override)</span>
+                  )}
+                </span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Max Competitions/Day</span>
                 <span className="text-white">{gm.limits.maxCompetitionsPerDay}</span>
@@ -513,6 +561,7 @@ export default function GameMasterManagementSection() {
                 <th className="px-4 py-3">User</th>
                 <th className="px-4 py-3">Package</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Comps</th>
                 <th className="px-4 py-3">Referral Code</th>
                 <th className="px-4 py-3">Referrals</th>
                 <th className="px-4 py-3">Earnings</th>
@@ -531,6 +580,19 @@ export default function GameMasterManagementSection() {
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded text-xs ${getStatusColor(gm.status)}`}>
                       {gm.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      (gm.competitionCreationOverride === 'enabled' || 
+                       (gm.competitionCreationOverride !== 'disabled' && gm.limits?.canCreateCompetitions))
+                        ? 'bg-green-900/50 text-green-400' 
+                        : 'bg-gray-700 text-gray-400'
+                    }`}>
+                      {(gm.competitionCreationOverride === 'enabled' || 
+                        (gm.competitionCreationOverride !== 'disabled' && gm.limits?.canCreateCompetitions))
+                        ? 'ON' : 'OFF'}
+                      {gm.competitionCreationOverride && ' *'}
                     </span>
                   </td>
                   <td className="px-4 py-3">

@@ -852,6 +852,7 @@ When users sign up using your unique referral link and join ANY competition on t
     maxUsersPerCompetition: 30,
     referralFeePercentage: 5,
     subscriptionDurationDays: 30,
+    canCreateCompetitions: true,
   },
 };
 
@@ -905,6 +906,7 @@ At 7.5% referral rate, just 8,000 credits in entry fees from your referrals pays
     maxUsersPerCompetition: 75,
     referralFeePercentage: 7.5,
     subscriptionDurationDays: 30,
+    canCreateCompetitions: true,
   },
 };
 
@@ -974,6 +976,7 @@ At 10% referral rate, your passive income potential is unmatched:
     maxUsersPerCompetition: 150,
     referralFeePercentage: 10,
     subscriptionDurationDays: 30,
+    canCreateCompetitions: true,
   },
 };
 

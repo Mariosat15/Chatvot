@@ -67,6 +67,7 @@ interface GameMasterConfig {
   referralFeePercentage: number;
   maxCompetitionsPerDay: number;
   maxUsersPerCompetition: number;
+  canCreateCompetitions: boolean;
 }
 
 interface MarketplaceItem {
@@ -161,6 +162,7 @@ const emptyItem: Partial<MarketplaceItem> = {
     referralFeePercentage: 5,
     maxCompetitionsPerDay: 1,
     maxUsersPerCompetition: 50,
+    canCreateCompetitions: true,
   },
   cosmeticType: 'avatar',
   imageUrl: '',
@@ -1162,30 +1164,79 @@ export default function MarketplaceSection() {
                     )}
                   </div>
                   
-                  {/* Max Competitions Per Day */}
-                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Trophy className="h-5 w-5 text-yellow-400" />
-                      <Label className="text-white font-semibold">Max Competitions Per Day</Label>
+                  {/* Can Create Competitions Toggle */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3 col-span-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Trophy className="h-5 w-5 text-purple-400" />
+                        <div>
+                          <Label className="text-white font-semibold">Allow Competition Creation</Label>
+                          <p className="text-xs text-gray-500 mt-1">
+                            When OFF, Game Masters can only earn from admin-created competitions (referral earnings only)
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingItem({
+                          ...editingItem,
+                          gameMasterConfig: {
+                            ...editingItem.gameMasterConfig!,
+                            canCreateCompetitions: !editingItem.gameMasterConfig?.canCreateCompetitions
+                          }
+                        })}
+                        className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
+                          editingItem.gameMasterConfig?.canCreateCompetitions !== false 
+                            ? 'bg-green-500' 
+                            : 'bg-gray-600'
+                        }`}
+                      >
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-lg ${
+                          editingItem.gameMasterConfig?.canCreateCompetitions !== false 
+                            ? 'translate-x-8' 
+                            : 'translate-x-1'
+                        }`} />
+                      </button>
                     </div>
-                    <Input
-                      type="number"
-                      value={editingItem.gameMasterConfig?.maxCompetitionsPerDay || 1}
-                      onChange={(e) => setEditingItem({
-                        ...editingItem,
-                        gameMasterConfig: {
-                          ...editingItem.gameMasterConfig!,
-                          maxCompetitionsPerDay: parseInt(e.target.value) || 1
-                        }
-                      })}
-                      min={1}
-                      max={100}
-                      className="bg-gray-800 border-gray-600 text-white text-lg h-12"
-                    />
-                    <p className="text-xs text-gray-500">
-                      How many competitions this Game Master can create per day
-                    </p>
+                    {editingItem.gameMasterConfig?.canCreateCompetitions === false && (
+                      <div className="mt-3 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                        <p className="text-xs text-purple-400 flex items-center gap-2">
+                          <span className="text-lg">💰</span>
+                          <span>
+                            <strong>Referral-Only Mode:</strong> Game Masters with this package will earn from their referrals 
+                            in ANY competition (admin or other GM competitions), but cannot create their own.
+                          </span>
+                        </p>
+                      </div>
+                    )}
                   </div>
+                  
+                  {/* Max Competitions Per Day - Only show if canCreateCompetitions is enabled */}
+                  {editingItem.gameMasterConfig?.canCreateCompetitions !== false && (
+                    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Trophy className="h-5 w-5 text-yellow-400" />
+                        <Label className="text-white font-semibold">Max Competitions Per Day</Label>
+                      </div>
+                      <Input
+                        type="number"
+                        value={editingItem.gameMasterConfig?.maxCompetitionsPerDay || 1}
+                        onChange={(e) => setEditingItem({
+                          ...editingItem,
+                          gameMasterConfig: {
+                            ...editingItem.gameMasterConfig!,
+                            maxCompetitionsPerDay: parseInt(e.target.value) || 1
+                          }
+                        })}
+                        min={1}
+                        max={100}
+                        className="bg-gray-800 border-gray-600 text-white text-lg h-12"
+                      />
+                      <p className="text-xs text-gray-500">
+                        How many competitions this Game Master can create per day
+                      </p>
+                    </div>
+                  )}
                   
                   {/* Max Users Per Competition */}
                   <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
@@ -1219,7 +1270,7 @@ export default function MarketplaceSection() {
                     <Star className="h-4 w-4" />
                     Package Summary
                   </h5>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
                     <div className="bg-gray-900/50 rounded-lg p-3">
                       <div className="text-2xl font-bold text-blue-400">
                         {editingItem.gameMasterConfig?.subscriptionDurationDays || 30}
@@ -1233,18 +1284,33 @@ export default function MarketplaceSection() {
                       <div className="text-xs text-gray-400">Referral Fee</div>
                     </div>
                     <div className="bg-gray-900/50 rounded-lg p-3">
-                      <div className="text-2xl font-bold text-yellow-400">
-                        {editingItem.gameMasterConfig?.maxCompetitionsPerDay || 1}
+                      <div className={`text-2xl font-bold ${editingItem.gameMasterConfig?.canCreateCompetitions !== false ? 'text-green-400' : 'text-red-400'}`}>
+                        {editingItem.gameMasterConfig?.canCreateCompetitions !== false ? '✓' : '✗'}
                       </div>
-                      <div className="text-xs text-gray-400">Comps/Day</div>
+                      <div className="text-xs text-gray-400">Create Comps</div>
                     </div>
-                    <div className="bg-gray-900/50 rounded-lg p-3">
-                      <div className="text-2xl font-bold text-cyan-400">
-                        {editingItem.gameMasterConfig?.maxUsersPerCompetition || 50}
-                      </div>
-                      <div className="text-xs text-gray-400">Max Users</div>
-                    </div>
+                    {editingItem.gameMasterConfig?.canCreateCompetitions !== false && (
+                      <>
+                        <div className="bg-gray-900/50 rounded-lg p-3">
+                          <div className="text-2xl font-bold text-yellow-400">
+                            {editingItem.gameMasterConfig?.maxCompetitionsPerDay || 1}
+                          </div>
+                          <div className="text-xs text-gray-400">Comps/Day</div>
+                        </div>
+                        <div className="bg-gray-900/50 rounded-lg p-3">
+                          <div className="text-2xl font-bold text-cyan-400">
+                            {editingItem.gameMasterConfig?.maxUsersPerCompetition || 50}
+                          </div>
+                          <div className="text-xs text-gray-400">Max Users</div>
+                        </div>
+                      </>
+                    )}
                   </div>
+                  {editingItem.gameMasterConfig?.canCreateCompetitions === false && (
+                    <div className="mt-4 text-center text-sm text-purple-400">
+                      💰 Referral-Only Package: GM earns from referrals in admin/other GM competitions
+                    </div>
+                  )}
                 </div>
                 
                 {/* Tips */}

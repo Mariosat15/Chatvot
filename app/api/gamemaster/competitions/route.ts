@@ -138,6 +138,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if GM is allowed to create competitions
+    // Override takes precedence, then falls back to package setting
+    const canCreateCompetitions = 
+      subscription.competitionCreationOverride === 'enabled' ? true :
+      subscription.competitionCreationOverride === 'disabled' ? false :
+      subscription.limits?.canCreateCompetitions ?? true;
+    
+    if (!canCreateCompetitions) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Your Game Master package does not allow creating competitions. You can still earn from referrals in admin-created competitions.' 
+        },
+        { status: 403 }
+      );
+    }
+
     // Check daily competition limit
     const today = new Date();
     today.setHours(0, 0, 0, 0);

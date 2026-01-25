@@ -80,7 +80,11 @@ export async function GET(request: NextRequest) {
         endDate: gm.endDate,
         autoRenew: gm.autoRenew,
         renewalPrice: gm.renewalPrice,
-        limits: gm.limits,
+        limits: {
+          ...gm.limits,
+          canCreateCompetitions: gm.limits?.canCreateCompetitions ?? true,
+        },
+        competitionCreationOverride: gm.competitionCreationOverride || null,
         totalReferredUsers: gm.totalReferredUsers,
         activeReferredUsers: gm.activeReferredUsers,
         totalEarnings: gm.totalEarnings,
