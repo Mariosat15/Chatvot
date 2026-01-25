@@ -212,15 +212,24 @@ export async function POST(request: NextRequest) {
       // Calculate remaining days from old subscription (only for upgrades)
       if (existingSubscription && purchaseType === 'upgrade') {
         const oldEndDate = new Date(existingSubscription.endDate);
+        console.log(`📅 [GM UPGRADE] Old subscription endDate: ${oldEndDate.toISOString()}`);
+        console.log(`📅 [GM UPGRADE] Current time: ${now.toISOString()}`);
         if (oldEndDate > now) {
           remainingDaysFromOld = Math.ceil((oldEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-          console.log(`📅 Carrying over ${remainingDaysFromOld} remaining days from old subscription`);
+          console.log(`📅 [GM UPGRADE] Carrying over ${remainingDaysFromOld} remaining days from old subscription`);
+        } else {
+          console.log(`📅 [GM UPGRADE] Old subscription already expired, no days to carry over`);
         }
       }
       
       // Total duration = new package duration + remaining days from old
       const totalDurationDays = durationDays + remainingDaysFromOld;
       const endDate = new Date(now.getTime() + totalDurationDays * 24 * 60 * 60 * 1000);
+      
+      console.log(`📅 [GM] New package duration: ${durationDays} days`);
+      console.log(`📅 [GM] Days carried over: ${remainingDaysFromOld}`);
+      console.log(`📅 [GM] Total duration: ${totalDurationDays} days`);
+      console.log(`📅 [GM] New endDate: ${endDate.toISOString()}`);
       
       // Generate unique referral code (only if new subscription)
       let referralCode = existingSubscription?.referralCode || '';
@@ -275,7 +284,9 @@ export async function POST(request: NextRequest) {
         existingSubscription.expiryWarnings = {}; // Reset expiry warnings
         await existingSubscription.save({ session: mongoSession });
         gameMasterSubscription = existingSubscription;
-        console.log(`✅ Game Master subscription UPGRADED for user ${userId} to ${item.name}`);
+        console.log(`✅ [GM UPGRADE] Subscription UPGRADED for user ${userId} to ${item.name}`);
+        console.log(`✅ [GM UPGRADE] Saved endDate: ${existingSubscription.endDate}`);
+        console.log(`✅ [GM UPGRADE] Days remaining after upgrade: ${Math.ceil((new Date(existingSubscription.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))}`);
       } else {
         // NEW: Create new subscription (first time or after deletion)
         const newSubscription = await GameMasterSubscription.create(

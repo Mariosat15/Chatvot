@@ -193,22 +193,33 @@ export default function MarketplaceContent() {
       if (data.success) {
         // Different success messages for GM packages
         if (data.gameMasterActivated) {
+          const endDate = data.gameMasterSubscription?.endDate 
+            ? new Date(data.gameMasterSubscription.endDate).toLocaleDateString()
+            : null;
+            
           if (data.gameMasterPurchaseType === 'upgrade') {
             const upgradeDetails = data.upgradeDetails;
             let description = 'Your new Game Master benefits are now active.';
             if (upgradeDetails?.daysCarriedOver > 0) {
-              description = `${upgradeDetails.daysCarriedOver} remaining days added! Total: ${upgradeDetails.totalDays} days.`;
+              description = `${upgradeDetails.daysCarriedOver} days carried over + ${upgradeDetails.newPackageDays} new days = ${upgradeDetails.totalDays} total days! Expires: ${endDate}`;
+            } else {
+              description = `${upgradeDetails?.totalDays || 30} days subscription. Expires: ${endDate}`;
             }
             toast.success(`🎉 Upgraded to ${data.gameMasterSubscription?.packageName}!`, {
               description,
-              duration: 6000,
+              duration: 8000,
             });
           } else {
             toast.success(`🎮 Welcome, Game Master!`, {
-              description: `Your ${data.gameMasterSubscription?.packageName} subscription is now active.`,
-              duration: 5000,
+              description: `Your ${data.gameMasterSubscription?.packageName} subscription is active until ${endDate}!`,
+              duration: 6000,
             });
           }
+          
+          // Redirect to GM dashboard after short delay to show the toast
+          setTimeout(() => {
+            router.push('/gamemaster');
+          }, 2000);
         } else {
           toast.success(`Successfully purchased ${item.name}!`);
         }
