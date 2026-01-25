@@ -367,27 +367,49 @@ export default function GameMasterManagementSection() {
               <hr className="border-gray-700 my-3" />
               <div className="flex justify-between">
                 <span className="text-gray-400">Can Create Competitions</span>
-                <span className={`font-medium ${
-                  (gm.competitionCreationOverride === 'enabled' || 
-                   (gm.competitionCreationOverride !== 'disabled' && gm.limits.canCreateCompetitions))
-                    ? 'text-green-400' : 'text-red-400'
-                }`}>
-                  {(gm.competitionCreationOverride === 'enabled' || 
-                    (gm.competitionCreationOverride !== 'disabled' && gm.limits.canCreateCompetitions))
-                    ? 'Yes' : 'No'}
-                  {gm.competitionCreationOverride && (
-                    <span className="ml-2 text-xs text-yellow-400">(Override)</span>
-                  )}
-                </span>
+                {(() => {
+                  const packageAllows = gm.limits?.canCreateCompetitions !== false;
+                  const hasOverride = gm.competitionCreationOverride === 'enabled' || gm.competitionCreationOverride === 'disabled';
+                  const effectivelyEnabled = gm.competitionCreationOverride === 'enabled' || 
+                    (gm.competitionCreationOverride !== 'disabled' && packageAllows);
+                  
+                  if (!packageAllows && !hasOverride) {
+                    return <span className="text-gray-500 font-medium">Pack doesn't offer</span>;
+                  }
+                  
+                  return (
+                    <span className={`font-medium ${effectivelyEnabled ? 'text-green-400' : 'text-red-400'}`}>
+                      {effectivelyEnabled ? 'Yes' : 'No'}
+                      {hasOverride && <span className="ml-2 text-xs text-purple-400">(Override)</span>}
+                    </span>
+                  );
+                })()}
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Max Competitions/Day</span>
-                <span className="text-white">{gm.limits.maxCompetitionsPerDay}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Max Users/Competition</span>
-                <span className="text-white">{gm.limits.maxUsersPerCompetition}</span>
-              </div>
+              {/* Only show these when competitions are effectively enabled */}
+              {(() => {
+                const packageAllows = gm.limits?.canCreateCompetitions !== false;
+                const effectivelyEnabled = gm.competitionCreationOverride === 'enabled' || 
+                  (gm.competitionCreationOverride !== 'disabled' && packageAllows);
+                
+                if (!effectivelyEnabled) return null;
+                
+                // Use override limits if admin enabled via override, otherwise package limits
+                const maxComps = gm.overrideLimits?.maxCompetitionsPerDay || gm.limits.maxCompetitionsPerDay;
+                const maxUsers = gm.overrideLimits?.maxUsersPerCompetition || gm.limits.maxUsersPerCompetition;
+                
+                return (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Max Competitions/Day</span>
+                      <span className="text-white">{maxComps}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Max Users/Competition</span>
+                      <span className="text-white">{maxUsers}</span>
+                    </div>
+                  </>
+                );
+              })()}
               <div className="flex justify-between">
                 <span className="text-gray-400">Referral Fee %</span>
                 <span className="text-white">{gm.limits.referralFeePercentage}%</span>
@@ -603,17 +625,26 @@ export default function GameMasterManagementSection() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      (gm.competitionCreationOverride === 'enabled' || 
-                       (gm.competitionCreationOverride !== 'disabled' && gm.limits?.canCreateCompetitions))
-                        ? 'bg-green-900/50 text-green-400' 
-                        : 'bg-gray-700 text-gray-400'
-                    }`}>
-                      {(gm.competitionCreationOverride === 'enabled' || 
-                        (gm.competitionCreationOverride !== 'disabled' && gm.limits?.canCreateCompetitions))
-                        ? 'ON' : 'OFF'}
-                      {gm.competitionCreationOverride && ' *'}
-                    </span>
+                    {(() => {
+                      const packageAllows = gm.limits?.canCreateCompetitions !== false;
+                      const hasOverride = gm.competitionCreationOverride === 'enabled' || gm.competitionCreationOverride === 'disabled';
+                      const effectivelyEnabled = gm.competitionCreationOverride === 'enabled' || 
+                        (gm.competitionCreationOverride !== 'disabled' && packageAllows);
+                      
+                      if (!packageAllows && !hasOverride) {
+                        // Package doesn't offer competitions, no admin override
+                        return <span className="px-2 py-1 rounded text-xs bg-gray-700 text-gray-500">Pack N/A</span>;
+                      }
+                      
+                      return (
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          effectivelyEnabled ? 'bg-green-900/50 text-green-400' : 'bg-gray-700 text-gray-400'
+                        }`}>
+                          {effectivelyEnabled ? 'ON' : 'OFF'}
+                          {hasOverride && <span className="ml-1 text-purple-400">(Override)</span>}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <span className="font-mono text-amber-400">{gm.referralCode}</span>
