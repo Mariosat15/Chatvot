@@ -42,6 +42,10 @@ interface GameMaster {
     canCreateCompetitions: boolean;
   };
   competitionCreationOverride?: 'enabled' | 'disabled' | null;
+  overrideLimits?: {
+    maxCompetitionsPerDay?: number;
+    maxUsersPerCompetition?: number;
+  };
   totalReferredUsers: number;
   totalEarnings: number;
   totalCompetitionsCreated: number;
@@ -109,6 +113,11 @@ export default function GameMasterManagementSection() {
   const [selectedGM, setSelectedGM] = useState<DetailedGameMaster | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  
+  // State for competition override limits modal
+  const [showLimitsModal, setShowLimitsModal] = useState(false);
+  const [limitsModalGM, setLimitsModalGM] = useState<GameMaster | null>(null);
+  const [overrideLimits, setOverrideLimits] = useState({ maxCompetitionsPerDay: 1, maxUsersPerCompetition: 50 });
 
   const fetchGameMasters = useCallback(async () => {
     try {
@@ -231,8 +240,19 @@ export default function GameMasterManagementSection() {
                   const currentEffective = gm.competitionCreationOverride === 'enabled' ? true :
                     gm.competitionCreationOverride === 'disabled' ? false :
                     gm.limits.canCreateCompetitions;
-                  const newOverride = currentEffective ? 'disabled' : 'enabled';
-                  handleAction(gm.id, 'toggleCompetitionCreation', { override: newOverride });
+                  
+                  if (currentEffective) {
+                    // Currently ON, turn OFF (no modal needed)
+                    handleAction(gm.id, 'toggleCompetitionCreation', { override: 'disabled' });
+                  } else {
+                    // Currently OFF, show modal to set limits before turning ON
+                    setLimitsModalGM(gm);
+                    setOverrideLimits({
+                      maxCompetitionsPerDay: gm.overrideLimits?.maxCompetitionsPerDay || gm.limits.maxCompetitionsPerDay || 1,
+                      maxUsersPerCompetition: gm.overrideLimits?.maxUsersPerCompetition || gm.limits.maxUsersPerCompetition || 50,
+                    });
+                    setShowLimitsModal(true);
+                  }
                 }}
                 disabled={actionLoading}
                 className={`flex items-center gap-2 px-4 py-2 rounded disabled:opacity-50 ${
@@ -639,6 +659,73 @@ export default function GameMasterManagementSection() {
           >
             Next
           </button>
+        </div>
+      )}
+
+      {/* Override Limits Modal */}
+      {showLimitsModal && limitsModalGM && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700">
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-400" />
+              Enable Competition Creation
+            </h3>
+            <p className="text-gray-400 text-sm mb-6">
+              Set the competition limits for <span className="text-white font-medium">{limitsModalGM.userName}</span>.
+              These override the package defaults.
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Max Competitions Per Day</label>
+                <input
+                  type="number"
+                  value={overrideLimits.maxCompetitionsPerDay}
+                  onChange={(e) => setOverrideLimits(prev => ({ ...prev, maxCompetitionsPerDay: parseInt(e.target.value) || 1 }))}
+                  min={1}
+                  max={100}
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Max Users Per Competition</label>
+                <input
+                  type="number"
+                  value={overrideLimits.maxUsersPerCompetition}
+                  onChange={(e) => setOverrideLimits(prev => ({ ...prev, maxUsersPerCompetition: parseInt(e.target.value) || 50 }))}
+                  min={2}
+                  max={1000}
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded text-white"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowLimitsModal(false);
+                  setLimitsModalGM(null);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  await handleAction(limitsModalGM.id, 'toggleCompetitionCreation', { 
+                    override: 'enabled',
+                    overrideLimits 
+                  });
+                  setShowLimitsModal(false);
+                  setLimitsModalGM(null);
+                }}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                Enable
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

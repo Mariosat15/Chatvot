@@ -70,6 +70,7 @@ export interface IGameMasterConfig {
   maxUsersPerCompetition: number;     // Max participants in GM-created competitions
   referralFeePercentage: number;      // % of entry fees from referred users (e.g., 5 = 5%)
   subscriptionDurationDays: number;   // Subscription period (typically 30 for monthly)
+  canCreateCompetitions: boolean;     // Whether this package allows GM to create competitions
 }
 
 export interface IMarketplaceItem extends Document {

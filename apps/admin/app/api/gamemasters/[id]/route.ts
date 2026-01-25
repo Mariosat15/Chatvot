@@ -85,6 +85,7 @@ export async function GET(
           canCreateCompetitions: subscription.limits?.canCreateCompetitions ?? true,
         },
         competitionCreationOverride: subscription.competitionCreationOverride || null,
+        overrideLimits: subscription.overrideLimits || null,
         currentPeriodCompetitionsCreated: subscription.currentPeriodCompetitionsCreated,
         totalCompetitionsCreated: subscription.totalCompetitionsCreated,
         totalEarnings: subscription.totalEarnings,
@@ -145,7 +146,7 @@ export async function PATCH(
     
     const { id } = await params;
     const body = await request.json();
-    const { action, reason, limits, override } = body;
+    const { action, reason, limits, override, overrideLimits } = body;
 
     await connectToDatabase();
     const db = mongoose.connection.db;
@@ -223,6 +224,17 @@ export async function PATCH(
           ...updateData,
           competitionCreationOverride: override,
         };
+        // If enabling, also save the custom limits
+        if (override === 'enabled' && overrideLimits) {
+          updateData.overrideLimits = {
+            maxCompetitionsPerDay: overrideLimits.maxCompetitionsPerDay || 1,
+            maxUsersPerCompetition: overrideLimits.maxUsersPerCompetition || 50,
+          };
+        }
+        // If disabling, clear the override limits
+        if (override === 'disabled' || override === null) {
+          updateData.overrideLimits = null;
+        }
         break;
       
       case 'clearCompetitionOverride':

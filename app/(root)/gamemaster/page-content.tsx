@@ -43,6 +43,11 @@ interface GameMasterData {
       referralFeePercentage: number;
       canCreateCompetitions?: boolean;
     };
+    effectiveLimits: {
+      maxCompetitionsPerDay: number;
+      maxUsersPerCompetition: number;
+      referralFeePercentage: number;
+    };
     competitionCreationOverride?: 'enabled' | 'disabled' | null;
     canCreateCompetitions: boolean; // Computed field from API
     currentPeriodCompetitionsCreated: number;
@@ -388,12 +393,12 @@ export default function GameMasterDashboardContent() {
                   <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
                     <span className="text-gray-400">Competitions/Day</span>
                     <span className="text-white font-medium">
-                      {sub.currentPeriodCompetitionsCreated} / {sub.limits.maxCompetitionsPerDay}
+                      {sub.currentPeriodCompetitionsCreated} / {sub.effectiveLimits?.maxCompetitionsPerDay || sub.limits.maxCompetitionsPerDay}
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
                     <span className="text-gray-400">Max Users/Competition</span>
-                    <span className="text-white font-medium">{sub.limits.maxUsersPerCompetition}</span>
+                    <span className="text-white font-medium">{sub.effectiveLimits?.maxUsersPerCompetition || sub.limits.maxUsersPerCompetition}</span>
                   </div>
                 </>
               )}
@@ -447,14 +452,14 @@ export default function GameMasterDashboardContent() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-400">Today's Competitions</span>
                     <span className="text-white font-medium">
-                      {sub.currentPeriodCompetitionsCreated} / {sub.limits.maxCompetitionsPerDay}
+                      {sub.currentPeriodCompetitionsCreated} / {sub.effectiveLimits?.maxCompetitionsPerDay || sub.limits.maxCompetitionsPerDay}
                     </span>
                   </div>
                   <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-gradient-to-r from-yellow-500 to-amber-500 transition-all"
                       style={{ 
-                        width: `${Math.min(100, (sub.currentPeriodCompetitionsCreated / sub.limits.maxCompetitionsPerDay) * 100)}%` 
+                        width: `${Math.min(100, (sub.currentPeriodCompetitionsCreated / (sub.effectiveLimits?.maxCompetitionsPerDay || sub.limits.maxCompetitionsPerDay)) * 100)}%` 
                       }}
                     />
                   </div>

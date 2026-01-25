@@ -155,6 +155,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Determine effective limits (override takes precedence if enabled)
+    const effectiveMaxCompetitionsPerDay = 
+      (subscription.competitionCreationOverride === 'enabled' && subscription.overrideLimits?.maxCompetitionsPerDay)
+        ? subscription.overrideLimits.maxCompetitionsPerDay
+        : subscription.limits.maxCompetitionsPerDay;
+    
+    const effectiveMaxUsersPerCompetition = 
+      (subscription.competitionCreationOverride === 'enabled' && subscription.overrideLimits?.maxUsersPerCompetition)
+        ? subscription.overrideLimits.maxUsersPerCompetition
+        : subscription.limits.maxUsersPerCompetition;
+
     // Check daily competition limit
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -177,11 +188,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if limit reached
-    if (subscription.currentPeriodCompetitionsCreated >= subscription.limits.maxCompetitionsPerDay) {
+    if (subscription.currentPeriodCompetitionsCreated >= effectiveMaxCompetitionsPerDay) {
       return NextResponse.json(
         { 
           success: false, 
-          error: `Daily limit reached. You can create ${subscription.limits.maxCompetitionsPerDay} competition(s) per day.` 
+          error: `Daily limit reached. You can create ${effectiveMaxCompetitionsPerDay} competition(s) per day.` 
         },
         { status: 403 }
       );
@@ -190,7 +201,7 @@ export async function POST(request: NextRequest) {
     // Check max participants limit
     const effectiveMaxParticipants = Math.min(
       parseInt(maxParticipants),
-      subscription.limits.maxUsersPerCompetition
+      effectiveMaxUsersPerCompetition
     );
 
     // Calculate prize pool
@@ -328,8 +339,8 @@ export async function POST(request: NextRequest) {
         maxParticipants: competition.maxParticipants,
       },
       limits: {
-        dailyRemaining: subscription.limits.maxCompetitionsPerDay - subscription.currentPeriodCompetitionsCreated - 1,
-        maxParticipants: subscription.limits.maxUsersPerCompetition,
+        dailyRemaining: effectiveMaxCompetitionsPerDay - subscription.currentPeriodCompetitionsCreated - 1,
+        maxParticipants: effectiveMaxUsersPerCompetition,
       },
       message: 'Competition created successfully!',
     });

@@ -42,6 +42,13 @@ export interface IGameMasterSubscription extends Document {
   // null = use package default, 'enabled' = force allow, 'disabled' = force deny
   competitionCreationOverride?: 'enabled' | 'disabled' | null;
   
+  // Custom limits when admin enables competition creation via override
+  // Only applies when competitionCreationOverride === 'enabled'
+  overrideLimits?: {
+    maxCompetitionsPerDay?: number;
+    maxUsersPerCompetition?: number;
+  };
+  
   // Usage Tracking
   currentPeriodCompetitionsCreated: number;   // Reset daily
   lastCompetitionResetDate: Date;             // When competitions were last reset
@@ -168,6 +175,16 @@ const GameMasterSubscriptionSchema = new Schema<IGameMasterSubscription>(
       type: String,
       enum: ['enabled', 'disabled', null],
       default: null,  // null = use package setting
+    },
+    overrideLimits: {
+      maxCompetitionsPerDay: {
+        type: Number,
+        min: 1,
+      },
+      maxUsersPerCompetition: {
+        type: Number,
+        min: 2,
+      },
     },
     currentPeriodCompetitionsCreated: {
       type: Number,

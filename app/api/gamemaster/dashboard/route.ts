@@ -68,12 +68,27 @@ export async function GET() {
       subscription.competitionCreationOverride === 'disabled' ? false :
       subscription.limits?.canCreateCompetitions ?? true;
     
+    // Calculate effective limits (override takes precedence if enabled)
+    const effectiveLimits = {
+      maxCompetitionsPerDay: 
+        (subscription.competitionCreationOverride === 'enabled' && subscription.overrideLimits?.maxCompetitionsPerDay)
+          ? subscription.overrideLimits.maxCompetitionsPerDay
+          : subscription.limits?.maxCompetitionsPerDay ?? 1,
+      maxUsersPerCompetition: 
+        (subscription.competitionCreationOverride === 'enabled' && subscription.overrideLimits?.maxUsersPerCompetition)
+          ? subscription.overrideLimits.maxUsersPerCompetition
+          : subscription.limits?.maxUsersPerCompetition ?? 50,
+      referralFeePercentage: subscription.limits?.referralFeePercentage ?? 5,
+      canCreateCompetitions: subscription.limits?.canCreateCompetitions ?? true,
+    };
+    
     return NextResponse.json({
       success: true,
       data: {
         subscription: {
           ...subscription,
           canCreateCompetitions, // Computed field for easy frontend access
+          effectiveLimits, // Computed effective limits considering override
         },
         referredUsers,
         recentEarnings,
