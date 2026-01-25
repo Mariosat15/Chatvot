@@ -210,6 +210,8 @@ export default function GameMasterDashboardContent() {
   const daysRemaining = Math.max(0, Math.ceil((new Date(sub.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
   const referralLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/sign-up?ref=${sub.referralCode}`;
   const isExpired = sub.status !== 'active' || daysRemaining === 0;
+  const isExpiringSoon = daysRemaining > 0 && daysRemaining <= 7; // Warning when 7 days or less
+  const isExpiringCritical = daysRemaining > 0 && daysRemaining <= 3; // Critical when 3 days or less
 
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
@@ -348,14 +350,40 @@ export default function GameMasterDashboardContent() {
             <p className="text-2xl font-bold text-white">{sub.totalCompetitionsCreated}</p>
           </div>
           
-          <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
+          <div className={`rounded-2xl p-5 border ${
+            isExpiringCritical ? 'bg-red-900/30 border-red-500/50' :
+            isExpiringSoon ? 'bg-yellow-900/20 border-yellow-500/50' :
+            'bg-gray-800/50 border-gray-700/50'
+          }`}>
             <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-lg bg-yellow-500/10">
-                <Calendar className="h-5 w-5 text-yellow-400" />
+              <div className={`p-2 rounded-lg ${
+                isExpiringCritical ? 'bg-red-500/20' :
+                isExpiringSoon ? 'bg-yellow-500/20' :
+                'bg-yellow-500/10'
+              }`}>
+                <Calendar className={`h-5 w-5 ${
+                  isExpiringCritical ? 'text-red-400' :
+                  isExpiringSoon ? 'text-yellow-400' :
+                  'text-yellow-400'
+                }`} />
               </div>
               <span className="text-sm text-gray-400">Days Remaining</span>
             </div>
-            <p className="text-2xl font-bold text-white">{daysRemaining}</p>
+            <p className={`text-2xl font-bold ${
+              isExpiringCritical ? 'text-red-400 animate-pulse' :
+              isExpiringSoon ? 'text-yellow-400' :
+              'text-white'
+            }`}>{daysRemaining}</p>
+            {isExpiringCritical && (
+              <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
+                ⚠️ Expires soon! Renew now
+              </p>
+            )}
+            {isExpiringSoon && !isExpiringCritical && (
+              <p className="text-xs text-yellow-400 mt-2">
+                ⏰ Expiring in {daysRemaining} days
+              </p>
+            )}
           </div>
         </div>
 

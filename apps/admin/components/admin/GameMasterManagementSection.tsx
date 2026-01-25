@@ -285,24 +285,41 @@ export default function GameMasterManagementSection() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-            <p className="text-gray-400 text-sm">Days Remaining</p>
-            <p className="text-2xl font-bold text-white">{daysRemaining}</p>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-            <p className="text-gray-400 text-sm">Total Referrals</p>
-            <p className="text-2xl font-bold text-white">{gm.totalReferredUsers}</p>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-            <p className="text-gray-400 text-sm">Total Earnings</p>
-            <p className="text-2xl font-bold text-green-400">{gm.totalEarnings.toFixed(2)}</p>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-            <p className="text-gray-400 text-sm">Competitions Created</p>
-            <p className="text-2xl font-bold text-white">{gm.totalCompetitionsCreated}</p>
-          </div>
-        </div>
+        {(() => {
+          const isExpiringSoon = daysRemaining > 0 && daysRemaining <= 7;
+          const isCritical = daysRemaining > 0 && daysRemaining <= 3;
+          
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className={`rounded-lg p-4 border ${
+                isCritical ? 'bg-red-900/30 border-red-500/50' :
+                isExpiringSoon ? 'bg-yellow-900/20 border-yellow-500/50' :
+                'bg-gray-800 border-gray-700'
+              }`}>
+                <p className="text-gray-400 text-sm">Days Remaining</p>
+                <p className={`text-2xl font-bold ${
+                  isCritical ? 'text-red-400' :
+                  isExpiringSoon ? 'text-yellow-400' :
+                  'text-white'
+                }`}>{daysRemaining}</p>
+                {isCritical && <p className="text-xs text-red-400 mt-1">⚠️ Expires soon!</p>}
+                {isExpiringSoon && !isCritical && <p className="text-xs text-yellow-400 mt-1">⏰ Expiring soon</p>}
+              </div>
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <p className="text-gray-400 text-sm">Total Referrals</p>
+                <p className="text-2xl font-bold text-white">{gm.totalReferredUsers}</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <p className="text-gray-400 text-sm">Total Earnings</p>
+                <p className="text-2xl font-bold text-green-400">{gm.totalEarnings.toFixed(2)}</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <p className="text-gray-400 text-sm">Competitions Created</p>
+                <p className="text-2xl font-bold text-white">{gm.totalCompetitionsCreated}</p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Details */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -584,8 +601,20 @@ export default function GameMasterManagementSection() {
                   </td>
                   <td className="px-4 py-3 text-gray-300">{gm.totalReferredUsers}</td>
                   <td className="px-4 py-3 text-green-400">{gm.totalEarnings.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-gray-300">
-                    {new Date(gm.endDate).toLocaleDateString()}
+                  <td className="px-4 py-3">
+                    {(() => {
+                      const daysLeft = Math.max(0, Math.ceil((new Date(gm.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                      const isExpiringSoon = daysLeft > 0 && daysLeft <= 7;
+                      const isCritical = daysLeft > 0 && daysLeft <= 3;
+                      
+                      return (
+                        <div className={`${isCritical ? 'text-red-400' : isExpiringSoon ? 'text-yellow-400' : 'text-gray-300'}`}>
+                          {new Date(gm.endDate).toLocaleDateString()}
+                          {isCritical && <span className="ml-2 text-xs bg-red-500/20 px-1.5 py-0.5 rounded">⚠️ {daysLeft}d</span>}
+                          {isExpiringSoon && !isCritical && <span className="ml-2 text-xs bg-yellow-500/20 px-1.5 py-0.5 rounded">{daysLeft}d</span>}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <button

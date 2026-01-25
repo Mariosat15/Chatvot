@@ -16,6 +16,7 @@ interface RenewalResult {
   expiredCount: number;
   failedCount: number;
   resetCount: number;
+  warningsSent: number;
   errors: string[];
 }
 
@@ -26,6 +27,7 @@ export async function runGameMasterRenewalJob(): Promise<RenewalResult> {
     expiredCount: 0,
     failedCount: 0,
     resetCount: 0,
+    warningsSent: 0,
     errors: [],
   };
 
@@ -60,6 +62,71 @@ export async function runGameMasterRenewalJob(): Promise<RenewalResult> {
     );
     result.resetCount = resetResult.modifiedCount;
     console.log(`   ✅ Reset ${result.resetCount} subscription(s) daily counters`);
+
+    // TASK 1.5: Send expiry warning notifications (7 days, 3 days, 1 day before)
+    console.log('📢 [GM RENEWAL] Checking for subscriptions needing expiry warnings...');
+    
+    const warningDays = [7, 3, 1]; // Days before expiry to send warnings
+    
+    for (const daysBeforeExpiry of warningDays) {
+      const targetDate = new Date(now);
+      targetDate.setDate(targetDate.getDate() + daysBeforeExpiry);
+      targetDate.setHours(0, 0, 0, 0);
+      
+      const targetDateEnd = new Date(targetDate);
+      targetDateEnd.setHours(23, 59, 59, 999);
+      
+      // Find subscriptions expiring on this target day that haven't been warned for this period
+      const subscriptionsToWarn = await db.collection('gamemastersubscriptions').find({
+        status: 'active',
+        endDate: { $gte: targetDate, $lte: targetDateEnd },
+        [`expiryWarnings.${daysBeforeExpiry}d`]: { $ne: true }, // Not already warned for this period
+      }).toArray();
+      
+      for (const subscription of subscriptionsToWarn) {
+        try {
+          // Create notification for user
+          await db.collection('notifications').insertOne({
+            userId: subscription.userId,
+            type: 'gamemaster_expiry_warning',
+            title: daysBeforeExpiry === 1 
+              ? '⚠️ Game Master Expires Tomorrow!'
+              : `⏰ Game Master Expires in ${daysBeforeExpiry} Days`,
+            message: daysBeforeExpiry === 1
+              ? `Your Game Master subscription expires tomorrow. ${subscription.autoRenew ? 'Auto-renewal is enabled.' : 'Enable auto-renewal or renew manually to keep earning!'}`
+              : `Your Game Master subscription (${subscription.packageName}) expires in ${daysBeforeExpiry} days. ${subscription.autoRenew ? 'Auto-renewal is enabled.' : 'Consider enabling auto-renewal to avoid interruption.'}`,
+            link: '/gamemaster',
+            isRead: false,
+            metadata: {
+              subscriptionId: subscription._id.toString(),
+              packageName: subscription.packageName,
+              endDate: subscription.endDate,
+              daysRemaining: daysBeforeExpiry,
+              autoRenew: subscription.autoRenew,
+            },
+            createdAt: now,
+          });
+          
+          // Mark this warning as sent
+          await db.collection('gamemastersubscriptions').updateOne(
+            { _id: subscription._id },
+            {
+              $set: {
+                [`expiryWarnings.${daysBeforeExpiry}d`]: true,
+                updatedAt: now,
+              },
+            }
+          );
+          
+          result.warningsSent++;
+          console.log(`   📧 Sent ${daysBeforeExpiry}-day warning to ${subscription.userEmail}`);
+        } catch (warnError) {
+          console.error(`   ⚠️ Failed to send warning for ${subscription._id}:`, warnError);
+        }
+      }
+    }
+    
+    console.log(`   ✅ Sent ${result.warningsSent} expiry warning notification(s)`);
 
     // TASK 2: Process subscriptions that need renewal (ending today or already ended)
     console.log('🔄 [GM RENEWAL] Processing subscriptions due for renewal...');
@@ -168,7 +235,7 @@ export async function runGameMasterRenewalJob(): Promise<RenewalResult> {
         const newEndDate = new Date(newStartDate);
         newEndDate.setDate(newEndDate.getDate() + durationDays);
 
-        // Update subscription
+        // Update subscription (and clear expiry warnings for new period)
         await db.collection('gamemastersubscriptions').updateOne(
           { _id: subscription._id },
           {
@@ -176,6 +243,7 @@ export async function runGameMasterRenewalJob(): Promise<RenewalResult> {
               startDate: newStartDate,
               endDate: newEndDate,
               nextRenewalDate: newEndDate,
+              expiryWarnings: {}, // Reset warnings for new period
               updatedAt: now,
             },
             $push: {
@@ -230,6 +298,7 @@ export async function runGameMasterRenewalJob(): Promise<RenewalResult> {
     console.log(`   Expired: ${result.expiredCount}`);
     console.log(`   Failed: ${result.failedCount}`);
     console.log(`   Daily resets: ${result.resetCount}`);
+    console.log(`   Warnings sent: ${result.warningsSent}`);
 
     return result;
 
