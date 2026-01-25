@@ -70,6 +70,7 @@ interface MarketplaceItem {
     referralFeePercentage: number;
     maxCompetitionsPerDay: number;
     maxUsersPerCompetition: number;
+    canCreateCompetitions: boolean;
   };
 }
 
@@ -1185,35 +1186,52 @@ function GameMasterCard({
         
         {/* Package Features */}
         {config && (
-          <div className="grid grid-cols-2 gap-3 mb-5">
-            <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
-              <div className="flex items-center gap-2 text-gray-400 mb-1">
-                <Calendar className="h-4 w-4" />
-                <span className="text-xs">Duration</span>
+          <div className="space-y-3 mb-5">
+            {/* Row 1: Duration & Referral Fee - Always shown */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
+                <div className="flex items-center gap-2 text-gray-400 mb-1">
+                  <Calendar className="h-4 w-4" />
+                  <span className="text-xs">Duration</span>
+                </div>
+                <p className="text-white font-semibold">{config.subscriptionDurationDays || 30} Days</p>
               </div>
-              <p className="text-white font-semibold">{config.subscriptionDurationDays} Days</p>
-            </div>
-            <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
-              <div className="flex items-center gap-2 text-gray-400 mb-1">
-                <Percent className="h-4 w-4" />
-                <span className="text-xs">Referral Fee</span>
+              <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
+                <div className="flex items-center gap-2 text-gray-400 mb-1">
+                  <Percent className="h-4 w-4" />
+                  <span className="text-xs">Referral Fee</span>
+                </div>
+                <p className="text-emerald-400 font-semibold">{config.referralFeePercentage || 5}%</p>
               </div>
-              <p className="text-emerald-400 font-semibold">{config.referralFeePercentage}%</p>
             </div>
-            <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
-              <div className="flex items-center gap-2 text-gray-400 mb-1">
-                <Zap className="h-4 w-4" />
-                <span className="text-xs">Competitions/Day</span>
+            
+            {/* Row 2: Competition settings - Only shown if canCreateCompetitions is true */}
+            {config.canCreateCompetitions !== false ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
+                  <div className="flex items-center gap-2 text-gray-400 mb-1">
+                    <Zap className="h-4 w-4" />
+                    <span className="text-xs">Competitions/Day</span>
+                  </div>
+                  <p className="text-white font-semibold">{config.maxCompetitionsPerDay || 1}</p>
+                </div>
+                <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
+                  <div className="flex items-center gap-2 text-gray-400 mb-1">
+                    <Users className="h-4 w-4" />
+                    <span className="text-xs">Max Users/Comp</span>
+                  </div>
+                  <p className="text-white font-semibold">{config.maxUsersPerCompetition || 50}</p>
+                </div>
               </div>
-              <p className="text-white font-semibold">{config.maxCompetitionsPerDay}</p>
-            </div>
-            <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
-              <div className="flex items-center gap-2 text-gray-400 mb-1">
-                <Users className="h-4 w-4" />
-                <span className="text-xs">Max Users/Comp</span>
+            ) : (
+              <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3">
+                <div className="flex items-center gap-2 text-yellow-400 text-sm">
+                  <Users className="h-4 w-4" />
+                  <span className="font-medium">Referral-Only Package</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Earn from referrals in any competition</p>
               </div>
-              <p className="text-white font-semibold">{config.maxUsersPerCompetition}</p>
-            </div>
+            )}
           </div>
         )}
         
