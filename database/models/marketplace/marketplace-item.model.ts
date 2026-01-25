@@ -252,6 +252,7 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       maxUsersPerCompetition: { type: Number, min: 2, default: 50 },
       referralFeePercentage: { type: Number, min: 0, max: 50, default: 5 },
       subscriptionDurationDays: { type: Number, min: 1, default: 30 },
+      canCreateCompetitions: { type: Boolean, default: true },
     },
     codeTemplate: {
       type: String,
