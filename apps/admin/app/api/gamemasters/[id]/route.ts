@@ -216,24 +216,32 @@ export async function PATCH(
       
       case 'toggleCompetitionCreation':
         // Set override: 'enabled', 'disabled', or null (to use package default)
-        const validOverrides = ['enabled', 'disabled', null];
-        if (!validOverrides.includes(override)) {
-          return NextResponse.json({ error: 'Invalid override value' }, { status: 400 });
+        const validOverrideValue = override === 'enabled' || override === 'disabled' || override === null || override === undefined;
+        if (!validOverrideValue) {
+          return NextResponse.json({ error: `Invalid override value: ${override}` }, { status: 400 });
         }
+        
+        // Normalize undefined to null
+        const normalizedOverride = override === undefined ? null : override;
+        
+        console.log(`[GM Toggle] Setting competitionCreationOverride to: ${normalizedOverride}`);
+        
         updateData = {
           ...updateData,
-          competitionCreationOverride: override,
+          competitionCreationOverride: normalizedOverride,
         };
         // If enabling, also save the custom limits
-        if (override === 'enabled' && overrideLimits) {
+        if (normalizedOverride === 'enabled' && overrideLimits) {
           updateData.overrideLimits = {
             maxCompetitionsPerDay: overrideLimits.maxCompetitionsPerDay || 1,
             maxUsersPerCompetition: overrideLimits.maxUsersPerCompetition || 50,
           };
+          console.log(`[GM Toggle] Setting overrideLimits:`, updateData.overrideLimits);
         }
-        // If disabling, clear the override limits
-        if (override === 'disabled' || override === null) {
+        // If disabling or clearing, clear the override limits
+        if (normalizedOverride === 'disabled' || normalizedOverride === null) {
           updateData.overrideLimits = null;
+          console.log(`[GM Toggle] Clearing overrideLimits`);
         }
         break;
       

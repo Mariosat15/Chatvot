@@ -164,7 +164,10 @@ export default function GameMasterManagementSection() {
   };
 
   const handleAction = async (gmId: string, action: string, extraData?: Record<string, unknown>) => {
-    if (!confirm(`Are you sure you want to ${action} this game master?`)) return;
+    // Skip confirmation for toggle actions (modal already serves as confirmation)
+    if (action !== 'toggleCompetitionCreation') {
+      if (!confirm(`Are you sure you want to ${action} this game master?`)) return;
+    }
     
     setActionLoading(true);
     try {
@@ -174,8 +177,9 @@ export default function GameMasterManagementSection() {
         body: JSON.stringify({ action, ...extraData }),
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || 'Action failed');
       }
       
@@ -183,7 +187,11 @@ export default function GameMasterManagementSection() {
       if (selectedGM) {
         await viewDetails(gmId);
       }
-      alert(`${action} successful`);
+      
+      // Only show alert for non-toggle actions
+      if (action !== 'toggleCompetitionCreation') {
+        alert(`${action} successful`);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Action failed');
     } finally {
@@ -234,45 +242,46 @@ export default function GameMasterManagementSection() {
           </div>
           <div className="flex gap-2 flex-wrap">
             {/* Competition Creation Toggle */}
-            {gm.status === 'active' && (
-              <button
-                onClick={() => {
-                  const currentEffective = gm.competitionCreationOverride === 'enabled' ? true :
-                    gm.competitionCreationOverride === 'disabled' ? false :
-                    gm.limits.canCreateCompetitions;
-                  
-                  if (currentEffective) {
-                    // Currently ON, turn OFF (no modal needed)
-                    handleAction(gm.id, 'toggleCompetitionCreation', { override: 'disabled' });
-                  } else {
-                    // Currently OFF, show modal to set limits before turning ON
-                    setLimitsModalGM(gm);
-                    setOverrideLimits({
-                      maxCompetitionsPerDay: gm.overrideLimits?.maxCompetitionsPerDay || gm.limits.maxCompetitionsPerDay || 1,
-                      maxUsersPerCompetition: gm.overrideLimits?.maxUsersPerCompetition || gm.limits.maxUsersPerCompetition || 50,
-                    });
-                    setShowLimitsModal(true);
-                  }
-                }}
-                disabled={actionLoading}
-                className={`flex items-center gap-2 px-4 py-2 rounded disabled:opacity-50 ${
-                  (gm.competitionCreationOverride === 'enabled' || 
-                   (gm.competitionCreationOverride !== 'disabled' && gm.limits.canCreateCompetitions))
-                    ? 'bg-green-600 text-white hover:bg-green-700'
-                    : 'bg-gray-600 text-white hover:bg-gray-500'
-                }`}
-                title={gm.competitionCreationOverride ? `Override: ${gm.competitionCreationOverride}` : 'Using package default'}
-              >
-                <Trophy className="h-4 w-4" />
-                {(gm.competitionCreationOverride === 'enabled' || 
-                  (gm.competitionCreationOverride !== 'disabled' && gm.limits.canCreateCompetitions))
-                  ? 'Comps: ON'
-                  : 'Comps: OFF'}
-                {gm.competitionCreationOverride && (
-                  <span className="text-xs bg-white/20 px-1 rounded">Override</span>
-                )}
-              </button>
-            )}
+            {gm.status === 'active' && (() => {
+              // Calculate effective state
+              const packageAllows = gm.limits?.canCreateCompetitions !== false; // Default to true if undefined
+              const hasOverride = gm.competitionCreationOverride === 'enabled' || gm.competitionCreationOverride === 'disabled';
+              const isEffectivelyEnabled = hasOverride 
+                ? gm.competitionCreationOverride === 'enabled'
+                : packageAllows;
+              
+              return (
+                <button
+                  onClick={() => {
+                    if (isEffectivelyEnabled) {
+                      // Currently ON, turn OFF (set override to disabled)
+                      handleAction(gm.id, 'toggleCompetitionCreation', { override: 'disabled' });
+                    } else {
+                      // Currently OFF, show modal to set limits before turning ON
+                      setLimitsModalGM(gm);
+                      setOverrideLimits({
+                        maxCompetitionsPerDay: gm.overrideLimits?.maxCompetitionsPerDay || gm.limits?.maxCompetitionsPerDay || 1,
+                        maxUsersPerCompetition: gm.overrideLimits?.maxUsersPerCompetition || gm.limits?.maxUsersPerCompetition || 50,
+                      });
+                      setShowLimitsModal(true);
+                    }
+                  }}
+                  disabled={actionLoading}
+                  className={`flex items-center gap-2 px-4 py-2 rounded disabled:opacity-50 ${
+                    isEffectivelyEnabled
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-gray-600 text-white hover:bg-gray-500'
+                  }`}
+                  title={hasOverride ? `Override: ${gm.competitionCreationOverride}` : `Package default: ${packageAllows ? 'ON' : 'OFF'}`}
+                >
+                  <Trophy className="h-4 w-4" />
+                  {isEffectivelyEnabled ? 'Comps: ON' : 'Comps: OFF'}
+                  {hasOverride && (
+                    <span className="text-xs bg-white/20 px-1 rounded">Override</span>
+                  )}
+                </button>
+              );
+            })()}
             {gm.status === 'active' && (
               <button
                 onClick={() => handleAction(gm.id, 'suspend', { reason: 'Suspended by admin' })}
