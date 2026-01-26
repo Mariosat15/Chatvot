@@ -392,6 +392,8 @@ export default function MarketplaceSection() {
       } else if (editingItem.category === 'gamemaster') {
         requestBody.gameMasterConfig = editingItem.gameMasterConfig;
         if (editingItem.imageUrl) requestBody.imageUrl = editingItem.imageUrl;
+        console.log('[AI Generate] Sending gameMasterConfig:', JSON.stringify(editingItem.gameMasterConfig, null, 2));
+        console.log('[AI Generate] canCreateCompetitions value:', editingItem.gameMasterConfig?.canCreateCompetitions);
       }
 
       // Add existing values for context
@@ -1385,13 +1387,19 @@ export default function MarketplaceSection() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setEditingItem({
-                          ...editingItem,
-                          gameMasterConfig: {
-                            ...editingItem.gameMasterConfig!,
-                            canCreateCompetitions: !editingItem.gameMasterConfig?.canCreateCompetitions
-                          }
-                        })}
+                        onClick={() => {
+                          // Toggle logic: if currently enabled (true or undefined), set to false; if false, set to true
+                          const currentlyEnabled = editingItem.gameMasterConfig?.canCreateCompetitions !== false;
+                          const newValue = !currentlyEnabled;
+                          console.log('[Toggle] canCreateCompetitions:', editingItem.gameMasterConfig?.canCreateCompetitions, '-> setting to:', newValue);
+                          setEditingItem({
+                            ...editingItem,
+                            gameMasterConfig: {
+                              ...editingItem.gameMasterConfig!,
+                              canCreateCompetitions: newValue
+                            }
+                          });
+                        }}
                         className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
                           editingItem.gameMasterConfig?.canCreateCompetitions !== false 
                             ? 'bg-green-500' 

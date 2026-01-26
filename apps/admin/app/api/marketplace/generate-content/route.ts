@@ -82,8 +82,11 @@ export async function POST(request: NextRequest) {
       userPrompt = `Generate compelling marketplace content for this trading strategy:\n\nStrategy Configuration: ${JSON.stringify(strategyConfig || {}, null, 2)}`;
     
     } else if (category === 'gamemaster') {
+      console.log('🎮 [AI Generate] Game Master Config received:', JSON.stringify(gameMasterConfig, null, 2));
+      console.log('🎮 [AI Generate] canCreateCompetitions value:', gameMasterConfig?.canCreateCompetitions);
       systemPrompt = getGameMasterPrompt(gameMasterConfig);
-      userPrompt = `Generate compelling marketplace content for this Game Master package:\n\nPackage Configuration: ${JSON.stringify(gameMasterConfig || {}, null, 2)}`;
+      userPrompt = `Generate compelling marketplace content for this Game Master package:\n\nPackage Configuration: ${JSON.stringify(gameMasterConfig || {}, null, 2)}\n\nIMPORTANT: canCreateCompetitions is ${gameMasterConfig?.canCreateCompetitions === false ? 'DISABLED - do NOT mention competition creation' : 'ENABLED'}`;
+      console.log('🎮 [AI Generate] System prompt includes canCreateCompetitions check');
     
     } else {
       return NextResponse.json({ error: `Unsupported category: ${category}` }, { status: 400 });
@@ -361,57 +364,105 @@ Respond in JSON format:
 // Prompt for Game Master packages
 function getGameMasterPrompt(config?: Record<string, unknown>): string {
   const gmConfig = config || {};
+  const canCreateCompetitions = gmConfig.canCreateCompetitions !== false;
+  const canEarnFromChallenges = gmConfig.canEarnFromChallenges === true;
   
-  return `You are a professional content writer for a trading competition platform. Create compelling marketplace content for a Game Master subscription package.
+  // Build the "What You Get" section based on enabled features
+  let whatYouGetSection = '';
+  
+  if (canCreateCompetitions) {
+    whatYouGetSection = `
+- **${gmConfig.maxCompetitionsPerDay || 1} Competition${(gmConfig.maxCompetitionsPerDay || 1) > 1 ? 's' : ''} per Day** - Host engaging trading battles for your community
+- **Up to ${gmConfig.maxUsersPerCompetition || 30} Participants** - Perfect size for competitive events
+- **${gmConfig.referralFeePercentage || 5}% Referral Earnings** - Earn from every entry fee your referred users pay
+- **${gmConfig.subscriptionDurationDays || 30} Days Duration** - Full subscription period`;
+  } else {
+    whatYouGetSection = `
+- **${gmConfig.referralFeePercentage || 5}% Referral Earnings** - Earn from every entry fee your referred users pay in ANY competition
+- **${gmConfig.subscriptionDurationDays || 30} Days Duration** - Full subscription period
+- **Passive Income Focus** - No competition management required`;
+  }
+  
+  if (canEarnFromChallenges) {
+    whatYouGetSection += `
+- **${gmConfig.challengeReferralFeePercentage || gmConfig.referralFeePercentage || 5}% Challenge Earnings** - Earn from 1v1 challenge referrals`;
+  }
+
+  const packageType = canCreateCompetitions 
+    ? 'a full-featured Game Master subscription package that allows creating competitions AND earning from referrals'
+    : 'a referral-only Game Master package focused purely on earning from referrals (NO competition creation)';
+
+  // Log for debugging
+  console.log('[getGameMasterPrompt] canCreateCompetitions:', canCreateCompetitions, 'raw value:', gmConfig.canCreateCompetitions);
+  
+  // Build strong constraint message for referral-only packages
+  const referralOnlyConstraint = !canCreateCompetitions ? `
+
+⚠️ CRITICAL CONSTRAINT - READ CAREFULLY:
+This is a REFERRAL-ONLY package. Competition creation is DISABLED.
+
+YOU MUST NOT include ANY of the following in the generated content:
+- "Competition per Day" or similar
+- "Max users per competition" or "participants per competition"
+- "Host competitions" or "create competitions" or "run competitions"
+- Any numbers related to competition limits
+- Any mention of managing, hosting, or creating trading events
+
+YOU MUST ONLY focus on:
+- Referral earnings (the percentage they earn from referred users)
+- Subscription duration
+- Passive income through network building
+- Earning from OTHER people's competitions (not their own)
+
+The GM with this package earns fees when their referred users participate in competitions created by others (admins or other GMs), but they CANNOT create their own competitions.
+` : '';
+
+  return `You are a professional content writer for a trading competition platform. Create compelling marketplace content for ${packageType}.
+${referralOnlyConstraint}
+IMPORTANT: This package ${canCreateCompetitions ? 'CAN create competitions and earn from referrals' : 'CANNOT create competitions - it is REFERRAL-ONLY'}.
 
 Package configuration:
 - Subscription Duration: ${gmConfig.subscriptionDurationDays || 30} days
 - Referral Fee Percentage: ${gmConfig.referralFeePercentage || 5}%
-- Max Competitions Per Day: ${gmConfig.maxCompetitionsPerDay || 1}
-- Max Users Per Competition: ${gmConfig.maxUsersPerCompetition || 30}
-- Can Create Competitions: ${gmConfig.canCreateCompetitions !== false ? 'Yes' : 'No (Referral Only)'}
-- Can Earn From Challenges: ${gmConfig.canEarnFromChallenges ? 'Yes' : 'No'}
-- Challenge Referral Fee: ${gmConfig.challengeReferralFeePercentage || 'N/A'}%
+${canCreateCompetitions ? `- Max Competitions Per Day: ${gmConfig.maxCompetitionsPerDay || 1}
+- Max Users Per Competition: ${gmConfig.maxUsersPerCompetition || 30}` : '- Competition Creation: DISABLED (Referral-Only Package)'}
+- Can Earn From Challenges: ${canEarnFromChallenges ? `Yes (${gmConfig.challengeReferralFeePercentage || gmConfig.referralFeePercentage || 5}%)` : 'No'}
 
 Create content that:
-1. Highlights the value proposition for community builders
+1. ${canCreateCompetitions ? 'Highlights both competition hosting AND referral earning potential' : 'Focuses ENTIRELY on passive referral income - DO NOT mention hosting competitions'}
 2. Explains the earning potential from referrals
 3. Makes the package feel exclusive and valuable
 4. Uses aspirational language that appeals to traders
 
 Your task is to create:
 
-1. **Name** (2-4 words max) - Tier name that conveys value (e.g., "Pro", "Elite", "Ultimate").
+1. **Name** (2-4 words max) - ${canCreateCompetitions ? 'Tier name that conveys power (e.g., "Pro", "Elite", "Ultimate")' : 'Name that conveys passive income/influence (e.g., "Affiliate Pro", "Referral Master", "Network Builder")'}.
 
-2. **Short Description** (max 120 characters) - Compelling one-liner about the package benefits.
+2. **Short Description** (max 120 characters) - Compelling one-liner about the package benefits. ${!canCreateCompetitions ? 'Focus on referral earnings, NOT competitions.' : ''}
 
 3. **Full Description** - Use this EXACT format:
 
 # [Package Name - Aspirational Title]
 
-[Opening hook - 1 sentence about what this package enables]
+[Opening hook - 1 sentence about what this package enables. ${!canCreateCompetitions ? 'DO NOT mention creating competitions.' : ''}]
 
 ## What You Get
-
-- **[Number] Competition[s] per Day** - [Brief benefit]
-- **Up to [Number] Participants** - [Brief benefit]
-- **[X]% Referral Earnings** - [Brief benefit]
-- **[X] Days Duration** - [Brief benefit]
-${gmConfig.canEarnFromChallenges ? `- **Challenge Earnings** - Earn ${gmConfig.challengeReferralFeePercentage || 5}% from 1v1 challenges` : ''}
+${whatYouGetSection}
 
 ## How Referral Earnings Work
 
-[2-3 sentences explaining the passive income model]
+[2-3 sentences explaining the passive income model - how GMs earn when their referred users join competitions${canEarnFromChallenges ? ' and challenges' : ''}]
 
 ## Ideal For
 
-- [Target audience 1]
+- [Target audience 1 - ${canCreateCompetitions ? 'community builders who want to host events' : 'influencers who want passive income'}]
 - [Target audience 2]
 - [Target audience 3]
 
-${gmConfig.canCreateCompetitions === false ? '## Note\\nThis is a referral-only package - perfect for influencers who want to earn without managing competitions.' : ''}
+${!canCreateCompetitions ? `## Note
+This is a referral-only package - perfect for influencers who want to earn from their network without the responsibility of managing competitions.` : ''}
 
-*"[Aspirational quote about building a trading community]"*
+*"[Aspirational quote about ${canCreateCompetitions ? 'building a trading community' : 'monetizing your influence'}]"*
 
 Respond in JSON format:
 {
