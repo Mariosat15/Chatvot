@@ -67,8 +67,9 @@ export const PlatformFinancialsService = {
    * These fees would have gone to the GM but are kept by platform
    */
   recordRetainedGmFee: async (params: {
-    competitionId: string;
-    competitionName: string;
+    sourceType: 'competition' | 'challenge';
+    sourceId: string;
+    sourceName: string;
     gameMasterId: string;
     gameMasterEmail?: string;
     referredUsersCount: number;
@@ -86,9 +87,9 @@ export const PlatformFinancialsService = {
       transactionType: 'retained_gm_fee',
       amount: params.amount,
       amountEUR: eurAmount,
-      sourceType: 'competition',
-      sourceId: params.competitionId,
-      sourceName: params.competitionName,
+      sourceType: params.sourceType,
+      sourceId: params.sourceId,
+      sourceName: params.sourceName,
       retainedGmFeeDetails: {
         gameMasterId: params.gameMasterId,
         gameMasterEmail: params.gameMasterEmail,
@@ -97,11 +98,11 @@ export const PlatformFinancialsService = {
         subscriptionStatus: params.subscriptionStatus,
         referredUserIds: params.referredUserIds,
       },
-      description: `Retained GM fee: ${params.referredUsersCount} referrals from inactive GM (${params.subscriptionStatus}) - ${params.competitionName}`,
+      description: `Retained GM fee: ${params.referredUsersCount} referral(s) from inactive GM (${params.subscriptionStatus}) - ${params.sourceName}`,
     });
     
     console.log(`💰 [PLATFORM] Retained GM fee: ${params.amount} credits (€${eurAmount.toFixed(2)}) from inactive GM ${params.gameMasterId}`);
-    console.log(`   Competition: ${params.competitionName}, Referrals: ${params.referredUsersCount}, Status: ${params.subscriptionStatus}`);
+    console.log(`   ${params.sourceType.charAt(0).toUpperCase() + params.sourceType.slice(1)}: ${params.sourceName}, Referrals: ${params.referredUsersCount}, Status: ${params.subscriptionStatus}`);
   },
 
   /**
@@ -109,7 +110,7 @@ export const PlatformFinancialsService = {
    */
   recordPlatformFee: async (params: {
     amount: number;
-    sourceType: 'competition' | 'user_deposit' | 'user_withdrawal';
+    sourceType: 'competition' | 'challenge' | 'user_deposit' | 'user_withdrawal';
     sourceId?: string;
     sourceName?: string;
     description: string;
@@ -121,6 +122,7 @@ export const PlatformFinancialsService = {
     
     const transactionType = params.sourceType === 'user_deposit' ? 'deposit_fee' 
       : params.sourceType === 'user_withdrawal' ? 'withdrawal_fee' 
+      : params.sourceType === 'challenge' ? 'challenge_platform_fee'
       : 'platform_fee';
     
     await PlatformTransaction.create({

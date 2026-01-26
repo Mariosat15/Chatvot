@@ -661,8 +661,9 @@ export async function finalizeCompetition(competitionId: string) {
           for (const inactiveGm of inactiveGmFees) {
             try {
               await PlatformFinancialsService.recordRetainedGmFee({
-                competitionId: competition._id.toString(),
-                competitionName: competition.name,
+                sourceType: 'competition',
+                sourceId: competition._id.toString(),
+                sourceName: competition.name,
                 gameMasterId: inactiveGm.gmId,
                 gameMasterEmail: inactiveGm.gmEmail,
                 referredUsersCount: inactiveGm.users.length,

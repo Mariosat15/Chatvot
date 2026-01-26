@@ -89,6 +89,8 @@ interface PlatformFinancials {
   totalPlatformFees: number;
   totalChallengeFees: number; // Challenge platform fees
   totalGameMasterFees: number; // Fees paid to game masters
+  totalRetainedGmFees: number; // GM fees retained due to inactive subscriptions
+  retainedGmFeesCount: number; // Number of retained GM fee instances
   
   // Marketplace revenue
   totalMarketplaceSales: number;
@@ -594,6 +596,10 @@ export default function FinancialDashboard() {
       challenge_win: 'bg-yellow-600',
       challenge_platform_fee: 'bg-orange-500',
       challenge_refund: 'bg-purple-400',
+      // GM-related transactions
+      retained_gm_fee: 'bg-cyan-500',
+      gamemaster_referral: 'bg-amber-500',
+      gamemaster_challenge_referral: 'bg-amber-400',
     };
     return colors[type] || 'bg-gray-500';
   };
@@ -617,6 +623,10 @@ export default function FinancialDashboard() {
       challenge_win: '⚔️ Challenge Win',
       challenge_platform_fee: '⚔️ Challenge Fee',
       challenge_refund: '⚔️ Challenge Refund',
+      // GM-related transactions
+      retained_gm_fee: '🎮 Retained GM Fee',
+      gamemaster_referral: '🎮 GM Referral (Comp)',
+      gamemaster_challenge_referral: '🎮 GM Referral (Challenge)',
     };
     return labels[type] || type.replace(/_/g, ' ');
   };
@@ -777,6 +787,12 @@ export default function FinancialDashboard() {
                     <span className="text-gray-400">Game Master Fees (Paid Out)</span>
                     <span className="text-amber-400">-{currencySymbol}{(platformFinancials?.totalGameMasterFees || 0).toFixed(2)}</span>
                   </div>
+                  {(platformFinancials?.totalRetainedGmFees || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Retained GM Fees (Inactive)</span>
+                      <span className="text-cyan-400">+{currencySymbol}{(platformFinancials?.totalRetainedGmFees || 0).toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-400">Marketplace Sales</span>
                     <span className="text-purple-400">+{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</span>
@@ -924,6 +940,13 @@ export default function FinancialDashboard() {
                   <div className="text-2xl font-bold text-amber-400">-{currencySymbol}{(platformFinancials?.totalGameMasterFees || 0).toFixed(2)}</div>
                   <div className="text-xs text-gray-500">Paid to GMs</div>
                 </div>
+                {(platformFinancials?.totalRetainedGmFees || 0) > 0 && (
+                  <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-4">
+                    <div className="text-xs text-gray-400 uppercase">Retained GM Fees</div>
+                    <div className="text-2xl font-bold text-cyan-400">+{currencySymbol}{(platformFinancials?.totalRetainedGmFees || 0).toFixed(2)}</div>
+                    <div className="text-xs text-gray-500">{platformFinancials?.retainedGmFeesCount || 0} inactive GM(s)</div>
+                  </div>
+                )}
                 <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
                   <div className="text-xs text-gray-400 uppercase">Marketplace Sales</div>
                   <div className="text-2xl font-bold text-purple-400">{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</div>
@@ -1034,6 +1057,14 @@ export default function FinancialDashboard() {
                       <td className="py-3 px-4 text-right text-gray-500">-{currencySymbol}0.00</td>
                       <td className="py-3 px-4 text-right text-emerald-400 font-bold">{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</td>
                     </tr>
+                    {(platformFinancials?.totalRetainedGmFees || 0) > 0 && (
+                      <tr className="border-b border-gray-800 hover:bg-gray-800/50">
+                        <td className="py-3 px-4 text-white font-medium">🎮 Retained GM Fees</td>
+                        <td className="py-3 px-4 text-right text-green-400">{currencySymbol}{(platformFinancials?.totalRetainedGmFees || 0).toFixed(2)}</td>
+                        <td className="py-3 px-4 text-right text-gray-500">-{currencySymbol}0.00</td>
+                        <td className="py-3 px-4 text-right text-emerald-400 font-bold">{currencySymbol}{(platformFinancials?.totalRetainedGmFees || 0).toFixed(2)}</td>
+                      </tr>
+                    )}
                     <tr className="border-b border-gray-800 hover:bg-gray-800/50">
                       <td className="py-3 px-4 text-white font-medium">🛒 Marketplace Sales</td>
                       <td className="py-3 px-4 text-right text-green-400">{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</td>
@@ -2009,6 +2040,9 @@ export default function FinancialDashboard() {
                       <SelectItem value="challenge_entry">Challenge Entry</SelectItem>
                       <SelectItem value="challenge_win">Challenge Win</SelectItem>
                       <SelectItem value="challenge_platform_fee">Challenge Fees</SelectItem>
+                      <SelectItem value="retained_gm_fee">Retained GM Fees</SelectItem>
+                      <SelectItem value="gamemaster_referral">GM Referrals (Comps)</SelectItem>
+                      <SelectItem value="gamemaster_challenge_referral">GM Referrals (Challenges)</SelectItem>
                       <SelectItem value="admin_withdrawal">Admin Withdrawals</SelectItem>
                       <SelectItem value="vat_payment">VAT Payments</SelectItem>
                       <SelectItem value="unclaimed_pool">Unclaimed Pools</SelectItem>
