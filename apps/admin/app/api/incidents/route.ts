@@ -107,12 +107,12 @@ export async function POST(request: NextRequest) {
       priority: priority || 'medium',
       tags: tags || [],
       createdBy: auth.adminId || 'admin',
-      createdByEmail: auth.adminEmail,
+      createdByEmail: auth.email,
       auditLog: [{
         timestamp: new Date(),
         action: 'incident_created',
         by: auth.adminId || 'admin',
-        byEmail: auth.adminEmail,
+        byEmail: auth.email,
         details: `Incident created: ${title}`,
       }],
     });

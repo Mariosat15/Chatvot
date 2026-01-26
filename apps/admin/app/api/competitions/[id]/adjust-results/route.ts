@@ -316,7 +316,7 @@ export async function POST(
       timestamp: new Date(),
       action: 'results_adjusted',
       by: auth.adminId || 'admin',
-      byEmail: auth.adminEmail,
+      byEmail: auth.email,
       details: `Adjusted ${resultAdjustments.length} participant results. Total prize adjustment: €${totalPrizeAdjustment.toFixed(2)}`,
       metadata: { competitionId, results },
     });

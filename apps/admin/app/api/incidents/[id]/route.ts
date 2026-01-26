@@ -83,7 +83,7 @@ export async function PATCH(
       if (status === 'resolved') {
         incident.resolvedAt = new Date();
         incident.resolvedBy = auth.adminId;
-        incident.resolvedByEmail = auth.adminEmail;
+        incident.resolvedByEmail = auth.email;
       }
     }
 
@@ -122,7 +122,7 @@ export async function PATCH(
         timestamp: new Date(),
         action: 'incident_updated',
         by: auth.adminId || 'admin',
-        byEmail: auth.adminEmail,
+        byEmail: auth.email,
         details: `Updated: ${changes.join(', ')}${notes ? `. Notes: ${notes}` : ''}`,
       });
     }

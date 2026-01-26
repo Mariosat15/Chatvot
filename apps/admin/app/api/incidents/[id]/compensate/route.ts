@@ -4,9 +4,24 @@ import { connectToDatabase } from '@/database/mongoose';
 import Incident from '@/database/models/incident.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import User from '@/database/models/user.model';
 import { notificationService } from '@/lib/services/notification.service';
 import mongoose from 'mongoose';
+
+// Helper to get user from collection (admin app doesn't have User model)
+async function getUserById(userId: string) {
+  const usersCollection = mongoose.connection.collection('user');
+  try {
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      const user = await usersCollection.findOne({ 
+        _id: new mongoose.Types.ObjectId(userId)
+      });
+      return user;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /api/incidents/[id]/compensate
@@ -75,8 +90,8 @@ export async function POST(
 
     for (const comp of compensations) {
       try {
-        // Get user
-        const user = await User.findById(comp.userId).select('username email').session(mongoSession);
+        // Get user from collection
+        const user = await getUserById(comp.userId);
         if (!user) {
           results.push({
             userId: comp.userId,
@@ -86,13 +101,14 @@ export async function POST(
           });
           continue;
         }
+        const username = user.username || user.name || user.email || 'Unknown';
 
         // Get wallet
         const wallet = await CreditWallet.findOne({ userId: comp.userId }).session(mongoSession);
         if (!wallet) {
           results.push({
             userId: comp.userId,
-            username: user.username,
+            username,
             amount: comp.amount,
             success: false,
             error: 'Wallet not found',
@@ -123,15 +139,14 @@ export async function POST(
             incidentType: incident.type,
             reason: comp.reason,
             issuedBy: auth.adminId,
-            issuedByEmail: auth.adminEmail,
+            issuedByEmail: auth.email,
           },
         }], { session: mongoSession });
 
         // Send notification
         try {
-          await notificationService.createCustom({
+          await notificationService.sendInstant({
             userId: comp.userId,
-            type: 'compensation_received',
             title: '💰 Compensation Received',
             message: `You have been credited €${comp.amount.toFixed(2)} as compensation. Reason: ${comp.reason}`,
             icon: 'gift',
@@ -145,7 +160,7 @@ export async function POST(
 
         results.push({
           userId: comp.userId,
-          username: user.username,
+          username,
           amount: comp.amount,
           success: true,
           newBalance,
@@ -154,7 +169,7 @@ export async function POST(
         totalCompensated += comp.amount;
         successCount++;
 
-        console.log(`   ✅ Compensated ${user.username}: €${comp.amount.toFixed(2)}`);
+        console.log(`   ✅ Compensated ${username}: €${comp.amount.toFixed(2)}`);
 
       } catch (error) {
         results.push({
@@ -195,7 +210,7 @@ export async function POST(
       timestamp: new Date(),
       action: 'compensations_issued',
       by: auth.adminId || 'admin',
-      byEmail: auth.adminEmail,
+      byEmail: auth.email,
       details: `Issued ${successCount} compensations totaling €${totalCompensated.toFixed(2)}`,
       metadata: { results },
     });

@@ -8,8 +8,10 @@
  */
 
 import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
-import { notificationService } from './notification.service';
 import { connectToDatabase } from '@/database/mongoose';
+
+// Get array of forex symbols from the FOREX_PAIRS object
+const FOREX_SYMBOLS = Object.keys(FOREX_PAIRS) as ForexSymbol[];
 
 // ============================================
 // Types & Interfaces
@@ -133,7 +135,7 @@ class PriceHealthMonitorService {
     }
 
     // Initialize health info for all forex pairs
-    for (const symbol of FOREX_PAIRS) {
+    for (const symbol of FOREX_SYMBOLS) {
       this.state.symbolHealth.set(symbol, {
         symbol,
         lastUpdate: 0,
@@ -311,7 +313,7 @@ class PriceHealthMonitorService {
     // Check overall health
     const overallStatus: PriceHealthStatus = 
       criticalCount > 0 ? 'critical' :
-      degradedCount > FOREX_PAIRS.length / 4 ? 'degraded' : 'healthy';
+      degradedCount > FOREX_SYMBOLS.length / 4 ? 'degraded' : 'healthy';
 
     // Trigger critical health alert if too many symbols are unhealthy
     if (overallStatus === 'critical') {
@@ -452,7 +454,7 @@ class PriceHealthMonitorService {
 
     const overallStatus: PriceHealthStatus = 
       criticalCount > 0 ? 'critical' :
-      degradedCount > FOREX_PAIRS.length / 4 ? 'degraded' : 'healthy';
+      degradedCount > FOREX_SYMBOLS.length / 4 ? 'degraded' : 'healthy';
 
     return {
       timestamp: new Date(),
