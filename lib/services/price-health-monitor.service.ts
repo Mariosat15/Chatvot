@@ -5,6 +5,9 @@
  * when issues are detected (staleness, anomalies, disconnections).
  * 
  * Used for competition risk mitigation - ensures fair pricing during competitions.
+ * 
+ * IMPORTANT: Only monitors symbols that are ENABLED in the admin TradingSymbol settings.
+ * Disabled symbols are not monitored to avoid false alerts.
  */
 
 import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
@@ -12,8 +15,8 @@ import { notificationService } from './notification.service';
 import { connectToDatabase } from '@/database/mongoose';
 import mongoose from 'mongoose';
 
-// Get array of forex symbols from the FOREX_PAIRS object
-const FOREX_SYMBOLS = Object.keys(FOREX_PAIRS) as ForexSymbol[];
+// Get array of forex symbols from the FOREX_PAIRS object (used as fallback)
+const FOREX_SYMBOLS_FALLBACK = Object.keys(FOREX_PAIRS) as ForexSymbol[];
 
 // ============================================
 // Types & Interfaces
@@ -88,6 +91,7 @@ const GLOBAL_KEY = '__PRICE_HEALTH_MONITOR__';
 interface PriceHealthGlobalState {
   config: PriceHealthConfig;
   symbolHealth: Map<ForexSymbol, SymbolHealthInfo>;
+  enabledSymbols: ForexSymbol[]; // Symbols enabled in admin settings
   alerts: PriceAlert[];
   lastAlertTimes: Map<string, number>; // Alert type -> last alert timestamp
   checkInterval: NodeJS.Timeout | null;
@@ -105,6 +109,7 @@ function getGlobalState(): PriceHealthGlobalState {
     (globalThis as Record<string, unknown>)[GLOBAL_KEY] = {
       config: { ...DEFAULT_CONFIG },
       symbolHealth: new Map<ForexSymbol, SymbolHealthInfo>(),
+      enabledSymbols: [], // Will be populated from database
       alerts: [],
       lastAlertTimes: new Map<string, number>(),
       checkInterval: null,
@@ -128,16 +133,58 @@ class PriceHealthMonitorService {
 
   /**
    * Initialize the health monitor
+   * Fetches enabled symbols from the database and only monitors those.
    */
-  initialize(config?: Partial<PriceHealthConfig>): void {
+  async initialize(config?: Partial<PriceHealthConfig>): Promise<void> {
     if (this.state.initialized) return;
 
     if (config) {
       this.state.config = { ...DEFAULT_CONFIG, ...config };
     }
 
-    // Initialize health info for all forex pairs
-    for (const symbol of FOREX_SYMBOLS) {
+    // Fetch enabled symbols from database
+    await this.loadEnabledSymbols();
+
+    // Start periodic health checks
+    this.startHealthChecks();
+    this.state.initialized = true;
+    console.log('🏥 [PriceHealthMonitor] Initialized with config:', this.state.config);
+    console.log(`🏥 [PriceHealthMonitor] Monitoring ${this.state.enabledSymbols.length} enabled symbols`);
+  }
+
+  /**
+   * Load enabled symbols from the TradingSymbol database collection
+   * Only monitors symbols that are enabled in admin settings
+   */
+  private async loadEnabledSymbols(): Promise<void> {
+    try {
+      await connectToDatabase();
+      
+      // Fetch enabled symbols from TradingSymbol collection
+      const TradingSymbol = (await import('@/database/models/trading/symbol-settings.model')).default;
+      const enabledDocs = await TradingSymbol.find({ enabled: true }).select('symbol').lean();
+      
+      if (enabledDocs && enabledDocs.length > 0) {
+        // Map database symbols to ForexSymbol format (they might be stored as EUR/USD or EURUSD)
+        this.state.enabledSymbols = enabledDocs
+          .map((doc: { symbol: string }) => doc.symbol as ForexSymbol)
+          .filter((symbol: ForexSymbol) => symbol in FOREX_PAIRS); // Only track symbols we know how to handle
+        
+        console.log(`🏥 [PriceHealthMonitor] Loaded ${this.state.enabledSymbols.length} enabled symbols from database`);
+      } else {
+        // Fallback to all symbols if database is empty or not seeded
+        console.log('🏥 [PriceHealthMonitor] No enabled symbols in database, using fallback (all symbols)');
+        this.state.enabledSymbols = [...FOREX_SYMBOLS_FALLBACK];
+      }
+    } catch (error) {
+      // Fallback to all symbols on error
+      console.warn('🏥 [PriceHealthMonitor] Failed to load symbols from database, using fallback:', error);
+      this.state.enabledSymbols = [...FOREX_SYMBOLS_FALLBACK];
+    }
+
+    // Initialize health info only for enabled symbols
+    this.state.symbolHealth.clear();
+    for (const symbol of this.state.enabledSymbols) {
       this.state.symbolHealth.set(symbol, {
         symbol,
         lastUpdate: 0,
@@ -151,21 +198,60 @@ class PriceHealthMonitorService {
         source: 'fallback',
       });
     }
+  }
 
-    // Start periodic health checks
-    this.startHealthChecks();
-    this.state.initialized = true;
-    console.log('🏥 [PriceHealthMonitor] Initialized with config:', this.state.config);
+  /**
+   * Refresh the list of enabled symbols
+   * Call this when admin changes symbol enabled/disabled state
+   */
+  async refreshEnabledSymbols(): Promise<void> {
+    const previousSymbols = new Set(this.state.enabledSymbols);
+    
+    await this.loadEnabledSymbols();
+    
+    // Log changes
+    const newSymbols = this.state.enabledSymbols.filter(s => !previousSymbols.has(s));
+    const removedSymbols = Array.from(previousSymbols).filter(s => !this.state.enabledSymbols.includes(s));
+    
+    if (newSymbols.length > 0) {
+      console.log(`🏥 [PriceHealthMonitor] Added symbols to monitoring: ${newSymbols.join(', ')}`);
+    }
+    if (removedSymbols.length > 0) {
+      console.log(`🏥 [PriceHealthMonitor] Removed symbols from monitoring: ${removedSymbols.join(', ')}`);
+    }
+    
+    // Notify subscribers of the change
+    this.notifySubscribers();
+  }
+
+  /**
+   * Get list of currently monitored symbols
+   */
+  getMonitoredSymbols(): ForexSymbol[] {
+    return [...this.state.enabledSymbols];
+  }
+
+  /**
+   * Check if a symbol is currently being monitored
+   */
+  isSymbolMonitored(symbol: ForexSymbol): boolean {
+    return this.state.enabledSymbols.includes(symbol);
   }
 
   /**
    * Update price for a symbol (called from websocket-price-streamer)
+   * Only updates if the symbol is enabled in admin settings
    */
   updatePrice(
     symbol: ForexSymbol,
     price: number,
     source: 'websocket' | 'rest' | 'cache' | 'fallback'
   ): void {
+    // Skip if symbol is not being monitored (disabled in admin)
+    if (!this.state.enabledSymbols.includes(symbol)) {
+      return;
+    }
+
     const now = Date.now();
     const health = this.state.symbolHealth.get(symbol);
     
@@ -312,10 +398,11 @@ class PriceHealthMonitorService {
       }
     }
 
-    // Check overall health
+    // Check overall health (based on enabled symbols count)
+    const enabledCount = this.state.enabledSymbols.length;
     const overallStatus: PriceHealthStatus = 
       criticalCount > 0 ? 'critical' :
-      degradedCount > FOREX_SYMBOLS.length / 4 ? 'degraded' : 'healthy';
+      degradedCount > enabledCount / 4 ? 'degraded' : 'healthy';
 
     // Trigger critical health alert if too many symbols are unhealthy
     if (overallStatus === 'critical') {
@@ -450,17 +537,21 @@ class PriceHealthMonitorService {
 
   /**
    * Get current health snapshot
+   * Only includes enabled symbols that are being monitored
    */
   getHealthSnapshot(): PriceHealthSnapshot {
-    const symbols = Array.from(this.state.symbolHealth.values());
+    // Only return health info for enabled symbols
+    const symbols = Array.from(this.state.symbolHealth.values())
+      .filter(s => this.state.enabledSymbols.includes(s.symbol));
     
     const healthyCount = symbols.filter(s => s.status === 'healthy').length;
     const degradedCount = symbols.filter(s => s.status === 'degraded').length;
     const criticalCount = symbols.filter(s => s.status === 'critical').length;
 
+    const enabledCount = this.state.enabledSymbols.length;
     const overallStatus: PriceHealthStatus = 
       criticalCount > 0 ? 'critical' :
-      degradedCount > FOREX_SYMBOLS.length / 4 ? 'degraded' : 'healthy';
+      degradedCount > enabledCount / 4 ? 'degraded' : 'healthy';
 
     return {
       timestamp: new Date(),

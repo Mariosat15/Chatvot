@@ -72,7 +72,7 @@ const PriceSnapshotSchema: Schema = new Schema(
       type: Date,
       required: true,
       default: Date.now,
-      index: true,
+      // Note: index is created by TTL index below (line 128), not needed here
     },
     snapshotType: {
       type: String,

@@ -128,19 +128,17 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { action, symbols, category } = body;
     
+    let updateMessage = '';
+    
     if (action === 'enableAll') {
       const filter = category && category !== 'all' ? { category } : {};
       await TradingSymbol.updateMany(filter, { enabled: true });
-      return NextResponse.json({ success: true, message: 'All symbols enabled' });
-    }
-    
-    if (action === 'disableAll') {
+      updateMessage = 'All symbols enabled';
+    } else if (action === 'disableAll') {
       const filter = category && category !== 'all' ? { category } : {};
       await TradingSymbol.updateMany(filter, { enabled: false });
-      return NextResponse.json({ success: true, message: 'All symbols disabled' });
-    }
-    
-    if (action === 'bulkUpdate' && Array.isArray(symbols)) {
+      updateMessage = 'All symbols disabled';
+    } else if (action === 'bulkUpdate' && Array.isArray(symbols)) {
       for (const sym of symbols) {
         await TradingSymbol.findOneAndUpdate(
           { symbol: sym.symbol },
@@ -148,19 +146,52 @@ export async function PUT(request: NextRequest) {
           { upsert: false }
         );
       }
-      return NextResponse.json({ success: true, message: `Updated ${symbols.length} symbols` });
+      updateMessage = `Updated ${symbols.length} symbols`;
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid action' },
+        { status: 400 }
+      );
     }
     
-    return NextResponse.json(
-      { error: 'Invalid action' },
-      { status: 400 }
-    );
+    // Notify the main app to refresh its price health monitor's enabled symbols list
+    await notifyPriceHealthMonitorRefresh();
+    
+    return NextResponse.json({ success: true, message: updateMessage });
   } catch (error) {
     console.error('Failed to bulk update symbols:', error);
     return NextResponse.json(
       { error: 'Failed to update symbols' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Notify the main app's price health monitor to refresh its enabled symbols list
+ * This ensures the monitor only tracks enabled symbols after admin changes
+ */
+async function notifyPriceHealthMonitorRefresh(): Promise<void> {
+  try {
+    const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const response = await fetch(`${mainAppUrl}/api/internal/price-health`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-key': process.env.INTERNAL_API_KEY || 'internal-key',
+      },
+      body: JSON.stringify({ action: 'refreshSymbols' }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`✅ Price health monitor refreshed: ${data.message}`);
+    } else {
+      console.warn('⚠️ Failed to notify price health monitor (main app may not be running)');
+    }
+  } catch (error) {
+    // Main app might not be running - this is not critical
+    console.warn('⚠️ Could not notify price health monitor:', error);
   }
 }
 

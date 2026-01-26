@@ -12,7 +12,8 @@ import {
   Bell, Mail, FileCheck, Receipt, Clock, Building, Key, RefreshCw,
   UserCog, Ban, Wallet, PieChart, Download, Filter, Calendar,
   Radio, Wifi, HardDrive, ArrowDown, ArrowRight, Layers, Timer,
-  Trash2, Play, Pause, RefreshCcw, LineChart, CandlestickChart
+  Trash2, Play, Pause, RefreshCcw, LineChart, CandlestickChart,
+  HeartPulse, FileWarning, ShieldAlert, Gift, Scale, Camera
 } from 'lucide-react';
 
 interface WikiTopic {
@@ -3383,6 +3384,657 @@ export default function AdminWikiSection() {
               </ul>
             </CardContent>
           </Card>
+        </div>
+      )
+    },
+
+    // ==================== PRICE MONITORING & OPERATIONS ====================
+    {
+      id: 'price-monitoring-overview',
+      title: 'Price Monitoring Overview',
+      icon: HeartPulse,
+      category: 'Operations',
+      tags: ['price', 'monitoring', 'health', 'websocket', 'alerts'],
+      content: (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-green-500/10 to-cyan-500/10 border border-green-500/30 rounded-xl p-6">
+            <h2 className="text-2xl font-bold text-green-400 mb-3 flex items-center gap-2">
+              <HeartPulse className="h-6 w-6" />
+              Price Monitoring System
+            </h2>
+            <p className="text-gray-300 leading-relaxed">
+              The Price Health Monitor continuously tracks the health of all price feeds in real-time. 
+              It detects issues like stale prices, anomalies, and connection problems to ensure fair pricing during competitions.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400">How It Works</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-gray-300">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Wifi className="h-4 w-4 text-green-400" />
+                    <h4 className="font-semibold text-white">WebSocket Connection</h4>
+                  </div>
+                  <p className="text-sm text-gray-400">Receives real-time price updates from Massive.com API via WebSocket.</p>
+                </div>
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <HeartPulse className="h-4 w-4 text-cyan-400" />
+                    <h4 className="font-semibold text-white">Health Checks</h4>
+                  </div>
+                  <p className="text-sm text-gray-400">Runs every 5 seconds to check for stale prices and anomalies.</p>
+                </div>
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Bell className="h-4 w-4 text-yellow-400" />
+                    <h4 className="font-semibold text-white">Alert System</h4>
+                  </div>
+                  <p className="text-sm text-gray-400">Triggers alerts when issues are detected (with 60s cooldown).</p>
+                </div>
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Camera className="h-4 w-4 text-purple-400" />
+                    <h4 className="font-semibold text-white">Price Snapshots</h4>
+                  </div>
+                  <p className="text-sm text-gray-400">Periodic snapshots stored for risk mitigation and emergency recovery.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400">Health Status Levels</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="bg-green-500/10 border border-green-500/30 rounded p-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="font-medium text-green-400">Healthy</span>
+                </div>
+                <p className="text-sm text-gray-400 mt-1">Prices are fresh (updated within last 30 seconds), no anomalies detected.</p>
+              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  <span className="font-medium text-yellow-400">Degraded</span>
+                </div>
+                <p className="text-sm text-gray-400 mt-1">Price is stale (30-60 seconds old) OR anomaly detected (sudden large price change).</p>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/30 rounded p-3">
+                <div className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-red-500" />
+                  <span className="font-medium text-red-400">Critical</span>
+                </div>
+                <p className="text-sm text-gray-400 mt-1">Price is critically stale (60+ seconds old) or using fallback data.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400">Configuration Defaults</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="text-cyan-400 font-medium">Stale Threshold</div>
+                  <div className="text-gray-300">30 seconds</div>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="text-cyan-400 font-medium">Critical Threshold</div>
+                  <div className="text-gray-300">60 seconds</div>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="text-cyan-400 font-medium">Anomaly Threshold</div>
+                  <div className="text-gray-300">1% sudden change</div>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="text-cyan-400 font-medium">Alert Cooldown</div>
+                  <div className="text-gray-300">60 seconds</div>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="text-cyan-400 font-medium">Health Check Interval</div>
+                  <div className="text-gray-300">5 seconds</div>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="text-cyan-400 font-medium">Max Reconnect Attempts</div>
+                  <div className="text-gray-300">10 (then alerts admin)</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+    {
+      id: 'price-health-alerts',
+      title: 'Price Health Alerts',
+      icon: Bell,
+      category: 'Operations',
+      tags: ['alerts', 'notifications', 'price', 'health', 'acknowledge'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-yellow-400 mb-3">Price Health Alerts</h2>
+            <p className="text-gray-300 mb-4">
+              The system generates alerts when price feed issues are detected. Understanding and managing these alerts
+              is critical for maintaining fair competitions.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400">Alert Types</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="bg-red-500/10 border border-red-500/30 rounded p-4">
+                <div className="font-semibold text-red-400 mb-2 flex items-center gap-2">
+                  <Wifi className="h-4 w-4" />
+                  connection_lost
+                </div>
+                <p className="text-sm text-gray-300">WebSocket connection to price feed lost. System will attempt reconnection.</p>
+                <p className="text-xs text-gray-500 mt-1">Severity: Error</p>
+              </div>
+              <div className="bg-green-500/10 border border-green-500/30 rounded p-4">
+                <div className="font-semibold text-green-400 mb-2 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  connection_restored
+                </div>
+                <p className="text-sm text-gray-300">WebSocket connection successfully restored after disconnect.</p>
+                <p className="text-xs text-gray-500 mt-1">Severity: Warning (informational)</p>
+              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-4">
+                <div className="font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  price_stale
+                </div>
+                <p className="text-sm text-gray-300">A specific symbol&apos;s price hasn&apos;t updated for 60+ seconds.</p>
+                <p className="text-xs text-gray-500 mt-1">Severity: Error</p>
+              </div>
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded p-4">
+                <div className="font-semibold text-orange-400 mb-2 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  price_anomaly
+                </div>
+                <p className="text-sm text-gray-300">Sudden large price movement detected (1%+ change in less than 1 second).</p>
+                <p className="text-xs text-gray-500 mt-1">Severity: Warning</p>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/30 rounded p-4">
+                <div className="font-semibold text-red-400 mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  max_reconnect_reached
+                </div>
+                <p className="text-sm text-gray-300">Maximum reconnection attempts (10) exhausted. Manual intervention required!</p>
+                <p className="text-xs text-gray-500 mt-1">Severity: Critical</p>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/30 rounded p-4">
+                <div className="font-semibold text-red-400 mb-2 flex items-center gap-2">
+                  <HeartPulse className="h-4 w-4" />
+                  critical_health
+                </div>
+                <p className="text-sm text-gray-300">Overall price feed health is critical - multiple symbols are stale.</p>
+                <p className="text-xs text-gray-500 mt-1">Severity: Critical</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400">Managing Alerts</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-gray-300">
+              <div>
+                <h4 className="font-semibold text-white mb-2">How to Acknowledge Alerts</h4>
+                <ol className="text-sm space-y-2">
+                  <li>1. Go to <strong>Operations → General</strong> in the admin panel</li>
+                  <li>2. View the <strong>Price Health</strong> section</li>
+                  <li>3. Click on unacknowledged alerts to acknowledge them</li>
+                  <li>4. Acknowledged alerts are logged with your admin ID and timestamp</li>
+                </ol>
+              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3">
+                <div className="flex items-start gap-2">
+                  <Lightbulb className="h-4 w-4 text-yellow-500 mt-0.5" />
+                  <p className="text-sm">Alerts are stored in the database for audit purposes. The system keeps the last 100 alerts in memory.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+    {
+      id: 'symbol-management',
+      title: 'Symbol Management',
+      icon: CandlestickChart,
+      category: 'Operations',
+      tags: ['symbols', 'forex', 'enable', 'disable', 'pairs', 'trading'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-purple-400 mb-3">Symbol Management</h2>
+            <p className="text-gray-300 mb-4">
+              Control which forex pairs are available for trading. Only enabled symbols are monitored for price health
+              and available to users in competitions.
+            </p>
+          </div>
+
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-6">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-blue-400 mb-1">Important: Enabled vs Disabled Symbols</h4>
+                <p className="text-sm text-gray-300">
+                  When you disable a symbol, it will no longer be monitored by the Price Health Monitor.
+                  This prevents false alerts for symbols you don&apos;t want to offer. The change takes effect immediately.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400">How to Enable/Disable Symbols</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-gray-300">
+              <div>
+                <h4 className="font-semibold text-white mb-2">Individual Symbol Toggle</h4>
+                <ol className="text-sm space-y-1">
+                  <li>1. Go to <strong>Admin → Symbols</strong></li>
+                  <li>2. Find the symbol you want to change</li>
+                  <li>3. Toggle the <strong>Enabled</strong> switch</li>
+                  <li>4. The change is saved automatically</li>
+                </ol>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-2">Bulk Enable/Disable</h4>
+                <ol className="text-sm space-y-1">
+                  <li>1. Go to <strong>Admin → Symbols</strong></li>
+                  <li>2. Filter by category (Major, Cross, Exotic, Custom)</li>
+                  <li>3. Use <strong>Enable All</strong> or <strong>Disable All</strong> buttons</li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400">Available Symbol Categories</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="bg-green-500/10 border border-green-500/30 rounded p-3">
+                  <div className="font-medium text-green-400 mb-1">Major Pairs</div>
+                  <p className="text-xs text-gray-400">EUR/USD, GBP/USD, USD/JPY, USD/CHF, AUD/USD, USD/CAD, NZD/USD</p>
+                </div>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+                  <div className="font-medium text-blue-400 mb-1">Cross Pairs</div>
+                  <p className="text-xs text-gray-400">EUR/GBP, EUR/JPY, GBP/JPY, AUD/JPY, CAD/JPY, and more</p>
+                </div>
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded p-3">
+                  <div className="font-medium text-orange-400 mb-1">Exotic Pairs</div>
+                  <p className="text-xs text-gray-400">USD/MXN, USD/ZAR, USD/TRY, USD/SEK, USD/NOK</p>
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded p-3">
+                  <div className="font-medium text-purple-400 mb-1">Custom</div>
+                  <p className="text-xs text-gray-400">Admin-added custom symbols (can be deleted)</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400">Symbol Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm">
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-1">Pip Value</div>
+                  <p className="text-xs text-gray-400">0.0001 for most pairs, 0.01 for JPY pairs</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-1">Contract Size</div>
+                  <p className="text-xs text-gray-400">Standard lot = 100,000 units</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-1">Lot Size Limits</div>
+                  <p className="text-xs text-gray-400">Min: 0.01, Max: 100, Step: 0.01</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-1">Default Spread</div>
+                  <p className="text-xs text-gray-400">Used when fixed spread mode is enabled</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded">
+                  <div className="font-medium text-white mb-1">Popular Flag</div>
+                  <p className="text-xs text-gray-400">Shows in &quot;Popular&quot; section in market watch</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+    {
+      id: 'price-snapshots',
+      title: 'Price Snapshots',
+      icon: Camera,
+      category: 'Operations',
+      tags: ['snapshots', 'backup', 'recovery', 'prices', 'finalization'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-purple-400 mb-3">Price Snapshots</h2>
+            <p className="text-gray-300 mb-4">
+              Price Snapshots are periodic captures of all forex prices during active competitions. 
+              They provide a safety net for emergency competition finalization if live prices become compromised.
+            </p>
+          </div>
+
+          <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-green-400 mb-1">Automatic Cleanup</h4>
+                <p className="text-sm text-gray-300">
+                  Price snapshots are automatically deleted after <strong>7 days</strong> using a MongoDB TTL index.
+                  You don&apos;t need to manually clear them - the database handles cleanup automatically.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400">Snapshot Types</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+                <div className="font-medium text-blue-400 mb-1">auto</div>
+                <p className="text-xs text-gray-400">Automatically created on a schedule during active competitions</p>
+              </div>
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded p-3">
+                <div className="font-medium text-purple-400 mb-1">manual</div>
+                <p className="text-xs text-gray-400">Created by admin manually via the Operations panel</p>
+              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3">
+                <div className="font-medium text-yellow-400 mb-1">alert</div>
+                <p className="text-xs text-gray-400">Automatically created when a critical health alert is triggered</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400">Snapshot Data</CardTitle>
+            </CardHeader>
+            <CardContent className="text-gray-300">
+              <p className="text-sm mb-3">Each snapshot stores:</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="bg-gray-900 p-2 rounded">Timestamp</div>
+                <div className="bg-gray-900 p-2 rounded">Competition ID (if any)</div>
+                <div className="bg-gray-900 p-2 rounded">All symbol prices (bid/ask/mid)</div>
+                <div className="bg-gray-900 p-2 rounded">Spread values</div>
+                <div className="bg-gray-900 p-2 rounded">Price source (websocket/api/cache)</div>
+                <div className="bg-gray-900 p-2 rounded">Health status at time</div>
+                <div className="bg-gray-900 p-2 rounded">Connection status</div>
+                <div className="bg-gray-900 p-2 rounded">Stale duration for each symbol</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400">Emergency Finalization</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-gray-300">
+              <p className="text-sm">
+                If live prices are compromised during competition finalization, you can use a healthy snapshot instead:
+              </p>
+              <ol className="text-sm space-y-2">
+                <li>1. Go to <strong>Competitions → [Competition] → Finalize</strong></li>
+                <li>2. If current prices show issues, click <strong>Use Snapshot Prices</strong></li>
+                <li>3. Select a snapshot from the list (sorted by health status)</li>
+                <li>4. The system will use those prices for final P&L calculations</li>
+              </ol>
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 mt-4">
+                <div className="flex items-start gap-2">
+                  <Lightbulb className="h-4 w-4 text-yellow-500 mt-0.5" />
+                  <p className="text-sm">Always prefer the most recent <strong>healthy</strong> snapshot when using emergency finalization.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+    {
+      id: 'operations-general',
+      title: 'Operations General Panel',
+      icon: Activity,
+      category: 'Operations',
+      tags: ['operations', 'general', 'monitoring', 'dashboard', 'status'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-cyan-400 mb-3">Operations General Panel</h2>
+            <p className="text-gray-300 mb-4">
+              The Operations → General panel provides a real-time overview of all system operations,
+              including price health monitoring, symbol status, and system diagnostics.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400">Panel Sections</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-green-500/10 border border-green-500/30 rounded p-4">
+                <div className="font-semibold text-green-400 mb-2 flex items-center gap-2">
+                  <HeartPulse className="h-4 w-4" />
+                  Price Health Status
+                </div>
+                <ul className="text-sm text-gray-300 space-y-1">
+                  <li>• Overall health status (Healthy/Degraded/Critical)</li>
+                  <li>• Connection status and reconnect attempts</li>
+                  <li>• Count of healthy, degraded, and critical symbols</li>
+                  <li>• Per-symbol health details (expandable)</li>
+                </ul>
+              </div>
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded p-4">
+                <div className="font-semibold text-blue-400 mb-2 flex items-center gap-2">
+                  <CandlestickChart className="h-4 w-4" />
+                  Symbol Status Grid
+                </div>
+                <ul className="text-sm text-gray-300 space-y-1">
+                  <li>• Real-time prices for each enabled symbol</li>
+                  <li>• Last update timestamp</li>
+                  <li>• Price source (websocket/api/cache/fallback)</li>
+                  <li>• Stale duration indicator</li>
+                </ul>
+              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-4">
+                <div className="font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  Recent Alerts
+                </div>
+                <ul className="text-sm text-gray-300 space-y-1">
+                  <li>• Last 20 price health alerts</li>
+                  <li>• Alert type, severity, and timestamp</li>
+                  <li>• Acknowledge/dismiss functionality</li>
+                  <li>• Filter by acknowledged status</li>
+                </ul>
+              </div>
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded p-4">
+                <div className="font-semibold text-purple-400 mb-2 flex items-center gap-2">
+                  <Camera className="h-4 w-4" />
+                  Snapshot Service Status
+                </div>
+                <ul className="text-sm text-gray-300 space-y-1">
+                  <li>• Whether snapshot service is running</li>
+                  <li>• Last snapshot timestamp</li>
+                  <li>• Total snapshot count</li>
+                  <li>• Manual snapshot trigger button</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400">Common Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <div className="bg-gray-900 p-3 rounded">
+                <div className="font-medium text-white mb-1">Refresh Health Status</div>
+                <p className="text-xs text-gray-400">Click the refresh button to manually fetch latest health data from the main app.</p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded">
+                <div className="font-medium text-white mb-1">Take Manual Snapshot</div>
+                <p className="text-xs text-gray-400">Creates an immediate price snapshot for backup purposes.</p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded">
+                <div className="font-medium text-white mb-1">Acknowledge All Alerts</div>
+                <p className="text-xs text-gray-400">Marks all current alerts as acknowledged (logged in audit).</p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded">
+                <div className="font-medium text-white mb-1">Refresh Enabled Symbols</div>
+                <p className="text-xs text-gray-400">Forces the price monitor to reload which symbols to track (after enabling/disabling symbols).</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-red-400 mb-1">Connection Refused Error?</h4>
+                <p className="text-sm text-gray-300">
+                  If you see &quot;ERR_CONNECTION_REFUSED&quot; errors for the price-health endpoint, it means 
+                  the main app (usually on port 3000) is not running or not reachable from the admin app.
+                  Make sure the main Chartvolt application is running before accessing Operations.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'operations-troubleshooting',
+      title: 'Operations Troubleshooting',
+      icon: FileWarning,
+      category: 'Operations',
+      tags: ['troubleshooting', 'errors', 'debug', 'issues', 'fix'],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-red-400 mb-3">Operations Troubleshooting</h2>
+            <p className="text-gray-300 mb-4">
+              Common issues and their solutions for the Operations/Price Monitoring system.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400">ERR_CONNECTION_REFUSED on price-health</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm"><strong>Cause:</strong> The admin app cannot reach the main app&apos;s internal API.</p>
+              <div>
+                <p className="text-sm font-medium text-white mb-2">Solutions:</p>
+                <ol className="text-sm space-y-1">
+                  <li>1. Ensure the main Chartvolt app is running (usually <code className="bg-gray-900 px-1 rounded">npm run dev</code> on port 3000)</li>
+                  <li>2. Check <code className="bg-gray-900 px-1 rounded">NEXT_PUBLIC_APP_URL</code> is correctly set in admin .env</li>
+                  <li>3. Verify <code className="bg-gray-900 px-1 rounded">INTERNAL_API_KEY</code> matches between both apps</li>
+                  <li>4. Check firewall/network settings if apps are on different machines</li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400">All Symbols Showing as Critical</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm"><strong>Cause:</strong> Price feed WebSocket not connected or API key invalid.</p>
+              <div>
+                <p className="text-sm font-medium text-white mb-2">Solutions:</p>
+                <ol className="text-sm space-y-1">
+                  <li>1. Check <code className="bg-gray-900 px-1 rounded">MASSIVE_API_KEY</code> is set and valid</li>
+                  <li>2. Verify WebSocket connection in server logs</li>
+                  <li>3. Check if Massive.com API is accessible (not blocked)</li>
+                  <li>4. Wait 60 seconds for auto-reconnection to attempt</li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-orange-400">Disabled Symbols Still Being Monitored</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm"><strong>Cause:</strong> Price health monitor hasn&apos;t refreshed its symbol list.</p>
+              <div>
+                <p className="text-sm font-medium text-white mb-2">Solution:</p>
+                <p className="text-sm">The system should auto-refresh when you enable/disable symbols. If not:</p>
+                <ol className="text-sm space-y-1">
+                  <li>1. Go to Operations → General</li>
+                  <li>2. Click &quot;Refresh Enabled Symbols&quot;</li>
+                  <li>3. Or restart the main app to reload from database</li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400">Mongoose Duplicate Index Warning</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm"><strong>Message:</strong> &quot;Duplicate schema index on {`{timestamp:1}`} found&quot;</p>
+              <p className="text-sm"><strong>Status:</strong> <span className="text-green-400">Fixed in latest version</span></p>
+              <p className="text-sm">This warning was caused by declaring an index both in the schema field and via schema.index(). It has been resolved by removing the redundant index declaration.</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400">Price Snapshots Not Being Created</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300">
+              <p className="text-sm"><strong>Possible Causes:</strong></p>
+              <ol className="text-sm space-y-1">
+                <li>1. No active competitions (auto-snapshots only run during competitions)</li>
+                <li>2. Snapshot service not started</li>
+                <li>3. Database connection issues</li>
+              </ol>
+              <div className="mt-3">
+                <p className="text-sm font-medium text-white mb-2">To verify:</p>
+                <p className="text-sm">Check Snapshot Service Status in Operations → General. If stopped, restart the main app.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-blue-400 mb-1">Debug Tip</h4>
+                <p className="text-sm text-gray-300">
+                  Check the server console logs for messages starting with 🏥 (health monitor), 🔌 (WebSocket), or 📸 (snapshots) 
+                  for detailed operation information.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )
     }

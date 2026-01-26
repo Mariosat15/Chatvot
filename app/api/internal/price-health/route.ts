@@ -16,8 +16,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Initialize health monitor if not already
-    priceHealthMonitor.initialize();
+    // Initialize health monitor if not already (async - loads enabled symbols from DB)
+    await priceHealthMonitor.initialize();
 
     // Get health snapshot
     const healthSnapshot = priceHealthMonitor.getHealthSnapshot();
@@ -73,8 +73,8 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/internal/price-health/acknowledge
- * Acknowledge a price health alert
+ * POST /api/internal/price-health
+ * Actions: acknowledge alert, refresh enabled symbols
  */
 export async function POST(request: NextRequest) {
   try {
@@ -86,21 +86,38 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { alertId, acknowledgedBy } = body;
+    const { action, alertId, acknowledgedBy } = body;
 
-    if (!alertId) {
-      return NextResponse.json({ error: 'alertId is required' }, { status: 400 });
+    // Action: Refresh enabled symbols (called when admin changes symbol enabled state)
+    if (action === 'refreshSymbols') {
+      await priceHealthMonitor.refreshEnabledSymbols();
+      const monitoredSymbols = priceHealthMonitor.getMonitoredSymbols();
+      return NextResponse.json({
+        success: true,
+        message: `Refreshed enabled symbols. Now monitoring ${monitoredSymbols.length} symbols.`,
+        monitoredCount: monitoredSymbols.length,
+        symbols: monitoredSymbols,
+      });
     }
 
-    const success = priceHealthMonitor.acknowledgeAlert(alertId, acknowledgedBy || 'admin');
+    // Action: Acknowledge alert
+    if (action === 'acknowledge' || alertId) {
+      if (!alertId) {
+        return NextResponse.json({ error: 'alertId is required' }, { status: 400 });
+      }
 
-    return NextResponse.json({
-      success,
-      message: success ? 'Alert acknowledged' : 'Alert not found',
-    });
+      const success = priceHealthMonitor.acknowledgeAlert(alertId, acknowledgedBy || 'admin');
+
+      return NextResponse.json({
+        success,
+        message: success ? 'Alert acknowledged' : 'Alert not found',
+      });
+    }
+
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
   } catch (error) {
-    console.error('Error acknowledging alert:', error);
+    console.error('Error processing price-health action:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

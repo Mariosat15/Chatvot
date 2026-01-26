@@ -366,8 +366,8 @@ export async function initializeWebSocket(): Promise<void> {
     return;
   }
 
-  // 🏥 Initialize price health monitor
-  priceHealthMonitor.initialize();
+  // 🏥 Initialize price health monitor (loads enabled symbols from DB)
+  await priceHealthMonitor.initialize();
   
   // ⚡ Initialize TP/SL cache for real-time triggering
   try {

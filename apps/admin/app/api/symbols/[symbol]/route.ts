@@ -50,6 +50,9 @@ export async function PUT(
     const symbol = decodeURIComponent(symbolParam).toUpperCase();
     const body = await request.json();
     
+    // Track if enabled state is being changed
+    const isEnableChange = 'enabled' in body;
+    
     // Don't allow changing the symbol itself
     delete body.symbol;
     delete body._id;
@@ -66,6 +69,11 @@ export async function PUT(
         { error: 'Symbol not found' },
         { status: 404 }
       );
+    }
+    
+    // If enabled state changed, notify price health monitor to refresh
+    if (isEnableChange) {
+      await notifyPriceHealthMonitorRefresh();
     }
     
     return NextResponse.json({ 
@@ -116,6 +124,9 @@ export async function DELETE(
     
     await TradingSymbol.deleteOne({ symbol });
     
+    // Notify price health monitor to refresh (deleted symbol should no longer be monitored)
+    await notifyPriceHealthMonitorRefresh();
+    
     return NextResponse.json({ 
       success: true, 
       message: `${symbol} deleted successfully`
@@ -126,6 +137,32 @@ export async function DELETE(
       { error: 'Failed to delete symbol' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Notify the main app's price health monitor to refresh its enabled symbols list
+ */
+async function notifyPriceHealthMonitorRefresh(): Promise<void> {
+  try {
+    const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const response = await fetch(`${mainAppUrl}/api/internal/price-health`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-key': process.env.INTERNAL_API_KEY || 'internal-key',
+      },
+      body: JSON.stringify({ action: 'refreshSymbols' }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`✅ Price health monitor refreshed: ${data.message}`);
+    } else {
+      console.warn('⚠️ Failed to notify price health monitor (main app may not be running)');
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not notify price health monitor:', error);
   }
 }
 
