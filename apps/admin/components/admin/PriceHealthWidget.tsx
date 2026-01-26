@@ -93,19 +93,21 @@ export default function PriceHealthWidget() {
 
   const acknowledgeAlert = async (alertId: string) => {
     try {
-      const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      const response = await fetch(`${mainAppUrl}/api/internal/price-health`, {
+      // Use the admin's API which proxies to the main app securely
+      const response = await fetch('/api/price-health', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-internal-key': 'internal-key',
         },
-        body: JSON.stringify({ alertId, acknowledgedBy: 'admin' }),
+        body: JSON.stringify({ action: 'acknowledge', alertId, acknowledgedBy: 'admin' }),
       });
 
       if (response.ok) {
         toast.success('Alert acknowledged');
         fetchHealth();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast.error(data.error || 'Failed to acknowledge alert');
       }
     } catch {
       toast.error('Failed to acknowledge alert');
