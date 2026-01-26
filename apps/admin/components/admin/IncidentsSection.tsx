@@ -25,6 +25,7 @@ import {
   Gift,
   TrendingUp,
   Loader2,
+  Trophy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import IncidentResolutionModal from './IncidentResolutionModal';
@@ -87,6 +88,15 @@ interface CompensationForm {
   reason: string;
 }
 
+interface CompetitionOption {
+  _id: string;
+  name: string;
+  status: string;
+  startTime: string;
+  endTime: string;
+  participantCount?: number;
+}
+
 export default function IncidentsSection() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,6 +112,11 @@ export default function IncidentsSection() {
   const [searchQuery, setSearchQuery] = useState('');
   const [compensations, setCompensations] = useState<CompensationForm[]>([{ userId: '', amount: 0, reason: '' }]);
   const [submitting, setSubmitting] = useState(false);
+
+  // Competition selector
+  const [competitions, setCompetitions] = useState<CompetitionOption[]>([]);
+  const [competitionsLoading, setCompetitionsLoading] = useState(false);
+  const [competitionSearch, setCompetitionSearch] = useState('');
 
   // New incident form
   const [newIncident, setNewIncident] = useState({
@@ -138,6 +153,36 @@ export default function IncidentsSection() {
   useEffect(() => {
     fetchIncidents();
   }, [fetchIncidents]);
+
+  // Fetch competitions for selector
+  const fetchCompetitions = useCallback(async () => {
+    try {
+      setCompetitionsLoading(true);
+      const response = await fetch('/api/competitions');
+      const data = await response.json();
+
+      if (data.success) {
+        setCompetitions(data.competitions || []);
+      }
+    } catch (error) {
+      console.error('Error fetching competitions:', error);
+    } finally {
+      setCompetitionsLoading(false);
+    }
+  }, []);
+
+  // Fetch competitions when create modal opens or when viewing incident with competition
+  useEffect(() => {
+    if (showCreateModal || (selectedIncident?.competitionId && competitions.length === 0)) {
+      fetchCompetitions();
+    }
+  }, [showCreateModal, selectedIncident?.competitionId, competitions.length, fetchCompetitions]);
+
+  // Filter competitions based on search
+  const filteredCompetitions = competitions.filter(comp => 
+    comp.name?.toLowerCase().includes(competitionSearch.toLowerCase()) ||
+    comp._id.includes(competitionSearch)
+  );
 
   const createIncident = async () => {
     if (!newIncident.title || !newIncident.description) {
@@ -503,6 +548,15 @@ export default function IncidentsSection() {
                             </span>
                           </>
                         )}
+                        {incident.competitionId && (
+                          <>
+                            <span>•</span>
+                            <span className="flex items-center gap-1 text-blue-400">
+                              <Trophy className="h-3 w-3" />
+                              Competition linked
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                     <ChevronRight className="h-5 w-5 text-gray-500 shrink-0" />
@@ -532,6 +586,23 @@ export default function IncidentsSection() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Linked Competition */}
+                {selectedIncident.competitionId && (
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                    <h4 className="text-sm font-medium text-blue-400 mb-1 flex items-center gap-2">
+                      <Trophy className="h-4 w-4" />
+                      Linked Competition
+                    </h4>
+                    <p className="text-sm text-white">
+                      {competitions.find(c => c._id === selectedIncident.competitionId)?.name || 
+                        `Competition ID: ${selectedIncident.competitionId.slice(-8)}`}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      ID: {selectedIncident.competitionId}
+                    </p>
+                  </div>
+                )}
+
                 {/* Description */}
                 <div>
                   <h4 className="text-sm font-medium text-gray-400 mb-1">Description</h4>
@@ -720,14 +791,92 @@ export default function IncidentsSection() {
                   </select>
                 </div>
               </div>
+              {/* Competition Selector */}
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Competition ID (optional)</label>
-                <Input
-                  value={newIncident.competitionId}
-                  onChange={(e) => setNewIncident(n => ({ ...n, competitionId: e.target.value }))}
-                  placeholder="Related competition ID"
-                  className="bg-gray-700 border-gray-600"
-                />
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  <Trophy className="h-4 w-4 inline mr-1" />
+                  Related Competition (optional)
+                </label>
+                <div className="relative">
+                  <Input
+                    value={competitionSearch}
+                    onChange={(e) => setCompetitionSearch(e.target.value)}
+                    placeholder="Search competitions..."
+                    className="bg-gray-700 border-gray-600 mb-2"
+                  />
+                  {competitionsLoading ? (
+                    <div className="flex items-center justify-center py-4 text-gray-400">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Loading competitions...
+                    </div>
+                  ) : (
+                    <div className="max-h-40 overflow-y-auto bg-gray-700/50 rounded-lg border border-gray-600">
+                      {/* No competition option */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewIncident(n => ({ ...n, competitionId: '' }));
+                          setCompetitionSearch('');
+                        }}
+                        className={cn(
+                          "w-full text-left px-3 py-2 text-sm hover:bg-gray-600/50 transition-colors",
+                          !newIncident.competitionId && "bg-blue-500/20 text-blue-400"
+                        )}
+                      >
+                        <span className="text-gray-400">No specific competition</span>
+                      </button>
+                      {filteredCompetitions.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-gray-500">
+                          {competitionSearch ? 'No competitions found' : 'No competitions available'}
+                        </div>
+                      ) : (
+                        filteredCompetitions.slice(0, 10).map((comp) => (
+                          <button
+                            key={comp._id}
+                            type="button"
+                            onClick={() => {
+                              setNewIncident(n => ({ ...n, competitionId: comp._id }));
+                              setCompetitionSearch('');
+                            }}
+                            className={cn(
+                              "w-full text-left px-3 py-2 text-sm hover:bg-gray-600/50 transition-colors border-t border-gray-600/50",
+                              newIncident.competitionId === comp._id && "bg-blue-500/20 text-blue-400"
+                            )}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{comp.name}</span>
+                              <span className={cn(
+                                "text-xs px-2 py-0.5 rounded",
+                                comp.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                                comp.status === 'completed' ? 'bg-gray-500/20 text-gray-400' :
+                                comp.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                                'bg-red-500/20 text-red-400'
+                              )}>
+                                {comp.status}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {new Date(comp.startTime).toLocaleDateString()} - {new Date(comp.endTime).toLocaleDateString()}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                  {newIncident.competitionId && (
+                    <div className="mt-2 flex items-center gap-2 text-sm text-blue-400 bg-blue-500/10 px-3 py-2 rounded-lg">
+                      <Trophy className="h-4 w-4" />
+                      <span>Selected: {competitions.find(c => c._id === newIncident.competitionId)?.name || newIncident.competitionId}</span>
+                      <button 
+                        type="button"
+                        onClick={() => setNewIncident(n => ({ ...n, competitionId: '' }))}
+                        className="ml-auto text-gray-400 hover:text-white"
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className="p-4 border-t border-gray-700 flex items-center justify-end gap-2">
