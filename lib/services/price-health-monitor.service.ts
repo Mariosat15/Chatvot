@@ -8,7 +8,9 @@
  */
 
 import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
+import { notificationService } from './notification.service';
 import { connectToDatabase } from '@/database/mongoose';
+import mongoose from 'mongoose';
 
 // Get array of forex symbols from the FOREX_PAIRS object
 const FOREX_SYMBOLS = Object.keys(FOREX_PAIRS) as ForexSymbol[];
@@ -399,21 +401,25 @@ class PriceHealthMonitorService {
     try {
       await connectToDatabase();
       
-      // Get admin users
-      const User = (await import('@/database/models/user.model')).default;
-      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      // Get admin users from collection (no User model exists)
+      const usersCollection = mongoose.connection.collection('user');
+      const admins = await usersCollection.find({ role: 'admin' }).project({ _id: 1 }).toArray();
 
       for (const admin of admins) {
-        await notificationService.createCustom({
-          userId: admin._id.toString(),
-          type: 'price_feed_critical',
-          title: '🚨 Critical: Price Feed Issue',
-          message,
-          icon: 'alert-triangle',
-          category: 'system',
-          priority: 'urgent',
-          color: 'red',
-        });
+        try {
+          await notificationService.createCustom({
+            userId: admin._id.toString(),
+            type: 'price_feed_critical',
+            title: '🚨 Critical: Price Feed Issue',
+            message,
+            icon: 'alert-triangle',
+            category: 'system',
+            priority: 'urgent',
+            color: 'red',
+          });
+        } catch {
+          // Notification method may not exist, continue
+        }
       }
     } catch (error) {
       console.error('Failed to notify admin:', error);
