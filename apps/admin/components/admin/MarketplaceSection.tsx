@@ -76,7 +76,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StrategyBuilder from './StrategyBuilder';
-import { Lightbulb, Target } from 'lucide-react';
+import { Lightbulb } from 'lucide-react';
 
 // Available icons for icon picker
 const AVAILABLE_ICONS = [
