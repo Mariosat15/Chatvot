@@ -121,8 +121,18 @@ export async function finalizeCompetition(competitionId: string) {
     let pricesMap: Map<ForexSymbol, { bid: number; ask: number; mid: number; spread: number; timestamp: number }> = new Map();
     let usedSnapshotPrices = false;
     
+    // Price health check - only runs in main app context
+    // Uses dynamic path to prevent Turbopack from analyzing imports in admin app build
+    const PRICE_HEALTH_SERVICE = '@/lib/services/price-health-monitor.service';
+    const PRICE_SNAPSHOT_SERVICE = '@/lib/services/price-snapshot.service';
+    const INCIDENT_MODEL = '@/database/models/incident.model';
+    
     try {
-      const { priceHealthMonitor } = await import('@/lib/services/price-health-monitor.service');
+      // Dynamic import that prevents static analysis
+      const priceHealthModule = await import(/* webpackIgnore: true */ PRICE_HEALTH_SERVICE).catch(() => null);
+      if (!priceHealthModule) throw new Error('Price health service not available');
+      
+      const { priceHealthMonitor } = priceHealthModule;
       const healthCheck = priceHealthMonitor.arePricesSafeForFinalization(uniqueSymbols);
       
       if (!healthCheck.safe) {
@@ -133,57 +143,65 @@ export async function finalizeCompetition(competitionId: string) {
         
         // Try to use last healthy snapshot instead
         console.log(`📸 Attempting to use last healthy snapshot for finalization...`);
-        const { priceSnapshotService } = await import('@/lib/services/price-snapshot.service');
-        const lastHealthy = await priceSnapshotService.getLastHealthySnapshot(competitionId);
+        const snapshotModule = await import(/* webpackIgnore: true */ PRICE_SNAPSHOT_SERVICE).catch(() => null);
         
-        if (lastHealthy && lastHealthy.prices.size > 0) {
-          console.log(`✅ Using snapshot from ${lastHealthy.timestamp.toISOString()}`);
+        if (snapshotModule) {
+          const { priceSnapshotService } = snapshotModule;
+          const lastHealthy = await priceSnapshotService.getLastHealthySnapshot(competitionId);
           
-          // Convert snapshot prices to the expected format
-          pricesMap = new Map();
-          for (const symbol of uniqueSymbols) {
-            const snapshotPrice = lastHealthy.prices.get(symbol);
-            if (snapshotPrice) {
-              pricesMap.set(symbol, {
-                bid: snapshotPrice.bid,
-                ask: snapshotPrice.ask,
-                mid: (snapshotPrice.bid + snapshotPrice.ask) / 2,
-                spread: snapshotPrice.ask - snapshotPrice.bid,
-                timestamp: lastHealthy.timestamp.getTime(),
-              });
+          if (lastHealthy && lastHealthy.prices.size > 0) {
+            console.log(`✅ Using snapshot from ${lastHealthy.timestamp.toISOString()}`);
+            
+            // Convert snapshot prices to the expected format
+            pricesMap = new Map();
+            for (const symbol of uniqueSymbols) {
+              const snapshotPrice = lastHealthy.prices.get(symbol);
+              if (snapshotPrice) {
+                pricesMap.set(symbol, {
+                  bid: snapshotPrice.bid,
+                  ask: snapshotPrice.ask,
+                  mid: (snapshotPrice.bid + snapshotPrice.ask) / 2,
+                  spread: snapshotPrice.ask - snapshotPrice.bid,
+                  timestamp: lastHealthy.timestamp.getTime(),
+                });
+              }
             }
-          }
-          
-          // Mark snapshot as used
-          await priceSnapshotService.markSnapshotAsUsed(lastHealthy.snapshotId, competitionId);
-          
-          // Update competition with snapshot info
-          competition.usedSnapshotId = lastHealthy.snapshotId;
-          usedSnapshotPrices = true;
-          
-          console.log(`📸 Loaded ${pricesMap.size} prices from snapshot`);
-        } else {
-          // No healthy snapshot - log critical warning but try to proceed with current prices
-          console.error(`❌ [FINALIZATION] No healthy snapshot available! Proceeding with potentially stale prices.`);
-          console.error(`   This may result in unfair finalization. Consider manual intervention.`);
-          
-          // Log incident
-          try {
-            const Incident = (await import('@/database/models/incident.model')).default;
-            await Incident.create({
-              competitionId,
-              type: 'price_feed_failure',
-              severity: 'critical',
-              status: 'open',
-              description: `Price health check failed during finalization. No healthy snapshot available. Proceeded with potentially stale prices.`,
-              affectedUsers: allParticipants.map(p => p.userId.toString()),
-              evidence: {
-                healthIssues: healthCheck.issues,
-              },
-              createdBy: 'system',
-            });
-          } catch {
-            // Incident model may not exist yet
+            
+            // Mark snapshot as used
+            await priceSnapshotService.markSnapshotAsUsed(lastHealthy.snapshotId, competitionId);
+            
+            // Update competition with snapshot info
+            competition.usedSnapshotId = lastHealthy.snapshotId;
+            usedSnapshotPrices = true;
+            
+            console.log(`📸 Loaded ${pricesMap.size} prices from snapshot`);
+          } else {
+            // No healthy snapshot - log critical warning but try to proceed with current prices
+            console.error(`❌ [FINALIZATION] No healthy snapshot available! Proceeding with potentially stale prices.`);
+            console.error(`   This may result in unfair finalization. Consider manual intervention.`);
+            
+            // Log incident - try to import dynamically
+            try {
+              const incidentModule = await import(/* webpackIgnore: true */ INCIDENT_MODEL).catch(() => null);
+              if (incidentModule) {
+                const Incident = incidentModule.default;
+                await Incident.create({
+                  competitionId,
+                  type: 'price_feed_failure',
+                  severity: 'critical',
+                  status: 'open',
+                  title: 'Price Feed Failure During Finalization',
+                  description: `Price health check failed during finalization. No healthy snapshot available. Proceeded with potentially stale prices.`,
+                  affectedUsers: allParticipants.map(p => p.userId.toString()),
+                  evidence: {
+                    healthIssues: healthCheck.issues,
+                  },
+                  createdBy: 'system',
+                });
+              }
+            } catch {
+              // Incident model may not exist in this context
+            }
           }
         }
       }
