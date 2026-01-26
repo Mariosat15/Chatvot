@@ -23,6 +23,34 @@ import {
   Percent,
   Trophy,
   UserPlus,
+  Zap,
+  Target,
+  Gauge,
+  BarChart3,
+  LineChart,
+  Activity,
+  TrendingDown,
+  Flame,
+  Shield,
+  Rocket,
+  Gem,
+  Sparkles,
+  Coins,
+  Wallet,
+  PiggyBank,
+  Banknote,
+  CircleDollarSign,
+  BadgePercent,
+  Swords,
+  Crosshair,
+  Focus,
+  Layers,
+  Grid3X3,
+  Waves,
+  Mountain,
+  Sun,
+  Moon,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -49,6 +77,45 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StrategyBuilder from './StrategyBuilder';
 import { Lightbulb, Target } from 'lucide-react';
+
+// Available icons for icon picker
+const AVAILABLE_ICONS = [
+  { name: 'TrendingUp', icon: TrendingUp, category: 'trading' },
+  { name: 'TrendingDown', icon: TrendingDown, category: 'trading' },
+  { name: 'BarChart3', icon: BarChart3, category: 'trading' },
+  { name: 'LineChart', icon: LineChart, category: 'trading' },
+  { name: 'Activity', icon: Activity, category: 'trading' },
+  { name: 'Target', icon: Target, category: 'trading' },
+  { name: 'Crosshair', icon: Crosshair, category: 'trading' },
+  { name: 'Focus', icon: Focus, category: 'trading' },
+  { name: 'Gauge', icon: Gauge, category: 'trading' },
+  { name: 'Waves', icon: Waves, category: 'trading' },
+  { name: 'Mountain', icon: Mountain, category: 'trading' },
+  { name: 'Layers', icon: Layers, category: 'trading' },
+  { name: 'Grid3X3', icon: Grid3X3, category: 'trading' },
+  { name: 'Zap', icon: Zap, category: 'action' },
+  { name: 'Flame', icon: Flame, category: 'action' },
+  { name: 'Rocket', icon: Rocket, category: 'action' },
+  { name: 'Sparkles', icon: Sparkles, category: 'action' },
+  { name: 'Star', icon: Star, category: 'action' },
+  { name: 'Crown', icon: Crown, category: 'premium' },
+  { name: 'Gem', icon: Gem, category: 'premium' },
+  { name: 'Trophy', icon: Trophy, category: 'premium' },
+  { name: 'Shield', icon: Shield, category: 'premium' },
+  { name: 'Swords', icon: Swords, category: 'premium' },
+  { name: 'Coins', icon: Coins, category: 'money' },
+  { name: 'Wallet', icon: Wallet, category: 'money' },
+  { name: 'PiggyBank', icon: PiggyBank, category: 'money' },
+  { name: 'Banknote', icon: Banknote, category: 'money' },
+  { name: 'CircleDollarSign', icon: CircleDollarSign, category: 'money' },
+  { name: 'BadgePercent', icon: BadgePercent, category: 'money' },
+  { name: 'Sun', icon: Sun, category: 'misc' },
+  { name: 'Moon', icon: Moon, category: 'misc' },
+  { name: 'Package', icon: Package, category: 'misc' },
+  { name: 'Code', icon: Code, category: 'misc' },
+  { name: 'Palette', icon: Palette, category: 'misc' },
+  { name: 'Users', icon: Users, category: 'misc' },
+] as const;
 
 interface StrategyConfig {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -91,6 +158,7 @@ interface MarketplaceItem {
   gameMasterConfig?: GameMasterConfig;
   cosmeticType?: string;
   imageUrl?: string;
+  iconName?: string; // Selected icon name for non-cosmetic items
   codeTemplate: string;
   defaultSettings: Record<string, any>;
   supportedAssets: string[];
@@ -149,6 +217,8 @@ const emptyItem: Partial<MarketplaceItem> = {
   version: '1.0.0',
   codeTemplate: '{}',
   defaultSettings: {},
+  imageUrl: '',
+  iconName: 'TrendingUp', // Default icon
   strategyConfig: {
     rules: [],
     defaultIndicators: [],
@@ -230,8 +300,8 @@ export default function MarketplaceSection() {
     }
   };
 
-  // Handle cosmetic image upload
-  const handleCosmeticImageUpload = async (file: File) => {
+  // Handle image upload for any marketplace item
+  const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload an image file');
       return;
@@ -955,82 +1025,95 @@ export default function MarketplaceSection() {
                 )}
               </div>
               
-              {/* Cosmetic Image Upload */}
-              {editingItem.category === 'cosmetic' && (
-                <div className="space-y-4">
-                  <div className="space-y-3">
-                    <Label className="flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4 text-pink-400" />
-                      Cosmetic Image *
-                    </Label>
-                    
-                    {/* File Upload */}
-                    <div className="flex flex-col gap-3">
-                      <input
-                        type="file"
-                        id="cosmetic-image-upload"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleCosmeticImageUpload(file);
-                          e.target.value = '';
-                        }}
-                        disabled={uploadingImage}
-                      />
-                      <label 
-                        htmlFor="cosmetic-image-upload"
-                        className={cn(
-                          "flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed cursor-pointer transition-all",
-                          uploadingImage 
-                            ? "border-gray-600 bg-gray-800/50 cursor-not-allowed" 
-                            : "border-pink-500/50 bg-pink-500/5 hover:bg-pink-500/10 hover:border-pink-500"
-                        )}
-                      >
-                        {uploadingImage ? (
-                          <>
-                            <RefreshCw className="h-5 w-5 animate-spin text-pink-400" />
-                            <span className="text-pink-400">Uploading...</span>
-                          </>
-                        ) : (
-                          <>
-                            <ImageIcon className="h-5 w-5 text-pink-400" />
-                            <span className="text-pink-400">Click to upload image</span>
-                          </>
-                        )}
-                      </label>
-                      
-                      <p className="text-xs text-gray-500">
-                        Recommended: 200x200px square image, PNG or JPEG (max 5MB)
-                      </p>
-                    </div>
-                  </div>
+              {/* Image Upload - Available for ALL categories */}
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4 text-cyan-400" />
+                    Item Image {editingItem.category === 'cosmetic' ? '*' : '(Optional)'}
+                  </Label>
                   
-                  {/* Preview */}
-                  {editingItem.imageUrl && (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-4 p-4 bg-gray-800/50 border border-gray-700 rounded-xl">
-                        <div className="relative w-24 h-24 rounded-xl border-2 border-pink-500/50 shadow-lg shadow-pink-500/20 overflow-hidden bg-gray-900 flex items-center justify-center">
-                          <img
-                            src={editingItem.imageUrl}
-                            alt="Preview"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                          <User className="w-10 h-10 text-gray-600 absolute" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-400">Preview</p>
-                          <p className="text-white font-medium text-lg">{editingItem.name || 'Untitled'}</p>
-                          <p className="text-xs text-gray-500 mt-1 font-mono truncate max-w-[200px]">
-                            {editingItem.imageUrl}
-                          </p>
-                        </div>
+                  {/* File Upload */}
+                  <div className="flex flex-col gap-3">
+                    <input
+                      type="file"
+                      id="item-image-upload"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file);
+                        e.target.value = '';
+                      }}
+                      disabled={uploadingImage}
+                    />
+                    <label 
+                      htmlFor="item-image-upload"
+                      className={cn(
+                        "flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed cursor-pointer transition-all",
+                        uploadingImage 
+                          ? "border-gray-600 bg-gray-800/50 cursor-not-allowed" 
+                          : "border-cyan-500/50 bg-cyan-500/5 hover:bg-cyan-500/10 hover:border-cyan-500"
+                      )}
+                    >
+                      {uploadingImage ? (
+                        <>
+                          <RefreshCw className="h-5 w-5 animate-spin text-cyan-400" />
+                          <span className="text-cyan-400">Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ImageIcon className="h-5 w-5 text-cyan-400" />
+                          <span className="text-cyan-400">Click to upload image</span>
+                        </>
+                      )}
+                    </label>
+                    
+                    <p className="text-xs text-gray-500">
+                      {editingItem.category === 'cosmetic' 
+                        ? 'Recommended: 200x200px square image for avatars' 
+                        : 'Optional: Upload a custom image for this item'}
+                      {' '}(PNG, JPEG, max 5MB)
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Preview */}
+                {editingItem.imageUrl && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-4 p-4 bg-gray-800/50 border border-gray-700 rounded-xl">
+                      <div className="relative w-24 h-24 rounded-xl border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/20 overflow-hidden bg-gray-900 flex items-center justify-center">
+                        <img
+                          src={editingItem.imageUrl}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                        <ImageIcon className="w-10 h-10 text-gray-600 absolute" />
                       </div>
-                      
-                      {/* AI Generate Button */}
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-400">Image Preview</p>
+                        <p className="text-white font-medium text-lg">{editingItem.name || 'Untitled'}</p>
+                        <p className="text-xs text-gray-500 mt-1 font-mono truncate max-w-[200px]">
+                          {editingItem.imageUrl}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingItem(prev => ({ ...prev, imageUrl: '' }))}
+                          className="text-red-400 hover:text-red-300 mt-1 h-6 px-2"
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Remove Image
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* AI Generate Button - Only for cosmetics */}
+                    {editingItem.category === 'cosmetic' && (
                       <Button
                         type="button"
                         onClick={handleGenerateWithAI}
@@ -1052,7 +1135,43 @@ export default function MarketplaceSection() {
                       <p className="text-xs text-gray-500 text-center">
                         AI will analyze the image and create a unique name, tagline, and backstory
                       </p>
-                    </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Icon Picker - For non-cosmetic items */}
+              {editingItem.category !== 'cosmetic' && (
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-amber-400" />
+                    Item Icon
+                  </Label>
+                  <p className="text-xs text-gray-500">
+                    Select an icon to represent this item in the marketplace
+                  </p>
+                  <div className="grid grid-cols-9 gap-2 p-4 bg-gray-800/50 border border-gray-700 rounded-xl max-h-48 overflow-y-auto">
+                    {AVAILABLE_ICONS.map(({ name, icon: Icon }) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => setEditingItem(prev => ({ ...prev, iconName: name }))}
+                        className={cn(
+                          "p-2 rounded-lg transition-all flex items-center justify-center",
+                          editingItem.iconName === name
+                            ? "bg-cyan-500/30 border-2 border-cyan-500 text-cyan-400"
+                            : "bg-gray-700/50 border border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-white"
+                        )}
+                        title={name}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </button>
+                    ))}
+                  </div>
+                  {editingItem.iconName && (
+                    <p className="text-xs text-cyan-400">
+                      Selected: {editingItem.iconName}
+                    </p>
                   )}
                 </div>
               )}

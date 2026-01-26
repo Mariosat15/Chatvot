@@ -25,6 +25,7 @@ import {
   Swords,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface GameMaster {
   id: string;
@@ -105,6 +106,9 @@ interface GameMasterManagementSectionProps {
 }
 
 export default function GameMasterManagementSection({ initialGmId }: GameMasterManagementSectionProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  
   const [gamemasters, setGamemasters] = useState<GameMaster[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -224,7 +228,13 @@ export default function GameMasterManagementSection({ initialGmId }: GameMasterM
     return (
       <div className="space-y-6">
         <button 
-          onClick={() => setSelectedGM(null)}
+          onClick={() => {
+            setSelectedGM(null);
+            // Clear URL params when going back
+            if (initialGmId) {
+              router.replace(pathname, { scroll: false });
+            }
+          }}
           className="flex items-center gap-2 text-gray-400 hover:text-white"
         >
           <ChevronLeft className="h-4 w-4" />

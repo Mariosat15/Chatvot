@@ -1047,6 +1047,10 @@ export async function seedMarketplaceItems(adminId: string = 'system'): Promise<
         if (!existing.imageUrl && itemData.imageUrl) {
           existing.imageUrl = itemData.imageUrl;
         }
+        // PRESERVE existing iconName if admin has selected one
+        if (!existing.iconName && itemData.iconName) {
+          existing.iconName = itemData.iconName;
+        }
         existing.codeTemplate = itemData.codeTemplate || existing.codeTemplate;
         existing.defaultSettings = itemData.defaultSettings || existing.defaultSettings;
         // PRESERVE existing descriptions if admin has customized them

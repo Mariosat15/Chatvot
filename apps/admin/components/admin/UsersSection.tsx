@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -145,6 +146,9 @@ interface UsersSectionProps {
 }
 
 export default function UsersSection({ initialUserId }: UsersSectionProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -908,7 +912,13 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
       {selectedUser && (
         <UserFullDetailPanel
           open={detailPanelOpen}
-          onOpenChange={setDetailPanelOpen}
+          onOpenChange={(open) => {
+            setDetailPanelOpen(open);
+            // Clear URL params when closing panel
+            if (!open && initialUserId) {
+              router.replace(pathname, { scroll: false });
+            }
+          }}
           user={selectedUser}
           onRefresh={() => {
             fetchUsers();

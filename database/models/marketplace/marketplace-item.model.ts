@@ -105,7 +105,8 @@ export interface IMarketplaceItem extends Document {
   indicatorType?: IndicatorType; // For indicator items
   strategyConfig?: IStrategyConfig; // For strategy items
   cosmeticType?: CosmeticType; // For cosmetic items (avatar, frame, etc.)
-  imageUrl?: string; // For cosmetic items - the actual image/asset
+  imageUrl?: string; // Image URL for any item type
+  iconName?: string; // Lucide icon name for non-cosmetic items
   gameMasterConfig?: IGameMasterConfig; // For gamemaster subscription packages
   
   // The actual code/configuration (JSON string)
@@ -248,7 +249,8 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       type: String,
       enum: ['avatar', 'profile_frame', 'badge', 'title'],
     },
-    imageUrl: String, // For cosmetic items - the actual image/asset
+    imageUrl: String, // Image URL for any item type
+    iconName: String, // Lucide icon name for non-cosmetic items
     gameMasterConfig: {
       maxCompetitionsPerDay: { type: Number, min: 1, default: 1 },
       maxUsersPerCompetition: { type: Number, min: 2, default: 50 },
