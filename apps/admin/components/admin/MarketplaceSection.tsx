@@ -1445,30 +1445,32 @@ export default function MarketplaceSection() {
                     </div>
                   )}
                   
-                  {/* Max Users Per Competition */}
-                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <UserPlus className="h-5 w-5 text-cyan-400" />
-                      <Label className="text-white font-semibold">Max Users Per Competition</Label>
+                  {/* Max Users Per Competition - Only show if competitions are enabled */}
+                  {editingItem.gameMasterConfig?.canCreateCompetitions !== false && (
+                    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <UserPlus className="h-5 w-5 text-cyan-400" />
+                        <Label className="text-white font-semibold">Max Users Per Competition</Label>
+                      </div>
+                      <Input
+                        type="number"
+                        value={editingItem.gameMasterConfig?.maxUsersPerCompetition || 50}
+                        onChange={(e) => setEditingItem({
+                          ...editingItem,
+                          gameMasterConfig: {
+                            ...editingItem.gameMasterConfig!,
+                            maxUsersPerCompetition: parseInt(e.target.value) || 50
+                          }
+                        })}
+                        min={2}
+                        max={1000}
+                        className="bg-gray-800 border-gray-600 text-white text-lg h-12"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Maximum number of participants in competitions created by this Game Master
+                      </p>
                     </div>
-                    <Input
-                      type="number"
-                      value={editingItem.gameMasterConfig?.maxUsersPerCompetition || 50}
-                      onChange={(e) => setEditingItem({
-                        ...editingItem,
-                        gameMasterConfig: {
-                          ...editingItem.gameMasterConfig!,
-                          maxUsersPerCompetition: parseInt(e.target.value) || 50
-                        }
-                      })}
-                      min={2}
-                      max={1000}
-                      className="bg-gray-800 border-gray-600 text-white text-lg h-12"
-                    />
-                    <p className="text-xs text-gray-500">
-                      Maximum number of participants in competitions created by this Game Master
-                    </p>
-                  </div>
+                  )}
                 </div>
 
                 {/* Challenge Earnings Section */}

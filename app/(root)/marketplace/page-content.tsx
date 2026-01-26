@@ -1531,28 +1531,56 @@ function ItemDetailModal({
                 <Crown className="h-5 w-5 text-yellow-400" />
                 Package Features
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 rounded-2xl p-5 border border-yellow-500/20">
-                  <Calendar className="h-6 w-6 text-yellow-400 mb-2" />
-                  <div className="text-2xl font-bold text-white">{item.gameMasterConfig.subscriptionDurationDays}</div>
-                  <div className="text-sm text-gray-400">Days Duration</div>
+              {item.gameMasterConfig.canCreateCompetitions !== false ? (
+                /* Full package with competitions */
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 rounded-2xl p-5 border border-yellow-500/20">
+                    <Calendar className="h-6 w-6 text-yellow-400 mb-2" />
+                    <div className="text-2xl font-bold text-white">{item.gameMasterConfig.subscriptionDurationDays}</div>
+                    <div className="text-sm text-gray-400">Days Duration</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-emerald-500/10 to-green-500/10 rounded-2xl p-5 border border-emerald-500/20">
+                    <Percent className="h-6 w-6 text-emerald-400 mb-2" />
+                    <div className="text-2xl font-bold text-emerald-400">{item.gameMasterConfig.referralFeePercentage}%</div>
+                    <div className="text-sm text-gray-400">Referral Earnings</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-2xl p-5 border border-blue-500/20">
+                    <Zap className="h-6 w-6 text-blue-400 mb-2" />
+                    <div className="text-2xl font-bold text-white">{item.gameMasterConfig.maxCompetitionsPerDay}</div>
+                    <div className="text-sm text-gray-400">Competitions/Day</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl p-5 border border-purple-500/20">
+                    <Users className="h-6 w-6 text-purple-400 mb-2" />
+                    <div className="text-2xl font-bold text-white">{item.gameMasterConfig.maxUsersPerCompetition}</div>
+                    <div className="text-sm text-gray-400">Max Users/Comp</div>
+                  </div>
                 </div>
-                <div className="bg-gradient-to-br from-emerald-500/10 to-green-500/10 rounded-2xl p-5 border border-emerald-500/20">
-                  <Percent className="h-6 w-6 text-emerald-400 mb-2" />
-                  <div className="text-2xl font-bold text-emerald-400">{item.gameMasterConfig.referralFeePercentage}%</div>
-                  <div className="text-sm text-gray-400">Referral Earnings</div>
+              ) : (
+                /* Referral-only package - no competition features */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 rounded-2xl p-5 border border-yellow-500/20">
+                      <Calendar className="h-6 w-6 text-yellow-400 mb-2" />
+                      <div className="text-2xl font-bold text-white">{item.gameMasterConfig.subscriptionDurationDays}</div>
+                      <div className="text-sm text-gray-400">Days Duration</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-emerald-500/10 to-green-500/10 rounded-2xl p-5 border border-emerald-500/20">
+                      <Percent className="h-6 w-6 text-emerald-400 mb-2" />
+                      <div className="text-2xl font-bold text-emerald-400">{item.gameMasterConfig.referralFeePercentage}%</div>
+                      <div className="text-sm text-gray-400">Referral Earnings</div>
+                    </div>
+                  </div>
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-5">
+                    <div className="flex items-center gap-3 text-yellow-400 mb-2">
+                      <Users className="h-6 w-6" />
+                      <span className="text-lg font-bold">Referral-Only Package</span>
+                    </div>
+                    <p className="text-gray-400 text-sm">
+                      This package focuses on earning from referrals. You can earn from any competition or challenge your referred users participate in.
+                    </p>
+                  </div>
                 </div>
-                <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-2xl p-5 border border-blue-500/20">
-                  <Zap className="h-6 w-6 text-blue-400 mb-2" />
-                  <div className="text-2xl font-bold text-white">{item.gameMasterConfig.maxCompetitionsPerDay}</div>
-                  <div className="text-sm text-gray-400">Competitions/Day</div>
-                </div>
-                <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl p-5 border border-purple-500/20">
-                  <Users className="h-6 w-6 text-purple-400 mb-2" />
-                  <div className="text-2xl font-bold text-white">{item.gameMasterConfig.maxUsersPerCompetition}</div>
-                  <div className="text-sm text-gray-400">Max Users/Comp</div>
-                </div>
-              </div>
+              )}
             </div>
           )}
           
