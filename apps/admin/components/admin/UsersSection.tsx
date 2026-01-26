@@ -30,7 +30,6 @@ import {
   AlertTriangle,
   Crown,
 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import UserFullDetailPanel from './UserFullDetailPanel';
 import { CustomerAssignmentBadge } from './CustomerAssignmentBadge';
@@ -141,10 +140,11 @@ export interface UserData {
 type SortField = 'name' | 'email' | 'balance' | 'netProfit' | 'createdAt' | 'competitions' | 'challenges' | 'online';
 type SortDirection = 'asc' | 'desc';
 
-export default function UsersSection() {
-  const searchParams = useSearchParams();
-  const urlUserId = searchParams.get('userId');
-  
+interface UsersSectionProps {
+  initialUserId?: string;
+}
+
+export default function UsersSection({ initialUserId }: UsersSectionProps) {
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -185,19 +185,19 @@ export default function UsersSection() {
     return () => clearInterval(onlineInterval);
   }, []);
 
-  // Handle URL parameter to open specific user
+  // Handle initial user ID to open specific user
   useEffect(() => {
-    if (urlUserId && users.length > 0 && !detailPanelOpen) {
-      const targetUser = users.find(u => u.id === urlUserId);
+    if (initialUserId && users.length > 0 && !detailPanelOpen) {
+      const targetUser = users.find(u => u.id === initialUserId);
       if (targetUser) {
         setSelectedUser(targetUser);
         setDetailPanelOpen(true);
       } else {
         // User not in current page, fetch directly
-        fetchUserById(urlUserId);
+        fetchUserById(initialUserId);
       }
     }
-  }, [urlUserId, users]);
+  }, [initialUserId, users]);
   
   const fetchUserById = async (userId: string) => {
     try {

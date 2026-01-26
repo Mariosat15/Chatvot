@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -538,8 +538,16 @@ export default function AdminDashboard({
     return allowedSections.includes(sectionId);
   };
 
-  // Determine the initial section - use first allowed section if user doesn't have access to overview
+  // URL params for deep linking
+  const searchParams = useSearchParams();
+  const urlActiveTab = searchParams.get('activeTab');
+  const urlUserId = searchParams.get('userId');
+  const urlGmId = searchParams.get('gmId');
+
+  // Determine the initial section - use URL param first, then first allowed section
   const getInitialSection = () => {
+    // Check URL param first
+    if (urlActiveTab && hasAccessToSection(urlActiveTab)) return urlActiveTab;
     if (isFirstLogin && hasAccessToSection('credentials')) return 'credentials';
     if (hasAccessToSection('overview')) return 'overview';
     // Find first accessible section
@@ -551,6 +559,13 @@ export default function AdminDashboard({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [serverTime, setServerTime] = useState(new Date());
+  
+  // Handle URL param changes for deep linking
+  useEffect(() => {
+    if (urlActiveTab && hasAccessToSection(urlActiveTab) && urlActiveTab !== activeSection) {
+      setActiveSection(urlActiveTab);
+    }
+  }, [urlActiveTab]);
   
   // Refresh keys for each section - increment to force refresh
   const [refreshKeys, setRefreshKeys] = useState<Record<string, number>>({});
@@ -764,7 +779,7 @@ export default function AdminDashboard({
       case 'marketplace':
         return <MarketplaceSection key={currentRefreshKey} />;
       case 'users':
-        return <UsersSection key={currentRefreshKey} />;
+        return <UsersSection key={currentRefreshKey} initialUserId={urlUserId || undefined} />;
       case 'trading-history':
         return <TradingHistorySection key={currentRefreshKey} />;
       case 'financial':
@@ -851,7 +866,7 @@ export default function AdminDashboard({
       case 'gamemaster-dashboard':
         return <GameMasterDashboardSection key={currentRefreshKey} />;
       case 'gamemaster-management':
-        return <GameMasterManagementSection key={currentRefreshKey} />;
+        return <GameMasterManagementSection key={currentRefreshKey} initialGmId={urlGmId || undefined} />;
       default:
         return <CompetitionsListSection key={currentRefreshKey} />;
     }

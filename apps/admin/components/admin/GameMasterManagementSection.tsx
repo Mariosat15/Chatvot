@@ -100,7 +100,11 @@ interface DetailedGameMaster {
   }>;
 }
 
-export default function GameMasterManagementSection() {
+interface GameMasterManagementSectionProps {
+  initialGmId?: string;
+}
+
+export default function GameMasterManagementSection({ initialGmId }: GameMasterManagementSectionProps) {
   const [gamemasters, setGamemasters] = useState<GameMaster[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -141,6 +145,13 @@ export default function GameMasterManagementSection() {
   useEffect(() => {
     fetchGameMasters();
   }, [fetchGameMasters]);
+
+  // Handle initial GM ID to auto-open specific GM's detail view
+  useEffect(() => {
+    if (initialGmId && !selectedGM && !detailLoading) {
+      viewDetails(initialGmId);
+    }
+  }, [initialGmId]);
 
   const viewDetails = async (gmId: string) => {
     setDetailLoading(true);
@@ -406,14 +417,23 @@ export default function GameMasterManagementSection() {
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {selectedGM.referredUsers.slice(0, 10).map((user) => (
-                  <div key={user.id} className="flex items-center justify-between p-2 bg-gray-900/50 rounded">
-                    <div>
-                      <p className="text-white text-sm">{user.name}</p>
-                      <p className="text-gray-400 text-xs">{user.email}</p>
+                  <div key={user.id} className="flex items-center justify-between p-3 bg-gray-900/50 rounded hover:bg-gray-900/70 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-medium">{user.name}</p>
+                      <p className="text-gray-400 text-xs truncate">{user.email}</p>
+                      <p className="text-gray-500 text-xs font-mono mt-0.5">ID: {user.id}</p>
                     </div>
-                    <p className="text-gray-400 text-xs">
-                      {new Date(user.referredAt || user.createdAt).toLocaleDateString()}
-                    </p>
+                    <div className="text-right ml-3">
+                      <p className="text-gray-400 text-xs">
+                        {new Date(user.referredAt || user.createdAt).toLocaleDateString()}
+                      </p>
+                      <Link 
+                        href={`/dashboard?activeTab=users&userId=${user.id}`}
+                        className="text-xs text-cyan-400 hover:text-cyan-300"
+                      >
+                        View User
+                      </Link>
+                    </div>
                   </div>
                 ))}
               </div>

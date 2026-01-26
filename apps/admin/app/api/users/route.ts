@@ -196,14 +196,17 @@ export async function GET(request: NextRequest) {
       const marketplaceSpent = userPurchs.reduce((sum: number, p: any) => sum + (p.pricePaid || 0), 0);
       const marketplaceItems = userPurchs.map((p: any) => p.itemId?.name || 'Unknown').filter(Boolean);
 
-      // Determine role - check stored role first, fallback to email-based detection
+      // Determine role - check GM subscription first, then stored role, fallback to email-based detection
       const storedRole = user.role || (user.email?.toLowerCase() === adminEmail ? 'admin' : 'trader');
+      // If user has active GM subscription, their effective role is 'gamemaster'
+      const hasActiveGM = gmSubscription && gmSubscription.status === 'active';
+      const effectiveRole = hasActiveGM ? 'gamemaster' : storedRole;
       
       return {
         id: userId,
         name: user.name || 'N/A',
         email: user.email,
-        role: storedRole, // 'admin', 'trader', 'backoffice', etc.
+        role: effectiveRole, // Effective role considering GM subscription
         isAdmin: storedRole === 'admin',
         createdAt: user.createdAt,
         emailVerified: user.emailVerified || false,

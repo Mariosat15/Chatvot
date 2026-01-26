@@ -234,10 +234,17 @@ export default function UserFullDetailPanel({
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [loading, setLoading] = useState(true);
   
+  // Check if user has active GM subscription
+  const hasActiveGMSubscription = (user as any).gameMaster?.isGameMaster && 
+    (user as any).gameMaster?.status === 'active';
+  
+  // Determine the effective role - if user has active GM, they should be 'gamemaster'
+  const effectiveRole: UserRole = hasActiveGMSubscription ? 'gamemaster' : (user.role || 'trader');
+  
   // Edit Form State
   const [editName, setEditName] = useState(user.name);
   const [editEmail, setEditEmail] = useState(user.email);
-  const [editRole, setEditRole] = useState<UserRole>(user.role || 'trader');
+  const [editRole, setEditRole] = useState<UserRole>(effectiveRole);
   const [editCountry, setEditCountry] = useState(user.country || '');
   const [editCity, setEditCity] = useState(user.city || '');
   const [editAddress, setEditAddress] = useState(user.address || '');
@@ -479,7 +486,7 @@ export default function UserFullDetailPanel({
       // Reset edit form
       setEditName(user.name);
       setEditEmail(user.email);
-      setEditRole(user.role || 'trader');
+      setEditRole(effectiveRole);
       setEditCountry(user.country || '');
       setEditCity(user.city || '');
       setEditAddress(user.address || '');
@@ -550,7 +557,7 @@ export default function UserFullDetailPanel({
           userId: user.id,
           name: editName !== user.name ? editName : undefined,
           email: editEmail !== user.email ? editEmail : undefined,
-          role: editRole !== user.role ? editRole : undefined,
+          role: editRole !== effectiveRole ? editRole : undefined,
           country: editCountry,
           city: editCity,
           address: editAddress,
@@ -917,7 +924,7 @@ export default function UserFullDetailPanel({
   const activeRestrictions = restrictions.filter((r) => r.isActive);
   const kycStatusConfig = KYC_STATUS_CONFIG[kycStatus?.status || 'none'] || KYC_STATUS_CONFIG.none;
   const KYCIcon = kycStatusConfig.icon;
-  const roleConfig = USER_ROLES.find(r => r.value === user.role) || USER_ROLES[0];
+  const roleConfig = USER_ROLES.find(r => r.value === effectiveRole) || USER_ROLES[0];
 
   if (!open) return null;
 
@@ -1187,7 +1194,12 @@ export default function UserFullDetailPanel({
                             </div>
                             <div>
                               <p className="text-xs text-gray-400 mb-1">Role</p>
-                              <p className="text-white">{user.role || 'N/A'}</p>
+                              <p className="text-white flex items-center gap-2">
+                                {effectiveRole || 'N/A'}
+                                {hasActiveGMSubscription && effectiveRole === 'gamemaster' && user.role !== 'gamemaster' && (
+                                  <span className="text-xs text-amber-400">(auto from GM pack)</span>
+                                )}
+                              </p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-400 mb-1">Email Verified</p>

@@ -364,6 +364,7 @@ export default function GameMasterDashboardSection() {
                   <div className="flex-1 min-w-0">
                     <p className="text-white font-medium truncate">{referral.name}</p>
                     <p className="text-gray-400 text-sm truncate">{referral.email}</p>
+                    <p className="text-gray-500 text-xs font-mono mt-0.5">ID: {referral.id}</p>
                   </div>
                   <p className="text-gray-400 text-sm">
                     {new Date(referral.createdAt).toLocaleDateString()}
