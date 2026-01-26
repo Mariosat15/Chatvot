@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { connectToDatabase } from '@/database/mongoose';
 import Incident from '@/database/models/incident.model';
+import { auditLogService } from '@/lib/services/audit-log.service';
 
 /**
  * GET /api/incidents/[id]
@@ -76,6 +77,7 @@ export async function PATCH(
     const changes: string[] = [];
 
     // Track changes for audit
+    const previousStatus = incident.status;
     if (status && status !== incident.status) {
       changes.push(`status: ${incident.status} -> ${status}`);
       incident.status = status;
@@ -131,6 +133,26 @@ export async function PATCH(
 
     console.log(`📋 [Incident] Updated ${id}: ${changes.join(', ')}`);
 
+    // Log status changes to audit trail
+    if (status && status !== previousStatus) {
+      try {
+        await auditLogService.logIncidentStatusChanged(
+          {
+            id: auth.adminId || 'unknown',
+            email: auth.email || 'admin@system',
+            name: auth.email?.split('@')[0],
+            role: 'admin',
+          },
+          id,
+          incident.title || `Incident #${id.slice(-6)}`,
+          previousStatus,
+          status
+        );
+      } catch (auditError) {
+        console.error('Failed to log audit entry:', auditError);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       incident,
@@ -176,9 +198,27 @@ export async function DELETE(
       );
     }
 
+    const incidentTitle = incident.title || `Incident #${id.slice(-6)}`;
+    
     await Incident.findByIdAndDelete(id);
 
     console.log(`📋 [Incident] Deleted: ${id}`);
+
+    // Log to audit trail
+    try {
+      await auditLogService.logIncidentDeleted(
+        {
+          id: auth.adminId || 'unknown',
+          email: auth.email || 'admin@system',
+          name: auth.email?.split('@')[0],
+          role: 'admin',
+        },
+        id,
+        incidentTitle
+      );
+    } catch (auditError) {
+      console.error('Failed to log audit entry:', auditError);
+    }
 
     return NextResponse.json({
       success: true,

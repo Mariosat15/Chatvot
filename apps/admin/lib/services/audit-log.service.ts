@@ -80,6 +80,13 @@ const actionToSection: Record<string, string> = {
   symbol_created: 'symbols',
   symbol_updated: 'symbols',
   symbol_deleted: 'symbols',
+  // Incidents
+  incident_created: 'incidents',
+  incident_updated: 'incidents',
+  incident_status_changed: 'incidents',
+  incident_resolved: 'incidents',
+  incident_compensation_issued: 'incidents',
+  incident_deleted: 'incidents',
 };
 
 interface LogActionParams {
@@ -414,6 +421,99 @@ export const auditLogService = {
       targetId: competitionId,
       targetName: competitionName,
       metadata: { reason },
+    });
+  },
+
+  // ==================== INCIDENTS ====================
+
+  async logIncidentCreated(admin: AdminInfo, incidentId: string, title: string, type: string, severity: string, competitionId?: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'incident_created',
+      category: 'security',
+      description: `Created incident: ${title} (${type}, ${severity})`,
+      targetType: 'other',
+      targetId: incidentId,
+      targetName: title,
+      metadata: { type, severity, competitionId },
+    });
+  },
+
+  async logIncidentStatusChanged(admin: AdminInfo, incidentId: string, title: string, previousStatus: string, newStatus: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'incident_status_changed',
+      category: 'security',
+      description: `Changed incident status: ${title} (${previousStatus} → ${newStatus})`,
+      targetType: 'other',
+      targetId: incidentId,
+      targetName: title,
+      previousValue: previousStatus,
+      newValue: newStatus,
+    });
+  },
+
+  async logIncidentResolved(
+    admin: AdminInfo, 
+    incidentId: string, 
+    title: string, 
+    resolutionType: string, 
+    totalCompensation: number, 
+    usersCompensated: number
+  ): Promise<void> {
+    await this.log({
+      admin,
+      action: 'incident_resolved',
+      category: 'financial',
+      description: `Resolved incident: ${title} with ${resolutionType}. Compensated ${usersCompensated} users with €${totalCompensation.toFixed(2)}`,
+      targetType: 'other',
+      targetId: incidentId,
+      targetName: title,
+      metadata: { 
+        resolutionType, 
+        totalCompensation, 
+        usersCompensated,
+      },
+    });
+  },
+
+  async logIncidentCompensationIssued(
+    admin: AdminInfo, 
+    incidentId: string, 
+    title: string, 
+    totalAmount: number, 
+    usersCompensated: number,
+    compensationDetails: Array<{ userId: string; username?: string; amount: number }>
+  ): Promise<void> {
+    await this.log({
+      admin,
+      action: 'incident_compensation_issued',
+      category: 'financial',
+      description: `Issued compensation for incident: ${title}. Total: €${totalAmount.toFixed(2)} to ${usersCompensated} user(s)`,
+      targetType: 'other',
+      targetId: incidentId,
+      targetName: title,
+      metadata: { 
+        totalAmount, 
+        usersCompensated,
+        compensationDetails: compensationDetails.map(c => ({
+          userId: c.userId,
+          username: c.username,
+          amount: c.amount,
+        })),
+      },
+    });
+  },
+
+  async logIncidentDeleted(admin: AdminInfo, incidentId: string, title: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'incident_deleted',
+      category: 'security',
+      description: `Deleted incident: ${title}`,
+      targetType: 'other',
+      targetId: incidentId,
+      targetName: title,
     });
   },
 

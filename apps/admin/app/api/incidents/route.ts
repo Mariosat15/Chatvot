@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { connectToDatabase } from '@/database/mongoose';
 import Incident from '@/database/models/incident.model';
+import { auditLogService } from '@/lib/services/audit-log.service';
 
 /**
  * GET /api/incidents
@@ -118,6 +119,25 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`📋 [Incident] Created: ${incident._id} - ${title}`);
+
+    // Log to audit trail
+    try {
+      await auditLogService.logIncidentCreated(
+        {
+          id: auth.adminId || 'unknown',
+          email: auth.email || 'admin@system',
+          name: auth.email?.split('@')[0],
+          role: 'admin',
+        },
+        incident._id.toString(),
+        title,
+        type,
+        severity,
+        competitionId
+      );
+    } catch (auditError) {
+      console.error('Failed to log audit entry:', auditError);
+    }
 
     return NextResponse.json({
       success: true,

@@ -6,6 +6,7 @@ import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import { PlatformTransaction } from '@/database/models/platform-financials.model';
 import { notificationService } from '@/lib/services/notification.service';
+import { auditLogService } from '@/lib/services/audit-log.service';
 import mongoose from 'mongoose';
 
 // Helper to get user from collection (admin app doesn't have User model)
@@ -246,6 +247,29 @@ export async function POST(
     await mongoSession.commitTransaction();
 
     console.log(`💰 [Compensation] Complete: ${successCount}/${compensations.length} successful, €${totalCompensated.toFixed(2)} total`);
+
+    // Log to audit trail
+    try {
+      await auditLogService.logIncidentCompensationIssued(
+        {
+          id: auth.adminId || 'unknown',
+          email: auth.email || 'admin@system',
+          name: auth.email?.split('@')[0],
+          role: 'admin',
+        },
+        incidentId,
+        incident.title || `Incident #${incidentId.slice(-6)}`,
+        totalCompensated,
+        successCount,
+        results.filter(r => r.success).map(r => ({
+          userId: r.userId,
+          username: r.username,
+          amount: r.amount,
+        }))
+      );
+    } catch (auditError) {
+      console.error('Failed to log audit entry:', auditError);
+    }
 
     return NextResponse.json({
       success: true,
