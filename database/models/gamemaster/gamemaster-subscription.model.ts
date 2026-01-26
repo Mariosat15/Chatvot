@@ -34,8 +34,10 @@ export interface IGameMasterSubscription extends Document {
   limits: {
     maxCompetitionsPerDay: number;
     maxUsersPerCompetition: number;
-    referralFeePercentage: number;      // % of entry fees from referred users
+    referralFeePercentage: number;      // % of entry fees from referred users in competitions
     canCreateCompetitions: boolean;     // Whether package allows competition creation
+    canEarnFromChallenges: boolean;     // Whether GM earns from 1v1 challenges
+    challengeReferralFeePercentage?: number; // % for challenges (defaults to referralFeePercentage)
   };
   
   // Admin Override for Competition Creation
@@ -178,6 +180,16 @@ const GameMasterSubscriptionSchema = new Schema<IGameMasterSubscription>(
         type: Boolean,
         required: true,
         default: true,  // By default, GMs can create competitions
+      },
+      canEarnFromChallenges: {
+        type: Boolean,
+        required: true,
+        default: false,  // By default, GMs don't earn from challenges (backward compatible)
+      },
+      challengeReferralFeePercentage: {
+        type: Number,
+        min: 0,
+        max: 50,
       },
     },
     competitionCreationOverride: {

@@ -47,8 +47,11 @@ interface GameMasterData {
       maxUsersPerCompetition: number;
       referralFeePercentage: number;
       canCreateCompetitions?: boolean;
+      canEarnFromChallenges?: boolean;
+      challengeReferralFeePercentage?: number;
     };
     canCreateCompetitions: boolean; // Computed field from API (based on package)
+    canEarnFromChallenges: boolean; // Computed field from API (based on package)
     currentPeriodCompetitionsCreated: number;
     totalCompetitionsCreated: number;
     totalEarnings: number;
@@ -583,8 +586,19 @@ export default function GameMasterDashboardContent() {
                 </>
               )}
               <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
-                <span className="text-gray-400">Referral Fee</span>
+                <span className="text-gray-400">Competition Referral Fee</span>
                 <span className="text-emerald-400 font-medium">{sub.limits.referralFeePercentage}%</span>
+              </div>
+              <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
+                <span className="text-gray-400">Challenge Earnings</span>
+                <span className={cn(
+                  'font-medium',
+                  sub.canEarnFromChallenges ? 'text-orange-400' : 'text-gray-500'
+                )}>
+                  {sub.canEarnFromChallenges 
+                    ? `${sub.limits.challengeReferralFeePercentage ?? sub.limits.referralFeePercentage}% ⚔️`
+                    : 'Not Included'}
+                </span>
               </div>
               <div className="flex items-center justify-between py-3 border-b border-gray-700/50">
                 <span className="text-gray-400">Expires</span>

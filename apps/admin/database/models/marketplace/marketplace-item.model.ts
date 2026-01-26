@@ -67,10 +67,12 @@ export interface IStrategyConfig {
 // Game Master Package Configuration
 export interface IGameMasterConfig {
   subscriptionDurationDays: number; // How long the subscription lasts (e.g., 30 days)
-  referralFeePercentage: number;    // % of entry fees earned from referrals (e.g., 5, 7.5, 10)
+  referralFeePercentage: number;    // % of entry fees earned from referrals in competitions (e.g., 5, 7.5, 10)
   maxCompetitionsPerDay: number;    // How many competitions can be created per day
   maxUsersPerCompetition: number;   // Max participants in GM-created competitions
   canCreateCompetitions: boolean;   // Whether this package allows GM to create competitions (true = can create, false = earn only from admin competitions)
+  canEarnFromChallenges: boolean;   // Whether GM earns referral fees from 1v1 challenges
+  challengeReferralFeePercentage?: number; // Optional separate % for challenges (defaults to referralFeePercentage if not set)
 }
 
 export interface IMarketplaceItem extends Document {
@@ -248,6 +250,8 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       maxCompetitionsPerDay: { type: Number, default: 1 },
       maxUsersPerCompetition: { type: Number, default: 50 },
       canCreateCompetitions: { type: Boolean, default: true },
+      canEarnFromChallenges: { type: Boolean, default: false },
+      challengeReferralFeePercentage: { type: Number, min: 0, max: 50 },
     },
     cosmeticType: {
       type: String,

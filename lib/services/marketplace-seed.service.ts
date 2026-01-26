@@ -853,6 +853,7 @@ When users sign up using your unique referral link and join ANY competition on t
     referralFeePercentage: 5,
     subscriptionDurationDays: 30,
     canCreateCompetitions: true,
+    canEarnFromChallenges: false,  // Starter package doesn't include challenge earnings
   },
 };
 
@@ -907,6 +908,8 @@ At 7.5% referral rate, just 8,000 credits in entry fees from your referrals pays
     referralFeePercentage: 7.5,
     subscriptionDurationDays: 30,
     canCreateCompetitions: true,
+    canEarnFromChallenges: true,   // Pro package includes challenge earnings
+    challengeReferralFeePercentage: 5,  // 5% for challenges
   },
 };
 
@@ -977,6 +980,8 @@ At 10% referral rate, your passive income potential is unmatched:
     referralFeePercentage: 10,
     subscriptionDurationDays: 30,
     canCreateCompetitions: true,
+    canEarnFromChallenges: true,   // Elite package includes challenge earnings
+    challengeReferralFeePercentage: 7,  // 7% for challenges (higher tier)
   },
 };
 

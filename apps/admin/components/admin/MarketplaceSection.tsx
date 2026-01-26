@@ -68,6 +68,8 @@ interface GameMasterConfig {
   maxCompetitionsPerDay: number;
   maxUsersPerCompetition: number;
   canCreateCompetitions: boolean;
+  canEarnFromChallenges: boolean;
+  challengeReferralFeePercentage?: number;
 }
 
 interface MarketplaceItem {
@@ -163,6 +165,8 @@ const emptyItem: Partial<MarketplaceItem> = {
     maxCompetitionsPerDay: 1,
     maxUsersPerCompetition: 50,
     canCreateCompetitions: true,
+    canEarnFromChallenges: false,
+    challengeReferralFeePercentage: undefined,
   },
   cosmeticType: 'avatar',
   imageUrl: '',
@@ -1263,6 +1267,87 @@ export default function MarketplaceSection() {
                     </p>
                   </div>
                 </div>
+
+                {/* Challenge Earnings Section */}
+                <div className="border-t border-gray-700 pt-6 mt-6">
+                  <h4 className="text-lg font-bold text-orange-400 mb-4 flex items-center gap-2">
+                    ⚔️ Challenge (1v1) Earnings
+                  </h4>
+                  
+                  {/* Enable Challenge Earnings Toggle */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3 mb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-white font-semibold">Earn from Challenges</Label>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Allow GM to earn referral fees when their referred users participate in 1v1 challenges
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingItem({
+                          ...editingItem,
+                          gameMasterConfig: {
+                            ...editingItem.gameMasterConfig!,
+                            canEarnFromChallenges: !editingItem.gameMasterConfig?.canEarnFromChallenges
+                          }
+                        })}
+                        className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
+                          editingItem.gameMasterConfig?.canEarnFromChallenges 
+                            ? 'bg-orange-500' 
+                            : 'bg-gray-600'
+                        }`}
+                      >
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-lg ${
+                          editingItem.gameMasterConfig?.canEarnFromChallenges 
+                            ? 'translate-x-8' 
+                            : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Challenge Referral Fee % - Only show if canEarnFromChallenges is enabled */}
+                  {editingItem.gameMasterConfig?.canEarnFromChallenges && (
+                    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Percent className="h-5 w-5 text-orange-400" />
+                        <Label className="text-white font-semibold">Challenge Referral Fee (%)</Label>
+                      </div>
+                      <Input
+                        type="number"
+                        value={editingItem.gameMasterConfig?.challengeReferralFeePercentage ?? editingItem.gameMasterConfig?.referralFeePercentage ?? 5}
+                        onChange={(e) => setEditingItem({
+                          ...editingItem,
+                          gameMasterConfig: {
+                            ...editingItem.gameMasterConfig!,
+                            challengeReferralFeePercentage: parseFloat(e.target.value) || undefined
+                          }
+                        })}
+                        min={0}
+                        max={50}
+                        step={0.5}
+                        className="bg-gray-800 border-gray-600 text-white text-lg h-12"
+                      />
+                      <p className="text-xs text-gray-500">
+                        % of challenge entry fees from referred users. Leave empty to use the same % as competitions ({editingItem.gameMasterConfig?.referralFeePercentage || 5}%)
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setEditingItem({
+                          ...editingItem,
+                          gameMasterConfig: {
+                            ...editingItem.gameMasterConfig!,
+                            challengeReferralFeePercentage: undefined
+                          }
+                        })}
+                        className="text-xs text-orange-400 hover:text-orange-300 underline"
+                      >
+                        Reset to use competition fee ({editingItem.gameMasterConfig?.referralFeePercentage || 5}%)
+                      </button>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Summary Card */}
                 <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-xl p-6">
@@ -1270,7 +1355,7 @@ export default function MarketplaceSection() {
                     <Star className="h-4 w-4" />
                     Package Summary
                   </h5>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
                     <div className="bg-gray-900/50 rounded-lg p-3">
                       <div className="text-2xl font-bold text-blue-400">
                         {editingItem.gameMasterConfig?.subscriptionDurationDays || 30}
@@ -1281,7 +1366,7 @@ export default function MarketplaceSection() {
                       <div className="text-2xl font-bold text-green-400">
                         {editingItem.gameMasterConfig?.referralFeePercentage || 5}%
                       </div>
-                      <div className="text-xs text-gray-400">Referral Fee</div>
+                      <div className="text-xs text-gray-400">Comp Fee</div>
                     </div>
                     <div className="bg-gray-900/50 rounded-lg p-3">
                       <div className={`text-2xl font-bold ${editingItem.gameMasterConfig?.canCreateCompetitions !== false ? 'text-green-400' : 'text-red-400'}`}>
@@ -1289,26 +1374,37 @@ export default function MarketplaceSection() {
                       </div>
                       <div className="text-xs text-gray-400">Create Comps</div>
                     </div>
+                    <div className="bg-gray-900/50 rounded-lg p-3">
+                      <div className={`text-2xl font-bold ${editingItem.gameMasterConfig?.canEarnFromChallenges ? 'text-orange-400' : 'text-red-400'}`}>
+                        {editingItem.gameMasterConfig?.canEarnFromChallenges ? '✓' : '✗'}
+                      </div>
+                      <div className="text-xs text-gray-400">Challenges</div>
+                    </div>
+                    {editingItem.gameMasterConfig?.canEarnFromChallenges && (
+                      <div className="bg-gray-900/50 rounded-lg p-3">
+                        <div className="text-2xl font-bold text-orange-400">
+                          {editingItem.gameMasterConfig?.challengeReferralFeePercentage ?? editingItem.gameMasterConfig?.referralFeePercentage ?? 5}%
+                        </div>
+                        <div className="text-xs text-gray-400">Challenge Fee</div>
+                      </div>
+                    )}
                     {editingItem.gameMasterConfig?.canCreateCompetitions !== false && (
-                      <>
-                        <div className="bg-gray-900/50 rounded-lg p-3">
-                          <div className="text-2xl font-bold text-yellow-400">
-                            {editingItem.gameMasterConfig?.maxCompetitionsPerDay || 1}
-                          </div>
-                          <div className="text-xs text-gray-400">Comps/Day</div>
+                      <div className="bg-gray-900/50 rounded-lg p-3">
+                        <div className="text-2xl font-bold text-yellow-400">
+                          {editingItem.gameMasterConfig?.maxCompetitionsPerDay || 1}
                         </div>
-                        <div className="bg-gray-900/50 rounded-lg p-3">
-                          <div className="text-2xl font-bold text-cyan-400">
-                            {editingItem.gameMasterConfig?.maxUsersPerCompetition || 50}
-                          </div>
-                          <div className="text-xs text-gray-400">Max Users</div>
-                        </div>
-                      </>
+                        <div className="text-xs text-gray-400">Comps/Day</div>
+                      </div>
                     )}
                   </div>
-                  {editingItem.gameMasterConfig?.canCreateCompetitions === false && (
+                  {editingItem.gameMasterConfig?.canCreateCompetitions === false && !editingItem.gameMasterConfig?.canEarnFromChallenges && (
                     <div className="mt-4 text-center text-sm text-purple-400">
                       💰 Referral-Only Package: GM earns from referrals in admin/other GM competitions
+                    </div>
+                  )}
+                  {editingItem.gameMasterConfig?.canEarnFromChallenges && (
+                    <div className="mt-4 text-center text-sm text-orange-400">
+                      ⚔️ Also earns from 1v1 challenges where referrals participate
                     </div>
                   )}
                 </div>

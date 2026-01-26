@@ -34,6 +34,7 @@ import {
   Loader2,
   RefreshCw,
   Trash2,
+  Swords,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -71,6 +72,8 @@ interface MarketplaceItem {
     maxCompetitionsPerDay: number;
     maxUsersPerCompetition: number;
     canCreateCompetitions: boolean;
+    canEarnFromChallenges?: boolean;
+    challengeReferralFeePercentage?: number;
   };
 }
 
@@ -1241,6 +1244,30 @@ function GameMasterCard({
                   <span className="font-medium">Referral-Only Package</span>
                 </div>
                 <p className="text-xs text-gray-400 mt-1">Earn from referrals in any competition</p>
+              </div>
+            )}
+
+            {/* Challenge Earnings Row */}
+            {config.canEarnFromChallenges ? (
+              <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl p-3 mt-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-orange-400 text-sm">
+                    <Swords className="h-4 w-4" />
+                    <span className="font-medium">⚔️ Challenge Earnings</span>
+                  </div>
+                  <span className="text-orange-400 font-bold">
+                    {config.challengeReferralFeePercentage ?? config.referralFeePercentage}%
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Earn from 1v1 challenge referrals</p>
+              </div>
+            ) : (
+              <div className="bg-gray-800/30 border border-gray-700/30 rounded-xl p-3 mt-3">
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <Swords className="h-4 w-4" />
+                  <span className="font-medium">No Challenge Earnings</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Upgrade for 1v1 challenge fees</p>
               </div>
             )}
           </div>

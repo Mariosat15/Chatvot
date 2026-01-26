@@ -75,12 +75,15 @@ export async function GET() {
           maxUsersPerCompetition: currentPackage.gameMasterConfig.maxUsersPerCompetition,
           referralFeePercentage: currentPackage.gameMasterConfig.referralFeePercentage,
           canCreateCompetitions: currentPackage.gameMasterConfig.canCreateCompetitions !== false,
+          canEarnFromChallenges: currentPackage.gameMasterConfig.canEarnFromChallenges === true,
+          challengeReferralFeePercentage: currentPackage.gameMasterConfig.challengeReferralFeePercentage,
         };
         console.log(`[GM Dashboard] Using current package settings for ${subscription.packageName}:`, currentPackageLimits);
       }
     }
     
     const canCreateCompetitions = currentPackageLimits.canCreateCompetitions !== false;
+    const canEarnFromChallenges = currentPackageLimits.canEarnFromChallenges === true;
     
     return NextResponse.json({
       success: true,
@@ -89,6 +92,7 @@ export async function GET() {
           ...subscription,
           limits: currentPackageLimits, // Use current package limits
           canCreateCompetitions, // Based on current package setting
+          canEarnFromChallenges, // Based on current package setting
         },
         referredUsers,
         recentEarnings,

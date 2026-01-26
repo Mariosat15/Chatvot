@@ -540,21 +540,174 @@ export async function finalizeChallenge(challengeId: string) {
     const platformFee = challenge.platformFeeAmount;
     const winnerPrize = challenge.winnerPrize;
 
-    // Record platform fee
+    // ========== STEP 4: CALCULATE GM REFERRAL FEES ==========
+    // Check if either participant was referred by a Game Master who can earn from challenges
+    let totalGmEarnings = 0;
+    const gmPayments: { gmId: string; amount: number; userId: string; userName: string }[] = [];
+    
+    try {
+      const db = mongoose.connection.db;
+      if (db) {
+        // Get user records to check for referrals
+        const userIds = [challenger.userId, challenged.userId];
+        const users = await db.collection('user').find({
+          id: { $in: userIds },
+          referredByGameMasterId: { $exists: true, $ne: null },
+        }).toArray();
+        
+        console.log(`   🎮 Found ${users.length} referred participant(s) in challenge`);
+        
+        for (const user of users) {
+          const gmId = user.referredByGameMasterId;
+          if (!gmId) continue;
+          
+          // Get the participant's entry fee
+          const isChallenger = user.id === challenger.userId;
+          const participantEntryFee = challenge.entryFee;
+          const userName = isChallenger ? challenge.challengerName : challenge.challengedName;
+          
+          // Look up GM subscription (must be active, not paused, and have canEarnFromChallenges)
+          const gmSubscription = await db.collection('gamemastersubscriptions').findOne({
+            userId: gmId,
+            status: 'active',
+            isPaused: { $ne: true },
+            'limits.canEarnFromChallenges': true,
+          });
+          
+          if (!gmSubscription) {
+            console.log(`   ⚠️ GM ${gmId} not eligible for challenge earnings (inactive, paused, or feature disabled)`);
+            continue;
+          }
+          
+          // Use challenge-specific fee or fall back to competition fee
+          const feePercentage = gmSubscription.limits?.challengeReferralFeePercentage ?? 
+                                gmSubscription.limits?.referralFeePercentage ?? 5;
+          const gmEarning = participantEntryFee * (feePercentage / 100);
+          
+          console.log(`   📊 GM ${gmId}: ${userName}'s entry ${participantEntryFee} × ${feePercentage}% = ${gmEarning.toFixed(2)}`);
+          
+          totalGmEarnings += gmEarning;
+          gmPayments.push({
+            gmId,
+            amount: gmEarning,
+            userId: user.id,
+            userName,
+          });
+        }
+      }
+    } catch (gmError) {
+      console.error('   ⚠️ Error calculating GM challenge fees:', gmError);
+      // Continue without GM fees if there's an error
+    }
+    
+    // SAFEGUARD: Cap GM earnings at platform fee
+    let actualGmEarnings = totalGmEarnings;
+    if (totalGmEarnings > platformFee) {
+      console.warn(`   ⚠️ GM earnings (${totalGmEarnings}) exceed platform fee (${platformFee}), capping`);
+      actualGmEarnings = platformFee;
+      // Scale down proportionally
+      const scale = platformFee / totalGmEarnings;
+      for (const payment of gmPayments) {
+        payment.amount *= scale;
+      }
+    }
+    
+    // Calculate net platform fee after GM earnings
+    const netPlatformFee = platformFee - actualGmEarnings;
+
+    // Record platform fee (net after GM earnings)
     await PlatformTransaction.create(
       [
         {
           transactionType: 'challenge_platform_fee',
-          amount: platformFee,
-          amountEUR: platformFee, // Assuming 1:1 for credits
+          amount: netPlatformFee,
+          amountEUR: netPlatformFee, // Assuming 1:1 for credits
           sourceType: 'challenge',
           sourceId: challenge._id.toString(),
           sourceName: `${challenge.challengerName} vs ${challenge.challengedName}`,
-          description: `Platform fee from 1v1 challenge: ${challenge.challengerName} vs ${challenge.challengedName}`,
+          description: actualGmEarnings > 0 
+            ? `Platform fee from 1v1 challenge (net after ${actualGmEarnings.toFixed(2)} GM referral fees)`
+            : `Platform fee from 1v1 challenge: ${challenge.challengerName} vs ${challenge.challengedName}`,
         },
       ],
       { session }
     );
+    
+    // Pay GM referral fees
+    if (gmPayments.length > 0) {
+      const db = mongoose.connection.db;
+      if (db) {
+        for (const payment of gmPayments) {
+          try {
+            // Update GM subscription earnings
+            await db.collection('gamemastersubscriptions').updateOne(
+              { userId: payment.gmId },
+              { 
+                $inc: { 
+                  totalEarnings: payment.amount,
+                  pendingEarnings: payment.amount,
+                } 
+              }
+            );
+            
+            // Add to GM's wallet
+            const gmWallet = await db.collection('creditwallets').findOne({ userId: payment.gmId });
+            if (gmWallet) {
+              const balanceBefore = gmWallet.creditBalance || 0;
+              await db.collection('creditwallets').updateOne(
+                { userId: payment.gmId },
+                { $inc: { creditBalance: payment.amount } }
+              );
+              
+              // Record transaction
+              await db.collection('wallettransactions').insertOne({
+                userId: payment.gmId,
+                transactionType: 'gamemaster_challenge_referral',
+                amount: payment.amount,
+                balanceBefore,
+                balanceAfter: balanceBefore + payment.amount,
+                currency: 'EUR',
+                exchangeRate: 1,
+                status: 'completed',
+                description: `Challenge referral fee from ${payment.userName} in ${challenge.challengerName} vs ${challenge.challengedName}`,
+                metadata: {
+                  challengeId: challenge._id.toString(),
+                  referredUserId: payment.userId,
+                  referredUserName: payment.userName,
+                  feePercentage: payment.amount / challenge.entryFee * 100,
+                },
+                processedAt: new Date(),
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              });
+              
+              console.log(`   ✅ Paid ${payment.amount.toFixed(2)} to GM ${payment.gmId} for ${payment.userName}'s referral`);
+            }
+            
+            // Record GM earning in GameMasterEarning collection
+            await db.collection('gamemasterearnings').insertOne({
+              gameMasterId: payment.gmId,
+              challengeId: challenge._id.toString(),
+              userId: payment.userId,
+              entryFeeAmount: challenge.entryFee,
+              earningPercentage: payment.amount / challenge.entryFee * 100,
+              earningAmount: payment.amount,
+              sourceType: 'challenge',
+              sourceName: `${challenge.challengerName} vs ${challenge.challengedName}`,
+              referredUserName: payment.userName,
+              status: 'paid',
+              paidAt: new Date(),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          } catch (paymentError) {
+            console.error(`   ❌ Failed to pay GM ${payment.gmId}:`, paymentError);
+          }
+        }
+      }
+    }
+    
+    console.log(`   💰 Platform fee: ${netPlatformFee.toFixed(2)} (after ${actualGmEarnings.toFixed(2)} GM fees)`);
 
     // Distribute prize based on outcome
     if (winnerId && !isTie) {
