@@ -91,10 +91,10 @@ const SORT_OPTIONS: { value: SortOption; label: string; icon: React.ComponentTyp
 
 const CATEGORIES: { value: Category; label: string; icon: React.ComponentType<{ className?: string }>; color: string; bgGradient: string }[] = [
   { value: 'all', label: 'All Items', icon: Sparkles, color: 'text-white', bgGradient: 'from-gray-600/20 to-gray-800/20' },
+  { value: 'gamemaster', label: 'Game Master', icon: Crown, color: 'text-yellow-400', bgGradient: 'from-yellow-500/20 to-amber-500/20' },
   { value: 'indicator', label: 'Indicators', icon: LineChart, color: 'text-emerald-400', bgGradient: 'from-emerald-500/20 to-teal-500/20' },
   { value: 'strategy', label: 'Strategies', icon: Target, color: 'text-orange-400', bgGradient: 'from-orange-500/20 to-amber-500/20' },
   { value: 'cosmetic', label: 'Cosmetics', icon: Palette, color: 'text-pink-400', bgGradient: 'from-pink-500/20 to-rose-500/20' },
-  { value: 'gamemaster', label: 'Game Master', icon: Crown, color: 'text-yellow-400', bgGradient: 'from-yellow-500/20 to-amber-500/20' },
 ];
 
 const INDICATOR_TYPE_INFO: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string; label: string }> = {
@@ -571,6 +571,36 @@ export default function MarketplaceContent() {
               </section>
             )}
             
+            {/* Game Master Packages Section - Shown first */}
+            {(category === 'all' || category === 'gamemaster') && gamemasterPackages.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="p-2 rounded-lg bg-yellow-500/10">
+                    <Crown className="h-5 w-5 text-yellow-400" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">Game Master Packages</h2>
+                  <span className="px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-400 text-sm font-medium">
+                    {gamemasterPackages.length}
+                  </span>
+                  <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/20 to-transparent" />
+                </div>
+                <p className="text-gray-400 mb-6 -mt-4">
+                  Become a Game Master! Create competitions, earn from referrals, and build your trading community.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {gamemasterPackages.filter(i => category === 'gamemaster' || !i.isFeatured).map((item) => (
+                    <GameMasterCard
+                      key={item._id}
+                      item={item}
+                      onView={() => setSelectedItem(item)}
+                      onPurchase={() => handlePurchase(item)}
+                      purchasing={purchasing === item._id}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+            
             {/* Indicators Section */}
             {(category === 'all' || category === 'indicator') && indicators.length > 0 && (
               <section>
@@ -598,7 +628,7 @@ export default function MarketplaceContent() {
               </section>
             )}
             
-            {/* Strategies Section - Always show strategies section if there are any */}
+            {/* Strategies Section */}
             {(category === 'all' || category === 'strategy') && strategies.length > 0 && (
               <section>
                 <div className="flex items-center gap-3 mb-8">
@@ -612,7 +642,6 @@ export default function MarketplaceContent() {
                   <div className="flex-1 h-px bg-gradient-to-r from-orange-500/20 to-transparent" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {/* Show all strategies when viewing Strategies category, or non-featured when viewing All */}
                   {strategies
                     .filter(i => category === 'strategy' || !i.isFeatured)
                     .map((item) => (
@@ -625,7 +654,6 @@ export default function MarketplaceContent() {
                       />
                     ))}
                 </div>
-                {/* Show message if all strategies are featured and viewing 'all' */}
                 {category === 'all' && strategies.every(s => s.isFeatured) && (
                   <p className="text-center text-gray-500 text-sm mt-4">
                     All strategies are featured above ☝️
@@ -634,7 +662,7 @@ export default function MarketplaceContent() {
               </section>
             )}
             
-            {/* Cosmetics Section */}
+            {/* Cosmetics Section - Shown last */}
             {(category === 'all' || category === 'cosmetic') && cosmetics.length > 0 && (
               <section>
                 <div className="flex items-center gap-3 mb-8">
@@ -650,36 +678,6 @@ export default function MarketplaceContent() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                   {cosmetics.filter(i => category === 'cosmetic' || !i.isFeatured).map((item) => (
                     <CosmeticCard
-                      key={item._id}
-                      item={item}
-                      onView={() => setSelectedItem(item)}
-                      onPurchase={() => handlePurchase(item)}
-                      purchasing={purchasing === item._id}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-            
-            {/* Game Master Packages Section */}
-            {(category === 'all' || category === 'gamemaster') && gamemasterPackages.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="p-2 rounded-lg bg-yellow-500/10">
-                    <Crown className="h-5 w-5 text-yellow-400" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-white">Game Master Packages</h2>
-                  <span className="px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-400 text-sm font-medium">
-                    {gamemasterPackages.length}
-                  </span>
-                  <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/20 to-transparent" />
-                </div>
-                <p className="text-gray-400 mb-6 -mt-4">
-                  Become a Game Master! Create competitions, earn from referrals, and build your trading community.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {gamemasterPackages.filter(i => category === 'gamemaster' || !i.isFeatured).map((item) => (
-                    <GameMasterCard
                       key={item._id}
                       item={item}
                       onView={() => setSelectedItem(item)}
