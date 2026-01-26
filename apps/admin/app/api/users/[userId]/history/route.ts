@@ -62,6 +62,7 @@ export async function GET(
           'admin_adjustment': '⚙️ Admin Adjustment',
           'marketplace_purchase': '🛒 Marketplace Purchase',
           'refund': '↩️ Refund',
+          'incident_compensation': '💰 Incident Compensation',
         };
 
         history.push({

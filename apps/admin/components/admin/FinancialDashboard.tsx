@@ -129,6 +129,12 @@ interface PlatformFinancials {
   
   totalAdminWithdrawals: number;
   totalAdminWithdrawalsEUR: number;
+  
+  // Incident Compensations (platform expense)
+  totalIncidentCompensations: number;
+  totalIncidentCompensationsEUR: number;
+  incidentCompensationsCount: number;
+  
   unclaimedPools: {
     totalAmount: number;
     totalAmountEUR: number;
@@ -977,6 +983,13 @@ export default function FinancialDashboard() {
                   <div className="text-2xl font-bold text-amber-400">{currencySymbol}{((platformFinancials?.totalUnclaimedPools || 0) / conversionRate).toFixed(2)}</div>
                   <div className="text-xs text-gray-500">All disqualified comps</div>
                 </div>
+                {(platformFinancials?.totalIncidentCompensations || 0) > 0 && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                    <div className="text-xs text-gray-400 uppercase">Incident Compensations</div>
+                    <div className="text-2xl font-bold text-red-400">-{currencySymbol}{(platformFinancials?.totalIncidentCompensationsEUR || 0).toFixed(2)}</div>
+                    <div className="text-xs text-gray-500">{platformFinancials?.incidentCompensationsCount || 0} incident(s)</div>
+                  </div>
+                )}
               </div>
               <div className="mt-4 space-y-2">
                 {/* Total Earned (Historical) */}
@@ -997,6 +1010,19 @@ export default function FinancialDashboard() {
                     <span className="text-lg font-semibold text-red-400">-{currencySymbol}{(platformFinancials?.totalAdminWithdrawalsEUR || 0).toFixed(2)}</span>
                   </div>
                 </div>
+                
+                {/* Incident Compensations */}
+                {(platformFinancials?.totalIncidentCompensations || 0) > 0 && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-red-400">Incident Compensations ({platformFinancials?.incidentCompensationsCount || 0})</span>
+                      <span className="text-lg font-semibold text-red-400">-{currencySymbol}{(platformFinancials?.totalIncidentCompensationsEUR || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Compensation paid to users due to incidents (already deducted from Net)
+                    </div>
+                  </div>
+                )}
                 
                 {/* Available to Withdraw (This is what matters!) */}
                 <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">

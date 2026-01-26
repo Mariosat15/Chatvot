@@ -233,6 +233,11 @@ export const PlatformFinancialsService = {
     totalAdminWithdrawals: number;
     totalAdminWithdrawalsEUR: number;
     
+    // Incident Compensations (platform expense)
+    totalIncidentCompensations: number;
+    totalIncidentCompensationsEUR: number;
+    incidentCompensationsCount: number;
+    
     // Net Platform Position
     platformNetCredits: number;
     platformNetEUR: number;
@@ -320,6 +325,9 @@ export const PlatformFinancialsService = {
     let netWithdrawalEarnings = 0;
     let totalAdminWithdrawals = 0;
     let totalAdminWithdrawalsEUR = 0;
+    let totalIncidentCompensations = 0;
+    let totalIncidentCompensationsEUR = 0;
+    let incidentCompensationsCount = 0;
     
     for (const earning of platformEarnings) {
       switch (earning._id) {
@@ -346,15 +354,23 @@ export const PlatformFinancialsService = {
           totalAdminWithdrawals = Math.abs(earning.total);
           totalAdminWithdrawalsEUR = Math.abs(earning.totalEUR);
           break;
+        case 'incident_compensation':
+          // Compensations are stored as negative values (platform expense)
+          totalIncidentCompensations = Math.abs(earning.total);
+          totalIncidentCompensationsEUR = Math.abs(earning.totalEUR);
+          incidentCompensationsCount = earning.count;
+          break;
       }
     }
     
-    // Calculate totals (including challenge fees and marketplace sales)
+    // Calculate totals (including challenge fees and marketplace sales, minus compensations)
     const totalBankFees = totalBankDepositFees + totalBankWithdrawalFees;
     const totalGrossEarnings = totalUnclaimedPools + totalPlatformFees + totalChallengeFees + totalMarketplaceSales + totalDepositFeesGross + totalWithdrawalFeesGross;
-    const totalNetEarnings = totalUnclaimedPools + totalPlatformFees + totalChallengeFees + totalMarketplaceSales + netDepositEarnings + netWithdrawalEarnings;
+    // Net earnings = gross - bank fees - incident compensations
+    const totalNetEarnings = totalUnclaimedPools + totalPlatformFees + totalChallengeFees + totalMarketplaceSales + netDepositEarnings + netWithdrawalEarnings - totalIncidentCompensations;
     const totalNetEarningsEUR = totalNetEarnings;
     
+    // Platform net = net earnings - admin withdrawals
     const platformNetCredits = totalNetEarnings - totalAdminWithdrawals;
     const platformNetEUR = platformNetCredits;
     
@@ -436,6 +452,11 @@ export const PlatformFinancialsService = {
       
       totalAdminWithdrawals,
       totalAdminWithdrawalsEUR,
+      
+      // Incident Compensations (platform expense)
+      totalIncidentCompensations,
+      totalIncidentCompensationsEUR,
+      incidentCompensationsCount,
       
       platformNetCredits,
       platformNetEUR,

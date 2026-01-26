@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import Incident from '@/database/models/incident.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import { PlatformTransaction } from '@/database/models/platform-financials.model';
 import { notificationService } from '@/lib/services/notification.service';
 import mongoose from 'mongoose';
 
@@ -216,6 +217,31 @@ export async function POST(
     });
 
     await incident.save({ session: mongoSession });
+
+    // Record platform expense for compensation (negative amount = platform pays out)
+    if (totalCompensated > 0) {
+      await PlatformTransaction.create([{
+        transactionType: 'incident_compensation',
+        amount: -totalCompensated,  // Negative = platform expense
+        amountEUR: -totalCompensated, // Credits = EUR 1:1
+        sourceType: 'incident',
+        sourceId: incidentId,
+        sourceName: incident.title || `Incident #${incidentId.slice(-6)}`,
+        compensationDetails: {
+          incidentId,
+          incidentType: incident.type,
+          affectedUsersCount: successCount,
+          compensationPerUser: successCount > 0 ? totalCompensated / successCount : 0,
+          resolutionType: 'manual_compensation',
+          competitionId: incident.competitionId,
+        },
+        description: `Compensation for incident #${incidentId.slice(-6)}: ${successCount} users, €${totalCompensated.toFixed(2)} total`,
+        processedBy: auth.adminId,
+        processedByEmail: auth.email,
+      }], { session: mongoSession });
+      
+      console.log(`   📊 [PlatformTransaction] Recorded expense: -€${totalCompensated.toFixed(2)}`);
+    }
 
     await mongoSession.commitTransaction();
 

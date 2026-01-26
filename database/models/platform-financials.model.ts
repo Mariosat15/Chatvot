@@ -16,15 +16,16 @@ export interface IPlatformTransaction extends Document {
     | 'admin_withdrawal'         // Admin withdrawing platform earnings to bank
     | 'admin_adjustment'         // Manual adjustment
     | 'refund_clawback'          // Refund that returns funds to platform
-    | 'retained_gm_fee';         // GM referral fee retained by platform due to inactive GM subscription
+    | 'retained_gm_fee'          // GM referral fee retained by platform due to inactive GM subscription
+    | 'incident_compensation';   // Platform expense for compensating users due to incidents
   
   amount: number;                 // Amount in credits (positive = platform gains, negative = platform pays out)
   amountEUR: number;              // EUR equivalent at time of transaction
   
   // Source reference
-  sourceType?: 'competition' | 'challenge' | 'user_deposit' | 'user_withdrawal' | 'manual';
-  sourceId?: string;              // Competition ID, Transaction ID, etc.
-  sourceName?: string;            // Competition name, user email, etc.
+  sourceType?: 'competition' | 'challenge' | 'user_deposit' | 'user_withdrawal' | 'manual' | 'incident';
+  sourceId?: string;              // Competition ID, Transaction ID, Incident ID, etc.
+  sourceName?: string;            // Competition name, user email, incident title, etc.
   
   // For unclaimed pools
   unclaimedReason?: 
@@ -63,6 +64,17 @@ export interface IPlatformTransaction extends Document {
     originalFeePercentage: number; // What % GM would have earned
     subscriptionStatus: string;   // Why GM didn't get paid (expired, suspended, etc.)
     referredUserIds?: string[];   // List of referred users in this competition
+  };
+  
+  // For incident compensations (platform expense)
+  compensationDetails?: {
+    incidentId: string;           // Reference to the incident
+    incidentType: string;         // Type of incident (price_feed_failure, etc.)
+    affectedUsersCount: number;   // Number of users compensated
+    compensationPerUser?: number; // Amount per user (if uniform)
+    resolutionType: string;       // partial_refund, full_refund, etc.
+    competitionId?: string;       // Related competition if any
+    competitionName?: string;
   };
   
   description: string;
@@ -118,6 +130,7 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
         'admin_adjustment',
         'refund_clawback',
         'retained_gm_fee',
+        'incident_compensation',
       ],
       index: true,
     },
@@ -131,7 +144,7 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
     },
     sourceType: {
       type: String,
-      enum: ['competition', 'challenge', 'user_deposit', 'user_withdrawal', 'manual'],
+      enum: ['competition', 'challenge', 'user_deposit', 'user_withdrawal', 'manual', 'incident'],
     },
     sourceId: String,
     sourceName: String,
@@ -172,6 +185,15 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
       originalFeePercentage: Number,
       subscriptionStatus: String,
       referredUserIds: [String],
+    },
+    compensationDetails: {
+      incidentId: String,
+      incidentType: String,
+      affectedUsersCount: Number,
+      compensationPerUser: Number,
+      resolutionType: String,
+      competitionId: String,
+      competitionName: String,
     },
     description: {
       type: String,

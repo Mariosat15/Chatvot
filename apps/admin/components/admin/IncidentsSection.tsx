@@ -27,6 +27,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import IncidentResolutionModal from './IncidentResolutionModal';
 
 interface Incident {
   _id: string;
@@ -92,6 +93,7 @@ export default function IncidentsSection() {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCompensateModal, setShowCompensateModal] = useState(false);
+  const [showResolveModal, setShowResolveModal] = useState(false);
   const [filters, setFilters] = useState({
     status: '',
     severity: '',
@@ -607,20 +609,30 @@ export default function IncidentsSection() {
                 {selectedIncident.status === 'investigating' && (
                   <>
                     <Button
-                      onClick={() => setShowCompensateModal(true)}
+                      onClick={() => setShowResolveModal(true)}
                       className="w-full bg-green-500 hover:bg-green-600"
                       size="sm"
                     >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Resolve with Compensation
+                    </Button>
+                    <Button
+                      onClick={() => setShowCompensateModal(true)}
+                      variant="outline"
+                      className="w-full border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
+                      size="sm"
+                    >
                       <Gift className="h-4 w-4 mr-2" />
-                      Issue Compensation
+                      Manual Compensation
                     </Button>
                     <Button
                       onClick={() => updateIncidentStatus(selectedIncident._id, 'resolved')}
-                      className="w-full bg-blue-500 hover:bg-blue-600"
+                      variant="outline"
+                      className="w-full border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
                       size="sm"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Mark Resolved
+                      Mark Resolved (No Compensation)
                     </Button>
                   </>
                 )}
@@ -811,6 +823,19 @@ export default function IncidentsSection() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Incident Resolution Modal */}
+      {selectedIncident && (
+        <IncidentResolutionModal
+          incidentId={selectedIncident._id}
+          isOpen={showResolveModal}
+          onClose={() => setShowResolveModal(false)}
+          onResolved={() => {
+            fetchIncidents();
+            setSelectedIncident(null);
+          }}
+        />
       )}
     </div>
   );

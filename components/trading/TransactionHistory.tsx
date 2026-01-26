@@ -1,13 +1,13 @@
 'use client';
 
-import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Zap, FileText, Swords } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Zap, FileText, Swords, Gift } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { Button } from '@/components/ui/button';
 
 interface Transaction {
   _id: string;
-  transactionType: 'deposit' | 'withdrawal' | 'withdrawal_fee' | 'competition_entry' | 'competition_win' | 'competition_refund' | 'platform_fee' | 'admin_adjustment' | 'challenge_entry' | 'challenge_win' | 'challenge_refund' | 'marketplace_purchase';
+  transactionType: 'deposit' | 'withdrawal' | 'withdrawal_fee' | 'competition_entry' | 'competition_win' | 'competition_refund' | 'platform_fee' | 'admin_adjustment' | 'challenge_entry' | 'challenge_win' | 'challenge_refund' | 'marketplace_purchase' | 'incident_compensation';
   amount: number;
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
   description: string;
@@ -103,6 +103,8 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
         return <Swords className="h-5 w-5 text-yellow-500" />;
       case 'challenge_refund':
         return <Swords className="h-5 w-5 text-purple-500" />;
+      case 'incident_compensation':
+        return <Gift className="h-5 w-5 text-green-500" />;
       default:
         return <ArrowDownCircle className="h-5 w-5 text-gray-500" />;
     }
@@ -134,6 +136,8 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
         return '⚔️ Challenge Win';
       case 'challenge_refund':
         return '⚔️ Challenge Refund';
+      case 'incident_compensation':
+        return '💰 Compensation';
       default:
         return 'Transaction';
     }

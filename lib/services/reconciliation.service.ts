@@ -413,6 +413,34 @@ async function verifyPlatformTransactions(): Promise<ReconciliationIssue[]> {
     }
   }
 
+  // Check for incident compensations - verify platform expense matches user credits
+  const compensations = await PlatformTransaction.find({
+    transactionType: 'incident_compensation',
+  }).lean();
+
+  for (const comp of compensations) {
+    if (comp.sourceId && comp.compensationDetails?.affectedUsersCount) {
+      // Verify there are matching wallet transactions for this incident
+      const walletTxCount = await WalletTransaction.countDocuments({
+        transactionType: 'incident_compensation',
+        'metadata.incidentId': comp.sourceId,
+      });
+
+      if (walletTxCount < comp.compensationDetails.affectedUsersCount) {
+        issues.push({
+          type: 'fee_mismatch',
+          severity: 'warning',
+          details: {
+            transactionId: comp._id.toString(),
+            expected: comp.compensationDetails.affectedUsersCount,
+            actual: walletTxCount,
+            description: `Incident compensation ${comp._id} (incident: ${comp.sourceId}) expected ${comp.compensationDetails.affectedUsersCount} wallet transactions but found ${walletTxCount}`,
+          },
+        });
+      }
+    }
+  }
+
   return issues;
 }
 
