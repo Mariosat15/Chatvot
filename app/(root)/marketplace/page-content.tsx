@@ -874,6 +874,8 @@ function ItemCard({
     categoryLabel = indicatorInfo.label;
   }
   
+  const hasImage = !!item.imageUrl;
+  
   return (
     <div
       className={cn(
@@ -888,52 +890,82 @@ function ItemCard({
     >
       {/* Top gradient accent */}
       <div className={cn(
-        'absolute top-0 left-0 right-0 h-1 bg-gradient-to-r',
+        'absolute top-0 left-0 right-0 h-1 bg-gradient-to-r z-10',
         accentGradient
       )} />
       
-      {/* Badges */}
-      <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
-        {featured && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 rounded-full">
-            <Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />
-            <span className="text-xs font-semibold text-yellow-400">Featured</span>
+      {/* Large Image Area (when image exists) */}
+      {hasImage && (
+        <div className="relative aspect-[4/3] bg-gray-800">
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+          {/* Badges over image */}
+          <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+            {featured && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 rounded-full">
+                <Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />
+                <span className="text-xs font-semibold text-yellow-400">Featured</span>
+              </div>
+            )}
+            {!featured && item.owned && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/20 backdrop-blur-sm border border-emerald-500/30 rounded-full">
+                <BadgeCheck className="h-3.5 w-3.5 text-emerald-400" />
+                <span className="text-xs font-semibold text-emerald-400">Owned</span>
+              </div>
+            )}
+            {!featured && !item.owned && item.isFree && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/20 backdrop-blur-sm border border-green-500/30 rounded-full">
+                <Gift className="h-3.5 w-3.5 text-green-400" />
+                <span className="text-xs font-semibold text-green-400">Free</span>
+              </div>
+            )}
+            <div className={cn(
+              'px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm border ml-auto',
+              riskStyle.bg, riskStyle.text, riskStyle.border
+            )}>
+              {item.riskLevel.replace('_', ' ')}
+            </div>
           </div>
-        )}
-        {!featured && item.owned && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/20 backdrop-blur-sm border border-emerald-500/30 rounded-full">
-            <BadgeCheck className="h-3.5 w-3.5 text-emerald-400" />
-            <span className="text-xs font-semibold text-emerald-400">Owned</span>
-          </div>
-        )}
-        {!featured && !item.owned && item.isFree && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/20 backdrop-blur-sm border border-green-500/30 rounded-full">
-            <Gift className="h-3.5 w-3.5 text-green-400" />
-            <span className="text-xs font-semibold text-green-400">Free</span>
-          </div>
-        )}
-        
-        {/* Risk Badge - Always on right */}
-        <div className={cn(
-          'px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm border ml-auto',
-          riskStyle.bg, riskStyle.text, riskStyle.border
-        )}>
-          {item.riskLevel.replace('_', ' ')}
         </div>
-      </div>
+      )}
+      
+      {/* Badges (when no image) */}
+      {!hasImage && (
+        <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
+          {featured && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 rounded-full">
+              <Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />
+              <span className="text-xs font-semibold text-yellow-400">Featured</span>
+            </div>
+          )}
+          {!featured && item.owned && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/20 backdrop-blur-sm border border-emerald-500/30 rounded-full">
+              <BadgeCheck className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="text-xs font-semibold text-emerald-400">Owned</span>
+            </div>
+          )}
+          {!featured && !item.owned && item.isFree && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/20 backdrop-blur-sm border border-green-500/30 rounded-full">
+              <Gift className="h-3.5 w-3.5 text-green-400" />
+              <span className="text-xs font-semibold text-green-400">Free</span>
+            </div>
+          )}
+          <div className={cn(
+            'px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm border ml-auto',
+            riskStyle.bg, riskStyle.text, riskStyle.border
+          )}>
+            {item.riskLevel.replace('_', ' ')}
+          </div>
+        </div>
+      )}
       
       {/* Content */}
-      <div className="p-6 pt-14">
-        {/* Icon/Image */}
-        {item.imageUrl ? (
-          <div className="w-14 h-14 rounded-xl overflow-hidden mb-4 border border-gray-700/50">
-            <img 
-              src={item.imageUrl} 
-              alt={item.name}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        ) : (
+      <div className={cn("p-6", !hasImage && "pt-14")}>
+        {/* Icon (only when no image) */}
+        {!hasImage && (
           <div className={cn(
             'w-14 h-14 rounded-xl flex items-center justify-center mb-4 bg-gradient-to-br',
             gradientBg
@@ -1161,6 +1193,7 @@ function GameMasterCard({
   purchasing: boolean;
 }) {
   const config = item.gameMasterConfig;
+  const hasImage = !!item.imageUrl;
   
   return (
     <div
@@ -1174,45 +1207,67 @@ function GameMasterCard({
       onClick={onView}
     >
       {/* Top gradient accent */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-500 to-amber-500" />
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-500 to-amber-500 z-10" />
       
       {/* Crown decoration */}
       <div className="absolute -top-4 -right-4 w-24 h-24 bg-gradient-to-br from-yellow-500/10 to-transparent rounded-full blur-2xl" />
       
+      {/* Large Image Area (when image exists) */}
+      {hasImage && (
+        <div className="relative aspect-[4/3] bg-gray-800">
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+          {/* Badges over image */}
+          <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 text-yellow-400">
+              Game Master
+            </span>
+            {item.owned && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 rounded-full">
+                <BadgeCheck className="h-3.5 w-3.5 text-yellow-400" />
+                <span className="text-xs font-semibold text-yellow-400">Active</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
       {/* Content */}
       <div className="p-6">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            {item.imageUrl ? (
-              <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-yellow-500/30">
-                <img 
-                  src={item.imageUrl} 
-                  alt={item.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ) : (
+        {/* Header (only when no image) */}
+        {!hasImage && (
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 flex items-center justify-center">
                 <Crown className="h-7 w-7 text-yellow-400" />
               </div>
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400">
+                  Game Master
+                </span>
+                <h3 className="text-lg font-bold text-white mt-1 group-hover:text-yellow-400 transition-colors">
+                  {item.name}
+                </h3>
+              </div>
+            </div>
+            {item.owned && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 rounded-full">
+                <BadgeCheck className="h-3.5 w-3.5 text-yellow-400" />
+                <span className="text-xs font-semibold text-yellow-400">Active</span>
+              </div>
             )}
-            <div>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400">
-                Game Master
-              </span>
-              <h3 className="text-lg font-bold text-white mt-1 group-hover:text-yellow-400 transition-colors">
-                {item.name}
-              </h3>
-            </div>
           </div>
-          {item.owned && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 rounded-full">
-              <BadgeCheck className="h-3.5 w-3.5 text-yellow-400" />
-              <span className="text-xs font-semibold text-yellow-400">Active</span>
-            </div>
-          )}
-        </div>
+        )}
+        
+        {/* Name (when image exists - shown below image) */}
+        {hasImage && (
+          <h3 className="text-lg font-bold text-white mb-2 group-hover:text-yellow-400 transition-colors">
+            {item.name}
+          </h3>
+        )}
         
         <p className="text-sm text-gray-400 mb-5 line-clamp-2">
           {item.shortDescription}
@@ -1367,6 +1422,8 @@ function ItemDetailModal({
       ? 'from-orange-500/20 to-amber-500/20' 
       : 'from-emerald-500/20 to-teal-500/20');
   
+  const hasImage = !!item.imageUrl;
+  
   return (
     <div 
       className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4"
@@ -1376,32 +1433,60 @@ function ItemDetailModal({
         className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-gray-700/50 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Large Image Area (when image exists) */}
+        {hasImage && (
+          <div className="relative aspect-video bg-gray-800">
+            <img
+              src={item.imageUrl}
+              alt={item.name}
+              className="w-full h-full object-cover"
+            />
+            <div className={cn(
+              'absolute top-0 left-0 right-0 h-1 bg-gradient-to-r',
+              isGameMaster ? 'from-yellow-500 to-amber-500' : (isStrategy ? 'from-orange-500 to-amber-500' : 'from-emerald-500 to-teal-500')
+            )} />
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 backdrop-blur-sm rounded-xl transition-colors text-white"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            {/* Category badge over image */}
+            <div className="absolute bottom-4 left-4">
+              <span className={cn(
+                'px-3 py-1.5 rounded-full text-sm font-medium backdrop-blur-sm border',
+                isGameMaster ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : (isStrategy ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30')
+              )}>
+                {isGameMaster ? 'Game Master' : (isStrategy ? 'Strategy' : 'Indicator')}
+              </span>
+            </div>
+          </div>
+        )}
+        
         {/* Header */}
-        <div className="relative p-8 border-b border-gray-800">
-          <div className={cn(
-            'absolute top-0 left-0 right-0 h-1 bg-gradient-to-r',
-            isGameMaster ? 'from-yellow-500 to-amber-500' : (isStrategy ? 'from-orange-500 to-amber-500' : 'from-emerald-500 to-teal-500')
-          )} />
+        <div className={cn("relative border-b border-gray-800", hasImage ? "p-6" : "p-8")}>
+          {!hasImage && (
+            <div className={cn(
+              'absolute top-0 left-0 right-0 h-1 bg-gradient-to-r',
+              isGameMaster ? 'from-yellow-500 to-amber-500' : (isStrategy ? 'from-orange-500 to-amber-500' : 'from-emerald-500 to-teal-500')
+            )} />
+          )}
           
-          <button
-            onClick={onClose}
-            className="absolute top-6 right-6 p-2 hover:bg-gray-800 rounded-xl transition-colors text-gray-400 hover:text-white"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          {!hasImage && (
+            <button
+              onClick={onClose}
+              className="absolute top-6 right-6 p-2 hover:bg-gray-800 rounded-xl transition-colors text-gray-400 hover:text-white"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
           
           <div className="flex items-start gap-5">
-            {item.imageUrl ? (
-              <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 border border-gray-700/50">
-                <img 
-                  src={item.imageUrl} 
-                  alt={item.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ) : (
+            {!hasImage && (
               <div className={cn(
                 'w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br flex-shrink-0',
                 gradientBg
@@ -1410,25 +1495,38 @@ function ItemDetailModal({
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <span className={cn(
-                  'px-2.5 py-0.5 rounded-full text-xs font-medium',
-                  isGameMaster ? 'bg-yellow-500/10 text-yellow-400' : (isStrategy ? 'bg-orange-500/10 text-orange-400' : 'bg-emerald-500/10 text-emerald-400')
-                )}>
-                  {isGameMaster ? 'Game Master' : (isStrategy ? 'Strategy' : 'Indicator')}
-                </span>
-                {!isGameMaster && <span className="text-xs text-gray-500">v{item.version}</span>}
-                {!isGameMaster && (
+              {!hasImage && (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={cn(
+                    'px-2.5 py-0.5 rounded-full text-xs font-medium',
+                    isGameMaster ? 'bg-yellow-500/10 text-yellow-400' : (isStrategy ? 'bg-orange-500/10 text-orange-400' : 'bg-emerald-500/10 text-emerald-400')
+                  )}>
+                    {isGameMaster ? 'Game Master' : (isStrategy ? 'Strategy' : 'Indicator')}
+                  </span>
+                  {!isGameMaster && <span className="text-xs text-gray-500">v{item.version}</span>}
+                  {!isGameMaster && (
+                    <span className={cn(
+                      'px-2.5 py-0.5 rounded-full text-xs font-semibold',
+                      riskStyle.bg, riskStyle.text
+                    )}>
+                      {item.riskLevel.replace('_', ' ')} risk
+                    </span>
+                  )}
+                </div>
+              )}
+              <h2 className="text-2xl font-bold text-white mb-1">{item.name}</h2>
+              <p className="text-gray-400">{item.shortDescription}</p>
+              {hasImage && !isGameMaster && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-xs text-gray-500">v{item.version}</span>
                   <span className={cn(
                     'px-2.5 py-0.5 rounded-full text-xs font-semibold',
                     riskStyle.bg, riskStyle.text
                   )}>
                     {item.riskLevel.replace('_', ' ')} risk
                   </span>
-                )}
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-1">{item.name}</h2>
-              <p className="text-gray-400">{item.shortDescription}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
