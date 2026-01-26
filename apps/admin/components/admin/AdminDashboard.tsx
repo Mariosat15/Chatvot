@@ -61,6 +61,8 @@ import {
   MessageCircle,
   Headphones,
   Image,
+  HeartPulse,
+  FileWarning,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CredentialsSection from '@/components/admin/CredentialsSection';
@@ -113,6 +115,8 @@ import MessagingSection from '@/components/admin/MessagingSection';
 import MessagingSettingsSection from '@/components/admin/MessagingSettingsSection';
 import GameMasterDashboardSection from '@/components/admin/GameMasterDashboardSection';
 import GameMasterManagementSection from '@/components/admin/GameMasterManagementSection';
+import PriceHealthWidget from '@/components/admin/PriceHealthWidget';
+import IncidentsSection from '@/components/admin/IncidentsSection';
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -340,6 +344,29 @@ const menuGroups: MenuGroup[] = [
         icon: <AlertTriangle className="h-5 w-5" />,
         color: 'text-red-400',
         bgColor: 'bg-red-500/10 hover:bg-red-500/20',
+      },
+    ],
+  },
+  // Operations (Price Health, Incidents, Risk Management)
+  {
+    id: 'operations',
+    label: 'Operations',
+    icon: <HeartPulse className="h-4 w-4" />,
+    color: 'text-rose-400',
+    items: [
+      {
+        id: 'price-health',
+        label: 'Price Feed Health',
+        icon: <HeartPulse className="h-5 w-5" />,
+        color: 'text-rose-400',
+        bgColor: 'bg-rose-500/10 hover:bg-rose-500/20',
+      },
+      {
+        id: 'incidents',
+        label: 'Incident Management',
+        icon: <FileWarning className="h-5 w-5" />,
+        color: 'text-orange-400',
+        bgColor: 'bg-orange-500/10 hover:bg-orange-500/20',
       },
     ],
   },
@@ -867,6 +894,10 @@ export default function AdminDashboard({
         return <GameMasterDashboardSection key={currentRefreshKey} />;
       case 'gamemaster-management':
         return <GameMasterManagementSection key={currentRefreshKey} initialGmId={urlGmId || undefined} />;
+      case 'price-health':
+        return <PriceHealthWidget key={currentRefreshKey} />;
+      case 'incidents':
+        return <IncidentsSection key={currentRefreshKey} />;
       default:
         return <CompetitionsListSection key={currentRefreshKey} />;
     }

@@ -332,6 +332,8 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                   startTime={competition.startTime}
                   endTime={competition.endTime}
                   participantCount={competition.currentParticipants || 0}
+                  isPaused={competition.isPaused}
+                  pauseReason={competition.pauseReason}
                 />
               </div>
 
