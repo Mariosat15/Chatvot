@@ -1070,6 +1070,11 @@ export async function seedMarketplaceItems(adminId: string = 'system'): Promise<
           existing.price = itemData.price ?? existing.price;
         }
         existing.isFree = itemData.isFree ?? existing.isFree;
+        // ALWAYS sync isFeatured from template to ensure consistency
+        // Admin can still change it manually after seeding
+        if (itemData.isFeatured !== undefined) {
+          existing.isFeatured = itemData.isFeatured;
+        }
         // PRESERVE existing tags, merge if needed
         if (!existing.tags || existing.tags.length === 0) {
           existing.tags = itemData.tags || existing.tags;

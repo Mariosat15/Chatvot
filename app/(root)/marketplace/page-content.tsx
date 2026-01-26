@@ -97,7 +97,7 @@ const CATEGORIES: { value: Category; label: string; icon: React.ComponentType<{ 
   { value: 'cosmetic', label: 'Cosmetics', icon: Palette, color: 'text-pink-400', bgGradient: 'from-pink-500/20 to-rose-500/20' },
 ];
 
-const INDICATOR_TYPE_INFO: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string; label: string }> = {
+const INDICATOR_TYPE_INFO: Record<string, { icon: typeof TrendingUp; color: string; label: string }> = {
   sma: { icon: TrendingUp, color: 'text-blue-400', label: 'Moving Average' },
   ema: { icon: Activity, color: 'text-cyan-400', label: 'EMA' },
   bb: { icon: Layers, color: 'text-purple-400', label: 'Volatility' },
@@ -588,7 +588,7 @@ export default function MarketplaceContent() {
                   Become a Game Master! Create competitions, earn from referrals, and build your trading community.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {gamemasterPackages.filter(i => category === 'gamemaster' || !i.isFeatured).map((item) => (
+                  {gamemasterPackages.map((item) => (
                     <GameMasterCard
                       key={item._id}
                       item={item}
@@ -615,7 +615,7 @@ export default function MarketplaceContent() {
                   <div className="flex-1 h-px bg-gradient-to-r from-emerald-500/20 to-transparent" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {indicators.filter(i => category === 'indicator' || !i.isFeatured).map((item) => (
+                  {indicators.map((item) => (
                     <ItemCard
                       key={item._id}
                       item={item}
@@ -642,23 +642,16 @@ export default function MarketplaceContent() {
                   <div className="flex-1 h-px bg-gradient-to-r from-orange-500/20 to-transparent" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {strategies
-                    .filter(i => category === 'strategy' || !i.isFeatured)
-                    .map((item) => (
-                      <ItemCard
-                        key={item._id}
-                        item={item}
-                        onView={() => setSelectedItem(item)}
-                        onPurchase={() => handlePurchase(item)}
-                        purchasing={purchasing === item._id}
-                      />
-                    ))}
+                  {strategies.map((item) => (
+                    <ItemCard
+                      key={item._id}
+                      item={item}
+                      onView={() => setSelectedItem(item)}
+                      onPurchase={() => handlePurchase(item)}
+                      purchasing={purchasing === item._id}
+                    />
+                  ))}
                 </div>
-                {category === 'all' && strategies.every(s => s.isFeatured) && (
-                  <p className="text-center text-gray-500 text-sm mt-4">
-                    All strategies are featured above ☝️
-                  </p>
-                )}
               </section>
             )}
             
@@ -676,7 +669,7 @@ export default function MarketplaceContent() {
                   <div className="flex-1 h-px bg-gradient-to-r from-pink-500/20 to-transparent" />
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                  {cosmetics.filter(i => category === 'cosmetic' || !i.isFeatured).map((item) => (
+                  {cosmetics.map((item) => (
                     <CosmeticCard
                       key={item._id}
                       item={item}
@@ -894,11 +887,11 @@ function ItemCard({
       
       {/* Large Image Area (when image exists) */}
       {hasImage && (
-        <div className="relative aspect-[4/3] bg-gray-800">
+        <div className="relative aspect-[16/10] bg-gray-900 overflow-hidden">
           <img
             src={item.imageUrl}
             alt={item.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
           />
           {/* Badges over image */}
           <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
@@ -1095,12 +1088,12 @@ function CosmeticCard({
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 to-rose-500" />
       
       {/* Image */}
-      <div className="relative aspect-square bg-gray-800">
+      <div className="relative aspect-square bg-gray-900 overflow-hidden">
         {item.imageUrl ? (
           <img
             src={item.imageUrl}
             alt={item.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -1212,11 +1205,11 @@ function GameMasterCard({
       
       {/* Large Image Area (when image exists) */}
       {hasImage && (
-        <div className="relative aspect-[4/3] bg-gray-800">
+        <div className="relative aspect-[16/10] bg-gray-900 overflow-hidden">
           <img
             src={item.imageUrl}
             alt={item.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
           />
           {/* Badges over image */}
           <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
@@ -1433,11 +1426,11 @@ function ItemDetailModal({
       >
         {/* Large Image Area (when image exists) */}
         {hasImage && (
-          <div className="relative aspect-video bg-gray-800">
+          <div className="relative aspect-[16/9] bg-gray-900 overflow-hidden">
             <img
               src={item.imageUrl}
               alt={item.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
             <div className={cn(
               'absolute top-0 left-0 right-0 h-1 bg-gradient-to-r',

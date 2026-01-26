@@ -347,25 +347,61 @@ export default function MarketplaceSection() {
     }
   };
 
-  // Generate title and description from image using AI
+  // Generate title and description using AI based on item category and configuration
   const handleGenerateWithAI = async () => {
-    if (!editingItem.imageUrl) {
+    // For cosmetics, require an image
+    if (editingItem.category === 'cosmetic' && !editingItem.imageUrl) {
       toast.error('Please upload an image first');
+      return;
+    }
+
+    // For indicators, require indicator type
+    if (editingItem.category === 'indicator' && !editingItem.indicatorType) {
+      toast.error('Please select an indicator type first');
+      return;
+    }
+
+    // For game master packages, require some config
+    if (editingItem.category === 'gamemaster' && !editingItem.gameMasterConfig) {
+      toast.error('Please configure the Game Master package settings first');
       return;
     }
 
     setGeneratingAI(true);
     
     try {
-      console.log('[AI Generate] Starting generation for:', editingItem.imageUrl);
+      console.log('[AI Generate] Starting generation for:', editingItem.category);
       
-      const response = await fetch('/api/marketplace/generate-cosmetic', {
+      // Build request body based on category
+      const requestBody: Record<string, unknown> = {
+        category: editingItem.category,
+      };
+
+      // Add category-specific data
+      if (editingItem.category === 'cosmetic') {
+        requestBody.imageUrl = editingItem.imageUrl;
+        requestBody.cosmeticType = editingItem.cosmeticType || 'avatar';
+      } else if (editingItem.category === 'indicator') {
+        requestBody.indicatorType = editingItem.indicatorType;
+        requestBody.defaultSettings = editingItem.defaultSettings;
+        if (editingItem.imageUrl) requestBody.imageUrl = editingItem.imageUrl;
+      } else if (editingItem.category === 'strategy') {
+        requestBody.strategyConfig = editingItem.strategyConfig;
+        requestBody.defaultSettings = editingItem.defaultSettings;
+        if (editingItem.imageUrl) requestBody.imageUrl = editingItem.imageUrl;
+      } else if (editingItem.category === 'gamemaster') {
+        requestBody.gameMasterConfig = editingItem.gameMasterConfig;
+        if (editingItem.imageUrl) requestBody.imageUrl = editingItem.imageUrl;
+      }
+
+      // Add existing values for context
+      if (editingItem.name) requestBody.existingName = editingItem.name;
+      if (editingItem.shortDescription) requestBody.existingDescription = editingItem.shortDescription;
+
+      const response = await fetch('/api/marketplace/generate-content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageUrl: editingItem.imageUrl,
-          cosmeticType: editingItem.cosmeticType || 'avatar'
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
@@ -1112,7 +1148,7 @@ export default function MarketplaceSection() {
                       </div>
                     </div>
                     
-                    {/* AI Generate Button - Only for cosmetics */}
+                    {/* AI Generate Button - For cosmetics with image */}
                     {editingItem.category === 'cosmetic' && (
                       <>
                         <Button
@@ -1141,6 +1177,52 @@ export default function MarketplaceSection() {
                   </div>
                 )}
               </div>
+
+              {/* AI Generate Button - For non-cosmetic items */}
+              {editingItem.category !== 'cosmetic' && (
+                <div className="space-y-3 p-4 bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl">
+                  <div className="flex items-center gap-2 text-purple-300">
+                    <Sparkles className="h-4 w-4" />
+                    <span className="font-medium text-sm">AI Content Generator</span>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    {editingItem.category === 'indicator' && 'AI will generate professional content based on the indicator type and settings.'}
+                    {editingItem.category === 'strategy' && 'AI will generate content explaining the strategy logic and use cases.'}
+                    {editingItem.category === 'gamemaster' && 'AI will create compelling marketing copy based on package configuration.'}
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={handleGenerateWithAI}
+                    disabled={generatingAI || 
+                      (editingItem.category === 'indicator' && !editingItem.indicatorType) ||
+                      (editingItem.category === 'gamemaster' && !editingItem.gameMasterConfig)
+                    }
+                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium"
+                  >
+                    {generatingAI ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        AI Generating Content...
+                      </>
+                    ) : (
+                      <>
+                        <Star className="h-4 w-4 mr-2" />
+                        ✨ Generate with AI
+                      </>
+                    )}
+                  </Button>
+                  {editingItem.category === 'indicator' && !editingItem.indicatorType && (
+                    <p className="text-xs text-amber-400 text-center">
+                      Select an indicator type first (in Settings tab)
+                    </p>
+                  )}
+                  {editingItem.category === 'gamemaster' && !editingItem.gameMasterConfig && (
+                    <p className="text-xs text-amber-400 text-center">
+                      Configure package settings first (in Settings tab)
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Icon Picker - For non-cosmetic items */}
               {editingItem.category !== 'cosmetic' && (

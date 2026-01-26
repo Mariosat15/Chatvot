@@ -24,10 +24,20 @@ import { cn } from '@/lib/utils';
 
 interface ImageInfo {
   filename: string;
+  fullPath: string;
+  directory: string;
+  directoryLabel: string;
   size: number;
-  cosmeticType: string;
+  imageType: string;
   isOptimized: boolean;
   canOptimize: boolean;
+}
+
+interface DirectoryInfo {
+  path: string;
+  label: string;
+  exists: boolean;
+  imageCount: number;
 }
 
 interface Stats {
@@ -37,6 +47,7 @@ interface Stats {
   optimizedCount: number;
   needsOptimization: number;
   potentialSavings: string;
+  directoriesScanned: number;
 }
 
 interface OptimizeResult {
@@ -54,8 +65,8 @@ export default function ImageOptimizerSection() {
   const [optimizing, setOptimizing] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [images, setImages] = useState<ImageInfo[]>([]);
-  const [directory, setDirectory] = useState<string>('');
-  const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
+  const [directories, setDirectories] = useState<DirectoryInfo[]>([]);
+  const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set()); // Uses fullPath as key
   const [results, setResults] = useState<OptimizeResult[]>([]);
   const [progress, setProgress] = useState(0);
 
@@ -75,15 +86,17 @@ export default function ImageOptimizerSection() {
 
       if (data.success) {
         setStats(data.stats);
-        setImages(data.images);
-        setDirectory(data.directory);
+        setImages(data.images || []);
+        setDirectories(data.directories || []);
         setSelectedImages(new Set());
         setResults([]);
         
         if (data.stats.needsOptimization > 0) {
-          toast.info(`Found ${data.stats.needsOptimization} images that can be optimized`);
-        } else {
+          toast.info(`Found ${data.stats.needsOptimization} images that can be optimized across ${data.stats.directoriesScanned || 1} directories`);
+        } else if (data.stats.totalImages > 0) {
           toast.success('All images are already optimized!');
+        } else {
+          toast.info('No images found in any directory');
         }
       } else {
         toast.error(data.error || 'Failed to scan images');
@@ -97,9 +110,12 @@ export default function ImageOptimizerSection() {
   };
 
   const optimizeImages = async (mode: 'all' | 'selected') => {
-    const filenames = mode === 'selected' ? Array.from(selectedImages) : [];
+    // Build selected images array with full info
+    const selectedImagesList = mode === 'selected' 
+      ? images.filter(img => selectedImages.has(img.fullPath))
+      : [];
     
-    if (mode === 'selected' && filenames.length === 0) {
+    if (mode === 'selected' && selectedImagesList.length === 0) {
       toast.error('No images selected');
       return;
     }
@@ -112,7 +128,16 @@ export default function ImageOptimizerSection() {
       const response = await fetch('/api/dev-zone/optimize-images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode, filenames }),
+        body: JSON.stringify({ 
+          mode, 
+          images: selectedImagesList.map(img => ({
+            filename: img.filename,
+            fullPath: img.fullPath,
+            directory: img.directory,
+            directoryLabel: img.directoryLabel,
+            imageType: img.imageType,
+          })),
+        }),
       });
 
       const data = await response.json();
@@ -139,16 +164,16 @@ export default function ImageOptimizerSection() {
     if (selectedImages.size === images.filter(i => i.canOptimize).length) {
       setSelectedImages(new Set());
     } else {
-      setSelectedImages(new Set(images.filter(i => i.canOptimize).map(i => i.filename)));
+      setSelectedImages(new Set(images.filter(i => i.canOptimize).map(i => i.fullPath)));
     }
   };
 
-  const toggleImage = (filename: string) => {
+  const toggleImage = (fullPath: string) => {
     const newSet = new Set(selectedImages);
-    if (newSet.has(filename)) {
-      newSet.delete(filename);
+    if (newSet.has(fullPath)) {
+      newSet.delete(fullPath);
     } else {
-      newSet.add(filename);
+      newSet.add(fullPath);
     }
     setSelectedImages(newSet);
   };
@@ -167,7 +192,7 @@ export default function ImageOptimizerSection() {
             Image Optimizer
           </h2>
           <p className="text-muted-foreground">
-            Optimize marketplace images for better performance
+            Scan and optimize images from all upload directories
           </p>
         </div>
         <Button
@@ -248,13 +273,28 @@ export default function ImageOptimizerSection() {
         </div>
       )}
 
-      {/* Directory Info */}
-      {directory && (
+      {/* Directories Info */}
+      {directories.length > 0 && (
         <Card className="bg-muted/30">
-          <CardContent className="pt-4 pb-4">
-            <p className="text-sm text-muted-foreground">
-              📁 Directory: <code className="bg-muted px-2 py-1 rounded">{directory}</code>
-            </p>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">📁 Scanned Directories</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              {directories.map((dir, idx) => (
+                <div key={idx} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {dir.label}
+                    </Badge>
+                    <code className="bg-muted px-2 py-1 rounded text-xs truncate max-w-[400px]">
+                      {dir.path}
+                    </code>
+                  </div>
+                  <span className="text-muted-foreground">{dir.imageCount} images</span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -350,7 +390,7 @@ export default function ImageOptimizerSection() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Images</CardTitle>
-                <CardDescription>Largest images first (top 50)</CardDescription>
+                <CardDescription>Largest images first (top 100 from all directories)</CardDescription>
               </div>
               {images.some(i => i.canOptimize) && (
                 <Button variant="outline" size="sm" onClick={toggleSelectAll}>
@@ -360,11 +400,11 @@ export default function ImageOptimizerSection() {
             </div>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[500px]">
               <div className="space-y-2">
                 {images.map((img) => (
                   <div
-                    key={img.filename}
+                    key={img.fullPath}
                     className={cn(
                       "flex items-center justify-between p-3 rounded border",
                       img.isOptimized ? "bg-green-500/5 border-green-500/20" : 
@@ -375,18 +415,21 @@ export default function ImageOptimizerSection() {
                     <div className="flex items-center gap-3">
                       {img.canOptimize && (
                         <Checkbox
-                          checked={selectedImages.has(img.filename)}
-                          onCheckedChange={() => toggleImage(img.filename)}
+                          checked={selectedImages.has(img.fullPath)}
+                          onCheckedChange={() => toggleImage(img.fullPath)}
                         />
                       )}
-                      <div>
-                        <p className="font-medium text-sm">{img.filename}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Type: {img.cosmeticType}
-                        </p>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{img.filename}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant="outline" className="text-[10px] px-1 py-0">
+                            {img.directoryLabel}
+                          </Badge>
+                          <span>Type: {img.imageType}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={cn(
                         "font-mono text-sm",
                         img.size > 500 * 1024 ? "text-red-500" :
