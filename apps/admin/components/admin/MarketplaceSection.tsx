@@ -655,8 +655,8 @@ export default function MarketplaceSection() {
                       <tr key={item._id} className="border-b border-gray-800 hover:bg-gray-800/50">
                         <td className="p-3">
                           <div className="flex items-center gap-3">
-                            {/* Show image for cosmetics, icon for others */}
-                            {item.category === 'cosmetic' && item.imageUrl ? (
+                            {/* Show image preview for all items with images */}
+                            {item.imageUrl ? (
                               <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-800 border border-gray-700 flex-shrink-0">
                                 <img
                                   src={item.imageUrl}
@@ -667,7 +667,7 @@ export default function MarketplaceSection() {
                                   }}
                                 />
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                  <Palette className="h-5 w-5 text-pink-400 opacity-50" />
+                                  <CategoryIcon className="h-5 w-5 text-cyan-400 opacity-30" />
                                 </div>
                               </div>
                             ) : (
