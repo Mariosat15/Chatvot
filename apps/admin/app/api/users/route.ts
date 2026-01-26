@@ -157,6 +157,12 @@ export async function GET(request: NextRequest) {
       userPurchases.get(userId)!.push(p);
     }
 
+    // Get Game Master subscriptions for displayed users
+    const gmSubscriptions = await db.collection('gamemastersubscriptions').find({ 
+      userId: { $in: userIds } 
+    }).toArray();
+    const gmSubscriptionMap = new Map(gmSubscriptions.map((gm: any) => [gm.userId, gm]));
+
     // Combine all data
     const usersWithData = users.map((user: any) => {
       const userId = user.id || user._id?.toString();
@@ -164,6 +170,7 @@ export async function GET(request: NextRequest) {
       const userComps = userParticipants.get(userId) || [];
       const userChalls = userChallenges.get(userId) || [];
       const userPurchs = userPurchases.get(userId) || [];
+      const gmSubscription = gmSubscriptionMap.get(userId) || null;
       
       // Calculate competition stats
       const totalCompetitions = userComps.length;
@@ -251,6 +258,27 @@ export async function GET(request: NextRequest) {
           totalPurchases: marketplacePurchases,
           totalSpent: marketplaceSpent,
           items: marketplaceItems,
+        },
+
+        // Game Master subscription (if any)
+        gameMaster: gmSubscription ? {
+          isGameMaster: true,
+          subscriptionId: gmSubscription._id?.toString(),
+          status: gmSubscription.status,
+          packageName: gmSubscription.packageName,
+          referralCode: gmSubscription.referralCode,
+          startDate: gmSubscription.startDate,
+          endDate: gmSubscription.endDate,
+          autoRenew: gmSubscription.autoRenew,
+          totalReferredUsers: gmSubscription.totalReferredUsers || 0,
+          totalEarnings: gmSubscription.totalEarnings || 0,
+          pendingEarnings: gmSubscription.pendingEarnings || 0,
+          totalCompetitionsCreated: gmSubscription.totalCompetitionsCreated || 0,
+          limits: gmSubscription.limits,
+          isPaused: gmSubscription.isPaused || false,
+          scheduledForDeletion: gmSubscription.scheduledForDeletion || false,
+        } : {
+          isGameMaster: false,
         },
       };
     });

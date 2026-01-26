@@ -28,7 +28,9 @@ import {
   UserCheck,
   UserPlus,
   AlertTriangle,
+  Crown,
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import UserFullDetailPanel from './UserFullDetailPanel';
 import { CustomerAssignmentBadge } from './CustomerAssignmentBadge';
@@ -56,6 +58,32 @@ export interface Assignment {
   employeeEmail: string;
   employeeRole: string;
   assignedAt: string;
+}
+
+// Game Master subscription data
+export interface GameMasterData {
+  isGameMaster: boolean;
+  subscriptionId?: string;
+  status?: 'active' | 'expired' | 'suspended' | 'cancelled';
+  packageName?: string;
+  referralCode?: string;
+  startDate?: string;
+  endDate?: string;
+  autoRenew?: boolean;
+  totalReferredUsers?: number;
+  totalEarnings?: number;
+  pendingEarnings?: number;
+  totalCompetitionsCreated?: number;
+  limits?: {
+    maxCompetitionsPerDay: number;
+    maxUsersPerCompetition: number;
+    referralFeePercentage: number;
+    canCreateCompetitions: boolean;
+    canEarnFromChallenges?: boolean;
+    challengeReferralFeePercentage?: number;
+  };
+  isPaused?: boolean;
+  scheduledForDeletion?: boolean;
 }
 
 export interface UserData {
@@ -95,6 +123,8 @@ export interface UserData {
     totalSpent: number;
     items: string[];
   };
+  // Game Master data
+  gameMaster?: GameMasterData;
   // Assignment info
   assignment?: Assignment | null;
   // Online status
@@ -112,6 +142,9 @@ type SortField = 'name' | 'email' | 'balance' | 'netProfit' | 'createdAt' | 'com
 type SortDirection = 'asc' | 'desc';
 
 export default function UsersSection() {
+  const searchParams = useSearchParams();
+  const urlUserId = searchParams.get('userId');
+  
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -151,6 +184,35 @@ export default function UsersSection() {
     const onlineInterval = setInterval(fetchOnlineStatus, 30000);
     return () => clearInterval(onlineInterval);
   }, []);
+
+  // Handle URL parameter to open specific user
+  useEffect(() => {
+    if (urlUserId && users.length > 0 && !detailPanelOpen) {
+      const targetUser = users.find(u => u.id === urlUserId);
+      if (targetUser) {
+        setSelectedUser(targetUser);
+        setDetailPanelOpen(true);
+      } else {
+        // User not in current page, fetch directly
+        fetchUserById(urlUserId);
+      }
+    }
+  }, [urlUserId, users]);
+  
+  const fetchUserById = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/users?userId=${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.users && data.users.length > 0) {
+          setSelectedUser(data.users[0]);
+          setDetailPanelOpen(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user by ID:', error);
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -625,11 +687,23 @@ export default function UsersSection() {
                             {user.isAdmin ? <Shield className="h-5 w-5" /> : user.name[0]?.toUpperCase() || 'U'}
                           </div>
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium text-gray-100 truncate">{user.name}</p>
                               <Badge className={`${roleConfig.color} text-xs border`}>
                                 {roleConfig.label}
                               </Badge>
+                              {user.gameMaster?.isGameMaster && (
+                                <Badge className={`text-xs border flex items-center gap-1 ${
+                                  user.gameMaster.status === 'active' && !user.gameMaster.isPaused
+                                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' 
+                                    : user.gameMaster.isPaused
+                                    ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                                    : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                                }`}>
+                                  <Crown className="h-3 w-3" />
+                                  GM {user.gameMaster.status === 'active' && !user.gameMaster.isPaused ? '' : `(${user.gameMaster.isPaused ? 'paused' : user.gameMaster.status})`}
+                                </Badge>
+                              )}
                             </div>
                             <p className="text-xs text-gray-500 truncate">{user.email}</p>
                           </div>

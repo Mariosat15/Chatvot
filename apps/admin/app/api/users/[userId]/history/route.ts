@@ -472,6 +472,113 @@ export async function GET(
       console.error('Error fetching notifications:', e);
     }
 
+    // 14. Game Master Subscription
+    try {
+      const gmSubscription = await db.collection('gamemastersubscriptions').findOne({
+        userId: userId
+      });
+
+      if (gmSubscription) {
+        // Subscription creation
+        history.push({
+          id: gmSubscription._id.toString(),
+          type: 'gamemaster',
+          category: 'subscription',
+          description: `👑 Game Master Subscription: ${gmSubscription.packageName}`,
+          status: gmSubscription.status,
+          createdAt: gmSubscription.startDate || gmSubscription.createdAt,
+          details: {
+            packageName: gmSubscription.packageName,
+            referralCode: gmSubscription.referralCode,
+            status: gmSubscription.status,
+            totalReferredUsers: gmSubscription.totalReferredUsers,
+            totalEarnings: gmSubscription.totalEarnings,
+            isPaused: gmSubscription.isPaused,
+            autoRenew: gmSubscription.autoRenew,
+            endDate: gmSubscription.endDate,
+          },
+        });
+
+        // Renewal history
+        if (gmSubscription.renewalHistory && Array.isArray(gmSubscription.renewalHistory)) {
+          for (const renewal of gmSubscription.renewalHistory) {
+            history.push({
+              id: `renewal_${gmSubscription._id}_${renewal.date}`,
+              type: 'gamemaster',
+              category: renewal.status === 'success' ? 'renewal' : 'renewal_failed',
+              description: `${renewal.status === 'success' ? '🔄' : '❌'} GM Subscription ${renewal.status === 'success' ? 'Renewed' : 'Renewal Failed'}`,
+              status: renewal.status,
+              amount: renewal.amount,
+              createdAt: new Date(renewal.date),
+              details: {
+                amount: renewal.amount,
+                failureReason: renewal.failureReason,
+              },
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching GM subscription:', e);
+    }
+
+    // 15. Game Master Earnings (from competitions & challenges)
+    try {
+      const gmEarnings = await db.collection('wallettransactions').find({
+        userId: userId,
+        transactionType: { $in: ['gamemaster_referral', 'gamemaster_challenge_referral'] }
+      }).sort({ createdAt: -1 }).toArray();
+
+      for (const earning of gmEarnings) {
+        const isChallenge = earning.transactionType === 'gamemaster_challenge_referral';
+        history.push({
+          id: earning._id.toString(),
+          type: 'gamemaster',
+          category: isChallenge ? 'challenge_earning' : 'competition_earning',
+          description: `💰 GM Referral Earning (${isChallenge ? 'Challenge' : 'Competition'})`,
+          status: earning.status,
+          amount: earning.amount,
+          createdAt: earning.createdAt,
+          details: {
+            amount: earning.amount,
+            sourceType: isChallenge ? 'challenge' : 'competition',
+            reference: earning.reference,
+            metadata: earning.metadata,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Error fetching GM earnings:', e);
+    }
+
+    // 16. Competitions created by Game Master
+    try {
+      const gmCompetitions = await db.collection('competitions').find({
+        createdByGameMaster: userId
+      }).sort({ createdAt: -1 }).toArray();
+
+      for (const comp of gmCompetitions) {
+        history.push({
+          id: `gm_comp_${comp._id.toString()}`,
+          type: 'gamemaster',
+          category: 'competition_created',
+          description: `🏆 GM Created Competition: ${comp.name}`,
+          status: comp.status,
+          createdAt: comp.createdAt,
+          details: {
+            competitionName: comp.name,
+            competitionId: comp._id.toString(),
+            entryFee: comp.entryFee,
+            prizePool: comp.prizePool,
+            maxParticipants: comp.maxParticipants,
+            status: comp.status,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Error fetching GM competitions:', e);
+    }
+
     // Sort all history by date (newest first)
     history.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

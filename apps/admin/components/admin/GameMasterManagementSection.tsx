@@ -20,7 +20,11 @@ import {
   Trash2,
   ToggleLeft,
   ToggleRight,
+  ExternalLink,
+  User,
+  Swords,
 } from 'lucide-react';
+import Link from 'next/link';
 
 interface GameMaster {
   id: string;
@@ -225,9 +229,23 @@ export default function GameMasterManagementSection() {
             <div>
               <h2 className="text-2xl font-bold text-white">{gm.userName}</h2>
               <p className="text-gray-400">{gm.userEmail}</p>
-              <span className={`px-2 py-1 rounded text-xs ${getStatusColor(gm.status)}`}>
-                {gm.status.toUpperCase()}
-              </span>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`px-2 py-1 rounded text-xs ${getStatusColor(gm.status)}`}>
+                  {gm.status.toUpperCase()}
+                </span>
+                <span className="text-xs text-gray-500 font-mono">
+                  ID: {gm.userId}
+                </span>
+              </div>
+              {/* Link to User Profile */}
+              <Link 
+                href={`/dashboard?activeTab=users&userId=${gm.userId}`}
+                className="mt-2 inline-flex items-center gap-1 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+              >
+                <User className="h-3 w-3" />
+                View User Profile
+                <ExternalLink className="h-3 w-3" />
+              </Link>
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -580,6 +598,14 @@ export default function GameMasterManagementSection() {
                   <td className="px-4 py-3">
                     <p className="text-white font-medium">{gm.userName}</p>
                     <p className="text-gray-400 text-sm">{gm.userEmail}</p>
+                    <Link 
+                      href={`/dashboard?activeTab=users&userId=${gm.userId}`}
+                      className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 mt-0.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <User className="h-3 w-3" />
+                      View User
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-gray-300">{gm.packageName}</td>
                   <td className="px-4 py-3">

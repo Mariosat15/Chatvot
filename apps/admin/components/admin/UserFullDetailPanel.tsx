@@ -49,7 +49,15 @@ import {
   ArrowUpDown,
   ArrowRight,
   ClipboardList,
+  Crown,
+  Users,
+  Link as LinkIcon,
+  ExternalLink,
+  DollarSign,
+  Pause,
+  Play,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,7 +72,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { UserData, Assignment } from './UsersSection';
+import { UserData, Assignment, GameMasterData } from './UsersSection';
 import { CustomerAssignmentCard } from './CustomerAssignmentBadge';
 import { CustomerAuditTrail } from './CustomerAuditTrail';
 import { TransferCustomerDialog } from './TransferCustomerDialog';
@@ -78,9 +86,9 @@ interface UserFullDetailPanelProps {
 
 // Valid user roles
 const USER_ROLES = [
-  { value: 'trader', label: 'Trader', color: 'bg-cyan-500', icon: '📈', disabled: false },
+  { value: 'trader', label: 'Trader', color: 'bg-cyan-500', icon: '📈', disabled: false, comingSoon: false },
   { value: 'affiliate', label: 'Affiliate', color: 'bg-emerald-500', icon: '🤝', disabled: true, comingSoon: true },
-  { value: 'gamemaster', label: 'Gamemaster', color: 'bg-orange-500', icon: '🎮', disabled: true, comingSoon: true },
+  { value: 'gamemaster', label: 'Gamemaster', color: 'bg-orange-500', icon: '🎮', disabled: false, comingSoon: false },
 ] as const;
 
 type UserRole = typeof USER_ROLES[number]['value'];
@@ -215,7 +223,7 @@ const RESTRICTION_REASONS = [
   { value: 'other', label: 'Other' },
 ];
 
-type TabType = 'overview' | 'edit' | 'wallet' | 'kyc' | 'notes' | 'restrictions' | 'invoices' | 'activity' | 'assignment' | 'audit' | 'conversations';
+type TabType = 'overview' | 'edit' | 'wallet' | 'kyc' | 'notes' | 'restrictions' | 'invoices' | 'activity' | 'assignment' | 'audit' | 'conversations' | 'gamemaster' | 'history';
 
 export default function UserFullDetailPanel({
   open,
@@ -913,11 +921,16 @@ export default function UserFullDetailPanel({
 
   if (!open) return null;
 
+  // Check if user is a Game Master
+  const isGameMaster = (user as any).gameMaster?.isGameMaster === true;
+  const gmData = (user as any).gameMaster;
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'edit', label: 'Edit User', icon: Edit },
     { id: 'assignment', label: assignment ? 'Assigned' : 'Unassigned', icon: UserPlus },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
+    ...(isGameMaster ? [{ id: 'gamemaster', label: '🎮 Game Master', icon: Crown }] : []),
     { id: 'kyc', label: 'KYC', icon: Shield },
     { id: 'history', label: `History (${history.length})`, icon: History },
     { id: 'conversations', label: 'Conversations', icon: MessageSquare },
@@ -1056,7 +1069,7 @@ export default function UserFullDetailPanel({
           {/* Danger Zone */}
           <div className="mt-6 pt-6 border-t border-gray-700">
             <div className="text-xs text-red-400 uppercase tracking-wider mb-3">Danger Zone</div>
-            {user.role !== 'admin' && (
+            {!user.isAdmin && (
               <Button
                 variant="outline"
                 size="sm"
@@ -2369,6 +2382,233 @@ export default function UserFullDetailPanel({
                         </CardContent>
                       </Card>
                     )}
+                  </div>
+                )}
+
+                {/* Game Master Tab */}
+                {activeTab === 'gamemaster' && isGameMaster && gmData && (
+                  <div className="space-y-6">
+                    {/* GM Status Card */}
+                    <Card className={`border ${
+                      gmData.status === 'active' && !gmData.isPaused
+                        ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-500/30'
+                        : gmData.isPaused
+                        ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/30'
+                        : 'bg-gradient-to-r from-gray-500/20 to-gray-600/20 border-gray-500/30'
+                    }`}>
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className={`p-3 rounded-lg ${
+                              gmData.status === 'active' && !gmData.isPaused
+                                ? 'bg-amber-500/30'
+                                : 'bg-gray-500/30'
+                            }`}>
+                              <Crown className={`h-8 w-8 ${
+                                gmData.status === 'active' && !gmData.isPaused
+                                  ? 'text-amber-400'
+                                  : 'text-gray-400'
+                              }`} />
+                            </div>
+                            <div>
+                              <h3 className="text-xl font-bold text-white">Game Master</h3>
+                              <p className="text-gray-400">{gmData.packageName}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                  gmData.status === 'active' && !gmData.isPaused
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : gmData.isPaused
+                                    ? 'bg-yellow-500/20 text-yellow-400'
+                                    : gmData.status === 'expired'
+                                    ? 'bg-red-500/20 text-red-400'
+                                    : 'bg-gray-500/20 text-gray-400'
+                                }`}>
+                                  {gmData.isPaused ? 'PAUSED' : gmData.status?.toUpperCase()}
+                                </span>
+                                {gmData.scheduledForDeletion && (
+                                  <span className="px-2 py-1 rounded text-xs bg-red-500/20 text-red-400">
+                                    Scheduled for Deletion
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <Link
+                            href={`/dashboard?activeTab=gamemaster-management&gmId=${gmData.subscriptionId}`}
+                            className="flex items-center gap-2 px-4 py-2 bg-amber-600/20 text-amber-400 rounded-lg hover:bg-amber-600/30 transition-colors border border-amber-500/30"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            View in GM Management
+                          </Link>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* GM Stats Grid */}
+                    <div className="grid grid-cols-4 gap-4">
+                      <Card className="bg-gray-800/50 border-gray-700">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-500/20 rounded-lg">
+                              <Users className="h-5 w-5 text-blue-400" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400">Total Referrals</p>
+                              <p className="text-xl font-bold text-white">{gmData.totalReferredUsers || 0}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-gray-800/50 border-gray-700">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-green-500/20 rounded-lg">
+                              <DollarSign className="h-5 w-5 text-green-400" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400">Total Earnings</p>
+                              <p className="text-xl font-bold text-green-400">${(gmData.totalEarnings || 0).toFixed(2)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-gray-800/50 border-gray-700">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-500/20 rounded-lg">
+                              <Coins className="h-5 w-5 text-amber-400" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400">Pending Earnings</p>
+                              <p className="text-xl font-bold text-amber-400">${(gmData.pendingEarnings || 0).toFixed(2)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-gray-800/50 border-gray-700">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-purple-500/20 rounded-lg">
+                              <Trophy className="h-5 w-5 text-purple-400" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400">Competitions Created</p>
+                              <p className="text-xl font-bold text-white">{gmData.totalCompetitionsCreated || 0}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Subscription Details */}
+                    <Card className="bg-gray-800/50 border-gray-700">
+                      <CardHeader>
+                        <CardTitle className="text-white text-lg flex items-center gap-2">
+                          <Settings className="h-5 w-5 text-amber-400" />
+                          Subscription Details
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-400">Referral Code</p>
+                            <p className="font-mono text-amber-400 text-lg">{gmData.referralCode}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-400">Auto Renewal</p>
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              gmData.autoRenew
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {gmData.autoRenew ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-400">Start Date</p>
+                            <p className="text-white">{gmData.startDate ? new Date(gmData.startDate).toLocaleDateString() : 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-400">End Date</p>
+                            <p className={`${
+                              gmData.endDate && new Date(gmData.endDate) < new Date()
+                                ? 'text-red-400'
+                                : gmData.endDate && new Date(gmData.endDate) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                                ? 'text-yellow-400'
+                                : 'text-white'
+                            }`}>
+                              {gmData.endDate ? new Date(gmData.endDate).toLocaleDateString() : 'N/A'}
+                              {gmData.endDate && (
+                                <span className="text-gray-400 text-sm ml-2">
+                                  ({Math.ceil((new Date(gmData.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days remaining)
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Package Limits */}
+                    <Card className="bg-gray-800/50 border-gray-700">
+                      <CardHeader>
+                        <CardTitle className="text-white text-lg flex items-center gap-2">
+                          <BarChart3 className="h-5 w-5 text-cyan-400" />
+                          Package Limits
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                            <p className="text-sm text-gray-400 mb-1">Competition Referral Fee</p>
+                            <p className="text-2xl font-bold text-green-400">{gmData.limits?.referralFeePercentage || 0}%</p>
+                          </div>
+                          <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                            <p className="text-sm text-gray-400 mb-1">Can Create Competitions</p>
+                            <span className={`px-3 py-1 rounded ${
+                              gmData.limits?.canCreateCompetitions
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-gray-500/20 text-gray-400'
+                            }`}>
+                              {gmData.limits?.canCreateCompetitions ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                          {gmData.limits?.canCreateCompetitions && (
+                            <>
+                              <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                                <p className="text-sm text-gray-400 mb-1">Max Competitions/Day</p>
+                                <p className="text-2xl font-bold text-white">{gmData.limits?.maxCompetitionsPerDay || 0}</p>
+                              </div>
+                              <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                                <p className="text-sm text-gray-400 mb-1">Max Users/Competition</p>
+                                <p className="text-2xl font-bold text-white">{gmData.limits?.maxUsersPerCompetition || 0}</p>
+                              </div>
+                            </>
+                          )}
+                          {gmData.limits?.canEarnFromChallenges && (
+                            <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                              <p className="text-sm text-gray-400 mb-1">Challenge Referral Fee</p>
+                              <p className="text-2xl font-bold text-orange-400">
+                                {gmData.limits?.challengeReferralFeePercentage || gmData.limits?.referralFeePercentage || 0}%
+                              </p>
+                            </div>
+                          )}
+                          <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                            <p className="text-sm text-gray-400 mb-1">Earn from Challenges</p>
+                            <span className={`px-3 py-1 rounded ${
+                              gmData.limits?.canEarnFromChallenges
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-gray-500/20 text-gray-400'
+                            }`}>
+                              {gmData.limits?.canEarnFromChallenges ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
 
