@@ -924,13 +924,23 @@ function ItemCard({
       
       {/* Content */}
       <div className="p-6 pt-14">
-        {/* Icon */}
-        <div className={cn(
-          'w-14 h-14 rounded-xl flex items-center justify-center mb-4 bg-gradient-to-br',
-          gradientBg
-        )}>
-          <CategoryIcon className={cn('h-7 w-7', iconColor)} />
-        </div>
+        {/* Icon/Image */}
+        {item.imageUrl ? (
+          <div className="w-14 h-14 rounded-xl overflow-hidden mb-4 border border-gray-700/50">
+            <img 
+              src={item.imageUrl} 
+              alt={item.name}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className={cn(
+            'w-14 h-14 rounded-xl flex items-center justify-center mb-4 bg-gradient-to-br',
+            gradientBg
+          )}>
+            <CategoryIcon className={cn('h-7 w-7', iconColor)} />
+          </div>
+        )}
         
         {/* Category Tag */}
         <div className="flex items-center gap-2 mb-3">
@@ -1174,9 +1184,19 @@ function GameMasterCard({
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 flex items-center justify-center">
-              <Crown className="h-7 w-7 text-yellow-400" />
-            </div>
+            {item.imageUrl ? (
+              <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-yellow-500/30">
+                <img 
+                  src={item.imageUrl} 
+                  alt={item.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 flex items-center justify-center">
+                <Crown className="h-7 w-7 text-yellow-400" />
+              </div>
+            )}
             <div>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400">
                 Game Master
@@ -1373,12 +1393,22 @@ function ItemDetailModal({
           </button>
           
           <div className="flex items-start gap-5">
-            <div className={cn(
-              'w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br flex-shrink-0',
-              gradientBg
-            )}>
-              <CategoryIcon className={cn('h-8 w-8', iconColor)} />
-            </div>
+            {item.imageUrl ? (
+              <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 border border-gray-700/50">
+                <img 
+                  src={item.imageUrl} 
+                  alt={item.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className={cn(
+                'w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br flex-shrink-0',
+                gradientBg
+              )}>
+                <CategoryIcon className={cn('h-8 w-8', iconColor)} />
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <span className={cn(
