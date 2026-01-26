@@ -359,7 +359,7 @@ export default function MarketplaceContent() {
             
             <h1 className="text-5xl md:text-6xl font-black text-white mb-6 tracking-tight">
               Supercharge Your
-              <span className="block bg-gradient-to-r from-emerald-400 via-cyan-400 to-orange-400 text-transparent bg-clip-text">
+              <span className="block bg-gradient-to-r from-emerald-400 via-cyan-400 to-orange-400 text-transparent bg-clip-text pb-2">
                 Trading Strategy
               </span>
             </h1>
