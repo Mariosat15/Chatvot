@@ -1114,27 +1114,29 @@ export default function MarketplaceSection() {
                     
                     {/* AI Generate Button - Only for cosmetics */}
                     {editingItem.category === 'cosmetic' && (
-                      <Button
-                        type="button"
-                        onClick={handleGenerateWithAI}
-                        disabled={generatingAI || !editingItem.imageUrl}
-                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium"
-                      >
-                        {generatingAI ? (
-                          <>
-                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                            AI Generating Title & Bio...
-                          </>
-                        ) : (
-                          <>
-                            <Star className="h-4 w-4 mr-2" />
-                            ✨ Generate Title & Bio with AI
-                          </>
-                        )}
-                      </Button>
-                      <p className="text-xs text-gray-500 text-center">
-                        AI will analyze the image and create a unique name, tagline, and backstory
-                      </p>
+                      <>
+                        <Button
+                          type="button"
+                          onClick={handleGenerateWithAI}
+                          disabled={generatingAI || !editingItem.imageUrl}
+                          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium"
+                        >
+                          {generatingAI ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              AI Generating Title & Bio...
+                            </>
+                          ) : (
+                            <>
+                              <Star className="h-4 w-4 mr-2" />
+                              ✨ Generate Title & Bio with AI
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-500 text-center">
+                          AI will analyze the image and create a unique name, tagline, and backstory
+                        </p>
+                      </>
                     )}
                   </div>
                 )}
