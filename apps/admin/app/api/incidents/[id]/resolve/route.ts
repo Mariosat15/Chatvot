@@ -103,9 +103,16 @@ export async function GET(
     }
 
     // Calculate affected users
-    const affectedUsers = incident.affectedUsers || [];
-    const affectedCount = affectedUsers.length;
+    // If no specific affected users are marked but competition is linked, use all participants
+    const specifiedAffectedUsers = incident.affectedUsers || [];
     const totalParticipants = participants.length;
+    
+    // Smart affected count: use specified affected users, or all participants if none specified
+    const effectiveAffectedCount = specifiedAffectedUsers.length > 0 
+      ? specifiedAffectedUsers.length 
+      : totalParticipants;
+    
+    const hasSpecificAffected = specifiedAffectedUsers.length > 0;
 
     // Calculate compensation options
     const options = {
@@ -119,10 +126,14 @@ export async function GET(
       },
       partial_refund: {
         type: 'partial_refund',
-        label: 'Partial Refund (Affected Users)',
-        description: `Refund entry fees to the ${affectedCount} affected user(s)`,
-        totalAmount: entryFee * affectedCount,
-        affectedUsers: affectedCount,
+        label: hasSpecificAffected 
+          ? 'Partial Refund (Affected Users)' 
+          : 'Partial Refund (All Participants)',
+        description: hasSpecificAffected
+          ? `Refund entry fees to the ${specifiedAffectedUsers.length} specifically affected user(s)`
+          : `Refund entry fees to all ${totalParticipants} participant(s) (no specific users marked)`,
+        totalAmount: entryFee * effectiveAffectedCount,
+        affectedUsers: effectiveAffectedCount,
         perUserAmount: entryFee,
       },
       full_refund: {
@@ -164,9 +175,11 @@ export async function GET(
       } : null,
       options,
       summary: {
-        affectedUsersCount: affectedCount,
+        specifiedAffectedCount: specifiedAffectedUsers.length,
+        effectiveAffectedCount,
         totalParticipants,
         entryFee,
+        hasSpecificAffected,
       },
     });
 
@@ -248,17 +261,28 @@ export async function POST(
     // Determine users to compensate and amounts
     let usersToCompensate: Array<{ userId: string; amount: number }> = [];
     let totalCompensation = 0;
+    
+    // Smart affected users: use specified or all participants
+    const specifiedAffectedUsers = incident.affectedUsers || [];
+    const hasSpecificAffected = specifiedAffectedUsers.length > 0;
 
     if (resolutionType === 'no_compensation') {
       // No compensation needed
       usersToCompensate = [];
     } else if (resolutionType === 'partial_refund') {
-      // Refund affected users only
+      // Refund affected users (or all participants if none specified)
       if (customAmounts && customAmounts.length > 0) {
         usersToCompensate = customAmounts;
-      } else {
-        usersToCompensate = (incident.affectedUsers || []).map((userId: string) => ({
+      } else if (hasSpecificAffected) {
+        // Use specifically marked affected users
+        usersToCompensate = specifiedAffectedUsers.map((userId: string) => ({
           userId,
+          amount: entryFee,
+        }));
+      } else {
+        // No specific users marked - use all participants
+        usersToCompensate = participants.map((p: Record<string, unknown>) => ({
+          userId: p.userId as string,
           amount: entryFee,
         }));
       }

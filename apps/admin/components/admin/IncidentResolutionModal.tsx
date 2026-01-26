@@ -66,9 +66,11 @@ interface ResolveData {
   competition: CompetitionSummary | null;
   options: ResolutionOptions;
   summary: {
-    affectedUsersCount: number;
+    specifiedAffectedCount: number;
+    effectiveAffectedCount: number;
     totalParticipants: number;
     entryFee: number;
+    hasSpecificAffected: boolean;
   };
 }
 
@@ -227,7 +229,13 @@ export default function IncidentResolutionModal({
                 <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-blue-400" />
-                    <span className="text-gray-300">{data.summary.affectedUsersCount} affected users</span>
+                    <span className="text-gray-300">
+                      {data.summary.hasSpecificAffected 
+                        ? `${data.summary.specifiedAffectedCount} affected users` 
+                        : data.competition 
+                          ? `${data.summary.totalParticipants} participants (all affected)`
+                          : '0 specified users'}
+                    </span>
                   </div>
                   {data.competition && (
                     <>
@@ -237,7 +245,10 @@ export default function IncidentResolutionModal({
                       </div>
                       <div className="col-span-2 flex items-center gap-2">
                         <FileText className="h-4 w-4 text-purple-400" />
-                        <span className="text-gray-300">Competition: {data.competition.name} ({data.summary.totalParticipants} participants)</span>
+                        <span className="text-gray-300">
+                          Competition: 🏆 {data.competition.name} 
+                          <span className="ml-1 text-yellow-400">({data.summary.totalParticipants} participants)</span>
+                        </span>
                       </div>
                     </>
                   )}
