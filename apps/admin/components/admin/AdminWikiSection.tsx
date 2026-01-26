@@ -4037,6 +4037,428 @@ export default function AdminWikiSection() {
           </div>
         </div>
       )
+    },
+    {
+      id: 'competition-finalization',
+      title: 'Competition Finalization & Price Validation',
+      icon: Target,
+      category: 'Operations',
+      tags: ['finalization', 'competition', 'prices', 'validation', 'correction'],
+      content: (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-green-500/30 rounded-xl p-6">
+            <h2 className="text-2xl font-bold text-green-400 mb-3 flex items-center gap-2">
+              <Target className="h-6 w-6" />
+              Competition Finalization & Price Validation
+            </h2>
+            <p className="text-gray-300 leading-relaxed">
+              When a competition ends, the system automatically validates all prices before calculating final results.
+              This ensures fair outcomes even when price feeds have issues.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400">The Finalization Flow</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">STEP 1</span>
+                  <h4 className="font-semibold text-white">Price Validation Check</h4>
+                </div>
+                <p className="text-sm text-gray-400 mb-3">
+                  System calls <code className="bg-gray-800 px-1 rounded">arePricesSafeForFinalization(symbols)</code> to check each symbol:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                  <div className="bg-red-500/10 border border-red-500/30 rounded p-2">
+                    <div className="text-red-400 font-medium">Critical Staleness</div>
+                    <p className="text-xs text-gray-400">Price not updated for 60+ seconds</p>
+                  </div>
+                  <div className="bg-orange-500/10 border border-orange-500/30 rounded p-2">
+                    <div className="text-orange-400 font-medium">Price Anomaly</div>
+                    <p className="text-xs text-gray-400">Sudden spike detected (&gt;1% in &lt;1s)</p>
+                  </div>
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-2">
+                    <div className="text-yellow-400 font-medium">Fallback Prices</div>
+                    <p className="text-xs text-gray-400">Using cached/fallback data, not live</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded">STEP 2</span>
+                  <h4 className="font-semibold text-white">Decision Point</h4>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-green-500/10 border border-green-500/30 rounded p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span className="font-medium text-green-400">Prices SAFE</span>
+                    </div>
+                    <p className="text-sm text-gray-400">Use live prices for P&L calculation</p>
+                  </div>
+                  <div className="bg-red-500/10 border border-red-500/30 rounded p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="h-4 w-4 text-red-500" />
+                      <span className="font-medium text-red-400">Prices NOT SAFE</span>
+                    </div>
+                    <p className="text-sm text-gray-400">Attempt to use backup snapshot</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="bg-purple-500 text-white text-xs font-bold px-2 py-1 rounded">STEP 3</span>
+                  <h4 className="font-semibold text-white">Snapshot Fallback</h4>
+                </div>
+                <p className="text-sm text-gray-400 mb-3">
+                  If prices are not safe, system retrieves the last healthy snapshot:
+                </p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-start gap-2">
+                    <ArrowRight className="h-4 w-4 text-purple-400 mt-0.5" />
+                    <span className="text-gray-300">Calls <code className="bg-gray-800 px-1 rounded">getLastHealthySnapshot(competitionId)</code></span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <ArrowRight className="h-4 w-4 text-purple-400 mt-0.5" />
+                    <span className="text-gray-300">Uses snapshot prices instead of live prices</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <ArrowRight className="h-4 w-4 text-purple-400 mt-0.5" />
+                    <span className="text-gray-300">Marks snapshot as used: <code className="bg-gray-800 px-1 rounded">competition.usedSnapshotId</code></span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <ArrowRight className="h-4 w-4 text-purple-400 mt-0.5" />
+                    <span className="text-gray-300">Logs which snapshot was used for audit trail</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded">STEP 4</span>
+                  <h4 className="font-semibold text-white">Final Calculation</h4>
+                </div>
+                <p className="text-sm text-gray-400">
+                  Using either live or snapshot prices:
+                </p>
+                <ol className="text-sm text-gray-300 space-y-1 mt-2">
+                  <li>1. Calculate final P&L for all participants</li>
+                  <li>2. Rank participants by selected metric (P&L, ROI, etc.)</li>
+                  <li>3. Apply tie-breaking rules if needed</li>
+                  <li>4. Distribute prizes to winners</li>
+                  <li>5. Mark competition as COMPLETED</li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400">Visual Flow Diagram</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-gray-900 p-4 rounded-lg font-mono text-xs overflow-x-auto">
+                <pre className="text-gray-300">{`Competition Ends
+       │
+       ▼
+┌──────────────────────┐
+│ Validate All Prices  │
+│ arePricesSafe()      │
+└──────────┬───────────┘
+           │
+     ┌─────┴─────┐
+     │           │
+     ▼           ▼
+┌─────────┐ ┌─────────────┐
+│ SAFE ✓  │ │ NOT SAFE ✗  │
+│         │ │             │
+│ Use     │ │ Get Last    │
+│ Live    │ │ Healthy     │
+│ Prices  │ │ Snapshot    │
+└────┬────┘ └──────┬──────┘
+     │             │
+     │       ┌─────┴─────┐
+     │       │           │
+     │       ▼           ▼
+     │  ┌─────────┐ ┌─────────────┐
+     │  │Snapshot │ │ No Snapshot │
+     │  │ Found   │ │ Available   │
+     │  │         │ │             │
+     │  │ Use     │ │ Log         │
+     │  │ Snapshot│ │ INCIDENT    │
+     │  │ Prices  │ │             │
+     │  └────┬────┘ └──────┬──────┘
+     │       │             │
+     └───────┼─────────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ Calculate P&L   │
+    │ Rank Users      │
+    │ Distribute $$   │
+    │ Mark COMPLETED  │
+    └─────────────────┘`}</pre>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Lightbulb className="h-5 w-5 text-yellow-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-yellow-400 mb-1">Key Point</h4>
+                <p className="text-sm text-gray-300">
+                  The system <strong>never finalizes a competition with invalid prices</strong> without either using a 
+                  backup snapshot or flagging it as an incident for admin review. This protects users from unfair results.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'incident-management',
+      title: 'Incident Management',
+      icon: ShieldAlert,
+      category: 'Operations',
+      tags: ['incident', 'compensation', 'resolution', 'issue', 'recovery'],
+      content: (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 border border-red-500/30 rounded-xl p-6">
+            <h2 className="text-2xl font-bold text-red-400 mb-3 flex items-center gap-2">
+              <ShieldAlert className="h-6 w-6" />
+              Incident Management
+            </h2>
+            <p className="text-gray-300 leading-relaxed">
+              When a serious issue occurs (e.g., no healthy snapshot available during finalization), the system 
+              automatically creates an Incident for admin review and resolution.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400">When Incidents Are Created</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="bg-red-500/10 border border-red-500/30 rounded p-4">
+                <div className="font-semibold text-red-400 mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  price_feed_failure
+                </div>
+                <p className="text-sm text-gray-300 mb-2">Created when:</p>
+                <ul className="text-sm text-gray-400 space-y-1">
+                  <li>• Competition finalization detects unsafe prices</li>
+                  <li>• AND no healthy snapshot is available to use</li>
+                  <li>• Competition proceeds with current prices (flagged for review)</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-orange-400">Incident Data Structure</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-gray-900 p-4 rounded-lg font-mono text-xs overflow-x-auto">
+                <pre className="text-gray-300">{`{
+  type: "price_feed_failure",
+  severity: "critical",
+  status: "open",              // open → investigating → resolved → closed
+  
+  // What was affected
+  relatedCompetitionId: "comp_123",
+  affectedUsers: ["user_1", "user_2", ...],
+  
+  // Evidence for investigation
+  evidence: {
+    healthIssues: [
+      { symbol: "EUR/USD", issue: "Critically stale (65s)" },
+      { symbol: "GBP/USD", issue: "Using fallback prices" }
+    ],
+    snapshotId: null,          // No snapshot was available
+    pricesUsed: "current",     // Had to use current prices
+    timestamp: "2024-01-15T14:30:00Z"
+  },
+  
+  // Resolution tracking
+  resolution: {
+    actionTaken: "",           // Admin fills this
+    compensationIssued: false,
+    compensationAmount: 0,
+    resultsAdjusted: false,
+    resolvedBy: "",
+    resolvedAt: null,
+    notes: ""
+  }
+}`}</pre>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400">Admin Resolution Process</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="bg-blue-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">1</span>
+                    <h4 className="font-semibold text-white">View Incident in Dashboard</h4>
+                  </div>
+                  <p className="text-sm text-gray-400">
+                    Navigate to <strong>Operations → Incidents</strong> to see all open incidents.
+                    Critical incidents are highlighted in red and should be addressed first.
+                  </p>
+                </div>
+
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="bg-blue-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">2</span>
+                    <h4 className="font-semibold text-white">Review Evidence</h4>
+                  </div>
+                  <p className="text-sm text-gray-400 mb-2">
+                    Click on the incident to see detailed evidence:
+                  </p>
+                  <ul className="text-sm text-gray-400 space-y-1">
+                    <li>• Which symbols had issues and why</li>
+                    <li>• What prices were used for finalization</li>
+                    <li>• List of affected users</li>
+                    <li>• Timestamp when it occurred</li>
+                  </ul>
+                </div>
+
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="bg-blue-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">3</span>
+                    <h4 className="font-semibold text-white">Decide on Compensation</h4>
+                  </div>
+                  <p className="text-sm text-gray-400 mb-2">
+                    Based on the evidence, decide if compensation is needed:
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div className="bg-green-500/10 border border-green-500/30 rounded p-2">
+                      <div className="text-green-400 text-sm font-medium">No Compensation Needed</div>
+                      <p className="text-xs text-gray-400">Prices were only slightly stale, results are fair</p>
+                    </div>
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-2">
+                      <div className="text-yellow-400 text-sm font-medium">Partial Compensation</div>
+                      <p className="text-xs text-gray-400">Refund entry fees to affected users</p>
+                    </div>
+                    <div className="bg-orange-500/10 border border-orange-500/30 rounded p-2">
+                      <div className="text-orange-400 text-sm font-medium">Full Compensation</div>
+                      <p className="text-xs text-gray-400">Refund all participants, void results</p>
+                    </div>
+                    <div className="bg-red-500/10 border border-red-500/30 rounded p-2">
+                      <div className="text-red-400 text-sm font-medium">Results Adjustment</div>
+                      <p className="text-xs text-gray-400">Recalculate with corrected prices</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="bg-blue-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">4</span>
+                    <h4 className="font-semibold text-white">Issue Compensation (if needed)</h4>
+                  </div>
+                  <p className="text-sm text-gray-400 mb-2">
+                    If compensation is needed:
+                  </p>
+                  <ol className="text-sm text-gray-400 space-y-1">
+                    <li>1. Go to <strong>Users</strong> section</li>
+                    <li>2. Select affected users</li>
+                    <li>3. Use <strong>Add Credits</strong> to compensate</li>
+                    <li>4. Note the incident ID in the transaction reason</li>
+                  </ol>
+                </div>
+
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="bg-blue-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">5</span>
+                    <h4 className="font-semibold text-white">Close Incident with Notes</h4>
+                  </div>
+                  <p className="text-sm text-gray-400 mb-2">
+                    Update the incident record with resolution details:
+                  </p>
+                  <ul className="text-sm text-gray-400 space-y-1">
+                    <li>• Change status to <strong>resolved</strong> or <strong>closed</strong></li>
+                    <li>• Document what action was taken</li>
+                    <li>• Record compensation amount (if any)</li>
+                    <li>• Add notes explaining your decision</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400">Incident Status Flow</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2">
+                <div className="flex items-center gap-2 min-w-max">
+                  <div className="bg-red-500/20 border border-red-500/50 rounded-lg px-4 py-2 text-center">
+                    <div className="text-red-400 font-bold">OPEN</div>
+                    <div className="text-xs text-gray-400">New incident</div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-gray-500" />
+                  <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg px-4 py-2 text-center">
+                    <div className="text-yellow-400 font-bold">INVESTIGATING</div>
+                    <div className="text-xs text-gray-400">Admin reviewing</div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-gray-500" />
+                  <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg px-4 py-2 text-center">
+                    <div className="text-blue-400 font-bold">RESOLVED</div>
+                    <div className="text-xs text-gray-400">Action taken</div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-gray-500" />
+                  <div className="bg-green-500/20 border border-green-500/50 rounded-lg px-4 py-2 text-center">
+                    <div className="text-green-400 font-bold">CLOSED</div>
+                    <div className="text-xs text-gray-400">Documented</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400">Audit Trail</CardTitle>
+            </CardHeader>
+            <CardContent className="text-gray-300">
+              <p className="text-sm mb-3">All incident-related actions are logged for compliance:</p>
+              <ul className="text-sm space-y-1">
+                <li>• <strong>Incident creation:</strong> Timestamp, trigger event, affected competition</li>
+                <li>• <strong>Status changes:</strong> Who changed it, when, from what to what</li>
+                <li>• <strong>Compensation:</strong> Amount, affected users, transaction IDs</li>
+                <li>• <strong>Resolution:</strong> Decision made, justification, admin who resolved</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-green-400 mb-1">Best Practices</h4>
+                <ul className="text-sm text-gray-300 space-y-1">
+                  <li>• Respond to critical incidents within 24 hours</li>
+                  <li>• Always document your reasoning in the resolution notes</li>
+                  <li>• Communicate with affected users if compensation is issued</li>
+                  <li>• Review incident patterns monthly to prevent recurring issues</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
     }
   ];
 
