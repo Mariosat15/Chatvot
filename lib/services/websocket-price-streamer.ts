@@ -16,6 +16,7 @@ import { ForexSymbol, FOREX_PAIRS } from './pnl-calculator.service';
 import Candle1m from '@/database/models/candle-1m.model';
 import { connectToDatabase } from '@/database/mongoose';
 import { getHistoricalModel } from '@/database/models/candle-historical.model';
+import { priceHealthMonitor } from './price-health-monitor.service';
 
 export interface StreamingPriceQuote {
   symbol: ForexSymbol;
@@ -365,6 +366,9 @@ export async function initializeWebSocket(): Promise<void> {
     return;
   }
 
+  // 🏥 Initialize price health monitor
+  priceHealthMonitor.initialize();
+  
   // ⚡ Initialize TP/SL cache for real-time triggering
   try {
     const { initializeTPSLCache } = await import('./tpsl-realtime.service');
@@ -400,6 +404,9 @@ async function connectWebSocket(): Promise<void> {
       console.log(`✅ WebSocket connected (ID: ${state.connectionId})`);
       state.isConnecting = false;
       state.reconnectAttempts = 0;
+      
+      // 🏥 Update health monitor - connection established
+      priceHealthMonitor.updateConnectionStatus('connected', 0);
       
       // Start heartbeat to keep connection alive
       startHeartbeat();
@@ -713,6 +720,9 @@ function handleQuoteMessage(msg: {
 
   priceCache.set(symbol, quote);
   getState().lastUpdateTime = Date.now();
+  
+  // 🏥 Update price health monitor
+  priceHealthMonitor.updatePrice(symbol, safeMid, 'websocket');
   
   // ⚡ REAL-TIME TP/SL CHECK - Triggers INSTANTLY when price hits levels!
   // This is fire-and-forget, doesn't block price updates
@@ -1400,6 +1410,9 @@ function cleanup(): void {
   state.isAuthenticated = false;
   state.isSubscribed = false;
   stopHeartbeat();
+  
+  // 🏥 Update health monitor - connection lost
+  priceHealthMonitor.updateConnectionStatus('disconnected', state.reconnectAttempts);
 }
 
 /**
@@ -1411,6 +1424,8 @@ function scheduleReconnect(): void {
 
   if (state.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
     console.error('❌ Max reconnect attempts reached');
+    // 🏥 Notify health monitor of max attempts
+    priceHealthMonitor.updateConnectionStatus('disconnected', state.reconnectAttempts);
     return;
   }
 
@@ -1418,6 +1433,9 @@ function scheduleReconnect(): void {
   const delay = RECONNECT_BASE_DELAY_MS * Math.pow(1.5, state.reconnectAttempts - 1);
 
   console.log(`🔄 Reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${state.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+
+  // 🏥 Notify health monitor of reconnection attempt
+  priceHealthMonitor.updateConnectionStatus('reconnecting', state.reconnectAttempts);
 
   state.reconnectTimer = setTimeout(() => {
     state.reconnectTimer = null;
@@ -2296,7 +2314,16 @@ async function autoInitialize(): Promise<void> {
     // Start broadcasting forming candles to WebSocket server
     await startBroadcastTimer();
     
-    console.log('✅ [AUTO-INIT] WebSocket, TP/SL cache, and broadcast ready');
+    // 📸 Start price snapshot service for competition risk mitigation
+    try {
+      const { priceSnapshotService } = await import('./price-snapshot.service');
+      priceSnapshotService.start();
+      console.log('📸 [AUTO-INIT] Price snapshot service started');
+    } catch (snapshotError) {
+      console.error('⚠️ [AUTO-INIT] Failed to start price snapshot service:', snapshotError);
+    }
+    
+    console.log('✅ [AUTO-INIT] WebSocket, TP/SL cache, snapshots, and broadcast ready');
   } catch (error) {
     console.error('❌ [AUTO-INIT] Failed:', error);
   }

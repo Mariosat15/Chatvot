@@ -236,8 +236,16 @@ export const placeOrder = async (params: {
         throw new Error(`${contestName} was cancelled. Trading is not available.`);
       } else if (contestData.status === 'upcoming') {
         throw new Error(`${contestName} hasn't started yet. Please wait for it to begin.`);
+      } else if (contestData.status === 'emergency_ended') {
+        throw new Error(`${contestName} was emergency ended. Trading is not available.`);
       }
       throw new Error(`${contestName} is not active (Status: ${contestData.status})`);
+    }
+    
+    // 🚨 Check if competition is PAUSED (risk mitigation)
+    if (contestType === 'competition' && contest.isPaused) {
+      const pauseReason = contest.pauseReason || 'Technical issues';
+      throw new Error(`⏸️ Competition is PAUSED: ${pauseReason}\n\nTrading is temporarily suspended. Please wait for the competition to resume.`);
     }
 
     // Check participant status with specific error messages

@@ -232,6 +232,18 @@ export const closePosition = async (
       throw new Error('Position not found or already closed');
     }
 
+    // 🚨 Check if competition is PAUSED (risk mitigation)
+    // Users cannot close positions manually during pause - positions are frozen
+    const Competition = (await import('@/database/models/trading/competition.model')).default;
+    const competition = await Competition.findById(position.competitionId).select('isPaused pauseReason status');
+    if (competition?.isPaused) {
+      const pauseReason = competition.pauseReason || 'Technical issues';
+      throw new Error(`⏸️ Competition is PAUSED: ${pauseReason}\n\nAll positions are frozen. You cannot close trades until the competition resumes.`);
+    }
+    if (competition?.status === 'emergency_ended') {
+      throw new Error(`Competition was emergency ended. Trading is not available.`);
+    }
+
     // Determine exit price - use locked price from frontend if provided and fresh
     let exitPrice: number;
     let currentPrice: { bid: number; ask: number; mid: number; spread: number; timestamp: number };

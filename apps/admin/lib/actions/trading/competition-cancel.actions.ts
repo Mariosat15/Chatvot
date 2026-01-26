@@ -6,7 +6,11 @@ import Competition from '@/database/models/trading/competition.model';
 import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
 import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
+import TradingPosition from '@/database/models/trading/trading-position.model';
+import TradingOrder from '@/database/models/trading/trading-order.model';
+import TradeHistory from '@/database/models/trading/trade-history.model';
 import mongoose from 'mongoose';
+import { ForexSymbol } from '@/lib/services/pnl-calculator.service';
 
 /**
  * Cancel a competition and refund ALL participants their FULL entry fee
@@ -212,6 +216,296 @@ export async function adminCancelCompetition(
       success: false,
       message: error instanceof Error ? error.message : 'Failed to cancel competition',
     };
+  }
+}
+
+/**
+ * Emergency cancel an ACTIVE competition
+ * - Closes all open positions using last valid prices
+ * - Refunds ALL entry fees to ALL participants
+ * - Marks competition as cancelled with emergency flag
+ * 
+ * Use this when price feed issues compromise competition fairness
+ */
+export async function emergencyCancelActiveCompetition(
+  competitionId: string,
+  reason: string,
+  adminId: string,
+  snapshotPrices?: Map<string, { bid: number; ask: number }>
+): Promise<{ 
+  success: boolean; 
+  message: string;
+  closedPositions?: number;
+  refundedCount?: number;
+  totalRefunded?: number;
+}> {
+  const mongoSession = await mongoose.startSession();
+  mongoSession.startTransaction();
+
+  try {
+    await connectToDatabase();
+
+    console.log(`🚨 [EMERGENCY CANCEL] Starting emergency cancellation: ${competitionId}`);
+    console.log(`   Reason: ${reason}`);
+    console.log(`   Admin: ${adminId}`);
+
+    const competition = await Competition.findById(competitionId).session(mongoSession);
+    if (!competition) {
+      throw new Error('Competition not found');
+    }
+
+    // Must be active to emergency cancel
+    if (competition.status !== 'active') {
+      throw new Error(`Cannot emergency cancel a ${competition.status} competition. Only active competitions can be emergency cancelled.`);
+    }
+
+    // Step 1: Pause the competition immediately to prevent new trades
+    competition.isPaused = true;
+    competition.pausedAt = new Date();
+    competition.pauseReason = `Emergency cancellation in progress: ${reason}`;
+    await competition.save({ session: mongoSession });
+
+    console.log(`⏸️ Competition paused for cancellation`);
+
+    // Step 2: Close all open positions
+    const openPositions = await TradingPosition.find({
+      competitionId: competitionId,
+      status: 'open',
+    }).session(mongoSession);
+
+    console.log(`📊 Found ${openPositions.length} open positions to close`);
+
+    let closedPositions = 0;
+
+    // Get prices - either from snapshot or fetch current
+    let pricesMap: Map<string, { bid: number; ask: number }>;
+    
+    if (snapshotPrices && snapshotPrices.size > 0) {
+      pricesMap = snapshotPrices;
+      console.log(`📸 Using snapshot prices for position closing`);
+    } else {
+      // Fetch current prices
+      const { fetchRealForexPrices } = await import('@/lib/services/real-forex-prices.service');
+      const uniqueSymbols = [...new Set(openPositions.map(p => p.symbol))] as ForexSymbol[];
+      const fetchedPrices = await fetchRealForexPrices(uniqueSymbols);
+      
+      pricesMap = new Map();
+      fetchedPrices.forEach((price, symbol) => {
+        pricesMap.set(symbol, { bid: price.bid, ask: price.ask });
+      });
+      console.log(`📈 Using current market prices for position closing`);
+    }
+
+    // Close each position
+    for (const position of openPositions) {
+      try {
+        const prices = pricesMap.get(position.symbol);
+        if (!prices) {
+          console.warn(`⚠️ No price available for ${position.symbol}, skipping position ${position._id}`);
+          continue;
+        }
+
+        // Determine exit price based on position side
+        const exitPrice = position.side === 'long' ? prices.bid : prices.ask;
+
+        // Calculate P&L
+        const priceDiff = position.side === 'long' 
+          ? exitPrice - position.entryPrice 
+          : position.entryPrice - exitPrice;
+        const realizedPnl = priceDiff * position.quantity * 100000; // Standard lot size
+
+        // Update position
+        await TradingPosition.findByIdAndUpdate(
+          position._id,
+          {
+            $set: {
+              status: 'closed',
+              closeReason: 'competition_cancelled',
+              exitPrice: exitPrice,
+              currentPrice: exitPrice,
+              pnl: realizedPnl,
+              unrealizedPnl: 0,
+              closedAt: new Date(),
+            },
+          },
+          { session: mongoSession }
+        );
+
+        // Create close order
+        await TradingOrder.create([{
+          competitionId: position.competitionId,
+          userId: position.userId,
+          participantId: position.participantId,
+          symbol: position.symbol,
+          side: position.side === 'long' ? 'sell' : 'buy',
+          orderType: 'market',
+          quantity: position.quantity,
+          executedPrice: exitPrice,
+          leverage: position.leverage,
+          marginRequired: 0,
+          status: 'filled',
+          filledQuantity: position.quantity,
+          remainingQuantity: 0,
+          placedAt: new Date(),
+          executedAt: new Date(),
+          orderSource: 'system',
+          positionId: position._id.toString(),
+        }], { session: mongoSession });
+
+        // Create trade history
+        await TradeHistory.create([{
+          competitionId: position.competitionId,
+          challengeId: position.challengeId,
+          participantId: position.participantId,
+          userId: position.userId,
+          positionId: position._id.toString(),
+          symbol: position.symbol,
+          side: position.side,
+          entryPrice: position.entryPrice,
+          exitPrice: exitPrice,
+          quantity: position.quantity,
+          leverage: position.leverage,
+          pnl: realizedPnl,
+          closeReason: 'competition_cancelled',
+          entryTime: position.openedAt,
+          exitTime: new Date(),
+          holdingTimeSeconds: Math.floor((Date.now() - position.openedAt.getTime()) / 1000),
+        }], { session: mongoSession });
+
+        closedPositions++;
+      } catch (posError) {
+        console.error(`Error closing position ${position._id}:`, posError);
+      }
+    }
+
+    console.log(`✅ Closed ${closedPositions} positions`);
+
+    // Step 3: Refund all participants
+    const participants = await CompetitionParticipant.find({
+      competitionId: competitionId,
+    }).session(mongoSession);
+
+    console.log(`👥 Found ${participants.length} participants to refund`);
+
+    const entryFee = competition.entryFee;
+    let totalRefunded = 0;
+    let refundedCount = 0;
+
+    const { notificationService } = await import('@/lib/services/notification.service');
+
+    for (const participant of participants) {
+      const userId = participant.userId.toString();
+
+      // Get wallet
+      const wallet = await CreditWallet.findOne({ userId }).session(mongoSession);
+      if (!wallet) {
+        console.log(`⚠️ No wallet found for user ${userId}, skipping`);
+        continue;
+      }
+
+      // Full refund
+      const refundAmount = entryFee;
+      const newBalance = wallet.creditBalance + refundAmount;
+
+      // Update wallet
+      await CreditWallet.findByIdAndUpdate(
+        wallet._id,
+        { $inc: { creditBalance: refundAmount } },
+        { session: mongoSession }
+      );
+
+      // Create refund transaction
+      await WalletTransaction.create([{
+        userId,
+        transactionType: 'competition_refund',
+        amount: refundAmount,
+        balanceBefore: wallet.creditBalance,
+        balanceAfter: newBalance,
+        competitionId: competitionId,
+        status: 'completed',
+        description: `Emergency cancellation - Full refund for "${competition.name}"`,
+        metadata: {
+          competitionName: competition.name,
+          cancellationReason: reason,
+          originalEntryFee: entryFee,
+          isEmergency: true,
+          cancelledBy: adminId,
+        },
+      }], { session: mongoSession });
+
+      // Update participant status
+      await CompetitionParticipant.findByIdAndUpdate(
+        participant._id,
+        { $set: { status: 'refunded' } },
+        { session: mongoSession }
+      );
+
+      // Send notification
+      try {
+        await notificationService.createCustom({
+          userId,
+          type: 'competition_emergency_cancelled',
+          title: '🚨 Competition Emergency Cancelled',
+          message: `${competition.name} has been emergency cancelled due to: ${reason}. Your full entry fee of €${entryFee.toFixed(2)} has been refunded.`,
+          icon: 'alert-octagon',
+          category: 'trading',
+          priority: 'urgent',
+          color: 'red',
+        });
+      } catch (notifError) {
+        console.error(`Error sending notification to ${userId}:`, notifError);
+      }
+
+      totalRefunded += refundAmount;
+      refundedCount++;
+    }
+
+    // Step 4: Update competition status
+    await Competition.findByIdAndUpdate(
+      competitionId,
+      {
+        $set: {
+          status: 'cancelled',
+          cancellationReason: `EMERGENCY: ${reason}`,
+          prizePool: 0,
+          isPaused: false,
+          emergencyEndedAt: new Date(),
+          emergencyEndReason: reason,
+          emergencyEndedBy: adminId,
+        },
+      },
+      { session: mongoSession }
+    );
+
+    await mongoSession.commitTransaction();
+
+    console.log(`✅ [EMERGENCY CANCEL] Competition "${competition.name}" cancelled successfully`);
+    console.log(`   Closed positions: ${closedPositions}`);
+    console.log(`   Refunded: ${refundedCount} participants`);
+    console.log(`   Total refunded: ${totalRefunded} credits`);
+
+    // Revalidate pages
+    revalidatePath(`/competitions/${competitionId}`);
+    revalidatePath(`/competitions/${competitionId}/trade`);
+    revalidatePath('/competitions');
+
+    return {
+      success: true,
+      message: `Emergency cancellation complete. Closed ${closedPositions} positions, refunded ${refundedCount} participants (${totalRefunded} credits total).`,
+      closedPositions,
+      refundedCount,
+      totalRefunded,
+    };
+
+  } catch (error) {
+    await mongoSession.abortTransaction();
+    console.error('❌ [EMERGENCY CANCEL] Error:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to emergency cancel competition',
+    };
+  } finally {
+    mongoSession.endSession();
   }
 }
 

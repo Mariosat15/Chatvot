@@ -19,8 +19,28 @@ export interface ICompetition extends Document {
   registrationDeadline: Date;
   
   // Status
-  status: 'draft' | 'upcoming' | 'active' | 'completed' | 'cancelled';
+  status: 'draft' | 'upcoming' | 'active' | 'completed' | 'cancelled' | 'emergency_ended';
   cancellationReason?: string; // Reason if cancelled (e.g., "Did not meet minimum participants")
+  
+  // Pause State (for risk mitigation)
+  isPaused: boolean;
+  pausedAt?: Date;
+  pauseReason?: string;
+  totalPauseDuration: number; // Total milliseconds the competition was paused
+  pauseHistory: {
+    pausedAt: Date;
+    resumedAt?: Date;
+    duration?: number; // milliseconds
+    reason: string;
+    pausedBy: string; // Admin ID
+    resumedBy?: string;
+  }[];
+  
+  // Emergency End (for price feed issues)
+  emergencyEndedAt?: Date;
+  emergencyEndReason?: string;
+  emergencyEndedBy?: string; // Admin ID
+  usedSnapshotId?: string; // ID of price snapshot used for emergency finalization
   
   // Trading Rules
   assetClasses: ('stocks' | 'forex' | 'crypto' | 'indices')[];
@@ -180,10 +200,46 @@ const CompetitionSchema = new Schema<ICompetition>(
     status: {
       type: String,
       required: true,
-      enum: ['draft', 'upcoming', 'active', 'completed', 'cancelled'],
+      enum: ['draft', 'upcoming', 'active', 'completed', 'cancelled', 'emergency_ended'],
       default: 'draft',
     },
     cancellationReason: {
+      type: String,
+    },
+    // Pause State
+    isPaused: {
+      type: Boolean,
+      default: false,
+    },
+    pausedAt: {
+      type: Date,
+    },
+    pauseReason: {
+      type: String,
+    },
+    totalPauseDuration: {
+      type: Number,
+      default: 0,
+    },
+    pauseHistory: [{
+      pausedAt: { type: Date, required: true },
+      resumedAt: { type: Date },
+      duration: { type: Number },
+      reason: { type: String, required: true },
+      pausedBy: { type: String, required: true },
+      resumedBy: { type: String },
+    }],
+    // Emergency End
+    emergencyEndedAt: {
+      type: Date,
+    },
+    emergencyEndReason: {
+      type: String,
+    },
+    emergencyEndedBy: {
+      type: String,
+    },
+    usedSnapshotId: {
       type: String,
     },
     assetClasses: [
