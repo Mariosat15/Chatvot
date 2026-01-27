@@ -605,6 +605,7 @@ export default function FinancialDashboard() {
       // GM-related transactions
       retained_gm_fee: 'bg-cyan-500',
       gamemaster_referral: 'bg-amber-500',
+      gamemaster_earning: 'bg-amber-500',
       gamemaster_challenge_referral: 'bg-amber-400',
     };
     return colors[type] || 'bg-gray-500';
@@ -632,6 +633,7 @@ export default function FinancialDashboard() {
       // GM-related transactions
       retained_gm_fee: '🎮 Retained GM Fee',
       gamemaster_referral: '🎮 GM Referral (Comp)',
+      gamemaster_earning: '🎮 GM Referral (Comp)',
       gamemaster_challenge_referral: '🎮 GM Referral (Challenge)',
     };
     return labels[type] || type.replace(/_/g, ' ');
@@ -2067,7 +2069,7 @@ export default function FinancialDashboard() {
                       <SelectItem value="challenge_win">Challenge Win</SelectItem>
                       <SelectItem value="challenge_platform_fee">Challenge Fees</SelectItem>
                       <SelectItem value="retained_gm_fee">Retained GM Fees</SelectItem>
-                      <SelectItem value="gamemaster_referral">GM Referrals (Comps)</SelectItem>
+                      <SelectItem value="gamemaster_earning">GM Referrals (Comps)</SelectItem>
                       <SelectItem value="gamemaster_challenge_referral">GM Referrals (Challenges)</SelectItem>
                       <SelectItem value="admin_withdrawal">Admin Withdrawals</SelectItem>
                       <SelectItem value="vat_payment">VAT Payments</SelectItem>

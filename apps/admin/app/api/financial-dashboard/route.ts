@@ -74,10 +74,10 @@ export async function GET(request: NextRequest) {
       },
     ]);
 
-    // Get total game master fees paid (from wallet transactions)
+    // Get total game master fees paid (from wallet transactions - include both types for backwards compat)
     const gameMasterFees = await WalletTransaction.aggregate([
       {
-        $match: { transactionType: 'gamemaster_earning' },
+        $match: { transactionType: { $in: ['gamemaster_earning', 'gamemaster_challenge_referral'] } },
       },
       {
         $group: {

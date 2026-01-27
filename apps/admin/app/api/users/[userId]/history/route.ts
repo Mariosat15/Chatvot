@@ -527,11 +527,14 @@ export async function GET(
     try {
       const gmEarnings = await db.collection('wallettransactions').find({
         userId: userId,
-        transactionType: { $in: ['gamemaster_referral', 'gamemaster_challenge_referral'] }
+        transactionType: { $in: ['gamemaster_earning', 'gamemaster_challenge_referral'] }
       }).sort({ createdAt: -1 }).toArray();
 
       for (const earning of gmEarnings) {
-        const isChallenge = earning.transactionType === 'gamemaster_challenge_referral';
+        // Check if it's a challenge earning (either by transaction type or metadata)
+        const isChallenge = earning.transactionType === 'gamemaster_challenge_referral' || 
+                           earning.metadata?.sourceType === 'challenge' ||
+                           earning.metadata?.challengeId;
         history.push({
           id: earning._id.toString(),
           type: 'gamemaster',

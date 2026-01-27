@@ -543,7 +543,7 @@ export async function finalizeChallenge(challengeId: string) {
     // ========== STEP 4: CALCULATE GM REFERRAL FEES ==========
     // Check if either participant was referred by a Game Master who can earn from challenges
     let totalGmEarnings = 0;
-    const gmPayments: { gmId: string; amount: number; userId: string; userName: string; feePercentage: number }[] = [];
+    const gmPayments: { gmId: string; amount: number; userId: string; userName: string; userEmail: string; feePercentage: number }[] = [];
     const inactiveGmFees: { 
       gmId: string; 
       gmEmail?: string; 
@@ -581,8 +581,8 @@ export async function finalizeChallenge(challengeId: string) {
           referredByGameMasterId: { $exists: true, $ne: null },
         }).toArray();
         
-        // Create a map: userId -> { gmId, userName }
-        const referralMap = new Map<string, { gmId: string; userName: string }>();
+        // Create a map: userId -> { gmId, userName, userEmail }
+        const referralMap = new Map<string, { gmId: string; userName: string; userEmail: string }>();
         
         // Add from user collection (fallback)
         for (const user of usersWithReferral) {
@@ -590,15 +590,20 @@ export async function finalizeChallenge(challengeId: string) {
           referralMap.set(user.id, {
             gmId: user.referredByGameMasterId,
             userName: isChallenger ? challenge.challengerName : challenge.challengedName,
+            userEmail: user.email || '',
           });
         }
         
         // Add/override from UserReferral collection (source of truth)
         for (const ref of userReferrals) {
           const isChallenger = ref.userId === challenger.userId;
+          // Get user email if not already available
+          const existingData = referralMap.get(ref.userId);
+          const userEmail = existingData?.userEmail || (usersWithReferral.find(u => u.id === ref.userId)?.email) || '';
           referralMap.set(ref.userId, {
             gmId: ref.gameMasterId,
             userName: isChallenger ? challenge.challengerName : challenge.challengedName,
+            userEmail,
           });
         }
         
@@ -689,6 +694,7 @@ export async function finalizeChallenge(challengeId: string) {
             amount: gmEarning,
             userId,
             userName,
+            userEmail: refData.userEmail,
             feePercentage,
           });
         }
@@ -758,14 +764,18 @@ export async function finalizeChallenge(challengeId: string) {
       if (db) {
         for (const payment of gmPayments) {
           try {
-            // Update GM subscription earnings
+            // Get GM subscription for email
+            const gmSubscription = await db.collection('gamemastersubscriptions').findOne({ userId: payment.gmId });
+            
+            // Update GM subscription earnings (add to total, but NOT to pending since we pay immediately)
             await db.collection('gamemastersubscriptions').updateOne(
               { userId: payment.gmId },
               { 
                 $inc: { 
                   totalEarnings: payment.amount,
-                  pendingEarnings: payment.amount,
-                } 
+                  // Don't increment pendingEarnings since we pay immediately
+                },
+                $set: { updatedAt: new Date() }
               }
             );
             
@@ -778,22 +788,25 @@ export async function finalizeChallenge(challengeId: string) {
                 { $inc: { creditBalance: payment.amount } }
               );
               
-              // Record transaction
+              // Record transaction - use consistent type 'gamemaster_earning' for all GM earnings
               await db.collection('wallettransactions').insertOne({
                 userId: payment.gmId,
-                transactionType: 'gamemaster_challenge_referral',
+                transactionType: 'gamemaster_earning',
                 amount: payment.amount,
                 balanceBefore,
                 balanceAfter: balanceBefore + payment.amount,
                 currency: 'EUR',
                 exchangeRate: 1,
                 status: 'completed',
-                description: `Challenge referral fee from ${payment.userName} in ${challenge.challengerName} vs ${challenge.challengedName}`,
+                description: `🎮 Game Master referral earnings from ${challenge.challengerName} vs ${challenge.challengedName} (1 referred user)`,
                 metadata: {
                   challengeId: challenge._id.toString(),
+                  challengeName: `${challenge.challengerName} vs ${challenge.challengedName}`,
+                  referredUsersCount: 1,
                   referredUserId: payment.userId,
                   referredUserName: payment.userName,
                   feePercentage: payment.amount / challenge.entryFee * 100,
+                  sourceType: 'challenge',
                 },
                 processedAt: new Date(),
                 createdAt: new Date(),
@@ -803,19 +816,29 @@ export async function finalizeChallenge(challengeId: string) {
               console.log(`   ✅ Paid ${payment.amount.toFixed(2)} to GM ${payment.gmId} for ${payment.userName}'s referral`);
             }
             
-            // Record GM earning in GameMasterEarning collection
+            // Record GM earning in GameMasterEarning collection - match competition structure exactly
+            const feePercentage = (payment.amount / challenge.entryFee) * 100;
             await db.collection('gamemasterearnings').insertOne({
               gameMasterId: payment.gmId,
-              challengeId: challenge._id.toString(),
-              userId: payment.userId,
-              entryFeeAmount: challenge.entryFee,
-              earningPercentage: payment.amount / challenge.entryFee * 100,
-              earningAmount: payment.amount,
+              gameMasterEmail: gmSubscription?.userEmail || '',
               sourceType: 'challenge',
+              sourceId: challenge._id.toString(),
               sourceName: `${challenge.challengerName} vs ${challenge.challengedName}`,
+              referredUserId: payment.userId,
+              referredUserEmail: payment.userEmail || '',
               referredUserName: payment.userName,
+              entryFeeAmount: challenge.entryFee,
+              earningPercentage: feePercentage,
+              originalPercentage: feePercentage,
+              grossEarning: payment.amount,
+              platformFee: 0,
+              netEarning: payment.amount,
               status: 'paid',
               paidAt: new Date(),
+              eventStartTime: challenge.createdAt,
+              eventEndTime: new Date(),
+              participantCount: 2,
+              wasCapped: false,
               createdAt: new Date(),
               updatedAt: new Date(),
             });
