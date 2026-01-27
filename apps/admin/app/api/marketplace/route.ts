@@ -146,7 +146,8 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     await requireAdminAuth();
-    await connectToDatabase();
+    const mongoose = await connectToDatabase();
+    const db = mongoose.connection.db;
     
     const { itemId, ...updates } = await request.json();
     
@@ -167,6 +168,9 @@ export async function PUT(request: NextRequest) {
       updates.codeTemplate = JSON.stringify(updates.codeTemplate);
     }
     
+    // Get the item before update to compare gameMasterConfig changes
+    const oldItem = await MarketplaceItem.findById(itemId).lean();
+    
     const item = await MarketplaceItem.findByIdAndUpdate(
       itemId,
       { $set: updates },
@@ -180,6 +184,58 @@ export async function PUT(request: NextRequest) {
       );
     }
     
+    // SYNC GAME MASTER SUBSCRIPTIONS: When a Game Master package's settings change,
+    // update all active subscriptions that use this package
+    let subscriptionsUpdated = 0;
+    if (item.category === 'gamemaster' && updates.gameMasterConfig && db) {
+      const gmConfig = updates.gameMasterConfig;
+      
+      console.log(`🔄 Syncing Game Master package changes to subscriptions...`);
+      console.log(`   Package: ${item.name} (${itemId})`);
+      
+      // Build the subscription limits update
+      const limitsUpdate: Record<string, unknown> = {};
+      
+      if (gmConfig.referralFeePercentage !== undefined) {
+        limitsUpdate['limits.referralFeePercentage'] = gmConfig.referralFeePercentage;
+        console.log(`   → referralFeePercentage: ${oldItem?.gameMasterConfig?.referralFeePercentage} → ${gmConfig.referralFeePercentage}`);
+      }
+      if (gmConfig.maxCompetitionsPerDay !== undefined) {
+        limitsUpdate['limits.maxCompetitionsPerDay'] = gmConfig.maxCompetitionsPerDay;
+        console.log(`   → maxCompetitionsPerDay: ${oldItem?.gameMasterConfig?.maxCompetitionsPerDay} → ${gmConfig.maxCompetitionsPerDay}`);
+      }
+      if (gmConfig.maxUsersPerCompetition !== undefined) {
+        limitsUpdate['limits.maxUsersPerCompetition'] = gmConfig.maxUsersPerCompetition;
+        console.log(`   → maxUsersPerCompetition: ${oldItem?.gameMasterConfig?.maxUsersPerCompetition} → ${gmConfig.maxUsersPerCompetition}`);
+      }
+      if (gmConfig.canCreateCompetitions !== undefined) {
+        limitsUpdate['limits.canCreateCompetitions'] = gmConfig.canCreateCompetitions;
+        console.log(`   → canCreateCompetitions: ${oldItem?.gameMasterConfig?.canCreateCompetitions} → ${gmConfig.canCreateCompetitions}`);
+      }
+      if (gmConfig.canEarnFromChallenges !== undefined) {
+        limitsUpdate['limits.canEarnFromChallenges'] = gmConfig.canEarnFromChallenges;
+        console.log(`   → canEarnFromChallenges: ${oldItem?.gameMasterConfig?.canEarnFromChallenges} → ${gmConfig.canEarnFromChallenges}`);
+      }
+      if (gmConfig.challengeReferralFeePercentage !== undefined) {
+        limitsUpdate['limits.challengeReferralFeePercentage'] = gmConfig.challengeReferralFeePercentage;
+        console.log(`   → challengeReferralFeePercentage: ${oldItem?.gameMasterConfig?.challengeReferralFeePercentage} → ${gmConfig.challengeReferralFeePercentage}`);
+      }
+      
+      // Only update if there are changes
+      if (Object.keys(limitsUpdate).length > 0) {
+        limitsUpdate.updatedAt = new Date();
+        
+        // Update all subscriptions using this package
+        const updateResult = await db.collection('gamemastersubscriptions').updateMany(
+          { packageId: itemId },
+          { $set: limitsUpdate }
+        );
+        
+        subscriptionsUpdated = updateResult.modifiedCount;
+        console.log(`   ✅ Updated ${subscriptionsUpdated} subscription(s)`);
+      }
+    }
+    
     // Log audit
     const adminSession2 = await getAdminSession();
     if (adminSession2) {
@@ -187,13 +243,19 @@ export async function PUT(request: NextRequest) {
         { id: adminSession2.id, email: adminSession2.email, name: adminSession2.name },
         'marketplace_item_updated',
         null,
-        { itemId: (item._id as any).toString(), name: item.name, updates: Object.keys(updates) }
+        { 
+          itemId: (item._id as any).toString(), 
+          name: item.name, 
+          updates: Object.keys(updates),
+          subscriptionsUpdated,
+        }
       );
     }
     
     return NextResponse.json({
       success: true,
       item,
+      subscriptionsUpdated,
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
