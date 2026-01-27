@@ -659,6 +659,9 @@ export async function finalizeCompetition(competitionId: string) {
         // Get participant user IDs
         const participantUserIds = participants.map(p => p.userId);
         
+        // DEBUG: Log participant userIds being searched
+        console.log(`   🔍 Searching for referrals with userIds: ${participantUserIds.join(', ')}`);
+        
         // Use UserReferral collection as source of truth for referral relationships
         // This is more reliable than user.referredByGameMasterId field
         const userReferrals = await db.collection('userreferrals').find({
@@ -668,6 +671,11 @@ export async function finalizeCompetition(competitionId: string) {
         }).toArray();
         
         console.log(`   Found ${userReferrals.length} referred participants (via UserReferral collection)`);
+        
+        // DEBUG: Log each found referral
+        for (const ref of userReferrals) {
+          console.log(`   📋 UserReferral: userId=${ref.userId}, gameMasterId=${ref.gameMasterId}, isActive=${ref.isActive}`);
+        }
         
         // Also check user.referredByGameMasterId as fallback
         const referredParticipantsFromUser = await db.collection('user').find({
@@ -700,6 +708,11 @@ export async function finalizeCompetition(competitionId: string) {
         
         console.log(`   Total unique referred participants: ${referralMap.size}`);
         
+        // DEBUG: Log referralMap contents
+        for (const [userId, refData] of referralMap) {
+          console.log(`   📍 referralMap: userId=${userId} -> gmId=${refData.gmId}, userName=${refData.userName}`);
+        }
+        
         // Group by game master
         const gmEarningsMap = new Map<string, { 
           gmId: string; 
@@ -710,7 +723,10 @@ export async function finalizeCompetition(competitionId: string) {
         for (const [userId, refData] of referralMap) {
           const gmId = refData.gmId;
           const participant = participants.find(p => p.userId === userId);
-          if (!participant || !gmId) continue;
+          if (!participant || !gmId) {
+            console.log(`   ⚠️ Skipping userId=${userId}: participant found=${!!participant}, gmId=${gmId}`);
+            continue;
+          }
           
           if (!gmEarningsMap.has(gmId)) {
             gmEarningsMap.set(gmId, { 
@@ -727,6 +743,12 @@ export async function finalizeCompetition(competitionId: string) {
             userEmail: refData.userEmail 
           });
           gmData.totalEntryFees += competition.entryFee;
+        }
+        
+        // DEBUG: Log gmEarningsMap contents
+        console.log(`   📊 gmEarningsMap has ${gmEarningsMap.size} GM(s):`);
+        for (const [gmId, data] of gmEarningsMap) {
+          console.log(`   📊 GM ${gmId}: ${data.users.length} user(s), totalEntryFees=${data.totalEntryFees}`);
         }
         
         // Calculate earnings for each game master (but don't pay yet)

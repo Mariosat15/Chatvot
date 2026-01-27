@@ -560,12 +560,20 @@ export async function finalizeChallenge(challengeId: string) {
         // Get user records to check for referrals
         const userIds = [challenger.userId, challenged.userId];
         
+        // DEBUG: Log user IDs being searched
+        console.log(`   🔍 Searching for referrals with userIds: ${userIds.join(', ')}`);
+        
         // Use UserReferral collection as source of truth
         const userReferrals = await db.collection('userreferrals').find({
           userId: { $in: userIds },
           isActive: true,
           gameMasterId: { $exists: true, $ne: null },
         }).toArray();
+        
+        // DEBUG: Log each found referral
+        for (const ref of userReferrals) {
+          console.log(`   📋 UserReferral: userId=${ref.userId}, gameMasterId=${ref.gameMasterId}, isActive=${ref.isActive}`);
+        }
         
         // Also check user.referredByGameMasterId as fallback
         const usersWithReferral = await db.collection('user').find({
