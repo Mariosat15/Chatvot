@@ -20,7 +20,8 @@ export interface IWalletTransaction extends Document {
     | 'marketplace_purchase' // User purchases item from marketplace
     | 'gamemaster_subscription' // Game master monthly subscription fee
     | 'gamemaster_subscription_refund' // Refund if subscription cancelled
-    | 'gamemaster_earning'; // Game master earnings from referred users
+    | 'gamemaster_earning' // Game master earnings from referred users
+    | 'gamemaster_challenge_referral'; // Game master challenge referral earnings
   amount: number; // Amount of credits (+/-)
   balanceBefore: number; // Balance before transaction
   balanceAfter: number; // Balance after transaction
@@ -68,6 +69,7 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
         'gamemaster_subscription',
         'gamemaster_subscription_refund',
         'gamemaster_earning',
+        'gamemaster_challenge_referral',
       ],
     },
     amount: {
