@@ -559,21 +559,50 @@ export async function finalizeChallenge(challengeId: string) {
       if (db) {
         // Get user records to check for referrals
         const userIds = [challenger.userId, challenged.userId];
-        const users = await db.collection('user').find({
+        
+        // Use UserReferral collection as source of truth
+        const userReferrals = await db.collection('userreferrals').find({
+          userId: { $in: userIds },
+          isActive: true,
+          gameMasterId: { $exists: true, $ne: null },
+        }).toArray();
+        
+        // Also check user.referredByGameMasterId as fallback
+        const usersWithReferral = await db.collection('user').find({
           id: { $in: userIds },
           referredByGameMasterId: { $exists: true, $ne: null },
         }).toArray();
         
-        console.log(`   🎮 Found ${users.length} referred participant(s) in challenge`);
+        // Create a map: userId -> { gmId, userName }
+        const referralMap = new Map<string, { gmId: string; userName: string }>();
         
-        for (const user of users) {
-          const gmId = user.referredByGameMasterId;
+        // Add from user collection (fallback)
+        for (const user of usersWithReferral) {
+          const isChallenger = user.id === challenger.userId;
+          referralMap.set(user.id, {
+            gmId: user.referredByGameMasterId,
+            userName: isChallenger ? challenge.challengerName : challenge.challengedName,
+          });
+        }
+        
+        // Add/override from UserReferral collection (source of truth)
+        for (const ref of userReferrals) {
+          const isChallenger = ref.userId === challenger.userId;
+          referralMap.set(ref.userId, {
+            gmId: ref.gameMasterId,
+            userName: isChallenger ? challenge.challengerName : challenge.challengedName,
+          });
+        }
+        
+        console.log(`   🎮 Found ${referralMap.size} referred participant(s) in challenge`);
+        
+        for (const [userId, refData] of referralMap) {
+          const gmId = refData.gmId;
           if (!gmId) continue;
           
           // Get the participant's entry fee
-          const isChallenger = user.id === challenger.userId;
           const participantEntryFee = challenge.entryFee;
-          const userName = isChallenger ? challenge.challengerName : challenge.challengedName;
+          const userName = refData.userName;
           
           // Look up GM subscription (must be active, not paused, and have canEarnFromChallenges)
           const gmSubscription = await db.collection('gamemastersubscriptions').findOne({
@@ -605,7 +634,7 @@ export async function finalizeChallenge(challengeId: string) {
             inactiveGmFees.push({
               gmId,
               gmEmail: anySubscription?.userEmail,
-              userId: user.id,
+              userId,
               userName,
               wouldHaveEarned,
               feePercentage: defaultFeePercentage,
@@ -625,7 +654,7 @@ export async function finalizeChallenge(challengeId: string) {
           gmPayments.push({
             gmId,
             amount: gmEarning,
-            userId: user.id,
+            userId,
             userName,
             feePercentage,
           });

@@ -656,13 +656,49 @@ export async function finalizeCompetition(competitionId: string) {
     try {
       const db = mongoose.connection.db;
       if (db) {
-        // Get all participants who have referredByGameMasterId
-        const referredParticipants = await db.collection('user').find({
-          id: { $in: participants.map(p => p.userId) },
+        // Get participant user IDs
+        const participantUserIds = participants.map(p => p.userId);
+        
+        // Use UserReferral collection as source of truth for referral relationships
+        // This is more reliable than user.referredByGameMasterId field
+        const userReferrals = await db.collection('userreferrals').find({
+          userId: { $in: participantUserIds },
+          isActive: true,
+          gameMasterId: { $exists: true, $ne: null },
+        }).toArray();
+        
+        console.log(`   Found ${userReferrals.length} referred participants (via UserReferral collection)`);
+        
+        // Also check user.referredByGameMasterId as fallback
+        const referredParticipantsFromUser = await db.collection('user').find({
+          id: { $in: participantUserIds },
           referredByGameMasterId: { $exists: true, $ne: null },
         }).toArray();
         
-        console.log(`   Found ${referredParticipants.length} referred participants`);
+        console.log(`   Found ${referredParticipantsFromUser.length} referred participants (via user.referredByGameMasterId)`);
+        
+        // Create a merged map of userId -> gameMasterId (UserReferral takes precedence)
+        const referralMap = new Map<string, { gmId: string; userName: string; userEmail: string }>();
+        
+        // First add from user collection (fallback)
+        for (const user of referredParticipantsFromUser) {
+          referralMap.set(user.id, {
+            gmId: user.referredByGameMasterId,
+            userName: user.name || 'Unknown',
+            userEmail: user.email,
+          });
+        }
+        
+        // Then add/override from UserReferral collection (source of truth)
+        for (const ref of userReferrals) {
+          referralMap.set(ref.userId, {
+            gmId: ref.gameMasterId,
+            userName: ref.userName || 'Unknown',
+            userEmail: ref.userEmail,
+          });
+        }
+        
+        console.log(`   Total unique referred participants: ${referralMap.size}`);
         
         // Group by game master
         const gmEarningsMap = new Map<string, { 
@@ -671,9 +707,9 @@ export async function finalizeCompetition(competitionId: string) {
           totalEntryFees: number;
         }>();
         
-        for (const user of referredParticipants) {
-          const gmId = user.referredByGameMasterId;
-          const participant = participants.find(p => p.userId === user.id);
+        for (const [userId, refData] of referralMap) {
+          const gmId = refData.gmId;
+          const participant = participants.find(p => p.userId === userId);
           if (!participant || !gmId) continue;
           
           if (!gmEarningsMap.has(gmId)) {
@@ -686,9 +722,9 @@ export async function finalizeCompetition(competitionId: string) {
           
           const gmData = gmEarningsMap.get(gmId)!;
           gmData.users.push({ 
-            userId: user.id, 
-            userName: user.name || 'Unknown', 
-            userEmail: user.email 
+            userId, 
+            userName: refData.userName, 
+            userEmail: refData.userEmail 
           });
           gmData.totalEntryFees += competition.entryFee;
         }
