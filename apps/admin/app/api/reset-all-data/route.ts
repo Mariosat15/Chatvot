@@ -372,6 +372,64 @@ export async function POST(request: Request) {
     const workerJobsDeleted = await workerJobsCollection.deleteMany({});
     console.log(`✅ Deleted ${workerJobsDeleted.deletedCount} worker jobs`);
 
+    // ============================================
+    // DELETE GAME MASTER DATA
+    // ============================================
+    
+    // Delete all GM subscriptions
+    const gmSubscriptionsCollection = mongoose.connection.collection('gamemastersubscriptions');
+    const gmSubsDeleted = await gmSubscriptionsCollection.deleteMany({});
+    console.log(`✅ Deleted ${gmSubsDeleted.deletedCount} GM subscriptions`);
+    
+    // Delete all user referrals
+    const userReferralsCollection = mongoose.connection.collection('userreferrals');
+    const userRefsDeleted = await userReferralsCollection.deleteMany({});
+    console.log(`✅ Deleted ${userRefsDeleted.deletedCount} user referrals`);
+    
+    // Delete all GM earnings
+    const gmEarningsCollection = mongoose.connection.collection('gamemasterearnings');
+    const gmEarningsDeleted = await gmEarningsCollection.deleteMany({});
+    console.log(`✅ Deleted ${gmEarningsDeleted.deletedCount} GM earnings`);
+    
+    // Clear referredByGameMasterId from all users
+    await userCollection.updateMany(
+      { referredByGameMasterId: { $exists: true } },
+      { $unset: { referredByGameMasterId: '', referredByReferralCode: '', referredAt: '' } }
+    );
+    console.log('✅ Cleared referral data from all users');
+
+    // ============================================
+    // DELETE ADMIN OPERATIONS DATA
+    // ============================================
+    
+    // Delete all incidents
+    const incidentsCollection = mongoose.connection.collection('incidents');
+    const incidentsDeleted = await incidentsCollection.deleteMany({});
+    console.log(`✅ Deleted ${incidentsDeleted.deletedCount} incidents`);
+    
+    // Delete price snapshots
+    const priceSnapshotsCollection = mongoose.connection.collection('pricesnapshots');
+    const priceSnapshotsDeleted = await priceSnapshotsCollection.deleteMany({});
+    console.log(`✅ Deleted ${priceSnapshotsDeleted.deletedCount} price snapshots`);
+    
+    // Delete price health records
+    const priceHealthCollection = mongoose.connection.collection('pricehealthrecords');
+    try {
+      const priceHealthDeleted = await priceHealthCollection.deleteMany({});
+      console.log(`✅ Deleted ${priceHealthDeleted.deletedCount} price health records`);
+    } catch (e) {
+      console.log('⚠️ No price health records collection found');
+    }
+    
+    // Delete admin operation logs (if separate from audit logs)
+    const adminOperationsCollection = mongoose.connection.collection('adminoperations');
+    try {
+      const adminOpsDeleted = await adminOperationsCollection.deleteMany({});
+      console.log(`✅ Deleted ${adminOpsDeleted.deletedCount} admin operations`);
+    } catch (e) {
+      console.log('⚠️ No admin operations collection found');
+    }
+
     // Delete orphan credit wallets (where user no longer exists)
     if (orphanWalletIds.length > 0) {
       const orphanDeleteResult = await CreditWallet.deleteMany({ _id: { $in: orphanWalletIds } });

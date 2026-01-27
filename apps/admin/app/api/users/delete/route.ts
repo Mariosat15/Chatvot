@@ -388,6 +388,88 @@ export async function DELETE(request: Request) {
     }
 
     // ============================================
+    // 10.5. DELETE REFERRAL DATA (if user was referred)
+    // ============================================
+    
+    try {
+      // Find if this user was referred by a GM
+      const userReferral = await db.collection('userreferrals').findOne({ userId });
+      
+      if (userReferral) {
+        // Decrement the GM's referral counter
+        await db.collection('gamemastersubscriptions').updateOne(
+          { userId: userReferral.gameMasterId },
+          { 
+            $inc: { 
+              totalReferredUsers: -1,
+              activeReferredUsers: userReferral.isActive ? -1 : 0 
+            } 
+          }
+        );
+        console.log(`✅ Decremented referral counter for GM ${userReferral.gameMasterId}`);
+        
+        // Delete the UserReferral record
+        await db.collection('userreferrals').deleteOne({ userId });
+        console.log(`✅ Deleted UserReferral record for user ${userId}`);
+      }
+      
+      // Also delete any GM earnings that were generated from this user
+      const gmEarningsResult = await db.collection('gamemasterearnings').deleteMany({
+        $or: [
+          { referredUserId: userId },
+          { userId: userId },
+        ]
+      });
+      deletionResults.gmEarningsFromUser = gmEarningsResult.deletedCount;
+      if (gmEarningsResult.deletedCount > 0) {
+        console.log(`✅ Deleted ${gmEarningsResult.deletedCount} GM earnings records related to this user`);
+      }
+      
+      // Clear user.referredByGameMasterId (already deleted above, but just in case)
+      deletionResults.userReferral = userReferral ? 1 : 0;
+    } catch (e) {
+      console.log(`⚠️ Error cleaning up referral data:`, e);
+      deletionResults.userReferral = 0;
+      deletionResults.gmEarningsFromUser = 0;
+    }
+
+    // ============================================
+    // 10.6. DELETE GM SUBSCRIPTION (if user is a GM)
+    // ============================================
+    
+    try {
+      // Check if this user is a Game Master
+      const gmSubscription = await db.collection('gamemastersubscriptions').findOne({ userId });
+      
+      if (gmSubscription) {
+        // Delete all referrals TO this GM (users referred by this GM)
+        const referralsToGmResult = await db.collection('userreferrals').deleteMany({ gameMasterId: userId });
+        if (referralsToGmResult.deletedCount > 0) {
+          console.log(`✅ Deleted ${referralsToGmResult.deletedCount} referral records for users referred by this GM`);
+        }
+        
+        // Delete all GM earnings for this GM
+        const gmEarningsResult = await db.collection('gamemasterearnings').deleteMany({ gameMasterId: userId });
+        if (gmEarningsResult.deletedCount > 0) {
+          console.log(`✅ Deleted ${gmEarningsResult.deletedCount} GM earnings records`);
+        }
+        
+        // Delete the GM subscription itself
+        await db.collection('gamemastersubscriptions').deleteOne({ userId });
+        console.log(`✅ Deleted GM subscription for user ${userId}`);
+        
+        deletionResults.gmSubscription = 1;
+        deletionResults.referralsToGm = referralsToGmResult.deletedCount;
+        deletionResults.gmEarnings = gmEarningsResult.deletedCount;
+      } else {
+        deletionResults.gmSubscription = 0;
+      }
+    } catch (e) {
+      console.log(`⚠️ Error cleaning up GM subscription data:`, e);
+      deletionResults.gmSubscription = 0;
+    }
+
+    // ============================================
     // 11. DELETE USER NOTES (Admin notes about user)
     // ============================================
 
