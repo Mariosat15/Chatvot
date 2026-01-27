@@ -1425,6 +1425,8 @@ async function createGmReferralData(
 ): Promise<Map<string, mongoose.Types.ObjectId>> {
   // Map from scenario gmId to actual MongoDB ObjectId
   const gmIdMap = new Map<string, mongoose.Types.ObjectId>();
+  // Map from scenario gmId to unique referral code
+  const gmReferralCodeMap = new Map<string, string>();
   
   if (!scenario.gameMasters || scenario.gameMasters.length === 0) {
     return gmIdMap;
@@ -1442,7 +1444,11 @@ async function createGmReferralData(
     const gmUserId = new mongoose.Types.ObjectId();
     const packageId = new mongoose.Types.ObjectId();
     const subscriptionId = new mongoose.Types.ObjectId();
+    // Generate unique referral code per GM per test run
+    const uniqueReferralCode = `TESTGM_${gm.gmId.toUpperCase()}_${nanoid(10)}`;
+    
     gmIdMap.set(gm.gmId, gmUserId);
+    gmReferralCodeMap.set(gm.gmId, uniqueReferralCode);
     
     testDataIds.push(`user:${gmUserId}`);
     testDataIds.push(`wallet:${gmUserId}`);
@@ -1507,12 +1513,12 @@ async function createGmReferralData(
       updatedAt: now,
     });
 
-    // Create GM subscription
+    // Create GM subscription with unique referral code
     await subscriptionsCollection.insertOne({
       _id: subscriptionId,
       userId: gmUserId.toString(),
       packageId: packageId.toString(),
-      referralCode: `TESTGM${gm.gmId.toUpperCase()}${testRunId.slice(0, 4)}`,
+      referralCode: uniqueReferralCode,
       status: gm.status,
       subscriptionStart,
       subscriptionEnd,
@@ -1537,6 +1543,7 @@ async function createGmReferralData(
     const p = scenario.participants[i];
     if (p.referredByGmId && gmIdMap.has(p.referredByGmId)) {
       const gmUserId = gmIdMap.get(p.referredByGmId)!;
+      const gmReferralCode = gmReferralCodeMap.get(p.referredByGmId)!;
       const participantUserId = participantUserIds[i];
       const referralId = new mongoose.Types.ObjectId();
       testDataIds.push(`referral:${referralId}`);
@@ -1544,7 +1551,7 @@ async function createGmReferralData(
       await referralsCollection.insertOne({
         _id: referralId,
         gameMasterId: gmUserId.toString(),
-        referralCode: `TESTGM${p.referredByGmId.toUpperCase()}${testRunId.slice(0, 4)}`,
+        referralCode: gmReferralCode,
         userId: participantUserId.toString(),
         status: 'active',
         testRunId,
@@ -1564,7 +1571,7 @@ async function createGmReferralData(
           role: 'user',
           status: 'active',
           referredByGameMasterId: gmUserId.toString(),
-          referredByReferralCode: `TESTGM${p.referredByGmId.toUpperCase()}${testRunId.slice(0, 4)}`,
+          referredByReferralCode: gmReferralCode,
           testRunId,
           createdAt: now,
           updatedAt: now,
@@ -1576,7 +1583,7 @@ async function createGmReferralData(
           { 
             $set: { 
               referredByGameMasterId: gmUserId.toString(),
-              referredByReferralCode: `TESTGM${p.referredByGmId.toUpperCase()}${testRunId.slice(0, 4)}`,
+              referredByReferralCode: gmReferralCode,
             } 
           }
         );

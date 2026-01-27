@@ -235,8 +235,8 @@ export async function POST(request: NextRequest) {
             // User email patterns for test GMs and participants
             { email: testPatternDel },
             { email: testStartPatternDel },
-            // Referral codes for GM test subscriptions
-            { referralCode: { $regex: 'TESTGM', $options: 'i' } },
+            // Referral codes for GM test subscriptions (both old and new format)
+            { referralCode: { $regex: '^TESTGM', $options: 'i' } },
           ]
         });
         deletedCount += result3.deletedCount;
