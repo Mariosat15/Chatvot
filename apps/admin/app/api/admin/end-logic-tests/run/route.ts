@@ -1539,6 +1539,9 @@ async function createGmReferralData(
   }
 
   // Create UserReferral records for referred participants
+  console.log(`🧪 [GM REFERRAL] Creating UserReferral records for ${scenario.participants.length} participants`);
+  console.log(`🧪 [GM REFERRAL] participantUserIds: ${participantUserIds.map(id => id.toString()).join(', ')}`);
+  
   for (let i = 0; i < scenario.participants.length; i++) {
     const p = scenario.participants[i];
     if (p.referredByGmId && gmIdMap.has(p.referredByGmId)) {
@@ -1553,6 +1556,8 @@ async function createGmReferralData(
       const gmEmail = `${testRunId}_gm_${p.referredByGmId}@test.com`;
       const userEmail = `${testRunId}_participant_${i}@test.com`;
       const userName = `${testRunId}_User${i + 1}`;
+      
+      console.log(`🧪 [GM REFERRAL] Creating UserReferral for participant ${i}: userId=${participantUserId.toString()}, gmId=${gmUserId.toString()}, gmScenarioId=${p.referredByGmId}`);
       
       await referralsCollection.insertOne({
         _id: referralId,
@@ -2160,6 +2165,18 @@ async function runRealCompetitionTest(
       const gmEarningsCollection = db.collection('gamemasterearnings');
       const gmFeeVerification: { gmId: string; expected: number; actual: number; passed: boolean }[] = [];
       
+      // Debug: Check what UserReferrals and GM subscriptions exist
+      const allReferrals = await db.collection('userreferrals').find({ testRunId }).toArray();
+      const allGmSubscriptions = await db.collection('gamemastersubscriptions').find({ testRunId }).toArray();
+      console.log(`🧪 [VERIFY] Found ${allReferrals.length} UserReferrals with testRunId`);
+      for (const ref of allReferrals) {
+        console.log(`🧪 [VERIFY] UserReferral: userId=${ref.userId}, gameMasterId=${ref.gameMasterId}, isActive=${ref.isActive}`);
+      }
+      console.log(`🧪 [VERIFY] Found ${allGmSubscriptions.length} GM subscriptions with testRunId`);
+      for (const sub of allGmSubscriptions) {
+        console.log(`🧪 [VERIFY] GMSubscription: userId=${sub.userId}, status=${sub.status}, isPaused=${sub.isPaused}`);
+      }
+      
       if (scenario.expected.expectedGmFees && scenario.expected.expectedGmFees.length > 0) {
         for (const expectedGmFee of scenario.expected.expectedGmFees) {
           // Get actual GM user ID from map
@@ -2627,6 +2644,18 @@ async function runRealChallengeTest(
       // ============ GM REFERRAL FEE VERIFICATION FOR CHALLENGES ============
       const gmEarningsCollection = db.collection('gamemasterearnings');
       const gmFeeVerification: { gmId: string; expected: number; actual: number; passed: boolean }[] = [];
+      
+      // Debug: Check what UserReferrals and GM subscriptions exist
+      const allReferrals = await db.collection('userreferrals').find({ testRunId }).toArray();
+      const allGmSubscriptions = await db.collection('gamemastersubscriptions').find({ testRunId }).toArray();
+      console.log(`🧪 [VERIFY CHALLENGE] Found ${allReferrals.length} UserReferrals with testRunId`);
+      for (const ref of allReferrals) {
+        console.log(`🧪 [VERIFY CHALLENGE] UserReferral: userId=${ref.userId}, gameMasterId=${ref.gameMasterId}, isActive=${ref.isActive}`);
+      }
+      console.log(`🧪 [VERIFY CHALLENGE] Found ${allGmSubscriptions.length} GM subscriptions with testRunId`);
+      for (const sub of allGmSubscriptions) {
+        console.log(`🧪 [VERIFY CHALLENGE] GMSubscription: userId=${sub.userId}, status=${sub.status}, isPaused=${sub.isPaused}, canEarnFromChallenges=${sub.limits?.canEarnFromChallenges}`);
+      }
       
       if (scenario.expected.expectedGmFees && scenario.expected.expectedGmFees.length > 0) {
         for (const expectedGmFee of scenario.expected.expectedGmFees) {
