@@ -612,21 +612,47 @@ export async function finalizeChallenge(challengeId: string) {
             'limits.canEarnFromChallenges': true,
           });
           
+          // IMPORTANT: Get CURRENT package settings (not cached subscription limits)
+          // This ensures if admin changes package settings, all GMs with that package see the update
+          let currentFeePercentage = 5; // Default fallback
+          let currentChallengeEarningsEnabled = false;
+          const subscriptionToCheck = gmSubscription || await db.collection('gamemastersubscriptions').findOne({ userId: gmId });
+          
+          if (subscriptionToCheck?.packageId) {
+            try {
+              const currentPackage = await db.collection('marketplaceitems').findOne({
+                _id: new mongoose.Types.ObjectId(subscriptionToCheck.packageId),
+              });
+              if (currentPackage?.gameMasterConfig) {
+                // Use challenge-specific fee or fall back to competition fee from current package
+                currentFeePercentage = currentPackage.gameMasterConfig.challengeReferralFeePercentage ?? 
+                                       currentPackage.gameMasterConfig.referralFeePercentage ?? 5;
+                currentChallengeEarningsEnabled = currentPackage.gameMasterConfig.canEarnFromChallenges === true;
+                console.log(`   📦 Using current package: ${currentFeePercentage}% challenge fee, enabled: ${currentChallengeEarningsEnabled}`);
+              }
+            } catch (pkgError) {
+              // Fallback to cached subscription limits
+              currentFeePercentage = subscriptionToCheck?.limits?.challengeReferralFeePercentage ?? 
+                                     subscriptionToCheck?.limits?.referralFeePercentage ?? 5;
+            }
+          } else if (subscriptionToCheck) {
+            currentFeePercentage = subscriptionToCheck.limits?.challengeReferralFeePercentage ?? 
+                                   subscriptionToCheck.limits?.referralFeePercentage ?? 5;
+          }
+          
           if (!gmSubscription) {
             // Check if they have ANY subscription to determine status
-            const anySubscription = await db.collection('gamemastersubscriptions').findOne({ userId: gmId });
+            const anySubscription = subscriptionToCheck;
             let subscriptionStatus = anySubscription?.status || 'no_subscription';
             
             // Determine specific reason for ineligibility
             if (anySubscription?.status === 'active' && anySubscription?.isPaused) {
               subscriptionStatus = 'paused';
-            } else if (anySubscription?.status === 'active' && !anySubscription?.limits?.canEarnFromChallenges) {
+            } else if (anySubscription?.status === 'active' && !currentChallengeEarningsEnabled) {
               subscriptionStatus = 'challenge_earnings_disabled';
             }
             
-            const defaultFeePercentage = anySubscription?.limits?.challengeReferralFeePercentage ?? 
-                                         anySubscription?.limits?.referralFeePercentage ?? 5;
-            const wouldHaveEarned = participantEntryFee * (defaultFeePercentage / 100);
+            const wouldHaveEarned = participantEntryFee * (currentFeePercentage / 100);
             
             console.log(`   ⚠️ GM ${gmId} not eligible for challenge earnings (${subscriptionStatus})`);
             console.log(`   💰 Would have earned: €${wouldHaveEarned.toFixed(2)} from ${userName}'s entry`);
@@ -637,15 +663,14 @@ export async function finalizeChallenge(challengeId: string) {
               userId,
               userName,
               wouldHaveEarned,
-              feePercentage: defaultFeePercentage,
+              feePercentage: currentFeePercentage,
               subscriptionStatus,
             });
             continue;
           }
           
-          // Use challenge-specific fee or fall back to competition fee
-          const feePercentage = gmSubscription.limits?.challengeReferralFeePercentage ?? 
-                                gmSubscription.limits?.referralFeePercentage ?? 5;
+          // Use current package fee percentage
+          const feePercentage = currentFeePercentage;
           const gmEarning = participantEntryFee * (feePercentage / 100);
           
           console.log(`   📊 GM ${gmId}: ${userName}'s entry ${participantEntryFee} × ${feePercentage}% = ${gmEarning.toFixed(2)}`);

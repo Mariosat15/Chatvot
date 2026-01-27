@@ -753,9 +753,34 @@ export async function finalizeCompetition(competitionId: string) {
             isPaused: { $ne: true }, // Must NOT be paused
           });
           
+          // IMPORTANT: Get CURRENT package settings (not cached subscription limits)
+          // This ensures if admin changes package settings, all GMs with that package see the update
+          let currentFeePercentage = 5; // Default fallback
+          if (gmSubscription?.packageId) {
+            try {
+              const currentPackage = await db.collection('marketplaceitems').findOne({
+                _id: new mongoose.Types.ObjectId(gmSubscription.packageId),
+              });
+              if (currentPackage?.gameMasterConfig?.referralFeePercentage !== undefined) {
+                currentFeePercentage = currentPackage.gameMasterConfig.referralFeePercentage;
+                console.log(`   📦 Using current package settings: ${currentFeePercentage}% from "${currentPackage.name}"`);
+              } else {
+                // Fallback to cached subscription limits if package not found
+                currentFeePercentage = gmSubscription.limits?.referralFeePercentage || 5;
+                console.log(`   ⚠️ Package not found, using cached subscription limits: ${currentFeePercentage}%`);
+              }
+            } catch (pkgError) {
+              // Fallback to cached subscription limits
+              currentFeePercentage = gmSubscription?.limits?.referralFeePercentage || 5;
+              console.log(`   ⚠️ Error fetching package, using cached: ${currentFeePercentage}%`);
+            }
+          } else if (gmSubscription) {
+            currentFeePercentage = gmSubscription.limits?.referralFeePercentage || 5;
+          }
+          
           if (!gmSubscription) {
             // GM has no active subscription OR is paused - record this for platform reconciliation
-            const defaultFeePercentage = anySubscription?.limits?.referralFeePercentage || 5;
+            const defaultFeePercentage = currentFeePercentage;
             const wouldHaveEarned = gmData.users.length * competition.entryFee * (defaultFeePercentage / 100);
             let subscriptionStatus = anySubscription?.status || 'no_subscription';
             
@@ -778,7 +803,7 @@ export async function finalizeCompetition(competitionId: string) {
             continue;
           }
           
-          const feePercentage = gmSubscription.limits?.referralFeePercentage || 5;
+          const feePercentage = currentFeePercentage;
           const totalEarning = gmData.users.length * competition.entryFee * (feePercentage / 100);
           
           totalGmEarnings += totalEarning;
