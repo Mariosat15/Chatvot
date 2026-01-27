@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Wallet, TrendingUp, TrendingDown, DollarSign, History, ArrowDownCircle, ArrowUpCircle, Zap, CheckCircle2, XCircle, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DepositModal from '@/components/trading/DepositModal';
 import WithdrawalModal from '@/components/trading/WithdrawalModal';
-import TransactionHistory from '@/components/trading/TransactionHistory';
+import TransactionHistory, { FilteredStats } from '@/components/trading/TransactionHistory';
 import BankAccountsSection from '@/components/wallet/BankAccountsSection';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 
@@ -40,6 +40,27 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
     bankWithdrawalsEnabled: true,
     cardWithdrawalsEnabled: true,
   });
+  const [filteredStats, setFilteredStats] = useState<FilteredStats | null>(null);
+  const [isDateFiltered, setIsDateFiltered] = useState(false);
+
+  // Callback for when transaction history filters change
+  const handleFilteredStatsChange = useCallback((newStats: FilteredStats) => {
+    setFilteredStats(newStats);
+    // Check if any filtering is happening (compare with original stats)
+    const isFiltered = 
+      newStats.totalDeposited !== stats.totalDeposited ||
+      newStats.totalWithdrawn !== stats.totalWithdrawn;
+    setIsDateFiltered(isFiltered);
+  }, [stats.totalDeposited, stats.totalWithdrawn]);
+
+  // Get display stats (filtered or original)
+  const displayStats = {
+    totalDeposited: isDateFiltered && filteredStats ? filteredStats.totalDeposited : stats.totalDeposited,
+    totalWithdrawn: isDateFiltered && filteredStats ? filteredStats.totalWithdrawn : stats.totalWithdrawn,
+    totalSpentOnCompetitions: isDateFiltered && filteredStats ? filteredStats.totalSpent : stats.totalSpentOnCompetitions,
+    totalWonFromCompetitions: isDateFiltered && filteredStats ? filteredStats.totalWinnings : stats.totalWonFromCompetitions,
+    totalGMEarnings: isDateFiltered && filteredStats ? filteredStats.totalGMEarnings : (stats.totalGMEarnings ?? 0),
+  };
 
   // Handle payment return from Stripe/Paddle
   useEffect(() => {
@@ -180,6 +201,11 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
       </div>
 
       {/* Stats Grid - Mobile: 2 cols, Desktop: 5 cols */}
+      {isDateFiltered && (
+        <div className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 mb-2">
+          📊 Stats are filtered by selected date range
+        </div>
+      )}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
         {/* Total Bought */}
         <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all">
@@ -188,13 +214,13 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
               <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">Total Bought</p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                 <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {stats.totalDeposited.toFixed(settings.credits.decimals)}
+                  {displayStats.totalDeposited.toFixed(settings.credits.decimals)}
                 </p>
                 <span className="text-sm sm:text-lg text-yellow-500">{settings.credits.symbol}</span>
               </div>
               {settings.credits.showEUREquivalent && (
                 <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-gray-500 truncate">
-                  ≈ {settings.currency.symbol}{creditsToEUR(stats.totalDeposited).toFixed(2)}
+                  ≈ {settings.currency.symbol}{creditsToEUR(displayStats.totalDeposited).toFixed(2)}
                 </p>
               )}
             </div>
@@ -211,13 +237,13 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
               <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">Withdrawn</p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                 <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {stats.totalWithdrawn.toFixed(settings.credits.decimals)}
+                  {displayStats.totalWithdrawn.toFixed(settings.credits.decimals)}
                 </p>
                 <span className="text-sm sm:text-lg text-yellow-500">{settings.credits.symbol}</span>
               </div>
               {settings.credits.showEUREquivalent && (
                 <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-gray-500 truncate">
-                  ≈ {settings.currency.symbol}{creditsToEUR(stats.totalWithdrawn).toFixed(2)}
+                  ≈ {settings.currency.symbol}{creditsToEUR(displayStats.totalWithdrawn).toFixed(2)}
                 </p>
               )}
             </div>
@@ -234,13 +260,13 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
               <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">Spent</p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                 <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {stats.totalSpentOnCompetitions.toFixed(settings.credits.decimals)}
+                  {displayStats.totalSpentOnCompetitions.toFixed(settings.credits.decimals)}
                 </p>
                 <span className="text-sm sm:text-lg text-yellow-500">{settings.credits.symbol}</span>
               </div>
               {settings.credits.showEUREquivalent && (
                 <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-gray-500 truncate">
-                  ≈ {settings.currency.symbol}{creditsToEUR(stats.totalSpentOnCompetitions).toFixed(2)}
+                  ≈ {settings.currency.symbol}{creditsToEUR(displayStats.totalSpentOnCompetitions).toFixed(2)}
                 </p>
               )}
             </div>
@@ -257,18 +283,18 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
               <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">Winnings</p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                 <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {stats.totalWonFromCompetitions.toFixed(settings.credits.decimals)}
+                  {displayStats.totalWonFromCompetitions.toFixed(settings.credits.decimals)}
                 </p>
                 <span className="text-sm sm:text-lg text-yellow-500">{settings.credits.symbol}</span>
               </div>
-              {stats.roi !== 0 && (
+              {!isDateFiltered && stats.roi !== 0 && (
                 <p className={`mt-0.5 sm:mt-1 text-[10px] sm:text-xs font-medium ${stats.roi > 0 ? 'text-green-500' : 'text-red-500'}`}>
                   ROI: {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
                 </p>
               )}
             </div>
-            <div className={`rounded-full ${stats.netProfitFromCompetitions >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} p-2 sm:p-3 flex-shrink-0`}>
-              {stats.netProfitFromCompetitions >= 0 ? (
+            <div className={`rounded-full ${displayStats.totalWonFromCompetitions - displayStats.totalSpentOnCompetitions >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} p-2 sm:p-3 flex-shrink-0`}>
+              {displayStats.totalWonFromCompetitions - displayStats.totalSpentOnCompetitions >= 0 ? (
                 <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
               ) : (
                 <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
@@ -285,7 +311,7 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
                 <p className="text-[10px] sm:text-xs font-medium text-amber-400/80 uppercase tracking-wider truncate">Referral Earnings</p>
                 <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-amber-400 tabular-nums">
-                    {(stats.totalGMEarnings ?? 0).toFixed(settings.credits.decimals)}
+                    {displayStats.totalGMEarnings.toFixed(settings.credits.decimals)}
                   </p>
                   <span className="text-sm sm:text-lg text-amber-500">{settings.credits.symbol}</span>
                 </div>
@@ -311,7 +337,7 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
           <h2 className="text-lg sm:text-xl font-semibold text-gray-100">Transaction History</h2>
         </div>
 
-        <TransactionHistory transactions={transactions} />
+        <TransactionHistory transactions={transactions} onFilteredStatsChange={handleFilteredStatsChange} />
       </div>
     </div>
   );

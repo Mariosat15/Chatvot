@@ -9,6 +9,7 @@ import GameMasterEarning from '@/database/models/gamemaster/gamemaster-earning.m
 /**
  * GET /api/gamemaster/earnings
  * Get detailed earnings history for a Game Master
+ * Supports date filtering with startDate/endDate or days (preset periods)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -24,6 +25,9 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const sourceType = searchParams.get('sourceType'); // 'competition' or 'challenge'
+    const days = searchParams.get('days'); // Preset: 30, 60, 90, 120
+    const startDate = searchParams.get('startDate'); // Custom date range
+    const endDate = searchParams.get('endDate');
 
     // Check if user is a Game Master
     const subscription = await GameMasterSubscription.findOne({ userId });
@@ -38,6 +42,29 @@ export async function GET(request: NextRequest) {
       query.sourceType = sourceType;
     }
 
+    // Apply date filtering
+    if (days) {
+      const daysNum = parseInt(days);
+      if (!isNaN(daysNum) && daysNum > 0) {
+        const dateFrom = new Date();
+        dateFrom.setDate(dateFrom.getDate() - daysNum);
+        dateFrom.setHours(0, 0, 0, 0);
+        query.createdAt = { $gte: dateFrom };
+      }
+    } else if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        query.createdAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
+
     // Get total count
     const total = await GameMasterEarning.countDocuments(query);
 
@@ -48,10 +75,10 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .lean();
 
-    // Calculate totals
-    const allEarnings = await GameMasterEarning.find({ gameMasterId: userId }).lean();
+    // Calculate totals for the filtered period (not just paginated results)
+    const allFilteredEarnings = await GameMasterEarning.find(query).lean();
     
-    const totals = allEarnings.reduce((acc, e) => {
+    const totals = allFilteredEarnings.reduce((acc, e) => {
       acc.totalEarnings += e.netEarning || 0;
       if (e.status === 'paid') acc.paidEarnings += e.netEarning || 0;
       if (e.status === 'pending') acc.pendingEarnings += e.netEarning || 0;

@@ -1,9 +1,10 @@
 'use client';
 
-import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Zap, FileText, Swords, Gift, Filter, Crown } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
+import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Zap, FileText, Swords, Gift, Filter, Crown, Calendar, ChevronDown, X } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface Transaction {
   _id: string;
@@ -21,9 +22,19 @@ interface Transaction {
 
 interface TransactionHistoryProps {
   transactions: Transaction[];
+  onFilteredStatsChange?: (stats: FilteredStats) => void;
+}
+
+export interface FilteredStats {
+  totalDeposited: number;
+  totalWithdrawn: number;
+  totalSpent: number;
+  totalWinnings: number;
+  totalGMEarnings: number;
 }
 
 type FilterType = 'all' | 'deposits' | 'withdrawals' | 'competitions' | 'challenges' | 'referrals';
+type DatePreset = 'all' | '30' | '60' | '90' | '120' | 'custom';
 
 const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -34,15 +45,62 @@ const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
   { value: 'referrals', label: 'Referrals' },
 ];
 
-export default function TransactionHistory({ transactions }: TransactionHistoryProps) {
+const DATE_PRESETS: { value: DatePreset; label: string }[] = [
+  { value: 'all', label: 'All Time' },
+  { value: '30', label: 'Last 30 Days' },
+  { value: '60', label: 'Last 60 Days' },
+  { value: '90', label: 'Last 90 Days' },
+  { value: '120', label: 'Last 120 Days' },
+  { value: 'custom', label: 'Custom Range' },
+];
+
+export default function TransactionHistory({ transactions, onFilteredStatsChange }: TransactionHistoryProps) {
   const { settings } = useAppSettings();
   const [filter, setFilter] = useState<FilterType>('all');
+  
+  // Date filter state
+  const [datePreset, setDatePreset] = useState<DatePreset>('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+
+  // Filter transactions by date
+  const dateFilteredTransactions = useMemo(() => {
+    if (datePreset === 'all') return transactions;
+    
+    const now = new Date();
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+
+    if (datePreset !== 'custom') {
+      const days = parseInt(datePreset);
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - days);
+      startDate.setHours(0, 0, 0, 0);
+    } else {
+      if (customStartDate) {
+        startDate = new Date(customStartDate);
+        startDate.setHours(0, 0, 0, 0);
+      }
+      if (customEndDate) {
+        endDate = new Date(customEndDate);
+        endDate.setHours(23, 59, 59, 999);
+      }
+    }
+
+    return transactions.filter(tx => {
+      const txDate = new Date(tx.createdAt);
+      if (startDate && txDate < startDate) return false;
+      if (endDate && txDate > endDate) return false;
+      return true;
+    });
+  }, [transactions, datePreset, customStartDate, customEndDate]);
 
   // Filter transactions based on selected type
   const filteredTransactions = useMemo(() => {
-    if (filter === 'all') return transactions;
+    if (filter === 'all') return dateFilteredTransactions;
     
-    return transactions.filter(tx => {
+    return dateFilteredTransactions.filter(tx => {
       switch (filter) {
         case 'deposits':
           return tx.transactionType === 'deposit';
@@ -58,7 +116,46 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
           return true;
       }
     });
-  }, [transactions, filter]);
+  }, [dateFilteredTransactions, filter]);
+
+  // Calculate filtered stats and notify parent
+  useEffect(() => {
+    if (!onFilteredStatsChange) return;
+
+    const stats = dateFilteredTransactions.reduce((acc, tx) => {
+      if (tx.status !== 'completed') return acc;
+      
+      switch (tx.transactionType) {
+        case 'deposit':
+          acc.totalDeposited += tx.amount;
+          break;
+        case 'withdrawal':
+          acc.totalWithdrawn += Math.abs(tx.amount);
+          break;
+        case 'competition_entry':
+        case 'challenge_entry':
+          acc.totalSpent += Math.abs(tx.amount);
+          break;
+        case 'competition_win':
+        case 'challenge_win':
+          acc.totalWinnings += tx.amount;
+          break;
+        case 'gamemaster_earning':
+        case 'gamemaster_challenge_referral':
+          acc.totalGMEarnings += tx.amount;
+          break;
+      }
+      return acc;
+    }, {
+      totalDeposited: 0,
+      totalWithdrawn: 0,
+      totalSpent: 0,
+      totalWinnings: 0,
+      totalGMEarnings: 0,
+    });
+
+    onFilteredStatsChange(stats);
+  }, [dateFilteredTransactions, onFilteredStatsChange]);
 
   // Check if there are any referral transactions
   const hasReferralTransactions = useMemo(() => 
@@ -71,6 +168,33 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
     hasReferralTransactions ? FILTER_OPTIONS : FILTER_OPTIONS.filter(f => f.value !== 'referrals'),
     [hasReferralTransactions]
   );
+
+  const handleDatePresetChange = (preset: DatePreset) => {
+    setDatePreset(preset);
+    if (preset !== 'custom') {
+      setShowDateDropdown(false);
+    }
+  };
+
+  const handleCustomDateApply = () => {
+    setShowDateDropdown(false);
+  };
+
+  const clearDateFilter = () => {
+    setDatePreset('all');
+    setCustomStartDate('');
+    setCustomEndDate('');
+  };
+
+  const getDateFilterLabel = () => {
+    if (datePreset === 'all') return 'All Time';
+    if (datePreset === 'custom' && (customStartDate || customEndDate)) {
+      const start = customStartDate ? new Date(customStartDate).toLocaleDateString() : 'Start';
+      const end = customEndDate ? new Date(customEndDate).toLocaleDateString() : 'Now';
+      return `${start} - ${end}`;
+    }
+    return DATE_PRESETS.find(p => p.value === datePreset)?.label || 'All Time';
+  };
 
   if (transactions.length === 0) {
     return (
@@ -88,30 +212,104 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
 
   return (
     <div className="space-y-4">
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
-        <div className="flex gap-1.5">
-          {availableFilters.map((option) => (
-            <button
-              key={option.value}
-              onClick={() => setFilter(option.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
-                filter === option.value
-                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+      {/* Filters Row */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        {/* Type Filter Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0">
+          <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <div className="flex gap-1.5">
+            {availableFilters.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setFilter(option.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+                  filter === option.value
+                    ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Date Filter */}
+        <div className="relative flex-shrink-0">
+          <button
+            onClick={() => setShowDateDropdown(!showDateDropdown)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors border border-gray-700"
+          >
+            <Calendar className="h-4 w-4" />
+            <span className="hidden sm:inline">{getDateFilterLabel()}</span>
+            <span className="sm:hidden">{datePreset === 'all' ? 'All' : datePreset === 'custom' ? 'Custom' : `${datePreset}d`}</span>
+            <ChevronDown className={cn("h-4 w-4 transition-transform", showDateDropdown && "rotate-180")} />
+            {datePreset !== 'all' && (
+              <button
+                onClick={(e) => { e.stopPropagation(); clearDateFilter(); }}
+                className="ml-1 p-0.5 rounded hover:bg-gray-600"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </button>
+
+          {showDateDropdown && (
+            <div className="absolute right-0 top-full mt-2 w-64 bg-gray-800 rounded-xl border border-gray-700 shadow-xl z-50">
+              <div className="p-2">
+                {DATE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.value}
+                    onClick={() => handleDatePresetChange(preset.value)}
+                    className={cn(
+                      'w-full px-3 py-2 rounded-lg text-sm text-left transition-colors',
+                      datePreset === preset.value
+                        ? 'bg-yellow-500/20 text-yellow-400'
+                        : 'text-gray-300 hover:bg-gray-700'
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              {datePreset === 'custom' && (
+                <div className="border-t border-gray-700 p-4 space-y-3">
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Start Date</label>
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm text-white focus:outline-none focus:border-yellow-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">End Date</label>
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm text-white focus:outline-none focus:border-yellow-500"
+                    />
+                  </div>
+                  <button
+                    onClick={handleCustomDateApply}
+                    className="w-full py-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Apply
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Transaction List */}
       {filteredTransactions.length === 0 ? (
         <div className="py-8 text-center">
-          <p className="text-sm text-gray-500">No {filter} transactions found</p>
+          <p className="text-sm text-gray-500">No {filter === 'all' ? '' : filter} transactions found{datePreset !== 'all' ? ' for selected period' : ''}</p>
         </div>
       ) : (
         <div className="space-y-3">

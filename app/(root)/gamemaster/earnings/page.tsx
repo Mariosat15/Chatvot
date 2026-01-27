@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   Crown, 
@@ -14,6 +14,8 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -54,17 +56,30 @@ interface EarningsData {
   };
 }
 
+type DatePreset = 'all' | '30' | '60' | '90' | '120' | 'custom';
+
+const DATE_PRESETS: { value: DatePreset; label: string }[] = [
+  { value: 'all', label: 'All Time' },
+  { value: '30', label: 'Last 30 Days' },
+  { value: '60', label: 'Last 60 Days' },
+  { value: '90', label: 'Last 90 Days' },
+  { value: '120', label: 'Last 120 Days' },
+  { value: 'custom', label: 'Custom Range' },
+];
+
 export default function GMEarningsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<EarningsData | null>(null);
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<'all' | 'competition' | 'challenge'>('all');
+  
+  // Date filter state
+  const [datePreset, setDatePreset] = useState<DatePreset>('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
 
-  useEffect(() => {
-    fetchEarnings();
-  }, [page, filter]);
-
-  const fetchEarnings = async () => {
+  const fetchEarnings = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -73,6 +88,14 @@ export default function GMEarningsPage() {
       });
       if (filter !== 'all') {
         params.set('sourceType', filter);
+      }
+      
+      // Add date filter params
+      if (datePreset !== 'all' && datePreset !== 'custom') {
+        params.set('days', datePreset);
+      } else if (datePreset === 'custom') {
+        if (customStartDate) params.set('startDate', customStartDate);
+        if (customEndDate) params.set('endDate', customEndDate);
       }
       
       const response = await fetch(`/api/gamemaster/earnings?${params}`);
@@ -89,6 +112,41 @@ export default function GMEarningsPage() {
     } finally {
       setLoading(false);
     }
+  }, [page, filter, datePreset, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    fetchEarnings();
+  }, [fetchEarnings]);
+
+  const handleDatePresetChange = (preset: DatePreset) => {
+    setDatePreset(preset);
+    setPage(1);
+    if (preset !== 'custom') {
+      setShowDateDropdown(false);
+    }
+  };
+
+  const handleCustomDateApply = () => {
+    setPage(1);
+    setShowDateDropdown(false);
+    fetchEarnings();
+  };
+
+  const clearDateFilter = () => {
+    setDatePreset('all');
+    setCustomStartDate('');
+    setCustomEndDate('');
+    setPage(1);
+  };
+
+  const getDateFilterLabel = () => {
+    if (datePreset === 'all') return 'All Time';
+    if (datePreset === 'custom' && (customStartDate || customEndDate)) {
+      const start = customStartDate ? new Date(customStartDate).toLocaleDateString() : 'Start';
+      const end = customEndDate ? new Date(customEndDate).toLocaleDateString() : 'Now';
+      return `${start} - ${end}`;
+    }
+    return DATE_PRESETS.find(p => p.value === datePreset)?.label || 'All Time';
   };
 
   return (
@@ -149,8 +207,9 @@ export default function GMEarningsPage() {
           </div>
         )}
 
-        {/* Filter */}
-        <div className="flex items-center justify-between mb-6">
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          {/* Type Filter */}
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-gray-400" />
             <span className="text-sm text-gray-400">Filter:</span>
@@ -174,6 +233,76 @@ export default function GMEarningsPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Date Filter */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDateDropdown(!showDateDropdown)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors border border-gray-700"
+            >
+              <Calendar className="h-4 w-4" />
+              <span>{getDateFilterLabel()}</span>
+              <ChevronDown className={cn("h-4 w-4 transition-transform", showDateDropdown && "rotate-180")} />
+              {datePreset !== 'all' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); clearDateFilter(); }}
+                  className="ml-1 p-0.5 rounded hover:bg-gray-600"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </button>
+
+            {showDateDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-72 bg-gray-800 rounded-xl border border-gray-700 shadow-xl z-50">
+                <div className="p-2">
+                  {DATE_PRESETS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      onClick={() => handleDatePresetChange(preset.value)}
+                      className={cn(
+                        'w-full px-3 py-2 rounded-lg text-sm text-left transition-colors',
+                        datePreset === preset.value
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'text-gray-300 hover:bg-gray-700'
+                      )}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {datePreset === 'custom' && (
+                  <div className="border-t border-gray-700 p-4 space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Start Date</label>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">End Date</label>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <button
+                      onClick={handleCustomDateApply}
+                      className="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
