@@ -33,8 +33,8 @@ export async function GET(
       return NextResponse.json({ error: 'Game master not found' }, { status: 404 });
     }
 
-    // Get referred users
-    const referredUsers = await db.collection('user').find({
+    // Get referred users from user collection (via referredByGameMasterId field)
+    const referredUsersFromUserCollection = await db.collection('user').find({
       referredByGameMasterId: subscription.userId,
     }).project({
       _id: 1,
@@ -44,6 +44,32 @@ export async function GET(
       createdAt: 1,
       referredAt: 1,
     }).sort({ referredAt: -1 }).limit(50).toArray();
+
+    // ALSO get referrals from userreferrals collection (source of truth)
+    const referralsFromCollection = await db.collection('userreferrals').find({
+      gameMasterId: subscription.userId,
+    }).sort({ referredAt: -1 }).limit(50).toArray();
+
+    // Diagnostic: Check data consistency
+    const referralDiagnostics = {
+      counterValue: subscription.totalReferredUsers || 0,
+      usersWithReferredByField: referredUsersFromUserCollection.length,
+      userReferralRecords: referralsFromCollection.length,
+      isConsistent: (subscription.totalReferredUsers || 0) === referredUsersFromUserCollection.length 
+                    && referredUsersFromUserCollection.length === referralsFromCollection.length,
+    };
+
+    // Use referrals from collection if user collection is empty but referrals exist
+    const referredUsers = referredUsersFromUserCollection.length > 0 
+      ? referredUsersFromUserCollection 
+      : referralsFromCollection.map(r => ({
+          _id: r.userId,
+          id: r.userId,
+          name: r.userName || 'Unknown',
+          email: r.userEmail,
+          createdAt: r.createdAt,
+          referredAt: r.referredAt,
+        }));
 
     // Get competitions created
     const competitions = await db.collection('competitions').find({
@@ -123,6 +149,8 @@ export async function GET(
         createdAt: u.createdAt,
         referredAt: u.referredAt,
       })),
+      // Diagnostic info to help debug referral data inconsistencies
+      referralDiagnostics,
       competitions: competitions.map(c => ({
         id: c._id.toString(),
         name: c.name,
