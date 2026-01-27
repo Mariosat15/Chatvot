@@ -1433,7 +1433,8 @@ async function createGmReferralData(
   }
 
   const now = new Date();
-  const usersCollection = db.collection('users');
+  // IMPORTANT: Use 'user' collection (singular) to match production code queries
+  const usersCollection = db.collection('user');
   const walletsCollection = db.collection('creditwallets');
   const subscriptionsCollection = db.collection('gamemastersubscriptions');
   const packagesCollection = db.collection('marketplaceitems');
@@ -1456,8 +1457,10 @@ async function createGmReferralData(
     testDataIds.push(`gmpackage:${packageId}`);
 
     // Create GM user
+    // IMPORTANT: Include 'id' field to match Clerk's schema (production queries use 'id', not '_id')
     await usersCollection.insertOne({
       _id: gmUserId,
+      id: gmUserId.toString(), // Clerk-style ID field for production compatibility
       email: `${testRunId}_gm_${gm.gmId}@test.com`,
       username: `${testRunId}_GM_${gm.gmId}`,
       name: `Test GM ${gm.gmId}`,
@@ -1582,10 +1585,16 @@ async function createGmReferralData(
 
       // Also update the participant's user document with referredByGameMasterId
       // Create a user document for the participant if not exists
-      const existingUser = await usersCollection.findOne({ _id: participantUserId });
+      // IMPORTANT: Query by both _id and id for compatibility
+      const participantIdStr = participantUserId.toString();
+      const existingUser = await usersCollection.findOne({ 
+        $or: [{ _id: participantUserId }, { id: participantIdStr }]
+      });
       if (!existingUser) {
+        // IMPORTANT: Include 'id' field to match Clerk's schema (production queries use 'id', not '_id')
         await usersCollection.insertOne({
           _id: participantUserId,
+          id: participantIdStr, // Clerk-style ID field for production compatibility
           email: `${testRunId}_participant_${i}@test.com`,
           username: `${testRunId}_User${i + 1}`,
           name: `Test User ${i + 1}`,
@@ -1600,9 +1609,10 @@ async function createGmReferralData(
         testDataIds.push(`user:${participantUserId}`);
       } else {
         await usersCollection.updateOne(
-          { _id: participantUserId },
+          { $or: [{ _id: participantUserId }, { id: participantIdStr }] },
           { 
             $set: { 
+              id: participantIdStr, // Ensure id field exists
               referredByGameMasterId: gmUserId.toString(),
               referredByReferralCode: gmReferralCode,
             } 

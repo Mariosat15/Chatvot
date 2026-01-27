@@ -91,13 +91,23 @@ export async function POST(request: NextRequest) {
       console.log(`   Found ${testReferrals.length} test user referrals`);
       
       // Get test user IDs directly (test GM users and participants)
-      const testUsers = await db.collection('users').find({
+      // Check both 'user' (production) and 'users' (legacy) collections
+      const testUsersFromUser = await db.collection('user').find({
         testRunId: testPattern
       }).toArray();
-      testUsers.forEach(u => {
+      testUsersFromUser.forEach(u => {
+        testUserIds.push(u._id.toString());
+        if (u.id) testUserIds.push(u.id); // Also track Clerk-style ID
+      });
+      console.log(`   Found ${testUsersFromUser.length} test users from 'user' collection`);
+      
+      const testUsersFromUsers = await db.collection('users').find({
+        testRunId: testPattern
+      }).toArray();
+      testUsersFromUsers.forEach(u => {
         testUserIds.push(u._id.toString());
       });
-      console.log(`   Found ${testUsers.length} test users`);
+      console.log(`   Found ${testUsersFromUsers.length} test users from 'users' collection (legacy)`);
       
       // Get test competition IDs directly - search by name containing TEST
       const testCompetitions = await db.collection('competitions').find({
@@ -147,13 +157,14 @@ export async function POST(request: NextRequest) {
         if (collection && id) {
           try {
             // Map short names to collection names
+            // Note: 'user' maps to 'user' (singular) to match production
             const collectionName = collection === 'competition' ? 'competitions' :
                                    collection === 'challenge' ? 'challenges' :
                                    collection === 'participant' ? 'competitionparticipants' :
                                    collection === 'challengeparticipant' ? 'challengeparticipants' :
                                    collection === 'wallet' ? 'creditwallets' :
                                    collection === 'position' ? 'tradingpositions' :
-                                   collection === 'user' ? 'users' :
+                                   collection === 'user' ? 'user' : // Changed to 'user' (singular)
                                    collection === 'gmsubscription' ? 'gamemastersubscriptions' :
                                    collection === 'gmpackage' ? 'marketplaceitems' :
                                    collection === 'referral' ? 'userreferrals' :
@@ -187,7 +198,8 @@ export async function POST(request: NextRequest) {
       'gamemastersubscriptions',
       'gamemasterearnings',
       'userreferrals',
-      'users', // Test users (GMs and participants)
+      'user', // Test users - production collection (singular)
+      'users', // Test users - legacy collection (plural, for backward compatibility)
     ];
     
     // Use string-based regex patterns for delete operations
