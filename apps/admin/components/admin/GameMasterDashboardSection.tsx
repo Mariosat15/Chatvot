@@ -274,7 +274,7 @@ export default function GameMasterDashboardSection() {
               <DollarSign className="h-5 w-5 text-green-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{stats.totalEarnings.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-white">{(stats.totalEarnings ?? 0).toFixed(2)}</p>
               <p className="text-sm text-gray-400">Total Earnings</p>
             </div>
           </div>
@@ -286,7 +286,7 @@ export default function GameMasterDashboardSection() {
               <Clock className="h-5 w-5 text-yellow-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{stats.pendingEarnings.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-white">{(stats.pendingEarnings ?? 0).toFixed(2)}</p>
               <p className="text-sm text-gray-400">Pending Payout</p>
             </div>
           </div>
@@ -394,7 +394,7 @@ export default function GameMasterDashboardSection() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-green-400 font-medium">+{earning.netEarning.toFixed(2)}</p>
+                    <p className="text-green-400 font-medium">+{(earning.netEarning ?? 0).toFixed(2)}</p>
                     <p className={`text-sm ${earning.status === 'paid' ? 'text-green-400' : 'text-yellow-400'}`}>
                       {earning.status}
                     </p>

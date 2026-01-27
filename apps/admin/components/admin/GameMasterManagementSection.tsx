@@ -421,7 +421,7 @@ export default function GameMasterManagementSection({ initialGmId }: GameMasterM
               </div>
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                 <p className="text-gray-400 text-sm">Total Earnings</p>
-                <p className="text-2xl font-bold text-green-400">{gm.totalEarnings.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-green-400">{(gm.totalEarnings ?? 0).toFixed(2)}</p>
               </div>
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                 <p className="text-gray-400 text-sm">Competitions Created</p>
@@ -545,8 +545,8 @@ export default function GameMasterManagementSection({ initialGmId }: GameMasterM
                     <tr key={e.id} className="border-b border-gray-700/50">
                       <td className="py-2 text-white">{e.sourceName}</td>
                       <td className="py-2 text-gray-300">{e.referredUserName}</td>
-                      <td className="py-2 text-gray-300">{e.entryFeeAmount}</td>
-                      <td className="py-2 text-green-400">+{e.netEarning.toFixed(2)}</td>
+                      <td className="py-2 text-gray-300">{e.entryFeeAmount ?? 0}</td>
+                      <td className="py-2 text-green-400">+{(e.netEarning ?? 0).toFixed(2)}</td>
                       <td className="py-2">
                         <span className={`px-2 py-1 rounded text-xs ${
                           e.status === 'paid' ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'
@@ -777,7 +777,7 @@ export default function GameMasterManagementSection({ initialGmId }: GameMasterM
               <DollarSign className="h-4 w-4" />
               <span className="text-sm">Total Earnings</span>
             </div>
-            <p className="text-2xl font-bold text-white">{stats.totalEarnings.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-white">{(stats.totalEarnings ?? 0).toFixed(2)}</p>
           </div>
         </div>
       )}
@@ -874,8 +874,8 @@ export default function GameMasterManagementSection({ initialGmId }: GameMasterM
                   <td className="px-4 py-3">
                     <span className="font-mono text-amber-400">{gm.referralCode}</span>
                   </td>
-                  <td className="px-4 py-3 text-gray-300">{gm.totalReferredUsers}</td>
-                  <td className="px-4 py-3 text-green-400">{gm.totalEarnings.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-gray-300">{gm.totalReferredUsers ?? 0}</td>
+                  <td className="px-4 py-3 text-green-400">{(gm.totalEarnings ?? 0).toFixed(2)}</td>
                   <td className="px-4 py-3">
                     {(() => {
                       const daysLeft = Math.max(0, Math.ceil((new Date(gm.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));

@@ -122,29 +122,29 @@ export default function GMEarningsPage() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1">Total Earned</div>
-              <div className="text-2xl font-bold text-emerald-400">⚡ {data.totals.totalEarnings.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-emerald-400">⚡ {(data.totals?.totalEarnings ?? 0).toLocaleString()}</div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1">Paid Out</div>
-              <div className="text-2xl font-bold text-white">⚡ {data.totals.paidEarnings.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-white">⚡ {(data.totals?.paidEarnings ?? 0).toLocaleString()}</div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1">Pending</div>
-              <div className="text-2xl font-bold text-yellow-400">⚡ {data.totals.pendingEarnings.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-yellow-400">⚡ {(data.totals?.pendingEarnings ?? 0).toLocaleString()}</div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1 flex items-center gap-1">
                 <Trophy className="h-3 w-3 text-yellow-400" />
                 From Competitions
               </div>
-              <div className="text-xl font-bold text-white">⚡ {data.totals.fromCompetitions.toLocaleString()}</div>
+              <div className="text-xl font-bold text-white">⚡ {(data.totals?.fromCompetitions ?? 0).toLocaleString()}</div>
             </div>
             <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
               <div className="text-sm text-gray-400 mb-1 flex items-center gap-1">
                 <Swords className="h-3 w-3 text-red-400" />
                 From Challenges
               </div>
-              <div className="text-xl font-bold text-white">⚡ {data.totals.fromChallenges.toLocaleString()}</div>
+              <div className="text-xl font-bold text-white">⚡ {(data.totals?.fromChallenges ?? 0).toLocaleString()}</div>
             </div>
           </div>
         )}
@@ -235,7 +235,7 @@ export default function GMEarningsPage() {
                           {earning.earningPercentage}%
                         </td>
                         <td className="px-6 py-4 text-emerald-400 font-semibold">
-                          ⚡ {earning.netEarning.toLocaleString()}
+                          ⚡ {(earning.netEarning ?? 0).toLocaleString()}
                         </td>
                         <td className="px-6 py-4">
                           <span className={cn(
