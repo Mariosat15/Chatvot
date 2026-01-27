@@ -245,7 +245,7 @@ export const placeOrder = async (params: {
     // 🚨 Check if competition is PAUSED (risk mitigation)
     if (contestType === 'competition' && contest.isPaused) {
       const pauseReason = contest.pauseReason || 'Technical issues';
-      throw new Error(`⏸️ Competition is PAUSED: ${pauseReason}\n\nTrading is temporarily suspended. Please wait for the competition to resume.`);
+      throw new Error(`Competition is paused (${pauseReason}). Trading is temporarily suspended. Please wait for the competition to resume.`);
     }
 
     // Check participant status with specific error messages

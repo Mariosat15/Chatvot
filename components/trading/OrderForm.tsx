@@ -358,6 +358,14 @@ const OrderForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Check if trading is disabled first
+    if (disabled) {
+      toast.error('Trading Disabled', {
+        description: disabledReason || 'Trading is currently disabled for this competition.',
+      });
+      return;
+    }
+
     if (!canPlaceOrder) {
       let errorMessage = 'Insufficient capital';
       

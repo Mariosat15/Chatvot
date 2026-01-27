@@ -27,6 +27,7 @@ interface GameModeOrderFormProps {
   openPositionsCount?: number;
   maxPositions?: number;
   disabled?: boolean;
+  disabledReason?: string;
   marginThresholds?: MarginThresholds;
 }
 
@@ -48,6 +49,7 @@ export default function GameModeOrderForm({
   openPositionsCount = 0,
   maxPositions = 10,
   disabled = false,
+  disabledReason,
   marginThresholds: propMarginThresholds,
 }: GameModeOrderFormProps) {
   const { symbol } = useChartSymbol();
@@ -138,7 +140,8 @@ export default function GameModeOrderForm({
       let errorTitle = '⚠️ Trade Blocked';
       
       if (disabled) {
-        errorMessage = 'Trading is disabled for your account.';
+        errorMessage = disabledReason || 'Trading is disabled for this competition.';
+        errorTitle = '⏸️ Trading Disabled';
       } else if (atMaxPositions) {
         errorMessage = `Maximum ${maxPositions} positions reached. Close some positions first.`;
         errorTitle = '🚫 Max Positions';
@@ -505,8 +508,8 @@ export default function GameModeOrderForm({
       
       {/* Disabled Message */}
       {disabled && (
-        <div className="p-3 bg-red-500/20 border-t border-red-500/30 text-center">
-          <span className="text-red-400 text-sm">⚔️ Trading is disabled</span>
+        <div className="p-3 bg-yellow-500/20 border-t border-yellow-500/30 text-center">
+          <span className="text-yellow-400 text-sm">{disabledReason || '⚔️ Trading is disabled'}</span>
         </div>
       )}
       

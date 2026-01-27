@@ -58,6 +58,8 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
   // Check if competition is active OR if user is viewing results of completed competition
   const isCompleted = competition.status === 'completed';
   const isCancelled = competition.status === 'cancelled';
+  const isPaused = competition.isPaused === true;
+  const pauseReason = competition.pauseReason || 'Technical issues';
   
   // Redirect if competition is cancelled
   if (isCancelled) {
@@ -179,6 +181,31 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
           marginThresholds={marginThresholds}
         >
         <div className="min-h-screen bg-gradient-to-br from-dark-100 via-dark-100 to-dark-200">
+        {/* Competition Paused Banner */}
+        {isPaused && !isViewOnly && (
+          <div className="bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-yellow-500/20 border-b border-yellow-500/40">
+            <div className="container-custom py-4">
+              <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center gap-2 text-yellow-300">
+                  <span className="text-2xl animate-pulse">⏸️</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                    <span className="font-bold text-lg">Competition Paused</span>
+                    <span className="text-yellow-400/80 text-sm">Trading is temporarily suspended</span>
+                  </div>
+                </div>
+                <div className="hidden md:block mx-4 w-px h-8 bg-yellow-500/30" />
+                <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                  <span className="text-yellow-400 text-sm font-medium">Reason:</span>
+                  <span className="text-yellow-300 text-sm">{pauseReason}</span>
+                </div>
+              </div>
+              <p className="text-center text-yellow-400/70 text-xs mt-2">
+                Please wait for the competition to resume. You will be notified when trading resumes.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* View-Only Banner for Completed Competitions */}
         {isViewOnly && (
           <div className="bg-gradient-to-r from-purple-500/20 via-purple-500/10 to-purple-500/20 border-b border-purple-500/30">
@@ -222,6 +249,11 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-400">
                           <span className="size-1.5 bg-purple-400 rounded-full" />
                           Viewing Results
+                        </span>
+                      ) : isPaused ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-400">
+                          <span className="size-1.5 bg-yellow-400 rounded-full animate-pulse" />
+                          Paused - Trading Suspended
                         </span>
                       ) : isDisqualified ? (
                         <span className={cn(
@@ -568,10 +600,13 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                       existingUsedMargin={participant.usedMargin}
                       currentBalance={participant.currentCapital}
                       marginThresholds={marginThresholds}
-                      disabled={isDisqualified}
-                      disabledReason={participantStatus === 'liquidated' 
-                        ? '💀 Your account was liquidated. You cannot place new trades.'
-                        : '🚫 You are disqualified. You cannot place new trades.'
+                      disabled={isDisqualified || isPaused}
+                      disabledReason={
+                        isPaused 
+                          ? `⏸️ Competition is paused: ${pauseReason}. Please wait for trading to resume.`
+                          : participantStatus === 'liquidated' 
+                            ? '💀 Your account was liquidated. You cannot place new trades.'
+                            : '🚫 You are disqualified. You cannot place new trades.'
                       }
                     />
                   </div>
