@@ -4,6 +4,7 @@ import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 import GameMasterSubscription from '@/database/models/gamemaster/gamemaster-subscription.model';
 import UserReferral from '@/database/models/user-referral.model';
+import mongoose from 'mongoose';
 
 /**
  * GET /api/gamemaster/referrals
@@ -58,31 +59,64 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .lean();
 
-    // Calculate stats from all referrals
-    const allReferrals = await UserReferral.find({ gameMasterId: userId }).lean();
+    // Get MongoDB connection for aggregations
+    const db = mongoose.connection.db;
     
-    const stats = allReferrals.reduce((acc, r) => {
-      acc.totalReferred++;
-      if (r.isActive) acc.activeUsers++;
-      acc.totalEntryFees += r.totalEntryFees || 0;
-      acc.totalEarningsGenerated += r.totalGMEarnings || 0;
-      return acc;
-    }, {
-      totalReferred: 0,
-      activeUsers: 0,
-      totalEntryFees: 0,
-      totalEarningsGenerated: 0,
-      avgEarningsPerUser: 0,
+    // Get earnings data from gamemasterearnings collection (source of truth)
+    let earningsByUser: Map<string, { totalEntryFees: number; totalEarnings: number }> = new Map();
+    let totalEntryFees = 0;
+    let totalEarningsGenerated = 0;
+    
+    if (db) {
+      // Get earnings grouped by referred user
+      const earningsData = await db.collection('gamemasterearnings').aggregate([
+        { $match: { gameMasterId: userId } },
+        { 
+          $group: { 
+            _id: '$referredUserId',
+            totalEntryFees: { $sum: '$entryFeeAmount' },
+            totalEarnings: { $sum: '$netEarning' },
+          } 
+        }
+      ]).toArray();
+      
+      for (const e of earningsData) {
+        earningsByUser.set(e._id, {
+          totalEntryFees: e.totalEntryFees || 0,
+          totalEarnings: e.totalEarnings || 0,
+        });
+        totalEntryFees += e.totalEntryFees || 0;
+        totalEarningsGenerated += e.totalEarnings || 0;
+      }
+    }
+
+    // Enrich referrals with actual earnings data
+    const enrichedReferrals = referrals.map(r => {
+      const earnings = earningsByUser.get(r.userId) || { totalEntryFees: 0, totalEarnings: 0 };
+      return {
+        ...r,
+        totalEntryFees: earnings.totalEntryFees,
+        totalGMEarnings: earnings.totalEarnings,
+      };
     });
+
+    // Count stats from UserReferral
+    const allReferrals = await UserReferral.find({ gameMasterId: userId }).lean();
+    const totalReferred = allReferrals.length;
+    const activeUsers = allReferrals.filter(r => r.isActive).length;
     
-    stats.avgEarningsPerUser = stats.totalReferred > 0 
-      ? stats.totalEarningsGenerated / stats.totalReferred 
-      : 0;
+    const stats = {
+      totalReferred,
+      activeUsers,
+      totalEntryFees,
+      totalEarningsGenerated,
+      avgEarningsPerUser: totalReferred > 0 ? totalEarningsGenerated / totalReferred : 0,
+    };
 
     return NextResponse.json({
       success: true,
       data: {
-        referrals,
+        referrals: enrichedReferrals,
         stats,
         pagination: {
           page,

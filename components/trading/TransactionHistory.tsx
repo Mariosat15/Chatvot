@@ -1,13 +1,13 @@
 'use client';
 
-import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Zap, FileText, Swords, Gift } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { ArrowDownCircle, ArrowUpCircle, Trophy, RefreshCw, ShieldAlert, UserCog, Zap, FileText, Swords, Gift, Filter, Crown } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { Button } from '@/components/ui/button';
 
 interface Transaction {
   _id: string;
-  transactionType: 'deposit' | 'withdrawal' | 'withdrawal_fee' | 'competition_entry' | 'competition_win' | 'competition_refund' | 'platform_fee' | 'admin_adjustment' | 'challenge_entry' | 'challenge_win' | 'challenge_refund' | 'marketplace_purchase' | 'incident_compensation';
+  transactionType: 'deposit' | 'withdrawal' | 'withdrawal_fee' | 'competition_entry' | 'competition_win' | 'competition_refund' | 'platform_fee' | 'admin_adjustment' | 'challenge_entry' | 'challenge_win' | 'challenge_refund' | 'marketplace_purchase' | 'incident_compensation' | 'gamemaster_earning' | 'gamemaster_challenge_referral';
   amount: number;
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
   description: string;
@@ -23,8 +23,54 @@ interface TransactionHistoryProps {
   transactions: Transaction[];
 }
 
+type FilterType = 'all' | 'deposits' | 'withdrawals' | 'competitions' | 'challenges' | 'referrals';
+
+const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'deposits', label: 'Deposits' },
+  { value: 'withdrawals', label: 'Withdrawals' },
+  { value: 'competitions', label: 'Competitions' },
+  { value: 'challenges', label: 'Challenges' },
+  { value: 'referrals', label: 'Referrals' },
+];
+
 export default function TransactionHistory({ transactions }: TransactionHistoryProps) {
   const { settings } = useAppSettings();
+  const [filter, setFilter] = useState<FilterType>('all');
+
+  // Filter transactions based on selected type
+  const filteredTransactions = useMemo(() => {
+    if (filter === 'all') return transactions;
+    
+    return transactions.filter(tx => {
+      switch (filter) {
+        case 'deposits':
+          return tx.transactionType === 'deposit';
+        case 'withdrawals':
+          return tx.transactionType === 'withdrawal' || tx.transactionType === 'withdrawal_fee';
+        case 'competitions':
+          return ['competition_entry', 'competition_win', 'competition_refund'].includes(tx.transactionType);
+        case 'challenges':
+          return ['challenge_entry', 'challenge_win', 'challenge_refund'].includes(tx.transactionType);
+        case 'referrals':
+          return ['gamemaster_earning', 'gamemaster_challenge_referral'].includes(tx.transactionType);
+        default:
+          return true;
+      }
+    });
+  }, [transactions, filter]);
+
+  // Check if there are any referral transactions
+  const hasReferralTransactions = useMemo(() => 
+    transactions.some(tx => ['gamemaster_earning', 'gamemaster_challenge_referral'].includes(tx.transactionType)),
+    [transactions]
+  );
+
+  // Filter out referrals option if no referral transactions
+  const availableFilters = useMemo(() => 
+    hasReferralTransactions ? FILTER_OPTIONS : FILTER_OPTIONS.filter(f => f.value !== 'referrals'),
+    [hasReferralTransactions]
+  );
 
   if (transactions.length === 0) {
     return (
@@ -41,10 +87,39 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
   }
 
   return (
-    <div className="space-y-3">
-      {transactions.map((transaction) => (
-        <TransactionItem key={transaction._id} transaction={transaction} />
-      ))}
+    <div className="space-y-4">
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2">
+        <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
+        <div className="flex gap-1.5">
+          {availableFilters.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => setFilter(option.value)}
+              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+                filter === option.value
+                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Transaction List */}
+      {filteredTransactions.length === 0 ? (
+        <div className="py-8 text-center">
+          <p className="text-sm text-gray-500">No {filter} transactions found</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredTransactions.map((transaction) => (
+            <TransactionItem key={transaction._id} transaction={transaction} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -105,6 +180,10 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
         return <Swords className="h-5 w-5 text-purple-500" />;
       case 'incident_compensation':
         return <Gift className="h-5 w-5 text-green-500" />;
+      // GM Referral earnings
+      case 'gamemaster_earning':
+      case 'gamemaster_challenge_referral':
+        return <Crown className="h-5 w-5 text-amber-400" />;
       default:
         return <ArrowDownCircle className="h-5 w-5 text-gray-500" />;
     }
@@ -138,6 +217,11 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
         return '⚔️ Challenge Refund';
       case 'incident_compensation':
         return '💰 Compensation';
+      // GM Referral earnings
+      case 'gamemaster_earning':
+        return '👑 Referral Earnings';
+      case 'gamemaster_challenge_referral':
+        return '👑 Challenge Referral';
       default:
         return 'Transaction';
     }

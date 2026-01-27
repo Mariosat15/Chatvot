@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Wallet, TrendingUp, TrendingDown, DollarSign, History, ArrowDownCircle, ArrowUpCircle, Zap, CheckCircle2, XCircle } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, DollarSign, History, ArrowDownCircle, ArrowUpCircle, Zap, CheckCircle2, XCircle, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DepositModal from '@/components/trading/DepositModal';
 import WithdrawalModal from '@/components/trading/WithdrawalModal';
@@ -26,6 +26,7 @@ interface WalletContentProps {
     roi: number;
     kycVerified: boolean;
     withdrawalEnabled: boolean;
+    totalGMEarnings?: number;
   };
   transactions: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
@@ -178,8 +179,8 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
         </div>
       </div>
 
-      {/* Stats Grid - Mobile: 2 cols, Desktop: 4 cols */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+      {/* Stats Grid - Mobile: 2 cols, Desktop: 5 cols */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
         {/* Total Bought */}
         <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all">
           <div className="flex items-start justify-between">
@@ -275,6 +276,29 @@ export default function WalletContent({ stats, transactions }: WalletContentProp
             </div>
           </div>
         </div>
+
+        {/* Referral Earnings (only show if user has GM earnings) */}
+        {(stats.totalGMEarnings ?? 0) > 0 && (
+          <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/30 p-3 sm:p-4 md:p-6 hover:bg-amber-500/15 transition-all">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] sm:text-xs font-medium text-amber-400/80 uppercase tracking-wider truncate">Referral Earnings</p>
+                <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-amber-400 tabular-nums">
+                    {(stats.totalGMEarnings ?? 0).toFixed(settings.credits.decimals)}
+                  </p>
+                  <span className="text-sm sm:text-lg text-amber-500">{settings.credits.symbol}</span>
+                </div>
+                <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-amber-500/60 truncate">
+                  From Game Master
+                </p>
+              </div>
+              <div className="rounded-full bg-amber-500/10 p-2 sm:p-3 flex-shrink-0">
+                <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Bank Accounts for Withdrawals - Only show if enabled in admin settings */}

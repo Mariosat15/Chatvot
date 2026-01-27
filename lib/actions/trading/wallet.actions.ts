@@ -773,6 +773,22 @@ export const getWalletStats = async () => {
 
     const wallet = await CreditWallet.findOne({ userId: session.user.id });
     
+    // Get GM referral earnings from gamemasterearnings collection
+    let totalGMEarnings = 0;
+    try {
+      const mongoose = await import('mongoose');
+      const db = mongoose.default.connection.db;
+      if (db) {
+        const gmEarningsResult = await db.collection('gamemasterearnings').aggregate([
+          { $match: { gameMasterId: session.user.id } },
+          { $group: { _id: null, total: { $sum: '$netEarning' } } }
+        ]).toArray();
+        totalGMEarnings = gmEarningsResult[0]?.total || 0;
+      }
+    } catch (gmError) {
+      console.error('Error fetching GM earnings:', gmError);
+    }
+    
     if (!wallet) {
       return {
         currentBalance: 0,
@@ -785,6 +801,7 @@ export const getWalletStats = async () => {
         netProfitFromCompetitions: 0,
         netProfitFromChallenges: 0,
         roi: 0,
+        totalGMEarnings,
       };
     }
 
@@ -808,6 +825,7 @@ export const getWalletStats = async () => {
       roi: roi,
       kycVerified: wallet.kycVerified,
       withdrawalEnabled: wallet.withdrawalEnabled,
+      totalGMEarnings,
     };
   } catch (error) {
     // Re-throw redirect errors so Next.js can handle them
