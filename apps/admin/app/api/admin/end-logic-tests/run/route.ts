@@ -1514,12 +1514,14 @@ async function createGmReferralData(
     });
 
     // Create GM subscription with unique referral code
+    // Note: isPaused must be explicitly false for the production query { isPaused: { $ne: true } }
     await subscriptionsCollection.insertOne({
       _id: subscriptionId,
       userId: gmUserId.toString(),
       packageId: packageId.toString(),
       referralCode: uniqueReferralCode,
       status: gm.status,
+      isPaused: gm.status === 'paused', // Explicitly set isPaused
       subscriptionStart,
       subscriptionEnd,
       limits: {
