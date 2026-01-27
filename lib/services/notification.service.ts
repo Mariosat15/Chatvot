@@ -472,11 +472,11 @@ class NotificationService {
   async notifyPodiumFinish(userId: string, competitionName: string, prize: number, position: number): Promise<any> {
     return this.send({
       userId,
-      templateId: 'podium_finish',
+      templateId: 'competition_podium',
       variables: { 
         competitionName, 
         prize: `€${prize.toFixed(2)}`,
-        position: position.toString(),
+        finalRank: position.toString(),
       },
     });
   }
@@ -487,7 +487,7 @@ class NotificationService {
   async notifyPrizeReceived(userId: string, competitionName: string, prize: number): Promise<any> {
     return this.send({
       userId,
-      templateId: 'prize_received',
+      templateId: 'competition_prize_received',
       variables: { 
         competitionName, 
         prize: `€${prize.toFixed(2)}`,

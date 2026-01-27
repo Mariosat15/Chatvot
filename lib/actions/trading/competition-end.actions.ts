@@ -130,7 +130,10 @@ export async function finalizeCompetition(competitionId: string) {
     try {
       // Dynamic import that prevents static analysis
       const priceHealthModule = await import(/* webpackIgnore: true */ PRICE_HEALTH_SERVICE).catch(() => null);
-      if (!priceHealthModule) throw new Error('Price health service not available');
+      if (!priceHealthModule) {
+        console.log(`ℹ️ [FINALIZATION] Price health service not available in this context - will use live prices`);
+        throw new Error('Price health service not initialized');
+      }
       
       const { priceHealthMonitor } = priceHealthModule;
       const healthCheck = priceHealthMonitor.arePricesSafeForFinalization(uniqueSymbols);

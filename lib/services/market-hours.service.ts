@@ -144,7 +144,11 @@ export async function isMarketOpen(assetClass: AssetClass = 'forex'): Promise<{
     console.log('[Market Hours] Using AUTOMATIC mode (Massive.com API)');
     try {
       const status = await getMarketStatusFromAPI();
-      console.log('[Market Hours] API response:', status);
+      console.log('[Market Hours] API response:', {
+        isOpen: status.isOpen,
+        status: status.status,
+        serverTime: status.serverTime,
+      });
       return {
         isOpen: status.isOpen,
         reason: status.isOpen ? undefined : 'Market is currently closed',
