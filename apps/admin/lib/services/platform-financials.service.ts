@@ -63,11 +63,54 @@ export const PlatformFinancialsService = {
   },
   
   /**
+   * Record retained GM fee (when GM subscription is inactive)
+   * These fees would have gone to the GM but are kept by platform
+   */
+  recordRetainedGmFee: async (params: {
+    sourceType: 'competition' | 'challenge';
+    sourceId: string;
+    sourceName: string;
+    gameMasterId: string;
+    gameMasterEmail?: string;
+    referredUsersCount: number;
+    amount: number; // Amount that would have been paid to GM
+    originalFeePercentage: number;
+    subscriptionStatus: string;
+    referredUserIds?: string[];
+  }): Promise<void> => {
+    await connectToDatabase();
+    
+    const conversionSettings = await CreditConversionSettings.getSingleton();
+    const eurAmount = params.amount / conversionSettings.eurToCreditsRate;
+    
+    await PlatformTransaction.create({
+      transactionType: 'retained_gm_fee',
+      amount: params.amount,
+      amountEUR: eurAmount,
+      sourceType: params.sourceType,
+      sourceId: params.sourceId,
+      sourceName: params.sourceName,
+      retainedGmFeeDetails: {
+        gameMasterId: params.gameMasterId,
+        gameMasterEmail: params.gameMasterEmail,
+        referredUsersCount: params.referredUsersCount,
+        originalFeePercentage: params.originalFeePercentage,
+        subscriptionStatus: params.subscriptionStatus,
+        referredUserIds: params.referredUserIds,
+      },
+      description: `Retained GM fee: ${params.referredUsersCount} referral(s) from inactive GM (${params.subscriptionStatus}) - ${params.sourceName}`,
+    });
+    
+    console.log(`💰 [PLATFORM] Retained GM fee: ${params.amount} credits (€${eurAmount.toFixed(2)}) from inactive GM ${params.gameMasterId}`);
+    console.log(`   ${params.sourceType.charAt(0).toUpperCase() + params.sourceType.slice(1)}: ${params.sourceName}, Referrals: ${params.referredUsersCount}, Status: ${params.subscriptionStatus}`);
+  },
+  
+  /**
    * Record platform fee earnings
    */
   recordPlatformFee: async (params: {
     amount: number;
-    sourceType: 'competition' | 'user_deposit' | 'user_withdrawal';
+    sourceType: 'competition' | 'challenge' | 'user_deposit' | 'user_withdrawal';
     sourceId?: string;
     sourceName?: string;
     description: string;
