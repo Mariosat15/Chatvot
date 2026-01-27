@@ -23,6 +23,8 @@ import {
   ExternalLink,
   User,
   Swords,
+  Link2,
+  Database,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -101,6 +103,22 @@ interface DetailedGameMaster {
   }>;
 }
 
+interface SyncStatus {
+  totalReferrals: number;
+  synced: number;
+  needsSync: number;
+  missingUsers: number;
+  sampleNeedsSync?: Array<{ userId: string; userName: string; gmId: string }>;
+}
+
+interface SyncResult {
+  totalReferrals: number;
+  synced: number;
+  alreadyCorrect: number;
+  errors: number;
+  errorDetails?: string[];
+}
+
 interface GameMasterManagementSectionProps {
   initialGmId?: string;
 }
@@ -120,6 +138,12 @@ export default function GameMasterManagementSection({ initialGmId }: GameMasterM
   const [selectedGM, setSelectedGM] = useState<DetailedGameMaster | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  
+  // Sync referrals state
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [showSyncPanel, setShowSyncPanel] = useState(false);
 
   const fetchGameMasters = useCallback(async () => {
     try {
@@ -215,6 +239,53 @@ export default function GameMasterManagementSection({ initialGmId }: GameMasterM
       case 'suspended': return 'bg-red-900/50 text-red-400';
       case 'cancelled': return 'bg-red-900/50 text-red-400';
       default: return 'bg-gray-700 text-gray-300';
+    }
+  };
+
+  // Check sync status
+  const checkSyncStatus = async () => {
+    setSyncLoading(true);
+    setSyncResult(null);
+    try {
+      const response = await fetch('/api/gamemasters/sync-referrals');
+      if (!response.ok) throw new Error('Failed to check sync status');
+      
+      const data = await response.json();
+      if (data.success) {
+        setSyncStatus(data.data);
+        setShowSyncPanel(true);
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to check sync status');
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  // Perform sync
+  const performSync = async () => {
+    if (!confirm('This will sync all UserReferral records to user documents. Continue?')) return;
+    
+    setSyncLoading(true);
+    try {
+      const response = await fetch('/api/gamemasters/sync-referrals', {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error('Failed to perform sync');
+      
+      const data = await response.json();
+      if (data.success) {
+        setSyncResult(data.data);
+        setSyncStatus(null); // Clear status to show result
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to perform sync');
+    } finally {
+      setSyncLoading(false);
     }
   };
 
@@ -505,15 +576,163 @@ export default function GameMasterManagementSection({ initialGmId }: GameMasterM
           <h2 className="text-2xl font-bold text-white">Game Master Management</h2>
           <p className="text-gray-400">Manage all game master subscriptions</p>
         </div>
-        <button
-          onClick={fetchGameMasters}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={checkSyncStatus}
+            disabled={syncLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
+            title="Check and sync referral data"
+          >
+            <Database className={`h-4 w-4 ${syncLoading ? 'animate-pulse' : ''}`} />
+            Sync Referrals
+          </button>
+          <button
+            onClick={fetchGameMasters}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Sync Referrals Panel */}
+      {showSyncPanel && (
+        <div className="bg-gray-800 rounded-lg border border-amber-700/50 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Link2 className="h-6 w-6 text-amber-400" />
+              <h3 className="text-lg font-semibold text-white">Referral Data Sync</h3>
+            </div>
+            <button
+              onClick={() => {
+                setShowSyncPanel(false);
+                setSyncStatus(null);
+                setSyncResult(null);
+              }}
+              className="text-gray-400 hover:text-white"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+          </div>
+
+          {syncStatus && (
+            <div className="space-y-4">
+              <p className="text-gray-300 text-sm">
+                This tool syncs referral data from the UserReferral collection to user documents,
+                ensuring competition/challenge finalization correctly identifies referred users.
+              </p>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-gray-900/50 rounded p-3">
+                  <p className="text-gray-400 text-xs">Total Referrals</p>
+                  <p className="text-xl font-bold text-white">{syncStatus.totalReferrals}</p>
+                </div>
+                <div className="bg-green-900/30 rounded p-3 border border-green-700/30">
+                  <p className="text-gray-400 text-xs">Already Synced</p>
+                  <p className="text-xl font-bold text-green-400">{syncStatus.synced}</p>
+                </div>
+                <div className={`rounded p-3 ${syncStatus.needsSync > 0 ? 'bg-amber-900/30 border border-amber-700/30' : 'bg-gray-900/50'}`}>
+                  <p className="text-gray-400 text-xs">Needs Sync</p>
+                  <p className={`text-xl font-bold ${syncStatus.needsSync > 0 ? 'text-amber-400' : 'text-gray-400'}`}>
+                    {syncStatus.needsSync}
+                  </p>
+                </div>
+                <div className="bg-gray-900/50 rounded p-3">
+                  <p className="text-gray-400 text-xs">Missing Users</p>
+                  <p className="text-xl font-bold text-gray-400">{syncStatus.missingUsers}</p>
+                </div>
+              </div>
+
+              {syncStatus.sampleNeedsSync && syncStatus.sampleNeedsSync.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-gray-400 text-sm mb-2">Users needing sync:</p>
+                  <div className="bg-gray-900/50 rounded p-3 max-h-32 overflow-y-auto">
+                    {syncStatus.sampleNeedsSync.map((user, i) => (
+                      <div key={i} className="text-sm text-gray-300 py-1 border-b border-gray-700/50 last:border-0">
+                        {user.userName} ({user.userId.slice(0, 8)}...) → GM: {user.gmId.slice(0, 8)}...
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={performSync}
+                  disabled={syncLoading || syncStatus.needsSync === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  {syncStatus.needsSync === 0 ? 'All Synced' : `Sync ${syncStatus.needsSync} Users`}
+                </button>
+                <button
+                  onClick={checkSyncStatus}
+                  disabled={syncLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${syncLoading ? 'animate-spin' : ''}`} />
+                  Refresh Status
+                </button>
+              </div>
+            </div>
+          )}
+
+          {syncResult && (
+            <div className="space-y-4">
+              <div className={`p-4 rounded-lg ${syncResult.errors > 0 ? 'bg-yellow-900/30 border border-yellow-700/50' : 'bg-green-900/30 border border-green-700/50'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {syncResult.errors > 0 ? (
+                    <AlertCircle className="h-5 w-5 text-yellow-400" />
+                  ) : (
+                    <CheckCircle className="h-5 w-5 text-green-400" />
+                  )}
+                  <span className={`font-semibold ${syncResult.errors > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    Sync Complete
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+                  <div>
+                    <p className="text-gray-400 text-xs">Total Processed</p>
+                    <p className="text-lg font-bold text-white">{syncResult.totalReferrals}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-xs">Newly Synced</p>
+                    <p className="text-lg font-bold text-green-400">{syncResult.synced}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-xs">Already Correct</p>
+                    <p className="text-lg font-bold text-gray-300">{syncResult.alreadyCorrect}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-xs">Errors</p>
+                    <p className={`text-lg font-bold ${syncResult.errors > 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                      {syncResult.errors}
+                    </p>
+                  </div>
+                </div>
+                {syncResult.errorDetails && syncResult.errorDetails.length > 0 && (
+                  <div className="mt-3 p-2 bg-red-900/30 rounded text-sm text-red-300">
+                    <p className="font-medium mb-1">Errors:</p>
+                    {syncResult.errorDetails.map((err, i) => (
+                      <p key={i} className="text-xs">{err}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={checkSyncStatus}
+                disabled={syncLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${syncLoading ? 'animate-spin' : ''}`} />
+                Check Status Again
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats Cards */}
       {stats && (
