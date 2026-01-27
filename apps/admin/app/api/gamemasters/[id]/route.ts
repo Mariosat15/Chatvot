@@ -88,6 +88,13 @@ export async function GET(
     const earnings = await db.collection('gamemasterearnings').find({
       gameMasterId: subscription.userId,
     }).sort({ createdAt: -1 }).limit(50).toArray();
+    
+    // Calculate actual pending earnings from gamemasterearnings (source of truth)
+    const pendingEarningsAgg = await db.collection('gamemasterearnings').aggregate([
+      { $match: { gameMasterId: subscription.userId, status: 'pending' } },
+      { $group: { _id: null, total: { $sum: '$netEarning' } } }
+    ]).toArray();
+    const actualPendingEarnings = pendingEarningsAgg[0]?.total || 0;
 
     // Get CURRENT package settings (not cached subscription limits)
     let currentLimits = {
@@ -134,7 +141,8 @@ export async function GET(
         currentPeriodCompetitionsCreated: subscription.currentPeriodCompetitionsCreated,
         totalCompetitionsCreated: subscription.totalCompetitionsCreated,
         totalEarnings: subscription.totalEarnings,
-        pendingEarnings: subscription.pendingEarnings,
+        // Use calculated pending earnings from gamemasterearnings (source of truth)
+        pendingEarnings: actualPendingEarnings,
         totalReferredUsers: subscription.totalReferredUsers,
         activeReferredUsers: subscription.activeReferredUsers,
         renewalHistory: subscription.renewalHistory,

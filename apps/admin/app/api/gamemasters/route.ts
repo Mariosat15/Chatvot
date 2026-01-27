@@ -78,6 +78,14 @@ export async function GET(request: NextRequest) {
     const packageSettingsMap = new Map(
       packages.map(pkg => [pkg._id.toString(), pkg.gameMasterConfig])
     );
+    
+    // Get actual pending earnings from gamemasterearnings (source of truth)
+    const gmUserIds = gamemasters.map(gm => gm.userId);
+    const pendingEarningsAgg = await db.collection('gamemasterearnings').aggregate([
+      { $match: { gameMasterId: { $in: gmUserIds }, status: 'pending' } },
+      { $group: { _id: '$gameMasterId', pendingEarnings: { $sum: '$netEarning' } } }
+    ]).toArray();
+    const actualPendingEarnings = new Map(pendingEarningsAgg.map((e: any) => [e._id, e.pendingEarnings || 0]));
 
     return NextResponse.json({
       gamemasters: gamemasters.map(gm => {
@@ -110,7 +118,8 @@ export async function GET(request: NextRequest) {
           totalReferredUsers: gm.totalReferredUsers,
           activeReferredUsers: gm.activeReferredUsers,
           totalEarnings: gm.totalEarnings,
-          pendingEarnings: gm.pendingEarnings,
+          // Use calculated pending earnings from gamemasterearnings (source of truth)
+          pendingEarnings: actualPendingEarnings.get(gm.userId) || 0,
           totalCompetitionsCreated: gm.totalCompetitionsCreated,
           createdAt: gm.createdAt,
         };
