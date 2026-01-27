@@ -71,6 +71,34 @@ export async function POST(request: NextRequest) {
       });
       console.log(`   Found ${testWallets.length} test wallets`);
       
+      // Get GM user IDs from test subscriptions (for referral fee tests)
+      const testGmSubs = await db.collection('gamemastersubscriptions').find({
+        testRunId: testPattern
+      }).toArray();
+      testGmSubs.forEach(s => {
+        if (s.userId) testUserIds.push(s.userId.toString());
+      });
+      console.log(`   Found ${testGmSubs.length} test GM subscriptions`);
+      
+      // Get user IDs from test referrals (both referred users and GMs)
+      const testReferrals = await db.collection('userreferrals').find({
+        testRunId: testPattern
+      }).toArray();
+      testReferrals.forEach(r => {
+        if (r.userId) testUserIds.push(r.userId.toString());
+        if (r.gameMasterId) testUserIds.push(r.gameMasterId.toString());
+      });
+      console.log(`   Found ${testReferrals.length} test user referrals`);
+      
+      // Get test user IDs directly (test GM users and participants)
+      const testUsers = await db.collection('users').find({
+        testRunId: testPattern
+      }).toArray();
+      testUsers.forEach(u => {
+        testUserIds.push(u._id.toString());
+      });
+      console.log(`   Found ${testUsers.length} test users`);
+      
       // Get test competition IDs directly - search by name containing TEST
       const testCompetitions = await db.collection('competitions').find({
         $or: [
@@ -118,11 +146,18 @@ export async function POST(request: NextRequest) {
         const [collection, id] = idString.split(':');
         if (collection && id) {
           try {
+            // Map short names to collection names
             const collectionName = collection === 'competition' ? 'competitions' :
                                    collection === 'challenge' ? 'challenges' :
                                    collection === 'participant' ? 'competitionparticipants' :
                                    collection === 'challengeparticipant' ? 'challengeparticipants' :
                                    collection === 'wallet' ? 'creditwallets' :
+                                   collection === 'position' ? 'tradingpositions' :
+                                   collection === 'user' ? 'users' :
+                                   collection === 'gmsubscription' ? 'gamemastersubscriptions' :
+                                   collection === 'gmpackage' ? 'marketplaceitems' :
+                                   collection === 'referral' ? 'userreferrals' :
+                                   collection === 'gmearning' ? 'gamemasterearnings' :
                                    collection;
             
             const result = await db.collection(collectionName).deleteOne({
@@ -148,6 +183,11 @@ export async function POST(request: NextRequest) {
       'tradingpositions',
       'tradingorders',
       'platformtransactions',
+      // GM Referral Fee test data
+      'gamemastersubscriptions',
+      'gamemasterearnings',
+      'userreferrals',
+      'users', // Test users (GMs and participants)
     ];
     
     // Use string-based regex patterns for delete operations
@@ -192,6 +232,11 @@ export async function POST(request: NextRequest) {
             { description: testStartPatternDel },
             // Also check source field
             { source: testPatternDel },
+            // User email patterns for test GMs and participants
+            { email: testPatternDel },
+            { email: testStartPatternDel },
+            // Referral codes for GM test subscriptions
+            { referralCode: { $regex: 'TESTGM', $options: 'i' } },
           ]
         });
         deletedCount += result3.deletedCount;
@@ -377,6 +422,83 @@ export async function POST(request: NextRequest) {
         }
       } catch (e) {
         console.warn('Failed to delete trading orders:', e);
+      }
+      
+      // Delete Game Master subscriptions for test users
+      try {
+        const gmSubResult = await db.collection('gamemastersubscriptions').deleteMany({
+          userId: { $in: uniqueUserIds }
+        });
+        if (gmSubResult.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${gmSubResult.deletedCount} GM subscriptions`);
+          deletedCount += gmSubResult.deletedCount;
+        }
+      } catch (e) {
+        console.warn('Failed to delete GM subscriptions:', e);
+      }
+      
+      // Delete Game Master earnings for test users
+      try {
+        const gmEarnResult = await db.collection('gamemasterearnings').deleteMany({
+          gameMasterId: { $in: uniqueUserIds }
+        });
+        if (gmEarnResult.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${gmEarnResult.deletedCount} GM earnings`);
+          deletedCount += gmEarnResult.deletedCount;
+        }
+      } catch (e) {
+        console.warn('Failed to delete GM earnings:', e);
+      }
+      
+      // Delete user referrals for test users
+      try {
+        const refResult = await db.collection('userreferrals').deleteMany({
+          $or: [
+            { userId: { $in: uniqueUserIds } },
+            { gameMasterId: { $in: uniqueUserIds } },
+          ]
+        });
+        if (refResult.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${refResult.deletedCount} user referrals`);
+          deletedCount += refResult.deletedCount;
+        }
+      } catch (e) {
+        console.warn('Failed to delete user referrals:', e);
+      }
+    }
+    
+    // ==========================================
+    // STEP 5: DELETE GM TEST PACKAGES (marketplace items)
+    // ==========================================
+    try {
+      const gmPackageResult = await db.collection('marketplaceitems').deleteMany({
+        $or: [
+          { testRunId: testPatternDel },
+          { name: testPatternDel },
+          { name: testStartPatternDel },
+          { slug: { $regex: 'test-gm-package', $options: 'i' } },
+        ]
+      });
+      if (gmPackageResult.deletedCount > 0) {
+        console.log(`🗑️ Deleted ${gmPackageResult.deletedCount} test GM packages`);
+        deletedCount += gmPackageResult.deletedCount;
+      }
+    } catch (e) {
+      console.warn('Failed to delete GM packages:', e);
+    }
+    
+    // Delete GM earnings by competition/challenge ID
+    if (uniqueCompetitionIds.length > 0 || uniqueChallengeIds.length > 0) {
+      try {
+        const gmEarnResult = await db.collection('gamemasterearnings').deleteMany({
+          sourceId: { $in: [...uniqueCompetitionIds, ...uniqueChallengeIds] }
+        });
+        if (gmEarnResult.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${gmEarnResult.deletedCount} GM earnings by sourceId`);
+          deletedCount += gmEarnResult.deletedCount;
+        }
+      } catch (e) {
+        console.warn('Failed to delete GM earnings by sourceId:', e);
       }
     }
     

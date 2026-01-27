@@ -15,6 +15,15 @@ import { nanoid } from 'nanoid';
  * - finalizeChallenge() for normal challenge end
  */
 
+// Game Master configuration for referral fee tests
+interface TestGmConfig {
+  gmId: string; // Unique identifier for this GM in the test
+  feePercentage: number; // Referral fee percentage (5, 10, etc.)
+  status: 'active' | 'expired' | 'paused' | 'suspended';
+  canEarnFromChallenges?: boolean; // For challenge tests
+  challengeFeePercentage?: number; // Different % for challenges (optional)
+}
+
 // Test scenarios configuration
 const TEST_SCENARIOS: Record<string, {
   type: 'competition' | 'challenge';
@@ -24,6 +33,8 @@ const TEST_SCENARIOS: Record<string, {
   tieBreaker1?: 'trades_count' | 'win_rate' | 'total_capital' | 'roi' | 'join_time' | 'split_prize';
   tieBreaker2?: 'trades_count' | 'win_rate' | 'total_capital' | 'roi' | 'join_time' | 'split_prize';
   tiePrizeDistribution?: 'split_equally' | 'split_weighted' | 'first_gets_all';
+  // Game Master configurations for referral tests
+  gameMasters?: TestGmConfig[];
   participants: Array<{
     role: 'participant' | 'challenger' | 'challenged';
     status: 'active' | 'liquidated' | 'disqualified';
@@ -32,6 +43,8 @@ const TEST_SCENARIOS: Record<string, {
     winRate?: number; // Optional: for win_rate tiebreaker tests
     pnlPercentage?: number; // Optional: for ROI tiebreaker tests
     startingCapital?: number; // Optional: override starting capital for ROI tests
+    // Referral configuration
+    referredByGmId?: string; // GM ID if this participant was referred
   }>;
   expected: {
     shouldEndEarly: boolean;
@@ -49,6 +62,14 @@ const TEST_SCENARIOS: Record<string, {
     expectedPrizes?: number[]; // Array of prize amounts for each rank
     expectedTiedRanks?: boolean; // Flag to indicate all participants are tied
     expectedWinners?: number; // Number of winners expected (for verification)
+    // Game Master referral fee verification
+    expectedGmFees?: Array<{
+      gmId: string;
+      amount: number;
+      referredCount: number;
+    }>;
+    expectedRetainedFees?: number; // Fees retained by platform (inactive GMs)
+    expectedNetPlatformFee?: number; // Platform fee after GM deductions
   };
 }> = {
   // ============ COMPETITION EARLY END TESTS ============
@@ -972,6 +993,385 @@ const TEST_SCENARIOS: Record<string, {
       statusAfter: 'completed',
     },
   },
+
+  // ============ COMPETITION REFERRAL FEE TESTS ============
+  // Test Game Master referral fee distribution during competition finalization
+  
+  'C-RF1': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 5, status: 'active' },
+    ],
+    participants: [
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 5, referredByGmId: 'gm1' }, // Referred - wins
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 4 }, // Not referred
+      { role: 'participant', status: 'active', equity: 5000, totalTrades: 3 }, // Not referred
+    ],
+    // 3 × 100 = 300 pool, 20% platform fee = 60
+    // GM1 gets 5% of referred user's entry fee: 100 × 5% = 5
+    // Net platform fee: 60 - 5 = 55
+    expected: { 
+      shouldEndEarly: false, 
+      winnerId: 0,
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 300,
+      expectedPlatformFee: 60,
+      expectedGmFees: [
+        { gmId: 'gm1', amount: 5, referredCount: 1 },
+      ],
+      expectedNetPlatformFee: 55,
+    },
+  },
+  
+  'C-RF2': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'active' },
+    ],
+    participants: [
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 5, referredByGmId: 'gm1' }, // Referred - wins
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 4 }, // Not referred
+    ],
+    // 2 × 100 = 200 pool, 20% platform fee = 40
+    // GM1 gets 10% of referred user's entry fee: 100 × 10% = 10
+    // Net platform fee: 40 - 10 = 30
+    expected: { 
+      shouldEndEarly: false, 
+      winnerId: 0,
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedGmFees: [
+        { gmId: 'gm1', amount: 10, referredCount: 1 },
+      ],
+      expectedNetPlatformFee: 30,
+    },
+  },
+  
+  'C-RF3': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'active' },
+    ],
+    participants: [
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 5, referredByGmId: 'gm1' }, // Referred
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 4, referredByGmId: 'gm1' }, // Referred
+      { role: 'participant', status: 'active', equity: 5000, totalTrades: 3, referredByGmId: 'gm1' }, // Referred
+    ],
+    // 3 × 100 = 300 pool, 20% platform fee = 60
+    // GM1 gets 10% of ALL referred users' entry fees: 3 × 100 × 10% = 30
+    // Net platform fee: 60 - 30 = 30
+    expected: { 
+      shouldEndEarly: false, 
+      winnerId: 0,
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 300,
+      expectedPlatformFee: 60,
+      expectedGmFees: [
+        { gmId: 'gm1', amount: 30, referredCount: 3 },
+      ],
+      expectedNetPlatformFee: 30,
+    },
+  },
+  
+  'C-RF4': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'active' },
+      { gmId: 'gm2', feePercentage: 5, status: 'active' },
+    ],
+    participants: [
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 5, referredByGmId: 'gm1' }, // GM1's referral
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 4, referredByGmId: 'gm2' }, // GM2's referral
+      { role: 'participant', status: 'active', equity: 5000, totalTrades: 3 }, // Not referred
+    ],
+    // 3 × 100 = 300 pool, 20% platform fee = 60
+    // GM1 gets 10% of 1 user: 100 × 10% = 10
+    // GM2 gets 5% of 1 user: 100 × 5% = 5
+    // Total GM fees: 15, Net platform fee: 60 - 15 = 45
+    expected: { 
+      shouldEndEarly: false, 
+      winnerId: 0,
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 300,
+      expectedPlatformFee: 60,
+      expectedGmFees: [
+        { gmId: 'gm1', amount: 10, referredCount: 1 },
+        { gmId: 'gm2', amount: 5, referredCount: 1 },
+      ],
+      expectedNetPlatformFee: 45,
+    },
+  },
+  
+  'C-RF5': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'expired' }, // EXPIRED - should not earn
+    ],
+    participants: [
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 5, referredByGmId: 'gm1' }, // Referred but GM expired
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 4 }, // Not referred
+    ],
+    // 2 × 100 = 200 pool, 20% platform fee = 40
+    // GM1 is EXPIRED - should NOT earn, fee retained by platform
+    // Would-be fee: 100 × 10% = 10 retained
+    expected: { 
+      shouldEndEarly: false, 
+      winnerId: 0,
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedGmFees: [], // No GM earnings
+      expectedRetainedFees: 10, // Fee retained by platform
+      expectedNetPlatformFee: 40, // Full platform fee kept
+    },
+  },
+  
+  'C-RF6': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'paused' }, // PAUSED - should not earn
+    ],
+    participants: [
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 5, referredByGmId: 'gm1' }, // Referred but GM paused
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 4 }, // Not referred
+    ],
+    // GM1 is PAUSED - should NOT earn, fee retained by platform
+    expected: { 
+      shouldEndEarly: false, 
+      winnerId: 0,
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 200,
+      expectedPlatformFee: 40,
+      expectedGmFees: [], // No GM earnings
+      expectedRetainedFees: 10, // Fee retained by platform
+      expectedNetPlatformFee: 40, // Full platform fee kept
+    },
+  },
+  
+  'C-RF7': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'active' },
+    ],
+    participants: [
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 5, referredByGmId: 'gm1' }, // Referred
+      { role: 'participant', status: 'active', equity: 6500, totalTrades: 4 }, // Not referred
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 3, referredByGmId: 'gm1' }, // Referred
+      { role: 'participant', status: 'active', equity: 5500, totalTrades: 2 }, // Not referred
+      { role: 'participant', status: 'active', equity: 5000, totalTrades: 1 }, // Not referred
+    ],
+    // 5 × 100 = 500 pool, 20% platform fee = 100
+    // GM1 gets 10% of 2 referred users: 2 × 100 × 10% = 20
+    // Net platform fee: 100 - 20 = 80
+    expected: { 
+      shouldEndEarly: false, 
+      winnerId: 0,
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 500,
+      expectedPlatformFee: 100,
+      expectedGmFees: [
+        { gmId: 'gm1', amount: 20, referredCount: 2 },
+      ],
+      expectedNetPlatformFee: 80,
+    },
+  },
+  
+  'C-RF8': {
+    type: 'competition',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 50, status: 'active' }, // Very high % - will exceed platform fee
+    ],
+    participants: [
+      { role: 'participant', status: 'active', equity: 7000, totalTrades: 5, referredByGmId: 'gm1' },
+      { role: 'participant', status: 'active', equity: 6000, totalTrades: 4, referredByGmId: 'gm1' },
+      { role: 'participant', status: 'active', equity: 5000, totalTrades: 3, referredByGmId: 'gm1' },
+    ],
+    // 3 × 100 = 300 pool, 20% platform fee = 60
+    // GM1 would get 50% of 3 users: 3 × 100 × 50% = 150
+    // BUT this exceeds platform fee (60)! Capped at 60.
+    // Net platform fee: 60 - 60 = 0
+    expected: { 
+      shouldEndEarly: false, 
+      winnerId: 0,
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedPrizePool: 300,
+      expectedPlatformFee: 60,
+      expectedGmFees: [
+        { gmId: 'gm1', amount: 60, referredCount: 3 }, // Capped at platform fee
+      ],
+      expectedNetPlatformFee: 0, // All platform fee goes to GM
+    },
+  },
+
+  // ============ CHALLENGE REFERRAL FEE TESTS ============
+  // Test Game Master referral fee distribution during challenge finalization
+  
+  'CH-RF1': {
+    type: 'challenge',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'active', canEarnFromChallenges: true, challengeFeePercentage: 5 },
+    ],
+    participants: [
+      { role: 'challenger', status: 'active', equity: 6500, totalTrades: 5, referredByGmId: 'gm1' }, // Referred - wins
+      { role: 'challenged', status: 'active', equity: 5500, totalTrades: 5 }, // Not referred
+    ],
+    // Challenge: 2 × 100 = 200 pool, 10% platform fee = 20
+    // GM1 gets 5% (challenge rate) of challenger's entry: 100 × 5% = 5
+    expected: { 
+      shouldEndEarly: false, 
+      winnerRole: 'challenger',
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedGmFees: [
+        { gmId: 'gm1', amount: 5, referredCount: 1 },
+      ],
+    },
+  },
+  
+  'CH-RF2': {
+    type: 'challenge',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'active', canEarnFromChallenges: true, challengeFeePercentage: 5 },
+    ],
+    participants: [
+      { role: 'challenger', status: 'active', equity: 5500, totalTrades: 5 }, // Not referred
+      { role: 'challenged', status: 'active', equity: 6500, totalTrades: 5, referredByGmId: 'gm1' }, // Referred - wins
+    ],
+    // GM1 gets 5% of challenged user's entry: 100 × 5% = 5
+    expected: { 
+      shouldEndEarly: false, 
+      winnerRole: 'challenged',
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedGmFees: [
+        { gmId: 'gm1', amount: 5, referredCount: 1 },
+      ],
+    },
+  },
+  
+  'CH-RF3': {
+    type: 'challenge',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'active', canEarnFromChallenges: true, challengeFeePercentage: 5 },
+    ],
+    participants: [
+      { role: 'challenger', status: 'active', equity: 6500, totalTrades: 5, referredByGmId: 'gm1' }, // Referred
+      { role: 'challenged', status: 'active', equity: 5500, totalTrades: 5, referredByGmId: 'gm1' }, // Referred
+    ],
+    // GM1 gets 5% from BOTH users: 2 × 100 × 5% = 10
+    expected: { 
+      shouldEndEarly: false, 
+      winnerRole: 'challenger',
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedGmFees: [
+        { gmId: 'gm1', amount: 10, referredCount: 2 },
+      ],
+    },
+  },
+  
+  'CH-RF4': {
+    type: 'challenge',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'active', canEarnFromChallenges: true, challengeFeePercentage: 8 },
+      { gmId: 'gm2', feePercentage: 5, status: 'active', canEarnFromChallenges: true, challengeFeePercentage: 3 },
+    ],
+    participants: [
+      { role: 'challenger', status: 'active', equity: 6500, totalTrades: 5, referredByGmId: 'gm1' }, // GM1's referral
+      { role: 'challenged', status: 'active', equity: 5500, totalTrades: 5, referredByGmId: 'gm2' }, // GM2's referral
+    ],
+    // GM1 gets 8% from challenger: 100 × 8% = 8
+    // GM2 gets 3% from challenged: 100 × 3% = 3
+    expected: { 
+      shouldEndEarly: false, 
+      winnerRole: 'challenger',
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedGmFees: [
+        { gmId: 'gm1', amount: 8, referredCount: 1 },
+        { gmId: 'gm2', amount: 3, referredCount: 1 },
+      ],
+    },
+  },
+  
+  'CH-RF5': {
+    type: 'challenge',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'active', canEarnFromChallenges: false }, // Cannot earn from challenges
+    ],
+    participants: [
+      { role: 'challenger', status: 'active', equity: 6500, totalTrades: 5, referredByGmId: 'gm1' }, // Referred but GM can't earn
+      { role: 'challenged', status: 'active', equity: 5500, totalTrades: 5 },
+    ],
+    // GM1 has canEarnFromChallenges=false - should NOT earn
+    expected: { 
+      shouldEndEarly: false, 
+      winnerRole: 'challenger',
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedGmFees: [], // No GM earnings
+      expectedRetainedFees: 10, // Would-be fee retained
+    },
+  },
+  
+  'CH-RF6': {
+    type: 'challenge',
+    endType: 'normal',
+    disqualifyOnLiquidation: true,
+    gameMasters: [
+      { gmId: 'gm1', feePercentage: 10, status: 'active', canEarnFromChallenges: true, challengeFeePercentage: 5 },
+    ],
+    participants: [
+      { role: 'challenger', status: 'active', equity: 6500, totalTrades: 5, referredByGmId: 'gm1' }, // Referred
+      { role: 'challenged', status: 'active', equity: 5500, totalTrades: 5 }, // Not referred
+    ],
+    // Only challenger is referred
+    // GM1 gets 5% from challenger only: 100 × 5% = 5
+    expected: { 
+      shouldEndEarly: false, 
+      winnerRole: 'challenger',
+      toUnclaimedPool: false, 
+      statusAfter: 'completed',
+      expectedGmFees: [
+        { gmId: 'gm1', amount: 5, referredCount: 1 },
+      ],
+    },
+  },
 };
 
 export async function POST(request: NextRequest) {
@@ -1012,6 +1412,181 @@ export async function POST(request: NextRequest) {
 /**
  * Run REAL competition test using actual production code
  */
+/**
+ * Create Game Master referral data for referral fee tests
+ * Creates GM users, subscriptions, packages, and referral records
+ */
+async function createGmReferralData(
+  db: mongoose.mongo.Db,
+  testRunId: string,
+  scenario: typeof TEST_SCENARIOS[keyof typeof TEST_SCENARIOS],
+  participantUserIds: mongoose.Types.ObjectId[],
+  testDataIds: string[]
+): Promise<Map<string, mongoose.Types.ObjectId>> {
+  // Map from scenario gmId to actual MongoDB ObjectId
+  const gmIdMap = new Map<string, mongoose.Types.ObjectId>();
+  
+  if (!scenario.gameMasters || scenario.gameMasters.length === 0) {
+    return gmIdMap;
+  }
+
+  const now = new Date();
+  const usersCollection = db.collection('users');
+  const walletsCollection = db.collection('creditwallets');
+  const subscriptionsCollection = db.collection('gamemastersubscriptions');
+  const packagesCollection = db.collection('marketplaceitems');
+  const referralsCollection = db.collection('userreferrals');
+
+  // Create GM users, subscriptions, packages
+  for (const gm of scenario.gameMasters) {
+    const gmUserId = new mongoose.Types.ObjectId();
+    const packageId = new mongoose.Types.ObjectId();
+    const subscriptionId = new mongoose.Types.ObjectId();
+    gmIdMap.set(gm.gmId, gmUserId);
+    
+    testDataIds.push(`user:${gmUserId}`);
+    testDataIds.push(`wallet:${gmUserId}`);
+    testDataIds.push(`gmsubscription:${subscriptionId}`);
+    testDataIds.push(`gmpackage:${packageId}`);
+
+    // Create GM user
+    await usersCollection.insertOne({
+      _id: gmUserId,
+      email: `${testRunId}_gm_${gm.gmId}@test.com`,
+      username: `${testRunId}_GM_${gm.gmId}`,
+      name: `Test GM ${gm.gmId}`,
+      role: 'gamemaster',
+      status: 'active',
+      testRunId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Create GM wallet (starts at 0 to track earnings)
+    await walletsCollection.insertOne({
+      _id: new mongoose.Types.ObjectId(),
+      userId: gmUserId.toString(),
+      creditBalance: 0,
+      totalDeposited: 0,
+      totalWithdrawn: 0,
+      testRunId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Determine subscription dates based on status
+    let subscriptionStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+    let subscriptionEnd: Date;
+    
+    if (gm.status === 'expired') {
+      subscriptionEnd = new Date(now.getTime() - 24 * 60 * 60 * 1000); // Expired yesterday
+    } else {
+      subscriptionEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+    }
+
+    // Create GM package (marketplace item)
+    await packagesCollection.insertOne({
+      _id: packageId,
+      name: `${testRunId}_GM_Package_${gm.gmId}`,
+      slug: `test-gm-package-${testRunId}-${gm.gmId}`.toLowerCase(),
+      description: 'Test GM package',
+      category: 'gamemaster',
+      price: 100,
+      currency: 'credits',
+      status: 'active',
+      gameMasterConfig: {
+        referralFeePercentage: gm.feePercentage,
+        challengeReferralFeePercentage: gm.challengeFeePercentage ?? gm.feePercentage,
+        canCreateCompetitions: true,
+        canEarnFromChallenges: gm.canEarnFromChallenges ?? true,
+        maxCompetitionsPerDay: 10,
+        maxChallengesPerDay: 10,
+      },
+      testRunId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Create GM subscription
+    await subscriptionsCollection.insertOne({
+      _id: subscriptionId,
+      userId: gmUserId.toString(),
+      packageId: packageId.toString(),
+      referralCode: `TESTGM${gm.gmId.toUpperCase()}${testRunId.slice(0, 4)}`,
+      status: gm.status,
+      subscriptionStart,
+      subscriptionEnd,
+      limits: {
+        referralFeePercentage: gm.feePercentage,
+        challengeReferralFeePercentage: gm.challengeFeePercentage ?? gm.feePercentage,
+        canCreateCompetitions: true,
+        canEarnFromChallenges: gm.canEarnFromChallenges ?? true,
+        maxCompetitionsPerDay: 10,
+        maxChallengesPerDay: 10,
+      },
+      totalEarnings: 0,
+      totalReferrals: 0,
+      testRunId,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  // Create UserReferral records for referred participants
+  for (let i = 0; i < scenario.participants.length; i++) {
+    const p = scenario.participants[i];
+    if (p.referredByGmId && gmIdMap.has(p.referredByGmId)) {
+      const gmUserId = gmIdMap.get(p.referredByGmId)!;
+      const participantUserId = participantUserIds[i];
+      const referralId = new mongoose.Types.ObjectId();
+      testDataIds.push(`referral:${referralId}`);
+
+      await referralsCollection.insertOne({
+        _id: referralId,
+        gameMasterId: gmUserId.toString(),
+        referralCode: `TESTGM${p.referredByGmId.toUpperCase()}${testRunId.slice(0, 4)}`,
+        userId: participantUserId.toString(),
+        status: 'active',
+        testRunId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Also update the participant's user document with referredByGameMasterId
+      // Create a user document for the participant if not exists
+      const existingUser = await usersCollection.findOne({ _id: participantUserId });
+      if (!existingUser) {
+        await usersCollection.insertOne({
+          _id: participantUserId,
+          email: `${testRunId}_participant_${i}@test.com`,
+          username: `${testRunId}_User${i + 1}`,
+          name: `Test User ${i + 1}`,
+          role: 'user',
+          status: 'active',
+          referredByGameMasterId: gmUserId.toString(),
+          referredByReferralCode: `TESTGM${p.referredByGmId.toUpperCase()}${testRunId.slice(0, 4)}`,
+          testRunId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        testDataIds.push(`user:${participantUserId}`);
+      } else {
+        await usersCollection.updateOne(
+          { _id: participantUserId },
+          { 
+            $set: { 
+              referredByGameMasterId: gmUserId.toString(),
+              referredByReferralCode: `TESTGM${p.referredByGmId.toUpperCase()}${testRunId.slice(0, 4)}`,
+            } 
+          }
+        );
+      }
+    }
+  }
+
+  return gmIdMap;
+}
+
 async function runRealCompetitionTest(
   db: mongoose.mongo.Db,
   testRunId: string,
@@ -1229,6 +1804,10 @@ async function runRealCompetitionTest(
       }
     }
   }
+
+  // Create Game Master referral data if this is a referral test
+  const gmIdMap = await createGmReferralData(db, testRunId, scenario, participantUserIds, testDataIds);
+  console.log(`🧪 [TEST] Created GM referral data: ${gmIdMap.size} GMs configured`);
 
   // Now run the ACTUAL production code
   let actualResult: {
@@ -1556,6 +2135,95 @@ async function runRealCompetitionTest(
         }
       }
 
+      // ============ GM REFERRAL FEE VERIFICATION ============
+      const gmEarningsCollection = db.collection('gamemasterearnings');
+      const gmFeeVerification: { gmId: string; expected: number; actual: number; passed: boolean }[] = [];
+      
+      if (scenario.expected.expectedGmFees && scenario.expected.expectedGmFees.length > 0) {
+        for (const expectedGmFee of scenario.expected.expectedGmFees) {
+          // Get actual GM user ID from map
+          const actualGmUserId = gmIdMap.get(expectedGmFee.gmId);
+          if (!actualGmUserId) {
+            passed = false;
+            issues.push(`GM ${expectedGmFee.gmId}: Not found in gmIdMap`);
+            continue;
+          }
+
+          // Check GM wallet balance
+          const gmWallet = await walletsCollection.findOne({ userId: actualGmUserId.toString() });
+          const actualGmBalance = gmWallet?.creditBalance || 0;
+          
+          console.log(`🧪 [TEST] GM ${expectedGmFee.gmId} wallet: expected $${expectedGmFee.amount}, actual $${actualGmBalance}`);
+          
+          gmFeeVerification.push({
+            gmId: expectedGmFee.gmId,
+            expected: expectedGmFee.amount,
+            actual: actualGmBalance,
+            passed: Math.abs(actualGmBalance - expectedGmFee.amount) <= 1, // $1 tolerance
+          });
+          
+          if (Math.abs(actualGmBalance - expectedGmFee.amount) > 1) {
+            passed = false;
+            issues.push(`GM ${expectedGmFee.gmId} fee: expected $${expectedGmFee.amount}, got $${actualGmBalance}`);
+          }
+
+          // Verify GameMasterEarning record was created
+          const gmEarning = await gmEarningsCollection.findOne({
+            gameMasterId: actualGmUserId.toString(),
+            sourceId: competitionId.toString(),
+          });
+          
+          if (!gmEarning && expectedGmFee.amount > 0) {
+            passed = false;
+            issues.push(`GM ${expectedGmFee.gmId}: No GameMasterEarning record found`);
+          } else if (gmEarning) {
+            console.log(`🧪 [TEST] GM ${expectedGmFee.gmId} earning record: $${gmEarning.amount}, referrals: ${gmEarning.referredUserCount || 1}`);
+          }
+        }
+      }
+
+      // Verify net platform fee (gross - GM fees) if specified
+      if (scenario.expected.expectedNetPlatformFee !== undefined && platformFeeTransaction) {
+        // The platform fee transaction should reflect the net amount after GM deductions
+        // Note: This depends on how the production code handles fee recording
+        const actualNetFee = platformFeeTransaction.amount || 0;
+        const expectedNetFee = scenario.expected.expectedNetPlatformFee;
+        
+        // Calculate total GM fees paid
+        const totalGmFeesPaid = gmFeeVerification.reduce((sum, v) => sum + v.actual, 0);
+        const calculatedNetFee = (scenario.expected.expectedPlatformFee || 0) - totalGmFeesPaid;
+        
+        console.log(`🧪 [TEST] Net platform fee: expected $${expectedNetFee}, calculated $${calculatedNetFee}, recorded $${actualNetFee}`);
+        
+        // The platform fee transaction records gross fee, we verify GM wallets received their portion
+        // So we verify: gross fee - GM wallet balances = expected net fee
+        if (Math.abs(calculatedNetFee - expectedNetFee) > 1) {
+          passed = false;
+          issues.push(`Net platform fee: expected $${expectedNetFee}, calculated $${calculatedNetFee}`);
+        }
+      }
+
+      // Verify retained fees (fees from inactive GMs kept by platform)
+      if (scenario.expected.expectedRetainedFees !== undefined) {
+        // For inactive GMs, no wallet credit should occur
+        // Total GM fees expected but not paid = retained fees
+        const totalExpectedGmFees = scenario.expected.expectedGmFees?.reduce((sum, f) => sum + f.amount, 0) || 0;
+        const totalActualGmFees = gmFeeVerification.reduce((sum, v) => sum + v.actual, 0);
+        const actualRetained = totalExpectedGmFees > 0 ? totalExpectedGmFees - totalActualGmFees : scenario.expected.expectedRetainedFees;
+        
+        // If no GM fees were expected to be paid (empty array), check that expected retained was indeed retained
+        if (scenario.expected.expectedGmFees?.length === 0 && scenario.expected.expectedRetainedFees > 0) {
+          // Verify no GM earnings were created for this competition
+          const anyGmEarnings = await gmEarningsCollection.findOne({ sourceId: competitionId.toString() });
+          if (anyGmEarnings) {
+            passed = false;
+            issues.push(`Retained fees: Expected no GM earnings but found one for GM ${anyGmEarnings.gameMasterId}`);
+          }
+        }
+        
+        console.log(`🧪 [TEST] Retained fees: expected $${scenario.expected.expectedRetainedFees}, actual retained $${actualRetained}`);
+      }
+
       // Build prize distribution summary
       const winnerSummary = walletBalances.length > 0 
         ? walletBalances.map((w, i) => `${i + 1}st: P${w.participantIndex} ($${w.balance})`).join(', ')
@@ -1585,6 +2253,9 @@ async function runRealCompetitionTest(
           unclaimedAmount: unclaimedTransaction?.amount,
           participantsCount: finalParticipants.length,
           winnersCount: walletBalances.length,
+          // GM referral fee details
+          gmFeeVerification: gmFeeVerification.length > 0 ? gmFeeVerification : undefined,
+          gmFeesTotal: gmFeeVerification.reduce((sum, v) => sum + v.actual, 0) || undefined,
         },
       };
     }
@@ -1785,6 +2456,12 @@ async function runRealChallengeTest(
     }
   }
 
+  // Create Game Master referral data if this is a referral test
+  // For challenges, participant order is [challenger, challenged]
+  const challengeParticipantUserIds = [challengerUserId, opponentUserId];
+  const gmIdMap = await createGmReferralData(db, testRunId, scenario, challengeParticipantUserIds, testDataIds);
+  console.log(`🧪 [TEST] Created GM referral data for challenge: ${gmIdMap.size} GMs configured`);
+
   // Run ACTUAL production code
   let actualResult: {
     passed: boolean;
@@ -1922,10 +2599,71 @@ async function runRealChallengeTest(
         issues.push(`Winner: expected '${scenario.expected.winnerRole}', got '${actualWinner}'`);
       }
 
+      // ============ GM REFERRAL FEE VERIFICATION FOR CHALLENGES ============
+      const gmEarningsCollection = db.collection('gamemasterearnings');
+      const gmFeeVerification: { gmId: string; expected: number; actual: number; passed: boolean }[] = [];
+      
+      if (scenario.expected.expectedGmFees && scenario.expected.expectedGmFees.length > 0) {
+        for (const expectedGmFee of scenario.expected.expectedGmFees) {
+          // Get actual GM user ID from map
+          const actualGmUserId = gmIdMap.get(expectedGmFee.gmId);
+          if (!actualGmUserId) {
+            passed = false;
+            issues.push(`GM ${expectedGmFee.gmId}: Not found in gmIdMap`);
+            continue;
+          }
+
+          // Check GM wallet balance
+          const gmWallet = await walletsCollection.findOne({ userId: actualGmUserId.toString() });
+          const actualGmBalance = gmWallet?.creditBalance || 0;
+          
+          console.log(`🧪 [TEST] Challenge GM ${expectedGmFee.gmId} wallet: expected $${expectedGmFee.amount}, actual $${actualGmBalance}`);
+          
+          gmFeeVerification.push({
+            gmId: expectedGmFee.gmId,
+            expected: expectedGmFee.amount,
+            actual: actualGmBalance,
+            passed: Math.abs(actualGmBalance - expectedGmFee.amount) <= 1, // $1 tolerance
+          });
+          
+          if (Math.abs(actualGmBalance - expectedGmFee.amount) > 1) {
+            passed = false;
+            issues.push(`GM ${expectedGmFee.gmId} fee: expected $${expectedGmFee.amount}, got $${actualGmBalance}`);
+          }
+
+          // Verify GameMasterEarning record was created
+          const gmEarning = await gmEarningsCollection.findOne({
+            gameMasterId: actualGmUserId.toString(),
+            sourceId: challengeId.toString(),
+          });
+          
+          if (!gmEarning && expectedGmFee.amount > 0) {
+            passed = false;
+            issues.push(`GM ${expectedGmFee.gmId}: No GameMasterEarning record found`);
+          } else if (gmEarning) {
+            console.log(`🧪 [TEST] Challenge GM ${expectedGmFee.gmId} earning record: $${gmEarning.amount}, referrals: ${gmEarning.referredUserCount || 1}`);
+          }
+        }
+      }
+
+      // Verify retained fees (fees from GMs with canEarnFromChallenges=false)
+      if (scenario.expected.expectedRetainedFees !== undefined) {
+        if (scenario.expected.expectedGmFees?.length === 0 && scenario.expected.expectedRetainedFees > 0) {
+          // Verify no GM earnings were created for this challenge
+          const anyGmEarnings = await gmEarningsCollection.findOne({ sourceId: challengeId.toString() });
+          if (anyGmEarnings) {
+            passed = false;
+            issues.push(`Retained fees: Expected no GM earnings but found one for GM ${anyGmEarnings.gameMasterId}`);
+          } else {
+            console.log(`🧪 [TEST] Challenge retained fees verified: no GM earnings created`);
+          }
+        }
+      }
+
       actualResult = {
         passed,
         message: passed ? '✅ Test PASSED - Real finalization executed correctly' : `❌ Test FAILED: ${issues.join(', ')}`,
-        actualOutcome: `Status: ${actualStatus}, Winner: ${actualWinner || 'none'}`,
+        actualOutcome: `Status: ${actualStatus}, Winner: ${actualWinner || 'none'}${gmFeeVerification.length > 0 ? `, GM fees: ${gmFeeVerification.map(g => `${g.gmId}=$${g.actual}`).join(', ')}` : ''}`,
         prizeDistribution: actualWinner === 'tie'
           ? { tie: true, splitPrize: prizePool / 2 }
           : actualWinner 
@@ -1938,6 +2676,9 @@ async function runRealChallengeTest(
           challengerBalance: challengerWallet?.creditBalance,
           opponentBalance: opponentWallet?.creditBalance,
           participantsCount: finalParticipants.length,
+          // GM referral fee details
+          gmFeeVerification: gmFeeVerification.length > 0 ? gmFeeVerification : undefined,
+          gmFeesTotal: gmFeeVerification.reduce((sum, v) => sum + v.actual, 0) || undefined,
         },
       };
     }

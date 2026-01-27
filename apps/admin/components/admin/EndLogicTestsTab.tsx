@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 // Test case definition
 interface TestCase {
   id: string;
-  category: 'competition-early' | 'competition-normal' | 'competition-prize' | 'competition-distribution' | 'competition-journey' | 'competition-ties' | 'competition-edge' | 'challenge-early' | 'challenge-normal' | 'challenge-prize' | 'challenge-ties';
+  category: 'competition-early' | 'competition-normal' | 'competition-prize' | 'competition-distribution' | 'competition-journey' | 'competition-ties' | 'competition-edge' | 'competition-referral' | 'challenge-early' | 'challenge-normal' | 'challenge-prize' | 'challenge-ties' | 'challenge-referral';
   name: string;
   description: string;
   disqualifyOnLiquidation: boolean;
@@ -42,6 +42,13 @@ interface TestCase {
       unclaimedPool?: number;
     };
     actualOutcome?: string;
+    // GM fee verification results
+    gmFeeVerification?: Array<{
+      gmId: string;
+      expected: number;
+      actual: number;
+      passed: boolean;
+    }>;
   };
 }
 
@@ -604,6 +611,150 @@ const TEST_CASES: TestCase[] = [
     expectedResult: 'Tie - both players split prize (default admin setting)',
     status: 'pending',
   },
+
+  // ============ COMPETITION REFERRAL FEE TESTS ============
+  {
+    id: 'C-RF1',
+    category: 'competition-referral',
+    name: 'Single Referred User (5%)',
+    description: 'One referred participant, active GM with 5% fee',
+    disqualifyOnLiquidation: true,
+    scenario: '1 referred + 2 non-referred participants',
+    expectedResult: 'GM gets $5 (5% of $100 entry fee)',
+    status: 'pending',
+  },
+  {
+    id: 'C-RF2',
+    category: 'competition-referral',
+    name: 'Single Referred User (10%)',
+    description: 'One referred participant, active GM with 10% fee',
+    disqualifyOnLiquidation: true,
+    scenario: '1 referred + 1 non-referred participants',
+    expectedResult: 'GM gets $10 (10% of $100 entry fee)',
+    status: 'pending',
+  },
+  {
+    id: 'C-RF3',
+    category: 'competition-referral',
+    name: 'Multiple Referred Same GM',
+    description: 'Three participants all referred by same GM',
+    disqualifyOnLiquidation: true,
+    scenario: '3 referred users from same GM (10%)',
+    expectedResult: 'GM gets $30 (10% × 3 × $100)',
+    status: 'pending',
+  },
+  {
+    id: 'C-RF4',
+    category: 'competition-referral',
+    name: 'Multiple GMs Different Rates',
+    description: 'Participants referred by different GMs with different rates',
+    disqualifyOnLiquidation: true,
+    scenario: '1 from GM1 (10%) + 1 from GM2 (5%) + 1 not referred',
+    expectedResult: 'GM1: $10, GM2: $5',
+    status: 'pending',
+  },
+  {
+    id: 'C-RF5',
+    category: 'competition-referral',
+    name: 'Expired GM No Fee',
+    description: 'GM subscription expired - no fee should be paid',
+    disqualifyOnLiquidation: true,
+    scenario: '1 referred user, GM subscription EXPIRED',
+    expectedResult: 'GM gets $0, fee retained by platform',
+    status: 'pending',
+  },
+  {
+    id: 'C-RF6',
+    category: 'competition-referral',
+    name: 'Paused GM No Fee',
+    description: 'GM subscription paused - no fee should be paid',
+    disqualifyOnLiquidation: true,
+    scenario: '1 referred user, GM subscription PAUSED',
+    expectedResult: 'GM gets $0, fee retained by platform',
+    status: 'pending',
+  },
+  {
+    id: 'C-RF7',
+    category: 'competition-referral',
+    name: 'Mix Referred + Non-Referred',
+    description: 'Some participants referred, others not',
+    disqualifyOnLiquidation: true,
+    scenario: '2 referred (10%) + 3 non-referred',
+    expectedResult: 'GM gets $20 (only from referred users)',
+    status: 'pending',
+  },
+  {
+    id: 'C-RF8',
+    category: 'competition-referral',
+    name: 'GM Fee Capped at Platform Fee',
+    description: 'High fee % capped to not exceed platform fee',
+    disqualifyOnLiquidation: true,
+    scenario: '3 referred, GM at 50% (would be $150, capped at $60)',
+    expectedResult: 'GM gets $60 (capped at platform fee)',
+    status: 'pending',
+  },
+
+  // ============ CHALLENGE REFERRAL FEE TESTS ============
+  {
+    id: 'CH-RF1',
+    category: 'challenge-referral',
+    name: 'Referred Challenger Wins',
+    description: 'Challenger is referred and wins',
+    disqualifyOnLiquidation: true,
+    scenario: 'Challenger referred (5% challenge fee), wins',
+    expectedResult: 'GM gets $5 (5% of $100 entry)',
+    status: 'pending',
+  },
+  {
+    id: 'CH-RF2',
+    category: 'challenge-referral',
+    name: 'Referred Challenged Wins',
+    description: 'Challenged (opponent) is referred and wins',
+    disqualifyOnLiquidation: true,
+    scenario: 'Challenged referred (5% challenge fee), wins',
+    expectedResult: 'GM gets $5 (5% of $100 entry)',
+    status: 'pending',
+  },
+  {
+    id: 'CH-RF3',
+    category: 'challenge-referral',
+    name: 'Both Referred Same GM',
+    description: 'Both players referred by same GM',
+    disqualifyOnLiquidation: true,
+    scenario: 'Both referred by same GM (5% challenge fee)',
+    expectedResult: 'GM gets $10 (5% × 2 × $100)',
+    status: 'pending',
+  },
+  {
+    id: 'CH-RF4',
+    category: 'challenge-referral',
+    name: 'Both Referred Different GMs',
+    description: 'Each player referred by different GM',
+    disqualifyOnLiquidation: true,
+    scenario: 'Challenger by GM1 (8%), Challenged by GM2 (3%)',
+    expectedResult: 'GM1: $8, GM2: $3',
+    status: 'pending',
+  },
+  {
+    id: 'CH-RF5',
+    category: 'challenge-referral',
+    name: 'GM Cannot Earn From Challenges',
+    description: 'GM config disallows challenge fees',
+    disqualifyOnLiquidation: true,
+    scenario: 'Referred user, but GM canEarnFromChallenges=false',
+    expectedResult: 'GM gets $0, fee retained',
+    status: 'pending',
+  },
+  {
+    id: 'CH-RF6',
+    category: 'challenge-referral',
+    name: 'One Referred One Not',
+    description: 'Only challenger is referred',
+    disqualifyOnLiquidation: true,
+    scenario: 'Challenger referred (5%), Challenged not',
+    expectedResult: 'GM gets $5 (only from referred)',
+    status: 'pending',
+  },
 ];
 
 // Category info
@@ -617,10 +768,12 @@ const CATEGORIES = [
   { id: 'competition-tiebreakers', name: '⚖️ Tiebreaker Types', icon: Trophy, color: 'text-indigo-400' },
   { id: 'competition-prize-dist', name: '💰 Prize Distribution Types', icon: DollarSign, color: 'text-lime-400' },
   { id: 'competition-edge', name: '⚠️ Edge Cases', icon: AlertCircle, color: 'text-red-400' },
+  { id: 'competition-referral', name: '🎯 Competition GM Referral Fees', icon: DollarSign, color: 'text-violet-400' },
   { id: 'challenge-early', name: 'Challenge Early End', icon: Swords, color: 'text-orange-400' },
   { id: 'challenge-normal', name: 'Challenge Normal End', icon: Swords, color: 'text-green-400' },
   { id: 'challenge-prize', name: 'Challenge Prize Distribution', icon: DollarSign, color: 'text-cyan-400' },
   { id: 'challenge-ties', name: '🤝 Challenge Ties', icon: Swords, color: 'text-amber-400' },
+  { id: 'challenge-referral', name: '🎯 Challenge GM Referral Fees', icon: DollarSign, color: 'text-violet-400' },
 ];
 
 export default function EndLogicTestsTab() {
