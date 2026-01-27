@@ -224,36 +224,34 @@ export async function POST(request: NextRequest) {
           console.log(`🗑️ Deleted ${result2.deletedCount} from ${collectionName} by isTest`);
         }
 
-        // Also cleanup by name/slug prefix (case insensitive) - VERY AGGRESSIVE
-        // This catches old test data that was created before testRunId was added
-        const result3 = await db.collection(collectionName).deleteMany({
-          $or: [
-            { name: testPatternDel },
-            { name: testStartPatternDel },
-            { slug: { $regex: 'test_', $options: 'i' } },
-            { slug: { $regex: 'test-test', $options: 'i' } },
-            { username: testPatternDel },
-            { username: testStartPatternDel },
-            { challengerName: testPatternDel },
-            { challengedName: testPatternDel },
-            { oddsUsername: testPatternDel },
-            { competitionName: testPatternDel },
-            { challengeName: testPatternDel },
-            // Platform transactions have description field
-            { description: testPatternDel },
-            { description: testStartPatternDel },
-            // Also check source field
-            { source: testPatternDel },
-            // User email patterns for test GMs and participants
-            { email: testPatternDel },
-            { email: testStartPatternDel },
-            // Referral codes for GM test subscriptions (both old and new format)
-            { referralCode: { $regex: '^TESTGM', $options: 'i' } },
-          ]
-        });
-        deletedCount += result3.deletedCount;
-        if (result3.deletedCount > 0) {
-          console.log(`🗑️ Deleted ${result3.deletedCount} from ${collectionName} by name patterns`);
+        // SAFE cleanup by specific test patterns
+        // Only delete records that CLEARLY look like test data:
+        // - Referral codes starting with TESTGM_ (our test format)
+        // - Competition/challenge names starting with TEST_ followed by UUID pattern
+        // IMPORTANT: Do NOT delete based on user names/emails - real users might have "test" in their name!
+        
+        // Skip user-related collections for pattern matching - too risky
+        const sensitiveCollections = ['user', 'users', 'userreferrals', 'creditwallets', 'gamemastersubscriptions'];
+        if (!sensitiveCollections.includes(collectionName)) {
+          // Only match very specific test patterns for non-sensitive collections
+          const safeTestPattern = { $regex: '^TEST_[a-zA-Z0-9]{8,}', $options: 'i' }; // TEST_ followed by 8+ chars (UUID-like)
+          
+          const result3 = await db.collection(collectionName).deleteMany({
+            $or: [
+              { name: safeTestPattern },
+              { slug: { $regex: '^test-test', $options: 'i' } }, // Very specific slug pattern
+              { challengerName: safeTestPattern },
+              { challengedName: safeTestPattern },
+              { competitionName: safeTestPattern },
+              { challengeName: safeTestPattern },
+              // Referral codes for GM test subscriptions (specific format only)
+              { referralCode: { $regex: '^TESTGM_', $options: 'i' } },
+            ]
+          });
+          deletedCount += result3.deletedCount;
+          if (result3.deletedCount > 0) {
+            console.log(`🗑️ Deleted ${result3.deletedCount} from ${collectionName} by safe test patterns`);
+          }
         }
       } catch (e) {
         console.warn(`Failed to cleanup ${collectionName}:`, e);
@@ -483,12 +481,13 @@ export async function POST(request: NextRequest) {
     // STEP 5: DELETE GM TEST PACKAGES (marketplace items)
     // ==========================================
     try {
+      // SAFE: Only delete marketplace items that are clearly test packages
+      const safeTestPackagePattern = { $regex: '^TEST_[a-zA-Z0-9]{8,}_GM_Package', $options: 'i' };
       const gmPackageResult = await db.collection('marketplaceitems').deleteMany({
         $or: [
           { testRunId: testPatternDel },
-          { name: testPatternDel },
-          { name: testStartPatternDel },
-          { slug: { $regex: 'test-gm-package', $options: 'i' } },
+          { name: safeTestPackagePattern }, // Only match our specific test package naming format
+          { slug: { $regex: '^test-gm-package-test_', $options: 'i' } }, // Specific slug format
         ]
       });
       if (gmPackageResult.deletedCount > 0) {
