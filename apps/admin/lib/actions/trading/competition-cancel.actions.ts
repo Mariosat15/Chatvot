@@ -352,7 +352,16 @@ export async function emergencyCancelActiveCompetition(
           positionId: position._id.toString(),
         }], { session: mongoSession });
 
-        // Create trade history
+        // Calculate trade metrics
+        const priceChange = exitPrice - position.entryPrice;
+        const priceChangePercentage = (priceChange / position.entryPrice) * 100;
+        const realizedPnlPercentage = position.marginUsed > 0 
+          ? (realizedPnl / position.marginUsed) * 100 
+          : 0;
+        const closedAt = new Date();
+        const holdingTimeSeconds = Math.floor((closedAt.getTime() - position.openedAt.getTime()) / 1000);
+
+        // Create trade history with all required fields
         await TradeHistory.create([{
           competitionId: position.competitionId,
           challengeId: position.challengeId,
@@ -361,15 +370,27 @@ export async function emergencyCancelActiveCompetition(
           positionId: position._id.toString(),
           symbol: position.symbol,
           side: position.side,
+          quantity: position.quantity,
+          orderType: 'market',
           entryPrice: position.entryPrice,
           exitPrice: exitPrice,
-          quantity: position.quantity,
+          priceChange,
+          priceChangePercentage,
+          realizedPnl,
+          realizedPnlPercentage,
+          openedAt: position.openedAt,
+          closedAt,
+          holdingTimeSeconds,
+          closeReason: 'emergency_cancel',
           leverage: position.leverage,
-          pnl: realizedPnl,
-          closeReason: 'competition_cancelled',
-          entryTime: position.openedAt,
-          exitTime: new Date(),
-          holdingTimeSeconds: Math.floor((Date.now() - position.openedAt.getTime()) / 1000),
+          marginUsed: position.marginUsed || 0,
+          hadStopLoss: !!position.stopLoss,
+          stopLossPrice: position.stopLoss,
+          hadTakeProfit: !!position.takeProfit,
+          takeProfitPrice: position.takeProfit,
+          openOrderId: position.orderId || `emergency_${position._id}`,
+          closeOrderId: `emergency_close_${position._id}`,
+          isWinner: realizedPnl > 0,
         }], { session: mongoSession });
 
         closedPositions++;

@@ -205,6 +205,51 @@ class NotificationService {
   }
 
   /**
+   * Create a custom notification directly (without template)
+   * Compatible with main app's notification service
+   */
+  async createCustom(data: {
+    userId: string;
+    type: string;
+    title: string;
+    message: string;
+    icon?: string;
+    category?: string;
+    priority?: string;
+    color?: string;
+    actionUrl?: string;
+    actionText?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<INotification | null> {
+    try {
+      await connectToDatabase();
+
+      const notification = await Notification.create({
+        userId: data.userId,
+        templateId: `custom_${data.type}`,
+        title: data.title,
+        message: data.message,
+        icon: data.icon || 'bell',
+        category: data.category || 'system',
+        type: data.type,
+        priority: data.priority || 'normal',
+        color: data.color || 'blue',
+        actionUrl: data.actionUrl,
+        actionText: data.actionText,
+        isRead: false,
+        metadata: data.metadata || {},
+        isInstant: true,
+      });
+
+      console.log(`📬 Custom notification created for user ${data.userId}`);
+      return notification;
+    } catch (error) {
+      console.error('Error creating custom notification:', error);
+      return null;
+    }
+  }
+
+  /**
    * Send notification to multiple users
    */
   async sendBulk(params: SendBulkNotificationParams): Promise<number> {

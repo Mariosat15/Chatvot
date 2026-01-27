@@ -29,7 +29,7 @@ export interface ITradeHistory extends Document {
   holdingTimeSeconds: number; // Duration
   
   // How Trade Closed
-  closeReason: 'user' | 'stop_loss' | 'take_profit' | 'margin_call' | 'competition_end' | 'challenge_end';
+  closeReason: 'user' | 'stop_loss' | 'take_profit' | 'margin_call' | 'competition_end' | 'challenge_end' | 'competition_cancelled' | 'emergency_cancel';
   
   // Leverage & Margin
   leverage: number;
@@ -149,7 +149,7 @@ const TradeHistorySchema = new Schema<ITradeHistory>(
     closeReason: {
       type: String,
       required: true,
-      enum: ['user', 'stop_loss', 'take_profit', 'margin_call', 'competition_end', 'challenge_end'],
+      enum: ['user', 'stop_loss', 'take_profit', 'margin_call', 'competition_end', 'challenge_end', 'competition_cancelled', 'emergency_cancel'],
     },
     leverage: {
       type: Number,
