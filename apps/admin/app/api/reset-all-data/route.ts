@@ -429,6 +429,60 @@ export async function POST(request: Request) {
     } catch (e) {
       console.log('⚠️ No admin operations collection found');
     }
+    
+    // Delete AI agent audits
+    const aiAgentAuditsCollection = mongoose.connection.collection('aiagentaudits');
+    try {
+      const aiAuditsDeleted = await aiAgentAuditsCollection.deleteMany({});
+      console.log(`✅ Deleted ${aiAuditsDeleted.deletedCount} AI agent audits`);
+    } catch (e) {
+      console.log('⚠️ No AI agent audits collection found');
+    }
+    
+    // Delete historical fetch status
+    const historicalFetchStatusCollection = mongoose.connection.collection('historical_fetch_status');
+    try {
+      const historicalFetchDeleted = await historicalFetchStatusCollection.deleteMany({});
+      console.log(`✅ Deleted ${historicalFetchDeleted.deletedCount} historical fetch status records`);
+    } catch (e) {
+      console.log('⚠️ No historical fetch status collection found');
+    }
+    
+    // Delete price caches
+    const priceCachesCollection = mongoose.connection.collection('pricecaches');
+    try {
+      const priceCachesDeleted = await priceCachesCollection.deleteMany({});
+      console.log(`✅ Deleted ${priceCachesDeleted.deletedCount} price caches`);
+    } catch (e) {
+      console.log('⚠️ No price caches collection found');
+    }
+    
+    // Delete price health alerts
+    const priceHealthAlertsCollection = mongoose.connection.collection('pricehealthalerts');
+    try {
+      const priceHealthAlertsDeleted = await priceHealthAlertsCollection.deleteMany({});
+      console.log(`✅ Deleted ${priceHealthAlertsDeleted.deletedCount} price health alerts`);
+    } catch (e) {
+      console.log('⚠️ No price health alerts collection found');
+    }
+    
+    // Delete price logs
+    const priceLogsCollection = mongoose.connection.collection('pricelogs');
+    try {
+      const priceLogsDeleted = await priceLogsCollection.deleteMany({});
+      console.log(`✅ Deleted ${priceLogsDeleted.deletedCount} price logs`);
+    } catch (e) {
+      console.log('⚠️ No price logs collection found');
+    }
+    
+    // Delete security logs
+    const securityLogsCollection = mongoose.connection.collection('securitylogs');
+    try {
+      const securityLogsDeleted = await securityLogsCollection.deleteMany({});
+      console.log(`✅ Deleted ${securityLogsDeleted.deletedCount} security logs`);
+    } catch (e) {
+      console.log('⚠️ No security logs collection found');
+    }
 
     // Delete orphan credit wallets (where user no longer exists)
     if (orphanWalletIds.length > 0) {
