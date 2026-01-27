@@ -2306,8 +2306,12 @@ async function runRealChallengeTest(
 
   const now = new Date();
   const entryFee = 100;
-  const prizePool = entryFee * 2;
-  const winnerPrize = prizePool; // No platform fee for simplicity
+  const prizePool = entryFee * 2; // 200
+  // For referral fee tests, we need a platform fee (GM fees come FROM platform fee)
+  const hasPlatformFee = scenario.gameMasters && scenario.gameMasters.length > 0;
+  const platformFeePercent = hasPlatformFee ? 10 : 0;
+  const platformFee = prizePool * (platformFeePercent / 100);
+  const winnerPrize = prizePool - platformFee; // 180 if 10% fee, 200 if no fee
 
   // For early end tests: end time is in the future
   // For normal end tests: end time is in the past
@@ -2359,8 +2363,8 @@ async function runRealChallengeTest(
     entryFee,
     prizePool,
     winnerPrize,
-    platformFeePercentage: 0,
-    platformFeeAmount: 0,
+    platformFeePercentage: platformFeePercent,
+    platformFeeAmount: platformFee,
     startingCapital: 10000,
     startTime: new Date(now.getTime() - 2 * 60 * 60 * 1000),
     endTime,
