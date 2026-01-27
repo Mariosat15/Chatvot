@@ -1548,12 +1548,26 @@ async function createGmReferralData(
       const referralId = new mongoose.Types.ObjectId();
       testDataIds.push(`referral:${referralId}`);
 
+      // Get GM email from the GM config
+      const gmConfig = scenario.gameMasters?.find(gm => gm.gmId === p.referredByGmId);
+      const gmEmail = `${testRunId}_gm_${p.referredByGmId}@test.com`;
+      const userEmail = `${testRunId}_participant_${i}@test.com`;
+      const userName = `${testRunId}_User${i + 1}`;
+      
       await referralsCollection.insertOne({
         _id: referralId,
         gameMasterId: gmUserId.toString(),
+        gameMasterEmail: gmEmail,
         referralCode: gmReferralCode,
         userId: participantUserId.toString(),
-        status: 'active',
+        userEmail: userEmail,
+        userName: userName,
+        referredAt: now,
+        isActive: true, // Required field - production code queries for this!
+        totalEntryFees: 0,
+        totalGMEarnings: 0,
+        competitionsEntered: 0,
+        challengesEntered: 0,
         testRunId,
         createdAt: now,
         updatedAt: now,
