@@ -54,8 +54,11 @@ export const AdminRoleTemplate: Model<IAdminRoleTemplate> =
   (models?.AdminRoleTemplate as Model<IAdminRoleTemplate>) || 
   model<IAdminRoleTemplate>('AdminRoleTemplate', AdminRoleTemplateSchema);
 
+// Type for default templates (excludes Document properties and auto-generated timestamps)
+type RoleTemplateInput = Omit<IAdminRoleTemplate, keyof Document | 'createdAt' | 'updatedAt'>;
+
 // Default role templates
-export const DEFAULT_ROLE_TEMPLATES: Omit<IAdminRoleTemplate, keyof Document>[] = [
+export const DEFAULT_ROLE_TEMPLATES: RoleTemplateInput[] = [
   {
     name: 'Full Admin',
     description: 'Full access to all admin sections except employee management',
