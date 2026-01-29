@@ -39,6 +39,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { CaseStudies, DemoScheduler } from '@/components/landing/enterprise';
 
 // Icon mapping
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -79,11 +80,33 @@ interface EnterpriseSettings {
     trustBadges: boolean;
     whiteLabel: boolean;
     adminShowcase: boolean;
+    caseStudies?: boolean;
     pricing: boolean;
     contact: boolean;
     footer: boolean;
   };
   footerCopyright: string;
+  // Case Studies
+  caseStudies?: Array<{
+    id: string;
+    companyName: string;
+    companyLogo: string;
+    industry: string;
+    quote: string;
+    quotePerson: string;
+    quoteTitle: string;
+    metrics: { label: string; value: string }[];
+    enabled: boolean;
+    order: number;
+  }>;
+  caseStudiesTitle?: string;
+  caseStudiesSubtitle?: string;
+  // Demo Scheduling
+  demoScheduling?: {
+    enabled: boolean;
+    calendlyUrl: string;
+    buttonText: string;
+  };
 }
 
 export default function EnterprisePage() {
@@ -464,6 +487,22 @@ export default function EnterprisePage() {
         </section>
       )}
 
+      {/* Case Studies Section */}
+      {settings.sectionVisibility.caseStudies && settings.caseStudies && settings.caseStudies.length > 0 && (
+        <CaseStudies
+          effectiveColors={{
+            primary: '#a855f7',
+            secondary: '#ec4899',
+            accent: '#fbbf24',
+            text: '#ffffff',
+          }}
+          effectiveHeadingFont="inherit"
+          caseStudies={settings.caseStudies}
+          title={settings.caseStudiesTitle || 'Success Stories'}
+          subtitle={settings.caseStudiesSubtitle || 'See how our clients are succeeding'}
+        />
+      )}
+
       {/* Contact Section */}
       {settings.sectionVisibility.contact && (
         <section id="contact" className="py-24 bg-gradient-to-b from-gray-900/50 to-gray-950">
@@ -506,10 +545,24 @@ export default function EnterprisePage() {
               </div>
               <div className="text-center">
                 <p className="text-gray-400 mb-4">Or schedule a demo call with our team</p>
-                <Button size="lg" className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-bold px-12">
-                  {settings.contactCTAText}
-                  <ChevronRight className="h-5 w-5 ml-2" />
-                </Button>
+                {settings.demoScheduling?.enabled && settings.demoScheduling?.calendlyUrl ? (
+                  <DemoScheduler
+                    effectiveColors={{
+                      primary: '#a855f7',
+                      secondary: '#ec4899',
+                      accent: '#fbbf24',
+                      text: '#ffffff',
+                    }}
+                    effectiveHeadingFont="inherit"
+                    calendlyUrl={settings.demoScheduling.calendlyUrl}
+                    buttonText={settings.demoScheduling.buttonText || settings.contactCTAText}
+                  />
+                ) : (
+                  <Button size="lg" className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-bold px-12">
+                    {settings.contactCTAText}
+                    <ChevronRight className="h-5 w-5 ml-2" />
+                  </Button>
+                )}
               </div>
             </motion.div>
           </div>

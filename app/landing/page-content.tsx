@@ -35,6 +35,17 @@ import { Button } from '@/components/ui/button';
 import { getThemeById, LandingTheme, getActiveHolidayTheme, defaultHolidaySchedule } from '@/lib/themes/landing-themes';
 import ThemedBackground from '@/components/landing/ThemedBackground';
 import GlobalThemeEffects from '@/components/theme/GlobalThemeEffects';
+import {
+  LiveStatsBar,
+  LiveCompetitions,
+  LiveChallenges,
+  LiveActivityFeed,
+  LeaderboardPreview,
+  TestimonialsSection,
+  FAQSection,
+  TrustBadges,
+  FinalCTA,
+} from '@/components/landing/sections';
 
 // Icon mapping
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -77,9 +88,52 @@ interface HeroSettings {
   ctaButtonText: string;
   ctaButtonLink: string;
   sectionVisibility: {
-    hero: boolean; features: boolean; stats: boolean; howItWorks: boolean;
-    competitions: boolean; challenges: boolean; cta: boolean; footer: boolean;
+    hero: boolean; features: boolean; stats: boolean; liveStats?: boolean; howItWorks: boolean;
+    competitions: boolean; challenges: boolean; leaderboard?: boolean; activityFeed?: boolean;
+    testimonials?: boolean; trustBadges?: boolean; faq?: boolean; cta: boolean; footer: boolean;
   };
+  // Trust Badges
+  trustBadges?: Array<{
+    id: string;
+    type: 'security' | 'partner' | 'press' | 'award';
+    name: string;
+    logo: string;
+    url?: string;
+    enabled: boolean;
+  }>;
+  trustBadgesTitle?: string;
+  // Live Data Settings
+  liveDataSettings?: {
+    showRealStats?: boolean;
+    showActivityFeed?: boolean;
+    showLeaderboardPreview?: boolean;
+    activityFeedRefreshRate?: number;
+    statsRefreshRate?: number;
+  };
+  // Testimonials
+  testimonialsTitle?: string;
+  testimonialsSubtitle?: string;
+  testimonials?: Array<{
+    id: string;
+    name: string;
+    role: string;
+    avatar: string;
+    content: string;
+    rating: number;
+    enabled: boolean;
+    order: number;
+  }>;
+  // FAQ
+  faqTitle?: string;
+  faqSubtitle?: string;
+  faqItems?: Array<{
+    id: string;
+    question: string;
+    answer: string;
+    category: string;
+    order: number;
+    enabled: boolean;
+  }>;
   footerCopyright: string;
   footerDisclaimer?: string;
   footerRiskDisclaimer?: string;
@@ -625,8 +679,18 @@ export default function LandingPageContent() {
         </section>
       )}
 
-      {/* Stats Section - Theme Aware */}
-      {settings.sectionVisibility.stats && settings.stats.length > 0 && (
+      {/* Live Stats Bar - Real Platform Metrics */}
+      {settings.sectionVisibility.liveStats && settings.liveDataSettings?.showRealStats && (
+        <LiveStatsBar
+          theme={theme}
+          effectiveColors={effectiveColors}
+          customStats={settings.stats}
+          animated={settings.statsAnimated}
+        />
+      )}
+
+      {/* Stats Section - Theme Aware (now shows custom stats, not live) */}
+      {settings.sectionVisibility.stats && !settings.sectionVisibility.liveStats && settings.stats.length > 0 && (
         <section className="py-20 relative overflow-hidden">
           <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, ${effectiveColors.primary}08, transparent, ${effectiveColors.secondary}08)` }} />
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -781,9 +845,23 @@ export default function LandingPageContent() {
         </section>
       )}
 
-      {/* Competitions Section - Theme Aware */}
+      {/* Competitions Section - Now using Live Data */}
       {settings.sectionVisibility.competitions && (
-        <section id="competitions" className="py-24 relative overflow-hidden">
+        <LiveCompetitions
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.competitionsTitle}
+          subtitle={settings.competitionsSubtitle}
+          description={settings.competitionsDescription}
+          ctaText={settings.competitionsCTAText}
+          ctaLink={settings.competitionsCTALink}
+        />
+      )}
+
+      {/* Legacy Competitions Section - Removed, now using LiveCompetitions above */}
+      {false && settings?.sectionVisibility?.competitions && (
+        <section id="competitions-legacy" className="py-24 relative overflow-hidden">
           <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at left, ${effectiveColors.primary}15, transparent)` }} />
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -797,11 +875,11 @@ export default function LandingPageContent() {
                   }}
                 >
                   <span>{theme?.themeIcons?.trophy || '🏆'}</span>
-                  {settings.competitionsSubtitle}
+                  {settings?.competitionsSubtitle}
                 </div>
-                <h2 className="text-4xl md:text-5xl font-black mb-6" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>{settings.competitionsTitle}</h2>
-                <p className="text-lg mb-8 leading-relaxed" style={{ color: theme?.colors.textMuted }}>{settings.competitionsDescription}</p>
-                <Link href={settings.competitionsCTALink}>
+                <h2 className="text-4xl md:text-5xl font-black mb-6" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>{settings?.competitionsTitle}</h2>
+                <p className="text-lg mb-8 leading-relaxed" style={{ color: theme?.colors.textMuted }}>{settings?.competitionsDescription}</p>
+                <Link href={settings?.competitionsCTALink || '/competitions'}>
                   <Button 
                     size="lg" 
                     className="font-bold hover:scale-105 transition-all"
@@ -811,7 +889,7 @@ export default function LandingPageContent() {
                       boxShadow: `0 10px 30px ${theme?.colors.accentGlow}`,
                     }}
                   >
-                    {settings.competitionsCTAText}
+                    {settings?.competitionsCTAText}
                     <ChevronRight className="h-5 w-5 ml-2" />
                   </Button>
                 </Link>
@@ -863,111 +941,91 @@ export default function LandingPageContent() {
         </section>
       )}
 
-      {/* Challenges Section - Theme Aware */}
+      {/* Challenges Section - Now using Live Data */}
       {settings.sectionVisibility.challenges && (
-        <section id="challenges" className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at right, ${effectiveColors.secondary}15, transparent)` }} />
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="lg:order-2">
-                <div 
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-6"
-                  style={{ 
-                    backgroundColor: `${effectiveColors.secondary}15`,
-                    border: `1px solid ${effectiveColors.secondary}30`,
-                    color: effectiveColors.secondary,
-                  }}
-                >
-                  <span>{theme?.themeIcons?.battle || '⚔️'}</span>
-                  {settings.challengesSubtitle}
-                </div>
-                <h2 className="text-4xl md:text-5xl font-black mb-6" style={{ color: effectiveColors.text, fontFamily: effectiveHeadingFont }}>{settings.challengesTitle}</h2>
-                <p className="text-lg mb-8 leading-relaxed" style={{ color: theme?.colors.textMuted }}>{settings.challengesDescription}</p>
-                <Link href={settings.challengesCTALink}>
-                  <Button 
-                    size="lg" 
-                    variant="outline" 
-                    className="font-bold hover:scale-105 transition-all border-2"
-                    style={{ 
-                      borderColor: `${effectiveColors.secondary}80`,
-                      color: effectiveColors.secondary,
-                    }}
-                  >
-                    {settings.challengesCTAText}
-                    <ArrowRight className="h-5 w-5 ml-2" />
-                  </Button>
-                </Link>
-              </motion.div>
+        <LiveChallenges
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.challengesTitle}
+          subtitle={settings.challengesSubtitle}
+          description={settings.challengesDescription}
+          ctaText={settings.challengesCTAText}
+          ctaLink={settings.challengesCTALink}
+        />
+      )}
 
-              <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="lg:order-1">
-                <div 
-                  className="relative p-8 rounded-3xl overflow-hidden"
-                  style={{ 
-                    backgroundColor: theme?.colors.backgroundCard,
-                    border: `1px solid ${theme?.colors.border}`,
-                  }}
-                >
-                  {/* Decorative glow */}
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full blur-3xl" style={{ backgroundColor: `${effectiveColors.secondary}30` }} />
-                  
-                  <div className="relative flex items-center justify-between gap-4">
-                    <div className="text-center flex-1">
-                      <motion.div
-                        animate={{ scale: [1, 1.05, 1] }}
-                        transition={{ repeat: Infinity, duration: 2 }}
-                        className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl border-2"
-                        style={{ 
-                          background: `linear-gradient(135deg, ${effectiveColors.primary}30, ${effectiveColors.accent}30)`,
-                          borderColor: `${effectiveColors.primary}40`,
-                        }}
-                      >
-                        {theme?.themeIcons?.special || '👑'}
-                      </motion.div>
-                      <p className="font-bold text-lg" style={{ color: effectiveColors.text }}>You</p>
-                      <p className="text-sm" style={{ color: theme?.colors.textMuted }}>Score: 0</p>
-                    </div>
-                    
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ repeat: Infinity, duration: 1.5 }}
-                      className="text-5xl font-black bg-clip-text text-transparent"
-                      style={{ backgroundImage: theme?.effects.gradientStyle, fontFamily: effectiveHeadingFont }}
-                    >
-                      VS
-                    </motion.div>
-                    
-                    <div className="text-center flex-1">
-                      <div 
-                        className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl border-2"
-                        style={{ 
-                          background: `linear-gradient(135deg, ${effectiveColors.secondary}30, ${effectiveColors.accent}30)`,
-                          borderColor: `${effectiveColors.secondary}40`,
-                        }}
-                      >
-                        {theme?.themeIcons?.battle || '🎯'}
-                      </div>
-                      <p className="font-bold text-lg" style={{ color: effectiveColors.text }}>Opponent</p>
-                      <p className="text-sm" style={{ color: theme?.colors.textMuted }}>Score: 0</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-8 flex items-center justify-center gap-4">
-                    <div className="px-4 py-2 rounded-xl text-sm" style={{ backgroundColor: `${theme?.colors.backgroundSecondary}`, color: theme?.colors.textMuted }}>
-                      <span style={{ color: effectiveColors.primary }}>⏱️</span> Duration: 24h
-                    </div>
-                    <div className="px-4 py-2 rounded-xl text-sm" style={{ backgroundColor: `${theme?.colors.backgroundSecondary}`, color: theme?.colors.textMuted }}>
-                      <span style={{ color: effectiveColors.primary }}>{theme?.themeIcons?.currency || '💰'}</span> Stake: 100 Credits
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
+      {/* Live Activity Feed - Only show if liveDataSettings.showActivityFeed */}
+      {settings.sectionVisibility.activityFeed && settings.liveDataSettings?.showActivityFeed && (
+        <section className="py-12 relative overflow-hidden">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <LiveActivityFeed
+              theme={theme}
+              effectiveColors={effectiveColors}
+              refreshInterval={settings.liveDataSettings?.activityFeedRefreshRate || 30000}
+            />
           </div>
         </section>
       )}
 
+      {/* Leaderboard Preview - Only show if liveDataSettings.showLeaderboardPreview */}
+      {settings.sectionVisibility.leaderboard && settings.liveDataSettings?.showLeaderboardPreview && (
+        <LeaderboardPreview
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+        />
+      )}
+
+      {/* Testimonials Section */}
+      {settings.sectionVisibility.testimonials && settings.testimonials && settings.testimonials.length > 0 && (
+        <TestimonialsSection
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          testimonials={settings.testimonials}
+          title={settings.testimonialsTitle}
+          subtitle={settings.testimonialsSubtitle}
+        />
+      )}
+
+      {/* Trust Badges */}
+      {settings.sectionVisibility.trustBadges && settings.trustBadges && settings.trustBadges.length > 0 && (
+        <TrustBadges
+          theme={theme}
+          effectiveColors={effectiveColors}
+          badges={settings.trustBadges}
+          title={settings.trustBadgesTitle}
+        />
+      )}
+
+      {/* FAQ Section */}
+      {settings.sectionVisibility.faq && settings.faqItems && settings.faqItems.length > 0 && (
+        <FAQSection
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          faqItems={settings.faqItems}
+          title={settings.faqTitle}
+          subtitle={settings.faqSubtitle}
+        />
+      )}
+
       {/* Final CTA - Theme Aware */}
       {settings.sectionVisibility.cta && (
+        <FinalCTA
+          theme={theme}
+          effectiveColors={effectiveColors}
+          effectiveHeadingFont={effectiveHeadingFont}
+          title={settings.ctaTitle}
+          subtitle={settings.ctaSubtitle}
+          primaryCTA={{ text: settings.ctaButtonText, href: settings.ctaButtonLink }}
+          secondaryCTA={{ text: 'View Competitions', href: '/competitions' }}
+        />
+      )}
+
+      {/* Legacy Final CTA - Fallback (remove once FinalCTA is confirmed working) */}
+      {false && settings?.sectionVisibility?.cta && (
         <section className="py-32 relative overflow-hidden">
           <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${effectiveColors.primary}15, ${effectiveColors.accent}08, ${effectiveColors.secondary}15)` }} />
           <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at center, ${effectiveColors.primary}15, transparent)` }} />
@@ -982,12 +1040,12 @@ export default function LandingPageContent() {
                 style={{ fontFamily: effectiveHeadingFont }}
               >
                 <span className="bg-clip-text text-transparent" style={{ backgroundImage: theme?.effects.gradientStyle }}>
-                  {settings.ctaTitle}
+                  {settings?.ctaTitle}
                 </span>
               </motion.h2>
-              <p className="text-xl mb-4" style={{ color: effectiveColors.text }}>{settings.ctaSubtitle}</p>
-              <p className="mb-12 max-w-2xl mx-auto" style={{ color: theme?.colors.textMuted }}>{settings.ctaDescription}</p>
-              <Link href={settings.ctaButtonLink}>
+              <p className="text-xl mb-4" style={{ color: effectiveColors.text }}>{settings?.ctaSubtitle}</p>
+              <p className="mb-12 max-w-2xl mx-auto" style={{ color: theme?.colors.textMuted }}>{settings?.ctaDescription}</p>
+              <Link href={settings?.ctaButtonLink || '/sign-up'}>
                 <Button
                   size="lg"
                   className="text-xl px-14 py-8 font-black hover:scale-110 transition-all duration-300"
@@ -998,7 +1056,7 @@ export default function LandingPageContent() {
                     fontFamily: effectiveHeadingFont,
                   }}
                 >
-                  {settings.ctaButtonText}
+                  {settings?.ctaButtonText}
                   <span className="ml-3 text-2xl">{theme?.heroTextStyle?.ctaIcon || '🚀'}</span>
                 </Button>
               </Link>

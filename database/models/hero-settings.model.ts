@@ -67,12 +67,15 @@ export interface ISectionVisibility {
   hero: boolean;
   features: boolean;
   stats: boolean;
+  liveStats: boolean;
   howItWorks: boolean;
   competitions: boolean;
   challenges: boolean;
   leaderboard: boolean;
+  activityFeed: boolean;
   marketplace: boolean;
   testimonials: boolean;
+  trustBadges: boolean;
   adminShowcase: boolean;
   whiteLabel: boolean;
   pricing: boolean;
@@ -99,6 +102,39 @@ export interface IFAQItem {
   category: string;
   order: number;
   enabled: boolean;
+}
+
+// Trust badge interface
+export interface ITrustBadge {
+  id: string;
+  type: 'security' | 'partner' | 'press' | 'award';
+  name: string;
+  logo: string;
+  url?: string;
+  enabled: boolean;
+}
+
+// Case study interface
+export interface ICaseStudy {
+  id: string;
+  companyName: string;
+  companyLogo: string;
+  industry: string;
+  quote: string;
+  quotePerson: string;
+  quoteTitle: string;
+  metrics: { label: string; value: string }[];
+  enabled: boolean;
+  order: number;
+}
+
+// Live data settings interface
+export interface ILiveDataSettings {
+  showRealStats: boolean;
+  showActivityFeed: boolean;
+  showLeaderboardPreview: boolean;
+  activityFeedRefreshRate: number;
+  statsRefreshRate: number;
 }
 
 // Pricing tier
@@ -346,6 +382,13 @@ export interface IHeroSettings extends Document {
   sectionVisibility: ISectionVisibility;
   sectionOrder: string[];
   
+  // Trust Badges (Landing Page)
+  trustBadges: ITrustBadge[];
+  trustBadgesTitle: string;
+  
+  // Live Data Settings
+  liveDataSettings: ILiveDataSettings;
+  
   // SEO
   seo: {
     metaTitle: string;
@@ -429,12 +472,25 @@ export interface IHeroSettings extends Document {
   enterpriseContactPhone: string;
   enterpriseContactCTAText: string;
   
+  // Enterprise Case Studies
+  enterpriseCaseStudies: ICaseStudy[];
+  enterpriseCaseStudiesTitle: string;
+  enterpriseCaseStudiesSubtitle: string;
+  
+  // Demo Scheduling
+  enterpriseDemoScheduling: {
+    enabled: boolean;
+    calendlyUrl: string;
+    buttonText: string;
+  };
+  
   // Enterprise Section Visibility
   enterpriseSectionVisibility: {
     hero: boolean;
     trustBadges: boolean;
     whiteLabel: boolean;
     adminShowcase: boolean;
+    caseStudies: boolean;
     pricing: boolean;
     contact: boolean;
     footer: boolean;
@@ -859,12 +915,15 @@ const HeroSettingsSchema = new Schema<IHeroSettings>({
     hero: { type: Boolean, default: true },
     features: { type: Boolean, default: true },
     stats: { type: Boolean, default: true },
+    liveStats: { type: Boolean, default: true },
     howItWorks: { type: Boolean, default: true },
     competitions: { type: Boolean, default: true },
     challenges: { type: Boolean, default: true },
     leaderboard: { type: Boolean, default: true },
+    activityFeed: { type: Boolean, default: true },
     marketplace: { type: Boolean, default: true },
     testimonials: { type: Boolean, default: false },
+    trustBadges: { type: Boolean, default: false },
     adminShowcase: { type: Boolean, default: true },
     whiteLabel: { type: Boolean, default: true },
     pricing: { type: Boolean, default: false },
@@ -873,10 +932,23 @@ const HeroSettingsSchema = new Schema<IHeroSettings>({
     footer: { type: Boolean, default: true },
   },
   sectionOrder: { type: [String], default: [
-    'hero', 'stats', 'features', 'howItWorks', 'competitions', 
-    'challenges', 'leaderboard', 'marketplace', 'adminShowcase', 
-    'whiteLabel', 'testimonials', 'pricing', 'faq', 'cta', 'footer'
+    'hero', 'liveStats', 'stats', 'features', 'howItWorks', 'competitions', 
+    'challenges', 'activityFeed', 'leaderboard', 'marketplace', 'testimonials',
+    'trustBadges', 'adminShowcase', 'whiteLabel', 'pricing', 'faq', 'cta', 'footer'
   ]},
+  
+  // Trust Badges (Landing Page)
+  trustBadges: { type: [Object], default: [] },
+  trustBadgesTitle: { type: String, default: 'Trusted By Traders Worldwide' },
+  
+  // Live Data Settings
+  liveDataSettings: {
+    showRealStats: { type: Boolean, default: true },
+    showActivityFeed: { type: Boolean, default: true },
+    showLeaderboardPreview: { type: Boolean, default: true },
+    activityFeedRefreshRate: { type: Number, default: 30000 },
+    statsRefreshRate: { type: Number, default: 60000 },
+  },
   
   // SEO
   seo: {
@@ -954,12 +1026,25 @@ const HeroSettingsSchema = new Schema<IHeroSettings>({
   enterpriseContactPhone: { type: String, default: '+1 (234) 567-890' },
   enterpriseContactCTAText: { type: String, default: 'Schedule Demo' },
   
+  // Enterprise Case Studies
+  enterpriseCaseStudies: { type: [Object], default: [] },
+  enterpriseCaseStudiesTitle: { type: String, default: 'Success Stories' },
+  enterpriseCaseStudiesSubtitle: { type: String, default: 'See how our clients are succeeding with their trading platforms' },
+  
+  // Demo Scheduling
+  enterpriseDemoScheduling: {
+    enabled: { type: Boolean, default: false },
+    calendlyUrl: { type: String, default: '' },
+    buttonText: { type: String, default: 'Schedule a Demo' },
+  },
+  
   // Enterprise Section Visibility
   enterpriseSectionVisibility: {
     hero: { type: Boolean, default: true },
     trustBadges: { type: Boolean, default: true },
     whiteLabel: { type: Boolean, default: true },
     adminShowcase: { type: Boolean, default: true },
+    caseStudies: { type: Boolean, default: false },
     pricing: { type: Boolean, default: true },
     contact: { type: Boolean, default: true },
     footer: { type: Boolean, default: true },

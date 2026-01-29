@@ -226,12 +226,15 @@ interface HeroSettings {
     hero: boolean;
     features: boolean;
     stats: boolean;
+    liveStats: boolean;
     howItWorks: boolean;
     competitions: boolean;
     challenges: boolean;
     leaderboard: boolean;
+    activityFeed: boolean;
     marketplace: boolean;
     testimonials: boolean;
+    trustBadges: boolean;
     adminShowcase: boolean;
     whiteLabel: boolean;
     pricing: boolean;
@@ -239,6 +242,48 @@ interface HeroSettings {
     cta: boolean;
     footer: boolean;
   };
+  // Trust Badges
+  trustBadges: Array<{
+    id: string;
+    type: 'security' | 'partner' | 'press' | 'award';
+    name: string;
+    logo: string;
+    url?: string;
+    enabled: boolean;
+  }>;
+  trustBadgesTitle: string;
+  // Live Data Settings
+  liveDataSettings: {
+    showRealStats: boolean;
+    showActivityFeed: boolean;
+    showLeaderboardPreview: boolean;
+    activityFeedRefreshRate: number;
+    statsRefreshRate: number;
+  };
+  // Testimonials
+  testimonialsTitle: string;
+  testimonialsSubtitle: string;
+  testimonials: Array<{
+    id: string;
+    name: string;
+    role: string;
+    avatar: string;
+    content: string;
+    rating: number;
+    enabled: boolean;
+    order: number;
+  }>;
+  // FAQ
+  faqTitle: string;
+  faqSubtitle: string;
+  faqItems: Array<{
+    id: string;
+    question: string;
+    answer: string;
+    category: string;
+    order: number;
+    enabled: boolean;
+  }>;
   seo: {
     metaTitle: string;
     metaDescription: string;
@@ -382,12 +427,15 @@ const defaultSettings: HeroSettings = {
     hero: true,
     features: true,
     stats: true,
+    liveStats: true,
     howItWorks: true,
     competitions: true,
     challenges: true,
     leaderboard: true,
+    activityFeed: true,
     marketplace: true,
     testimonials: false,
+    trustBadges: false,
     adminShowcase: true,
     whiteLabel: true,
     pricing: false,
@@ -395,6 +443,21 @@ const defaultSettings: HeroSettings = {
     cta: true,
     footer: true,
   },
+  trustBadges: [],
+  trustBadgesTitle: 'Trusted By Traders Worldwide',
+  liveDataSettings: {
+    showRealStats: true,
+    showActivityFeed: true,
+    showLeaderboardPreview: true,
+    activityFeedRefreshRate: 30000,
+    statsRefreshRate: 60000,
+  },
+  testimonialsTitle: 'What Our Traders Say',
+  testimonialsSubtitle: 'Real Stories from Real Winners',
+  testimonials: [],
+  faqTitle: 'Frequently Asked Questions',
+  faqSubtitle: "Got Questions? We've Got Answers",
+  faqItems: [],
   seo: {
     metaTitle: '',
     metaDescription: '',
@@ -1381,6 +1444,452 @@ export default function HeroPageSection() {
                       onChange={(e) => updateSettings('whiteLabelCTALink', e.target.value)}
                       className="bg-gray-900 border-gray-600 text-white mt-1"
                     />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Live Data Settings */}
+            <AccordionItem value="livedata" className="bg-gray-800 border border-gray-700 rounded-lg">
+              <AccordionTrigger className="px-4 text-white hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-yellow-500" />
+                  Live Data Settings
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4 space-y-4">
+                <p className="text-sm text-gray-400 mb-4">
+                  Configure real-time data feeds for your landing page including live stats, activity feed, and leaderboard.
+                </p>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-white">Show Real Stats</Label>
+                      <p className="text-xs text-gray-500">Display actual platform statistics</p>
+                    </div>
+                    <Switch
+                      checked={settings.liveDataSettings?.showRealStats ?? true}
+                      onCheckedChange={(v) => updateSettings('liveDataSettings.showRealStats', v)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-white">Show Activity Feed</Label>
+                      <p className="text-xs text-gray-500">Live feed of recent platform activity</p>
+                    </div>
+                    <Switch
+                      checked={settings.liveDataSettings?.showActivityFeed ?? true}
+                      onCheckedChange={(v) => updateSettings('liveDataSettings.showActivityFeed', v)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-white">Show Leaderboard Preview</Label>
+                      <p className="text-xs text-gray-500">Top traders preview on landing page</p>
+                    </div>
+                    <Switch
+                      checked={settings.liveDataSettings?.showLeaderboardPreview ?? true}
+                      onCheckedChange={(v) => updateSettings('liveDataSettings.showLeaderboardPreview', v)}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-gray-400">Stats Refresh Rate (ms)</Label>
+                      <Input
+                        type="number"
+                        value={settings.liveDataSettings?.statsRefreshRate ?? 60000}
+                        onChange={(e) => updateSettings('liveDataSettings.statsRefreshRate', parseInt(e.target.value))}
+                        className="bg-gray-900 border-gray-600 text-white mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-gray-400">Activity Feed Refresh Rate (ms)</Label>
+                      <Input
+                        type="number"
+                        value={settings.liveDataSettings?.activityFeedRefreshRate ?? 30000}
+                        onChange={(e) => updateSettings('liveDataSettings.activityFeedRefreshRate', parseInt(e.target.value))}
+                        className="bg-gray-900 border-gray-600 text-white mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Testimonials Section */}
+            <AccordionItem value="testimonials" className="bg-gray-800 border border-gray-700 rounded-lg">
+              <AccordionTrigger className="px-4 text-white hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-purple-500" />
+                  Testimonials
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-400">Section Title</Label>
+                    <Input
+                      value={settings.testimonialsTitle || 'What Our Traders Say'}
+                      onChange={(e) => updateSettings('testimonialsTitle', e.target.value)}
+                      className="bg-gray-900 border-gray-600 text-white mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-400">Section Subtitle</Label>
+                    <Input
+                      value={settings.testimonialsSubtitle || 'Real Stories from Real Winners'}
+                      onChange={(e) => updateSettings('testimonialsSubtitle', e.target.value)}
+                      className="bg-gray-900 border-gray-600 text-white mt-1"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-white">Testimonials</Label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const newTestimonial = {
+                          id: `testimonial-${Date.now()}`,
+                          name: 'New Trader',
+                          role: 'Professional Trader',
+                          avatar: '',
+                          content: 'Your testimonial text here...',
+                          rating: 5,
+                          enabled: true,
+                          order: (settings.testimonials?.length || 0) + 1,
+                        };
+                        updateSettings('testimonials', [...(settings.testimonials || []), newTestimonial]);
+                      }}
+                      className="border-purple-500 text-purple-400 hover:bg-purple-500/20"
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Add Testimonial
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {(settings.testimonials || []).map((testimonial, index) => (
+                      <div key={testimonial.id} className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                          <Input
+                            placeholder="Name"
+                            value={testimonial.name}
+                            onChange={(e) => {
+                              const updated = [...settings.testimonials];
+                              updated[index] = { ...testimonial, name: e.target.value };
+                              updateSettings('testimonials', updated);
+                            }}
+                            className="bg-gray-800 border-gray-600 text-white"
+                          />
+                          <Input
+                            placeholder="Role / Title"
+                            value={testimonial.role}
+                            onChange={(e) => {
+                              const updated = [...settings.testimonials];
+                              updated[index] = { ...testimonial, role: e.target.value };
+                              updateSettings('testimonials', updated);
+                            }}
+                            className="bg-gray-800 border-gray-600 text-white"
+                          />
+                        </div>
+                        <Textarea
+                          placeholder="Testimonial content..."
+                          value={testimonial.content}
+                          onChange={(e) => {
+                            const updated = [...settings.testimonials];
+                            updated[index] = { ...testimonial, content: e.target.value };
+                            updateSettings('testimonials', updated);
+                          }}
+                          className="bg-gray-800 border-gray-600 text-white mb-3"
+                        />
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <Label className="text-gray-400 text-sm">Rating:</Label>
+                              <Select
+                                value={String(testimonial.rating)}
+                                onValueChange={(v) => {
+                                  const updated = [...settings.testimonials];
+                                  updated[index] = { ...testimonial, rating: parseInt(v) };
+                                  updateSettings('testimonials', updated);
+                                }}
+                              >
+                                <SelectTrigger className="w-20 bg-gray-800 border-gray-600 text-white">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {[1, 2, 3, 4, 5].map(r => (
+                                    <SelectItem key={r} value={String(r)}>{r} ★</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={testimonial.enabled}
+                                onCheckedChange={(v) => {
+                                  const updated = [...settings.testimonials];
+                                  updated[index] = { ...testimonial, enabled: v };
+                                  updateSettings('testimonials', updated);
+                                }}
+                              />
+                              <Label className="text-gray-400 text-sm">Enabled</Label>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              const updated = settings.testimonials.filter((_, i) => i !== index);
+                              updateSettings('testimonials', updated);
+                            }}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* FAQ Section */}
+            <AccordionItem value="faq" className="bg-gray-800 border border-gray-700 rounded-lg">
+              <AccordionTrigger className="px-4 text-white hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-500" />
+                  FAQ Section
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-400">Section Title</Label>
+                    <Input
+                      value={settings.faqTitle || 'Frequently Asked Questions'}
+                      onChange={(e) => updateSettings('faqTitle', e.target.value)}
+                      className="bg-gray-900 border-gray-600 text-white mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-400">Section Subtitle</Label>
+                    <Input
+                      value={settings.faqSubtitle || "Got Questions? We've Got Answers"}
+                      onChange={(e) => updateSettings('faqSubtitle', e.target.value)}
+                      className="bg-gray-900 border-gray-600 text-white mt-1"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-white">FAQ Items</Label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const newFaq = {
+                          id: `faq-${Date.now()}`,
+                          question: 'New Question?',
+                          answer: 'Answer here...',
+                          category: 'general',
+                          order: (settings.faqItems?.length || 0) + 1,
+                          enabled: true,
+                        };
+                        updateSettings('faqItems', [...(settings.faqItems || []), newFaq]);
+                      }}
+                      className="border-blue-500 text-blue-400 hover:bg-blue-500/20"
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Add FAQ
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {(settings.faqItems || []).map((faq, index) => (
+                      <div key={faq.id} className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+                        <Input
+                          placeholder="Question"
+                          value={faq.question}
+                          onChange={(e) => {
+                            const updated = [...settings.faqItems];
+                            updated[index] = { ...faq, question: e.target.value };
+                            updateSettings('faqItems', updated);
+                          }}
+                          className="bg-gray-800 border-gray-600 text-white mb-3"
+                        />
+                        <Textarea
+                          placeholder="Answer..."
+                          value={faq.answer}
+                          onChange={(e) => {
+                            const updated = [...settings.faqItems];
+                            updated[index] = { ...faq, answer: e.target.value };
+                            updateSettings('faqItems', updated);
+                          }}
+                          className="bg-gray-800 border-gray-600 text-white mb-3"
+                        />
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <Input
+                              placeholder="Category"
+                              value={faq.category}
+                              onChange={(e) => {
+                                const updated = [...settings.faqItems];
+                                updated[index] = { ...faq, category: e.target.value };
+                                updateSettings('faqItems', updated);
+                              }}
+                              className="w-32 bg-gray-800 border-gray-600 text-white"
+                            />
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={faq.enabled}
+                                onCheckedChange={(v) => {
+                                  const updated = [...settings.faqItems];
+                                  updated[index] = { ...faq, enabled: v };
+                                  updateSettings('faqItems', updated);
+                                }}
+                              />
+                              <Label className="text-gray-400 text-sm">Enabled</Label>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              const updated = settings.faqItems.filter((_, i) => i !== index);
+                              updateSettings('faqItems', updated);
+                            }}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Trust Badges Section */}
+            <AccordionItem value="trustbadges" className="bg-gray-800 border border-gray-700 rounded-lg">
+              <AccordionTrigger className="px-4 text-white hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-green-500" />
+                  Trust Badges
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4 space-y-4">
+                <div>
+                  <Label className="text-gray-400">Section Title</Label>
+                  <Input
+                    value={settings.trustBadgesTitle || 'Trusted By Traders Worldwide'}
+                    onChange={(e) => updateSettings('trustBadgesTitle', e.target.value)}
+                    className="bg-gray-900 border-gray-600 text-white mt-1"
+                  />
+                </div>
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-white">Trust Badges</Label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const newBadge = {
+                          id: `badge-${Date.now()}`,
+                          type: 'security' as const,
+                          name: 'New Badge',
+                          logo: '',
+                          url: '',
+                          enabled: true,
+                        };
+                        updateSettings('trustBadges', [...(settings.trustBadges || []), newBadge]);
+                      }}
+                      className="border-green-500 text-green-400 hover:bg-green-500/20"
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Add Badge
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {(settings.trustBadges || []).map((badge, index) => (
+                      <div key={badge.id} className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                          <Input
+                            placeholder="Badge Name"
+                            value={badge.name}
+                            onChange={(e) => {
+                              const updated = [...settings.trustBadges];
+                              updated[index] = { ...badge, name: e.target.value };
+                              updateSettings('trustBadges', updated);
+                            }}
+                            className="bg-gray-800 border-gray-600 text-white"
+                          />
+                          <Select
+                            value={badge.type}
+                            onValueChange={(v) => {
+                              const updated = [...settings.trustBadges];
+                              updated[index] = { ...badge, type: v as 'security' | 'partner' | 'press' | 'award' };
+                              updateSettings('trustBadges', updated);
+                            }}
+                          >
+                            <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="security">Security</SelectItem>
+                              <SelectItem value="partner">Partner</SelectItem>
+                              <SelectItem value="press">Press</SelectItem>
+                              <SelectItem value="award">Award</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            placeholder="Logo URL"
+                            value={badge.logo}
+                            onChange={(e) => {
+                              const updated = [...settings.trustBadges];
+                              updated[index] = { ...badge, logo: e.target.value };
+                              updateSettings('trustBadges', updated);
+                            }}
+                            className="bg-gray-800 border-gray-600 text-white"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <Input
+                              placeholder="Link URL (optional)"
+                              value={badge.url || ''}
+                              onChange={(e) => {
+                                const updated = [...settings.trustBadges];
+                                updated[index] = { ...badge, url: e.target.value };
+                                updateSettings('trustBadges', updated);
+                              }}
+                              className="w-48 bg-gray-800 border-gray-600 text-white"
+                            />
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={badge.enabled}
+                                onCheckedChange={(v) => {
+                                  const updated = [...settings.trustBadges];
+                                  updated[index] = { ...badge, enabled: v };
+                                  updateSettings('trustBadges', updated);
+                                }}
+                              />
+                              <Label className="text-gray-400 text-sm">Enabled</Label>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              const updated = settings.trustBadges.filter((_, i) => i !== index);
+                              updateSettings('trustBadges', updated);
+                            }}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </AccordionContent>
