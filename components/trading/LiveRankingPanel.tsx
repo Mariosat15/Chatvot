@@ -9,11 +9,13 @@ interface RankingEntry {
   userId: string;
   username: string;
   profitPercent: number;
+  displayValue: number;
   liveEquity: number;
   potentialReward: number;
   distanceToFirst: number;
   isDisqualified: boolean;
   status: string;
+  rankingMethod?: string;
   isSeparator?: boolean;
 }
 
@@ -32,6 +34,7 @@ export default function LiveRankingPanel({
   const [userRank, setUserRank] = useState<number | null>(null);
   const [totalParticipants, setTotalParticipants] = useState(0);
   const [prizePool, setPrizePool] = useState(0);
+  const [rankingMethod, setRankingMethod] = useState<string>('pnl');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +51,7 @@ export default function LiveRankingPanel({
       setUserRank(data.userRank);
       setTotalParticipants(data.totalParticipants || 0);
       setPrizePool(data.prizePool || 0);
+      setRankingMethod(data.rankingMethod || 'pnl');
       setError(null);
     } catch (err) {
       console.error('Error fetching live rankings:', err);
@@ -135,19 +139,59 @@ export default function LiveRankingPanel({
     );
   }
 
+  // Get ranking method label
+  const getRankingLabel = () => {
+    switch (rankingMethod) {
+      case 'pnl': return 'P&L';
+      case 'roi': return 'ROI';
+      case 'total_capital': return 'Equity';
+      case 'win_rate': return 'Win %';
+      case 'total_wins': return 'Wins';
+      case 'profit_factor': return 'PF';
+      default: return 'P&L';
+    }
+  };
+
+  // Format display value based on ranking method
+  const formatDisplayValue = (value: number) => {
+    switch (rankingMethod) {
+      case 'roi':
+      case 'win_rate':
+        return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+      case 'total_wins':
+        return value.toString();
+      case 'profit_factor':
+        return value.toFixed(2);
+      default: // pnl, total_capital
+        return `${value >= 0 ? '+' : ''}$${Math.abs(value).toFixed(2)}`;
+    }
+  };
+
+  // Format distance to first based on ranking method
+  const formatDistance = (value: number) => {
+    if (value === 0) return null;
+    switch (rankingMethod) {
+      case 'roi':
+      case 'win_rate':
+        return `${value.toFixed(1)}%`;
+      case 'total_wins':
+        return value.toString();
+      case 'profit_factor':
+        return value.toFixed(2);
+      default: // pnl, total_capital
+        return `$${Math.abs(value).toFixed(0)}`;
+    }
+  };
+
   return (
     <div className={cn("space-y-3", className)}>
-      {/* Header */}
+      {/* Header - just show traders count and ranking type */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Crown className="h-4 w-4 text-yellow-400" />
-          <span className="text-xs font-bold text-gray-300 uppercase tracking-wide">
-            Live Ranking
-          </span>
-        </div>
         <div className="flex items-center gap-1.5">
           <div className="size-1.5 bg-green-400 rounded-full animate-pulse" />
-          <span className="text-[10px] text-gray-500">{totalParticipants} traders</span>
+          <span className="text-[10px] text-gray-400">{totalParticipants} traders</span>
+          <span className="text-[10px] text-gray-600">•</span>
+          <span className="text-[10px] text-primary/80">Ranked by {getRankingLabel()}</span>
         </div>
       </div>
 
@@ -155,7 +199,7 @@ export default function LiveRankingPanel({
       <div className="grid grid-cols-12 gap-1 px-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
         <div className="col-span-1">#</div>
         <div className="col-span-4">Trader</div>
-        <div className="col-span-2 text-right">Profit</div>
+        <div className="col-span-2 text-right">{getRankingLabel()}</div>
         <div className="col-span-3 text-right">Reward</div>
         <div className="col-span-2 text-right">To 1st</div>
       </div>
@@ -177,6 +221,8 @@ export default function LiveRankingPanel({
                   isCurrentUser={true}
                   getRankIcon={getRankIcon}
                   getRankBgColor={getRankBgColor}
+                  formatDisplayValue={formatDisplayValue}
+                  formatDistance={formatDistance}
                 />
               </div>
             );
@@ -189,6 +235,8 @@ export default function LiveRankingPanel({
               isCurrentUser={isCurrentUser}
               getRankIcon={getRankIcon}
               getRankBgColor={getRankBgColor}
+              formatDisplayValue={formatDisplayValue}
+              formatDistance={formatDistance}
             />
           );
         })}
@@ -231,12 +279,19 @@ function RankingRow({
   isCurrentUser,
   getRankIcon,
   getRankBgColor,
+  formatDisplayValue,
+  formatDistance,
 }: { 
   entry: RankingEntry; 
   isCurrentUser: boolean;
   getRankIcon: (rank: number, isDisqualified: boolean) => React.ReactNode;
   getRankBgColor: (rank: number, isCurrentUser: boolean, isDisqualified: boolean) => string;
+  formatDisplayValue: (value: number) => string;
+  formatDistance: (value: number) => string | null;
 }) {
+  const displayValue = entry.displayValue ?? entry.profitPercent;
+  const distanceStr = formatDistance(entry.distanceToFirst);
+
   return (
     <div 
       className={cn(
@@ -261,14 +316,14 @@ function RankingRow({
         </p>
       </div>
 
-      {/* Profit % */}
+      {/* Display Value (P&L, ROI, etc based on ranking method) */}
       <div className="col-span-2 text-right">
         <span className={cn(
           "text-xs font-bold tabular-nums",
-          entry.profitPercent > 0 ? "text-green-400" : 
-          entry.profitPercent < 0 ? "text-red-400" : "text-gray-400"
+          displayValue > 0 ? "text-green-400" : 
+          displayValue < 0 ? "text-red-400" : "text-gray-400"
         )}>
-          {entry.profitPercent > 0 ? '+' : ''}{entry.profitPercent.toFixed(2)}%
+          {formatDisplayValue(displayValue)}
         </span>
       </div>
 
@@ -289,11 +344,13 @@ function RankingRow({
           <span className="text-xs text-yellow-400">🏆</span>
         ) : entry.isDisqualified ? (
           <span className="text-xs text-gray-600">—</span>
-        ) : (
+        ) : distanceStr ? (
           <span className="text-xs text-gray-400 tabular-nums flex items-center justify-end gap-0.5">
             <Target className="h-3 w-3 text-gray-500" />
-            ${Math.abs(entry.distanceToFirst).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {distanceStr}
           </span>
+        ) : (
+          <span className="text-xs text-gray-600">—</span>
         )}
       </div>
     </div>

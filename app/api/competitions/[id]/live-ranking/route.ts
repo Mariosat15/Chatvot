@@ -71,6 +71,8 @@ export async function GET(
         pnlPercentage: 1,
         status: 1,
         totalTrades: 1,
+        winningTrades: 1,
+        losingTrades: 1,
       })
       .toArray();
 
@@ -84,41 +86,69 @@ export async function GET(
 
     const disqualifyOnLiquidation = competition.rules?.disqualifyOnLiquidation !== false;
     const startingCapital = competition.startingCapital || 10000;
+    const rankingMethod = competition.rules?.rankingMethod || 'pnl';
 
-    // Calculate live equity and sort
+    // Calculate all metrics for each participant
     const rankedParticipants = participants
       .map(p => {
         const liveEquity = (p.currentCapital || 0) + (p.unrealizedPnl || 0);
-        const profit = liveEquity - startingCapital;
-        const profitPercent = ((profit / startingCapital) * 100);
+        const livePnl = liveEquity - startingCapital; // Live P&L = current equity - starting
+        const liveRoi = ((livePnl / startingCapital) * 100);
+        const winRate = p.totalTrades > 0 ? ((p.winningTrades || 0) / p.totalTrades) * 100 : 0;
         const isDisqualified = disqualifyOnLiquidation && p.status === 'liquidated';
         
         return {
-          oderId: p.userId,
+          userId: p.userId,
           username: p.username || 'Anonymous',
           liveEquity,
-          profit,
-          profitPercent,
+          livePnl,
+          liveRoi,
+          winRate,
+          totalTrades: p.totalTrades || 0,
+          winningTrades: p.winningTrades || 0,
+          losingTrades: p.losingTrades || 0,
           status: p.status,
           isDisqualified,
-          totalTrades: p.totalTrades || 0,
         };
-      })
-      .sort((a, b) => {
-        // Disqualified go to bottom
-        if (a.isDisqualified && !b.isDisqualified) return 1;
-        if (!a.isDisqualified && b.isDisqualified) return -1;
-        // Sort by live equity (descending)
-        return b.liveEquity - a.liveEquity;
       });
+
+    // Get ranking value based on competition's ranking method
+    const getRankingValue = (p: typeof rankedParticipants[0]) => {
+      switch (rankingMethod) {
+        case 'pnl':
+          return p.livePnl;
+        case 'roi':
+          return p.liveRoi;
+        case 'total_capital':
+          return p.liveEquity;
+        case 'win_rate':
+          return p.winRate;
+        case 'total_wins':
+          return p.winningTrades;
+        case 'profit_factor':
+          if (p.losingTrades === 0) return p.winningTrades > 0 ? 9999 : 0;
+          return p.winningTrades / p.losingTrades;
+        default:
+          return p.livePnl;
+      }
+    };
+
+    // Sort by the correct ranking method
+    rankedParticipants.sort((a, b) => {
+      // Disqualified go to bottom
+      if (a.isDisqualified && !b.isDisqualified) return 1;
+      if (!a.isDisqualified && b.isDisqualified) return -1;
+      // Sort by ranking value (descending - higher is better)
+      return getRankingValue(b) - getRankingValue(a);
+    });
 
     // Assign ranks (handle ties)
     let currentRank = 1;
     const rankings = rankedParticipants.map((p, index) => {
       if (index > 0) {
         const prev = rankedParticipants[index - 1];
-        // Same equity = same rank
-        if (Math.abs(p.liveEquity - prev.liveEquity) < 0.01) {
+        // Same ranking value = same rank
+        if (Math.abs(getRankingValue(p) - getRankingValue(prev)) < 0.01) {
           // Keep same rank
         } else {
           currentRank = index + 1;
@@ -127,8 +157,9 @@ export async function GET(
       return { ...p, rank: p.isDisqualified ? rankedParticipants.length : currentRank };
     });
 
-    // Get first place equity for "distance to 1st" calculation
-    const firstPlaceEquity = rankings.find(r => !r.isDisqualified)?.liveEquity || startingCapital;
+    // Get first place value for "distance to 1st" calculation
+    const firstPlace = rankings.find(r => !r.isDisqualified);
+    const firstPlaceValue = firstPlace ? getRankingValue(firstPlace) : 0;
 
     // Calculate prize for each rank position
     const prizePool = competition.prizePool || 0;
@@ -141,18 +172,28 @@ export async function GET(
       const prizeInfo = prizeDistribution.find((p: { rank: number; percentage: number }) => p.rank === r.rank);
       const prizePercent = prizeInfo?.percentage || 0;
       const potentialReward = r.isDisqualified ? 0 : Math.floor((netPool * prizePercent / 100) * 100) / 100;
-      const distanceToFirst = r.rank === 1 ? 0 : firstPlaceEquity - r.liveEquity;
+      
+      // Distance to first based on ranking method
+      const myValue = getRankingValue(r);
+      const distanceToFirst = r.rank === 1 ? 0 : firstPlaceValue - myValue;
+
+      // Display value based on ranking method (what user sees as "profit")
+      const displayValue = rankingMethod === 'roi' || rankingMethod === 'win_rate' 
+        ? r.liveRoi 
+        : r.livePnl;
 
       return {
         rank: r.rank,
-        userId: r.oderId,
+        userId: r.userId,
         username: r.username,
-        profitPercent: Number(r.profitPercent.toFixed(2)),
+        profitPercent: Number(r.liveRoi.toFixed(2)),
+        displayValue: Number(displayValue.toFixed(2)),
         liveEquity: Number(r.liveEquity.toFixed(2)),
         potentialReward,
         distanceToFirst: Number(distanceToFirst.toFixed(2)),
         isDisqualified: r.isDisqualified,
         status: r.status,
+        rankingMethod, // Include so frontend knows how to display
       };
     });
 
@@ -176,7 +217,8 @@ export async function GET(
       userEquity: userRanking?.liveEquity || null,
       totalParticipants: rankings.length,
       prizePool: netPool,
-      firstPlaceEquity,
+      firstPlaceValue,
+      rankingMethod,
     });
 
   } catch (error) {
