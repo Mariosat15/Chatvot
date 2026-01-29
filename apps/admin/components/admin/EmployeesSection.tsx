@@ -120,9 +120,11 @@ const SECTION_LABELS: Record<string, string> = {
   'analytics': 'Analytics',
   'market': 'Market Hours',
   'symbols': 'Trading Symbols',
+  'market-data': 'Market Data',
   // User Management
   'users': 'Users',
   'badges': 'Badges & XP',
+  'customer-assignment': 'Customer Assignment',
   // Finance
   'financial': 'Financial Dashboard',
   'payments': 'Pending Payments',
@@ -133,13 +135,20 @@ const SECTION_LABELS: Record<string, string> = {
   'kyc-settings': 'KYC Settings',
   'kyc-history': 'KYC History',
   'fraud': 'Fraud Detection',
+  // Operations
+  'price-health': 'Price Feed Health',
+  'incidents': 'Incident Management',
   // Messaging
   'messaging': 'Support Center',
   'messaging-settings': 'Messaging Settings',
   // Help
   'wiki': 'Documentation',
+  // Game Master
+  'gamemaster-dashboard': 'GM Dashboard',
+  'gamemaster-management': 'Manage Game Masters',
   // AI & Automation
   'ai-agent': 'AI Agent',
+  'ai-knowledge': 'AI Database',
   // Settings
   'settings': 'Settings',
   'credentials': 'Credentials',
@@ -157,27 +166,34 @@ const SECTION_LABELS: Record<string, string> = {
   'audit-logs': 'Audit Logs',
   // Dev Zone
   'dev-zone-menu': 'Dev Zone',
+  'server-monitor': 'Server Monitor',
   'redis': 'Redis Cache',
   'dev-settings': 'Test',
   'performance-simulator': 'Performance Simulator',
+  'image-optimizer': 'Image Optimizer',
   'dependency-updates': 'Dependency Updates',
   // Admin
   'employees': 'Employees',
+  // My Account
+  'profile': 'My Profile',
 };
 
 const SECTION_GROUPS = {
   'Dashboard': ['overview'],
   'Content': ['hero-page', 'marketplace'],
-  'Trading': ['competitions', 'challenges', 'trading-history', 'analytics', 'market', 'symbols'],
-  'User Management': ['users', 'badges'],
+  'Trading': ['competitions', 'challenges', 'trading-history', 'analytics', 'market', 'symbols', 'market-data'],
+  'User Management': ['users', 'badges', 'customer-assignment'],
   'Finance': ['financial', 'payments', 'failed-deposits', 'withdrawals', 'pending-withdrawals'],
   'Security': ['kyc-settings', 'kyc-history', 'fraud'],
+  'Operations': ['price-health', 'incidents'],
   'Messaging': ['messaging', 'messaging-settings'],
   'Help': ['wiki'],
-  'AI & Automation': ['ai-agent'],
+  'Game Master': ['gamemaster-dashboard', 'gamemaster-management'],
+  'AI & Automation': ['ai-agent', 'ai-knowledge'],
   'Settings': ['settings', 'credentials', 'environment', 'branding', 'company', 'invoices', 'email-templates', 'notifications', 'trading-risk', 'currency', 'fees', 'payment-providers', 'database', 'audit-logs'],
-  'Dev Zone': ['dev-zone-menu', 'redis', 'dev-settings', 'performance-simulator', 'dependency-updates'],
+  'Dev Zone': ['dev-zone-menu', 'server-monitor', 'redis', 'dev-settings', 'performance-simulator', 'image-optimizer', 'dependency-updates'],
   'Admin': ['employees'],
+  'My Account': ['profile'],
 };
 
 const ROLE_ICONS: Record<string, React.ReactNode> = {

@@ -426,9 +426,11 @@ async function sendEmployeeCredentialsEmail(
       'analytics': 'Analytics',
       'market': 'Market Hours',
       'symbols': 'Trading Symbols',
+      'market-data': 'Market Data',
       // User Management
       'users': 'Users',
       'badges': 'Badges & XP',
+      'customer-assignment': 'Customer Assignment',
       // Finance
       'financial': 'Financial Dashboard',
       'payments': 'Pending Payments',
@@ -439,10 +441,20 @@ async function sendEmployeeCredentialsEmail(
       'kyc-settings': 'KYC Settings',
       'kyc-history': 'KYC History',
       'fraud': 'Fraud Detection',
+      // Operations
+      'price-health': 'Price Feed Health',
+      'incidents': 'Incident Management',
+      // Messaging
+      'messaging': 'Support Center',
+      'messaging-settings': 'Messaging Settings',
       // Help
       'wiki': 'Documentation',
+      // Game Master
+      'gamemaster-dashboard': 'GM Dashboard',
+      'gamemaster-management': 'Manage Game Masters',
       // AI & Automation
       'ai-agent': 'AI Agent',
+      'ai-knowledge': 'AI Database',
       // Settings
       'settings': 'Settings',
       'credentials': 'Credentials',
@@ -460,12 +472,16 @@ async function sendEmployeeCredentialsEmail(
       'audit-logs': 'Audit Logs',
       // Dev Zone
       'dev-zone-menu': 'Dev Zone',
+      'server-monitor': 'Server Monitor',
       'redis': 'Redis Cache',
       'dev-settings': 'Test',
       'performance-simulator': 'Performance Simulator',
+      'image-optimizer': 'Image Optimizer',
       'dependency-updates': 'Dependency Updates',
       // Admin
       'employees': 'Employees',
+      // My Account
+      'profile': 'My Profile',
     };
 
     const sections = allowedSections.map(s => sectionLabels[s] || s);
