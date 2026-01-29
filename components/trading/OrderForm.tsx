@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Loader2, RefreshCw, CheckCircle2, XCircle, AlertCircle, TrendingUp, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { validateLimitOrderPrice, getPipValue } from '@/lib/utils/limit-order-validation';
+import LiveRankingPanel from './LiveRankingPanel';
 
 // Collapsible Section Component
 const CollapsibleSection = ({ 
@@ -77,6 +78,7 @@ interface OrderFormProps {
   };
   disabled?: boolean; // Disable trading (e.g., when disqualified)
   disabledReason?: string; // Reason for disabling
+  userId?: string; // Current user ID for live ranking highlight
 }
 
 const OrderForm = ({
@@ -91,6 +93,7 @@ const OrderForm = ({
   marginThresholds,
   disabled = false,
   disabledReason,
+  userId,
 }: OrderFormProps) => {
   const { prices, subscribe, unsubscribe, marketOpen, marketStatus } = usePrices();
   const { symbol, setSymbol: setChartSymbol } = useChartSymbol();
@@ -487,33 +490,16 @@ const OrderForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Section 1: Live Price Display */}
-      <CollapsibleSection title="Live Market Prices" icon="💰" defaultOpen={true}>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between bg-dark-400/50 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <div className="size-2 bg-red-400 rounded-full" />
-              <span className="text-sm font-semibold text-dark-600">BID</span>
-            </div>
-            <span className="text-xl font-bold text-red-400 tabular-nums">
-              {currentPrice ? currentPrice.bid.toFixed(5) : '—'}
-            </span>
-          </div>
-          <div className="flex items-center justify-between bg-dark-400/50 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <div className="size-2 bg-green-400 rounded-full" />
-              <span className="text-sm font-semibold text-dark-600">ASK</span>
-            </div>
-            <span className="text-xl font-bold text-green-400 tabular-nums">
-              {currentPrice ? currentPrice.ask.toFixed(5) : '—'}
-            </span>
-          </div>
-        </div>
-        {!marketOpen && (
-          <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-center">
-            <p className="text-xs text-red-400 font-semibold">
-              ⚠️ Market Closed - Last Known Prices
-            </p>
+      {/* Section 1: Live Ranking */}
+      <CollapsibleSection title="Live Ranking" icon="🏆" defaultOpen={true}>
+        {userId ? (
+          <LiveRankingPanel 
+            competitionId={competitionId} 
+            userId={userId} 
+          />
+        ) : (
+          <div className="text-center py-4 text-gray-500 text-xs">
+            Loading ranking...
           </div>
         )}
       </CollapsibleSection>

@@ -608,6 +608,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                             ? '💀 Your account was liquidated. You cannot place new trades.'
                             : '🚫 You are disqualified. You cannot place new trades.'
                       }
+                      userId={session.user.id}
                     />
                   </div>
                 </div>
