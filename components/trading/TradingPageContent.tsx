@@ -49,6 +49,7 @@ interface TradingPageContentProps {
   startingCapital: number;
   isDisqualified?: boolean;
   marginThresholds?: MarginThresholds;
+  userId?: string;
   // Children for professional mode (existing layout)
   children: ReactNode;
 }
@@ -62,6 +63,7 @@ export default function TradingPageContent({
   startingCapital,
   isDisqualified,
   marginThresholds,
+  userId,
   children,
 }: TradingPageContentProps) {
   const { mode } = useTradingMode();
@@ -78,6 +80,7 @@ export default function TradingPageContent({
         startingCapital={startingCapital}
         isDisqualified={isDisqualified}
         marginThresholds={marginThresholds}
+        userId={userId}
       />
     );
   }

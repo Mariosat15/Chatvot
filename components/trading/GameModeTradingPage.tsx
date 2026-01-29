@@ -10,6 +10,7 @@ import GameChart from './GameChart';
 import GameModeOrderForm from './GameModeOrderForm';
 import GameModePositions from './GameModePositions';
 import GameMarketWatchSidebar from './GameMarketWatchSidebar';
+import GameLiveRankingPanel from './GameLiveRankingPanel';
 import { ArrowLeft, Users, Swords, Monitor, Gamepad2 } from 'lucide-react';
 import { MarginStatusIndicator } from './MarginStatusIndicator';
 import { getMarginStatus } from '@/lib/services/risk-manager.service';
@@ -58,6 +59,7 @@ interface GameModeTradingPageProps {
   startingCapital: number;
   isDisqualified?: boolean;
   marginThresholds?: MarginThresholds;
+  userId?: string;
 }
 
 export default function GameModeTradingPage({
@@ -69,6 +71,7 @@ export default function GameModeTradingPage({
   startingCapital,
   isDisqualified = false,
   marginThresholds,
+  userId,
 }: GameModeTradingPageProps) {
   const { symbol } = useChartSymbol();
   const { marketOpen } = usePrices();
@@ -275,10 +278,16 @@ export default function GameModeTradingPage({
             </div>
           </div>
           
-          {/* Right Column - Market Watch & Trade Station */}
+          {/* Right Column - Market Watch, Leaderboard & Trade Station */}
           <div className="xl:col-span-4 space-y-4">
             {/* Market Watch Sidebar */}
             <GameMarketWatchSidebar />
+            
+            {/* Live Ranking Leaderboard */}
+            <GameLiveRankingPanel
+              competitionId={competitionId}
+              userId={userId}
+            />
             
             {/* Order Form (Trade Station) */}
             <GameModeOrderForm

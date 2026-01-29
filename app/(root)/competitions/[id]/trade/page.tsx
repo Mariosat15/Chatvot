@@ -179,6 +179,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
           startingCapital={competition.startingCapital}
           isDisqualified={isDisqualified}
           marginThresholds={marginThresholds}
+          userId={session.user.id}
         >
         <div className="min-h-screen bg-gradient-to-br from-dark-100 via-dark-100 to-dark-200">
         {/* Competition Paused Banner */}
