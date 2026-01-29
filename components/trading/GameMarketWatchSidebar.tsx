@@ -247,10 +247,10 @@ export default function GameMarketWatchSidebar() {
                                 </span>
                               </div>
 
-                              {/* Spread */}
+                              {/* Spread in pips */}
                               <div className="text-right">
                                 <span className="text-[8px] font-mono text-gray-400">
-                                  {((quote.spread / quote.mid) * 10000).toFixed(1)}
+                                  {(quote.spread * (pair.includes('JPY') ? 100 : 10000)).toFixed(1)}
                                 </span>
                               </div>
                             </>
