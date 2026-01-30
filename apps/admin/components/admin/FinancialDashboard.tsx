@@ -747,63 +747,15 @@ export default function FinancialDashboard() {
                   {currencySymbol}{liabilityMetrics?.theoreticalBankBalance.toFixed(2) || '0.00'}
                 </div>
                 <div className="space-y-2 text-sm border-t border-green-500/20 pt-4">
-                  {/* Money IN */}
-                  <div className="text-xs text-gray-500 uppercase font-semibold mb-1">💰 Money Received</div>
+                  {/* Real EUR IN */}
+                  <div className="text-xs text-gray-500 uppercase font-semibold mb-1">💰 EUR Received (Bank)</div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">User Deposits (Base)</span>
+                    <span className="text-gray-400">User Deposits</span>
                     <span className="text-green-400">+{currencySymbol}{(platformFinancials?.totalUserDeposits || 0).toFixed(2)}</span>
                   </div>
-                  
-                  {/* Deposit Fees Section */}
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Deposit Fees (We Charge)</span>
+                    <span className="text-gray-400">Deposit Fees</span>
                     <span className="text-green-400">+{currencySymbol}{(platformFinancials?.totalDepositFeesGross || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs pl-2">
-                    <span className="text-gray-500">↳ Stripe Takes</span>
-                    <span className="text-red-400/70">-{currencySymbol}{(platformFinancials?.totalBankDepositFees || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs pl-2 pb-1 border-b border-gray-700/50">
-                    <span className="text-emerald-400/80 font-medium">↳ We Keep (Net)</span>
-                    <span className="text-emerald-400/80 font-medium">{currencySymbol}{(platformFinancials?.netDepositEarnings || 0).toFixed(2)}</span>
-                  </div>
-                  
-                  {/* Withdrawal Fees Section */}
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Withdrawal Fees (We Charge)</span>
-                    <span className="text-green-400">+{currencySymbol}{(platformFinancials?.totalWithdrawalFeesGross || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs pl-2">
-                    <span className="text-gray-500">↳ Bank Takes</span>
-                    <span className="text-red-400/70">-{currencySymbol}{(platformFinancials?.totalBankWithdrawalFees || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs pl-2 pb-1 border-b border-gray-700/50">
-                    <span className="text-emerald-400/80 font-medium">↳ We Keep (Net)</span>
-                    <span className="text-emerald-400/80 font-medium">{currencySymbol}{(platformFinancials?.netWithdrawalEarnings || 0).toFixed(2)}</span>
-                  </div>
-                  
-                  {/* Other Platform Earnings */}
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Competition Fees</span>
-                    <span className="text-emerald-400">+{currencySymbol}{(platformFinancials?.totalPlatformFees || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Challenge Fees</span>
-                    <span className="text-orange-400">+{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Game Master Fees (Paid Out)</span>
-                    <span className="text-amber-400">-{currencySymbol}{(platformFinancials?.totalGameMasterFees || 0).toFixed(2)}</span>
-                  </div>
-                  {(platformFinancials?.totalRetainedGmFees || 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Retained GM Fees (Inactive)</span>
-                      <span className="text-cyan-400">+{currencySymbol}{(platformFinancials?.totalRetainedGmFees || 0).toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Marketplace Sales</span>
-                    <span className="text-purple-400">+{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</span>
                   </div>
                   {vatEnabled && (
                     <div className="flex justify-between">
@@ -812,10 +764,17 @@ export default function FinancialDashboard() {
                     </div>
                   )}
                   
-                  {/* Money OUT */}
-                  <div className="text-xs text-gray-500 uppercase font-semibold mt-3 mb-1">💸 Money Paid Out</div>
+                  {/* Bank Fees */}
+                  <div className="text-xs text-gray-500 uppercase font-semibold mt-2 mb-1">🏦 Bank Fees</div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">User Withdrawals (Net)</span>
+                    <span className="text-gray-400">Stripe/Bank Takes</span>
+                    <span className="text-orange-400">-{currencySymbol}{(platformFinancials?.totalBankFees || 0).toFixed(2)}</span>
+                  </div>
+                  
+                  {/* EUR OUT */}
+                  <div className="text-xs text-gray-500 uppercase font-semibold mt-2 mb-1">💸 EUR Paid Out</div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">User Withdrawals</span>
                     <span className="text-red-400">-{currencySymbol}{(platformFinancials?.totalUserWithdrawals || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
@@ -824,7 +783,7 @@ export default function FinancialDashboard() {
                   </div>
                   {vatEnabled && (
                     <div className="flex justify-between">
-                      <span className="text-gray-400">VAT Paid</span>
+                      <span className="text-gray-400">VAT Paid to Gov</span>
                       <span className="text-red-400">-{currencySymbol}{(platformFinancials?.totalVATPaid || 0).toFixed(2)}</span>
                     </div>
                   )}
