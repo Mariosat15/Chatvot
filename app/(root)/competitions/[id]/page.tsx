@@ -260,7 +260,7 @@ const CompetitionDetailsPage = async ({ params }: CompetitionDetailsPageProps) =
                 losingTrades: userParticipant.losingTrades,
                   status: userParticipant.status,
                 }}
-                competitionStatus={isCompleted ? 'completed' : isActive ? 'active' : 'upcoming'}
+                competitionStatus={isCancelled ? 'cancelled' : isCompleted ? 'completed' : isActive ? 'active' : 'upcoming'}
                 startTime={new Date(competition.startTime).toISOString()}
                 endTime={new Date(competition.endTime).toISOString()}
                 startingCapital={competition.startingCapital || competition.startingTradingPoints || 10000}

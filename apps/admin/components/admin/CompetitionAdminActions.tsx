@@ -207,7 +207,7 @@ export default function CompetitionAdminActions({
         throw new Error(data.error || 'Failed to emergency cancel competition');
       }
 
-      toast.success(`Competition emergency cancelled! ${data.positionsClosed} positions closed, ${data.refundedCount} participants refunded.`);
+      toast.success(`Competition emergency cancelled! ${data.details?.closedPositions || 0} positions closed, ${data.details?.refundedCount || 0} participants refunded.`);
       setEmergencyCancelDialogOpen(false);
       router.refresh();
     } catch (error) {

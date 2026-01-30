@@ -32,7 +32,7 @@ interface CompetitionDashboardProps {
     losingTrades?: number;
     status?: string;
   } | null;
-  competitionStatus: 'upcoming' | 'active' | 'completed';
+  competitionStatus: 'upcoming' | 'active' | 'completed' | 'cancelled';
   startTime: string;
   endTime: string;
   startingCapital: number;
@@ -131,6 +131,7 @@ export default function CompetitionDashboard({
   const isActive = competitionStatus === 'active';
   const isCompleted = competitionStatus === 'completed';
   const isUpcoming = competitionStatus === 'upcoming';
+  const isCancelled = competitionStatus === 'cancelled';
 
   // Fetch comprehensive stats
   const fetchStats = useCallback(async () => {
@@ -379,6 +380,12 @@ export default function CompetitionDashboard({
                     <span className="px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500/30 via-orange-500/30 to-yellow-500/30 text-amber-300 text-sm font-bold flex items-center gap-2 border border-amber-500/50 shadow-lg shadow-amber-500/20 animate-pulse">
                       <Clock className="h-4 w-4 text-amber-400" />
                       <span className="bg-gradient-to-r from-amber-300 to-yellow-300 bg-clip-text text-transparent">Starting Soon</span>
+                    </span>
+                  )}
+                  {isCancelled && (
+                    <span className="px-4 py-1.5 rounded-full bg-gradient-to-r from-red-500/30 via-red-600/30 to-red-700/30 text-red-300 text-sm font-bold flex items-center gap-2 border border-red-500/50 shadow-lg shadow-red-500/20">
+                      <Ban className="h-4 w-4 text-red-400" />
+                      <span className="text-red-300">CANCELLED</span>
                     </span>
                   )}
                 </h2>
