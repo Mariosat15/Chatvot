@@ -1212,34 +1212,19 @@ export default function FinancialDashboard() {
                 {currencySymbol}{liabilityMetrics?.theoreticalBankBalance.toFixed(2) || '0.00'}
               </div>
               
-              {/* Incoming Money */}
+              {/* Incoming Money - REAL EUR only */}
               <div className="border-b border-gray-700 pb-3">
-                <div className="text-xs text-gray-500 uppercase mb-2">💰 Money Received</div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+                <div className="text-xs text-gray-500 uppercase mb-2">💰 Real Money Received (EUR into Bank)</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                   <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
                     <div className="text-gray-400 text-xs">User Credit Purchases</div>
                     <div className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalUserDeposits || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">Base amount for credits</div>
+                    <div className="text-xs text-gray-500">Base EUR deposited</div>
                   </div>
                   <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                    <div className="text-gray-400 text-xs">Deposit/Withdrawal Fees</div>
-                    <div className="text-green-400 font-semibold">+{currencySymbol}{((platformFinancials?.totalDepositFeesGross || 0) + (platformFinancials?.totalWithdrawalFeesGross || 0)).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">Deposit + withdrawal fees</div>
-                  </div>
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
-                    <div className="text-gray-400 text-xs">Competition Fees</div>
-                    <div className="text-emerald-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalPlatformFees || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">% of prize pools</div>
-                  </div>
-                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
-                    <div className="text-gray-400 text-xs">Challenge Fees</div>
-                    <div className="text-orange-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">1v1 challenge fees</div>
-                  </div>
-                  <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
-                    <div className="text-gray-400 text-xs">Marketplace</div>
-                    <div className="text-purple-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">{platformFinancials?.marketplacePurchases || 0} sales</div>
+                    <div className="text-gray-400 text-xs">Deposit Fees (Charged)</div>
+                    <div className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalDepositFeesGross || 0).toFixed(2)}</div>
+                    <div className="text-xs text-gray-500">EUR fees charged to users</div>
                   </div>
                   {vatEnabled && (
                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
@@ -1249,11 +1234,26 @@ export default function FinancialDashboard() {
                     </div>
                   )}
                 </div>
+                <div className="mt-2 text-xs text-gray-500 italic">
+                  Total Received: {currencySymbol}{((platformFinancials?.totalUserDeposits || 0) + (platformFinancials?.totalDepositFeesGross || 0) + (vatEnabled ? (platformFinancials?.totalVATCollected || 0) : 0)).toFixed(2)}
+                </div>
+              </div>
+              
+              {/* Bank/Provider Fees - deducted from what we actually receive */}
+              <div className="border-b border-gray-700 pb-3">
+                <div className="text-xs text-gray-500 uppercase mb-2">🏦 Bank/Provider Fees (Deducted)</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
+                    <div className="text-gray-400 text-xs">Stripe/Bank Fees</div>
+                    <div className="text-orange-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalBankFees || 0).toFixed(2)}</div>
+                    <div className="text-xs text-gray-500">Payment processor costs</div>
+                  </div>
+                </div>
               </div>
               
               {/* Outgoing Money */}
-              <div>
-                <div className="text-xs text-gray-500 uppercase mb-2">💸 Money Paid Out</div>
+              <div className="border-b border-gray-700 pb-3">
+                <div className="text-xs text-gray-500 uppercase mb-2">💸 Money Paid Out (EUR from Bank)</div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                   <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
                     <div className="text-gray-400 text-xs">User Withdrawals</div>
@@ -1272,6 +1272,38 @@ export default function FinancialDashboard() {
                       <div className="text-xs text-gray-500">Tax remitted to government</div>
                     </div>
                   )}
+                </div>
+                <div className="mt-2 text-xs text-gray-500 italic">
+                  Total Paid: {currencySymbol}{((platformFinancials?.totalUserWithdrawals || 0) + (platformFinancials?.totalAdminWithdrawalsEUR || 0) + (vatEnabled ? (platformFinancials?.totalVATPaid || 0) : 0)).toFixed(2)}
+                </div>
+              </div>
+              
+              {/* Platform Credit Earnings - NOT in bank */}
+              <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
+                <div className="text-xs text-blue-400 uppercase mb-2 flex items-center gap-2">
+                  <Info className="h-3 w-3" />
+                  Platform Credit Earnings (NOT real EUR in bank)
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div className="text-center">
+                    <div className="text-gray-400 text-xs">Competition Fees</div>
+                    <div className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalPlatformFees || 0).toFixed(2)}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-gray-400 text-xs">Challenge Fees</div>
+                    <div className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-gray-400 text-xs">Marketplace</div>
+                    <div className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-gray-400 text-xs">Unclaimed Pools</div>
+                    <div className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalUnclaimedPools || 0).toFixed(2)}</div>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-gray-500">
+                  These are credits from prize pools/sales - not EUR. See "Platform Earnings" tab for details.
                 </div>
               </div>
             </CardContent>
