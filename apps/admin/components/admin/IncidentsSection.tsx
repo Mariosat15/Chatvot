@@ -126,6 +126,7 @@ export default function IncidentsSection() {
     description: '',
     priority: 'medium',
     competitionId: '',
+    competitionAction: 'none' as 'none' | 'pause' | 'emergency_cancel',
   });
 
   const fetchIncidents = useCallback(async () => {
@@ -190,12 +191,68 @@ export default function IncidentsSection() {
       return;
     }
 
+    // Validate competition action requirements
+    if (newIncident.competitionAction !== 'none' && !newIncident.competitionId) {
+      toast.error('Please select a competition for the selected action');
+      return;
+    }
+
     try {
       setSubmitting(true);
+
+      // Step 1: Take competition action if specified
+      if (newIncident.competitionId && newIncident.competitionAction !== 'none') {
+        const competition = competitions.find(c => c._id === newIncident.competitionId);
+        
+        if (newIncident.competitionAction === 'pause') {
+          // Pause the competition
+          const pauseResponse = await fetch(`/api/competitions/${newIncident.competitionId}/pause`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              action: 'pause', 
+              reason: `Incident: ${newIncident.title} - ${newIncident.description}` 
+            }),
+          });
+          const pauseData = await pauseResponse.json();
+          
+          if (!pauseResponse.ok) {
+            toast.error(pauseData.error || 'Failed to pause competition');
+            setSubmitting(false);
+            return;
+          }
+          toast.success(`Competition "${competition?.name}" paused successfully`);
+        } else if (newIncident.competitionAction === 'emergency_cancel') {
+          // Emergency cancel the competition
+          const cancelResponse = await fetch(`/api/competitions/${newIncident.competitionId}/emergency-cancel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              reason: `Incident: ${newIncident.title} - ${newIncident.description}` 
+            }),
+          });
+          const cancelData = await cancelResponse.json();
+          
+          if (!cancelResponse.ok) {
+            toast.error(cancelData.error || 'Failed to emergency cancel competition');
+            setSubmitting(false);
+            return;
+          }
+          toast.success(`Competition "${competition?.name}" emergency cancelled! ${cancelData.details?.closedPositions || 0} positions closed, ${cancelData.details?.refundedCount || 0} participants refunded.`);
+        }
+      }
+
+      // Step 2: Create the incident record
       const response = await fetch('/api/incidents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newIncident),
+        body: JSON.stringify({
+          ...newIncident,
+          // Add action taken to description
+          description: newIncident.competitionAction !== 'none' 
+            ? `${newIncident.description}\n\n[Action Taken: ${newIncident.competitionAction === 'pause' ? 'Competition Paused' : 'Emergency Cancel & Refund'}]`
+            : newIncident.description,
+        }),
       });
 
       const data = await response.json();
@@ -210,6 +267,7 @@ export default function IncidentsSection() {
           description: '',
           priority: 'medium',
           competitionId: '',
+          competitionAction: 'none',
         });
         fetchIncidents();
       } else {
@@ -869,7 +927,7 @@ export default function IncidentsSection() {
                       <span>Selected: {competitions.find(c => c._id === newIncident.competitionId)?.name || newIncident.competitionId}</span>
                       <button 
                         type="button"
-                        onClick={() => setNewIncident(n => ({ ...n, competitionId: '' }))}
+                        onClick={() => setNewIncident(n => ({ ...n, competitionId: '', competitionAction: 'none' }))}
                         className="ml-auto text-gray-400 hover:text-white"
                       >
                         <XCircle className="h-4 w-4" />
@@ -878,6 +936,68 @@ export default function IncidentsSection() {
                   )}
                 </div>
               </div>
+
+              {/* Competition Action - Only show when competition is selected */}
+              {newIncident.competitionId && (
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
+                  <label className="block text-sm font-medium text-orange-400 mb-2">
+                    <AlertTriangle className="h-4 w-4 inline mr-1" />
+                    Immediate Competition Action
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="competitionAction"
+                        value="none"
+                        checked={newIncident.competitionAction === 'none'}
+                        onChange={() => setNewIncident(n => ({ ...n, competitionAction: 'none' }))}
+                        className="text-blue-500"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-300">Log Only</span>
+                        <p className="text-xs text-gray-500">Create incident record without affecting the competition</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="competitionAction"
+                        value="pause"
+                        checked={newIncident.competitionAction === 'pause'}
+                        onChange={() => setNewIncident(n => ({ ...n, competitionAction: 'pause' }))}
+                        className="text-yellow-500"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-yellow-400">⏸️ Pause Competition</span>
+                        <p className="text-xs text-gray-500">Immediately pause trading, can be resumed later</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700/50 cursor-pointer border border-red-500/30 bg-red-500/5">
+                      <input
+                        type="radio"
+                        name="competitionAction"
+                        value="emergency_cancel"
+                        checked={newIncident.competitionAction === 'emergency_cancel'}
+                        onChange={() => setNewIncident(n => ({ ...n, competitionAction: 'emergency_cancel' }))}
+                        className="text-red-500"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-red-400">🚨 Emergency Cancel & Refund</span>
+                        <p className="text-xs text-gray-500">Close all positions, refund ALL entry fees, cancel competition permanently</p>
+                      </div>
+                    </label>
+                  </div>
+                  {newIncident.competitionAction === 'emergency_cancel' && (
+                    <div className="mt-3 p-2 bg-red-500/20 border border-red-500/40 rounded-lg">
+                      <p className="text-xs text-red-300">
+                        <strong>⚠️ Warning:</strong> This action is irreversible. All open positions will be closed at current prices, 
+                        and all participants will receive a full refund of their entry fees.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="p-4 border-t border-gray-700 flex items-center justify-end gap-2">
               <Button variant="outline" onClick={() => setShowCreateModal(false)} disabled={submitting}>
