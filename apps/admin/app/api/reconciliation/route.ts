@@ -39,6 +39,7 @@ interface UserReconciliationDetail {
     totalSpentOnCompetitions: number;
     totalSpentOnChallenges: number;
     totalSpentOnMarketplace: number;
+    totalGmEarnings?: number; // GM referral earnings
   };
   calculated: {
     expectedBalance: number;
@@ -50,6 +51,7 @@ interface UserReconciliationDetail {
     competitionSpentTotal: number;
     challengeSpentTotal: number;
     marketplaceSpentTotal: number;
+    gmEarningsTotal: number; // GM referral earnings from transactions
     pendingWithdrawalCredits?: number;
     pendingDepositCredits?: number;
   };
@@ -67,9 +69,12 @@ interface UserReconciliationDetail {
     withdrawalRefunds: number;
     manualCredits: number;
     platformFees: number;
+    gmCompetitionEarnings: number; // GM earnings from competition referrals
+    gmChallengeEarnings: number;   // GM earnings from challenge referrals
     refunds: number;  // Legacy: sum of all refunds
     other: number;
   };
+  isGameMaster?: boolean; // Flag if user is a GM
   issues: ReconciliationIssue[];
   healthy: boolean;
 }
@@ -796,8 +801,13 @@ async function getDetailedUserReconciliation(
     withdrawalRefunds: 0,         // NEW: Track withdrawal refunds
     manualCredits: 0,             // NEW: Track manual credits
     platformFees: 0,              // NEW: Track platform fees
+    gmCompetitionEarnings: 0,     // GM earnings from competition referrals
+    gmChallengeEarnings: 0,       // GM earnings from challenge referrals
     other: 0,
   };
+  
+  // Track GM earnings separately
+  let gmEarningsTotal = 0;
 
   // Calculate the ACTUAL expected balance from all transactions (the truth!)
   let balanceFromAllTransactions = 0;
@@ -886,6 +896,18 @@ async function getDetailedUserReconciliation(
       case 'platform_fee':
         // Fee deducted from winnings
         breakdown.platformFees++;
+        break;
+        
+      case 'gamemaster_earning':
+        // GM earned from competition referral
+        gmEarningsTotal += Math.abs(amount);
+        breakdown.gmCompetitionEarnings++;
+        break;
+        
+      case 'gamemaster_challenge_referral':
+        // GM earned from challenge referral
+        gmEarningsTotal += Math.abs(amount);
+        breakdown.gmChallengeEarnings++;
         break;
         
       default:
@@ -1068,11 +1090,17 @@ async function getDetailedUserReconciliation(
     });
   }
 
+  // Check if user is a Game Master (has GM earnings)
+  const isGameMaster = gmEarningsTotal > 0 || breakdown.gmCompetitionEarnings > 0 || breakdown.gmChallengeEarnings > 0;
+
   return {
     userId,
     userEmail,
     userName,
-    wallet: walletData,
+    wallet: {
+      ...walletData,
+      totalGmEarnings: gmEarningsTotal, // Add GM earnings to wallet display
+    },
     calculated: {
       // Expected balance calculated from ALL transactions (the source of truth)
       expectedBalance: expectedFromTransactions,
@@ -1084,6 +1112,7 @@ async function getDetailedUserReconciliation(
       competitionSpentTotal: Math.round(competitionSpentTotal * 100) / 100,
       challengeSpentTotal: Math.round(challengeSpentTotal * 100) / 100,
       marketplaceSpentTotal: Math.round(marketplaceSpentTotal * 100) / 100,
+      gmEarningsTotal: Math.round(gmEarningsTotal * 100) / 100,
       pendingWithdrawalCredits: Math.round(pendingWithdrawalCredits * 100) / 100,
       pendingDepositCredits: Math.round(pendingDepositCredits * 100) / 100,
     },
@@ -1092,6 +1121,7 @@ async function getDetailedUserReconciliation(
       // Legacy fields for backwards compatibility
       refunds: breakdown.competitionRefunds + breakdown.challengeRefunds + breakdown.withdrawalRefunds,
     },
+    isGameMaster,
     issues,
     healthy: issues.filter(i => i.severity === 'critical').length === 0,
   };

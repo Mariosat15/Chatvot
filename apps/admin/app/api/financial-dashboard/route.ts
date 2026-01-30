@@ -87,6 +87,45 @@ export async function GET(request: NextRequest) {
         },
       },
     ]);
+    
+    // Get breakdown of GM fees by type
+    const gameMasterFeesByType = await WalletTransaction.aggregate([
+      {
+        $match: { transactionType: { $in: ['gamemaster_earning', 'gamemaster_challenge_referral'] } },
+      },
+      {
+        $group: {
+          _id: '$transactionType',
+          totalFees: { $sum: '$amount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    
+    const gmCompetitionFees = gameMasterFeesByType.find(g => g._id === 'gamemaster_earning');
+    const gmChallengeFees = gameMasterFeesByType.find(g => g._id === 'gamemaster_challenge_referral');
+    
+    // Get list of GMs who received fees (for detailed view)
+    const gmFeesDetail = await WalletTransaction.aggregate([
+      {
+        $match: { transactionType: { $in: ['gamemaster_earning', 'gamemaster_challenge_referral'] } },
+      },
+      {
+        $group: {
+          _id: '$userId',
+          totalEarned: { $sum: '$amount' },
+          transactionCount: { $sum: 1 },
+          fromCompetitions: { 
+            $sum: { $cond: [{ $eq: ['$transactionType', 'gamemaster_earning'] }, '$amount', 0] }
+          },
+          fromChallenges: { 
+            $sum: { $cond: [{ $eq: ['$transactionType', 'gamemaster_challenge_referral'] }, '$amount', 0] }
+          },
+        },
+      },
+      { $sort: { totalEarned: -1 } },
+      { $limit: 10 },
+    ]);
 
     // Get recent transactions (last 50) with user info
     const recentTransactions = await WalletTransaction.find()
@@ -174,6 +213,11 @@ export async function GET(request: NextRequest) {
         platformFinancials: {
           ...platformFinancialStats,
           totalGameMasterFees: gameMasterFees[0]?.totalFees || 0,
+          gmFeesFromCompetitions: gmCompetitionFees?.totalFees || 0,
+          gmFeesFromChallenges: gmChallengeFees?.totalFees || 0,
+          gmCompetitionPaymentCount: gmCompetitionFees?.count || 0,
+          gmChallengePaymentCount: gmChallengeFees?.count || 0,
+          gmFeesDetail: gmFeesDetail, // Top GMs by earnings
           unclaimedPools: unclaimedPoolsSummary,
         },
         // NEW: Liability tracking for bank reconciliation

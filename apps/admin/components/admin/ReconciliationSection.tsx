@@ -72,6 +72,7 @@ interface UserReconciliationDetail {
     totalSpentOnCompetitions: number;
     totalSpentOnChallenges: number;
     totalSpentOnMarketplace: number;
+    totalGmEarnings?: number; // GM referral earnings
   };
   calculated: {
     expectedBalance: number;
@@ -85,6 +86,7 @@ interface UserReconciliationDetail {
     pendingDepositCredits?: number;
     challengeSpentTotal: number;
     marketplaceSpentTotal: number;
+    gmEarningsTotal?: number; // GM referral earnings from transactions
   };
   transactionBreakdown: {
     deposits: number;
@@ -96,8 +98,11 @@ interface UserReconciliationDetail {
     marketplacePurchases: number;
     adminAdjustments: number;
     refunds: number;
+    gmCompetitionEarnings?: number; // GM earnings from competition referrals
+    gmChallengeEarnings?: number;   // GM earnings from challenge referrals
     other: number;
   };
+  isGameMaster?: boolean; // Flag if user is a GM
   issues: ReconciliationIssue[];
   healthy: boolean;
 }
@@ -879,6 +884,17 @@ export default function ReconciliationSection() {
                               )}
                             </td>
                           </tr>
+                          {/* GM Earnings Row - only show if user is a Game Master */}
+                          {(user.isGameMaster || (user.calculated.gmEarningsTotal || 0) > 0) && (
+                            <tr className="border-t border-amber-500/30 bg-amber-500/5">
+                              <td className="py-2 px-3 text-amber-400 font-medium">🎮 GM Referral Earnings</td>
+                              <td className="py-2 px-3 text-right text-amber-400 font-mono">{(user.wallet.totalGmEarnings || 0).toFixed(2)}</td>
+                              <td className="py-2 px-3 text-right text-amber-400 font-mono">{(user.calculated.gmEarningsTotal || 0).toFixed(2)}</td>
+                              <td className="py-2 px-3 text-right">
+                                <span className="text-amber-400">💰</span>
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -950,6 +966,16 @@ export default function ReconciliationSection() {
                         {(user.transactionBreakdown.platformFees || 0) > 0 && (
                           <Badge variant="outline" className="text-xs border-red-500/50 text-red-400">
                             {user.transactionBreakdown.platformFees} Platform Fees
+                          </Badge>
+                        )}
+                        {(user.transactionBreakdown.gmCompetitionEarnings || 0) > 0 && (
+                          <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-400">
+                            {user.transactionBreakdown.gmCompetitionEarnings} GM Comp Earnings
+                          </Badge>
+                        )}
+                        {(user.transactionBreakdown.gmChallengeEarnings || 0) > 0 && (
+                          <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-400">
+                            {user.transactionBreakdown.gmChallengeEarnings} GM Challenge Earnings
                           </Badge>
                         )}
                         {user.transactionBreakdown.other > 0 && (

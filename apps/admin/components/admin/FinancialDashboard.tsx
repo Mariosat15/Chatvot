@@ -906,6 +906,17 @@ export default function FinancialDashboard() {
                   <div className="text-xs text-gray-400 uppercase">Game Master Fees</div>
                   <div className="text-2xl font-bold text-amber-400">-{currencySymbol}{(platformFinancials?.totalGameMasterFees || 0).toFixed(2)}</div>
                   <div className="text-xs text-gray-500">Paid to GMs</div>
+                  {/* GM Fee Breakdown */}
+                  <div className="mt-2 pt-2 border-t border-amber-500/20 space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">From Competitions:</span>
+                      <span className="text-amber-400">{currencySymbol}{((platformFinancials as any)?.gmFeesFromCompetitions || 0).toFixed(2)} ({(platformFinancials as any)?.gmCompetitionPaymentCount || 0})</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">From Challenges:</span>
+                      <span className="text-amber-400">{currencySymbol}{((platformFinancials as any)?.gmFeesFromChallenges || 0).toFixed(2)} ({(platformFinancials as any)?.gmChallengePaymentCount || 0})</span>
+                    </div>
+                  </div>
                 </div>
                 {(platformFinancials?.totalRetainedGmFees || 0) > 0 && (
                   <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-4">
