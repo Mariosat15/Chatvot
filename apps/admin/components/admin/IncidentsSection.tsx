@@ -789,17 +789,20 @@ export default function IncidentsSection() {
         </div>
       </div>
 
-      {/* Create Incident Modal */}
+      {/* Create Incident Modal - Full Screen */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-lg">
-            <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-              <h3 className="font-semibold text-white">Create New Incident</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-white">
-                <XCircle className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
+        <div className="fixed inset-0 bg-black/90 z-50 flex flex-col">
+          {/* Fixed Header */}
+          <div className="bg-gray-800 border-b border-gray-700 p-4 flex items-center justify-between shrink-0">
+            <h3 className="font-semibold text-white text-lg">Create New Incident</h3>
+            <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-white p-2">
+              <XCircle className="h-6 w-6" />
+            </button>
+          </div>
+          
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="max-w-2xl mx-auto space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">Title</label>
                 <Input
@@ -999,15 +1002,17 @@ export default function IncidentsSection() {
                 </div>
               )}
             </div>
-            <div className="p-4 border-t border-gray-700 flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowCreateModal(false)} disabled={submitting}>
-                Cancel
-              </Button>
-              <Button onClick={createIncident} disabled={submitting} className="bg-red-500 hover:bg-red-600">
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                Create Incident
-              </Button>
-            </div>
+          </div>
+          
+          {/* Fixed Footer */}
+          <div className="bg-gray-800 border-t border-gray-700 p-4 flex items-center justify-end gap-3 shrink-0">
+            <Button variant="outline" onClick={() => setShowCreateModal(false)} disabled={submitting} size="lg">
+              Cancel
+            </Button>
+            <Button onClick={createIncident} disabled={submitting} className="bg-red-500 hover:bg-red-600" size="lg">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+              Create Incident
+            </Button>
           </div>
         </div>
       )}
