@@ -1538,7 +1538,7 @@ export default function FinancialDashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <ArrowRightLeft className="h-5 w-5 text-blue-400" />
-                Bank Money Flow (EUR Only)
+                Bank Money Flow
               </CardTitle>
               <CardDescription>Real money in and out of bank account</CardDescription>
             </CardHeader>
@@ -1548,7 +1548,7 @@ export default function FinancialDashboard() {
                 <div className="bg-green-950/20 border border-green-500/20 rounded-lg p-4">
                   <h3 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
                     <TrendingUp className="h-5 w-5" />
-                    💰 EUR INTO BANK
+                    💰 MONEY IN
                   </h3>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center py-2 border-b border-green-500/10">
@@ -1590,7 +1590,7 @@ export default function FinancialDashboard() {
                 <div className="bg-red-950/20 border border-red-500/20 rounded-lg p-4">
                   <h3 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
                     <TrendingDown className="h-5 w-5" />
-                    💸 EUR OUT OF BANK
+                    💸 MONEY OUT
                   </h3>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center py-2 border-b border-red-500/10">
@@ -3835,7 +3835,7 @@ export default function FinancialDashboard() {
 
               {/* Payment Amount */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Payment Amount (EUR)</label>
+                <label className="text-sm font-medium text-gray-300">Payment Amount ({currencySymbol})</label>
                 <Input
                   type="number"
                   value={vendorPaymentAmount}
@@ -3947,7 +3947,7 @@ export default function FinancialDashboard() {
           <div className="space-y-4 py-4">
             {/* Amount */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Amount (EUR) *</label>
+              <label className="text-sm font-medium text-gray-300">Amount ({currencySymbol}) *</label>
               <Input
                 type="number"
                 value={balanceAddForm.amount}
@@ -4058,7 +4058,7 @@ export default function FinancialDashboard() {
           <div className="space-y-4 py-4">
             {/* Amount */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Amount (EUR) *</label>
+              <label className="text-sm font-medium text-gray-300">Amount ({currencySymbol}) *</label>
               <Input
                 type="number"
                 value={expenseForm.amount}
