@@ -1741,371 +1741,285 @@ export default function FinancialDashboard() {
 
         {/* EARNINGS TAB */}
         <TabsContent value="earnings" className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-gray-900 border-emerald-500/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                  <PiggyBank className="h-4 w-4 text-emerald-400" />
-                  Gross Platform Fees
-                </CardTitle>
-                <CardDescription className="text-xs">What platform charges users</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-emerald-400">
-                  {currencySymbol}{platformFinancials?.totalGrossEarnings?.toFixed(2) || '0.00'}
-              </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-900 border-red-500/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-red-400" />
-                  Bank/Provider Fees
-            </CardTitle>
-                <CardDescription className="text-xs">What Stripe/bank charges us</CardDescription>
-          </CardHeader>
-          <CardContent>
-                <div className="text-3xl font-bold text-red-400">
-                  -{currencySymbol}{platformFinancials?.totalBankFees?.toFixed(2) || '0.00'}
+          {/* Top Summary - 3 Key Numbers */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-gradient-to-br from-emerald-900/40 to-gray-900 border border-emerald-500/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">💰 Gross Platform Fees</p>
+                    <p className="text-3xl font-bold text-emerald-400">{currencySymbol}{(platformFinancials?.totalGrossEarnings || 0).toFixed(2)}</p>
+                  </div>
+                  <PiggyBank className="h-10 w-10 text-emerald-500/30" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-gray-900 border-green-500/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-green-400" />
-                  Net Platform Earnings
-                </CardTitle>
-                <CardDescription className="text-xs">What platform actually keeps</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-green-400">
-                  {currencySymbol}{platformFinancials?.totalNetEarningsEUR?.toFixed(2) || '0.00'}
+            <Card className="bg-gradient-to-br from-red-900/40 to-gray-900 border border-red-500/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">🏦 Bank/Provider Fees</p>
+                    <p className="text-3xl font-bold text-red-400">-{currencySymbol}{(platformFinancials?.totalBankFees || 0).toFixed(2)}</p>
+                  </div>
+                  <Building2 className="h-10 w-10 text-red-500/30" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-green-900/40 to-gray-900 border border-green-500/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">✅ Net Platform Earnings</p>
+                    <p className="text-3xl font-bold text-green-400">{currencySymbol}{(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}</p>
+                  </div>
+                  <TrendingUp className="h-10 w-10 text-green-500/30" />
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Earnings Breakdown */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Deposit Fees Breakdown */}
-            <Card className="bg-gray-900 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white text-lg flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-green-400" />
-                  Deposit Fee Breakdown
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                  <div>
-                    <div className="text-sm text-gray-400">Platform Deposit Fees</div>
-                    <div className="text-xs text-gray-500">Charged to users</div>
-                  </div>
-                  <div className="text-xl font-bold text-green-400">
-                    {currencySymbol}{platformFinancials?.totalDepositFeesGross?.toFixed(2) || '0.00'}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                  <div>
-                    <div className="text-sm text-gray-400">Bank Deposit Fees</div>
-                    <div className="text-xs text-gray-500">Stripe/payment provider</div>
-                  </div>
-                  <div className="text-xl font-bold text-red-400">
-                    -{currencySymbol}{platformFinancials?.totalBankDepositFees?.toFixed(2) || '0.00'}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-emerald-900/30 rounded-lg border border-emerald-500/30">
-                  <div>
-                    <div className="text-sm text-emerald-300 font-medium">Net Deposit Earnings</div>
-                    <div className="text-xs text-emerald-500">Platform keeps</div>
-                  </div>
-                  <div className="text-xl font-bold text-emerald-400">
-                    {currencySymbol}{platformFinancials?.netDepositEarnings?.toFixed(2) || '0.00'}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Withdrawal Fees Breakdown */}
-            <Card className="bg-gray-900 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white text-lg flex items-center gap-2">
-                  <TrendingDown className="h-5 w-5 text-blue-400" />
-                  Withdrawal Fee Breakdown
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                  <div>
-                    <div className="text-sm text-gray-400">Platform Withdrawal Fees</div>
-                    <div className="text-xs text-gray-500">Charged to users</div>
-                  </div>
-                  <div className="text-xl font-bold text-blue-400">
-                    {currencySymbol}{platformFinancials?.totalWithdrawalFeesGross?.toFixed(2) || '0.00'}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                  <div>
-                    <div className="text-sm text-gray-400">Bank Withdrawal Fees</div>
-                    <div className="text-xs text-gray-500">Payout/transfer costs</div>
-                  </div>
-                  <div className="text-xl font-bold text-red-400">
-                    -{currencySymbol}{platformFinancials?.totalBankWithdrawalFees?.toFixed(2) || '0.00'}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-emerald-900/30 rounded-lg border border-emerald-500/30">
-                  <div>
-                    <div className="text-sm text-emerald-300 font-medium">Net Withdrawal Earnings</div>
-                    <div className="text-xs text-emerald-500">Platform keeps</div>
-                  </div>
-                  <div className="text-xl font-bold text-emerald-400">
-                    {currencySymbol}{platformFinancials?.netWithdrawalEarnings?.toFixed(2) || '0.00'}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Other Earnings */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-gray-900 border-emerald-500/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-emerald-400" />
-                  Competition Fees
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">
-                  {creditSymbol} {platformFinancials?.totalPlatformFees.toLocaleString() || 0}
-            </div>
-            <p className="text-sm text-gray-400 mt-2">
-                  ≈ {currencySymbol}{creditsToEUR(platformFinancials?.totalPlatformFees || 0)}
-            </p>
-                <p className="text-xs text-gray-500 mt-1">% of competition prize pools</p>
-          </CardContent>
-        </Card>
-
-            <Card className="bg-gray-900 border-orange-500/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                  <Swords className="h-4 w-4 text-orange-400" />
-                  Challenge Fees
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">
-                  {creditSymbol} {platformFinancials?.totalChallengeFees?.toLocaleString() || 0}
-              </div>
-                <p className="text-sm text-gray-400 mt-2">
-                  ≈ {currencySymbol}{creditsToEUR(platformFinancials?.totalChallengeFees || 0)}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">1v1 challenge platform fees</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-900 border-purple-500/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-purple-400" />
-                  Marketplace Revenue
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-                <div className="text-2xl font-bold text-white">
-                  {creditSymbol} {platformFinancials?.totalMarketplaceSales?.toLocaleString() || 0}
-            </div>
-            <p className="text-sm text-gray-400 mt-2">
-                  ≈ {currencySymbol}{creditsToEUR(platformFinancials?.totalMarketplaceSales || 0)}
-            </p>
-                <p className="text-xs text-gray-500 mt-1">{platformFinancials?.marketplacePurchases || 0} items sold</p>
-          </CardContent>
-        </Card>
-
-            <Card className="bg-gray-900 border-amber-500/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                  <Target className="h-4 w-4 text-amber-400" />
-                  Unclaimed Pools
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">
-                  {creditSymbol} {platformFinancials?.totalUnclaimedPools.toLocaleString() || 0}
-              </div>
-                <p className="text-sm text-gray-400 mt-2">
-                  ≈ {currencySymbol}{creditsToEUR(platformFinancials?.totalUnclaimedPools || 0)}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">All disqualified competitions</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Unclaimed Pools Detail */}
-          {platformFinancials?.unclaimedPools && (
-            <Card className="bg-gray-900 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white text-xl flex items-center gap-2">
-                  <Target className="h-5 w-5 text-amber-400" />
-                  Unclaimed Pools Breakdown
-            </CardTitle>
-                <CardDescription>
-                  Competition pools kept by platform when NO prizes were awarded (all disqualified or no participants)
-                </CardDescription>
-          </CardHeader>
-          <CardContent>
-                {/* Info Box explaining unclaimed pools */}
-                <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Info className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                    <div className="text-xs text-amber-200/80">
-                      <strong>What are unclaimed pools?</strong> When a competition ends and <u>ALL participants are disqualified</u> (or no one joined), 
-                      no one qualifies for prizes. The prize pool then goes to the platform. <br/>
-                      <strong>Note:</strong> If some winners exist (e.g., 2/3 positions filled), prizes are <u>redistributed</u> among them as bonus - nothing is unclaimed.
+          {/* Two-Column: Earnings vs Costs */}
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-lg flex items-center gap-2">
+                <ArrowRightLeft className="h-5 w-5 text-blue-400" />
+                Earnings Breakdown
+              </CardTitle>
+              <CardDescription>What we earn vs what providers take</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* EARNINGS Column */}
+                <div className="bg-green-950/20 border border-green-500/20 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    💰 WE EARN
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center py-2 border-b border-green-500/10">
+                      <div>
+                        <span className="text-gray-300">Deposit Fees</span>
+                        <p className="text-xs text-gray-500">Charged to users on deposits</p>
+                      </div>
+                      <span className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalDepositFeesGross || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-green-500/10">
+                      <div>
+                        <span className="text-gray-300">Withdrawal Fees</span>
+                        <p className="text-xs text-gray-500">Charged on user withdrawals</p>
+                      </div>
+                      <span className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalWithdrawalFeesGross || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-green-500/10">
+                      <div>
+                        <span className="text-gray-300">Competition Fees</span>
+                        <p className="text-xs text-gray-500">% of prize pools</p>
+                      </div>
+                      <span className="text-emerald-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalPlatformFees || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-green-500/10">
+                      <div>
+                        <span className="text-gray-300">Challenge Fees</span>
+                        <p className="text-xs text-gray-500">1v1 platform fees</p>
+                      </div>
+                      <span className="text-orange-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</span>
+                    </div>
+                    {(platformFinancials?.totalMarketplaceSales || 0) > 0 && (
+                      <div className="flex justify-between items-center py-2 border-b border-green-500/10">
+                        <div>
+                          <span className="text-gray-300">Marketplace Sales</span>
+                          <p className="text-xs text-gray-500">{platformFinancials?.marketplacePurchases || 0} items</p>
+                        </div>
+                        <span className="text-purple-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {(platformFinancials?.totalUnclaimedPools || 0) > 0 && (
+                      <div className="flex justify-between items-center py-2 border-b border-green-500/10">
+                        <div>
+                          <span className="text-gray-300">Unclaimed Pools</span>
+                          <p className="text-xs text-gray-500">All disqualified comps</p>
+                        </div>
+                        <span className="text-amber-400 font-semibold">+{currencySymbol}{((platformFinancials?.totalUnclaimedPools || 0) / conversionRate).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {/* Total */}
+                    <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-green-500/30">
+                      <span className="text-white font-bold">GROSS EARNINGS</span>
+                      <span className="text-green-400 font-bold text-xl">+{currencySymbol}{(platformFinancials?.totalGrossEarnings || 0).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  {Object.entries(platformFinancials.unclaimedPools.byReason).map(([reason, data]) => (
-                    <div key={reason} className="bg-gray-800 rounded-lg p-4">
-                      <div className="text-xs text-gray-400 uppercase">{reason.replace(/_/g, ' ')}</div>
-                      <div className="text-xl font-bold text-white mt-1">
-                        {creditSymbol} {data.amount.toLocaleString()}
+                {/* COSTS Column */}
+                <div className="bg-red-950/20 border border-red-500/20 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
+                    <TrendingDown className="h-5 w-5" />
+                    💸 PROVIDER COSTS
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center py-2 border-b border-red-500/10">
+                      <div>
+                        <span className="text-gray-300">Stripe Deposit Fees</span>
+                        <p className="text-xs text-gray-500">Payment processing</p>
                       </div>
-                      <div className="text-xs text-gray-500">{data.count} competition(s)</div>
+                      <span className="text-red-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalBankDepositFees || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-red-500/10">
+                      <div>
+                        <span className="text-gray-300">Bank Withdrawal Fees</span>
+                        <p className="text-xs text-gray-500">Payout/transfer costs</p>
+                      </div>
+                      <span className="text-red-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalBankWithdrawalFees || 0).toFixed(2)}</span>
+                    </div>
+                    {(platformFinancials?.totalGameMasterFees || 0) > 0 && (
+                      <div className="flex justify-between items-center py-2 border-b border-red-500/10">
+                        <div>
+                          <span className="text-gray-300">Game Master Fees</span>
+                          <p className="text-xs text-gray-500">
+                            Comp: {currencySymbol}{((platformFinancials as any)?.gmFeesFromCompetitions || 0).toFixed(2)} | 
+                            Chall: {currencySymbol}{((platformFinancials as any)?.gmFeesFromChallenges || 0).toFixed(2)}
+                          </p>
+                        </div>
+                        <span className="text-amber-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalGameMasterFees || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {/* Total */}
+                    <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-red-500/30">
+                      <span className="text-white font-bold">TOTAL COSTS</span>
+                      <span className="text-red-400 font-bold text-xl">-{currencySymbol}{(platformFinancials?.totalBankFees || 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Net Earnings Result */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-emerald-900/30 to-gray-900 border border-emerald-500/30 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-lg text-white font-semibold">= Net Platform Earnings</p>
+                    <p className="text-xs text-gray-400">Gross Earnings - Provider Costs</p>
+                  </div>
+                  <p className="text-3xl font-bold text-emerald-400">{currencySymbol}{(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Available to Withdraw Section */}
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-lg flex items-center gap-2">
+                <Banknote className="h-5 w-5 text-cyan-400" />
+                Available to Withdraw
+              </CardTitle>
+              <CardDescription>After reserving funds for user liabilities</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left: Calculation */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                    <span className="text-gray-300">Platform Net Earnings</span>
+                    <span className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}</span>
+                  </div>
+                  {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
+                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                      <span className="text-gray-300">💵 Admin Balance Injected</span>
+                      <span className="text-teal-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                    <span className="text-gray-300">Admin Withdrawals</span>
+                    <span className="text-red-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalAdminWithdrawalsEUR || 0).toFixed(2)}</span>
+                  </div>
+                  {(platformFinancials?.totalVendorPayments || 0) > 0 && (
+                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                      <span className="text-gray-300">🏢 Vendor Payments</span>
+                      <span className="text-purple-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalVendorPayments || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {(platformFinancials?.totalCustomExpenses || 0) > 0 && (
+                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                      <span className="text-gray-300">📝 Custom Expenses</span>
+                      <span className="text-rose-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalCustomExpenses || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                    <span className="text-gray-300">User Credit Balances</span>
+                    <span className="text-orange-400 font-semibold">-{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t-2 border-cyan-500/30">
+                    <span className="text-white font-bold text-lg">💰 Can Withdraw</span>
+                    <span className="text-cyan-400 font-bold text-2xl">{currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Right: Summary + Button */}
+                <div className="flex flex-col justify-between">
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-center">
+                      <p className="text-xs text-gray-400">Bank Balance</p>
+                      <p className="text-xl font-bold text-green-400">{currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}</p>
+                    </div>
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-center">
+                      <p className="text-xs text-gray-400">User Liabilities</p>
+                      <p className="text-xl font-bold text-red-400">-{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => setShowWithdrawDialog(true)}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 text-lg"
+                    disabled={Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)) <= 0}
+                  >
+                    <Banknote className="h-5 w-5 mr-2" />
+                    Withdraw to Bank
+                  </Button>
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    Maximum safe withdrawal after reserving user funds
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Unclaimed Pools Detail (Collapsible Info) */}
+          {platformFinancials?.unclaimedPools && (platformFinancials?.totalUnclaimedPools || 0) > 0 && (
+            <Card className="bg-gray-900 border-amber-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-amber-400 text-lg flex items-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Unclaimed Pools Detail
+                </CardTitle>
+                <CardDescription>
+                  Pools from competitions where all participants were disqualified
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  {Object.entries(platformFinancials.unclaimedPools.byReason).map(([reason, data]) => (
+                    <div key={reason} className="bg-amber-900/20 border border-amber-500/20 rounded-lg p-3 text-center">
+                      <p className="text-xs text-gray-400 uppercase">{reason.replace(/_/g, ' ')}</p>
+                      <p className="text-lg font-bold text-amber-400">{creditSymbol} {data.amount.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">{data.count} comp(s)</p>
                     </div>
                   ))}
                 </div>
-
                 {platformFinancials.unclaimedPools.recentPools.length > 0 && (
-                  <>
-                    <h4 className="text-sm font-medium text-gray-400 mb-3">Recent Unclaimed Pools</h4>
-                    <div className="space-y-2">
-                      {platformFinancials.unclaimedPools.recentPools.slice(0, 5).map((pool) => (
-                        <div key={pool._id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                          <div>
-                            <div className="font-medium text-white">{pool.sourceName}</div>
-                            <div className="text-xs text-gray-400">
-                              {pool.unclaimedReason?.replace(/_/g, ' ')} • {pool.winnersCount}/{pool.expectedWinnersCount} winners
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-semibold text-amber-400">
-                              {creditSymbol} {pool.amount.toLocaleString()}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {new Date(pool.createdAt).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-400">Recent:</p>
+                    {platformFinancials.unclaimedPools.recentPools.slice(0, 3).map((pool) => (
+                      <div key={pool._id} className="flex justify-between items-center p-2 bg-gray-800/50 rounded-lg text-sm">
+                        <span className="text-gray-300">{pool.sourceName}</span>
+                        <span className="text-amber-400 font-semibold">{creditSymbol} {pool.amount.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>
           )}
-
-          {/* Net Platform Position */}
-          <Card className="bg-gray-900 border-emerald-500/50">
-            <CardHeader>
-              <CardTitle className="text-white text-xl flex items-center gap-2">
-                <PiggyBank className="h-5 w-5 text-emerald-400" />
-                Net Platform Position
-              </CardTitle>
-              <CardDescription>
-                Earnings + Admin Balance - Withdrawals - Vendors - Expenses
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-4xl font-bold text-emerald-400">
-                      {currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}
-                    </div>
-                    <p className="text-sm text-gray-400 mt-2">
-                      Available to withdraw (after user liabilities)
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => setShowWithdrawDialog(true)}
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                    disabled={Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)) <= 0}
-                  >
-                    <Banknote className="h-4 w-4 mr-2" />
-                    Withdraw to Bank
-                  </Button>
-                </div>
-                
-                {/* Summary Cards */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-                    <div className="text-xs text-gray-400">Total in Bank</div>
-                    <div className="text-xl font-bold text-green-400">{currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}</div>
-                  </div>
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-                    <div className="text-xs text-gray-400">User Liabilities</div>
-                    <div className="text-xl font-bold text-red-400">-{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</div>
-                  </div>
-                </div>
-                
-                {/* Detailed Breakdown */}
-                <div className="border-t border-gray-700 pt-4 space-y-2 text-sm">
-                  <div className="text-xs text-gray-500 uppercase font-semibold mb-2">Income</div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Platform Net Earnings</span>
-                    <span className="text-green-400">+{currencySymbol}{(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}</span>
-                  </div>
-                  {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">💵 Admin Balance Injected</span>
-                      <span className="text-teal-400">+{currencySymbol}{(platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}</span>
-                    </div>
-                  )}
-                  
-                  <div className="text-xs text-gray-500 uppercase font-semibold mt-3 mb-2">Outgoing</div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Admin Withdrawals</span>
-                    <span className="text-red-400">-{currencySymbol}{(platformFinancials?.totalAdminWithdrawalsEUR || 0).toFixed(2)}</span>
-                  </div>
-                  {(platformFinancials?.totalVendorPayments || 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">🏢 Vendor Payments</span>
-                      <span className="text-purple-400">-{currencySymbol}{(platformFinancials?.totalVendorPayments || 0).toFixed(2)}</span>
-                    </div>
-                  )}
-                  {(platformFinancials?.totalCustomExpenses || 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">📝 Custom Expenses</span>
-                      <span className="text-rose-400">-{currencySymbol}{(platformFinancials?.totalCustomExpenses || 0).toFixed(2)}</span>
-                    </div>
-                  )}
-                  
-                  <div className="text-xs text-gray-500 uppercase font-semibold mt-3 mb-2">Liabilities Reserved</div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">User Credit Balances</span>
-                    <span className="text-orange-400">-{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</span>
-                  </div>
-                  
-                  <div className="flex justify-between pt-3 border-t border-gray-700 font-semibold text-lg">
-                    <span className="text-white">💰 Can Withdraw</span>
-                    <span className="text-emerald-400">{currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}</span>
-                  </div>
-                </div>
-                
-                {/* Info */}
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-xs text-blue-300">
-                  💡 <strong>Can Withdraw</strong> = Total Bank Balance - User Liabilities. This is the maximum you can safely withdraw while still being able to pay all user withdrawals.
-                </div>
-              </div>
-          </CardContent>
-        </Card>
         </TabsContent>
 
         {/* VAT TAB */}
