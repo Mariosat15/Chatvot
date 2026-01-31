@@ -116,6 +116,7 @@ import MessagingSettingsSection from '@/components/admin/MessagingSettingsSectio
 import GameMasterDashboardSection from '@/components/admin/GameMasterDashboardSection';
 import GameMasterManagementSection from '@/components/admin/GameMasterManagementSection';
 import PriceHealthWidget from '@/components/admin/PriceHealthWidget';
+import VendorSubscriptionsSection from '@/components/admin/VendorSubscriptionsSection';
 import IncidentsSection from '@/components/admin/IncidentsSection';
 
 interface AdminDashboardProps {
@@ -471,6 +472,7 @@ const menuGroups: MenuGroup[] = [
         children: [
           { id: 'credentials', label: 'Credentials', icon: <Key className="h-4 w-4" /> },
           { id: 'environment', label: 'Environment', icon: <Globe className="h-4 w-4" /> },
+          { id: 'vendors', label: 'Vendor Subscriptions', icon: <CreditCard className="h-4 w-4" /> },
           { id: 'branding', label: 'Branding', icon: <Palette className="h-4 w-4" /> },
           { id: 'company', label: 'Company', icon: <Building2 className="h-4 w-4" /> },
           { id: 'invoices', label: 'Invoices', icon: <FileText className="h-4 w-4" /> },
@@ -841,6 +843,8 @@ export default function AdminDashboard({
         return <CredentialsSection key={currentRefreshKey} currentEmail={adminEmail} currentName={adminName} />;
       case 'environment':
         return <EnvironmentSection key={currentRefreshKey} />;
+      case 'vendors':
+        return <VendorSubscriptionsSection key={currentRefreshKey} />;
       case 'branding':
         return <ImagesSection key={currentRefreshKey} />;
       case 'company':

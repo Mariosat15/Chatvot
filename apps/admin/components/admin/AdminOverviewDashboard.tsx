@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import UpcomingPaymentsWidget from '@/components/admin/UpcomingPaymentsWidget';
 
 interface DashboardStats {
   users: {
@@ -759,6 +760,13 @@ export default function AdminOverviewDashboard({
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Vendor Payments Widget */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <UpcomingPaymentsWidget onNavigate={onNavigate} daysAhead={30} />
+        </div>
       </div>
 
       {/* Quick Actions */}
