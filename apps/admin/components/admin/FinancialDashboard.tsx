@@ -121,6 +121,17 @@ interface PlatformFinancials {
   totalVendorPayments?: number;
   vendorPaymentCount?: number;
   
+  // Admin Balance Additions
+  totalAdminBalanceAdded?: number;
+  adminBalanceAddCount?: number;
+  
+  // Custom Expenses
+  totalCustomExpenses?: number;
+  customExpenseCount?: number;
+  
+  // Net Operating Balance
+  netOperatingBalance?: number;
+  
   // User deposits/withdrawals (actual money flow)
   totalUserDeposits: number;      // Base EUR deposited by users for credits
   totalUserWithdrawals: number;   // EUR withdrawn by users
@@ -272,6 +283,51 @@ export default function FinancialDashboard() {
     type: 'all',
     status: 'all',
     search: '',
+    startDate: '',
+    endDate: '',
+  });
+  const [exportingTransactions, setExportingTransactions] = useState(false);
+  
+  // Admin Funds states
+  const [adminFundsData, setAdminFundsData] = useState<{
+    transactions: Array<{
+      _id: string;
+      transactionType: string;
+      amountEUR: number;
+      description: string;
+      notes?: string;
+      createdAt: string;
+      processedByEmail?: string;
+      balanceAddDetails?: { source: string; reference?: string };
+      expenseDetails?: { category: string; vendor?: string; invoiceNumber?: string };
+    }>;
+    summary: {
+      totalBalanceAdded: number;
+      balanceAddCount: number;
+      totalExpenses: number;
+      expenseCount: number;
+      netOperatingBalance: number;
+      expensesByCategory: Array<{ _id: string; total: number; count: number }>;
+    };
+  } | null>(null);
+  const [showAddBalanceDialog, setShowAddBalanceDialog] = useState(false);
+  const [showAddExpenseDialog, setShowAddExpenseDialog] = useState(false);
+  const [adminFundsProcessing, setAdminFundsProcessing] = useState(false);
+  const [balanceAddForm, setBalanceAddForm] = useState({
+    amount: '',
+    source: '',
+    reference: '',
+    notes: '',
+    description: '',
+  });
+  const [expenseForm, setExpenseForm] = useState({
+    amount: '',
+    category: 'other',
+    vendor: '',
+    invoiceNumber: '',
+    paymentMethod: '',
+    notes: '',
+    description: '',
   });
   
   // VAT states
@@ -377,6 +433,50 @@ export default function FinancialDashboard() {
       console.error('Failed to load vendor payment data:', error);
     }
   }, []);
+
+  const fetchAdminFundsData = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin-funds');
+      if (!response.ok) throw new Error('Failed to fetch admin funds data');
+      
+      const result = await response.json();
+      setAdminFundsData(result.data);
+    } catch (error) {
+      console.error('Failed to load admin funds data:', error);
+    }
+  }, []);
+
+  const handleExportTransactions = async () => {
+    setExportingTransactions(true);
+    try {
+      const params = new URLSearchParams();
+      if (txFilters.type !== 'all') params.set('type', txFilters.type);
+      if (txFilters.status !== 'all') params.set('status', txFilters.status);
+      if (txFilters.search) params.set('search', txFilters.search);
+      if (txFilters.startDate) params.set('startDate', txFilters.startDate);
+      if (txFilters.endDate) params.set('endDate', txFilters.endDate);
+      
+      const response = await fetch(`/api/transactions/export?${params}`);
+      if (!response.ok) throw new Error('Failed to export transactions');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Transactions exported successfully');
+    } catch (error) {
+      toast.error('Failed to export transactions');
+      console.error(error);
+    } finally {
+      setExportingTransactions(false);
+    }
+  };
   
   const fetchData = useCallback(async () => {
     setRefreshing(true);
@@ -400,6 +500,9 @@ export default function FinancialDashboard() {
       
       // Fetch vendor payment data
       await fetchVendorPaymentData();
+      
+      // Fetch admin funds data
+      await fetchAdminFundsData();
     } catch (error) {
       toast.error('Failed to load financial data');
       console.error(error);
@@ -407,7 +510,7 @@ export default function FinancialDashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [fetchVatData, fetchVatEnabled]);
+  }, [fetchVatData, fetchVatEnabled, fetchVendorPaymentData, fetchAdminFundsData]);
 
   const fetchTransactions = useCallback(async () => {
     setTxLoading(true);
@@ -419,6 +522,8 @@ export default function FinancialDashboard() {
         status: txFilters.status,
         search: txFilters.search,
       });
+      if (txFilters.startDate) params.set('startDate', txFilters.startDate);
+      if (txFilters.endDate) params.set('endDate', txFilters.endDate);
       
       const response = await fetch(`/api/transactions?${params}`);
       if (!response.ok) throw new Error('Failed to fetch transactions');
@@ -675,6 +780,86 @@ export default function FinancialDashboard() {
     setVendorPaymentAmount(vendor.amount.toString());
     setShowVendorPayDialog(true);
   };
+
+  const handleAddBalance = async () => {
+    const amount = parseFloat(balanceAddForm.amount);
+    if (!amount || amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    if (!balanceAddForm.source) {
+      toast.error('Please specify the source of funds');
+      return;
+    }
+
+    setAdminFundsProcessing(true);
+    try {
+      const response = await fetch('/api/admin-funds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add_balance',
+          amount,
+          source: balanceAddForm.source,
+          reference: balanceAddForm.reference,
+          notes: balanceAddForm.notes,
+          description: balanceAddForm.description,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to add balance');
+
+      const result = await response.json();
+      toast.success(result.message || `€${amount.toFixed(2)} added to operating funds`);
+      setShowAddBalanceDialog(false);
+      setBalanceAddForm({ amount: '', source: '', reference: '', notes: '', description: '' });
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to add balance');
+      console.error(error);
+    } finally {
+      setAdminFundsProcessing(false);
+    }
+  };
+
+  const handleAddExpense = async () => {
+    const amount = parseFloat(expenseForm.amount);
+    if (!amount || amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+
+    setAdminFundsProcessing(true);
+    try {
+      const response = await fetch('/api/admin-funds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add_expense',
+          amount,
+          category: expenseForm.category,
+          vendor: expenseForm.vendor,
+          invoiceNumber: expenseForm.invoiceNumber,
+          paymentMethod: expenseForm.paymentMethod,
+          notes: expenseForm.notes,
+          description: expenseForm.description,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to record expense');
+
+      const result = await response.json();
+      toast.success(result.message || `€${amount.toFixed(2)} expense recorded`);
+      setShowAddExpenseDialog(false);
+      setExpenseForm({ amount: '', category: 'other', vendor: '', invoiceNumber: '', paymentMethod: '', notes: '', description: '' });
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to record expense');
+      console.error(error);
+    } finally {
+      setAdminFundsProcessing(false);
+    }
+  };
   
   const handleBackfillFees = async () => {
     if (!confirm('This will calculate and record fees for all existing deposits/withdrawals. Continue?')) {
@@ -722,6 +907,8 @@ export default function FinancialDashboard() {
       admin_withdrawal: 'bg-cyan-500',
       vat_payment: 'bg-indigo-500',
       vendor_payment: 'bg-purple-500',
+      admin_balance_add: 'bg-teal-500',
+      custom_expense: 'bg-rose-500',
       unclaimed_pool: 'bg-amber-500',
       deposit_fee: 'bg-emerald-500',
       // Challenge transactions
@@ -751,6 +938,8 @@ export default function FinancialDashboard() {
       admin_withdrawal: '💰 Admin Withdrawal',
       vat_payment: '🏛️ VAT Payment',
       vendor_payment: '🏢 Vendor Payment',
+      admin_balance_add: '💵 Balance Addition',
+      custom_expense: '📝 Custom Expense',
       unclaimed_pool: '🎯 Unclaimed Pool',
       deposit_fee: 'Deposit Fee',
       // Challenge transactions
@@ -850,6 +1039,7 @@ export default function FinancialDashboard() {
           <TabsTrigger value="earnings">Platform Earnings</TabsTrigger>
           {vatEnabled && <TabsTrigger value="vat">VAT</TabsTrigger>}
           <TabsTrigger value="vendor-payments">Vendor Payments</TabsTrigger>
+          <TabsTrigger value="admin-funds">Admin Funds</TabsTrigger>
           <TabsTrigger value="wallets">User Wallets</TabsTrigger>
           <TabsTrigger value="transactions">All Transactions</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
@@ -921,6 +1111,23 @@ export default function FinancialDashboard() {
                       <span className="text-gray-400">Vendor Payments</span>
                       <span className="text-red-400">-{currencySymbol}{(platformFinancials?.totalVendorPayments || 0).toFixed(2)}</span>
                     </div>
+                  )}
+                  {(platformFinancials?.totalCustomExpenses || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Custom Expenses</span>
+                      <span className="text-red-400">-{currencySymbol}{(platformFinancials?.totalCustomExpenses || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  
+                  {/* Admin Balance Additions (separate section - these ADD to bank) */}
+                  {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
+                    <>
+                      <div className="text-xs text-gray-500 uppercase font-semibold mt-2 mb-1">💵 Admin Balance Added</div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Operating Funds Added</span>
+                        <span className="text-teal-400">+{currencySymbol}{(platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}</span>
+                      </div>
+                    </>
                   )}
                 </div>
               </CardContent>
@@ -1384,7 +1591,26 @@ export default function FinancialDashboard() {
                       <div className="text-xs text-gray-500">{platformFinancials?.vendorPaymentCount || 0} payments to vendors</div>
                     </div>
                   )}
+                  {(platformFinancials?.totalCustomExpenses || 0) > 0 && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-3">
+                      <div className="text-gray-400 text-xs">Custom Expenses</div>
+                      <div className="text-rose-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalCustomExpenses || 0).toFixed(2)}</div>
+                      <div className="text-xs text-gray-500">{platformFinancials?.customExpenseCount || 0} custom expenses</div>
+                    </div>
+                  )}
                 </div>
+                
+                {/* Admin Balance Additions */}
+                {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
+                  <div className="border-t border-gray-700 pt-3 mt-3">
+                    <div className="text-xs text-gray-500 uppercase font-semibold mb-2">💵 Admin Balance Added</div>
+                    <div className="bg-teal-500/10 border border-teal-500/20 rounded-lg p-3">
+                      <div className="text-gray-400 text-xs">Operating Funds Injected</div>
+                      <div className="text-teal-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}</div>
+                      <div className="text-xs text-gray-500">{platformFinancials?.adminBalanceAddCount || 0} balance additions</div>
+                    </div>
+                  </div>
+                )}
                 <div className="mt-2 text-xs text-gray-500 italic">
                   Total Paid: {currencySymbol}{((platformFinancials?.totalUserWithdrawals || 0) + (platformFinancials?.totalAdminWithdrawalsEUR || 0) + (vatEnabled ? (platformFinancials?.totalVATPaid || 0) : 0)).toFixed(2)}
                 </div>
@@ -2322,6 +2548,177 @@ export default function FinancialDashboard() {
           )}
         </TabsContent>
 
+        {/* ADMIN FUNDS TAB */}
+        <TabsContent value="admin-funds" className="space-y-6">
+          {/* Admin Funds Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card className="bg-gray-900 border-teal-500/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-400">Total Balance Added</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-teal-400">
+                  {currencySymbol}{(adminFundsData?.summary?.totalBalanceAdded || platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {adminFundsData?.summary?.balanceAddCount || platformFinancials?.adminBalanceAddCount || 0} additions
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-900 border-rose-500/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-400">Total Custom Expenses</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-rose-400">
+                  {currencySymbol}{(adminFundsData?.summary?.totalExpenses || platformFinancials?.totalCustomExpenses || 0).toFixed(2)}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {adminFundsData?.summary?.expenseCount || platformFinancials?.customExpenseCount || 0} expenses
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-900 border-cyan-500/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-400">Net Operating Balance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${
+                  (adminFundsData?.summary?.netOperatingBalance || platformFinancials?.netOperatingBalance || 0) >= 0
+                    ? 'text-cyan-400'
+                    : 'text-orange-400'
+                }`}>
+                  {currencySymbol}{(adminFundsData?.summary?.netOperatingBalance || platformFinancials?.netOperatingBalance || 0).toFixed(2)}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Balance Added - Expenses
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-900 border-green-500/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-400">Platform Net Position</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-400">
+                  {currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Available after user liabilities
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-4">
+            <Button
+              onClick={() => setShowAddBalanceDialog(true)}
+              className="bg-teal-600 hover:bg-teal-700"
+            >
+              <DollarSign className="h-4 w-4 mr-2" />
+              Add Balance to Operating Funds
+            </Button>
+            <Button
+              onClick={() => setShowAddExpenseDialog(true)}
+              className="bg-rose-600 hover:bg-rose-700"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Record Custom Expense
+            </Button>
+          </div>
+
+          {/* Expenses by Category */}
+          {adminFundsData?.summary?.expensesByCategory && adminFundsData.summary.expensesByCategory.length > 0 && (
+            <Card className="bg-gray-900 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-white text-lg flex items-center gap-2">
+                  <Target className="h-5 w-5 text-rose-400" />
+                  Expenses by Category
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {adminFundsData.summary.expensesByCategory.map((item) => (
+                    <div key={item._id} className="bg-gray-800 rounded-lg p-4">
+                      <p className="text-sm text-gray-400 capitalize">{item._id || 'Other'}</p>
+                      <p className="text-xl font-bold text-rose-400">€{item.total.toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">{item.count} expenses</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent Admin Fund Transactions */}
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white text-xl flex items-center gap-2">
+                <History className="h-5 w-5 text-cyan-400" />
+                Admin Fund History
+              </CardTitle>
+              <CardDescription>Balance additions and custom expenses</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {adminFundsData?.transactions && adminFundsData.transactions.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-gray-700">
+                      <TableHead className="text-gray-400">Date</TableHead>
+                      <TableHead className="text-gray-400">Type</TableHead>
+                      <TableHead className="text-gray-400">Description</TableHead>
+                      <TableHead className="text-gray-400">Amount</TableHead>
+                      <TableHead className="text-gray-400">Details</TableHead>
+                      <TableHead className="text-gray-400">Processed By</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {adminFundsData.transactions.map((tx) => (
+                      <TableRow key={tx._id} className="border-gray-700">
+                        <TableCell className="text-gray-300">
+                          {new Date(tx.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={tx.transactionType === 'admin_balance_add' 
+                            ? 'bg-teal-500/20 text-teal-400 border-teal-500/30'
+                            : 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                          }>
+                            {tx.transactionType === 'admin_balance_add' ? 'Balance Add' : 'Expense'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-white max-w-[300px] truncate">
+                          {tx.description}
+                        </TableCell>
+                        <TableCell className={`font-mono ${tx.amountEUR >= 0 ? 'text-teal-400' : 'text-rose-400'}`}>
+                          {tx.amountEUR >= 0 ? '+' : ''}{currencySymbol}{Math.abs(tx.amountEUR).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-gray-400 text-sm">
+                          {tx.balanceAddDetails?.source && `Source: ${tx.balanceAddDetails.source}`}
+                          {tx.expenseDetails?.category && `Category: ${tx.expenseDetails.category}`}
+                          {tx.expenseDetails?.vendor && ` | Vendor: ${tx.expenseDetails.vendor}`}
+                        </TableCell>
+                        <TableCell className="text-gray-400">
+                          {tx.processedByEmail || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <History className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No admin fund transactions recorded yet</p>
+                  <p className="text-sm mt-2">Add balance or record expenses to get started</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* WALLETS TAB */}
         <TabsContent value="wallets" className="space-y-6">
           <Card className="bg-gray-900 border-gray-700">
@@ -2472,6 +2869,8 @@ export default function FinancialDashboard() {
                       <SelectItem value="admin_withdrawal">Admin Withdrawals</SelectItem>
                       <SelectItem value="vat_payment">VAT Payments</SelectItem>
                       <SelectItem value="vendor_payment">Vendor Payments</SelectItem>
+                      <SelectItem value="admin_balance_add">Balance Additions</SelectItem>
+                      <SelectItem value="custom_expense">Custom Expenses</SelectItem>
                       <SelectItem value="unclaimed_pool">Unclaimed Pools</SelectItem>
                       <SelectItem value="deposit_fee">Deposit Fees</SelectItem>
                       <SelectItem value="withdrawal_fee">Withdrawal Fees</SelectItem>
@@ -2492,6 +2891,28 @@ export default function FinancialDashboard() {
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                {/* Date Filters Row */}
+                <div className="flex items-center gap-3 mt-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-400 text-sm">From:</span>
+                    <Input
+                      type="date"
+                      value={txFilters.startDate}
+                      onChange={(e) => setTxFilters(f => ({ ...f, startDate: e.target.value }))}
+                      className="bg-gray-800 border-gray-700 text-white w-40"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 text-sm">To:</span>
+                    <Input
+                      type="date"
+                      value={txFilters.endDate}
+                      onChange={(e) => setTxFilters(f => ({ ...f, endDate: e.target.value }))}
+                      className="bg-gray-800 border-gray-700 text-white w-40"
+                    />
+                  </div>
                   <Button
                     onClick={fetchTransactions}
                     disabled={txLoading}
@@ -2499,8 +2920,30 @@ export default function FinancialDashboard() {
                     className="border-gray-700"
                   >
                     <Filter className="h-4 w-4 mr-2" />
-                    Apply
+                    Apply Filters
                   </Button>
+                  <Button
+                    onClick={handleExportTransactions}
+                    disabled={exportingTransactions}
+                    variant="outline"
+                    className="border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10"
+                  >
+                    {exportingTransactions ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    Export Excel
+                  </Button>
+                  {(txFilters.startDate || txFilters.endDate || txFilters.type !== 'all' || txFilters.status !== 'all' || txFilters.search) && (
+                    <Button
+                      onClick={() => setTxFilters({ type: 'all', status: 'all', search: '', startDate: '', endDate: '' })}
+                      variant="ghost"
+                      className="text-gray-400 hover:text-white"
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
                 </div>
               </div>
           </CardHeader>
@@ -3172,6 +3615,273 @@ export default function FinancialDashboard() {
                 <>
                   <Banknote className="h-4 w-4 mr-2" />
                   Record Payment
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Balance Dialog */}
+      <Dialog open={showAddBalanceDialog} onOpenChange={setShowAddBalanceDialog}>
+        <DialogContent className="bg-gray-900 border-gray-700 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <DollarSign className="h-5 w-5 text-teal-400" />
+              Add Balance to Operating Funds
+            </DialogTitle>
+            <DialogDescription>
+              Inject money into the platform&apos;s operating balance (e.g., from bank transfer, personal investment)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Amount */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">Amount (EUR) *</label>
+              <Input
+                type="number"
+                value={balanceAddForm.amount}
+                onChange={(e) => setBalanceAddForm(f => ({ ...f, amount: e.target.value }))}
+                placeholder="0.00"
+                className="bg-gray-800 border-gray-600 text-white"
+                step="0.01"
+                min="0"
+              />
+            </div>
+
+            {/* Source */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">Source of Funds *</label>
+              <Select
+                value={balanceAddForm.source}
+                onValueChange={(v) => setBalanceAddForm(f => ({ ...f, source: v }))}
+              >
+                <SelectTrigger className="bg-gray-800 border-gray-600">
+                  <SelectValue placeholder="Select source..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="personal_funds">Personal Funds</SelectItem>
+                  <SelectItem value="investor_capital">Investor Capital</SelectItem>
+                  <SelectItem value="loan">Loan</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Reference */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">Reference Number (optional)</label>
+              <Input
+                value={balanceAddForm.reference}
+                onChange={(e) => setBalanceAddForm(f => ({ ...f, reference: e.target.value }))}
+                placeholder="e.g., Transfer reference"
+                className="bg-gray-800 border-gray-600 text-white"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">Description (optional)</label>
+              <Input
+                value={balanceAddForm.description}
+                onChange={(e) => setBalanceAddForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Additional details..."
+                className="bg-gray-800 border-gray-600 text-white"
+              />
+            </div>
+
+            {/* Info */}
+            <div className="bg-teal-500/10 border border-teal-500/30 rounded-lg p-3 text-sm">
+              <p className="text-gray-400">
+                This will add to your platform&apos;s operating balance, increasing the &quot;What We Have&quot; 
+                amount and allowing you to pay vendor bills or record expenses.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddBalanceDialog(false);
+                setBalanceAddForm({ amount: '', source: '', reference: '', notes: '', description: '' });
+              }}
+              className="border-gray-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddBalance}
+              disabled={adminFundsProcessing || !balanceAddForm.amount || !balanceAddForm.source}
+              className="bg-teal-600 hover:bg-teal-700"
+            >
+              {adminFundsProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Add Balance
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Expense Dialog */}
+      <Dialog open={showAddExpenseDialog} onOpenChange={setShowAddExpenseDialog}>
+        <DialogContent className="bg-gray-900 border-gray-700 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <AlertTriangle className="h-5 w-5 text-rose-400" />
+              Record Custom Expense
+            </DialogTitle>
+            <DialogDescription>
+              Record an expense that will be deducted from your platform&apos;s operating balance
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Amount */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">Amount (EUR) *</label>
+              <Input
+                type="number"
+                value={expenseForm.amount}
+                onChange={(e) => setExpenseForm(f => ({ ...f, amount: e.target.value }))}
+                placeholder="0.00"
+                className="bg-gray-800 border-gray-600 text-white"
+                step="0.01"
+                min="0"
+              />
+            </div>
+
+            {/* Category */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">Category *</label>
+              <Select
+                value={expenseForm.category}
+                onValueChange={(v) => setExpenseForm(f => ({ ...f, category: v }))}
+              >
+                <SelectTrigger className="bg-gray-800 border-gray-600">
+                  <SelectValue placeholder="Select category..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="marketing">Marketing & Advertising</SelectItem>
+                  <SelectItem value="software">Software & Tools</SelectItem>
+                  <SelectItem value="hosting">Hosting & Infrastructure</SelectItem>
+                  <SelectItem value="legal">Legal & Compliance</SelectItem>
+                  <SelectItem value="accounting">Accounting & Finance</SelectItem>
+                  <SelectItem value="office">Office & Supplies</SelectItem>
+                  <SelectItem value="equipment">Equipment</SelectItem>
+                  <SelectItem value="travel">Travel & Entertainment</SelectItem>
+                  <SelectItem value="salary">Salaries & Wages</SelectItem>
+                  <SelectItem value="consulting">Consulting & Services</SelectItem>
+                  <SelectItem value="insurance">Insurance</SelectItem>
+                  <SelectItem value="utilities">Utilities</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="subscriptions">Subscriptions</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Vendor */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">Vendor/Payee (optional)</label>
+              <Input
+                value={expenseForm.vendor}
+                onChange={(e) => setExpenseForm(f => ({ ...f, vendor: e.target.value }))}
+                placeholder="Who was paid?"
+                className="bg-gray-800 border-gray-600 text-white"
+              />
+            </div>
+
+            {/* Invoice Number */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">Invoice/Receipt # (optional)</label>
+              <Input
+                value={expenseForm.invoiceNumber}
+                onChange={(e) => setExpenseForm(f => ({ ...f, invoiceNumber: e.target.value }))}
+                placeholder="e.g., INV-2026-001"
+                className="bg-gray-800 border-gray-600 text-white"
+              />
+            </div>
+
+            {/* Payment Method */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">Payment Method (optional)</label>
+              <Select
+                value={expenseForm.paymentMethod}
+                onValueChange={(v) => setExpenseForm(f => ({ ...f, paymentMethod: v }))}
+              >
+                <SelectTrigger className="bg-gray-800 border-gray-600">
+                  <SelectValue placeholder="How was it paid?" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="credit_card">Credit Card</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="paypal">PayPal</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">Description (optional)</label>
+              <Input
+                value={expenseForm.description}
+                onChange={(e) => setExpenseForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="What was this expense for?"
+                className="bg-gray-800 border-gray-600 text-white"
+              />
+            </div>
+
+            {/* Warning */}
+            <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-3 text-sm">
+              <div className="flex items-center gap-2 text-rose-400 mb-1">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="font-semibold">Important</span>
+              </div>
+              <p className="text-gray-400">
+                This expense will be deducted from your platform&apos;s operating balance. 
+                Make sure you have already paid this expense before recording it here.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddExpenseDialog(false);
+                setExpenseForm({ amount: '', category: 'other', vendor: '', invoiceNumber: '', paymentMethod: '', notes: '', description: '' });
+              }}
+              className="border-gray-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddExpense}
+              disabled={adminFundsProcessing || !expenseForm.amount}
+              className="bg-rose-600 hover:bg-rose-700"
+            >
+              {adminFundsProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Recording...
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Record Expense
                 </>
               )}
             </Button>

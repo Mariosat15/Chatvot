@@ -304,6 +304,17 @@ export const PlatformFinancialsService = {
     totalVendorPayments: number;
     vendorPaymentCount: number;
     
+    // Admin Balance Additions
+    totalAdminBalanceAdded: number;
+    adminBalanceAddCount: number;
+    
+    // Custom Expenses
+    totalCustomExpenses: number;
+    customExpenseCount: number;
+    
+    // Net Operating Balance (what admin has added - what admin has spent)
+    netOperatingBalance: number;
+    
     // Conversion Rate
     conversionRate: number;
   }> => {
@@ -468,13 +479,44 @@ export const PlatformFinancialsService = {
     const totalVendorPayments = vendorPaymentAggregation[0]?.totalPaid || 0;
     const vendorPaymentCount = vendorPaymentAggregation[0]?.count || 0;
     
+    // Admin Balance Additions (money added by admin to operating funds)
+    const adminBalanceAddAggregation = await PlatformTransaction.aggregate([
+      { $match: { transactionType: 'admin_balance_add' } },
+      {
+        $group: {
+          _id: null,
+          totalAdded: { $sum: '$amountEUR' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const totalAdminBalanceAdded = adminBalanceAddAggregation[0]?.totalAdded || 0;
+    const adminBalanceAddCount = adminBalanceAddAggregation[0]?.count || 0;
+    
+    // Custom Expenses (operational expenses recorded by admin)
+    const customExpenseAggregation = await PlatformTransaction.aggregate([
+      { $match: { transactionType: 'custom_expense' } },
+      {
+        $group: {
+          _id: null,
+          totalExpenses: { $sum: { $abs: '$amountEUR' } }, // Expenses are stored as negative
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const totalCustomExpenses = customExpenseAggregation[0]?.totalExpenses || 0;
+    const customExpenseCount = customExpenseAggregation[0]?.count || 0;
+    
+    // Net operating balance = what admin added - what admin spent on expenses
+    const netOperatingBalance = totalAdminBalanceAdded - totalCustomExpenses;
+    
     // Bank reconciliation: 
-    // What we HAVE = Money received from users - Bank fees taken - Money paid out + Platform fees (from contests)
+    // What we HAVE = Money received from users - Bank fees taken - Money paid out + Platform fees (from contests) + Admin balance additions
     // IMPORTANT: Bank fees (Stripe, etc.) are DEDUCTED from what we receive, so subtract them!
     // Competition/Challenge fees are earned from prize pools, which come from entry fees (already in deposits)
-    const totalMoneyReceivedGross = walletStats.totalDeposited + totalDepositFeesGross + totalVATCollected;
-    // Include vendor payments in money paid out (operational expenses)
-    const totalMoneyPaidOut = walletStats.totalWithdrawn + totalAdminWithdrawalsEUR + totalVATPaid + totalVendorPayments;
+    const totalMoneyReceivedGross = walletStats.totalDeposited + totalDepositFeesGross + totalVATCollected + totalAdminBalanceAdded;
+    // Include vendor payments and custom expenses in money paid out (operational expenses)
+    const totalMoneyPaidOut = walletStats.totalWithdrawn + totalAdminWithdrawalsEUR + totalVATPaid + totalVendorPayments + totalCustomExpenses;
     // FIXED: Subtract bank fees because they reduce what we actually have in bank
     // Add competition/challenge fees as they represent earnings from the platform (not deducted from user wallets directly)
     const theoreticalBankBalance = totalMoneyReceivedGross - totalBankFees - totalMoneyPaidOut;
@@ -539,6 +581,17 @@ export const PlatformFinancialsService = {
       // Vendor Payments
       totalVendorPayments,
       vendorPaymentCount,
+      
+      // Admin Balance Additions
+      totalAdminBalanceAdded,
+      adminBalanceAddCount,
+      
+      // Custom Expenses
+      totalCustomExpenses,
+      customExpenseCount,
+      
+      // Net Operating Balance
+      netOperatingBalance,
       
       conversionRate,
     };

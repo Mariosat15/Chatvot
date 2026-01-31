@@ -16,7 +16,9 @@ export interface IPlatformTransaction extends Document {
     | 'admin_withdrawal'         // Admin withdrawing platform earnings to bank
     | 'admin_adjustment'         // Manual adjustment
     | 'refund_clawback'          // Refund that returns funds to platform
-    | 'incident_compensation';   // Platform expense for compensating users due to incidents
+    | 'incident_compensation'    // Platform expense for compensating users due to incidents
+    | 'admin_balance_add'        // Admin adding funds to operating balance
+    | 'custom_expense';          // Custom expense (e.g., marketing, software, etc.)
   
   amount: number;                 // Amount in credits (positive = platform gains, negative = platform pays out)
   amountEUR: number;              // EUR equivalent at time of transaction
@@ -64,6 +66,20 @@ export interface IPlatformTransaction extends Document {
     resolutionType: string;       // partial_refund, full_refund, etc.
     competitionId?: string;       // Related competition if any
     competitionName?: string;
+  };
+  
+  // For admin balance additions
+  balanceAddDetails?: {
+    source: string;               // Where the money came from (e.g., "Bank transfer", "Personal funds")
+    reference?: string;           // Transfer reference number
+  };
+  
+  // For custom expenses
+  expenseDetails?: {
+    category: string;             // Expense category (marketing, software, legal, etc.)
+    vendor?: string;              // Who was paid (if applicable)
+    invoiceNumber?: string;       // Invoice/receipt number
+    paymentMethod?: string;       // How it was paid
   };
   
   description: string;
@@ -119,6 +135,8 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
         'admin_adjustment',
         'refund_clawback',
         'incident_compensation',
+        'admin_balance_add',
+        'custom_expense',
       ],
       index: true,
     },
@@ -174,6 +192,16 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
       resolutionType: String,
       competitionId: String,
       competitionName: String,
+    },
+    balanceAddDetails: {
+      source: String,
+      reference: String,
+    },
+    expenseDetails: {
+      category: String,
+      vendor: String,
+      invoiceNumber: String,
+      paymentMethod: String,
     },
     description: {
       type: String,

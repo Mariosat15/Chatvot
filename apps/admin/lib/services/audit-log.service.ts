@@ -368,6 +368,28 @@ export const auditLogService = {
     });
   },
 
+  async logAdminBalanceAdd(admin: AdminInfo, amount: number, source: string, reference: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'admin_balance_add',
+      category: 'financial',
+      description: `Added €${amount.toFixed(2)} to operating funds from ${source} (Ref: ${reference})`,
+      targetType: 'system',
+      metadata: { amount, source, reference },
+    });
+  },
+
+  async logCustomExpense(admin: AdminInfo, amount: number, category: string, vendor: string, reference: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'custom_expense',
+      category: 'financial',
+      description: `Recorded expense of €${amount.toFixed(2)} for ${category}${vendor !== 'N/A' ? ` to ${vendor}` : ''} (Ref: ${reference})`,
+      targetType: 'system',
+      metadata: { amount, category, vendor, reference },
+    });
+  },
+
   async logCreditsAdjusted(admin: AdminInfo, userId: string, userName: string, previousBalance: number, newBalance: number, reason: string): Promise<void> {
     await this.log({
       admin,

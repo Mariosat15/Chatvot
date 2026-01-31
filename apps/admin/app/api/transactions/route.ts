@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
     // Check if we should include admin/platform transactions
     const includeAdminTx = type === 'all' || type === 'admin_withdrawal' || type === 'vat_payment' || 
                            type === 'platform_fee' || type === 'unclaimed_pool' || type === 'deposit_fee' || 
-                           type === 'withdrawal_fee' || !type;
+                           type === 'withdrawal_fee' || type === 'admin_balance_add' || type === 'custom_expense' || !type;
 
     // OPTIMIZATION: Limit max records to prevent memory issues
     // For very large result sets, use date filters to narrow down
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
     if (includeAdminTx) {
       const platformQuery: any = {};
       if (type && type !== 'all') {
-        if (['admin_withdrawal', 'platform_fee', 'unclaimed_pool', 'deposit_fee', 'withdrawal_fee'].includes(type)) {
+        if (['admin_withdrawal', 'platform_fee', 'unclaimed_pool', 'deposit_fee', 'withdrawal_fee', 'admin_balance_add', 'custom_expense'].includes(type)) {
           platformQuery.transactionType = type;
         }
       }
