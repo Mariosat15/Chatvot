@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import Link from 'next/link';
 import { 
   Swords, Trash2, Eye, Users, Calendar, DollarSign, 
   RefreshCw, CheckCircle, Clock, XCircle, Ban, Loader2,
@@ -665,15 +666,16 @@ export default function ChallengesAdminSection() {
 
                     {/* Right: Actions */}
                     <div className="flex flex-col gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleViewClick(challenge)}
-                        className="w-full border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white"
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
-                      </Button>
+                      <Link href={`/challenges/view/${challenge._id}`}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View
+                        </Button>
+                      </Link>
 
                       {/* Cancel Button - Only for pending, accepted, or active challenges */}
                       {['pending', 'accepted', 'active'].includes(challenge.status) && (
