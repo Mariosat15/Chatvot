@@ -1480,294 +1480,299 @@ export default function FinancialDashboard() {
 
         {/* LIABILITIES TAB */}
         <TabsContent value="liabilities" className="space-y-6">
-          {/* What We HAVE */}
-          <Card className="bg-gray-900 border-green-500/50">
-            <CardHeader>
-              <CardTitle className="text-white text-lg flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-green-400" />
-                What We HAVE (Theoretical Bank Balance)
-              </CardTitle>
-              <CardDescription className="text-sm">
-                Money received from users minus money paid out
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-4xl font-bold text-green-400">
-                {currencySymbol}{liabilityMetrics?.theoreticalBankBalance.toFixed(2) || '0.00'}
-              </div>
-              
-              {/* Incoming Money - REAL EUR only */}
-              <div className="border-b border-gray-700 pb-3">
-                <div className="text-xs text-gray-500 uppercase mb-2">💰 Real Money Received (EUR into Bank)</div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                    <div className="text-gray-400 text-xs">User Credit Purchases</div>
-                    <div className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalUserDeposits || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">Base EUR deposited</div>
+          {/* Top Summary - 3 Key Numbers */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-gradient-to-br from-green-900/40 to-gray-900 border border-green-500/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">💰 Bank Balance</p>
+                    <p className="text-3xl font-bold text-green-400">{currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}</p>
+                    <p className="text-xs text-gray-500">Total money in bank</p>
                   </div>
-                  <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                    <div className="text-gray-400 text-xs">Deposit Fees (Charged)</div>
-                    <div className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalDepositFeesGross || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">EUR fees charged to users</div>
-                  </div>
-                  {vatEnabled && (
-                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs">VAT Collected</div>
-                      <div className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalVATCollected || 0).toFixed(2)}</div>
-                      <div className="text-xs text-gray-500">Tax collected from EU users</div>
-                    </div>
-                  )}
+                  <TrendingUp className="h-10 w-10 text-green-500/30" />
                 </div>
-                <div className="mt-2 text-xs text-gray-500 italic">
-                  Total Received: {currencySymbol}{((platformFinancials?.totalUserDeposits || 0) + (platformFinancials?.totalDepositFeesGross || 0) + (vatEnabled ? (platformFinancials?.totalVATCollected || 0) : 0)).toFixed(2)}
-                </div>
-              </div>
-              
-              {/* Bank/Provider Fees - deducted from what we actually receive */}
-              <div className="border-b border-gray-700 pb-3">
-                <div className="text-xs text-gray-500 uppercase mb-2">🏦 Bank/Provider Fees (Deducted)</div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
-                    <div className="text-gray-400 text-xs">Stripe/Bank Fees</div>
-                    <div className="text-orange-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalBankFees || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">Payment processor costs</div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Outgoing Money */}
-              <div className="border-b border-gray-700 pb-3">
-                <div className="text-xs text-gray-500 uppercase mb-2">💸 Money Paid Out (EUR from Bank)</div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                    <div className="text-gray-400 text-xs">User Withdrawals</div>
-                    <div className="text-red-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalUserWithdrawals || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">Paid to user bank accounts</div>
-                  </div>
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                    <div className="text-gray-400 text-xs">Admin Withdrawals</div>
-                    <div className="text-red-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalAdminWithdrawalsEUR || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">Company withdrawals</div>
-                  </div>
-                  {vatEnabled && (
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs">VAT Paid to Gov</div>
-                      <div className="text-red-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalVATPaid || 0).toFixed(2)}</div>
-                      <div className="text-xs text-gray-500">Tax remitted to government</div>
-                    </div>
-                  )}
-                  {(platformFinancials?.totalVendorPayments || 0) > 0 && (
-                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs">Vendor Payments</div>
-                      <div className="text-purple-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalVendorPayments || 0).toFixed(2)}</div>
-                      <div className="text-xs text-gray-500">{platformFinancials?.vendorPaymentCount || 0} payments to vendors</div>
-                    </div>
-                  )}
-                  {(platformFinancials?.totalCustomExpenses || 0) > 0 && (
-                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs">Custom Expenses</div>
-                      <div className="text-rose-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalCustomExpenses || 0).toFixed(2)}</div>
-                      <div className="text-xs text-gray-500">{platformFinancials?.customExpenseCount || 0} custom expenses</div>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Admin Balance Additions */}
-                {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
-                  <div className="border-t border-gray-700 pt-3 mt-3">
-                    <div className="text-xs text-gray-500 uppercase font-semibold mb-2">💵 Admin Balance Added</div>
-                    <div className="bg-teal-500/10 border border-teal-500/20 rounded-lg p-3">
-                      <div className="text-gray-400 text-xs">Operating Funds Injected</div>
-                      <div className="text-teal-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}</div>
-                      <div className="text-xs text-gray-500">{platformFinancials?.adminBalanceAddCount || 0} balance additions</div>
-                    </div>
-                  </div>
-                )}
-                <div className="mt-2 text-xs text-gray-500 italic">
-                  Total Paid: {currencySymbol}{((platformFinancials?.totalUserWithdrawals || 0) + (platformFinancials?.totalAdminWithdrawalsEUR || 0) + (vatEnabled ? (platformFinancials?.totalVATPaid || 0) : 0)).toFixed(2)}
-                </div>
-              </div>
-              
-              {/* Platform Credit Earnings - NOT in bank */}
-              <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
-                <div className="text-xs text-blue-400 uppercase mb-2 flex items-center gap-2">
-                  <Info className="h-3 w-3" />
-                  Platform Credit Earnings (NOT real EUR in bank)
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                  <div className="text-center">
-                    <div className="text-gray-400 text-xs">Competition Fees</div>
-                    <div className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalPlatformFees || 0).toFixed(2)}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-gray-400 text-xs">Challenge Fees</div>
-                    <div className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-gray-400 text-xs">Marketplace</div>
-                    <div className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-gray-400 text-xs">Unclaimed Pools</div>
-                    <div className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalUnclaimedPools || 0).toFixed(2)}</div>
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-gray-500">
-                  These are credits from prize pools/sales - not EUR. See "Platform Earnings" tab for details.
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* What We OWE */}
-          <Card className="bg-gray-900 border-red-500/50">
-            <CardHeader>
-              <CardTitle className="text-white text-lg flex items-center gap-2">
-                <ShieldAlert className="h-5 w-5 text-red-400" />
-                What We OWE (Total Liabilities)
-              </CardTitle>
-              <CardDescription className="text-sm">
-                Money we must be able to pay if requested
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-4xl font-bold text-red-400">
-                {currencySymbol}{((liabilityMetrics?.totalUserCreditsEUR || 0) + (vatEnabled ? (platformFinancials?.outstandingVAT || 0) : 0)).toFixed(2)}
-              </div>
-              <div className={`grid ${vatEnabled ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'} gap-3 text-sm`}>
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                  <div className="text-gray-400 text-xs">User {creditName} Balances</div>
-                  <div className="text-red-400 font-semibold">{currencySymbol}{liabilityMetrics?.totalUserCreditsEUR.toFixed(2) || '0.00'}</div>
-                  <div className="text-xs text-gray-500">{liabilityMetrics?.totalUserCredits.toLocaleString() || 0} {creditName} can be withdrawn</div>
-                </div>
-                {vatEnabled && (
-                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
-                    <div className="text-gray-400 text-xs">Outstanding VAT</div>
-                    <div className="text-orange-400 font-semibold">{currencySymbol}{(platformFinancials?.outstandingVAT || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">Tax owed to government</div>
+            <Card className="bg-gradient-to-br from-red-900/40 to-gray-900 border border-red-500/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">⚠️ Total Liabilities</p>
+                    <p className="text-3xl font-bold text-red-400">{currencySymbol}{((liabilityMetrics?.totalUserCreditsEUR || 0) + (vatEnabled ? (platformFinancials?.outstandingVAT || 0) : 0)).toFixed(2)}</p>
+                    <p className="text-xs text-gray-500">Must be able to pay</p>
                   </div>
-                )}
-                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-                  <div className="text-gray-400 text-xs">Pending Withdrawals</div>
-                  <div className="text-yellow-400 font-semibold">{currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)}</div>
-                  <div className="text-xs text-gray-500">{pendingWithdrawals.length} awaiting processing</div>
+                  <ShieldAlert className="h-10 w-10 text-red-500/30" />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Coverage Ratio */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className={`bg-gray-900 ${(liabilityMetrics?.coverageRatio || 1) >= 1 ? 'border-emerald-500/50' : 'border-red-500/50'}`}>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-400" />
-                  Coverage Ratio
-            </CardTitle>
-                <CardDescription className="text-xs">
-                  {vatEnabled ? 'Bank Balance ÷ Total Liabilities' : 'Bank Balance ÷ User Liabilities'}
-                </CardDescription>
-          </CardHeader>
-          <CardContent>
-                <div className={`text-3xl font-bold ${(liabilityMetrics?.coverageRatio || 1) >= 1 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {((liabilityMetrics?.coverageRatio || 1) * 100).toFixed(1)}%
-            </div>
-            <p className="text-sm text-gray-400 mt-2">
-                  {(liabilityMetrics?.coverageRatio || 1) >= 1 
-                    ? '✅ Fully covered - All obligations can be met' 
-                    : '⚠️ Under-covered - Insufficient funds to cover all obligations'}
-            </p>
-          </CardContent>
-        </Card>
-
-            <Card className="bg-gray-900 border-blue-500/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                  <Wallet className="h-4 w-4 text-blue-400" />
-                  Net Position
-            </CardTitle>
-                <CardDescription className="text-xs">
-                  What We HAVE - What We OWE
-                </CardDescription>
-          </CardHeader>
-          <CardContent>
-                <div className={`text-3xl font-bold ${(liabilityMetrics?.theoreticalBankBalance || 0) - ((liabilityMetrics?.totalUserCreditsEUR || 0) + (vatEnabled ? (platformFinancials?.outstandingVAT || 0) : 0)) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {currencySymbol}{((liabilityMetrics?.theoreticalBankBalance || 0) - ((liabilityMetrics?.totalUserCreditsEUR || 0) + (vatEnabled ? (platformFinancials?.outstandingVAT || 0) : 0))).toFixed(2)}
-            </div>
-            <p className="text-sm text-gray-400 mt-2">
-                  Platform's actual available funds
-            </p>
-          </CardContent>
-        </Card>
+            <Card className={`bg-gradient-to-br ${
+              ((liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)) >= 0 
+                ? 'from-cyan-900/40 to-gray-900 border-cyan-500/30' 
+                : 'from-orange-900/40 to-gray-900 border-orange-500/30'
+            } border`}>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">📊 Net Position</p>
+                    <p className={`text-3xl font-bold ${
+                      ((liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)) >= 0 
+                        ? 'text-cyan-400' : 'text-orange-400'
+                    }`}>
+                      {currencySymbol}{((liabilityMetrics?.theoreticalBankBalance || 0) - ((liabilityMetrics?.totalUserCreditsEUR || 0) + (vatEnabled ? (platformFinancials?.outstandingVAT || 0) : 0))).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Coverage: {((liabilityMetrics?.coverageRatio || 1) * 100).toFixed(0)}%
+                      {(liabilityMetrics?.coverageRatio || 1) >= 1 ? ' ✅' : ' ⚠️'}
+                    </p>
+                  </div>
+                  <Wallet className="h-10 w-10 text-cyan-500/30" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Pending Withdrawals */}
+          {/* Two-Column Layout: HAVE vs OWE */}
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-lg flex items-center gap-2">
+                <ArrowRightLeft className="h-5 w-5 text-blue-400" />
+                Bank Balance Breakdown
+              </CardTitle>
+              <CardDescription>What builds up vs what depletes your bank balance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* MONEY IN Column */}
+                <div className="bg-green-950/20 border border-green-500/20 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    💰 MONEY IN (Bank)
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center py-2 border-b border-green-500/10">
+                      <span className="text-gray-300">User Credit Purchases</span>
+                      <span className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalUserDeposits || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-green-500/10">
+                      <span className="text-gray-300">Deposit Fees Charged</span>
+                      <span className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalDepositFeesGross || 0).toFixed(2)}</span>
+                    </div>
+                    {vatEnabled && (platformFinancials?.totalVATCollected || 0) > 0 && (
+                      <div className="flex justify-between items-center py-2 border-b border-green-500/10">
+                        <span className="text-gray-300">VAT Collected</span>
+                        <span className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalVATCollected || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
+                      <div className="flex justify-between items-center py-2 border-b border-green-500/10 bg-teal-500/10 -mx-2 px-2 rounded">
+                        <span className="text-teal-300">💵 Admin Balance Injected</span>
+                        <span className="text-teal-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {/* Total */}
+                    <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-green-500/30">
+                      <span className="text-white font-bold">TOTAL IN</span>
+                      <span className="text-green-400 font-bold text-xl">
+                        +{currencySymbol}{(
+                          (platformFinancials?.totalUserDeposits || 0) +
+                          (platformFinancials?.totalDepositFeesGross || 0) +
+                          (platformFinancials?.totalAdminBalanceAdded || 0) +
+                          (vatEnabled ? (platformFinancials?.totalVATCollected || 0) : 0)
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* MONEY OUT Column */}
+                <div className="bg-red-950/20 border border-red-500/20 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
+                    <TrendingDown className="h-5 w-5" />
+                    💸 MONEY OUT (Bank)
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center py-2 border-b border-red-500/10">
+                      <span className="text-gray-300">User Withdrawals</span>
+                      <span className="text-red-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalUserWithdrawals || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-red-500/10">
+                      <span className="text-gray-300">Stripe/Bank Fees</span>
+                      <span className="text-orange-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalBankFees || 0).toFixed(2)}</span>
+                    </div>
+                    {(platformFinancials?.totalAdminWithdrawalsEUR || 0) > 0 && (
+                      <div className="flex justify-between items-center py-2 border-b border-red-500/10">
+                        <span className="text-gray-300">Admin Withdrawals</span>
+                        <span className="text-red-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalAdminWithdrawalsEUR || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {vatEnabled && (platformFinancials?.totalVATPaid || 0) > 0 && (
+                      <div className="flex justify-between items-center py-2 border-b border-red-500/10">
+                        <span className="text-gray-300">VAT Paid to Gov</span>
+                        <span className="text-red-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalVATPaid || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {(platformFinancials?.totalVendorPayments || 0) > 0 && (
+                      <div className="flex justify-between items-center py-2 border-b border-red-500/10">
+                        <span className="text-gray-300">🏢 Vendor Payments</span>
+                        <span className="text-purple-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalVendorPayments || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {(platformFinancials?.totalCustomExpenses || 0) > 0 && (
+                      <div className="flex justify-between items-center py-2 border-b border-red-500/10">
+                        <span className="text-gray-300">📝 Custom Expenses</span>
+                        <span className="text-rose-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalCustomExpenses || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {/* Total */}
+                    <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-red-500/30">
+                      <span className="text-white font-bold">TOTAL OUT</span>
+                      <span className="text-red-400 font-bold text-xl">
+                        -{currencySymbol}{(
+                          (platformFinancials?.totalUserWithdrawals || 0) +
+                          (platformFinancials?.totalBankFees || 0) +
+                          (platformFinancials?.totalAdminWithdrawalsEUR || 0) +
+                          (platformFinancials?.totalVendorPayments || 0) +
+                          (platformFinancials?.totalCustomExpenses || 0) +
+                          (vatEnabled ? (platformFinancials?.totalVATPaid || 0) : 0)
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank Balance Result */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-green-900/30 to-gray-900 border border-green-500/30 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-lg text-white font-semibold">= Current Bank Balance</p>
+                    <p className="text-xs text-gray-400">Total IN - Total OUT</p>
+                  </div>
+                  <p className="text-3xl font-bold text-green-400">{currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Liabilities Breakdown */}
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-lg flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-red-400" />
+                Liabilities (What We Must Reserve)
+              </CardTitle>
+              <CardDescription>Funds that belong to users or government</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-red-950/20 border border-red-500/20 rounded-lg p-4">
+                  <p className="text-sm text-gray-400">User {creditName} Balances</p>
+                  <p className="text-2xl font-bold text-red-400">{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</p>
+                  <p className="text-xs text-gray-500">{liabilityMetrics?.totalUserCredits?.toLocaleString() || 0} {creditName}</p>
+                </div>
+                {vatEnabled && (
+                  <div className="bg-orange-950/20 border border-orange-500/20 rounded-lg p-4">
+                    <p className="text-sm text-gray-400">Outstanding VAT</p>
+                    <p className="text-2xl font-bold text-orange-400">{currencySymbol}{(platformFinancials?.outstandingVAT || 0).toFixed(2)}</p>
+                    <p className="text-xs text-gray-500">Owed to government</p>
+                  </div>
+                )}
+                <div className="bg-yellow-950/20 border border-yellow-500/20 rounded-lg p-4">
+                  <p className="text-sm text-gray-400">Pending Withdrawals</p>
+                  <p className="text-2xl font-bold text-yellow-400">{currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)}</p>
+                  <p className="text-xs text-gray-500">{pendingWithdrawals.length} awaiting</p>
+                </div>
+              </div>
+
+              {/* Platform Credit Earnings Note */}
+              <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                <div className="flex items-center gap-2 text-sm text-blue-400 mb-2">
+                  <Info className="h-4 w-4" />
+                  Platform Credit Earnings (Internal - Not EUR in Bank)
+                </div>
+                <div className="grid grid-cols-4 gap-4 text-center text-sm">
+                  <div>
+                    <p className="text-gray-400 text-xs">Competition</p>
+                    <p className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalPlatformFees || 0).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-xs">Challenge</p>
+                    <p className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-xs">Marketplace</p>
+                    <p className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-xs">Unclaimed</p>
+                    <p className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalUnclaimedPools || 0).toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Pending Withdrawals Table */}
           {pendingWithdrawals.length > 0 && (
-            <Card className="bg-gray-900 border-orange-500/50">
-              <CardHeader>
-                <CardTitle className="text-white text-xl flex items-center gap-2">
-                  <Download className="h-5 w-5 text-orange-400" />
-                  Pending User Withdrawals ({pendingWithdrawals.length})
-                </CardTitle>
-                <CardDescription>
-                  Total Gross: {currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)} | 
-                  Total Net to Users: {currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.netAmountEUR || 0), 0).toFixed(2)} | 
-                  Total Platform Fees: {currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.platformFee || 0), 0).toFixed(2)}
-                </CardDescription>
+            <Card className="bg-gray-900 border-orange-500/30">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-white text-lg flex items-center gap-2">
+                      <Download className="h-5 w-5 text-orange-400" />
+                      Pending Withdrawals ({pendingWithdrawals.length})
+                    </CardTitle>
+                    <CardDescription>
+                      Gross: {currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)} | 
+                      Net: {currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.netAmountEUR || 0), 0).toFixed(2)} | 
+                      Fees: {currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.platformFee || 0), 0).toFixed(2)}
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-gray-700">
-                      <TableHead className="text-gray-400">User</TableHead>
-                      <TableHead className="text-gray-400">Amount Requested</TableHead>
-                      <TableHead className="text-gray-400">Platform Fee</TableHead>
-                      <TableHead className="text-gray-400">Net to User</TableHead>
-                      <TableHead className="text-gray-400">Status</TableHead>
-                      <TableHead className="text-gray-400">Requested</TableHead>
-                      <TableHead className="text-gray-400">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pendingWithdrawals.map((withdrawal) => (
-                      <TableRow key={withdrawal._id} className="border-gray-700">
-                        <TableCell>
-                          <div>
-                            <div className="font-medium text-white">{withdrawal.userName}</div>
-                            <div className="text-xs text-gray-400">{withdrawal.userEmail}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-semibold text-white">
-                            {creditSymbol} {Math.abs(withdrawal.amount).toLocaleString()}
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            {currencySymbol}{(withdrawal.amountEUR || 0).toFixed(2)}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-red-400 text-sm">
-                          {currencySymbol}{(withdrawal.platformFee || 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-green-400 font-semibold">
-                          {currencySymbol}{(withdrawal.netAmountEUR || 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={`${getStatusColor(withdrawal.status)} text-white text-xs`}>
-                            {withdrawal.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-gray-400 text-sm">
-                          {new Date(withdrawal.createdAt).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                            Process
-                          </Button>
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-gray-700">
+                        <TableHead className="text-gray-400">User</TableHead>
+                        <TableHead className="text-gray-400">Amount</TableHead>
+                        <TableHead className="text-gray-400">Fee</TableHead>
+                        <TableHead className="text-gray-400">Net</TableHead>
+                        <TableHead className="text-gray-400">Status</TableHead>
+                        <TableHead className="text-gray-400">Date</TableHead>
+                        <TableHead className="text-gray-400">Action</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingWithdrawals.map((withdrawal) => (
+                        <TableRow key={withdrawal._id} className="border-gray-700">
+                          <TableCell>
+                            <div className="font-medium text-white text-sm">{withdrawal.userName}</div>
+                            <div className="text-xs text-gray-500">{withdrawal.userEmail}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-white font-semibold">{currencySymbol}{(withdrawal.amountEUR || 0).toFixed(2)}</div>
+                          </TableCell>
+                          <TableCell className="text-red-400 text-sm">{currencySymbol}{(withdrawal.platformFee || 0).toFixed(2)}</TableCell>
+                          <TableCell className="text-green-400 font-semibold">{currencySymbol}{(withdrawal.netAmountEUR || 0).toFixed(2)}</TableCell>
+                          <TableCell>
+                            <Badge className={`${getStatusColor(withdrawal.status)} text-white text-xs`}>
+                              {withdrawal.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-gray-400 text-sm">{new Date(withdrawal.createdAt).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-xs">Process</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           )}
