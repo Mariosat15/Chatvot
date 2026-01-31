@@ -257,61 +257,123 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                 </div>
               </div>
 
-              {/* Leaderboard */}
+              {/* Leaderboard / Results */}
               <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
                   <Trophy className="h-5 w-5 text-yellow-400" />
-                  Current Leaderboard
+                  {isCompleted ? 'Final Results' : 'Current Leaderboard'}
                   <span className="text-sm font-normal text-gray-500">
                     ({leaderboard.length} participants)
                   </span>
                 </h2>
 
                 {leaderboard.length > 0 ? (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {leaderboard.slice(0, 20).map((participant: any, index: number) => (
-                      <div
-                        key={participant._id}
-                        className={`flex items-center justify-between p-3 rounded-lg ${
-                          index < 3
-                            ? 'bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/30'
-                            : 'bg-gray-800/50 border border-gray-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                            index === 0 ? 'bg-yellow-500 text-gray-900' :
-                            index === 1 ? 'bg-gray-400 text-gray-900' :
-                            index === 2 ? 'bg-orange-600 text-white' :
-                            'bg-gray-700 text-gray-300'
-                          }`}>
-                            {index + 1}
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                    {leaderboard.map((participant: any, index: number) => {
+                      const isDisqualified = participant.isDisqualified || participant.status === 'disqualified';
+                      const isWinner = isCompleted && !isDisqualified && index < (competition.prizeDistribution?.length || 3);
+                      
+                      // Calculate prize for winners
+                      let prizeAmount = 0;
+                      if (isWinner && competition.prizeDistribution?.[index]) {
+                        const prizePool = competition.prizePool || competition.prizePoolCredits || 0;
+                        const grossAmount = (prizePool * competition.prizeDistribution[index].percentage) / 100;
+                        const platformFeePercentage = (competition.platformFeePercentage || 0) / 100;
+                        prizeAmount = grossAmount * (1 - platformFeePercentage);
+                      }
+
+                      return (
+                        <div
+                          key={participant._id}
+                          className={`flex items-center justify-between p-3 rounded-lg ${
+                            isDisqualified
+                              ? 'bg-red-500/10 border border-red-500/30 opacity-75'
+                              : isWinner
+                              ? 'bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/30'
+                              : 'bg-gray-800/50 border border-gray-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                              isDisqualified ? 'bg-red-500/50 text-red-200' :
+                              index === 0 ? 'bg-yellow-500 text-gray-900' :
+                              index === 1 ? 'bg-gray-400 text-gray-900' :
+                              index === 2 ? 'bg-orange-600 text-white' :
+                              'bg-gray-700 text-gray-300'
+                            }`}>
+                              {isDisqualified ? '✗' : index + 1}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className={`text-sm font-semibold ${isDisqualified ? 'text-red-300 line-through' : 'text-gray-100'}`}>
+                                  {participant.username || participant.userId}
+                                </p>
+                                {isDisqualified && (
+                                  <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs font-semibold rounded">
+                                    DISQUALIFIED
+                                  </span>
+                                )}
+                                {isWinner && (
+                                  <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-semibold rounded">
+                                    🏆 WINNER
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {participant.totalTrades} trades
+                                {participant.disqualificationReason && (
+                                  <span className="text-red-400 ml-2">• {participant.disqualificationReason}</span>
+                                )}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-100">
-                              {participant.username || participant.userId}
+                          <div className="text-right">
+                            <p className={`text-sm font-bold ${
+                              isDisqualified ? 'text-red-400' :
+                              participant.pnl >= 0 ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {participant.pnl >= 0 ? '+' : ''}{participant.pnl?.toFixed(2) || '0.00'}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {participant.totalTrades} trades
+                              {participant.pnlPercentage >= 0 ? '+' : ''}{participant.pnlPercentage?.toFixed(2) || '0.00'}%
                             </p>
+                            {isWinner && prizeAmount > 0 && (
+                              <p className="text-xs text-yellow-400 font-semibold mt-1">
+                                Won: {currencySymbol}{prizeAmount.toFixed(2)}
+                              </p>
+                            )}
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className={`text-sm font-bold ${
-                            participant.pnl >= 0 ? 'text-green-400' : 'text-red-400'
-                          }`}>
-                            {participant.pnl >= 0 ? '+' : ''}{participant.pnl?.toFixed(2) || '0.00'}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {participant.pnlPercentage >= 0 ? '+' : ''}{participant.pnlPercentage?.toFixed(2) || '0.00'}%
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     No participants yet
+                  </div>
+                )}
+
+                {/* Summary for completed competitions */}
+                {isCompleted && leaderboard.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-700">
+                    <div className="grid grid-cols-3 gap-4 text-center text-sm">
+                      <div>
+                        <p className="text-gray-500">Total Participants</p>
+                        <p className="text-xl font-bold text-white">{leaderboard.length}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Qualified</p>
+                        <p className="text-xl font-bold text-green-400">
+                          {leaderboard.filter((p: any) => !p.isDisqualified && p.status !== 'disqualified').length}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Disqualified</p>
+                        <p className="text-xl font-bold text-red-400">
+                          {leaderboard.filter((p: any) => p.isDisqualified || p.status === 'disqualified').length}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

@@ -109,9 +109,17 @@ interface Challenge {
   winnerId?: string;
   winnerName?: string;
   winnerPnL?: number;
+  loserId?: string;
   loserName?: string;
   loserPnL?: number;
   isTie?: boolean;
+  // Disqualification fields
+  challengerDisqualified?: boolean;
+  challengerDisqualificationReason?: string;
+  challengedDisqualified?: boolean;
+  challengedDisqualificationReason?: string;
+  challengerTrades?: number;
+  challengedTrades?: number;
 }
 
 interface Stats {
@@ -679,104 +687,252 @@ export default function ChallengesAdminSection() {
         </>
       )}
 
-      {/* View Challenge Dialog */}
+      {/* View Challenge Dialog - Full screen layout matching competitions */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="bg-gray-900 border-gray-700 max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-orange-400 flex items-center gap-2">
-              <Swords className="h-5 w-5" />
-              Challenge Details
-            </DialogTitle>
-          </DialogHeader>
-          
+        <DialogContent className="bg-gray-900 border-gray-700 max-w-4xl max-h-[90vh] overflow-y-auto">
           {selectedChallenge && (
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-800 rounded-lg p-4">
-                  <h4 className="text-xs text-gray-500 uppercase mb-2">Challenger</h4>
-                  <p className="text-white font-semibold">{selectedChallenge.challengerName}</p>
-                  <p className="text-xs text-gray-400">{selectedChallenge.challengerEmail}</p>
-                  {selectedChallenge.status === 'completed' && (
-                    <p className="text-sm mt-2">
-                      P&L: <span className={selectedChallenge.winnerId === selectedChallenge.challengerId ? 'text-green-400' : 'text-red-400'}>
-                        {selectedChallenge.winnerId === selectedChallenge.challengerId ? `+€${selectedChallenge.winnerPnL?.toFixed(2)}` : `€${selectedChallenge.loserPnL?.toFixed(2)}`}
+            <>
+              {/* Header */}
+              <div className="bg-gradient-to-r from-orange-500 to-orange-600 -m-6 mb-0 p-6 rounded-t-lg">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 bg-white/20 rounded-xl flex items-center justify-center">
+                    <Swords className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h2 className="text-2xl font-bold text-white">1v1 Challenge</h2>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        selectedChallenge.status === 'completed' ? 'bg-gray-500 text-white' :
+                        selectedChallenge.status === 'active' ? 'bg-green-500 text-white' :
+                        selectedChallenge.status === 'cancelled' ? 'bg-red-500 text-white' :
+                        'bg-blue-500 text-white'
+                      }`}>
+                        {selectedChallenge.status.toUpperCase()}
                       </span>
+                    </div>
+                    <p className="text-orange-100 text-sm">
+                      {selectedChallenge.challengerName} vs {selectedChallenge.challengedName}
                     </p>
-                  )}
-                </div>
-                <div className="bg-gray-800 rounded-lg p-4">
-                  <h4 className="text-xs text-gray-500 uppercase mb-2">Challenged</h4>
-                  <p className="text-white font-semibold">{selectedChallenge.challengedName}</p>
-                  <p className="text-xs text-gray-400">{selectedChallenge.challengedEmail}</p>
-                  {selectedChallenge.status === 'completed' && (
-                    <p className="text-sm mt-2">
-                      P&L: <span className={selectedChallenge.winnerId === selectedChallenge.challengedId ? 'text-green-400' : 'text-red-400'}>
-                        {selectedChallenge.winnerId === selectedChallenge.challengedId ? `+€${selectedChallenge.winnerPnL?.toFixed(2)}` : `€${selectedChallenge.loserPnL?.toFixed(2)}`}
-                      </span>
-                    </p>
-                  )}
+                  </div>
                 </div>
               </div>
-              
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Entry Fee</p>
-                  <p className="text-lg font-bold text-white">€{selectedChallenge.entryFee}</p>
+
+              <div className="space-y-6 pt-6">
+                {/* Key Stats */}
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
+                    <p className="text-xs text-gray-500">Prize Pool</p>
+                    <p className="text-2xl font-bold text-yellow-400">€{selectedChallenge.prizePool}</p>
+                  </div>
+                  <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
+                    <p className="text-xs text-gray-500">Entry Fee</p>
+                    <p className="text-2xl font-bold text-green-400">€{selectedChallenge.entryFee}</p>
+                  </div>
+                  <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
+                    <p className="text-xs text-gray-500">Winner Prize</p>
+                    <p className="text-2xl font-bold text-yellow-400">€{selectedChallenge.winnerPrize}</p>
+                  </div>
+                  <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
+                    <p className="text-xs text-gray-500">Platform Fee</p>
+                    <p className="text-2xl font-bold text-blue-400">{selectedChallenge.platformFeePercentage}%</p>
+                  </div>
                 </div>
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Prize Pool</p>
-                  <p className="text-lg font-bold text-green-400">€{selectedChallenge.prizePool}</p>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Winner Prize</p>
-                  <p className="text-lg font-bold text-yellow-400">€{selectedChallenge.winnerPrize}</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Duration</p>
-                  <p className="text-lg font-bold text-white">{formatDuration(selectedChallenge.duration)}</p>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Starting Capital</p>
-                  <p className="text-lg font-bold text-white">€{selectedChallenge.startingCapital}</p>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Platform Fee</p>
-                  <p className="text-lg font-bold text-white">{selectedChallenge.platformFeePercentage}% (€{selectedChallenge.platformFeeAmount})</p>
-                </div>
-              </div>
-              
-              <div className="bg-gray-800 rounded-lg p-4">
-                <h4 className="text-xs text-gray-500 uppercase mb-2">Timeline</h4>
-                <div className="space-y-1 text-sm">
-                  <p><span className="text-gray-500">Created:</span> <span className="text-white">{new Date(selectedChallenge.createdAt).toLocaleString()}</span></p>
-                  <p><span className="text-gray-500">Accept Deadline:</span> <span className="text-white">{new Date(selectedChallenge.acceptDeadline).toLocaleString()}</span></p>
-                  {selectedChallenge.startTime && (
-                    <p><span className="text-gray-500">Started:</span> <span className="text-white">{new Date(selectedChallenge.startTime).toLocaleString()}</span></p>
+
+                {/* Participants / Results */}
+                <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <Users className="h-5 w-5 text-blue-400" />
+                    {selectedChallenge.status === 'completed' ? 'Final Results' : 'Participants'}
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Challenger */}
+                    <div className={`rounded-xl p-4 ${
+                      selectedChallenge.challengerDisqualified 
+                        ? 'bg-red-500/10 border-2 border-red-500/30' 
+                        : selectedChallenge.status === 'completed' && selectedChallenge.winnerId === selectedChallenge.challengerId
+                        ? 'bg-yellow-500/10 border-2 border-yellow-500/30'
+                        : 'bg-gray-700/50 border border-gray-600'
+                    }`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs text-gray-500 uppercase">Challenger</span>
+                        {selectedChallenge.challengerDisqualified ? (
+                          <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-semibold rounded">DISQUALIFIED</span>
+                        ) : selectedChallenge.status === 'completed' && selectedChallenge.winnerId === selectedChallenge.challengerId ? (
+                          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-semibold rounded">🏆 WINNER</span>
+                        ) : null}
+                      </div>
+                      <p className={`font-bold text-lg ${selectedChallenge.challengerDisqualified ? 'text-red-300 line-through' : 'text-white'}`}>
+                        {selectedChallenge.challengerName}
+                      </p>
+                      <p className="text-xs text-gray-400 mb-3">{selectedChallenge.challengerEmail}</p>
+                      
+                      {selectedChallenge.status === 'completed' && (
+                        <div className="space-y-2 pt-3 border-t border-gray-600">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">P&L:</span>
+                            <span className={`font-bold ${
+                              selectedChallenge.winnerId === selectedChallenge.challengerId ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {selectedChallenge.winnerId === selectedChallenge.challengerId 
+                                ? `+${selectedChallenge.winnerPnL?.toFixed(2)}` 
+                                : selectedChallenge.loserPnL?.toFixed(2)}
+                            </span>
+                          </div>
+                          {selectedChallenge.challengerTrades !== undefined && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">Trades:</span>
+                              <span className="text-white">{selectedChallenge.challengerTrades}</span>
+                            </div>
+                          )}
+                          {selectedChallenge.winnerId === selectedChallenge.challengerId && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">Prize Won:</span>
+                              <span className="text-yellow-400 font-bold">€{selectedChallenge.winnerPrize}</span>
+                            </div>
+                          )}
+                          {selectedChallenge.challengerDisqualified && selectedChallenge.challengerDisqualificationReason && (
+                            <p className="text-xs text-red-400 mt-2">
+                              Reason: {selectedChallenge.challengerDisqualificationReason}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Challenged */}
+                    <div className={`rounded-xl p-4 ${
+                      selectedChallenge.challengedDisqualified 
+                        ? 'bg-red-500/10 border-2 border-red-500/30' 
+                        : selectedChallenge.status === 'completed' && selectedChallenge.winnerId === selectedChallenge.challengedId
+                        ? 'bg-yellow-500/10 border-2 border-yellow-500/30'
+                        : 'bg-gray-700/50 border border-gray-600'
+                    }`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs text-gray-500 uppercase">Challenged</span>
+                        {selectedChallenge.challengedDisqualified ? (
+                          <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-semibold rounded">DISQUALIFIED</span>
+                        ) : selectedChallenge.status === 'completed' && selectedChallenge.winnerId === selectedChallenge.challengedId ? (
+                          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-semibold rounded">🏆 WINNER</span>
+                        ) : null}
+                      </div>
+                      <p className={`font-bold text-lg ${selectedChallenge.challengedDisqualified ? 'text-red-300 line-through' : 'text-white'}`}>
+                        {selectedChallenge.challengedName}
+                      </p>
+                      <p className="text-xs text-gray-400 mb-3">{selectedChallenge.challengedEmail}</p>
+                      
+                      {selectedChallenge.status === 'completed' && (
+                        <div className="space-y-2 pt-3 border-t border-gray-600">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">P&L:</span>
+                            <span className={`font-bold ${
+                              selectedChallenge.winnerId === selectedChallenge.challengedId ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {selectedChallenge.winnerId === selectedChallenge.challengedId 
+                                ? `+${selectedChallenge.winnerPnL?.toFixed(2)}` 
+                                : selectedChallenge.loserPnL?.toFixed(2)}
+                            </span>
+                          </div>
+                          {selectedChallenge.challengedTrades !== undefined && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">Trades:</span>
+                              <span className="text-white">{selectedChallenge.challengedTrades}</span>
+                            </div>
+                          )}
+                          {selectedChallenge.winnerId === selectedChallenge.challengedId && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">Prize Won:</span>
+                              <span className="text-yellow-400 font-bold">€{selectedChallenge.winnerPrize}</span>
+                            </div>
+                          )}
+                          {selectedChallenge.challengedDisqualified && selectedChallenge.challengedDisqualificationReason && (
+                            <p className="text-xs text-red-400 mt-2">
+                              Reason: {selectedChallenge.challengedDisqualificationReason}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tie notification */}
+                  {selectedChallenge.status === 'completed' && selectedChallenge.isTie && (
+                    <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg text-center">
+                      <p className="text-blue-400 font-semibold">🤝 This challenge ended in a TIE</p>
+                      <p className="text-blue-300/70 text-sm">Entry fees were refunded to both participants</p>
+                    </div>
                   )}
-                  {selectedChallenge.endTime && (
-                    <p><span className="text-gray-500">Ended:</span> <span className="text-white">{new Date(selectedChallenge.endTime).toLocaleString()}</span></p>
-                  )}
                 </div>
+
+                {/* Configuration */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+                    <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                      <Settings className="h-4 w-4 text-blue-400" />
+                      Configuration
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between py-2 border-b border-gray-700">
+                        <span className="text-gray-400">Starting Capital</span>
+                        <span className="text-white font-semibold">${selectedChallenge.startingCapital}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-gray-700">
+                        <span className="text-gray-400">Duration</span>
+                        <span className="text-white font-semibold">{formatDuration(selectedChallenge.duration)}</span>
+                      </div>
+                      <div className="flex justify-between py-2">
+                        <span className="text-gray-400">Platform Fee</span>
+                        <span className="text-white font-semibold">{selectedChallenge.platformFeePercentage}% (€{selectedChallenge.platformFeeAmount})</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+                    <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-purple-400" />
+                      Timeline
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between py-2 border-b border-gray-700">
+                        <span className="text-gray-400">Created</span>
+                        <span className="text-white">{new Date(selectedChallenge.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      {selectedChallenge.startTime && (
+                        <div className="flex justify-between py-2 border-b border-gray-700">
+                          <span className="text-gray-400">Started</span>
+                          <span className="text-white">{new Date(selectedChallenge.startTime).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      {selectedChallenge.endTime && (
+                        <div className="flex justify-between py-2">
+                          <span className="text-gray-400">Ended</span>
+                          <span className="text-white">{new Date(selectedChallenge.endTime).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Winner Banner (for completed) */}
+                {selectedChallenge.status === 'completed' && selectedChallenge.winnerName && !selectedChallenge.isTie && (
+                  <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-xl p-6 text-center">
+                    <Trophy className="h-12 w-12 text-yellow-400 mx-auto mb-3" />
+                    <p className="text-2xl font-bold text-yellow-400 mb-1">🏆 {selectedChallenge.winnerName}</p>
+                    <p className="text-yellow-300/70 mb-2">Challenge Winner</p>
+                    <div className="inline-block bg-yellow-500/20 px-4 py-2 rounded-lg">
+                      <p className="text-yellow-400 font-bold text-xl">Earned €{selectedChallenge.winnerPrize}</p>
+                    </div>
+                  </div>
+                )}
               </div>
-              
-              {selectedChallenge.status === 'completed' && selectedChallenge.winnerName && (
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 text-center">
-                  <Trophy className="h-8 w-8 text-yellow-400 mx-auto mb-2" />
-                  <p className="text-yellow-400 font-bold text-lg">Winner: {selectedChallenge.winnerName}</p>
-                  <p className="text-yellow-300/70">Earned €{selectedChallenge.winnerPrize}</p>
-                </div>
-              )}
-            </div>
+
+              <DialogFooter className="mt-6">
+                <Button variant="outline" onClick={() => setViewDialogOpen(false)} className="border-gray-600">
+                  Close
+                </Button>
+              </DialogFooter>
+            </>
           )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
