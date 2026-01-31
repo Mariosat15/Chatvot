@@ -1478,7 +1478,7 @@ export default function FinancialDashboard() {
           </Card>
         </TabsContent>
 
-        {/* LIABILITIES TAB */}
+        {/* LIABILITIES TAB - Bank Related Data Only */}
         <TabsContent value="liabilities" className="space-y-6">
           {/* Top Summary - 3 Key Numbers */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1488,7 +1488,6 @@ export default function FinancialDashboard() {
                   <div>
                     <p className="text-sm text-gray-400">💰 Bank Balance</p>
                     <p className="text-3xl font-bold text-green-400">{currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}</p>
-                    <p className="text-xs text-gray-500">Total money in bank</p>
                   </div>
                   <TrendingUp className="h-10 w-10 text-green-500/30" />
                 </div>
@@ -1499,9 +1498,9 @@ export default function FinancialDashboard() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">⚠️ Total Liabilities</p>
-                    <p className="text-3xl font-bold text-red-400">{currencySymbol}{((liabilityMetrics?.totalUserCreditsEUR || 0) + (vatEnabled ? (platformFinancials?.outstandingVAT || 0) : 0)).toFixed(2)}</p>
-                    <p className="text-xs text-gray-500">Must be able to pay</p>
+                    <p className="text-sm text-gray-400">⚠️ User Liabilities</p>
+                    <p className="text-3xl font-bold text-red-400">{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</p>
+                    <p className="text-xs text-gray-500">{liabilityMetrics?.totalUserCredits?.toLocaleString() || 0} {creditName}</p>
                   </div>
                   <ShieldAlert className="h-10 w-10 text-red-500/30" />
                 </div>
@@ -1516,12 +1515,12 @@ export default function FinancialDashboard() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">📊 Net Position</p>
+                    <p className="text-sm text-gray-400">💰 Available to Spend</p>
                     <p className={`text-3xl font-bold ${
                       ((liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)) >= 0 
                         ? 'text-cyan-400' : 'text-orange-400'
                     }`}>
-                      {currencySymbol}{((liabilityMetrics?.theoreticalBankBalance || 0) - ((liabilityMetrics?.totalUserCreditsEUR || 0) + (vatEnabled ? (platformFinancials?.outstandingVAT || 0) : 0))).toFixed(2)}
+                      {currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}
                     </p>
                     <p className="text-xs text-gray-500">
                       Coverage: {((liabilityMetrics?.coverageRatio || 1) * 100).toFixed(0)}%
@@ -1534,26 +1533,26 @@ export default function FinancialDashboard() {
             </Card>
           </div>
 
-          {/* Two-Column Layout: HAVE vs OWE */}
+          {/* Two-Column: EUR IN vs EUR OUT */}
           <Card className="bg-gray-900 border-gray-700">
             <CardHeader className="pb-2">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <ArrowRightLeft className="h-5 w-5 text-blue-400" />
-                Bank Balance Breakdown
+                Bank Money Flow (EUR Only)
               </CardTitle>
-              <CardDescription>What builds up vs what depletes your bank balance</CardDescription>
+              <CardDescription>Real money in and out of bank account</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* MONEY IN Column */}
+                {/* EUR IN Column */}
                 <div className="bg-green-950/20 border border-green-500/20 rounded-lg p-4">
                   <h3 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
                     <TrendingUp className="h-5 w-5" />
-                    💰 MONEY IN (Bank)
+                    💰 EUR INTO BANK
                   </h3>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between items-center py-2 border-b border-green-500/10">
-                      <span className="text-gray-300">User Credit Purchases</span>
+                      <span className="text-gray-300">User Deposits (Base)</span>
                       <span className="text-green-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalUserDeposits || 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-green-500/10">
@@ -1568,7 +1567,7 @@ export default function FinancialDashboard() {
                     )}
                     {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
                       <div className="flex justify-between items-center py-2 border-b border-green-500/10 bg-teal-500/10 -mx-2 px-2 rounded">
-                        <span className="text-teal-300">💵 Admin Balance Injected</span>
+                        <span className="text-teal-300">💵 Admin Injected</span>
                         <span className="text-teal-400 font-semibold">+{currencySymbol}{(platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}</span>
                       </div>
                     )}
@@ -1587,13 +1586,13 @@ export default function FinancialDashboard() {
                   </div>
                 </div>
 
-                {/* MONEY OUT Column */}
+                {/* EUR OUT Column */}
                 <div className="bg-red-950/20 border border-red-500/20 rounded-lg p-4">
                   <h3 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
                     <TrendingDown className="h-5 w-5" />
-                    💸 MONEY OUT (Bank)
+                    💸 EUR OUT OF BANK
                   </h3>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between items-center py-2 border-b border-red-500/10">
                       <span className="text-gray-300">User Withdrawals</span>
                       <span className="text-red-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalUserWithdrawals || 0).toFixed(2)}</span>
@@ -1644,134 +1643,96 @@ export default function FinancialDashboard() {
                 </div>
               </div>
 
-              {/* Bank Balance Result */}
-              <div className="mt-6 p-4 bg-gradient-to-r from-green-900/30 to-gray-900 border border-green-500/30 rounded-lg">
-                <div className="flex justify-between items-center">
+              {/* Bottom Summary */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-cyan-900/30 to-emerald-900/30 border border-cyan-500/30 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                   <div>
-                    <p className="text-lg text-white font-semibold">= Current Bank Balance</p>
-                    <p className="text-xs text-gray-400">Total IN - Total OUT</p>
+                    <p className="text-sm text-gray-400">Bank Balance</p>
+                    <p className="text-2xl font-bold text-green-400">{currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}</p>
+                    <p className="text-xs text-gray-500">IN - OUT</p>
                   </div>
-                  <p className="text-3xl font-bold text-green-400">{currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}</p>
+                  <div>
+                    <p className="text-sm text-gray-400">User Liabilities</p>
+                    <p className="text-2xl font-bold text-red-400">-{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</p>
+                    <p className="text-xs text-gray-500">Must reserve for users</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Available to Spend</p>
+                    <p className="text-2xl font-bold text-cyan-400">{currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}</p>
+                    <p className="text-xs text-gray-500">Safe to withdraw/use</p>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Liabilities Breakdown */}
-          <Card className="bg-gray-900 border-gray-700">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-white text-lg flex items-center gap-2">
-                <ShieldAlert className="h-5 w-5 text-red-400" />
-                Liabilities (What We Must Reserve)
-              </CardTitle>
-              <CardDescription>Funds that belong to users or government</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-red-950/20 border border-red-500/20 rounded-lg p-4">
-                  <p className="text-sm text-gray-400">User {creditName} Balances</p>
-                  <p className="text-2xl font-bold text-red-400">{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</p>
-                  <p className="text-xs text-gray-500">{liabilityMetrics?.totalUserCredits?.toLocaleString() || 0} {creditName}</p>
+          {/* Pending Items */}
+          {(pendingWithdrawals.length > 0 || (vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0)) && (
+            <Card className="bg-yellow-950/20 border border-yellow-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-yellow-400 text-lg flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Pending Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {pendingWithdrawals.length > 0 && (
+                    <div className="flex justify-between items-center p-3 bg-yellow-900/20 rounded-lg">
+                      <div>
+                        <span className="text-yellow-300 font-medium">{pendingWithdrawals.length} Pending Withdrawal(s)</span>
+                        <p className="text-xs text-gray-400">Net to users: {currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.netAmountEUR || 0), 0).toFixed(2)}</p>
+                      </div>
+                      <span className="text-yellow-400 font-semibold">{currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 && (
+                    <div className="flex justify-between items-center p-3 bg-orange-900/20 rounded-lg">
+                      <span className="text-orange-300 font-medium">Outstanding VAT</span>
+                      <span className="text-orange-400 font-semibold">{currencySymbol}{(platformFinancials?.outstandingVAT || 0).toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
-                {vatEnabled && (
-                  <div className="bg-orange-950/20 border border-orange-500/20 rounded-lg p-4">
-                    <p className="text-sm text-gray-400">Outstanding VAT</p>
-                    <p className="text-2xl font-bold text-orange-400">{currencySymbol}{(platformFinancials?.outstandingVAT || 0).toFixed(2)}</p>
-                    <p className="text-xs text-gray-500">Owed to government</p>
-                  </div>
-                )}
-                <div className="bg-yellow-950/20 border border-yellow-500/20 rounded-lg p-4">
-                  <p className="text-sm text-gray-400">Pending Withdrawals</p>
-                  <p className="text-2xl font-bold text-yellow-400">{currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)}</p>
-                  <p className="text-xs text-gray-500">{pendingWithdrawals.length} awaiting</p>
-                </div>
-              </div>
-
-              {/* Platform Credit Earnings Note */}
-              <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
-                <div className="flex items-center gap-2 text-sm text-blue-400 mb-2">
-                  <Info className="h-4 w-4" />
-                  Platform Credit Earnings (Internal - Not EUR in Bank)
-                </div>
-                <div className="grid grid-cols-4 gap-4 text-center text-sm">
-                  <div>
-                    <p className="text-gray-400 text-xs">Competition</p>
-                    <p className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalPlatformFees || 0).toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-xs">Challenge</p>
-                    <p className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalChallengeFees || 0).toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-xs">Marketplace</p>
-                    <p className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalMarketplaceSales || 0).toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-xs">Unclaimed</p>
-                    <p className="text-blue-400 font-semibold">{currencySymbol}{(platformFinancials?.totalUnclaimedPools || 0).toFixed(2)}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Pending Withdrawals Table */}
           {pendingWithdrawals.length > 0 && (
-            <Card className="bg-gray-900 border-orange-500/30">
+            <Card className="bg-gray-900 border-gray-700">
               <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-white text-lg flex items-center gap-2">
-                      <Download className="h-5 w-5 text-orange-400" />
-                      Pending Withdrawals ({pendingWithdrawals.length})
-                    </CardTitle>
-                    <CardDescription>
-                      Gross: {currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)} | 
-                      Net: {currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.netAmountEUR || 0), 0).toFixed(2)} | 
-                      Fees: {currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.platformFee || 0), 0).toFixed(2)}
-                    </CardDescription>
-                  </div>
-                </div>
+                <CardTitle className="text-white text-lg flex items-center gap-2">
+                  <Download className="h-5 w-5 text-orange-400" />
+                  Pending Withdrawals
+                </CardTitle>
+                <CardDescription>
+                  Gross: {currencySymbol}{(liabilityMetrics?.pendingWithdrawalsEUR || 0).toFixed(2)} | 
+                  Net: {currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.netAmountEUR || 0), 0).toFixed(2)} | 
+                  Fees: {currencySymbol}{pendingWithdrawals.reduce((sum, w) => sum + (w.platformFee || 0), 0).toFixed(2)}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-gray-700">
-                        <TableHead className="text-gray-400">User</TableHead>
-                        <TableHead className="text-gray-400">Amount</TableHead>
-                        <TableHead className="text-gray-400">Fee</TableHead>
-                        <TableHead className="text-gray-400">Net</TableHead>
-                        <TableHead className="text-gray-400">Status</TableHead>
-                        <TableHead className="text-gray-400">Date</TableHead>
-                        <TableHead className="text-gray-400">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingWithdrawals.map((withdrawal) => (
-                        <TableRow key={withdrawal._id} className="border-gray-700">
-                          <TableCell>
-                            <div className="font-medium text-white text-sm">{withdrawal.userName}</div>
-                            <div className="text-xs text-gray-500">{withdrawal.userEmail}</div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-white font-semibold">{currencySymbol}{(withdrawal.amountEUR || 0).toFixed(2)}</div>
-                          </TableCell>
-                          <TableCell className="text-red-400 text-sm">{currencySymbol}{(withdrawal.platformFee || 0).toFixed(2)}</TableCell>
-                          <TableCell className="text-green-400 font-semibold">{currencySymbol}{(withdrawal.netAmountEUR || 0).toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Badge className={`${getStatusColor(withdrawal.status)} text-white text-xs`}>
-                              {withdrawal.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-gray-400 text-sm">{new Date(withdrawal.createdAt).toLocaleDateString()}</TableCell>
-                          <TableCell>
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-xs">Process</Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {pendingWithdrawals.map((withdrawal) => (
+                    <div key={withdrawal._id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <p className="text-white font-medium text-sm">{withdrawal.userName}</p>
+                          <p className="text-xs text-gray-500">{withdrawal.userEmail}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <p className="text-white font-semibold">{currencySymbol}{(withdrawal.amountEUR || 0).toFixed(2)}</p>
+                          <p className="text-xs text-gray-500">Net: {currencySymbol}{(withdrawal.netAmountEUR || 0).toFixed(2)}</p>
+                        </div>
+                        <Badge className={`${getStatusColor(withdrawal.status)} text-white text-xs`}>
+                          {withdrawal.status}
+                        </Badge>
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-xs">Process</Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
