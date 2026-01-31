@@ -1337,15 +1337,41 @@ export default function FinancialDashboard() {
                     </div>
                   </div>
                 )}
+
+                {/* Vendor Payments */}
+                {(platformFinancials?.totalVendorPayments || 0) > 0 && (
+                  <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-purple-400">🏢 Vendor Payments ({platformFinancials?.vendorPaymentCount || 0})</span>
+                      <span className="text-lg font-semibold text-purple-400">-{currencySymbol}{(platformFinancials?.totalVendorPayments || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Paid to external vendors/services
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom Expenses */}
+                {(platformFinancials?.totalCustomExpenses || 0) > 0 && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-rose-400">📝 Custom Expenses ({platformFinancials?.customExpenseCount || 0})</span>
+                      <span className="text-lg font-semibold text-rose-400">-{currencySymbol}{(platformFinancials?.totalCustomExpenses || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Business expenses recorded
+                    </div>
+                  </div>
+                )}
                 
                 {/* Available to Withdraw (This is what matters!) */}
                 <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
                   <div className="flex justify-between items-center">
                     <span className="text-emerald-400 font-semibold">💰 Available to Withdraw</span>
-                    <span className="text-2xl font-bold text-emerald-400">{currencySymbol}{(liabilityMetrics?.platformNetEUR || 0).toFixed(2)}</span>
+                    <span className="text-2xl font-bold text-emerald-400">{currencySymbol}{Math.max(0, (liabilityMetrics?.platformNetEUR || 0) - (platformFinancials?.totalVendorPayments || 0) - (platformFinancials?.totalCustomExpenses || 0)).toFixed(2)}</span>
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    Total Earned - Already Withdrawn = What you can take out now
+                    Total Earned - Withdrawn - Vendor Payments - Expenses = What you can take out
                   </div>
                 </div>
               </div>
@@ -1417,10 +1443,34 @@ export default function FinancialDashboard() {
                       <td className="py-3 px-4 text-right text-gray-500">-{currencySymbol}0.00</td>
                       <td className="py-3 px-4 text-right text-emerald-400 font-bold">{currencySymbol}{((platformFinancials?.totalUnclaimedPools || 0) / conversionRate).toFixed(2)}</td>
                     </tr>
+                    {/* Deductions Section */}
+                    {((platformFinancials?.totalVendorPayments || 0) > 0 || (platformFinancials?.totalCustomExpenses || 0) > 0) && (
+                      <>
+                        <tr className="bg-gray-800/30">
+                          <td colSpan={4} className="py-2 px-4 text-xs text-gray-500 uppercase font-semibold">Deductions (Paid Out)</td>
+                        </tr>
+                        {(platformFinancials?.totalVendorPayments || 0) > 0 && (
+                          <tr className="border-b border-gray-800 hover:bg-gray-800/50">
+                            <td className="py-3 px-4 text-white font-medium">🏢 Vendor Payments</td>
+                            <td className="py-3 px-4 text-right text-gray-500">-</td>
+                            <td className="py-3 px-4 text-right text-gray-500">-</td>
+                            <td className="py-3 px-4 text-right text-purple-400 font-bold">-{currencySymbol}{(platformFinancials?.totalVendorPayments || 0).toFixed(2)}</td>
+                          </tr>
+                        )}
+                        {(platformFinancials?.totalCustomExpenses || 0) > 0 && (
+                          <tr className="border-b border-gray-800 hover:bg-gray-800/50">
+                            <td className="py-3 px-4 text-white font-medium">📝 Custom Expenses</td>
+                            <td className="py-3 px-4 text-right text-gray-500">-</td>
+                            <td className="py-3 px-4 text-right text-gray-500">-</td>
+                            <td className="py-3 px-4 text-right text-rose-400 font-bold">-{currencySymbol}{(platformFinancials?.totalCustomExpenses || 0).toFixed(2)}</td>
+                          </tr>
+                        )}
+                      </>
+                    )}
                   </tbody>
                   <tfoot>
                     <tr className="bg-gray-800/50 font-bold">
-                      <td className="py-4 px-4 text-white">TOTALS</td>
+                      <td className="py-4 px-4 text-white">GROSS TOTALS</td>
                       <td className="py-4 px-4 text-right text-green-400">
                         {currencySymbol}{(platformFinancials?.totalGrossEarnings || 0).toFixed(2)}
                       </td>
@@ -1431,6 +1481,18 @@ export default function FinancialDashboard() {
                         {currencySymbol}{(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}
                       </td>
                     </tr>
+                    {((platformFinancials?.totalVendorPayments || 0) > 0 || (platformFinancials?.totalCustomExpenses || 0) > 0) && (
+                      <tr className="bg-emerald-900/30 font-bold">
+                        <td className="py-4 px-4 text-white">NET AFTER DEDUCTIONS</td>
+                        <td className="py-4 px-4 text-right text-gray-500">-</td>
+                        <td className="py-4 px-4 text-right text-gray-500">
+                          Vendors + Expenses: -{currencySymbol}{((platformFinancials?.totalVendorPayments || 0) + (platformFinancials?.totalCustomExpenses || 0)).toFixed(2)}
+                        </td>
+                        <td className="py-4 px-4 text-right text-emerald-400 text-xl">
+                          {currencySymbol}{((platformFinancials?.totalNetEarningsEUR || 0) - (platformFinancials?.totalVendorPayments || 0) - (platformFinancials?.totalCustomExpenses || 0)).toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
                   </tfoot>
                 </table>
               </div>
@@ -2081,27 +2143,57 @@ export default function FinancialDashboard() {
                 Net Platform Position
               </CardTitle>
               <CardDescription>
-                Total Earnings minus Admin Withdrawals
+                Total Earnings minus Withdrawals, Vendors & Expenses
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-4xl font-bold text-emerald-400">
-                    {currencySymbol}{liabilityMetrics?.platformNetEUR.toFixed(2) || '0.00'}
-            </div>
-            <p className="text-sm text-gray-400 mt-2">
-                    {creditSymbol} {liabilityMetrics?.platformNetCredits.toLocaleString() || 0} available to withdraw
-                  </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-4xl font-bold text-emerald-400">
+                      {currencySymbol}{Math.max(0, (liabilityMetrics?.platformNetEUR || 0) - (platformFinancials?.totalVendorPayments || 0) - (platformFinancials?.totalCustomExpenses || 0)).toFixed(2)}
+                    </div>
+                    <p className="text-sm text-gray-400 mt-2">
+                      Available after all deductions
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => setShowWithdrawDialog(true)}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    disabled={(liabilityMetrics?.platformNetCredits || 0) <= 0}
+                  >
+                    <Banknote className="h-4 w-4 mr-2" />
+                    Convert to Bank
+                  </Button>
                 </div>
-                <Button
-                  onClick={() => setShowWithdrawDialog(true)}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                  disabled={(liabilityMetrics?.platformNetCredits || 0) <= 0}
-                >
-                  <Banknote className="h-4 w-4 mr-2" />
-                  Convert to Bank
-                </Button>
+                
+                {/* Breakdown */}
+                <div className="border-t border-gray-700 pt-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Gross Earnings</span>
+                    <span className="text-green-400">+{currencySymbol}{(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Admin Withdrawals</span>
+                    <span className="text-red-400">-{currencySymbol}{(platformFinancials?.totalAdminWithdrawalsEUR || 0).toFixed(2)}</span>
+                  </div>
+                  {(platformFinancials?.totalVendorPayments || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">🏢 Vendor Payments</span>
+                      <span className="text-purple-400">-{currencySymbol}{(platformFinancials?.totalVendorPayments || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {(platformFinancials?.totalCustomExpenses || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">📝 Custom Expenses</span>
+                      <span className="text-rose-400">-{currencySymbol}{(platformFinancials?.totalCustomExpenses || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-2 border-t border-gray-700 font-semibold">
+                    <span className="text-white">Net Available</span>
+                    <span className="text-emerald-400">{currencySymbol}{Math.max(0, (liabilityMetrics?.platformNetEUR || 0) - (platformFinancials?.totalVendorPayments || 0) - (platformFinancials?.totalCustomExpenses || 0)).toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
           </CardContent>
         </Card>

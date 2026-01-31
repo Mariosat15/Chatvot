@@ -5,6 +5,7 @@ import WalletTransaction from '@/database/models/trading/wallet-transaction.mode
 import WithdrawalRequest from '@/database/models/withdrawal-request.model';
 import { PlatformTransaction } from '@/database/models/platform-financials.model';
 import VATPayment from '@/database/models/vat-payment.model';
+import VendorPayment from '@/database/models/vendor-payment.model';
 import { getUsersByIds } from '@/lib/utils/user-lookup';
 
 /**
@@ -85,7 +86,8 @@ export async function GET(request: NextRequest) {
     // Check if we should include admin/platform transactions
     const includeAdminTx = type === 'all' || type === 'admin_withdrawal' || type === 'vat_payment' || 
                            type === 'platform_fee' || type === 'unclaimed_pool' || type === 'deposit_fee' || 
-                           type === 'withdrawal_fee' || type === 'admin_balance_add' || type === 'custom_expense' || !type;
+                           type === 'withdrawal_fee' || type === 'admin_balance_add' || type === 'custom_expense' ||
+                           type === 'vendor_payment' || !type;
 
     // OPTIMIZATION: Limit max records to prevent memory issues
     // For very large result sets, use date filters to narrow down
@@ -134,6 +136,21 @@ export async function GET(request: NextRequest) {
           .limit(maxRecords)
           .lean();
       }
+    }
+
+    // Fetch vendor payments if type is 'all' or 'vendor_payment'
+    let vendorPayments: any[] = [];
+    if (type === 'all' || type === 'vendor_payment' || !type) {
+      const vendorQuery: any = { status: 'paid' };
+      if (startDate || endDate) {
+        vendorQuery.paidAt = {};
+        if (startDate) vendorQuery.paidAt.$gte = new Date(startDate);
+        if (endDate) vendorQuery.paidAt.$lte = new Date(endDate);
+      }
+      vendorPayments = await VendorPayment.find(vendorQuery)
+        .sort({ paidAt: -1 })
+        .limit(maxRecords)
+        .lean();
     }
 
     // Get unique user IDs to fetch user info
@@ -240,11 +257,40 @@ export async function GET(request: NextRequest) {
       },
     }));
 
+    // Format Vendor payments
+    const enrichedVendorPayments = vendorPayments.map(v => ({
+      _id: v._id,
+      userId: 'admin',
+      transactionType: 'vendor_payment',
+      amount: -v.amount, // Negative because it's money going out
+      amountEUR: v.amount,
+      status: 'completed',
+      description: `Vendor Payment to ${v.vendorName} (${v.serviceType})`,
+      createdAt: v.paidAt || v.createdAt,
+      updatedAt: v.updatedAt,
+      source: 'vendor' as const,
+      metadata: {
+        vendorId: v.vendorId,
+        vendorName: v.vendorName,
+        serviceType: v.serviceType,
+        reference: v.reference,
+        invoiceNumber: v.invoiceNumber,
+        paidByEmail: v.paidByEmail,
+        billingCycle: v.billingCycle,
+      },
+      userInfo: { 
+        id: 'admin', 
+        name: v.paidByEmail || 'Admin', 
+        email: v.paidByEmail || 'admin@system' 
+      },
+    }));
+
     // Combine all transactions and sort by date
     const allTransactions = [
       ...enrichedWalletTransactions,
       ...enrichedPlatformTransactions,
       ...enrichedVatPayments,
+      ...enrichedVendorPayments,
     ].sort((a, b) => {
       const dateA = new Date((a as any).createdAt).getTime();
       const dateB = new Date((b as any).createdAt).getTime();

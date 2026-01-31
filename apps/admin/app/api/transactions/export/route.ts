@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       admin_adjustment: 'Admin Adjustment',
       admin_withdrawal: 'Admin Withdrawal',
       vat_payment: 'VAT Payment',
-      vendor_payment: 'Vendor Payment',
+      vendor_payment: '🏢 Vendor Payment',
       unclaimed_pool: 'Unclaimed Pool',
       deposit_fee: 'Deposit Fee',
       withdrawal_fee: 'Withdrawal Fee',
