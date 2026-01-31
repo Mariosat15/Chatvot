@@ -1,4 +1,4 @@
-import { Trophy, Users, DollarSign, Calendar, ArrowLeft, Edit, Clock, Target, Award } from 'lucide-react';
+import { Trophy, Users, DollarSign, Calendar, ArrowLeft, Edit, Clock, Target, Award, User } from 'lucide-react';
 import { getCompetitionById, getCompetitionLeaderboard } from '@/lib/actions/trading/competition.actions';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -7,6 +7,7 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { connectToDatabase } from '@/database/mongoose';
 import AppSettings from '@/database/models/app-settings.model';
 import CompetitionAdminActions from '@/components/admin/CompetitionAdminActions';
+import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 
 interface AdminCompetitionViewPageProps {
   params: Promise<{ id: string }>;
@@ -35,6 +36,36 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
     const _isUpcoming = competition.status === 'upcoming';
     const isCompleted = competition.status === 'completed';
     const isCancelled = competition.status === 'cancelled';
+
+    // Get actual prizes won from database (WalletTransaction)
+    const prizeTransactions = await WalletTransaction.find({
+      competitionId: id,
+      transactionType: 'competition_win',
+      status: 'completed',
+    }).lean() as any[];
+
+    // Create a map of userId -> prize amount
+    const prizeMap = new Map<string, number>();
+    prizeTransactions.forEach((tx: any) => {
+      prizeMap.set(tx.userId, tx.amount);
+    });
+
+    // Get Game Master earnings for this competition
+    const db = (await connectToDatabase()).connection.db;
+    const gmEarnings = await db.collection('gamemasterearnings').find({
+      sourceId: id,
+      sourceType: 'competition',
+    }).toArray();
+
+    // Create a map of referredUserId -> GM info
+    const gmMap = new Map<string, { gmId: string; gmEmail: string; gmEarning: number }>();
+    gmEarnings.forEach((earning: any) => {
+      gmMap.set(earning.referredUserId, {
+        gmId: earning.gameMasterId,
+        gmEmail: earning.gameMasterEmail,
+        gmEarning: earning.netEarning || earning.grossEarning || 0,
+      });
+    });
 
     const formatUTCDate = (date: Date) => {
       const year = date.getUTCFullYear();
@@ -268,38 +299,11 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                 </h2>
 
                 {(() => {
-                  // Count qualified participants to calculate prizes correctly
+                  // Count qualified participants
                   const qualifiedParticipants = leaderboard.filter((p: any) => p.qualificationStatus === 'qualified');
                   const qualifiedCount = qualifiedParticipants.length;
                   const disqualifiedCount = leaderboard.length - qualifiedCount;
-                  
-                  // Calculate total prize pool and platform fee
-                  const prizePool = competition.prizePool || competition.prizePoolCredits || 0;
-                  const platformFeePercentage = (competition.platformFeePercentage || 0) / 100;
                   const prizeDistribution = competition.prizeDistribution || [];
-
-                  // Calculate actual prize amounts for qualified winners
-                  // When some participants are disqualified, prizes may redistribute
-                  const calculatePrizeForRank = (qualifiedRank: number) => {
-                    if (qualifiedRank <= 0 || qualifiedRank > prizeDistribution.length) return 0;
-                    
-                    // If only 1 qualified, they get all prize pool positions
-                    if (qualifiedCount === 1) {
-                      // Winner takes all applicable prize positions
-                      let totalPrize = 0;
-                      for (let i = 0; i < Math.min(prizeDistribution.length, leaderboard.length); i++) {
-                        const grossAmount = (prizePool * prizeDistribution[i].percentage) / 100;
-                        totalPrize += grossAmount * (1 - platformFeePercentage);
-                      }
-                      return totalPrize;
-                    }
-                    
-                    // Normal distribution based on rank
-                    const prizeForRank = prizeDistribution[qualifiedRank - 1];
-                    if (!prizeForRank) return 0;
-                    const grossAmount = (prizePool * prizeForRank.percentage) / 100;
-                    return grossAmount * (1 - platformFeePercentage);
-                  };
 
                   return (
                     <>
@@ -311,10 +315,13 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                             const qualifiedRank = participant.currentRank || 0;
                             const isWinner = isCompleted && !isDisqualified && qualifiedRank <= prizeDistribution.length;
                             
-                            // Calculate prize for this winner
-                            const prizeAmount = isWinner ? calculatePrizeForRank(qualifiedRank) : 0;
+                            // Get ACTUAL prize from database (not calculated)
+                            const actualPrize = prizeMap.get(participant.userId) || 0;
                             
-                            // Display rank (qualified rank for winners, or position for disqualified)
+                            // Get GM info for this participant
+                            const gmInfo = gmMap.get(participant.userId);
+                            
+                            // Display rank
                             const displayRank = qualifiedRank;
 
                             return (
@@ -339,7 +346,7 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                                     {isDisqualified ? '✗' : displayRank}
                                   </div>
                                   <div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                       <p className={`text-sm font-semibold ${isDisqualified ? 'text-red-300 line-through' : 'text-gray-100'}`}>
                                         {participant.username || participant.userId}
                                       </p>
@@ -353,6 +360,12 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                                           🏆 WINNER
                                         </span>
                                       )}
+                                      {gmInfo && (
+                                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs font-semibold rounded flex items-center gap-1">
+                                          <User className="h-3 w-3" />
+                                          GM Referral
+                                        </span>
+                                      )}
                                     </div>
                                     <p className="text-xs text-gray-500">
                                       {participant.totalTrades} trades
@@ -360,6 +373,11 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                                         <span className="text-red-400 ml-2">• {participant.disqualificationReason}</span>
                                       )}
                                     </p>
+                                    {gmInfo && (
+                                      <p className="text-xs text-purple-400 mt-1">
+                                        GM: {gmInfo.gmEmail} • Earned: {currencySymbol}{gmInfo.gmEarning.toFixed(2)}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="text-right">
@@ -372,9 +390,9 @@ const AdminCompetitionViewPage = async ({ params }: AdminCompetitionViewPageProp
                                   <p className="text-xs text-gray-500">
                                     {participant.pnlPercentage >= 0 ? '+' : ''}{participant.pnlPercentage?.toFixed(2) || '0.00'}%
                                   </p>
-                                  {isWinner && prizeAmount > 0 && (
+                                  {actualPrize > 0 && (
                                     <p className="text-xs text-yellow-400 font-semibold mt-1">
-                                      Won: {currencySymbol}{prizeAmount.toFixed(2)}
+                                      Won: {currencySymbol}{actualPrize.toFixed(2)}
                                     </p>
                                   )}
                                 </div>

@@ -85,6 +85,16 @@ function LiveCountdownBadge({ targetDate, label, isEnding = false }: { targetDat
   );
 }
 
+interface FinalStats {
+  finalCapital: number;
+  pnl: number;
+  pnlPercentage: number;
+  totalTrades: number;
+  winRate: number;
+  isDisqualified: boolean;
+  disqualificationReason?: string;
+}
+
 interface Challenge {
   _id: string;
   slug: string;
@@ -113,13 +123,15 @@ interface Challenge {
   loserName?: string;
   loserPnL?: number;
   isTie?: boolean;
-  // Disqualification fields
-  challengerDisqualified?: boolean;
-  challengerDisqualificationReason?: string;
-  challengedDisqualified?: boolean;
-  challengedDisqualificationReason?: string;
-  challengerTrades?: number;
-  challengedTrades?: number;
+  // Final stats from challenge finalization
+  challengerFinalStats?: FinalStats;
+  challengedFinalStats?: FinalStats;
+}
+
+interface GmInfo {
+  gameMasterId: string;
+  gameMasterEmail: string;
+  netEarning: number;
 }
 
 interface Stats {
@@ -160,6 +172,23 @@ export default function ChallengesAdminSection() {
   // View dialog state
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
+  const [challengeGmInfo, setChallengeGmInfo] = useState<{
+    challenger?: GmInfo;
+    challenged?: GmInfo;
+  }>({});
+
+  // Fetch GM info when viewing a challenge
+  const fetchChallengeGmInfo = useCallback(async (challengeId: string, challengerId: string, challengedId: string) => {
+    try {
+      const response = await fetch(`/api/challenges/${challengeId}/gm-info?challengerId=${challengerId}&challengedId=${challengedId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setChallengeGmInfo(data);
+      }
+    } catch (error) {
+      console.error('Error fetching GM info:', error);
+    }
+  }, []);
 
   const fetchChallenges = useCallback(async () => {
     setLoading(true);
@@ -245,7 +274,12 @@ export default function ChallengesAdminSection() {
 
   const handleViewClick = (challenge: Challenge) => {
     setSelectedChallenge(challenge);
+    setChallengeGmInfo({}); // Reset GM info
     setViewDialogOpen(true);
+    // Fetch GM info for this challenge
+    if (challenge.status === 'completed' || challenge.status === 'active') {
+      fetchChallengeGmInfo(challenge._id, challenge.challengerId, challenge.challengedId);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -747,112 +781,170 @@ export default function ChallengesAdminSection() {
 
                   <div className="grid grid-cols-2 gap-6">
                     {/* Challenger */}
-                    <div className={`rounded-xl p-4 ${
-                      selectedChallenge.challengerDisqualified 
-                        ? 'bg-red-500/10 border-2 border-red-500/30' 
-                        : selectedChallenge.status === 'completed' && selectedChallenge.winnerId === selectedChallenge.challengerId
-                        ? 'bg-yellow-500/10 border-2 border-yellow-500/30'
-                        : 'bg-gray-700/50 border border-gray-600'
-                    }`}>
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs text-gray-500 uppercase">Challenger</span>
-                        {selectedChallenge.challengerDisqualified ? (
-                          <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-semibold rounded">DISQUALIFIED</span>
-                        ) : selectedChallenge.status === 'completed' && selectedChallenge.winnerId === selectedChallenge.challengerId ? (
-                          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-semibold rounded">🏆 WINNER</span>
-                        ) : null}
-                      </div>
-                      <p className={`font-bold text-lg ${selectedChallenge.challengerDisqualified ? 'text-red-300 line-through' : 'text-white'}`}>
-                        {selectedChallenge.challengerName}
-                      </p>
-                      <p className="text-xs text-gray-400 mb-3">{selectedChallenge.challengerEmail}</p>
-                      
-                      {selectedChallenge.status === 'completed' && (
-                        <div className="space-y-2 pt-3 border-t border-gray-600">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-400">P&L:</span>
-                            <span className={`font-bold ${
-                              selectedChallenge.winnerId === selectedChallenge.challengerId ? 'text-green-400' : 'text-red-400'
-                            }`}>
-                              {selectedChallenge.winnerId === selectedChallenge.challengerId 
-                                ? `+${selectedChallenge.winnerPnL?.toFixed(2)}` 
-                                : selectedChallenge.loserPnL?.toFixed(2)}
-                            </span>
+                    {(() => {
+                      const stats = selectedChallenge.challengerFinalStats;
+                      const isDisqualified = stats?.isDisqualified || false;
+                      const isWinner = selectedChallenge.winnerId === selectedChallenge.challengerId;
+                      const gmInfo = challengeGmInfo.challenger;
+
+                      return (
+                        <div className={`rounded-xl p-4 ${
+                          isDisqualified 
+                            ? 'bg-red-500/10 border-2 border-red-500/30' 
+                            : selectedChallenge.status === 'completed' && isWinner
+                            ? 'bg-yellow-500/10 border-2 border-yellow-500/30'
+                            : 'bg-gray-700/50 border border-gray-600'
+                        }`}>
+                          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <span className="text-xs text-gray-500 uppercase">Challenger</span>
+                            <div className="flex gap-2 flex-wrap">
+                              {isDisqualified ? (
+                                <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-semibold rounded">DISQUALIFIED</span>
+                              ) : selectedChallenge.status === 'completed' && isWinner ? (
+                                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-semibold rounded">🏆 WINNER</span>
+                              ) : null}
+                              {gmInfo && (
+                                <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs font-semibold rounded">GM Referral</span>
+                              )}
+                            </div>
                           </div>
-                          {selectedChallenge.challengerTrades !== undefined && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">Trades:</span>
-                              <span className="text-white">{selectedChallenge.challengerTrades}</span>
+                          <p className={`font-bold text-lg ${isDisqualified ? 'text-red-300 line-through' : 'text-white'}`}>
+                            {selectedChallenge.challengerName}
+                          </p>
+                          <p className="text-xs text-gray-400 mb-3">{selectedChallenge.challengerEmail}</p>
+                          
+                          {selectedChallenge.status === 'completed' && stats && (
+                            <div className="space-y-2 pt-3 border-t border-gray-600">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">P&L:</span>
+                                <span className={`font-bold ${stats.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {stats.pnl >= 0 ? '+' : ''}{stats.pnl?.toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">ROI:</span>
+                                <span className={`${stats.pnlPercentage >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {stats.pnlPercentage >= 0 ? '+' : ''}{stats.pnlPercentage?.toFixed(2)}%
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">Trades:</span>
+                                <span className="text-white">{stats.totalTrades}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">Win Rate:</span>
+                                <span className="text-white">{stats.winRate?.toFixed(1)}%</span>
+                              </div>
+                              {isWinner && (
+                                <div className="flex justify-between text-sm pt-2 border-t border-gray-600">
+                                  <span className="text-gray-400">Prize Won:</span>
+                                  <span className="text-yellow-400 font-bold">€{selectedChallenge.winnerPrize}</span>
+                                </div>
+                              )}
+                              {isDisqualified && stats.disqualificationReason && (
+                                <p className="text-xs text-red-400 mt-2">
+                                  Reason: {stats.disqualificationReason}
+                                </p>
+                              )}
                             </div>
                           )}
-                          {selectedChallenge.winnerId === selectedChallenge.challengerId && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">Prize Won:</span>
-                              <span className="text-yellow-400 font-bold">€{selectedChallenge.winnerPrize}</span>
+                          
+                          {/* GM Info */}
+                          {gmInfo && (
+                            <div className="mt-3 pt-3 border-t border-purple-500/30 bg-purple-500/10 -mx-4 -mb-4 p-4 rounded-b-xl">
+                              <p className="text-xs text-purple-400 font-semibold mb-1">Game Master Referral</p>
+                              <p className="text-xs text-purple-300">{gmInfo.gameMasterEmail}</p>
+                              <p className="text-xs text-purple-400 mt-1">
+                                GM Earned: <span className="font-bold">€{gmInfo.netEarning.toFixed(2)}</span>
+                              </p>
                             </div>
-                          )}
-                          {selectedChallenge.challengerDisqualified && selectedChallenge.challengerDisqualificationReason && (
-                            <p className="text-xs text-red-400 mt-2">
-                              Reason: {selectedChallenge.challengerDisqualificationReason}
-                            </p>
                           )}
                         </div>
-                      )}
-                    </div>
+                      );
+                    })()}
 
                     {/* Challenged */}
-                    <div className={`rounded-xl p-4 ${
-                      selectedChallenge.challengedDisqualified 
-                        ? 'bg-red-500/10 border-2 border-red-500/30' 
-                        : selectedChallenge.status === 'completed' && selectedChallenge.winnerId === selectedChallenge.challengedId
-                        ? 'bg-yellow-500/10 border-2 border-yellow-500/30'
-                        : 'bg-gray-700/50 border border-gray-600'
-                    }`}>
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs text-gray-500 uppercase">Challenged</span>
-                        {selectedChallenge.challengedDisqualified ? (
-                          <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-semibold rounded">DISQUALIFIED</span>
-                        ) : selectedChallenge.status === 'completed' && selectedChallenge.winnerId === selectedChallenge.challengedId ? (
-                          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-semibold rounded">🏆 WINNER</span>
-                        ) : null}
-                      </div>
-                      <p className={`font-bold text-lg ${selectedChallenge.challengedDisqualified ? 'text-red-300 line-through' : 'text-white'}`}>
-                        {selectedChallenge.challengedName}
-                      </p>
-                      <p className="text-xs text-gray-400 mb-3">{selectedChallenge.challengedEmail}</p>
-                      
-                      {selectedChallenge.status === 'completed' && (
-                        <div className="space-y-2 pt-3 border-t border-gray-600">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-400">P&L:</span>
-                            <span className={`font-bold ${
-                              selectedChallenge.winnerId === selectedChallenge.challengedId ? 'text-green-400' : 'text-red-400'
-                            }`}>
-                              {selectedChallenge.winnerId === selectedChallenge.challengedId 
-                                ? `+${selectedChallenge.winnerPnL?.toFixed(2)}` 
-                                : selectedChallenge.loserPnL?.toFixed(2)}
-                            </span>
+                    {(() => {
+                      const stats = selectedChallenge.challengedFinalStats;
+                      const isDisqualified = stats?.isDisqualified || false;
+                      const isWinner = selectedChallenge.winnerId === selectedChallenge.challengedId;
+                      const gmInfo = challengeGmInfo.challenged;
+
+                      return (
+                        <div className={`rounded-xl p-4 ${
+                          isDisqualified 
+                            ? 'bg-red-500/10 border-2 border-red-500/30' 
+                            : selectedChallenge.status === 'completed' && isWinner
+                            ? 'bg-yellow-500/10 border-2 border-yellow-500/30'
+                            : 'bg-gray-700/50 border border-gray-600'
+                        }`}>
+                          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <span className="text-xs text-gray-500 uppercase">Challenged</span>
+                            <div className="flex gap-2 flex-wrap">
+                              {isDisqualified ? (
+                                <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-semibold rounded">DISQUALIFIED</span>
+                              ) : selectedChallenge.status === 'completed' && isWinner ? (
+                                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-semibold rounded">🏆 WINNER</span>
+                              ) : null}
+                              {gmInfo && (
+                                <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs font-semibold rounded">GM Referral</span>
+                              )}
+                            </div>
                           </div>
-                          {selectedChallenge.challengedTrades !== undefined && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">Trades:</span>
-                              <span className="text-white">{selectedChallenge.challengedTrades}</span>
+                          <p className={`font-bold text-lg ${isDisqualified ? 'text-red-300 line-through' : 'text-white'}`}>
+                            {selectedChallenge.challengedName}
+                          </p>
+                          <p className="text-xs text-gray-400 mb-3">{selectedChallenge.challengedEmail}</p>
+                          
+                          {selectedChallenge.status === 'completed' && stats && (
+                            <div className="space-y-2 pt-3 border-t border-gray-600">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">P&L:</span>
+                                <span className={`font-bold ${stats.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {stats.pnl >= 0 ? '+' : ''}{stats.pnl?.toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">ROI:</span>
+                                <span className={`${stats.pnlPercentage >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {stats.pnlPercentage >= 0 ? '+' : ''}{stats.pnlPercentage?.toFixed(2)}%
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">Trades:</span>
+                                <span className="text-white">{stats.totalTrades}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">Win Rate:</span>
+                                <span className="text-white">{stats.winRate?.toFixed(1)}%</span>
+                              </div>
+                              {isWinner && (
+                                <div className="flex justify-between text-sm pt-2 border-t border-gray-600">
+                                  <span className="text-gray-400">Prize Won:</span>
+                                  <span className="text-yellow-400 font-bold">€{selectedChallenge.winnerPrize}</span>
+                                </div>
+                              )}
+                              {isDisqualified && stats.disqualificationReason && (
+                                <p className="text-xs text-red-400 mt-2">
+                                  Reason: {stats.disqualificationReason}
+                                </p>
+                              )}
                             </div>
                           )}
-                          {selectedChallenge.winnerId === selectedChallenge.challengedId && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">Prize Won:</span>
-                              <span className="text-yellow-400 font-bold">€{selectedChallenge.winnerPrize}</span>
+                          
+                          {/* GM Info */}
+                          {gmInfo && (
+                            <div className="mt-3 pt-3 border-t border-purple-500/30 bg-purple-500/10 -mx-4 -mb-4 p-4 rounded-b-xl">
+                              <p className="text-xs text-purple-400 font-semibold mb-1">Game Master Referral</p>
+                              <p className="text-xs text-purple-300">{gmInfo.gameMasterEmail}</p>
+                              <p className="text-xs text-purple-400 mt-1">
+                                GM Earned: <span className="font-bold">€{gmInfo.netEarning.toFixed(2)}</span>
+                              </p>
                             </div>
-                          )}
-                          {selectedChallenge.challengedDisqualified && selectedChallenge.challengedDisqualificationReason && (
-                            <p className="text-xs text-red-400 mt-2">
-                              Reason: {selectedChallenge.challengedDisqualificationReason}
-                            </p>
                           )}
                         </div>
-                      )}
-                    </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Tie notification */}
