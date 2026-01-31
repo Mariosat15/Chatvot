@@ -124,7 +124,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
     const challengedGm = gmMap.get(challenge.challengedId);
 
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 p-4 md:p-8">
+      <div className="min-h-screen bg-linear-to-b from-gray-900 via-gray-900 to-gray-800 p-4 md:p-8">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header Actions */}
           <div className="flex items-center justify-between gap-4">
@@ -137,8 +137,8 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
           </div>
 
           {/* Challenge Header */}
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-orange-500/50 rounded-2xl shadow-2xl shadow-orange-500/10 overflow-hidden">
-            <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-8">
+          <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-orange-500/50 rounded-2xl shadow-2xl shadow-orange-500/10 overflow-hidden">
+            <div className="bg-linear-to-r from-orange-500 to-orange-600 p-8">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-4 flex-1">
                   <div className="relative">
@@ -165,7 +165,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
 
           {/* Key Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
+            <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
               <div className="flex items-center gap-3 mb-2">
                 <div className="h-10 w-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
                   <Trophy className="h-5 w-5 text-yellow-400" />
@@ -179,7 +179,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
+            <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
               <div className="flex items-center gap-3 mb-2">
                 <div className="h-10 w-10 bg-green-500/20 rounded-lg flex items-center justify-center">
                   <DollarSign className="h-5 w-5 text-green-400" />
@@ -193,7 +193,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
+            <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
               <div className="flex items-center gap-3 mb-2">
                 <div className="h-10 w-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
                   <Award className="h-5 w-5 text-orange-400" />
@@ -207,7 +207,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
+            <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
               <div className="flex items-center gap-3 mb-2">
                 <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
                   isCancelled ? 'bg-red-500/20' : 'bg-purple-500/20'
@@ -230,7 +230,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* Challenge Configuration */}
-              <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
+              <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
                   <Target className="h-5 w-5 text-blue-400" />
                   Challenge Configuration
@@ -271,7 +271,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
               </div>
 
               {/* Schedule */}
-              <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
+              <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-purple-400" />
                   Timeline
@@ -310,7 +310,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
               </div>
 
               {/* Final Results */}
-              <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
+              <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
                   <Users className="h-5 w-5 text-blue-400" />
                   {isCompleted ? 'Final Results' : 'Participants'}
@@ -499,7 +499,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Challenge Status */}
-              <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
+              <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                 <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
                   <Clock className="h-5 w-5 text-blue-400" />
                   Challenge Status
@@ -540,7 +540,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
 
               {/* Winner Banner */}
               {isCompleted && challenge.winnerName && !challenge.isTie && (
-                <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-xl p-6 shadow-xl text-center">
+                <div className="bg-linear-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-xl p-6 shadow-xl text-center">
                   <Trophy className="h-12 w-12 text-yellow-400 mx-auto mb-3" />
                   <p className="text-2xl font-bold text-yellow-400 mb-1">🏆 {challenge.winnerName}</p>
                   <p className="text-yellow-300/70 mb-3">Challenge Winner</p>
@@ -559,7 +559,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
 
               {/* Rules */}
               {challenge.rules && (
-                <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
+                <div className="bg-linear-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-6 shadow-xl">
                   <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
                     <Settings className="h-5 w-5 text-blue-400" />
                     Rules
@@ -594,7 +594,7 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
               )}
 
               {/* Platform Fee Info */}
-              <div className="bg-gradient-to-br from-blue-500/10 to-gray-900 border border-blue-500/30 rounded-xl p-6 shadow-xl">
+              <div className="bg-linear-to-br from-blue-500/10 to-gray-900 border border-blue-500/30 rounded-xl p-6 shadow-xl">
                 <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
                   <DollarSign className="h-5 w-5 text-blue-400" />
                   Fee Breakdown
