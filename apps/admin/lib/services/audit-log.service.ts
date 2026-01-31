@@ -357,6 +357,17 @@ export const auditLogService = {
     });
   },
 
+  async logVendorPayment(admin: AdminInfo, vendorName: string, amount: number, reference: string): Promise<void> {
+    await this.log({
+      admin,
+      action: 'vendor_payment',
+      category: 'financial',
+      description: `Recorded vendor payment to ${vendorName}: €${amount.toFixed(2)} (Ref: ${reference})`,
+      targetType: 'system',
+      metadata: { vendorName, amount, reference },
+    });
+  },
+
   async logCreditsAdjusted(admin: AdminInfo, userId: string, userName: string, previousBalance: number, newBalance: number, reason: string): Promise<void> {
     await this.log({
       admin,

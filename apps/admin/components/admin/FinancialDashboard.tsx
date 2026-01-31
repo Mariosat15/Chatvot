@@ -117,6 +117,10 @@ interface PlatformFinancials {
   totalVATPaid: number;
   outstandingVAT: number;
   
+  // Vendor Payments
+  totalVendorPayments?: number;
+  vendorPaymentCount?: number;
+  
   // User deposits/withdrawals (actual money flow)
   totalUserDeposits: number;      // Base EUR deposited by users for credits
   totalUserWithdrawals: number;   // EUR withdrawn by users
@@ -177,6 +181,52 @@ interface VATPayment {
   createdAt: string;
 }
 
+interface VendorSubscription {
+  _id: string;
+  name: string;
+  serviceType: string;
+  description?: string;
+  amount: number;
+  currency: string;
+  billingCycle: 'monthly' | 'quarterly' | 'yearly' | 'one-time';
+  nextPaymentDate: string;
+  lastPaymentDate?: string;
+  isActive: boolean;
+  vendorUrl?: string;
+}
+
+interface VendorPaymentRecord {
+  _id: string;
+  vendorId: string;
+  vendorName: string;
+  serviceType: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'paid' | 'failed' | 'refunded';
+  paidAt?: string;
+  paidByEmail?: string;
+  reference?: string;
+  invoiceNumber?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+interface VendorPaymentData {
+  payments: VendorPaymentRecord[];
+  summary: {
+    totalPaid: number;
+    paymentCount: number;
+    byServiceType: { _id: string; total: number; count: number }[];
+    byVendor: { _id: string; total: number; count: number }[];
+    monthlyTotals: { _id: number; total: number; count: number }[];
+  };
+  upcoming: {
+    vendors: VendorSubscription[];
+    total: number;
+    count: number;
+  };
+}
+
 interface Transaction {
   _id: string;
   userId: string;
@@ -235,6 +285,16 @@ export default function FinancialDashboard() {
   const [vatPaymentProcessing, setVatPaymentProcessing] = useState(false);
   const [vatPaymentRef, setVatPaymentRef] = useState('');
   const [vatPaymentNotes, setVatPaymentNotes] = useState('');
+  
+  // Vendor Payment states
+  const [vendorPaymentData, setVendorPaymentData] = useState<VendorPaymentData | null>(null);
+  const [showVendorPayDialog, setShowVendorPayDialog] = useState(false);
+  const [selectedVendor, setSelectedVendor] = useState<VendorSubscription | null>(null);
+  const [vendorPaymentProcessing, setVendorPaymentProcessing] = useState(false);
+  const [vendorPaymentRef, setVendorPaymentRef] = useState('');
+  const [vendorPaymentInvoice, setVendorPaymentInvoice] = useState('');
+  const [vendorPaymentNotes, setVendorPaymentNotes] = useState('');
+  const [vendorPaymentAmount, setVendorPaymentAmount] = useState('');
   
   // Invoice export states
   const [invoiceDateRange, setInvoiceDateRange] = useState({
@@ -305,6 +365,18 @@ export default function FinancialDashboard() {
       console.error('Failed to load VAT data:', error);
     }
   }, [vatDateRange]);
+
+  const fetchVendorPaymentData = useCallback(async () => {
+    try {
+      const response = await fetch('/api/vendor-payments');
+      if (!response.ok) throw new Error('Failed to fetch vendor payment data');
+      
+      const result = await response.json();
+      setVendorPaymentData(result.data);
+    } catch (error) {
+      console.error('Failed to load vendor payment data:', error);
+    }
+  }, []);
   
   const fetchData = useCallback(async () => {
     setRefreshing(true);
@@ -325,6 +397,9 @@ export default function FinancialDashboard() {
       
       // Also fetch VAT data (for historical data even if VAT is now disabled)
       await fetchVatData();
+      
+      // Fetch vendor payment data
+      await fetchVendorPaymentData();
     } catch (error) {
       toast.error('Failed to load financial data');
       console.error(error);
@@ -550,6 +625,57 @@ export default function FinancialDashboard() {
     }
   };
   
+  const handleVendorPayment = async () => {
+    if (!selectedVendor) {
+      toast.error('No vendor selected');
+      return;
+    }
+    
+    const amount = parseFloat(vendorPaymentAmount) || selectedVendor.amount;
+    if (amount <= 0) {
+      toast.error('Invalid payment amount');
+      return;
+    }
+    
+    setVendorPaymentProcessing(true);
+    try {
+      const response = await fetch('/api/vendor-payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendorId: selectedVendor._id,
+          amount,
+          reference: vendorPaymentRef,
+          invoiceNumber: vendorPaymentInvoice,
+          notes: vendorPaymentNotes,
+        }),
+      });
+      
+      if (!response.ok) throw new Error('Failed to record vendor payment');
+      
+      const result = await response.json();
+      toast.success(result.message || `Payment of €${amount.toFixed(2)} to ${selectedVendor.name} recorded successfully`);
+      setShowVendorPayDialog(false);
+      setSelectedVendor(null);
+      setVendorPaymentRef('');
+      setVendorPaymentInvoice('');
+      setVendorPaymentNotes('');
+      setVendorPaymentAmount('');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to record vendor payment');
+      console.error(error);
+    } finally {
+      setVendorPaymentProcessing(false);
+    }
+  };
+
+  const openVendorPayDialog = (vendor: VendorSubscription) => {
+    setSelectedVendor(vendor);
+    setVendorPaymentAmount(vendor.amount.toString());
+    setShowVendorPayDialog(true);
+  };
+  
   const handleBackfillFees = async () => {
     if (!confirm('This will calculate and record fees for all existing deposits/withdrawals. Continue?')) {
       return;
@@ -595,6 +721,7 @@ export default function FinancialDashboard() {
       // Admin transactions
       admin_withdrawal: 'bg-cyan-500',
       vat_payment: 'bg-indigo-500',
+      vendor_payment: 'bg-purple-500',
       unclaimed_pool: 'bg-amber-500',
       deposit_fee: 'bg-emerald-500',
       // Challenge transactions
@@ -623,6 +750,7 @@ export default function FinancialDashboard() {
       withdrawal_fee: 'Withdrawal Fee',
       admin_withdrawal: '💰 Admin Withdrawal',
       vat_payment: '🏛️ VAT Payment',
+      vendor_payment: '🏢 Vendor Payment',
       unclaimed_pool: '🎯 Unclaimed Pool',
       deposit_fee: 'Deposit Fee',
       // Challenge transactions
@@ -721,6 +849,7 @@ export default function FinancialDashboard() {
           <TabsTrigger value="liabilities">Bank & Liabilities</TabsTrigger>
           <TabsTrigger value="earnings">Platform Earnings</TabsTrigger>
           {vatEnabled && <TabsTrigger value="vat">VAT</TabsTrigger>}
+          <TabsTrigger value="vendor-payments">Vendor Payments</TabsTrigger>
           <TabsTrigger value="wallets">User Wallets</TabsTrigger>
           <TabsTrigger value="transactions">All Transactions</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
@@ -785,6 +914,12 @@ export default function FinancialDashboard() {
                     <div className="flex justify-between">
                       <span className="text-gray-400">VAT Paid to Gov</span>
                       <span className="text-red-400">-{currencySymbol}{(platformFinancials?.totalVATPaid || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {(platformFinancials?.totalVendorPayments || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Vendor Payments</span>
+                      <span className="text-red-400">-{currencySymbol}{(platformFinancials?.totalVendorPayments || 0).toFixed(2)}</span>
                     </div>
                   )}
                 </div>
@@ -1240,6 +1375,13 @@ export default function FinancialDashboard() {
                       <div className="text-gray-400 text-xs">VAT Paid to Gov</div>
                       <div className="text-red-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalVATPaid || 0).toFixed(2)}</div>
                       <div className="text-xs text-gray-500">Tax remitted to government</div>
+                    </div>
+                  )}
+                  {(platformFinancials?.totalVendorPayments || 0) > 0 && (
+                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
+                      <div className="text-gray-400 text-xs">Vendor Payments</div>
+                      <div className="text-purple-400 font-semibold">-{currencySymbol}{(platformFinancials?.totalVendorPayments || 0).toFixed(2)}</div>
+                      <div className="text-xs text-gray-500">{platformFinancials?.vendorPaymentCount || 0} payments to vendors</div>
                     </div>
                   )}
                 </div>
@@ -1926,6 +2068,260 @@ export default function FinancialDashboard() {
         </TabsContent>
         )}
 
+        {/* VENDOR PAYMENTS TAB */}
+        <TabsContent value="vendor-payments" className="space-y-6">
+          {/* Vendor Payments Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card className="bg-gray-900 border-purple-500/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-400">Total Paid to Vendors</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-400">
+                  {currencySymbol}{(vendorPaymentData?.summary?.totalPaid || 0).toFixed(2)}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {vendorPaymentData?.summary?.paymentCount || 0} payments
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-900 border-orange-500/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-400">Upcoming (30 days)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-400">
+                  {currencySymbol}{(vendorPaymentData?.upcoming?.total || 0).toFixed(2)}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {vendorPaymentData?.upcoming?.count || 0} vendors due
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-900 border-cyan-500/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-400">Available to Pay</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-cyan-400">
+                  {currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Net position (Bank - User Credits)
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-900 border-green-500/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-400">Platform Net Earnings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-400">
+                  {currencySymbol}{(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  After all deductions
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Upcoming Vendor Payments Section */}
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-white text-xl flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-orange-400" />
+                    Upcoming Vendor Payments
+                  </CardTitle>
+                  <CardDescription>Pay vendors from platform earnings - deducted from net position</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchVendorPaymentData()}
+                  className="border-gray-600"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {vendorPaymentData?.upcoming?.vendors && vendorPaymentData.upcoming.vendors.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-gray-700">
+                      <TableHead className="text-gray-400">Vendor</TableHead>
+                      <TableHead className="text-gray-400">Type</TableHead>
+                      <TableHead className="text-gray-400">Billing</TableHead>
+                      <TableHead className="text-gray-400">Amount</TableHead>
+                      <TableHead className="text-gray-400">Due Date</TableHead>
+                      <TableHead className="text-gray-400">Status</TableHead>
+                      <TableHead className="text-gray-400 text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {vendorPaymentData.upcoming.vendors.map((vendor) => {
+                      const daysUntil = Math.ceil((new Date(vendor.nextPaymentDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                      const isOverdue = daysUntil < 0;
+                      const isDueSoon = daysUntil >= 0 && daysUntil <= 7;
+                      
+                      return (
+                        <TableRow key={vendor._id} className="border-gray-700">
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-white">{vendor.name}</p>
+                              {vendor.description && (
+                                <p className="text-xs text-gray-500">{vendor.description}</p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="border-gray-600 text-gray-300">
+                              {vendor.serviceType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-gray-300">{vendor.billingCycle}</TableCell>
+                          <TableCell className="text-white font-mono">
+                            {vendor.currency === 'EUR' ? '€' : vendor.currency === 'USD' ? '$' : vendor.currency}
+                            {vendor.amount.toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            <p className="text-white">{new Date(vendor.nextPaymentDate).toLocaleDateString()}</p>
+                            <p className={`text-xs ${isOverdue ? 'text-red-400' : isDueSoon ? 'text-yellow-400' : 'text-gray-500'}`}>
+                              {isOverdue ? `${Math.abs(daysUntil)} days overdue` : daysUntil === 0 ? 'Due today' : `${daysUntil} days`}
+                            </p>
+                          </TableCell>
+                          <TableCell>
+                            {isOverdue ? (
+                              <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Overdue</Badge>
+                            ) : isDueSoon ? (
+                              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Due Soon</Badge>
+                            ) : (
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">Scheduled</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => openVendorPayDialog(vendor)}
+                              className="bg-purple-600 hover:bg-purple-700"
+                            >
+                              Pay Now
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No upcoming vendor payments in the next 30 days</p>
+                  <p className="text-sm mt-2">Add vendors in Settings → Vendor Subscriptions</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Vendor Payment History */}
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white text-xl flex items-center gap-2">
+                <History className="h-5 w-5 text-cyan-400" />
+                Vendor Payment History
+              </CardTitle>
+              <CardDescription>Record of all payments to vendors (deducted from platform earnings)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {vendorPaymentData?.payments && vendorPaymentData.payments.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-gray-700">
+                      <TableHead className="text-gray-400">Date</TableHead>
+                      <TableHead className="text-gray-400">Vendor</TableHead>
+                      <TableHead className="text-gray-400">Type</TableHead>
+                      <TableHead className="text-gray-400">Amount</TableHead>
+                      <TableHead className="text-gray-400">Reference</TableHead>
+                      <TableHead className="text-gray-400">Paid By</TableHead>
+                      <TableHead className="text-gray-400">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {vendorPaymentData.payments.map((payment) => (
+                      <TableRow key={payment._id} className="border-gray-700">
+                        <TableCell className="text-gray-300">
+                          {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString() : new Date(payment.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-white font-medium">{payment.vendorName}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="border-gray-600 text-gray-300">
+                            {payment.serviceType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-white font-mono">
+                          {payment.currency === 'EUR' ? '€' : payment.currency === 'USD' ? '$' : payment.currency}
+                          {payment.amount.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-gray-400">
+                          {payment.reference || payment.invoiceNumber || '-'}
+                        </TableCell>
+                        <TableCell className="text-gray-400">
+                          {payment.paidByEmail || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`
+                            ${payment.status === 'paid' ? 'bg-green-500/20 text-green-400 border-green-500/30' : ''}
+                            ${payment.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : ''}
+                            ${payment.status === 'failed' ? 'bg-red-500/20 text-red-400 border-red-500/30' : ''}
+                            ${payment.status === 'refunded' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : ''}
+                          `}>
+                            {payment.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <History className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No vendor payments recorded yet</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Payment Breakdown by Service Type */}
+          {vendorPaymentData?.summary?.byServiceType && vendorPaymentData.summary.byServiceType.length > 0 && (
+            <Card className="bg-gray-900 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-white text-lg flex items-center gap-2">
+                  <Target className="h-5 w-5 text-purple-400" />
+                  Payments by Service Type
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {vendorPaymentData.summary.byServiceType.map((item) => (
+                    <div key={item._id} className="bg-gray-800 rounded-lg p-4">
+                      <p className="text-sm text-gray-400 capitalize">{item._id}</p>
+                      <p className="text-xl font-bold text-purple-400">€{item.total.toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">{item.count} payments</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
         {/* WALLETS TAB */}
         <TabsContent value="wallets" className="space-y-6">
           <Card className="bg-gray-900 border-gray-700">
@@ -2075,6 +2471,7 @@ export default function FinancialDashboard() {
                       <SelectItem value="gamemaster_challenge_referral">GM Referrals (Challenges)</SelectItem>
                       <SelectItem value="admin_withdrawal">Admin Withdrawals</SelectItem>
                       <SelectItem value="vat_payment">VAT Payments</SelectItem>
+                      <SelectItem value="vendor_payment">Vendor Payments</SelectItem>
                       <SelectItem value="unclaimed_pool">Unclaimed Pools</SelectItem>
                       <SelectItem value="deposit_fee">Deposit Fees</SelectItem>
                       <SelectItem value="withdrawal_fee">Withdrawal Fees</SelectItem>
@@ -2626,6 +3023,155 @@ export default function FinancialDashboard() {
                 <>
                   <Banknote className="h-4 w-4 mr-2" />
                   Record VAT Payment
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vendor Payment Dialog */}
+      <Dialog open={showVendorPayDialog} onOpenChange={setShowVendorPayDialog}>
+        <DialogContent className="bg-gray-900 border-gray-700 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <Building2 className="h-5 w-5 text-purple-400" />
+              Record Vendor Payment
+            </DialogTitle>
+            <DialogDescription>
+              Pay vendor from platform earnings - this will be deducted from your net position
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedVendor && (
+            <div className="space-y-4 py-4">
+              {/* Vendor Info */}
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                <h3 className="text-white font-semibold text-lg">{selectedVendor.name}</h3>
+                <p className="text-gray-400 text-sm mt-1">{selectedVendor.description || selectedVendor.serviceType}</p>
+                <div className="flex items-center gap-4 mt-3">
+                  <Badge variant="outline" className="border-purple-500/50 text-purple-300">
+                    {selectedVendor.serviceType}
+                  </Badge>
+                  <Badge variant="outline" className="border-gray-600 text-gray-300">
+                    {selectedVendor.billingCycle}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Platform Position Info */}
+              <div className="bg-gray-800/50 rounded-lg p-4 text-sm">
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-400">Theoretical Bank Balance:</span>
+                  <span className="text-cyan-400 font-mono">{currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-400">User Credit Liabilities:</span>
+                  <span className="text-red-400 font-mono">-{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-gray-700">
+                  <span className="text-gray-300 font-semibold">Available to Pay:</span>
+                  <span className={`font-mono font-bold ${
+                    (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0) >= 0
+                      ? 'text-green-400'
+                      : 'text-orange-400'
+                  }`}>
+                    {currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Payment Amount */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300">Payment Amount (EUR)</label>
+                <Input
+                  type="number"
+                  value={vendorPaymentAmount}
+                  onChange={(e) => setVendorPaymentAmount(e.target.value)}
+                  placeholder={selectedVendor.amount.toString()}
+                  className="bg-gray-800 border-gray-600 text-white"
+                  step="0.01"
+                  min="0"
+                />
+                <p className="text-xs text-gray-500">Default: €{selectedVendor.amount.toFixed(2)}</p>
+              </div>
+
+              {/* Reference */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300">Payment Reference (optional)</label>
+                <Input
+                  value={vendorPaymentRef}
+                  onChange={(e) => setVendorPaymentRef(e.target.value)}
+                  placeholder="e.g., Bank transfer ref"
+                  className="bg-gray-800 border-gray-600 text-white"
+                />
+              </div>
+
+              {/* Invoice Number */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300">Invoice Number (optional)</label>
+                <Input
+                  value={vendorPaymentInvoice}
+                  onChange={(e) => setVendorPaymentInvoice(e.target.value)}
+                  placeholder="e.g., INV-2026-001"
+                  className="bg-gray-800 border-gray-600 text-white"
+                />
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300">Notes (optional)</label>
+                <Input
+                  value={vendorPaymentNotes}
+                  onChange={(e) => setVendorPaymentNotes(e.target.value)}
+                  placeholder="Additional notes..."
+                  className="bg-gray-800 border-gray-600 text-white"
+                />
+              </div>
+
+              {/* Warning */}
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 text-sm">
+                <div className="flex items-center gap-2 text-orange-400 mb-1">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-semibold">Important</span>
+                </div>
+                <p className="text-gray-400">
+                  This payment will be recorded as an expense and deducted from your platform&apos;s net position. 
+                  Make sure you have actually made the payment to the vendor before recording it here.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowVendorPayDialog(false);
+                setSelectedVendor(null);
+                setVendorPaymentRef('');
+                setVendorPaymentInvoice('');
+                setVendorPaymentNotes('');
+                setVendorPaymentAmount('');
+              }}
+              className="border-gray-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleVendorPayment}
+              disabled={vendorPaymentProcessing || !selectedVendor}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {vendorPaymentProcessing ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Recording...
+                </>
+              ) : (
+                <>
+                  <Banknote className="h-4 w-4 mr-2" />
+                  Record Payment
                 </>
               )}
             </Button>

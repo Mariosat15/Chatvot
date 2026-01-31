@@ -4,6 +4,7 @@ import CreditWallet from '@/database/models/trading/credit-wallet.model';
 import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
 import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
 import VATPayment from '@/database/models/vat-payment.model';
+import VendorPayment from '@/database/models/vendor-payment.model';
 import { UserPurchase } from '@/database/models/marketplace/user-purchase.model';
 
 /**
@@ -299,6 +300,10 @@ export const PlatformFinancialsService = {
     totalVATPaid: number;
     outstandingVAT: number;
     
+    // Vendor Payments
+    totalVendorPayments: number;
+    vendorPaymentCount: number;
+    
     // Conversion Rate
     conversionRate: number;
   }> => {
@@ -449,12 +454,27 @@ export const PlatformFinancialsService = {
     const totalVATPaid = vatPaidAggregation[0]?.totalPaid || 0;
     const outstandingVAT = totalVATCollected - totalVATPaid;
     
+    // Total Vendor Payments (operational expenses)
+    const vendorPaymentAggregation = await VendorPayment.aggregate([
+      { $match: { status: 'paid' } },
+      {
+        $group: {
+          _id: null,
+          totalPaid: { $sum: '$amount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const totalVendorPayments = vendorPaymentAggregation[0]?.totalPaid || 0;
+    const vendorPaymentCount = vendorPaymentAggregation[0]?.count || 0;
+    
     // Bank reconciliation: 
     // What we HAVE = Money received from users - Bank fees taken - Money paid out + Platform fees (from contests)
     // IMPORTANT: Bank fees (Stripe, etc.) are DEDUCTED from what we receive, so subtract them!
     // Competition/Challenge fees are earned from prize pools, which come from entry fees (already in deposits)
     const totalMoneyReceivedGross = walletStats.totalDeposited + totalDepositFeesGross + totalVATCollected;
-    const totalMoneyPaidOut = walletStats.totalWithdrawn + totalAdminWithdrawalsEUR + totalVATPaid;
+    // Include vendor payments in money paid out (operational expenses)
+    const totalMoneyPaidOut = walletStats.totalWithdrawn + totalAdminWithdrawalsEUR + totalVATPaid + totalVendorPayments;
     // FIXED: Subtract bank fees because they reduce what we actually have in bank
     // Add competition/challenge fees as they represent earnings from the platform (not deducted from user wallets directly)
     const theoreticalBankBalance = totalMoneyReceivedGross - totalBankFees - totalMoneyPaidOut;
@@ -515,6 +535,10 @@ export const PlatformFinancialsService = {
       totalVATCollected,
       totalVATPaid,
       outstandingVAT,
+      
+      // Vendor Payments
+      totalVendorPayments,
+      vendorPaymentCount,
       
       conversionRate,
     };
