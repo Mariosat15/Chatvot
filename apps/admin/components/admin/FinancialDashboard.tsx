@@ -654,8 +654,15 @@ export default function FinancialDashboard() {
       return;
     }
 
-    const amount = parseFloat(withdrawAmount) * conversionRate; // Convert EUR to credits
     const amountEUR = parseFloat(withdrawAmount);
+    const maxWithdrawable = Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0));
+    
+    if (amountEUR > maxWithdrawable) {
+      toast.error(`Cannot withdraw more than ${currencySymbol}${maxWithdrawable.toFixed(2)} (available after user liabilities)`);
+      return;
+    }
+
+    const amount = amountEUR * conversionRate; // Convert EUR to credits
 
     setWithdrawing(true);
     try {
@@ -3489,10 +3496,17 @@ export default function FinancialDashboard() {
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-sm text-gray-400">Available to withdraw</div>
               <div className="text-2xl font-bold text-emerald-400">
-                {currencySymbol}{liabilityMetrics?.platformNetEUR.toFixed(2) || '0.00'}
+                {currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}
               </div>
-              <div className="text-xs text-gray-500">
-                {creditSymbol} {liabilityMetrics?.platformNetCredits.toLocaleString() || 0}
+              <div className="text-xs text-gray-500 mt-1 space-y-1">
+                <div className="flex justify-between">
+                  <span>Bank Balance:</span>
+                  <span className="text-green-400">{currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>User Liabilities:</span>
+                  <span className="text-red-400">-{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</span>
+                </div>
               </div>
             </div>
 
@@ -3504,6 +3518,7 @@ export default function FinancialDashboard() {
                 placeholder="0.00"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
+                max={Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0))}
                 className="mt-1 bg-gray-800 border-gray-700 text-white"
               />
             </div>
