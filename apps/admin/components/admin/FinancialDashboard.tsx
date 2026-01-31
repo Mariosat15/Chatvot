@@ -2206,7 +2206,7 @@ export default function FinancialDashboard() {
                 Net Platform Position
               </CardTitle>
               <CardDescription>
-                Total Earnings minus Withdrawals, Vendors & Expenses
+                Earnings + Admin Balance - Withdrawals - Vendors - Expenses
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -2214,28 +2214,49 @@ export default function FinancialDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-4xl font-bold text-emerald-400">
-                      {currencySymbol}{Math.max(0, (liabilityMetrics?.platformNetEUR || 0) - (platformFinancials?.totalVendorPayments || 0) - (platformFinancials?.totalCustomExpenses || 0)).toFixed(2)}
+                      {currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}
                     </div>
                     <p className="text-sm text-gray-400 mt-2">
-                      Available after all deductions
+                      Available to withdraw (after user liabilities)
                     </p>
                   </div>
                   <Button
                     onClick={() => setShowWithdrawDialog(true)}
                     className="bg-emerald-600 hover:bg-emerald-700"
-                    disabled={(liabilityMetrics?.platformNetCredits || 0) <= 0}
+                    disabled={Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)) <= 0}
                   >
                     <Banknote className="h-4 w-4 mr-2" />
-                    Convert to Bank
+                    Withdraw to Bank
                   </Button>
                 </div>
                 
-                {/* Breakdown */}
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                    <div className="text-xs text-gray-400">Total in Bank</div>
+                    <div className="text-xl font-bold text-green-400">{currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}</div>
+                  </div>
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                    <div className="text-xs text-gray-400">User Liabilities</div>
+                    <div className="text-xl font-bold text-red-400">-{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</div>
+                  </div>
+                </div>
+                
+                {/* Detailed Breakdown */}
                 <div className="border-t border-gray-700 pt-4 space-y-2 text-sm">
+                  <div className="text-xs text-gray-500 uppercase font-semibold mb-2">Income</div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Gross Earnings</span>
+                    <span className="text-gray-400">Platform Net Earnings</span>
                     <span className="text-green-400">+{currencySymbol}{(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}</span>
                   </div>
+                  {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">💵 Admin Balance Injected</span>
+                      <span className="text-teal-400">+{currencySymbol}{(platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  
+                  <div className="text-xs text-gray-500 uppercase font-semibold mt-3 mb-2">Outgoing</div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Admin Withdrawals</span>
                     <span className="text-red-400">-{currencySymbol}{(platformFinancials?.totalAdminWithdrawalsEUR || 0).toFixed(2)}</span>
@@ -2252,10 +2273,22 @@ export default function FinancialDashboard() {
                       <span className="text-rose-400">-{currencySymbol}{(platformFinancials?.totalCustomExpenses || 0).toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between pt-2 border-t border-gray-700 font-semibold">
-                    <span className="text-white">Net Available</span>
-                    <span className="text-emerald-400">{currencySymbol}{Math.max(0, (liabilityMetrics?.platformNetEUR || 0) - (platformFinancials?.totalVendorPayments || 0) - (platformFinancials?.totalCustomExpenses || 0)).toFixed(2)}</span>
+                  
+                  <div className="text-xs text-gray-500 uppercase font-semibold mt-3 mb-2">Liabilities Reserved</div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">User Credit Balances</span>
+                    <span className="text-orange-400">-{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</span>
                   </div>
+                  
+                  <div className="flex justify-between pt-3 border-t border-gray-700 font-semibold text-lg">
+                    <span className="text-white">💰 Can Withdraw</span>
+                    <span className="text-emerald-400">{currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}</span>
+                  </div>
+                </div>
+                
+                {/* Info */}
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-xs text-blue-300">
+                  💡 <strong>Can Withdraw</strong> = Total Bank Balance - User Liabilities. This is the maximum you can safely withdraw while still being able to pay all user withdrawals.
                 </div>
               </div>
           </CardContent>
