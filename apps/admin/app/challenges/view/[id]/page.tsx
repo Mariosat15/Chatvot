@@ -41,20 +41,23 @@ const AdminChallengeViewPage = async ({ params }: AdminChallengeViewPageProps) =
 
     // Get Game Master earnings for this challenge
     const db = (await connectToDatabase()).connection.db;
-    const gmEarnings = await db.collection('gamemasterearnings').find({
-      sourceId: id,
-      sourceType: 'challenge',
-    }).toArray();
-
-    // Create a map of referredUserId -> GM info
     const gmMap = new Map<string, { gmId: string; gmEmail: string; gmEarning: number }>();
-    gmEarnings.forEach((earning: any) => {
-      gmMap.set(earning.referredUserId, {
-        gmId: earning.gameMasterId,
-        gmEmail: earning.gameMasterEmail,
-        gmEarning: earning.netEarning || earning.grossEarning || 0,
+    
+    if (db) {
+      const gmEarnings = await db.collection('gamemasterearnings').find({
+        sourceId: id,
+        sourceType: 'challenge',
+      }).toArray();
+
+      // Create a map of referredUserId -> GM info
+      gmEarnings.forEach((earning: any) => {
+        gmMap.set(earning.referredUserId, {
+          gmId: earning.gameMasterId,
+          gmEmail: earning.gameMasterEmail,
+          gmEarning: earning.netEarning || earning.grossEarning || 0,
+        });
       });
-    });
+    }
 
     const formatDate = (date: Date | string) => {
       const d = new Date(date);
