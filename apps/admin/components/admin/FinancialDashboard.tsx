@@ -42,6 +42,23 @@ import {
 } from 'lucide-react';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import ReconciliationSection from './ReconciliationSection';
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 interface WalletData {
   userId: string;
@@ -329,6 +346,48 @@ export default function FinancialDashboard() {
     notes: '',
     description: '',
   });
+
+  // Analytics states
+  const [analyticsData, setAnalyticsData] = useState<{
+    period: { startDate: string; endDate: string; days: number };
+    summary: {
+      totalIncome: number;
+      totalExpenses: number;
+      netProfit: number;
+      totalDeposits: number;
+      totalWithdrawals: number;
+      profitMargin: number;
+      incomeGrowth: number;
+      expenseGrowth: number;
+    };
+    timeSeries: Array<{
+      date: string;
+      deposits: number;
+      withdrawals: number;
+      competitionFees: number;
+      challengeFees: number;
+      depositFees: number;
+      withdrawalFees: number;
+      unclaimedPools: number;
+      adminWithdrawals: number;
+      vendorPayments: number;
+      vatPayments: number;
+      customExpenses: number;
+      adminBalanceAdded: number;
+      totalIncome: number;
+      totalExpenses: number;
+      netProfit: number;
+      cumulativeIncome: number;
+      cumulativeExpenses: number;
+      cumulativeProfit: number;
+    }>;
+    revenuePieData: Array<{ name: string; value: number; color: string }>;
+    expensePieData: Array<{ name: string; value: number; color: string }>;
+  } | null>(null);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState('30');
+  const [analyticsCustomStart, setAnalyticsCustomStart] = useState('');
+  const [analyticsCustomEnd, setAnalyticsCustomEnd] = useState('');
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   
   // VAT states
   const [vatEnabled, setVatEnabled] = useState<boolean>(false);
@@ -445,6 +504,28 @@ export default function FinancialDashboard() {
       console.error('Failed to load admin funds data:', error);
     }
   }, []);
+
+  const fetchAnalyticsData = useCallback(async () => {
+    setAnalyticsLoading(true);
+    try {
+      const params = new URLSearchParams({ period: analyticsPeriod });
+      if (analyticsPeriod === 'custom' && analyticsCustomStart && analyticsCustomEnd) {
+        params.set('startDate', analyticsCustomStart);
+        params.set('endDate', analyticsCustomEnd);
+      }
+      
+      const response = await fetch(`/api/financial-analytics?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch analytics data');
+      
+      const result = await response.json();
+      setAnalyticsData(result.data);
+    } catch (error) {
+      console.error('Failed to load analytics data:', error);
+      toast.error('Failed to load analytics data');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [analyticsPeriod, analyticsCustomStart, analyticsCustomEnd]);
 
   const handleExportTransactions = async () => {
     setExportingTransactions(true);
@@ -647,6 +728,12 @@ export default function FinancialDashboard() {
       fetchInvoiceSummary();
     }
   }, [activeTab, invoiceDateRange, fetchInvoiceSummary]);
+
+  useEffect(() => {
+    if (activeTab === 'analytics') {
+      fetchAnalyticsData();
+    }
+  }, [activeTab, fetchAnalyticsData]);
 
   const handleAdminWithdraw = async () => {
     if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
@@ -1050,6 +1137,7 @@ export default function FinancialDashboard() {
           <TabsTrigger value="wallets">User Wallets</TabsTrigger>
           <TabsTrigger value="transactions">All Transactions</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
+          <TabsTrigger value="analytics">📊 Analytics</TabsTrigger>
           <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
         </TabsList>
 
@@ -3471,6 +3559,392 @@ export default function FinancialDashboard() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ANALYTICS TAB */}
+        <TabsContent value="analytics" className="space-y-6">
+          {/* Period Selector */}
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-white text-xl flex items-center gap-2">
+                    📊 Financial Analytics
+                  </CardTitle>
+                  <CardDescription>Performance snapshots and trends</CardDescription>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Select value={analyticsPeriod} onValueChange={setAnalyticsPeriod}>
+                    <SelectTrigger className="w-40 bg-gray-800 border-gray-700">
+                      <SelectValue placeholder="Select period" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="all">All Time</SelectItem>
+                      <SelectItem value="30">Last 30 Days</SelectItem>
+                      <SelectItem value="60">Last 60 Days</SelectItem>
+                      <SelectItem value="90">Last 90 Days</SelectItem>
+                      <SelectItem value="120">Last 120 Days</SelectItem>
+                      <SelectItem value="custom">Custom Range</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {analyticsPeriod === 'custom' && (
+                    <>
+                      <Input
+                        type="date"
+                        value={analyticsCustomStart}
+                        onChange={(e) => setAnalyticsCustomStart(e.target.value)}
+                        className="bg-gray-800 border-gray-700 text-white w-36"
+                      />
+                      <span className="text-gray-400">to</span>
+                      <Input
+                        type="date"
+                        value={analyticsCustomEnd}
+                        onChange={(e) => setAnalyticsCustomEnd(e.target.value)}
+                        className="bg-gray-800 border-gray-700 text-white w-36"
+                      />
+                    </>
+                  )}
+                  <Button
+                    onClick={fetchAnalyticsData}
+                    disabled={analyticsLoading}
+                    className="bg-cyan-600 hover:bg-cyan-700"
+                  >
+                    {analyticsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+
+          {analyticsLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-10 w-10 animate-spin text-cyan-400" />
+            </div>
+          ) : analyticsData ? (
+            <>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card className="bg-gradient-to-br from-green-900/50 to-gray-900 border-green-500/50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-400">Total Income</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-green-400">
+                      {currencySymbol}{analyticsData.summary.totalIncome.toFixed(2)}
+                    </div>
+                    <div className={`text-sm mt-1 ${analyticsData.summary.incomeGrowth >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {analyticsData.summary.incomeGrowth >= 0 ? '↑' : '↓'} {Math.abs(analyticsData.summary.incomeGrowth).toFixed(1)}% vs previous period
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-red-900/50 to-gray-900 border-red-500/50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-400">Total Expenses</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-red-400">
+                      {currencySymbol}{analyticsData.summary.totalExpenses.toFixed(2)}
+                    </div>
+                    <div className={`text-sm mt-1 ${analyticsData.summary.expenseGrowth <= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {analyticsData.summary.expenseGrowth >= 0 ? '↑' : '↓'} {Math.abs(analyticsData.summary.expenseGrowth).toFixed(1)}% vs previous period
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className={`bg-gradient-to-br ${analyticsData.summary.netProfit >= 0 ? 'from-emerald-900/50 to-gray-900 border-emerald-500/50' : 'from-orange-900/50 to-gray-900 border-orange-500/50'}`}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-400">Net Profit</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-3xl font-bold ${analyticsData.summary.netProfit >= 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
+                      {analyticsData.summary.netProfit >= 0 ? '+' : ''}{currencySymbol}{analyticsData.summary.netProfit.toFixed(2)}
+                    </div>
+                    <div className="text-sm mt-1 text-gray-400">
+                      Profit Margin: {analyticsData.summary.profitMargin.toFixed(1)}%
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-blue-900/50 to-gray-900 border-blue-500/50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-400">User Money Flow</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Deposits:</span>
+                        <span className="text-green-400 font-semibold">{currencySymbol}{analyticsData.summary.totalDeposits.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Withdrawals:</span>
+                        <span className="text-red-400 font-semibold">{currencySymbol}{analyticsData.summary.totalWithdrawals.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Charts Row 1: Income/Expense Trend + Cumulative */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Daily Income vs Expenses */}
+                <Card className="bg-gray-900 border-gray-700">
+                  <CardHeader>
+                    <CardTitle className="text-white text-lg">Daily Income vs Expenses</CardTitle>
+                    <CardDescription>Daily comparison of platform income and expenses</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analyticsData.timeSeries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke="#9ca3af" 
+                            fontSize={10}
+                            tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          />
+                          <YAxis stroke="#9ca3af" fontSize={10} tickFormatter={(value) => `€${value}`} />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                            labelStyle={{ color: '#fff' }}
+                            formatter={(value) => [`€${(value as number)?.toFixed(2) || '0.00'}`, '']}
+                            labelFormatter={(label) => new Date(label as string).toLocaleDateString()}
+                          />
+                          <Legend />
+                          <Bar dataKey="totalIncome" name="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="totalExpenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Cumulative Profit Trend */}
+                <Card className="bg-gray-900 border-gray-700">
+                  <CardHeader>
+                    <CardTitle className="text-white text-lg">Cumulative Profit Trend</CardTitle>
+                    <CardDescription>Running total of profit over time</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={analyticsData.timeSeries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke="#9ca3af" 
+                            fontSize={10}
+                            tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          />
+                          <YAxis stroke="#9ca3af" fontSize={10} tickFormatter={(value) => `€${value}`} />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                            labelStyle={{ color: '#fff' }}
+                            formatter={(value) => [`€${(value as number)?.toFixed(2) || '0.00'}`, '']}
+                            labelFormatter={(label) => new Date(label as string).toLocaleDateString()}
+                          />
+                          <Legend />
+                          <Area 
+                            type="monotone" 
+                            dataKey="cumulativeProfit" 
+                            name="Cumulative Profit"
+                            stroke="#10b981" 
+                            fill="url(#profitGradient)" 
+                            strokeWidth={2}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Charts Row 2: Pie Charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Revenue Breakdown */}
+                <Card className="bg-gray-900 border-gray-700">
+                  <CardHeader>
+                    <CardTitle className="text-white text-lg">Revenue Breakdown</CardTitle>
+                    <CardDescription>Where platform income comes from</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80">
+                      {analyticsData.revenuePieData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={analyticsData.revenuePieData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={100}
+                              paddingAngle={2}
+                              dataKey="value"
+                              label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                              labelLine={{ stroke: '#9ca3af' }}
+                            >
+                              {analyticsData.revenuePieData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                              formatter={(value) => [`€${(value as number)?.toFixed(2) || '0.00'}`, '']}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                          No revenue data for this period
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Expense Breakdown */}
+                <Card className="bg-gray-900 border-gray-700">
+                  <CardHeader>
+                    <CardTitle className="text-white text-lg">Expense Breakdown</CardTitle>
+                    <CardDescription>Where money goes out</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80">
+                      {analyticsData.expensePieData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={analyticsData.expensePieData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={100}
+                              paddingAngle={2}
+                              dataKey="value"
+                              label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                              labelLine={{ stroke: '#9ca3af' }}
+                            >
+                              {analyticsData.expensePieData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                              formatter={(value) => [`€${(value as number)?.toFixed(2) || '0.00'}`, '']}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                          No expense data for this period
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Charts Row 3: Income Components Breakdown */}
+              <Card className="bg-gray-900 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-white text-lg">Income Components Over Time</CardTitle>
+                  <CardDescription>Stacked view of all income sources</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={analyticsData.timeSeries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="compFeeGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                          </linearGradient>
+                          <linearGradient id="challFeeGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#f97316" stopOpacity={0.1}/>
+                          </linearGradient>
+                          <linearGradient id="depositFeeGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0.1}/>
+                          </linearGradient>
+                          <linearGradient id="unclaimedGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.1}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                        <XAxis 
+                          dataKey="date" 
+                          stroke="#9ca3af" 
+                          fontSize={10}
+                          tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        />
+                        <YAxis stroke="#9ca3af" fontSize={10} tickFormatter={(value) => `€${value}`} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                          labelStyle={{ color: '#fff' }}
+                          formatter={(value) => [`€${(value as number)?.toFixed(2) || '0.00'}`, '']}
+                          labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                        />
+                        <Legend />
+                        <Area type="monotone" dataKey="competitionFees" name="Competition Fees" stackId="1" stroke="#10b981" fill="url(#compFeeGradient)" />
+                        <Area type="monotone" dataKey="challengeFees" name="Challenge Fees" stackId="1" stroke="#f97316" fill="url(#challFeeGradient)" />
+                        <Area type="monotone" dataKey="depositFees" name="Deposit Fees" stackId="1" stroke="#22c55e" fill="url(#depositFeeGradient)" />
+                        <Area type="monotone" dataKey="unclaimedPools" name="Unclaimed Pools" stackId="1" stroke="#f59e0b" fill="url(#unclaimedGradient)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* User Deposits vs Withdrawals */}
+              <Card className="bg-gray-900 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-white text-lg">User Deposits vs Withdrawals</CardTitle>
+                  <CardDescription>Money flow in and out from users</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={analyticsData.timeSeries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                        <XAxis 
+                          dataKey="date" 
+                          stroke="#9ca3af" 
+                          fontSize={10}
+                          tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        />
+                        <YAxis stroke="#9ca3af" fontSize={10} tickFormatter={(value) => `€${value}`} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                          labelStyle={{ color: '#fff' }}
+                          formatter={(value) => [`€${(value as number)?.toFixed(2) || '0.00'}`, '']}
+                          labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                        />
+                        <Legend />
+                        <Line type="monotone" dataKey="deposits" name="Deposits" stroke="#22c55e" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="withdrawals" name="Withdrawals" stroke="#ef4444" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+              <Info className="h-12 w-12 mb-4 opacity-50" />
+              <p>Select a period and click refresh to load analytics</p>
+            </div>
+          )}
         </TabsContent>
 
         {/* RECONCILIATION TAB */}
