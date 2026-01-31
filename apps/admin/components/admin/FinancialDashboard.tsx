@@ -1304,18 +1304,39 @@ export default function FinancialDashboard() {
                     <div className="text-xs text-gray-500">{platformFinancials?.incidentCompensationsCount || 0} incident(s)</div>
                   </div>
                 )}
+                {/* Admin Balance Added */}
+                {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
+                  <div className="bg-teal-500/10 border border-teal-500/20 rounded-lg p-4">
+                    <div className="text-xs text-gray-400 uppercase">💵 Admin Balance Added</div>
+                    <div className="text-2xl font-bold text-teal-400">+{currencySymbol}{(platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}</div>
+                    <div className="text-xs text-gray-500">{platformFinancials?.adminBalanceAddCount || 0} injection(s)</div>
+                  </div>
+                )}
               </div>
               <div className="mt-4 space-y-2">
                 {/* Total Earned (Historical) */}
                 <div className="p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Total Earned (All Time)</span>
+                    <span className="text-gray-400">Platform Net Earnings (All Time)</span>
                     <span className="text-lg font-semibold text-white">{currencySymbol}{(platformFinancials?.totalNetEarningsEUR || 0).toFixed(2)}</span>
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
                     Gross: {currencySymbol}{(platformFinancials?.totalGrossEarnings || 0).toFixed(2)} - Bank Fees: {currencySymbol}{(platformFinancials?.totalBankFees || 0).toFixed(2)}
                   </div>
                 </div>
+
+                {/* Admin Balance Added */}
+                {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
+                  <div className="p-3 bg-teal-500/10 border border-teal-500/20 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-teal-400">💵 Admin Balance Injected ({platformFinancials?.adminBalanceAddCount || 0})</span>
+                      <span className="text-lg font-semibold text-teal-400">+{currencySymbol}{(platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Operating funds added to platform
+                    </div>
+                  </div>
+                )}
                 
                 {/* Already Withdrawn */}
                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
@@ -1364,14 +1385,35 @@ export default function FinancialDashboard() {
                   </div>
                 )}
                 
-                {/* Available to Withdraw (This is what matters!) */}
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                {/* Total Available Funds */}
+                <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
                   <div className="flex justify-between items-center">
-                    <span className="text-emerald-400 font-semibold">💰 Available to Withdraw</span>
-                    <span className="text-2xl font-bold text-emerald-400">{currencySymbol}{Math.max(0, (liabilityMetrics?.platformNetEUR || 0) - (platformFinancials?.totalVendorPayments || 0) - (platformFinancials?.totalCustomExpenses || 0)).toFixed(2)}</span>
+                    <span className="text-cyan-400 font-semibold">💼 Total Available Funds</span>
+                    <span className="text-2xl font-bold text-cyan-400">{currencySymbol}{((platformFinancials?.totalNetEarningsEUR || 0) + (platformFinancials?.totalAdminBalanceAdded || 0) - (platformFinancials?.totalAdminWithdrawalsEUR || 0) - (platformFinancials?.totalVendorPayments || 0) - (platformFinancials?.totalCustomExpenses || 0)).toFixed(2)}</span>
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    Total Earned - Withdrawn - Vendor Payments - Expenses = What you can take out
+                    Earnings + Balance Added - Withdrawn - Vendors - Expenses
+                  </div>
+                </div>
+
+                {/* Available to Pay (includes user liabilities) */}
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="text-emerald-400 font-semibold">💰 Available to Pay (After User Liabilities)</span>
+                    <span className="text-2xl font-bold text-emerald-400">{currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Bank Balance - User Credit Liabilities = What you can safely spend
+                  </div>
+                  <div className="text-xs text-gray-400 mt-2 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Bank Balance:</span>
+                      <span className="text-green-400">{currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>User Liabilities:</span>
+                      <span className="text-red-400">-{currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1493,11 +1535,32 @@ export default function FinancialDashboard() {
                         </td>
                       </tr>
                     )}
+                    {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
+                      <tr className="bg-teal-900/30 font-bold">
+                        <td className="py-4 px-4 text-white">💵 + ADMIN BALANCE ADDED</td>
+                        <td className="py-4 px-4 text-right text-gray-500">-</td>
+                        <td className="py-4 px-4 text-right text-teal-400">
+                          Operating funds injected
+                        </td>
+                        <td className="py-4 px-4 text-right text-teal-400 text-xl">
+                          +{currencySymbol}{(platformFinancials?.totalAdminBalanceAdded || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
+                    <tr className="bg-cyan-900/40 font-bold border-t-2 border-cyan-500">
+                      <td className="py-4 px-4 text-white">💰 AVAILABLE TO PAY</td>
+                      <td colSpan={2} className="py-4 px-4 text-right text-xs text-gray-400">
+                        Bank ({currencySymbol}{(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}) - User Liabilities ({currencySymbol}{(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)})
+                      </td>
+                      <td className="py-4 px-4 text-right text-cyan-400 text-xl">
+                        {currencySymbol}{Math.max(0, (liabilityMetrics?.theoreticalBankBalance || 0) - (liabilityMetrics?.totalUserCreditsEUR || 0)).toFixed(2)}
+                      </td>
+                    </tr>
                   </tfoot>
                 </table>
               </div>
               <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-blue-300">
-                💡 <strong>Understanding Fees:</strong> "We Charged Users" is what we invoice. "Stripe/Bank Takes" is what payment processors deduct. "WE KEEP" is our actual net earnings.
+                💡 <strong>Understanding:</strong> "GROSS TOTALS" = Platform earnings. "NET AFTER DEDUCTIONS" = After vendor/expense payments. "AVAILABLE TO PAY" = What you can safely spend after reserving for user withdrawals.
               </div>
             </CardContent>
           </Card>
