@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin/auth";
 import crypto from "crypto";
-import { isValidKycProviderUrl } from "@/lib/utils/url-validator";
+import { getSafeKycBaseUrl } from "@/lib/utils/url-validator";
 
 // Default Veriff API URL
 const DEFAULT_VERIFF_URL = "https://stationapi.veriff.com";
@@ -23,15 +23,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Validate baseUrl to prevent SSRF attacks
-    const targetUrl = baseUrl || DEFAULT_VERIFF_URL;
-    const urlValidation = isValidKycProviderUrl(targetUrl);
-    if (!urlValidation.valid) {
-      return NextResponse.json({
-        success: false,
-        message: `Invalid base URL: ${urlValidation.reason}`,
-      }, { status: 400 });
-    }
+    // Get safe URL from whitelist to prevent SSRF attacks
+    // This returns a hardcoded URL from our whitelist, not the user-provided URL
+    const targetUrl = getSafeKycBaseUrl(baseUrl, DEFAULT_VERIFF_URL);
 
     // Test the connection by making a simple API call to Veriff
     // We'll try to create a session with minimal data just to verify credentials

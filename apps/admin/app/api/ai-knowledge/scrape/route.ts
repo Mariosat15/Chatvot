@@ -114,11 +114,25 @@ export async function POST(request: NextRequest) {
  * Extract text content from HTML, preserving structure
  */
 function extractTextFromHtml(html: string, url: string): string {
-  // Remove script and style tags
-  let text = html
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, "")
+  // Remove script and style tags using iterative approach for complete removal
+  let text = html;
+  let prevLength;
+  
+  // Remove script blocks iteratively (handles whitespace in closing tags)
+  do {
+    prevLength = text.length;
+    text = text.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
+  } while (text.length < prevLength);
+  
+  // Remove style blocks iteratively
+  do {
+    prevLength = text.length;
+    text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "");
+  } while (text.length < prevLength);
+  
+  // Remove noscript and comments
+  text = text
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript\s*>/gi, "")
     .replace(/<!--[\s\S]*?-->/g, "");
 
   // Convert headings to markdown

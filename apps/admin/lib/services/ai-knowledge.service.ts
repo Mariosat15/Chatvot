@@ -41,7 +41,8 @@ export function splitTextByHeadings(
 
   for (const line of lines) {
     // Check if line is a heading
-    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    // Use possessive quantifier alternative to prevent ReDoS
+    const headingMatch = line.match(/^(#{1,6})\s+(\S(?:[^\n]*\S)?)$/);
 
     if (headingMatch) {
       // Save current chunk if not empty

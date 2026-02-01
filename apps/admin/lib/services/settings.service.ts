@@ -99,7 +99,7 @@ export async function getSetting(key: string, fallback: any = "") {
     const settings = await getSettings();
     return settings[key] || fallback;
   } catch (error) {
-    console.error(`Error getting setting ${key}:`, error);
+    console.error("Error getting setting", key, error);
     return fallback;
   }
 }
@@ -131,7 +131,7 @@ export async function getPaymentProviderCredentials(slug: string) {
       displayName: provider.displayName,
     };
   } catch (error) {
-    console.error(`Error getting payment provider ${slug}:`, error);
+    console.error("Error getting payment provider", slug, error);
     return null;
   }
 }

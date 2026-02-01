@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
-import { isValidForexSymbol } from "@/lib/utils/url-validator";
+import { getSafeForexTicker } from "@/lib/utils/url-validator";
 
 // Define the Candle1m schema locally to avoid cross-app imports
 const Candle1mSchema = new mongoose.Schema(
@@ -419,12 +419,12 @@ async function fetchFromMassive(
   }
 
   // Validate symbol to prevent SSRF/path injection attacks
-  if (!isValidForexSymbol(symbol)) {
-    console.error(`❌ [Gap Fill] Invalid forex symbol: ${symbol}`);
+  // Use getSafeForexTicker which returns a value from the whitelist, not user input
+  const ticker = getSafeForexTicker(symbol);
+  if (!ticker) {
+    console.error("❌ [Gap Fill] Invalid forex symbol:", symbol);
     return [];
   }
-
-  const ticker = `C:${symbol.replace("/", "")}`;
   const url = `${MASSIVE_API_BASE_URL}/v2/aggs/ticker/${ticker}/range/${config.multiplier}/${config.timespan}/${fromMs}/${toMs}?adjusted=true&sort=asc&limit=50000&apiKey=${MASSIVE_API_KEY}`;
 
   try {

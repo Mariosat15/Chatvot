@@ -5,7 +5,7 @@
  */
 
 import { ForexSymbol } from "./pnl-calculator.service";
-import { isValidForexSymbol } from "@/lib/utils/url-validator";
+import { getSafeForexTicker } from "@/lib/utils/url-validator";
 
 // Disable debug logging in production
 const DEBUG = process.env.NODE_ENV === "development" && false;
@@ -63,13 +63,14 @@ const TIMEFRAME_MAP: Record<
 
 // Convert our symbol format (EUR/USD) to Massive.com format (C:EURUSD)
 // Validates symbol to prevent SSRF/path injection attacks
+// SECURITY: Returns a value from the whitelist, not user input
 function symbolToMassiveFormat(symbol: ForexSymbol): string {
-  // Validate against whitelist to prevent path manipulation
-  if (!isValidForexSymbol(symbol)) {
+  // Get safe ticker from whitelist - this returns a hardcoded value, not user input
+  const safeTicker = getSafeForexTicker(symbol);
+  if (!safeTicker) {
     throw new Error(`Invalid forex symbol: ${symbol}`);
   }
-  const cleanSymbol = symbol.replace("/", "");
-  return `C:${cleanSymbol}`;
+  return safeTicker;
 }
 
 /**

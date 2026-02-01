@@ -39,6 +39,14 @@ const ALLOWED_KYC_DOMAINS = [
   "station.veriff.me",
 ];
 
+// Allowed KYC base URLs (exact matches for SSRF protection)
+const ALLOWED_KYC_BASE_URLS: Record<string, string> = {
+  "stationapi.veriff.com": "https://stationapi.veriff.com",
+  "api.veriff.com": "https://api.veriff.com",
+  "magic.veriff.me": "https://magic.veriff.me",
+  "station.veriff.me": "https://station.veriff.me",
+};
+
 // Valid forex symbols (whitelist)
 const VALID_FOREX_SYMBOLS = [
   "EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF", "AUD/USD", "USD/CAD", "NZD/USD",
@@ -133,6 +141,32 @@ export function isValidKycProviderUrl(url: string): { valid: boolean; reason?: s
 }
 
 /**
+ * Get a safe KYC provider base URL from a validated user URL
+ * SECURITY: Returns a hardcoded URL from the whitelist, not the user-provided URL
+ * This prevents SSRF attacks by ensuring only known URLs are used
+ */
+export function getSafeKycBaseUrl(userProvidedUrl: string | undefined | null, defaultUrl: string): string {
+  if (!userProvidedUrl) {
+    return defaultUrl;
+  }
+  
+  try {
+    const parsed = new URL(userProvidedUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    
+    // Return the hardcoded URL from our whitelist, not the user input
+    if (ALLOWED_KYC_BASE_URLS[hostname]) {
+      return ALLOWED_KYC_BASE_URLS[hostname];
+    }
+    
+    // If hostname is not in exact whitelist, return default
+    return defaultUrl;
+  } catch {
+    return defaultUrl;
+  }
+}
+
+/**
  * Validate forex symbol format
  */
 export function isValidForexSymbol(symbol: string): boolean {
@@ -144,13 +178,30 @@ export function isValidForexSymbol(symbol: string): boolean {
 /**
  * Sanitize a forex symbol for use in API URLs
  * Returns null if invalid
+ * IMPORTANT: Returns a value from the whitelist, not the user input, to prevent SSRF
  */
 export function sanitizeForexSymbol(symbol: string): string | null {
   const normalizedSymbol = symbol.toUpperCase().trim();
-  if (!isValidForexSymbol(normalizedSymbol)) {
+  // Return the actual whitelist value (not user input) to prevent any injection
+  const whitelistMatch = VALID_FOREX_SYMBOLS.find(s => s === normalizedSymbol);
+  return whitelistMatch || null;
+}
+
+/**
+ * Get a safe forex ticker for API URLs
+ * This converts a forex symbol to the API format (e.g., EUR/USD -> C:EURUSD)
+ * Returns null if the symbol is not in the whitelist
+ * 
+ * SECURITY: This function returns a hardcoded value from the whitelist,
+ * NOT the user-provided input, to prevent SSRF attacks.
+ */
+export function getSafeForexTicker(symbol: string): string | null {
+  const safeSymbol = sanitizeForexSymbol(symbol);
+  if (!safeSymbol) {
     return null;
   }
-  return normalizedSymbol;
+  // Remove the "/" and prefix with "C:" for Massive.com API format
+  return `C:${safeSymbol.replace("/", "")}`;
 }
 
 // Trusted domains for external redirects

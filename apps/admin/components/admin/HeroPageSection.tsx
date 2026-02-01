@@ -651,19 +651,33 @@ export default function HeroPageSection() {
       const newSettings = { ...prev };
       const keys = path.split(".");
       
-      // Guard against prototype pollution
-      const dangerousKeys = ["__proto__", "constructor", "prototype"];
-      if (keys.some(key => dangerousKeys.includes(key))) {
-        console.error("Attempted prototype pollution via path:", path);
-        return prev;
+      // Guard against prototype pollution - check all keys
+      const dangerousKeys = new Set(["__proto__", "constructor", "prototype"]);
+      
+      // Validate all keys upfront
+      for (const key of keys) {
+        if (dangerousKeys.has(key)) {
+          console.error("Attempted prototype pollution via path:", path);
+          return prev;
+        }
       }
       
+      // Navigate to the parent object, checking each key as we go
       let current: Record<string, unknown> = newSettings;
-
       for (let i = 0; i < keys.length - 1; i++) {
-        current = current[keys[i]] as Record<string, unknown>;
+        const key = keys[i];
+        // Double-check each key for safety
+        if (dangerousKeys.has(key)) {
+          return prev;
+        }
+        current = current[key] as Record<string, unknown>;
       }
-      current[keys[keys.length - 1]] = value;
+      
+      // Set the value on the final key (also validated above)
+      const finalKey = keys[keys.length - 1];
+      if (!dangerousKeys.has(finalKey)) {
+        current[finalKey] = value;
+      }
 
       return newSettings;
     });

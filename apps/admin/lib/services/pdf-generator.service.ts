@@ -767,20 +767,10 @@ export async function generatePDFFromHTML(html: string): Promise<Buffer> {
     const page = pdfDoc.addPage([595, 842]);
     const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    // Strip HTML tags
-    const textContent = html
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/\s+/g, " ")
-      .trim()
-      .substring(0, 3000); // Limit text length
+    // Strip HTML tags to extract plain text for PDF
+    // Use DOMPurify to safely strip all HTML first, then decode entities
+    const { stripHtml } = await import("@/lib/utils/html-sanitizer");
+    const textContent = stripHtml(html).substring(0, 3000); // Limit text length
 
     // Simple text wrapping
     const words = textContent.split(" ");

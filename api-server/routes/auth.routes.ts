@@ -158,9 +158,9 @@ router.post("/register", async (req: Request, res: Response) => {
       return;
     }
 
-    // Email format validation (matches batch registration requirement)
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Email format validation - use a ReDoS-safe pattern
+    // Limit the length and use atomic grouping pattern
+    if (email.length > 254 || !/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(email)) {
       res.status(400).json({ error: "Invalid email format" });
       return;
     }

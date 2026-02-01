@@ -644,8 +644,10 @@ export async function validateLogin(data: {
     ).default;
 
     // Use case-insensitive regex to match email
+    // Escape special regex characters to prevent regex injection
+    const escapedEmail = data.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const dbLockout = await AccountLockout.findOne({
-      email: { $regex: new RegExp(`^${data.email}$`, "i") },
+      email: { $regex: new RegExp(`^${escapedEmail}$`, "i") },
       isActive: true,
       $or: [
         { lockedUntil: { $gt: nowDate } }, // Temporary lockout not expired
@@ -777,15 +779,17 @@ export async function recordFailedLogin(data: {
         ).default;
 
         // Check for active lockout first
+        // Escape special regex characters to prevent regex injection
+        const escapedEmailForLockout = data.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const activeLockout = await AccountLockout.findOne({
-          email: { $regex: new RegExp(`^${data.email}$`, "i") },
+          email: { $regex: new RegExp(`^${escapedEmailForLockout}$`, "i") },
           isActive: true,
         });
 
         if (!activeLockout) {
           // No active lockout - check if there was a recent unlock
           const recentUnlock = await AccountLockout.findOne({
-            email: { $regex: new RegExp(`^${data.email}$`, "i") },
+            email: { $regex: new RegExp(`^${escapedEmailForLockout}$`, "i") },
             isActive: false,
             unlockedAt: { $exists: true },
           }).sort({ unlockedAt: -1 });
@@ -1112,22 +1116,24 @@ export async function adminUnlockAccount(data: {
     ).default;
 
     // DEBUG: First, let's see ALL lockouts for this email
+    // Escape special regex characters to prevent regex injection
+    const escapedEmailForUnlock = data.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const allLockouts = await AccountLockout.find({
-      email: { $regex: new RegExp(`^${data.email}$`, "i") },
+      email: { $regex: new RegExp(`^${escapedEmailForUnlock}$`, "i") },
     }).lean();
 
     console.log(
-      `🔓 [Database] Found ${allLockouts.length} total lockouts for ${data.email}:`,
+      "🔓 [Database] Found", allLockouts.length, "total lockouts for", data.email
     );
     for (const l of allLockouts) {
       console.log(
-        `   - ID: ${(l as any)._id}, isActive: ${(l as any).isActive}, IP: ${(l as any).ipAddress}`,
+        "   - ID:", (l as any)._id, ", isActive:", (l as any).isActive, ", IP:", (l as any).ipAddress
       );
     }
 
     // Clear ALL lockouts for this email (regardless of isActive status to be safe)
     const result = await AccountLockout.updateMany(
-      { email: { $regex: new RegExp(`^${data.email}$`, "i") } },
+      { email: { $regex: new RegExp(`^${escapedEmailForUnlock}$`, "i") } },
       {
         $set: {
           isActive: false,

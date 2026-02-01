@@ -66,11 +66,26 @@ export async function POST(request: NextRequest) {
     if (extension === "txt" || extension === "md" || extension === "html") {
       content = buffer.toString("utf-8");
 
-      // Basic HTML stripping for HTML files
+      // Safe HTML stripping for HTML files using iterative approach
       if (extension === "html") {
+        // Remove script blocks iteratively to handle edge cases
+        let prevLength;
+        do {
+          prevLength = content.length;
+          content = content.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
+        } while (content.length < prevLength);
+        
+        // Remove style blocks iteratively
+        do {
+          prevLength = content.length;
+          content = content.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "");
+        } while (content.length < prevLength);
+        
+        // Remove comments
+        content = content.replace(/<!--[\s\S]*?-->/g, "");
+        
+        // Remove remaining HTML tags and clean up
         content = content
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
           .replace(/<[^>]+>/g, "\n")
           .replace(/\n\s*\n/g, "\n\n")
           .trim();

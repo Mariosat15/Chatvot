@@ -10,6 +10,7 @@ import {
   sendKYCExpiredNotification,
 } from "@/lib/services/notification.service";
 import { checkForDuplicateKYC } from "@/lib/services/kyc-fraud-detection.service";
+import { isValidObjectId, isSafeMongoString } from "@/lib/utils/url-validator";
 
 interface VeriffSessionResponse {
   status: string;
@@ -312,9 +313,22 @@ class VeriffService {
       console.error("❌ [KYC] Veriff webhook missing vendorData (userId)");
       return;
     }
+    
+    // Validate userId to prevent NoSQL injection
+    if (!isValidObjectId(userId)) {
+      console.error("❌ [KYC] Invalid userId format:", userId);
+      return;
+    }
+    
+    // Validate veriffSessionId to prevent NoSQL injection
+    if (!isSafeMongoString(verification.id)) {
+      console.error("❌ [KYC] Invalid veriff session ID format");
+      return;
+    }
+    
     console.log("👤 [KYC] Processing for user:", userId);
 
-    // Find and update session
+    // Find and update session - inputs are now validated
     const session = await KYCSession.findOne({
       veriffSessionId: verification.id,
     });

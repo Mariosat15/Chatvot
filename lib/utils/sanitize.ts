@@ -59,12 +59,20 @@ export function sanitizeText(
   // Remove null bytes
   str = str.replace(/\0/g, "");
 
-  // Remove script tags and event handlers
-  str = str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-  str = str.replace(/on\w+\s*=/gi, "");
+  // Remove script/style tags using iterative approach to handle nested/malformed tags
+  // Use loop to ensure complete removal even with whitespace variations
+  let prevLength;
+  do {
+    prevLength = str.length;
+    str = str.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
+    str = str.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "");
+  } while (str.length < prevLength);
 
-  // Remove javascript: URLs
-  str = str.replace(/javascript:/gi, "");
+  // Remove event handlers (on* attributes) - match various patterns
+  str = str.replace(/\s*on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, "");
+
+  // Remove dangerous URL schemes (javascript, vbscript, data with scripts)
+  str = str.replace(/\b(javascript|vbscript|data)\s*:/gi, "blocked:");
 
   // Basic HTML entity escaping for dangerous characters
   str = str.replace(/</g, "&lt;").replace(/>/g, "&gt;");

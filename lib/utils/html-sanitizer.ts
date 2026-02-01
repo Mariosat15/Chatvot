@@ -181,9 +181,28 @@ export function escapeHtml(text: string | null | undefined): string {
 }
 
 /**
- * Strip all HTML tags from content
+ * Strip all HTML tags from content and return plain text
+ * @param html - HTML string to strip
+ * @returns Plain text with no HTML tags
  */
 export function stripHtml(html: string | null | undefined): string {
   if (!html) return "";
-  return DOMPurify.sanitize(html, { ALLOWED_TAGS: [] });
+  
+  // Use DOMPurify to safely strip all HTML tags
+  let text = DOMPurify.sanitize(html, { ALLOWED_TAGS: [] });
+  
+  // Decode common HTML entities that remain after stripping
+  text = text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, "/")
+    .replace(/\s+/g, " ")
+    .trim();
+  
+  return text;
 }

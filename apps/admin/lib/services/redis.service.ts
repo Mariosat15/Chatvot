@@ -157,7 +157,7 @@ export async function setPrice(
     });
     return true;
   } catch (error) {
-    console.error(`Failed to set price for ${symbol}:`, error);
+    console.error("Failed to set price for", symbol, error);
     return false;
   }
 }
@@ -210,7 +210,7 @@ export async function getPrice(symbol: string): Promise<CachedPrice | null> {
 
     return JSON.parse(data);
   } catch (error) {
-    console.error(`Failed to get price for ${symbol}:`, error);
+    console.error("Failed to get price for", symbol, error);
     return null;
   }
 }
