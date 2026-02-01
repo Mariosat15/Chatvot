@@ -21,14 +21,15 @@ const PORT = process.env.WEBSOCKET_PORT || 3003;
 const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
 
 // Get JWT secret with production safety check
+// Checks multiple env vars for compatibility with different auth setups
 function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET || process.env.AUTH_SECRET;
+  const secret = process.env.JWT_SECRET || process.env.AUTH_SECRET || process.env.BETTER_AUTH_SECRET;
   if (!secret && process.env.NODE_ENV === "production") {
-    throw new Error("JWT_SECRET or AUTH_SECRET is required in production");
+    throw new Error("JWT_SECRET, AUTH_SECRET, or BETTER_AUTH_SECRET is required in production");
   }
   if (!secret) {
-    console.warn("⚠️  JWT_SECRET not set - using insecure fallback (OK for development only)");
-    return "dev-only-insecure-secret-do-not-use-in-production-32chars";
+    console.warn("⚠️  JWT secret not set - using insecure fallback (OK for development only)");
+    return "dev-fallback-secret-not-for-production-use-32ch";
   }
   return secret;
 }

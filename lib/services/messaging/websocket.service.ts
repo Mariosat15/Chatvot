@@ -113,13 +113,14 @@ export class WebSocketService {
 
   /**
    * Get JWT secret with production safety check
+   * Checks multiple env vars for compatibility with different auth setups
    */
   private static getJwtSecret(): string | null {
-    const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
+    const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET;
     if (secret) return secret;
     
     if (process.env.NODE_ENV === "production") {
-      console.error("CRITICAL: AUTH_SECRET or JWT_SECRET required in production");
+      console.error("CRITICAL: AUTH_SECRET, JWT_SECRET, or BETTER_AUTH_SECRET required in production");
       return null;
     }
     
