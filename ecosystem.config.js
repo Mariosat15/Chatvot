@@ -11,6 +11,9 @@
  *   pm2 monit
  */
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 module.exports = {
   apps: [
     // ============================================
@@ -121,6 +124,12 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         WEBSOCKET_PORT: 3003,
+        // Pass secrets from .env to websocket process
+        BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+        JWT_SECRET: process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET,
+        AUTH_SECRET: process.env.AUTH_SECRET || process.env.BETTER_AUTH_SECRET,
+        MONGODB_URI: process.env.MONGODB_URI,
+        DATABASE_URL: process.env.DATABASE_URL,
       },
       instances: 1,
       exec_mode: 'fork',
