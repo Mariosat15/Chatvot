@@ -44,7 +44,7 @@ export async function GET(
       userId: session.user.id, // Filter out messages cleared by this user
     });
 
-    console.log(`📩 [ConvAPI] Got ${messages.length} messages:`);
+    console.log("📩 [ConvAPI] Got messages:", messages.length);
     messages.forEach((m: any, i: number) => {
       console.log(
         `   ${i + 1}. ${m.senderType}/${m.senderId}: "${m.content?.slice(0, 30)}..."`,

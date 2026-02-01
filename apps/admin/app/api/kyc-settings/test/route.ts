@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin/auth";
 import crypto from "crypto";
+import { isValidKycProviderUrl } from "@/lib/utils/url-validator";
+
+// Default Veriff API URL
+const DEFAULT_VERIFF_URL = "https://stationapi.veriff.com";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +21,16 @@ export async function POST(req: NextRequest) {
         success: false,
         message: "API Key is required",
       });
+    }
+
+    // Validate baseUrl to prevent SSRF attacks
+    const targetUrl = baseUrl || DEFAULT_VERIFF_URL;
+    const urlValidation = isValidKycProviderUrl(targetUrl);
+    if (!urlValidation.valid) {
+      return NextResponse.json({
+        success: false,
+        message: `Invalid base URL: ${urlValidation.reason}`,
+      }, { status: 400 });
     }
 
     // Test the connection by making a simple API call to Veriff
@@ -50,7 +64,7 @@ export async function POST(req: NextRequest) {
     }
 
     const response = await fetch(
-      `${baseUrl || "https://stationapi.veriff.com"}/v1/sessions`,
+      `${targetUrl}/v1/sessions`,
       {
         method: "POST",
         headers,

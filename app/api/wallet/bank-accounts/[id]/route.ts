@@ -171,7 +171,7 @@ export async function PATCH(
 
     await account.save();
 
-    console.log(`✅ Bank account ${id} updated for user ${session.user.id}`);
+    console.log("✅ Bank account updated:", id, "for user:", session.user.id);
 
     return NextResponse.json({
       success: true,
@@ -263,7 +263,7 @@ export async function DELETE(
       }
     }
 
-    console.log(`🗑️ Bank account ${id} removed for user ${session.user.id}`);
+    console.log("🗑️ Bank account removed:", id, "for user:", session.user.id);
 
     return NextResponse.json({
       success: true,

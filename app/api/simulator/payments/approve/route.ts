@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
             await import("@/lib/services/badge-evaluation.service");
           await evaluateUserBadges(uid);
         } catch (badgeError) {
-          console.error(`Error evaluating badges for user ${uid}:`, badgeError);
+          console.error("Error evaluating badges for user", uid, badgeError);
         }
       }
 

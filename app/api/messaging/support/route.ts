@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       { limit: 50 },
     );
 
-    console.log(`📨 [Support GET] Messages: ${messages.length}`);
+    console.log("📨 [Support GET] Messages:", messages.length);
 
     // Mark as read
     await MessagingService.markMessagesAsRead(
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     console.log(
       `📤 [Support POST] From: ${session.user.name} (${session.user.id})`,
     );
-    console.log(`📤 [Support POST] Content: "${content?.substring(0, 50)}..."`);
+    console.log("📤 [Support POST] Content:", content?.substring(0, 50));
 
     if (!content && (!attachments || attachments.length === 0)) {
       return NextResponse.json(
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
       attachments,
     });
 
-    console.log(`📤 [Support POST] Message sent: ${message._id}`);
+    console.log("📤 [Support POST] Message sent:", message._id);
 
     // Broadcast via WebSocket
     const { wsNotifier } =
@@ -236,8 +236,8 @@ async function handleAIResponse(
   userName: string,
   userMessage: string,
 ) {
-  console.log(`🤖 [AI] Starting AI response for conv: ${conversationId}`);
-  console.log(`🤖 [AI] User message: "${userMessage}"`);
+  console.log("🤖 [AI] Starting AI response for conv:", conversationId);
+  console.log("🤖 [AI] User message:", userMessage);
 
   const { connectToDatabase } = await import("@/database/mongoose");
   const mongoose = await import("mongoose");
@@ -257,7 +257,7 @@ async function handleAIResponse(
     maxAIResponsesBeforeEscalation?: number;
   };
 
-  console.log(`🤖 [AI] Settings enableAISupport: ${settings.enableAISupport}`);
+  console.log("🤖 [AI] Settings enableAISupport:", settings.enableAISupport);
 
   if (!settings.enableAISupport) {
     console.log(`🤖 [AI] AI Support disabled in settings`);
@@ -289,7 +289,7 @@ async function handleAIResponse(
   const aiMessageCount = await db
     .collection("messages")
     .countDocuments(aiMessageQuery);
-  console.log(`🤖 [AI] AI message count for this session: ${aiMessageCount}`);
+  console.log("🤖 [AI] AI message count for this session:", aiMessageCount);
 
   // Check for escalation keywords
   const escalationKeywords = (settings as { aiEscalationKeywords?: string[] })
@@ -564,7 +564,7 @@ async function escalateToHuman(
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
-    console.log(`🤖→👤 [Escalate] Added ${employeeName} as participant`);
+    console.log("🤖→👤 [Escalate] Added as participant:", employeeName);
   }
 
   // Send escalation message
@@ -615,7 +615,7 @@ async function escalateToHuman(
         customerId: userId,
         reason,
       });
-      console.log(`📧 [Escalate] Notified employee ${employeeName}`);
+      console.log("📧 [Escalate] Notified employee:", employeeName);
     } catch (notifyError) {
       console.warn("Failed to send escalation notification:", notifyError);
     }

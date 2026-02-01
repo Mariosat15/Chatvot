@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     // If there's an active conversation, archive it first
     if (activeConversation) {
       const ticketNumber = activeConversation.ticketNumber || 1;
-      console.log(`📦 [NewTicket] Archiving current ticket #${ticketNumber}`);
+      console.log("📦 [NewTicket] Archiving current ticket #", ticketNumber);
 
       // Archive the current conversation
       await db.collection("conversations").updateOne(
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       });
 
-      console.log(`✅ [NewTicket] Archived ticket #${ticketNumber}`);
+      console.log("✅ [NewTicket] Archived ticket #", ticketNumber);
     }
 
     // Now create a new support conversation

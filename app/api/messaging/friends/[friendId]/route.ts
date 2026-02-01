@@ -143,7 +143,7 @@ export async function POST(
         });
       }
 
-      console.log(`🚫 [Block] ${currentUserName} blocked user ${friendId}`);
+      console.log("🚫 [Block]", currentUserName, "blocked user", friendId);
 
       // Send notification to blocked user
       try {
@@ -184,7 +184,7 @@ export async function POST(
         });
       }
 
-      console.log(`✅ [Unblock] ${currentUserName} unblocked user ${friendId}`);
+      console.log("✅ [Unblock]", currentUserName, "unblocked user", friendId);
 
       return NextResponse.json({
         success: true,

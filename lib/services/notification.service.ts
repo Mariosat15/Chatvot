@@ -248,8 +248,8 @@ class NotificationService {
    * Send deposit initiated notification
    */
   async notifyDepositInitiated(userId: string, amount: number): Promise<any> {
-    console.log(`🔔 Sending deposit_initiated notification to ${userId}`);
-    console.log(`   Amount: €${amount.toFixed(2)}`);
+    console.log("🔔 Sending deposit_initiated notification to", userId);
+    console.log("   Amount: €", amount.toFixed(2));
     try {
       const result = await this.send({
         userId,
@@ -257,7 +257,7 @@ class NotificationService {
         variables: { amount: `€${amount.toFixed(2)}` },
       });
       if (result) {
-        console.log(`✅ Deposit initiated notification CREATED: ${result._id}`);
+        console.log("✅ Deposit initiated notification CREATED:", result._id);
       } else {
         console.log(
           `⚠️ Deposit initiated notification NOT created (check template/preferences)`,
@@ -307,7 +307,7 @@ class NotificationService {
     amount: number,
     reason: string,
   ): Promise<any> {
-    console.log(`🔔 Sending deposit_failed notification to ${userId}`);
+    console.log("🔔 Sending deposit_failed notification to", userId);
     try {
       const result = await this.send({
         userId,
@@ -328,7 +328,7 @@ class NotificationService {
     userId: string,
     amount: number,
   ): Promise<any> {
-    console.log(`🔔 Sending withdrawal_initiated notification to ${userId}`);
+    console.log("🔔 Sending withdrawal_initiated notification to", userId);
     try {
       const result = await this.send({
         userId,
@@ -371,7 +371,7 @@ class NotificationService {
     amount: number,
     reason: string,
   ): Promise<any> {
-    console.log(`🔔 Sending withdrawal_failed notification to ${userId}`);
+    console.log("🔔 Sending withdrawal_failed notification to", userId);
     try {
       const result = await this.send({
         userId,

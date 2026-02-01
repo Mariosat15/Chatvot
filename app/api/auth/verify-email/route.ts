@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       const errorParam = result.error?.includes("expired")
         ? "expired"
         : "invalid";
-      console.log(`❌ Verification failed: ${result.error}`);
+      console.log("❌ Verification failed:", result.error);
       return NextResponse.redirect(
         `${baseUrl}/sign-in?verification=${errorParam}`,
       );

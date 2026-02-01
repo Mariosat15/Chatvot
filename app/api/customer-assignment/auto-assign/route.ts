@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose, { Types } from "mongoose";
 import { sendAccountManagerAssignedEmail } from "@/lib/nodemailer";
+import crypto from "crypto";
 
 /**
  * POST /api/customer-assignment/auto-assign
@@ -263,16 +264,15 @@ export async function POST(request: NextRequest) {
       }
       case "random":
       default: {
-        const randomIndex = Math.floor(
-          Math.random() * availableEmployees.length,
-        );
+        // Use crypto.randomInt for cryptographically secure random selection
+        const randomIndex = crypto.randomInt(0, availableEmployees.length);
         selectedEmployee = availableEmployees[randomIndex];
         break;
       }
     }
 
     if (!selectedEmployee) {
-      console.log(`⚠️ [AutoAssign] Could not select employee for ${userEmail}`);
+      console.log("⚠️ [AutoAssign] Could not select employee for", userEmail);
       return NextResponse.json({
         success: true,
         assigned: false,
@@ -409,7 +409,7 @@ export async function POST(request: NextRequest) {
           managerName: selectedEmployee.name,
           managerFirstName: employeeFirstName,
         });
-        console.log(`📧 [AutoAssign] Customer EMAIL sent to ${userEmail}`);
+        console.log("📧 [AutoAssign] Customer EMAIL sent to", userEmail);
       } catch (emailError) {
         console.error("Failed to send customer email:", emailError);
         // Don't fail the assignment if email fails

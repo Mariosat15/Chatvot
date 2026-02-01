@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { sanitizeHtml } from "@/lib/utils/html-sanitizer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -758,33 +759,35 @@ export default function TradingArsenalSection() {
                     <div
                       className="text-gray-400 text-sm leading-relaxed"
                       dangerouslySetInnerHTML={{
-                        __html: infoDialogItem.item.fullDescription
-                          // Bold text
-                          .replace(
-                            /\*\*(.*?)\*\*/g,
-                            '<strong class="text-white font-semibold">$1</strong>',
-                          )
-                          // Italic quotes
-                          .replace(
-                            /\*"(.*?)"\*/g,
-                            '<em class="text-cyan-400 italic block mt-3 text-base">"$1"</em>',
-                          )
-                          .replace(
-                            /\*(.*?)\*/g,
-                            '<em class="text-gray-500 italic">$1</em>',
-                          )
-                          // Bullet points
-                          .replace(
-                            /^• (.*$)/gm,
-                            '<li class="ml-3 text-gray-400 list-disc">$1</li>',
-                          )
-                          .replace(
-                            /^- (.*$)/gm,
-                            '<li class="ml-3 text-gray-400 list-disc">$1</li>',
-                          )
-                          // Line breaks
-                          .replace(/\n\n/g, "<br/><br/>")
-                          .replace(/\n/g, "<br/>"),
+                        __html: sanitizeHtml(
+                          infoDialogItem.item.fullDescription
+                            // Bold text
+                            .replace(
+                              /\*\*(.*?)\*\*/g,
+                              '<strong class="text-white font-semibold">$1</strong>',
+                            )
+                            // Italic quotes
+                            .replace(
+                              /\*"(.*?)"\*/g,
+                              '<em class="text-cyan-400 italic block mt-3 text-base">"$1"</em>',
+                            )
+                            .replace(
+                              /\*(.*?)\*/g,
+                              '<em class="text-gray-500 italic">$1</em>',
+                            )
+                            // Bullet points
+                            .replace(
+                              /^• (.*$)/gm,
+                              '<li class="ml-3 text-gray-400 list-disc">$1</li>',
+                            )
+                            .replace(
+                              /^- (.*$)/gm,
+                              '<li class="ml-3 text-gray-400 list-disc">$1</li>',
+                            )
+                            // Line breaks
+                            .replace(/\n\n/g, "<br/><br/>")
+                            .replace(/\n/g, "<br/>")
+                        ),
                       }}
                     />
                   </div>

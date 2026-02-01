@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
         headers: await headers(),
       });
 
-      console.log(`✅ Password changed for user: ${session.user.email}`);
+      console.log("✅ Password changed for user:", session.user.email);
 
       return NextResponse.json({
         success: true,

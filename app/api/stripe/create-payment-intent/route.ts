@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
       "metadata.totalCharged": chargeAmount,
     });
 
-    console.log(`✅ Payment Intent created: ${paymentIntent.id}`);
+    console.log("✅ Payment Intent created:", paymentIntent.id);
     console.log(
       `   Total charge: €${chargeAmount} (Credits: €${amount}, VAT: €${vatAmount || 0}, Platform Fee: €${platformFeeAmount || 0})`,
     );

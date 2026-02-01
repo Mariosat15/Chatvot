@@ -7,6 +7,7 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import UserRestriction from "@/database/models/user-restriction.model";
 import SuspicionScore from "@/database/models/fraud/suspicion-score.model";
 import { connectToDatabase } from "@/database/mongoose";
+import { isValidObjectId } from "@/lib/utils/url-validator";
 
 interface DocumentInfo {
   documentNumber?: string;
@@ -212,7 +213,12 @@ export async function checkForDuplicateKYC(
   const allInvolvedUserIds = [
     userId,
     ...result.duplicateAccounts.map((d) => d.userId),
-  ];
+  ].filter(id => isValidObjectId(id)); // Validate all user IDs to prevent NoSQL injection
+
+  if (allInvolvedUserIds.length === 0) {
+    console.error("❌ [KYC Fraud] No valid user IDs found");
+    return result;
+  }
 
   // Check if alert already exists for these users
   const existingAlert = await FraudAlert.findOne({

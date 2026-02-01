@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import veriffService from "@/lib/services/veriff.service";
 import KYCSession from "@/database/models/kyc-session.model";
+import { isSafeMongoString } from "@/lib/utils/url-validator";
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,6 +64,12 @@ async function handleSessionEvent(payload: any) {
   const { action, verification } = payload;
 
   if (!verification?.id) return;
+
+  // Validate verification.id to prevent NoSQL injection
+  if (!isSafeMongoString(verification.id)) {
+    console.error("❌ [KYC Webhook] Invalid verification.id format");
+    return;
+  }
 
   const statusMap: Record<string, string> = {
     started: "started",

@@ -12,6 +12,17 @@ import mongoose, { Document, Model } from "mongoose";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 
+// Input validation helpers to prevent NoSQL injection
+function isValidEmail(email: unknown): email is string {
+  if (typeof email !== "string") return false;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
+}
+
+function isSafeString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
 const router = Router();
 
 // User interface - matches better-auth's user schema (NO password field!)
@@ -721,9 +732,11 @@ router.post("/register-batch", async (req: Request, res: Response) => {
     }
 
     // Verify the provided key matches using timing-safe comparison
-    // Hash both keys first to produce fixed-length outputs - this prevents
-    // timing attacks that could leak the API key length through response times.
-    // Without hashing, the length check would reject wrong-length keys faster.
+    // NOTE: SHA-256 is used here ONLY for timing-safe comparison, NOT for password storage.
+    // This creates fixed-length outputs to prevent timing attacks that could leak key length.
+    // User passwords are properly hashed with bcrypt (see hashPassword in worker-pool).
+    // CodeQL may flag this as "insufficient computational effort" but that's a false positive -
+    // API keys don't need slow hashing since they're not derived from user-memorable passwords.
     const hashKey = (key: string | undefined): Buffer => {
       return crypto
         .createHash("sha256")

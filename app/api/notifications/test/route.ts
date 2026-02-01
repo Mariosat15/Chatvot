@@ -25,24 +25,24 @@ export async function POST(request: NextRequest) {
       await NotificationTemplate.deleteMany({});
       await NotificationTemplate.seedDefaults();
       const count = await NotificationTemplate.countDocuments();
-      console.log(`✅ Re-seeded ${count} templates`);
+      console.log("✅ Re-seeded templates:", count);
       return NextResponse.json({
         success: true,
         message: `Re-seeded ${count} templates`,
       });
     }
 
-    console.log(`\n🧪 TEST NOTIFICATION for user: ${userId}`);
+    console.log("\n🧪 TEST NOTIFICATION for user:", userId);
 
     // Check template count
     const templateCount = await NotificationTemplate.countDocuments();
-    console.log(`📋 Total templates in database: ${templateCount}`);
+    console.log("📋 Total templates in database:", templateCount);
 
     if (templateCount === 0) {
       console.log("⚠️ No templates found, seeding...");
       await NotificationTemplate.seedDefaults();
       const newCount = await NotificationTemplate.countDocuments();
-      console.log(`✅ Seeded ${newCount} templates`);
+      console.log("✅ Seeded templates:", newCount);
     }
 
     // Check if deposit_completed template exists
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       template ? "EXISTS" : "NOT FOUND",
     );
     if (template) {
-      console.log(`   Enabled: ${template.isEnabled}`);
+      console.log("   Enabled:", template.isEnabled);
     }
 
     // Send a test notification
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     // Count user's notifications
     const userNotifications = await Notification.countDocuments({ userId });
-    console.log(`📊 Total notifications for user: ${userNotifications}`);
+    console.log("📊 Total notifications for user:", userNotifications);
 
     return NextResponse.json({
       success: true,

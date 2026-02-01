@@ -88,7 +88,7 @@ export async function GET() {
     const user = await findUserById(db, session.user.id);
 
     if (!user) {
-      console.error(`User not found for ID: ${session.user.id}`);
+      console.error("User not found for ID:", session.user.id);
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
@@ -209,11 +209,11 @@ export async function PUT(req: NextRequest) {
       );
 
     if (!result) {
-      console.error(`User not found for update, ID: ${session.user.id}`);
+      console.error("User not found for update, ID:", session.user.id);
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    console.log(`✅ User profile updated: ${session.user.email}`, {
+    console.log("✅ User profile updated:", session.user.email, {
       country: result.country,
       address: result.address,
       city: result.city,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import { isValidForexSymbol } from "@/lib/utils/url-validator";
 
 // Define the Candle1m schema locally to avoid cross-app imports
 const Candle1mSchema = new mongoose.Schema(
@@ -414,6 +415,12 @@ async function fetchFromMassive(
   const config = TIMEFRAME_TO_MASSIVE[timeframe];
   if (!config) {
     console.error(`❌ [Gap Fill] Unknown timeframe: ${timeframe}`);
+    return [];
+  }
+
+  // Validate symbol to prevent SSRF/path injection attacks
+  if (!isValidForexSymbol(symbol)) {
+    console.error(`❌ [Gap Fill] Invalid forex symbol: ${symbol}`);
     return [];
   }
 

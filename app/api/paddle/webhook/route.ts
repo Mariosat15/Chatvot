@@ -7,6 +7,7 @@ import {
 } from "@/lib/actions/trading/wallet.actions";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { isValidObjectId, isSafeMongoString } from "@/lib/utils/url-validator";
 
 /**
  * Paddle Webhook Handler
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     // Parse the event
     const event = JSON.parse(body);
 
-    console.log(`📨 Paddle Webhook: ${event.event_type}`);
+    console.log("📨 Paddle Webhook:", event.event_type);
 
     // Handle different event types
     switch (event.event_type) {
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
         break;
 
       default:
-        console.log(`ℹ️ Unhandled Paddle event: ${event.event_type}`);
+        console.log("ℹ️ Unhandled Paddle event:", event.event_type);
     }
 
     return NextResponse.json({ received: true });
@@ -136,6 +137,20 @@ async function handleTransactionCompleted(data: any) {
     const userId = customData.user_id;
     const paddleTransactionId = data.id;
 
+    // Validate IDs to prevent NoSQL injection
+    if (!isValidObjectId(transactionId)) {
+      console.error("❌ Invalid transactionId format:", transactionId);
+      return;
+    }
+    if (!isValidObjectId(userId)) {
+      console.error("❌ Invalid userId format:", userId);
+      return;
+    }
+    if (!isSafeMongoString(paddleTransactionId)) {
+      console.error(`❌ Invalid paddleTransactionId format`);
+      return;
+    }
+
     // IDEMPOTENCY CHECK: Verify transaction hasn't already been processed
     // This prevents duplicate credits if Paddle sends the same webhook multiple times
     await connectToDatabase();
@@ -150,7 +165,7 @@ async function handleTransactionCompleted(data: any) {
       console.log(
         `⚠️ IDEMPOTENCY: Paddle payment ${paddleTransactionId} already processed (found by paymentId)`,
       );
-      console.log(`   Existing transaction: ${existingByPaymentId._id}`);
+      console.log("   Existing transaction:", existingByPaymentId._id);
       return; // Already processed, skip
     }
 
@@ -160,25 +175,23 @@ async function handleTransactionCompleted(data: any) {
     ).lean()) as { _id: { toString(): string }; status?: string } | null;
 
     if (!existingTransaction) {
-      console.error(`❌ Transaction ${transactionId} not found in database`);
+      console.error("❌ Transaction not found in database:", transactionId);
       return;
     }
 
     if (existingTransaction.status === "completed") {
-      console.log(
-        `⚠️ IDEMPOTENCY: Transaction ${transactionId} already completed`,
-      );
+      console.log("⚠️ IDEMPOTENCY: Transaction already completed:", transactionId);
       return; // Already processed, skip
     }
 
-    console.log(`✅ Paddle payment completed: ${paddleTransactionId}`);
-    console.log(`   User: ${userId}`);
-    console.log(`   Transaction: ${transactionId}`);
+    console.log("✅ Paddle payment completed:", paddleTransactionId);
+    console.log("   User:", userId);
+    console.log("   Transaction:", transactionId);
 
     // Complete the deposit - this adds credits to user's wallet
     await completeDeposit(transactionId, paddleTransactionId, "paddle");
 
-    console.log(`✅ Credits added for transaction ${transactionId}`);
+    console.log("✅ Credits added for transaction", transactionId);
 
     // Send notification to user
     try {
@@ -207,10 +220,17 @@ async function handleTransactionFailed(data: any) {
     }
 
     const transactionId = customData.transaction_id;
+
+    // Validate transactionId to prevent NoSQL injection
+    if (!isValidObjectId(transactionId)) {
+      console.error("❌ Invalid transactionId format:", transactionId);
+      return;
+    }
+
     const reason = data.details?.reason || "Payment failed";
 
-    console.error(`❌ Paddle payment failed: ${data.id}`);
-    console.error(`   Reason: ${reason}`);
+    console.error("❌ Paddle payment failed:", data.id);
+    console.error("   Reason:", reason);
 
     // Cancel the deposit
     await cancelDeposit(transactionId, "failed", reason);
@@ -245,9 +265,15 @@ async function handleTransactionRefunded(data: any) {
   try {
     const customData = data.custom_data;
 
-    console.log(`💸 Paddle refund: ${data.id}`);
+    console.log("💸 Paddle refund:", data.id);
 
     if (customData?.transaction_id) {
+      // Validate transactionId to prevent NoSQL injection
+      if (!isValidObjectId(customData.transaction_id)) {
+        console.error("❌ Invalid transactionId format:", customData.transaction_id);
+        return;
+      }
+
       // Update transaction status
       await connectToDatabase();
       await WalletTransaction.findByIdAndUpdate(customData.transaction_id, {
@@ -256,9 +282,7 @@ async function handleTransactionRefunded(data: any) {
         "metadata.paddleRefundId": data.id,
       });
 
-      console.log(
-        `   Transaction ${customData.transaction_id} marked as refunded`,
-      );
+      console.log("   Transaction marked as refunded:", customData.transaction_id);
 
       // TODO: Optionally auto-deduct credits when refund is issued
       // For now, admin handles credit adjustment manually

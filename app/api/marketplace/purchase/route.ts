@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
         console.log(
           `📅 [GM UPGRADE] Old subscription endDate: ${oldEndDate.toISOString()}`,
         );
-        console.log(`📅 [GM UPGRADE] Current time: ${now.toISOString()}`);
+        console.log("📅 [GM UPGRADE] Current time:", now.toISOString());
         if (oldEndDate > now) {
           remainingDaysFromOld = Math.ceil(
             (oldEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
@@ -253,10 +253,10 @@ export async function POST(request: NextRequest) {
         now.getTime() + totalDurationDays * 24 * 60 * 60 * 1000,
       );
 
-      console.log(`📅 [GM] New package duration: ${durationDays} days`);
-      console.log(`📅 [GM] Days carried over: ${remainingDaysFromOld}`);
-      console.log(`📅 [GM] Total duration: ${totalDurationDays} days`);
-      console.log(`📅 [GM] New endDate: ${endDate.toISOString()}`);
+      console.log("📅 [GM] New package duration:", durationDays, "days");
+      console.log("📅 [GM] Days carried over:", remainingDaysFromOld);
+      console.log("📅 [GM] Total duration:", totalDurationDays, "days");
+      console.log("📅 [GM] New endDate:", endDate.toISOString());
 
       // Generate unique referral code (only if new subscription)
       let referralCode = existingSubscription?.referralCode || "";
@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
             _id: mongoose.Types.ObjectId;
           };
           if (oldItem && oldItem.category === "gamemaster") {
-            console.log(`🗑️ Removing old GM package purchase: ${oldItem._id}`);
+            console.log("🗑️ Removing old GM package purchase:", oldItem._id);
             await UserPurchase.deleteOne({ _id: oldPurchase._id }).session(
               mongoSession,
             );

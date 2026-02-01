@@ -1807,7 +1807,7 @@ class NuveiService {
         }
       }
     } else if (upoCheck.error) {
-      console.log(`⚠️ Could not fetch UPOs: ${upoCheck.error}`);
+      console.log("⚠️ Could not fetch UPOs:", upoCheck.error);
     } else {
       console.log(
         `❌ Nuvei has NO UPOs for ${params.userTokenId}! UPOs might not have been saved during deposit.`,

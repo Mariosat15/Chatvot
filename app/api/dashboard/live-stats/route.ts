@@ -32,7 +32,7 @@ export async function GET() {
     console.log(
       `   - Total capital: $${dashboardData.overallStats.totalCapital}`,
     );
-    console.log(`   - Total P&L: $${dashboardData.overallStats.totalPnL}`);
+    console.log("   - Total P&L: $", dashboardData.overallStats.totalPnL);
 
     return NextResponse.json(dashboardData, {
       headers: {

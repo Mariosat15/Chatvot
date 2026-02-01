@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import { isValidForexSymbol } from "@/lib/utils/url-validator";
 
 const MASSIVE_API_BASE_URL = "https://api.massive.com";
 const MASSIVE_API_KEY =
@@ -176,7 +177,15 @@ const FetchStatus =
 /**
  * Convert symbol format (EUR/USD) to Massive format (C:EURUSD)
  */
+/**
+ * Convert symbol to Massive format with validation
+ * Validates symbol to prevent SSRF/path injection attacks
+ */
 function symbolToMassiveFormat(symbol: string): string {
+  // Validate against whitelist to prevent path manipulation
+  if (!isValidForexSymbol(symbol)) {
+    throw new Error(`Invalid forex symbol: ${symbol}`);
+  }
   const cleanSymbol = symbol.replace("/", "");
   return `C:${cleanSymbol}`;
 }

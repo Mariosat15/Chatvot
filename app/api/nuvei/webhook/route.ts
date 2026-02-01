@@ -576,7 +576,7 @@ export async function POST(req: NextRequest) {
         dmnTransactionId: nuveiTransactionId,
       };
       await transaction.save();
-      console.log(`Transaction ${transaction._id} still pending`);
+      console.log("Transaction still pending:", transaction._id);
     }
 
     // Return OK to acknowledge receipt
@@ -979,7 +979,7 @@ async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
             paymentMethodDisplay = "Bank Transfer (SEPA)";
           }
 
-          console.log(`📧 Payout DMN: Sending email to ${emailToUse}...`);
+          console.log("📧 Payout DMN: Sending email to", emailToUse);
 
           await sendWithdrawalCompletedEmail({
             email: emailToUse,
@@ -1390,7 +1390,7 @@ async function handleWithdrawalDmn(
             paymentMethodDisplay = "Bank Transfer (SEPA)";
           }
 
-          console.log(`📧 Withdrawal DMN: Sending email to ${emailToSend}...`);
+          console.log("📧 Withdrawal DMN: Sending email to", emailToSend);
 
           await sendWithdrawalCompletedEmail({
             email: emailToSend,
@@ -1418,7 +1418,7 @@ async function handleWithdrawalDmn(
       }
     }
 
-    console.log(`💸 Withdrawal ${merchantWDRequestId} updated to ${newStatus}`);
+    console.log("💸 Withdrawal updated:", merchantWDRequestId, "to", newStatus);
     return NextResponse.json({ status: "OK" });
   } catch (error) {
     console.error("💸 Withdrawal DMN error:", error);

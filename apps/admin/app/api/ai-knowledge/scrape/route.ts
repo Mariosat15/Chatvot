@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/admin/auth";
 import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
+import { isValidSsrfUrl } from "@/lib/utils/url-validator";
 
 // POST - Scrape a URL and add to knowledge base
 export async function POST(request: NextRequest) {
@@ -28,12 +29,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
 
-    // Validate URL
+    // Validate URL format
     try {
       new URL(url);
     } catch {
       return NextResponse.json(
         { error: "Invalid URL format" },
+        { status: 400 },
+      );
+    }
+
+    // SSRF Protection: Block requests to internal/private addresses
+    const ssrfValidation = isValidSsrfUrl(url);
+    if (!ssrfValidation.valid) {
+      return NextResponse.json(
+        { error: `URL validation failed: ${ssrfValidation.reason}` },
         { status: 400 },
       );
     }

@@ -6,6 +6,36 @@ import { constants } from "fs";
 import path from "path";
 
 /**
+ * Sanitize filename to prevent path traversal attacks
+ * Only allows alphanumeric characters, hyphens, underscores, and dots
+ * Removes any directory components
+ */
+function sanitizeFilename(filename: string): string | null {
+  if (!filename || typeof filename !== "string") return null;
+  
+  // Get only the base filename (no directory components)
+  const baseName = path.basename(filename);
+  
+  // Check for path traversal attempts
+  if (baseName.includes("..") || baseName.includes("/") || baseName.includes("\\")) {
+    return null;
+  }
+  
+  // Only allow safe characters: alphanumeric, hyphen, underscore, dot
+  if (!/^[a-zA-Z0-9_.-]+$/.test(baseName)) {
+    return null;
+  }
+  
+  // Must have a valid image extension
+  const ext = baseName.split(".").pop()?.toLowerCase();
+  if (!ext || !["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) {
+    return null;
+  }
+  
+  return baseName;
+}
+
+/**
  * POST /api/marketplace/generate-content
  * Uses OpenAI to generate title, short description, and full description
  * for ANY marketplace item type (indicators, strategies, game master packages, cosmetics)
@@ -201,7 +231,14 @@ export async function POST(request: NextRequest) {
 // Helper function to get image as base64
 async function getImageBase64(imageUrl: string): Promise<string | null> {
   const urlPath = imageUrl.split("?")[0];
-  const filename = urlPath.split("/").pop() || "";
+  const rawFilename = urlPath.split("/").pop() || "";
+  
+  // Sanitize filename to prevent path traversal attacks
+  const filename = sanitizeFilename(rawFilename);
+  if (!filename) {
+    console.error(`❌ [AI Generate] Invalid filename: ${rawFilename}`);
+    return null;
+  }
 
   let mimeType = "image/png";
   const ext = filename.split(".").pop()?.toLowerCase();

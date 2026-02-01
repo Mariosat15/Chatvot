@@ -11,6 +11,13 @@ import { getSettings } from "@/lib/services/settings.service";
 import { ObjectId } from "mongodb";
 
 /**
+ * Escape special regex characters in a string to prevent ReDoS attacks
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
  * Build query to find user by multiple ID formats
  * Better-auth may use either `id` field or `_id` field
  */
@@ -337,8 +344,9 @@ export async function resendVerificationEmail(
     }
 
     // Find user by email (case-insensitive)
+    // Escape the email to prevent ReDoS attacks
     const user = await db.collection("user").findOne({
-      email: { $regex: new RegExp(`^${email}$`, "i") },
+      email: { $regex: new RegExp(`^${escapeRegex(email)}$`, "i") },
     });
 
     if (!user) {

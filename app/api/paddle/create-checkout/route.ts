@@ -97,9 +97,9 @@ export async function POST(req: NextRequest) {
       "metadata.provider": "paddle",
     });
 
-    console.log(`✅ Paddle transaction created: ${paddleTransaction.data.id}`);
-    console.log(`   Amount: €${amount}`);
-    console.log(`   User: ${session.user.email}`);
+    console.log("✅ Paddle transaction created:", paddleTransaction.data.id);
+    console.log("   Amount: €", amount);
+    console.log("   User:", session.user.email);
 
     // Return checkout URL for redirect
     // Paddle provides a hosted checkout page

@@ -455,7 +455,7 @@ async function autoFillGaps(
           broadcastDataUpdated(symbol, "1m", "gap_fill_complete");
         }
       } catch (error) {
-        console.error(`❌ [Auto Gap Fill] Failed for ${symbol}:`, error);
+        console.error("❌ [Auto Gap Fill] Failed for", symbol, error);
       } finally {
         gapFillInProgress.delete(symbol);
       }
@@ -536,7 +536,7 @@ async function fillCollectionGap(symbol: string): Promise<void> {
     ); // in seconds
 
     // Log the timestamps for debugging
-    console.log(`🔍 [Collection Gap Check] ${symbol}:`);
+    console.log("🔍 [Collection Gap Check]", symbol);
     console.log(
       `   candles_1m oldest: ${new Date(oldest1mTime * 1000).toISOString()}`,
     );
@@ -643,7 +643,7 @@ async function fillCollectionGap(symbol: string): Promise<void> {
           broadcastDataUpdated(symbol, "1m", "gap_fill_complete");
         }
       } catch (error) {
-        console.error(`❌ [Collection Gap Fill] Failed for ${symbol}:`, error);
+        console.error("❌ [Collection Gap Fill] Failed for", symbol, error);
       } finally {
         collectionGapFillInProgress.delete(symbol);
       }
@@ -918,7 +918,7 @@ async function handleCandleRequest(
         backgroundSeeding: needsSeeding,
       });
     } catch (dbError) {
-      console.error(`❌ [Candles API] MongoDB error for ${symbol}:`, dbError);
+      console.error("❌ [Candles API] MongoDB error for", symbol, dbError);
       return NextResponse.json({
         candles: [],
         source: "error",

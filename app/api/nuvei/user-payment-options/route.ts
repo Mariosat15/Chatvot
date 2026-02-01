@@ -31,7 +31,7 @@ export async function GET() {
     // Get stored UPOs from our database (captured from deposit DMNs)
     const storedUPOs = await NuveiUserPaymentOption.getActiveUPOs(userId);
 
-    console.log(`💳 Found ${storedUPOs.length} stored UPOs for user ${userId}`);
+    console.log("💳 Found stored UPOs for user:", storedUPOs.length, userId);
 
     // Build combined payment options
     const paymentOptions: Array<{

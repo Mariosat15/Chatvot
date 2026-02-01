@@ -60,11 +60,11 @@ export async function GET(
       try {
         await access(possiblePath, constants.R_OK);
         filePath = possiblePath;
-        console.log(`✅ Found image at: ${possiblePath}`);
+        console.log("✅ Found image at:", possiblePath);
         break;
       } catch {
         // File doesn't exist at this path, try next
-        console.log(`⚠️ Image not at: ${possiblePath}`);
+        console.log("⚠️ Image not at:", possiblePath);
       }
     }
 

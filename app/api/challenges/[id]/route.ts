@@ -43,16 +43,16 @@ export async function GET(
       new Date() >= new Date(challenge.endTime) &&
       !challenge.winnerId // Not yet finalized
     ) {
-      console.log(`🏁 Auto-finalizing challenge ${id} on access...`);
+      console.log("🏁 Auto-finalizing challenge on access:", id);
       try {
         const { finalizeChallenge } =
           await import("@/lib/actions/trading/challenge-finalize.actions");
         await finalizeChallenge(id);
         // Refresh challenge data after finalization
         challenge = await Challenge.findById(id);
-        console.log(`✅ Challenge ${id} auto-finalized successfully`);
+        console.log("✅ Challenge auto-finalized successfully:", id);
       } catch (error) {
-        console.error(`❌ Failed to auto-finalize challenge ${id}:`, error);
+        console.error("❌ Failed to auto-finalize challenge:", id, error);
       }
     }
 

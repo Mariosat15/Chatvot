@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`📨 Stripe Webhook: ${event.type}`);
+    console.log("📨 Stripe Webhook:", event.type);
 
     // Handle deposit-related events
     switch (event.type) {
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
         break;
 
       default:
-        console.log(`ℹ️ Unhandled event type: ${event.type}`);
+        console.log("ℹ️ Unhandled event type:", event.type);
     }
 
     return NextResponse.json({ received: true });
@@ -148,10 +148,8 @@ async function handlePaymentIntentSucceeded(
     }).lean()) as { _id: { toString(): string }; status?: string } | null;
 
     if (existingByPaymentId) {
-      console.log(
-        `⚠️ IDEMPOTENCY: Payment ${paymentIntent.id} already processed (found by paymentId)`,
-      );
-      console.log(`   Existing transaction: ${existingByPaymentId._id}`);
+      console.log("⚠️ IDEMPOTENCY: Payment already processed:", paymentIntent.id);
+      console.log("   Existing transaction:", existingByPaymentId._id);
       return; // Already processed, skip
     }
 
@@ -161,21 +159,19 @@ async function handlePaymentIntentSucceeded(
     ).lean()) as { _id: { toString(): string }; status?: string } | null;
 
     if (!existingTransaction) {
-      console.error(`❌ Transaction ${transactionId} not found in database`);
+      console.error("❌ Transaction not found in database:", transactionId);
       return;
     }
 
     if (existingTransaction.status === "completed") {
-      console.log(
-        `⚠️ IDEMPOTENCY: Transaction ${transactionId} already completed`,
-      );
+      console.log("⚠️ IDEMPOTENCY: Transaction already completed:", transactionId);
       return; // Already processed, skip
     }
 
-    console.log(`✅ Payment succeeded: ${paymentIntent.id}`);
-    console.log(`   Amount: €${paymentIntent.amount / 100}`);
-    console.log(`   User: ${userId}`);
-    console.log(`   Transaction: ${transactionId}`);
+    console.log("✅ Payment succeeded:", paymentIntent.id);
+    console.log("   Amount: €", paymentIntent.amount / 100);
+    console.log("   User:", userId);
+    console.log("   Transaction:", transactionId);
 
     // Fetch card details for future refund reference
     let cardDetails:
@@ -222,7 +218,7 @@ async function handlePaymentIntentSucceeded(
       cardDetails,
     );
 
-    console.log(`✅ Credits added for transaction ${transactionId}`);
+    console.log("✅ Credits added for transaction", transactionId);
 
     // Track for fraud detection
     await trackPaymentFingerprint(paymentIntent, userId);
@@ -293,8 +289,8 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
   try {
     const { transactionId, userId } = paymentIntent.metadata;
 
-    console.error(`❌ Payment failed: ${paymentIntent.id}`);
-    console.error(`   Reason: ${paymentIntent.last_payment_error?.message}`);
+    console.error("❌ Payment failed:", paymentIntent.id);
+    console.error("   Reason:", paymentIntent.last_payment_error?.message);
 
     if (transactionId) {
       await cancelDeposit(
@@ -333,7 +329,7 @@ async function handlePaymentIntentCanceled(
   try {
     const { transactionId } = paymentIntent.metadata;
 
-    console.log(`🚫 Payment canceled: ${paymentIntent.id}`);
+    console.log("🚫 Payment canceled:", paymentIntent.id);
 
     if (transactionId) {
       await cancelDeposit(
@@ -352,8 +348,8 @@ async function handlePaymentIntentCanceled(
  */
 async function handleChargeRefunded(charge: Stripe.Charge) {
   try {
-    console.log(`💸 Charge refunded: ${charge.id}`);
-    console.log(`   Amount: €${charge.amount_refunded / 100}`);
+    console.log("💸 Charge refunded:", charge.id);
+    console.log("   Amount: €", charge.amount_refunded / 100);
 
     // Log for audit - actual credit deduction should be done via admin panel
     // TODO: Optionally auto-deduct credits when refund is issued

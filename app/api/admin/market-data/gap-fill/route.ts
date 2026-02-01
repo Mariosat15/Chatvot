@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
                   symbolGapsFilled++;
                 }
               } catch (gapError) {
-                console.error(`Error filling 1m gap for ${sym}:`, gapError);
+                console.error("Error filling 1m gap for", sym, gapError);
               }
             }
           }
@@ -268,7 +268,7 @@ export async function POST(request: NextRequest) {
               `✅ [Gap Fill] ${sym} ${tf}: Saved ${tfCandlesFilled} candles from API`,
             );
           } catch (err) {
-            console.error(`❌ [Gap Fill] ${sym} ${tf}: API fetch failed:`, err);
+            console.error("❌ [Gap Fill]", sym, tf, "API fetch failed:", err);
           }
         } else if (candles.length >= 2) {
           // Check for gaps within existing data
@@ -336,7 +336,7 @@ export async function POST(request: NextRequest) {
                   tfGapsFilled++;
                 }
               } catch (err) {
-                console.error(`❌ [Gap Fill] ${sym} ${tf} gap error:`, err);
+                console.error("❌ [Gap Fill]", sym, tf, "gap error:", err);
               }
             }
           }

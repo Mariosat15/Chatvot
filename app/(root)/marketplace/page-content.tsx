@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { sanitizeHtml } from "@/lib/utils/html-sanitizer";
 import {
   TrendingUp,
   Star,
@@ -1913,43 +1914,45 @@ function ItemDetailModal({
             <div
               className="text-gray-300 leading-relaxed whitespace-pre-line"
               dangerouslySetInnerHTML={{
-                __html: item.fullDescription
-                  // Headers
-                  .replace(
-                    /^# (.*$)/gm,
-                    '<h2 class="text-xl font-bold text-white mt-6 mb-3 first:mt-0">$1</h2>',
-                  )
-                  .replace(
-                    /^## (.*$)/gm,
-                    '<h3 class="text-lg font-semibold text-white mt-5 mb-2">$1</h3>',
-                  )
-                  // Bold text (** or __)
-                  .replace(
-                    /\*\*(.*?)\*\*/g,
-                    '<strong class="text-white font-semibold">$1</strong>',
-                  )
-                  // Italic text for quotes (*"text"*)
-                  .replace(
-                    /\*"(.*?)"\*/g,
-                    '<em class="text-cyan-400 italic block mt-4 text-lg">"$1"</em>',
-                  )
-                  .replace(
-                    /\*(.*?)\*/g,
-                    '<em class="text-gray-400 italic">$1</em>',
-                  )
-                  // Bullet points (- or •)
-                  .replace(
-                    /^- (.*$)/gm,
-                    '<li class="ml-4 text-gray-300 list-disc">$1</li>',
-                  )
-                  .replace(
-                    /^• (.*$)/gm,
-                    '<li class="ml-4 text-gray-300 list-disc">$1</li>',
-                  )
-                  // Line breaks - convert double newlines to paragraph spacing
-                  .replace(/\n\n/g, '</p><p class="mt-4">')
-                  // Wrap in paragraph
-                  .replace(/^(.*)$/, "<p>$1</p>"),
+                __html: sanitizeHtml(
+                  item.fullDescription
+                    // Headers
+                    .replace(
+                      /^# (.*$)/gm,
+                      '<h2 class="text-xl font-bold text-white mt-6 mb-3 first:mt-0">$1</h2>',
+                    )
+                    .replace(
+                      /^## (.*$)/gm,
+                      '<h3 class="text-lg font-semibold text-white mt-5 mb-2">$1</h3>',
+                    )
+                    // Bold text (** or __)
+                    .replace(
+                      /\*\*(.*?)\*\*/g,
+                      '<strong class="text-white font-semibold">$1</strong>',
+                    )
+                    // Italic text for quotes (*"text"*)
+                    .replace(
+                      /\*"(.*?)"\*/g,
+                      '<em class="text-cyan-400 italic block mt-4 text-lg">"$1"</em>',
+                    )
+                    .replace(
+                      /\*(.*?)\*/g,
+                      '<em class="text-gray-400 italic">$1</em>',
+                    )
+                    // Bullet points (- or •)
+                    .replace(
+                      /^- (.*$)/gm,
+                      '<li class="ml-4 text-gray-300 list-disc">$1</li>',
+                    )
+                    .replace(
+                      /^• (.*$)/gm,
+                      '<li class="ml-4 text-gray-300 list-disc">$1</li>',
+                    )
+                    // Line breaks - convert double newlines to paragraph spacing
+                    .replace(/\n\n/g, '</p><p class="mt-4">')
+                    // Wrap in paragraph
+                    .replace(/^(.*)$/, "<p>$1</p>")
+                ),
               }}
             />
           </div>

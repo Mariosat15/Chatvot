@@ -482,9 +482,7 @@ export default function ProfileOverviewCharts({
 }: ProfileOverviewChartsProps) {
   const { settings, creditsToEUR } = useAppSettings();
 
-  if (!settings) return null;
-
-  // Calculate trading performance data
+  // Calculate trading performance data - must be before any early returns (Rules of Hooks)
   const tradingBarData = useMemo(
     () => [
       {
@@ -534,6 +532,9 @@ export default function ProfileOverviewCharts({
   const hasActivity =
     competitionStats?.totalCompetitionsEntered > 0 ||
     challengeStats?.totalChallengesEntered > 0;
+
+  // Early return must be after all hooks (Rules of Hooks)
+  if (!settings) return null;
 
   return (
     <div className="space-y-6">

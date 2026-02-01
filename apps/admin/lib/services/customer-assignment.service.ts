@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import crypto from "crypto";
 import {
   CustomerAssignment,
   ICustomerAssignment,
@@ -624,8 +625,8 @@ class CustomerAssignmentService {
         )[0];
 
       case "random":
-        // Random selection
-        return employees[Math.floor(Math.random() * employees.length)];
+        // Random selection using crypto.randomInt for better randomness
+        return employees[crypto.randomInt(0, employees.length)];
 
       default:
         return employees[0];

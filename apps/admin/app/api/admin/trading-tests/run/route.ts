@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import crypto from "crypto";
 
 // =====================================================
 // TRADING FUNCTIONALITY TESTS
@@ -1466,7 +1467,7 @@ export async function POST(request: Request) {
     const db = mongoose.connection.db;
     if (!db) throw new Error("Database not connected");
 
-    const testRunId = `TEST_TRADE_${scenario.id}_${Math.random().toString(36).substring(2, 8)}`;
+    const testRunId = `TEST_TRADE_${scenario.id}_${crypto.randomBytes(4).toString("hex")}`;
     const testDataIds: string[] = [];
     let actualResult: {
       passed: boolean;

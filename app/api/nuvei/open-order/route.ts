@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     // SECURITY: Rate limiting - 5 deposit attempts per minute per user
     const rateLimitResult = RateLimiters.deposit(userId);
     if (!rateLimitResult.success) {
-      console.log(`🛡️ Rate limit exceeded for user ${userId} - deposit`);
+      console.log("🛡️ Rate limit exceeded for user - deposit:", userId);
       return NextResponse.json(
         {
           error: "Too many requests. Please wait a moment before trying again.",
@@ -227,14 +227,12 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`💰 Nuvei Deposit calculation:`);
-    console.log(`   Credits Value: €${creditsToReceive}`);
-    console.log(`   Total Charged: €${amountNum}`);
-    console.log(`   VAT (${vatPercentage}%): €${vatAmount}`);
-    console.log(
-      `   Platform Fee (${platformFeePercentage}%): €${platformFeeAmount}`,
-    );
-    console.log(`   Bank Fee: €${bankFeeTotal.toFixed(2)}`);
-    console.log(`   Net Platform Earning: €${netPlatformEarning.toFixed(2)}`);
+    console.log("   Credits Value: €", creditsToReceive);
+    console.log("   Total Charged: €", amountNum);
+    console.log("   VAT (%):", vatPercentage, "€", vatAmount);
+    console.log("   Platform Fee (%):", platformFeePercentage, "€", platformFeeAmount);
+    console.log("   Bank Fee: €", bankFeeTotal.toFixed(2));
+    console.log("   Net Platform Earning: €", netPlatformEarning.toFixed(2));
 
     // STEP 1: Create pending transaction with full fee metadata (like Stripe)
     const pendingTransaction = await WalletTransaction.create({

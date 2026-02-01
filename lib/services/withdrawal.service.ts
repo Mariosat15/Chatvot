@@ -103,19 +103,19 @@ export async function approveWithdrawal(
     await withdrawal.save({ session });
 
     // Log for admin
-    console.log(`\n🏦 WITHDRAWAL APPROVED - Reference: ${referenceId}`);
-    console.log(`   Amount: €${withdrawal.netAmountEUR.toFixed(2)}`);
-    console.log(`   User: ${withdrawal.userEmail}`);
-    console.log(`   Recipient: ${bankAccount.accountHolderName}`);
-    console.log(`   IBAN: ${bankAccount.iban}`);
-    console.log(`   Bank: ${bankAccount.bankName || "N/A"}`);
-    console.log(`   Country: ${bankAccount.country}`);
+    console.log("\n🏦 WITHDRAWAL APPROVED - Reference:", referenceId);
+    console.log("   Amount: €", withdrawal.netAmountEUR.toFixed(2));
+    console.log("   User:", withdrawal.userEmail);
+    console.log("   Recipient:", bankAccount.accountHolderName);
+    console.log("   IBAN:", bankAccount.iban);
+    console.log("   Bank:", bankAccount.bankName || "N/A");
+    console.log("   Country:", bankAccount.country);
     console.log(`\n   📋 ADMIN ACTION REQUIRED:`);
     console.log(`   1. Log into your company bank account`);
     console.log(
       `   2. Transfer €${withdrawal.netAmountEUR.toFixed(2)} to the above IBAN`,
     );
-    console.log(`   3. Use reference: ${referenceId}`);
+    console.log("   3. Use reference:", referenceId);
     console.log(`   4. Mark as "completed" in Admin Panel after transfer\n`);
 
     await session.commitTransaction();
@@ -261,7 +261,7 @@ export async function completeWithdrawal(
     console.log(
       `   Bank fee (${feeSettings.bankWithdrawalFeePercentage}% + €${feeSettings.bankWithdrawalFeeFixed}): €${calculatedBankFee.toFixed(2)}`,
     );
-    console.log(`   Net platform earning: €${netEarning.toFixed(2)}`);
+    console.log("   Net platform earning: €", netEarning.toFixed(2));
 
     // Record platform fee as revenue
     await PlatformTransaction.create(

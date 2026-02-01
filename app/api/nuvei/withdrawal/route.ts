@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
 
         if (storedUpo) {
           actualUpoId = storedUpo.userPaymentOptionId;
-          console.log(`💳 Using stored UPO ${actualUpoId} for card refund`);
+          console.log("💳 Using stored UPO for card refund:", actualUpoId);
         }
       }
 
@@ -251,7 +251,7 @@ export async function POST(req: NextRequest) {
     if (isCardPayout && actualUpoId) {
       // For card refund, we MUST pass the UPO ID from the original deposit
       withdrawalParams.userPaymentOptionId = actualUpoId;
-      console.log(`💳 Using UPO ${actualUpoId} for card refund withdrawal`);
+      console.log("💳 Using UPO for card refund withdrawal:", actualUpoId);
     }
     // NOTE: For bank transfers, we'll use the new SEPA payout method below
 
@@ -747,7 +747,7 @@ export async function POST(req: NextRequest) {
             paymentMethodDisplay = "Bank Transfer (SEPA)";
           }
 
-          console.log(`📧 Sending withdrawal email to ${emailToUse}...`);
+          console.log("📧 Sending withdrawal email to", emailToUse);
 
           await sendWithdrawalCompletedEmail({
             email: emailToUse,
@@ -762,7 +762,7 @@ export async function POST(req: NextRequest) {
               .toUpperCase(),
             remainingBalance: wallet.creditBalance,
           });
-          console.log(`✅ Automatic withdrawal email sent to ${emailToUse}`);
+          console.log("✅ Automatic withdrawal email sent to", emailToUse);
         } catch (emailError) {
           console.error(
             "❌ Error sending automatic withdrawal email:",

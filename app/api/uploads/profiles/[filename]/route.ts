@@ -56,7 +56,7 @@ export async function GET(
       try {
         await access(possiblePath, constants.R_OK);
         filePath = possiblePath;
-        console.log(`✅ Found profile image at: ${possiblePath}`);
+        console.log("✅ Found profile image at:", possiblePath);
         break;
       } catch {
         // File doesn't exist at this path, try next
@@ -64,8 +64,8 @@ export async function GET(
     }
 
     if (!filePath) {
-      console.error(`❌ Profile image not found: ${sanitizedFilename}`);
-      console.error(`   Searched paths: ${possiblePaths.join(", ")}`);
+      console.error("❌ Profile image not found:", sanitizedFilename);
+      console.error("   Searched paths:", possiblePaths.join(", "));
       return NextResponse.json({ error: "Image not found" }, { status: 404 });
     }
 

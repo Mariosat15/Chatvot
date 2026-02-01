@@ -5,6 +5,7 @@
  */
 
 import { ForexSymbol } from "./pnl-calculator.service";
+import { isValidForexSymbol } from "@/lib/utils/url-validator";
 
 // Disable debug logging in production
 const DEBUG = process.env.NODE_ENV === "development" && false;
@@ -61,7 +62,12 @@ const TIMEFRAME_MAP: Record<
 };
 
 // Convert our symbol format (EUR/USD) to Massive.com format (C:EURUSD)
+// Validates symbol to prevent SSRF/path injection attacks
 function symbolToMassiveFormat(symbol: ForexSymbol): string {
+  // Validate against whitelist to prevent path manipulation
+  if (!isValidForexSymbol(symbol)) {
+    throw new Error(`Invalid forex symbol: ${symbol}`);
+  }
   const cleanSymbol = symbol.replace("/", "");
   return `C:${cleanSymbol}`;
 }

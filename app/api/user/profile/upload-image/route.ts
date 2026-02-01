@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         uploadsDir = dir;
         break;
       } catch (err) {
-        console.warn(`Could not create directory ${dir}:`, err);
+        console.warn("Could not create directory:", dir, err);
       }
     }
 

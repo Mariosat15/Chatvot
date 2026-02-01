@@ -3,6 +3,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import PositionEvent from "@/database/models/position-event.model";
+import crypto from "crypto";
 
 /**
  * SSE Endpoint for Real-Time Position Events
@@ -30,8 +31,8 @@ export async function GET(request: NextRequest) {
       return new Response("Missing competitionId", { status: 400 });
     }
 
-    // Generate unique session ID for this connection
-    const sessionId = `${session.user.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Generate unique session ID for this connection using crypto for better randomness
+    const sessionId = `${session.user.id}-${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
 
     await connectToDatabase();
 

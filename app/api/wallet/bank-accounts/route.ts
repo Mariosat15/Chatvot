@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
       `✅ Bank account added for user ${session.user.id}: ${bankAccount._id}`,
     );
     if (nuveiUpoId) {
-      console.log(`✅ Nuvei UPO linked: ${nuveiUpoId}`);
+      console.log("✅ Nuvei UPO linked:", nuveiUpoId);
     }
 
     return NextResponse.json({

@@ -650,6 +650,14 @@ export default function HeroPageSection() {
     setSettings((prev) => {
       const newSettings = { ...prev };
       const keys = path.split(".");
+      
+      // Guard against prototype pollution
+      const dangerousKeys = ["__proto__", "constructor", "prototype"];
+      if (keys.some(key => dangerousKeys.includes(key))) {
+        console.error("Attempted prototype pollution via path:", path);
+        return prev;
+      }
+      
       let current: Record<string, unknown> = newSettings;
 
       for (let i = 0; i < keys.length - 1; i++) {

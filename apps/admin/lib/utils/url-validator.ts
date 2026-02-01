@@ -220,7 +220,9 @@ export function isValidRedirectUrl(url: string): boolean {
  */
 export function safeRedirect(url: string): boolean {
   if (isValidRedirectUrl(url)) {
-    window.location.href = url;
+    if (typeof window !== "undefined") {
+      window.location.href = url;
+    }
     return true;
   }
   return false;
@@ -236,7 +238,9 @@ export function safeWindowOpen(
   features?: string
 ): Window | null {
   if (isValidRedirectUrl(url)) {
-    return window.open(url, target, features);
+    if (typeof window !== "undefined") {
+      return window.open(url, target, features);
+    }
   }
   return null;
 }

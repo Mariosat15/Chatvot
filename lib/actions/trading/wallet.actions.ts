@@ -8,6 +8,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import mongoose from "mongoose";
+import { isValidObjectId } from "@/lib/utils/url-validator";
 
 // Get or create user's credit wallet
 export const getOrCreateWallet = async () => {
@@ -279,6 +280,11 @@ export const completeDeposit = async (
   },
 ) => {
   try {
+    // Validate transactionId to prevent NoSQL injection
+    if (!isValidObjectId(transactionId)) {
+      throw new Error("Invalid transaction ID format");
+    }
+
     await connectToDatabase();
 
     // Start MongoDB transaction for ACID compliance
@@ -849,6 +855,12 @@ export const cancelDeposit = async (
   reason?: string,
 ) => {
   try {
+    // Validate transactionId to prevent NoSQL injection
+    if (!isValidObjectId(transactionId)) {
+      console.error(`❌ Invalid transactionId format: ${transactionId}`);
+      return { success: false, error: "Invalid transaction ID format" };
+    }
+
     await connectToDatabase();
 
     // Find and update the transaction

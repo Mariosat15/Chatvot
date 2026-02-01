@@ -28,6 +28,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { COUNTRY_NAMES } from "@/database/models/company-settings.model";
+import { sanitizeHtml } from "@/lib/utils/html-sanitizer";
 
 interface InvoiceSettings {
   vatEnabled: boolean;
@@ -1050,26 +1051,28 @@ export default function InvoiceTemplateSection() {
                         <div
                           className="text-[9px] text-gray-600 leading-relaxed space-y-2"
                           dangerouslySetInnerHTML={{
-                            __html: invoiceSettings.legalDisclaimer
-                              .replace(
-                                /\*\*([^*]+)\*\*/g,
-                                "<strong>$1</strong>",
-                              )
-                              .replace(
-                                /\{\{companyName\}\}/g,
-                                companySettings.companyName,
-                              )
-                              .replace(
-                                /\{\{companyEmail\}\}/g,
-                                companySettings.email,
-                              )
-                              .replace(
-                                /\{\{vatNumber\}\}/g,
-                                companySettings.vatNumber,
-                              )
-                              .split(/\n\n+/)
-                              .map((p) => `<p class="mb-2">${p.trim()}</p>`)
-                              .join(""),
+                            __html: sanitizeHtml(
+                              invoiceSettings.legalDisclaimer
+                                .replace(
+                                  /\*\*([^*]+)\*\*/g,
+                                  "<strong>$1</strong>",
+                                )
+                                .replace(
+                                  /\{\{companyName\}\}/g,
+                                  companySettings.companyName,
+                                )
+                                .replace(
+                                  /\{\{companyEmail\}\}/g,
+                                  companySettings.email,
+                                )
+                                .replace(
+                                  /\{\{vatNumber\}\}/g,
+                                  companySettings.vatNumber,
+                                )
+                                .split(/\n\n+/)
+                                .map((p) => `<p class="mb-2">${p.trim()}</p>`)
+                                .join("")
+                            ),
                           }}
                         />
                       </div>

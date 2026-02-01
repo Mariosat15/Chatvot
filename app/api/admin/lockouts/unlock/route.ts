@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       reason: reason || "Admin manual unlock",
     });
 
-    console.log(`🔓 [Main App] adminUnlockAccount result: ${success}`);
+    console.log("🔓 [Main App] adminUnlockAccount result:", success);
 
     // Always return success - the important part is clearing in-memory
     return NextResponse.json({

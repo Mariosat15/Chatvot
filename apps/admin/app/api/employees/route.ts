@@ -38,14 +38,14 @@ async function isOriginalAdmin(admin: any): Promise<boolean> {
   return isDefaultEmail || isFirstAdmin;
 }
 
-// Generate random password
+// Generate random password using unbiased random selection
 function generatePassword(length = 12): string {
   const chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*";
   let password = "";
-  const randomBytes = crypto.randomBytes(length);
+  // Use crypto.randomInt to avoid modulo bias
   for (let i = 0; i < length; i++) {
-    password += chars[randomBytes[i] % chars.length];
+    password += chars[crypto.randomInt(0, chars.length)];
   }
   return password;
 }

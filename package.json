@@ -68,6 +68,7 @@
     "decimal.js": "^10.6.0",
     "framer-motion": "^12.23.26",
     "inngest": "^3.40.1",
+    "isomorphic-dompurify": "^2.35.0",
     "jose": "^6.1.2",
     "jsonwebtoken": "^9.0.3",
     "lightweight-charts": "^4.1.3",

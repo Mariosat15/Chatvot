@@ -8,6 +8,7 @@ import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import { PlatformTransaction } from "@/database/models/platform-financials.model";
 import ReconciliationLog from "@/database/models/reconciliation-log.model";
 import mongoose from "mongoose";
+import { isValidObjectId, isSafeMongoString } from "@/lib/utils/url-validator";
 
 interface ReconciliationIssue {
   type:
@@ -344,6 +345,23 @@ export async function POST(request: NextRequest) {
       await session.abortTransaction();
       return NextResponse.json(
         { success: false, error: "Missing issueType or userId" },
+        { status: 400 },
+      );
+    }
+
+    // Validate inputs to prevent NoSQL injection
+    if (!isSafeMongoString(issueType)) {
+      await session.abortTransaction();
+      return NextResponse.json(
+        { success: false, error: "Invalid issueType format" },
+        { status: 400 },
+      );
+    }
+
+    if (!isValidObjectId(userId)) {
+      await session.abortTransaction();
+      return NextResponse.json(
+        { success: false, error: "Invalid userId format" },
         { status: 400 },
       );
     }
