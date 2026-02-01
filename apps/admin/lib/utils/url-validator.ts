@@ -354,7 +354,12 @@ export function sanitizeMongoInput<T>(value: unknown, allowedType: "string" | "n
  */
 export function isValidEmail(email: unknown): email is string {
   if (typeof email !== "string") return false;
-  // Basic email validation - not perfect but prevents obvious injection
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email) && email.length <= 254;
+  // Length check first to prevent processing very long strings
+  if (email.length > 254 || email.length < 3) return false;
+  
+  // ReDoS-safe email validation using specific character classes with length limits
+  // Local part: up to 64 chars of allowed email characters
+  // Domain: alphanumeric with dots and hyphens, TLD at least 2 chars
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}\.[a-zA-Z]{2,63}$/;
+  return emailRegex.test(email);
 }
