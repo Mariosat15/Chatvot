@@ -802,11 +802,14 @@ router.post('/register-batch', async (req: Request, res: Response) => {
           }
           
           // Create user (no password here - better-auth stores it in account)
+          // IMPORTANT: Batch users are created via authenticated internal API (INTERNAL_API_KEY)
+          // and are intended for simulator/internal use. Setting emailVerified: true allows
+          // them to log in immediately without requiring email verification workflow.
           const [user] = await User.create([{
             id: userId,
             email: userData.email,
             name: userData.name || userData.email.split('@')[0],
-            emailVerified: false,
+            emailVerified: true,  // Internal/simulator users are pre-verified
             role: 'trader',
           }], { session });
           
